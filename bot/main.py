@@ -1,0 +1,61 @@
+import asyncio
+import logging
+
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import CommandStart
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
+
+from config import get_settings
+
+router = Router()
+settings = get_settings()
+
+
+@router.message(CommandStart())
+async def start_handler(message: Message) -> None:
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Open Mini App",
+                    web_app=WebAppInfo(url=settings.mini_app_url),
+                )
+            ]
+        ]
+    )
+    await message.answer(
+        "Hello dear user! Click the button below to open the Mini App.",
+        reply_markup=keyboard,
+    )
+
+
+async def run_bot() -> None:
+    logging.basicConfig(level=logging.INFO)
+
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    dp = Dispatcher()
+    dp.include_router(router)
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="Mini App",
+            web_app=WebAppInfo(url=settings.mini_app_url),
+        )
+    )
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(run_bot())

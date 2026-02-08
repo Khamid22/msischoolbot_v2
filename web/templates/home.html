@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="MSI School student portal for quick mobile-friendly academic access." />
+    <title>MSI School Portal</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
+    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}" />
+  </head>
+  <body class="home-page">
+    <div class="bg-shape bg-shape-top"></div>
+    <div class="bg-shape bg-shape-bottom"></div>
+
+    <main class="home-wrap">
+      <section class="login-card">
+        <header class="login-header">
+          <div class="logo-block" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
+              <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
+            </svg>
+          </div>
+          <h1>MSI School Portal</h1>
+          <p>Enter details to view performance</p>
+        </header>
+
+        {% if error %}
+        <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        <form action="{{ url_for('search_student_form') }}" method="post" class="login-form">
+          <div class="field-grid-2">
+            <label class="field">
+              <span>Surname</span>
+              <input
+                type="text"
+                name="surname"
+                placeholder="Адилов"
+                value="{{ form_data.surname }}"
+                autocomplete="family-name"
+                autocapitalize="words"
+                spellcheck="false"
+                enterkeyhint="next"
+                required
+              />
+            </label>
+
+            <label class="field">
+              <span>Name</span>
+              <input
+                type="text"
+                name="name"
+                placeholder="Давлат"
+                value="{{ form_data.name }}"
+                autocomplete="given-name"
+                autocapitalize="words"
+                spellcheck="false"
+                enterkeyhint="next"
+                required
+              />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Subject</span>
+            <select id="subject-select" name="subject" required>
+              <option value="" disabled {% if not form_data.subject %}selected{% endif %}>Select subject stream</option>
+              {% for subject_name in subjects %}
+              <option value="{{ subject_name }}" {% if form_data.subject == subject_name %}selected{% endif %}>{{ subject_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Group</span>
+            <select id="group-select" name="group" {% if not form_data.subject %}disabled{% endif %} required>
+              <option value="" disabled {% if not form_data.group %}selected{% endif %}>Select your group</option>
+              {% for group_name in groups %}
+              <option value="{{ group_name }}" {% if form_data.group == group_name %}selected{% endif %}>{{ group_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <button type="submit" class="primary-btn">View Performance</button>
+        </form>
+      </section>
+    </main>
+    <script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>
+    <script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
+    <script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+    <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
+  </body>
+</html>
