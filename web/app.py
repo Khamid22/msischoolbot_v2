@@ -10,6 +10,10 @@ try:
     # Package import path (used by `from web.app import ...`).
     from .sheets_data import SheetsDataError, get_school_dataset
 except ImportError:
+    # If imported as a package (`python -m web.app`), propagate the original
+    # error (e.g. missing dependency) instead of masking it.
+    if __package__:
+        raise
     # Script import path (used by `python web/app.py`).
     from sheets_data import SheetsDataError, get_school_dataset
 
