@@ -182,7 +182,7 @@ def _get_sheets_service():
         return _SERVICE
 
     raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
-    credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    credentials_source = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
 
     credentials = None
     if raw_json:
@@ -194,16 +194,32 @@ def _get_sheets_service():
             service_account_info,
             scopes=SCOPES,
         )
-    elif credentials_path:
-        try:
-            credentials = Credentials.from_service_account_file(
-                credentials_path,
+    elif credentials_source:
+        # Backward-compatible behavior:
+        # - If GOOGLE_APPLICATION_CREDENTIALS contains JSON text, parse it.
+        # - Otherwise treat it as a filesystem path.
+        if credentials_source.startswith("{"):
+            try:
+                service_account_info = json.loads(credentials_source)
+            except json.JSONDecodeError as exc:
+                raise SheetsDataError(
+                    "GOOGLE_APPLICATION_CREDENTIALS looks like JSON but is invalid."
+                ) from exc
+            credentials = Credentials.from_service_account_info(
+                service_account_info,
                 scopes=SCOPES,
             )
-        except Exception as exc:
-            raise SheetsDataError(
-                "Failed to load GOOGLE_APPLICATION_CREDENTIALS file."
-            ) from exc
+        else:
+            try:
+                credentials = Credentials.from_service_account_file(
+                    credentials_source,
+                    scopes=SCOPES,
+                )
+            except Exception as exc:
+                raise SheetsDataError(
+                    "Failed to load GOOGLE_APPLICATION_CREDENTIALS file. "
+                    "Use a valid in-container path, or set GOOGLE_SERVICE_ACCOUNT_JSON."
+                ) from exc
     else:
         raise SheetsDataError(
             "Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS."
