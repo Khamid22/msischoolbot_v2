@@ -32,10 +32,9 @@ async def start_handler(message: Message) -> None:
         ]
     )
     await message.answer(
-        "Hello dear user! Click the button below to open the Mini App.",
+        "Welcome! 👋\n\nClick the button below to open the Student Performance Dashboard and review attendance and academic results.",
         reply_markup=keyboard,
     )
-
 
 async def run_bot() -> None:
     logging.basicConfig(level=logging.INFO)

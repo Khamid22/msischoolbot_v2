@@ -14,7 +14,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 
 SCOPES = ("https://www.googleapis.com/auth/spreadsheets.readonly",)
-CACHE_TTL_SECONDS = int(os.environ.get("SHEETS_CACHE_TTL_SECONDS", "120"))
+CACHE_TTL_SECONDS = int(os.environ.get("SHEETS_CACHE_TTL_SECONDS", "600"))
 
 SUBJECT_NAMES = {
     "M": "IGCSE Mathematics A",
@@ -26,6 +26,11 @@ SUBJECT_NAMES = {
 
 SUBJECT_ALIASES = {
     "E": "ENG",
+}
+
+SUBJECT_DISPLAY_ORDER = {
+    "IGCSE Mathematics A": 0,
+    "General English": 1,
 }
 
 EXACT_GROUP_DISPLAY_NAMES = {
@@ -52,6 +57,27 @@ class GroupInfo:
     subject_code: str
     subject_name: str
     group_display_name: str
+
+
+def _subject_sort_key(subject_name: str) -> tuple[int, str]:
+    normalized = subject_name.strip()
+    return (SUBJECT_DISPLAY_ORDER.get(normalized, 999), normalized.casefold())
+
+
+def _group_sort_key(group_name: str) -> tuple[int, int, str]:
+    normalized = group_name.strip()
+    normalized_lower = normalized.casefold()
+
+    if normalized_lower.startswith("morning group"):
+        part_order = 0
+    elif normalized_lower.startswith("afternoon group"):
+        part_order = 1
+    else:
+        part_order = 2
+
+    number_match = re.search(r"(\d+)$", normalized)
+    group_number = int(number_match.group(1)) if number_match else 999
+    return (part_order, group_number, normalized_lower)
 
 
 def get_school_dataset(force_refresh: bool = False) -> dict[str, Any]:
@@ -158,21 +184,24 @@ def _load_from_google_sheets() -> dict[str, Any]:
 
     students.sort(
         key=lambda student: (
-            student["subject"],
-            student["group"],
-            student["fullName"],
+            _subject_sort_key(str(student.get("subject", ""))),
+            _group_sort_key(str(student.get("group", ""))),
+            str(student.get("fullName", "")).casefold(),
         )
     )
+
+    ordered_subjects = sorted(subjects_set, key=_subject_sort_key)
+    ordered_groups_by_subject = {
+        subject: sorted(groups_by_subject.get(subject, set()), key=_group_sort_key)
+        for subject in ordered_subjects
+    }
 
     return {
         "students": students,
         "dashboards_by_id": dashboards_by_id,
-        "groups": sorted(groups_set),
-        "groups_by_subject": {
-            subject: sorted(group_names)
-            for subject, group_names in sorted(groups_by_subject.items())
-        },
-        "subjects": sorted(subjects_set),
+        "groups": sorted(groups_set, key=_group_sort_key),
+        "groups_by_subject": ordered_groups_by_subject,
+        "subjects": ordered_subjects,
     }
 
 

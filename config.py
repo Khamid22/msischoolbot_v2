@@ -25,7 +25,7 @@ def _int_env(name: str, default: int) -> int:
     return int(value)
 
 
-def get_settings() -> Settings:
+def get_settings():
     bot_token = getenv("BOT_TOKEN", "").strip()
     mini_app_url = getenv("MINI_APP_URL", "").strip()
 
@@ -34,7 +34,6 @@ def get_settings() -> Settings:
     if not mini_app_url:
         raise ValueError("MINI_APP_URL is required")
 
-    # Railway injects PORT automatically; use it first if present.
     flask_port = _int_env("PORT", _int_env("FLASK_PORT", 8080))
 
     return Settings(

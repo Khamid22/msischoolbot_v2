@@ -82,6 +82,14 @@
           {{ payload.student.fullName }}
           {% endif %}
         </h2>
+        <p class="student-rating">
+          Rating:
+          {% if subject_rating and subject_rating.rank %}
+          #{{ subject_rating.rank }}
+          {% else %}
+          N/A
+          {% endif %}
+        </p>
       </section>
 
       <section class="program-grid">
@@ -116,7 +124,7 @@
             </svg>
             AAP
           </p>
-          <h3>{{ payload.averageGrade|int }}/9</h3>
+          <h3>{{ (payload.averageGrade|float + 0.5)|int }}/9</h3>
         </article>
 
         <article class="stat-card stat-card-compact">
@@ -212,9 +220,14 @@
               Homework Grades
             </h3>
           </div>
-          <div class="chart-scroll">
-            <div class="chart-box chart-box-homework">
-              <svg id="homeworkGradesChart" role="img" aria-label="Homework grades by lesson"></svg>
+          <div class="chart-homework-shell">
+            <div class="chart-homework-yaxis" aria-hidden="true">
+              <svg id="homeworkGradesYAxis"></svg>
+            </div>
+            <div class="chart-scroll">
+              <div class="chart-box chart-box-homework">
+                <svg id="homeworkGradesChart" role="img" aria-label="Homework grades by lesson"></svg>
+              </div>
             </div>
           </div>
         </article>

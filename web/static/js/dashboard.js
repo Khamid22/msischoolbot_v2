@@ -284,8 +284,9 @@
   }
 
   function createHomeworkChart() {
-    const svg = document.getElementById("homeworkGradesChart");
-    if (!svg) {
+    const chartSvg = document.getElementById("homeworkGradesChart");
+    const yAxisSvg = document.getElementById("homeworkGradesYAxis");
+    if (!chartSvg) {
       return;
     }
 
@@ -295,21 +296,29 @@
       .filter((score) => Number.isFinite(score) && score >= 1 && score <= 9);
 
     if (!scores.length) {
-      showChartMessage(svg, "No homework grades yet.");
+      if (yAxisSvg) {
+        yAxisSvg.style.display = "none";
+        yAxisSvg.innerHTML = "";
+      }
+      showChartMessage(chartSvg, "No homework grades yet.");
       return;
     }
 
     const labels = scores.map((_score, index) => `L${index + 1}`);
-    const scrollContainer = svg.closest(".chart-scroll");
-    const homeworkBox = svg.closest(".chart-box-homework");
+    const scrollContainer = chartSvg.closest(".chart-scroll");
+    const homeworkBox = chartSvg.closest(".chart-box-homework");
 
     if (!scrollContainer || !homeworkBox) {
-      showChartMessage(svg, "Failed to render chart data.");
+      if (yAxisSvg) {
+        yAxisSvg.style.display = "none";
+        yAxisSvg.innerHTML = "";
+      }
+      showChartMessage(chartSvg, "Failed to render chart data.");
       return;
     }
 
     const visiblePoints = 15;
-    const paddingLeft = 28;
+    const axisWidth = Math.max(yAxisSvg && yAxisSvg.parentElement ? yAxisSvg.parentElement.clientWidth : 36, 34);
     const paddingRight = 14;
     const paddingTop = 12;
     const paddingBottom = 34;
@@ -317,11 +326,9 @@
     const yMax = 9;
 
     const viewportWidth = Math.max(scrollContainer.clientWidth, 320);
-    const plotVisibleWidth = Math.max(120, viewportWidth - paddingLeft - paddingRight);
+    const plotVisibleWidth = Math.max(120, viewportWidth - paddingRight);
     const pointSpacing = plotVisibleWidth / Math.max(visiblePoints - 1, 1);
-    const fullWidth = Math.round(
-      paddingLeft + paddingRight + Math.max(0, labels.length - 1) * pointSpacing
-    );
+    const fullWidth = Math.round(paddingRight + Math.max(0, labels.length - 1) * pointSpacing);
     const fullHeight = Math.max(Math.round(homeworkBox.clientHeight || 240), 210);
     const plotHeight = Math.max(120, fullHeight - paddingTop - paddingBottom);
     const canScroll = labels.length > visiblePoints;
@@ -333,24 +340,48 @@
     homeworkBox.style.setProperty("width", `${fullWidth}px`, "important");
     homeworkBox.style.setProperty("min-width", `${fullWidth}px`, "important");
 
-    svg.style.removeProperty("display");
-    svg.setAttribute("width", String(fullWidth));
-    svg.setAttribute("height", String(fullHeight));
-    svg.setAttribute("viewBox", `0 0 ${fullWidth} ${fullHeight}`);
-    svg.setAttribute("aria-label", "Homework grades by lesson");
-    svg.innerHTML = "";
+    const chartEmptyMessage = homeworkBox.querySelector(".chart-empty");
+    if (chartEmptyMessage) {
+      chartEmptyMessage.remove();
+    }
+
+    chartSvg.style.removeProperty("display");
+    chartSvg.setAttribute("width", String(fullWidth));
+    chartSvg.setAttribute("height", String(fullHeight));
+    chartSvg.setAttribute("viewBox", `0 0 ${fullWidth} ${fullHeight}`);
+    chartSvg.setAttribute("aria-label", "Homework grades by lesson");
+    chartSvg.innerHTML = "";
+
+    if (yAxisSvg) {
+      yAxisSvg.style.removeProperty("display");
+      yAxisSvg.setAttribute("width", String(axisWidth));
+      yAxisSvg.setAttribute("height", String(fullHeight));
+      yAxisSvg.setAttribute("viewBox", `0 0 ${axisWidth} ${fullHeight}`);
+      yAxisSvg.setAttribute("aria-label", "Homework grade axis");
+      yAxisSvg.innerHTML = "";
+    }
 
     const NS = "http://www.w3.org/2000/svg";
-    const append = (name, attributes) => {
+    const appendChart = (name, attributes) => {
       const element = document.createElementNS(NS, name);
       Object.entries(attributes).forEach(([key, value]) => {
         element.setAttribute(key, String(value));
       });
-      svg.appendChild(element);
+      chartSvg.appendChild(element);
       return element;
     };
+    const appendAxis = yAxisSvg
+      ? (name, attributes) => {
+          const element = document.createElementNS(NS, name);
+          Object.entries(attributes).forEach(([key, value]) => {
+            element.setAttribute(key, String(value));
+          });
+          yAxisSvg.appendChild(element);
+          return element;
+        }
+      : null;
 
-    const xScale = (index) => paddingLeft + index * pointSpacing;
+    const xScale = (index) => index * pointSpacing;
     const yScale = (grade) => {
       const ratio = (grade - yMin) / (yMax - yMin);
       return paddingTop + (1 - ratio) * plotHeight;
@@ -385,43 +416,65 @@
       return d;
     };
 
-    append("rect", {
+    appendChart("rect", {
       x: 0,
       y: 0,
       width: fullWidth,
       height: fullHeight,
       fill: "#ffffff",
     });
+    if (appendAxis) {
+      appendAxis("rect", {
+        x: 0,
+        y: 0,
+        width: axisWidth,
+        height: fullHeight,
+        fill: "#ffffff",
+      });
+    }
 
     for (let grade = yMin; grade <= yMax; grade += 1) {
       const y = yScale(grade);
-      append("line", {
-        x1: paddingLeft,
+      appendChart("line", {
+        x1: 0,
         y1: y,
         x2: fullWidth - paddingRight,
         y2: y,
         stroke: "#e2e8f0",
         "stroke-width": 1,
       });
-      append("text", {
-        x: paddingLeft - 10,
-        y: y + 4,
-        "text-anchor": "end",
-        fill: "#64748b",
-        "font-size": 11,
-      }).textContent = String(grade);
+      if (appendAxis) {
+        appendAxis("text", {
+          x: axisWidth - 8,
+          y: y + 4,
+          "text-anchor": "end",
+          fill: "#64748b",
+          "font-size": 11,
+        }).textContent = String(grade);
+      }
     }
 
-    append("line", {
-      x1: paddingLeft,
+    if (appendAxis) {
+      appendAxis("line", {
+        x1: axisWidth - 1,
+        y1: paddingTop,
+        x2: axisWidth - 1,
+        y2: fullHeight - paddingBottom,
+        stroke: "#111827",
+        "stroke-width": 1.2,
+      });
+    }
+
+    appendChart("line", {
+      x1: 0,
       y1: paddingTop,
-      x2: paddingLeft,
+      x2: 0,
       y2: fullHeight - paddingBottom,
       stroke: "#111827",
       "stroke-width": 1.2,
     });
-    append("line", {
-      x1: paddingLeft,
+    appendChart("line", {
+      x1: 0,
       y1: fullHeight - paddingBottom,
       x2: fullWidth - paddingRight,
       y2: fullHeight - paddingBottom,
@@ -434,7 +487,7 @@
     const labelFontSize = Math.max(6, Math.min(9, computedLabelFontSize));
 
     labels.forEach((label, index) => {
-      append("text", {
+      appendChart("text", {
         x: xScale(index),
         y: fullHeight - paddingBottom + 16,
         "text-anchor": "middle",
@@ -449,9 +502,9 @@
     const lastPoint = points[points.length - 1];
     const areaPath = `${linePath} L ${lastPoint.x} ${baselineY} L ${firstPoint.x} ${baselineY} Z`;
 
-    const defs = append("defs", {});
+    const defs = appendChart("defs", {});
     const gradient = document.createElementNS(NS, "linearGradient");
-    gradient.setAttribute("id", "homeworkAreaGradient");
+    gradient.setAttribute("id", "homeworkAreaGradientMain");
     gradient.setAttribute("x1", "0");
     gradient.setAttribute("y1", "0");
     gradient.setAttribute("x2", "0");
@@ -466,13 +519,13 @@
     gradient.appendChild(stopBottom);
     defs.appendChild(gradient);
 
-    append("path", {
+    appendChart("path", {
       d: areaPath,
-      fill: "url(#homeworkAreaGradient)",
+      fill: "url(#homeworkAreaGradientMain)",
       stroke: "none",
     });
 
-    append("path", {
+    appendChart("path", {
       d: linePath,
       fill: "none",
       stroke: "#111827",
