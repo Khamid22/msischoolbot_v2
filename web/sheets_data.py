@@ -18,7 +18,7 @@ CACHE_TTL_SECONDS = int(os.environ.get("SHEETS_CACHE_TTL_SECONDS", "120"))
 
 SUBJECT_NAMES = {
     "M": "IGCSE Mathematics A",
-    "ENG": "English",
+    "ENG": "General English",
     "CHM": "Chemistry",
     "BIO": "Biology",
     "PHY": "Physics",

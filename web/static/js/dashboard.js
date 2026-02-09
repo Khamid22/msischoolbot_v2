@@ -309,8 +309,8 @@
     }
 
     const visiblePoints = 15;
-    const paddingLeft = 40;
-    const paddingRight = 16;
+    const paddingLeft = 28;
+    const paddingRight = 14;
     const paddingTop = 12;
     const paddingBottom = 34;
     const yMin = 1;
@@ -328,9 +328,7 @@
 
     scrollContainer.style.overflowX = canScroll ? "scroll" : "hidden";
     scrollContainer.style.touchAction = canScroll ? "pan-x" : "auto";
-    if (!canScroll) {
-      scrollContainer.scrollLeft = 0;
-    }
+    scrollContainer.scrollLeft = 0;
 
     homeworkBox.style.setProperty("width", `${fullWidth}px`, "important");
     homeworkBox.style.setProperty("min-width", `${fullWidth}px`, "important");

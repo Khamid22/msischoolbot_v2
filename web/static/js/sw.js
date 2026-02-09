@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'msi-mobile-v22';
+const CACHE_VERSION = 'msi-mobile-v24';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [

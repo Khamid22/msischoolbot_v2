@@ -62,8 +62,7 @@ def _normalize(value: str) -> str:
 
 def _empty_form_data() -> dict[str, str]:
     return {
-        "surname": "",
-        "name": "",
+        "student_id": "",
         "group": "",
         "subject": "",
     }
@@ -100,6 +99,37 @@ def _search_student(
     return None
 
 
+def _build_students_by_subject_group(
+    students: list[dict[str, Any]],
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    students_by_subject_group: dict[str, dict[str, list[dict[str, Any]]]] = {}
+
+    sorted_students = sorted(
+        students,
+        key=lambda student: (
+            _normalize(str(student.get("subject", ""))),
+            _normalize(str(student.get("group", ""))),
+            _normalize(str(student.get("fullName", ""))),
+        ),
+    )
+
+    for student in sorted_students:
+        subject = str(student.get("subject", "")).strip()
+        group = str(student.get("group", "")).strip()
+        student_id = student.get("id")
+        if not subject or not group or not isinstance(student_id, int):
+            continue
+
+        students_by_subject_group.setdefault(subject, {}).setdefault(group, []).append(
+            {
+                "id": student_id,
+                "fullName": str(student.get("fullName", "")).strip(),
+            }
+        )
+
+    return students_by_subject_group
+
+
 def _load_dataset() -> tuple[dict[str, Any] | None, str | None]:
     try:
         return get_school_dataset(), None
@@ -132,12 +162,16 @@ def home() -> str:
     groups = dataset["groups"] if dataset else []
     groups_by_subject = dataset["groups_by_subject"] if dataset else {}
     subjects = dataset["subjects"] if dataset else []
+    students_by_subject_group = (
+        _build_students_by_subject_group(dataset["students"]) if dataset else {}
+    )
 
     return render_template(
         "home.html",
         groups=groups,
         groups_by_subject=groups_by_subject,
         subjects=subjects,
+        students_by_subject_group=students_by_subject_group,
         error=load_error,
         form_data=_empty_form_data(),
     )
@@ -146,8 +180,7 @@ def home() -> str:
 @app.post("/search")
 def search_student_form():
     form_data = {
-        "surname": request.form.get("surname", "").strip(),
-        "name": request.form.get("name", "").strip(),
+        "student_id": request.form.get("student_id", "").strip(),
         "group": request.form.get("group", "").strip(),
         "subject": request.form.get("subject", "").strip(),
     }
@@ -160,6 +193,7 @@ def search_student_form():
                 groups=[],
                 groups_by_subject={},
                 subjects=[],
+                students_by_subject_group={},
                 error=load_error or "Unable to load Google Sheets data.",
                 form_data=form_data,
             ),
@@ -173,18 +207,42 @@ def search_student_form():
                 groups=dataset["groups"],
                 groups_by_subject=dataset["groups_by_subject"],
                 subjects=dataset["subjects"],
+                students_by_subject_group=_build_students_by_subject_group(
+                    dataset["students"]
+                ),
                 error="Please fill all fields.",
                 form_data=form_data,
             ),
             400,
         )
 
-    student = _search_student(
-        dataset["students"],
-        surname=form_data["surname"],
-        name=form_data["name"],
-        group=form_data["group"],
-        subject=form_data["subject"],
+    try:
+        requested_student_id = int(form_data["student_id"])
+    except ValueError:
+        return (
+            render_template(
+                "home.html",
+                groups=dataset["groups"],
+                groups_by_subject=dataset["groups_by_subject"],
+                subjects=dataset["subjects"],
+                students_by_subject_group=_build_students_by_subject_group(
+                    dataset["students"]
+                ),
+                error="Please choose a valid student from the list.",
+                form_data=form_data,
+            ),
+            400,
+        )
+
+    student = next(
+        (
+            item
+            for item in dataset["students"]
+            if item.get("id") == requested_student_id
+            and _normalize(item.get("group", "")) == _normalize(form_data["group"])
+            and _normalize(item.get("subject", "")) == _normalize(form_data["subject"])
+        ),
+        None,
     )
 
     if not student:
@@ -194,13 +252,16 @@ def search_student_form():
                 groups=dataset["groups"],
                 groups_by_subject=dataset["groups_by_subject"],
                 subjects=dataset["subjects"],
+                students_by_subject_group=_build_students_by_subject_group(
+                    dataset["students"]
+                ),
                 error="Student not found. Please check your details.",
                 form_data=form_data,
             ),
             404,
         )
 
-    return redirect(url_for("dashboard", student_id=student["id"]))
+    return redirect(url_for("dashboard", student_id=requested_student_id))
 
 
 @app.get("/dashboard/<int:student_id>")
@@ -273,6 +334,9 @@ def api_metadata():
         {
             "groups": dataset["groups"],
             "groupsBySubject": dataset["groups_by_subject"],
+            "studentsBySubjectGroup": _build_students_by_subject_group(
+                dataset["students"]
+            ),
             "subjects": dataset["subjects"],
         }
     )

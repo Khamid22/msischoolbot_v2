@@ -455,6 +455,8 @@ button {
   border-radius: var(--radius-xl);
   box-shadow: var(--card-shadow);
   padding: 14px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card-head h3 {
@@ -498,6 +500,7 @@ button {
 .chart-scroll {
   margin-top: 14px;
   display: block;
+  text-align: left;
   overflow-x: auto !important;
   overflow-y: hidden;
   touch-action: pan-x;
@@ -505,7 +508,9 @@ button {
   overscroll-behavior-x: contain;
   scrollbar-gutter: stable both-edges;
   padding-bottom: 4px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   scrollbar-width: thin;
   scrollbar-color: #94a3b8 #e2e8f0;
 }
