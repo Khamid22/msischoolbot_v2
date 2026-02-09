@@ -380,6 +380,68 @@ button {
   white-space: nowrap;
 }
 
+.student-rating-btn {
+  text-decoration: none;
+  color: #000;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.student-rating-btn:hover {
+  background: #f8fafc;
+}
+
+.student-rating-btn:active {
+  transform: translateY(1px);
+}
+
+.rating-board-summary h2 {
+  font-size: clamp(1.06rem, 4.6vw, 1.42rem);
+  text-transform: none;
+}
+
+.rating-board-summary p {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rating-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rating-table {
+  width: 100%;
+  min-width: 580px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.rating-table th,
+.rating-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 8px;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.rating-table th {
+  color: #334155;
+  font-family: var(--font-display);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rating-table tr.is-current td {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
 .program-grid {
   display: grid;
   grid-template-columns: 1fr;

@@ -255,6 +255,79 @@ def _build_subject_rating(
     return None
 
 
+def _round_grade_half_up(value: float) -> int:
+    return int(math.floor(value + 0.5))
+
+
+def _build_subject_leaderboard(
+    dashboards: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    ranking_rows: list[tuple[int, float, str, str, str]] = []
+
+    for dashboard_payload in dashboards:
+        student = dashboard_payload.get("student", {})
+        if not isinstance(student, dict):
+            continue
+
+        student_id = student.get("id")
+        if not isinstance(student_id, int):
+            continue
+
+        average_grade = _extract_numeric_average_grade(dashboard_payload)
+        if average_grade is None:
+            continue
+
+        full_name = str(student.get("fullName", "")).strip()
+        group_name = str(student.get("group", "")).strip()
+        ranking_rows.append(
+            (
+                student_id,
+                average_grade,
+                _normalize(full_name),
+                full_name,
+                group_name,
+            )
+        )
+
+    ranking_rows.sort(key=lambda row: (-row[1], row[2], row[0]))
+
+    leaderboard: list[dict[str, Any]] = []
+    position = 0
+    current_rank = 0
+    previous_average: float | None = None
+
+    for (
+        student_id,
+        average_grade,
+        _normalized_full_name,
+        full_name,
+        group_name,
+    ) in ranking_rows:
+        position += 1
+        if previous_average is None or not math.isclose(
+            average_grade,
+            previous_average,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        ):
+            current_rank = position
+            previous_average = average_grade
+
+        leaderboard.append(
+            {
+                "rank": current_rank,
+                "position": position,
+                "studentId": student_id,
+                "fullName": full_name,
+                "group": group_name,
+                "averageGrade": average_grade,
+                "averageGradeRounded": _round_grade_half_up(average_grade),
+            }
+        )
+
+    return leaderboard
+
+
 def _compute_subject_rating(
     student_id: int,
     payload: dict[str, Any],
@@ -360,6 +433,33 @@ def _load_dataset() -> tuple[dict[str, Any] | None, str | None]:
         return get_school_dataset(), None
     except SheetsDataError as exc:
         return None, str(exc)
+
+
+def _load_dashboard_payload(
+    student_id: int,
+    requested_subject: str,
+    requested_group: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str | None]:
+    dataset: dict[str, Any] | None = None
+    payload = None
+    cache_error = None
+
+    if requested_subject and requested_group:
+        group_cache_entry, cache_error = _get_group_cache_entry(
+            requested_subject,
+            requested_group,
+        )
+        if group_cache_entry:
+            payload = group_cache_entry.get("dashboards_by_id", {}).get(student_id)
+
+    if payload is None:
+        dataset, load_error = _load_dataset()
+        if load_error or not dataset:
+            return None, None, load_error or cache_error or "Unable to load Google Sheets data."
+        _seed_group_cache_from_dataset(dataset)
+        payload = dataset["dashboards_by_id"].get(student_id)
+
+    return payload, dataset, None
 
 
 @app.context_processor
@@ -526,29 +626,19 @@ def dashboard(student_id: int):
     requested_subject = request.args.get("subject", "").strip()
     requested_group = request.args.get("group", "").strip()
 
-    dataset: dict[str, Any] | None = None
-    payload = None
-    cache_error = None
-    if requested_subject and requested_group:
-        group_cache_entry, cache_error = _get_group_cache_entry(
-            requested_subject,
-            requested_group,
+    payload, dataset, payload_error = _load_dashboard_payload(
+        student_id=student_id,
+        requested_subject=requested_subject,
+        requested_group=requested_group,
+    )
+    if payload_error:
+        return (
+            render_template(
+                "not_found.html",
+                message=payload_error,
+            ),
+            503,
         )
-        if group_cache_entry:
-            payload = group_cache_entry.get("dashboards_by_id", {}).get(student_id)
-
-    if payload is None:
-        dataset, load_error = _load_dataset()
-        if load_error or not dataset:
-            return (
-                render_template(
-                    "not_found.html",
-                    message=load_error or cache_error or "Unable to load Google Sheets data.",
-                ),
-                503,
-            )
-        _seed_group_cache_from_dataset(dataset)
-        payload = dataset["dashboards_by_id"].get(student_id)
 
     if not payload:
         return (
@@ -576,6 +666,12 @@ def dashboard(student_id: int):
         payload=payload,
         dataset=dataset,
     )
+    rating_board_url = url_for(
+        "rating_board",
+        student_id=student_id,
+        subject=requested_subject or str(payload.get("student", {}).get("subject", "")).strip(),
+        group=requested_group or str(payload.get("student", {}).get("group", "")).strip(),
+    )
 
     return render_template(
         "dashboard.html",
@@ -584,6 +680,90 @@ def dashboard(student_id: int):
         program_completed_lessons=completed_lessons,
         program_completed_rate=program_completed_rate,
         subject_rating=subject_rating,
+        rating_board_url=rating_board_url,
+    )
+
+
+@app.get("/dashboard/<int:student_id>/rating-board")
+def rating_board(student_id: int):
+    requested_subject = request.args.get("subject", "").strip()
+    requested_group = request.args.get("group", "").strip()
+
+    payload, dataset, payload_error = _load_dashboard_payload(
+        student_id=student_id,
+        requested_subject=requested_subject,
+        requested_group=requested_group,
+    )
+    if payload_error:
+        return (
+            render_template(
+                "not_found.html",
+                message=payload_error,
+            ),
+            503,
+        )
+
+    if not payload:
+        return (
+            render_template(
+                "not_found.html",
+                message="We could not retrieve data for this student. Please search again.",
+            ),
+            404,
+        )
+
+    student = payload.get("student", {})
+    if not isinstance(student, dict):
+        return (
+            render_template(
+                "not_found.html",
+                message="Student profile is unavailable.",
+            ),
+            404,
+        )
+
+    subject_name = str(student.get("subject", "")).strip()
+    dashboards = (
+        _collect_subject_dashboards_from_dataset(dataset, subject_name)
+        if dataset
+        else _collect_subject_dashboards_from_cache(subject_name)
+    )
+    if not dashboards:
+        refreshed_dataset, load_error = _load_dataset()
+        if load_error or not refreshed_dataset:
+            return (
+                render_template(
+                    "not_found.html",
+                    message=load_error or "Unable to load subject rating board.",
+                ),
+                503,
+            )
+        _seed_group_cache_from_dataset(refreshed_dataset)
+        dashboards = _collect_subject_dashboards_from_dataset(
+            refreshed_dataset,
+            subject_name,
+        )
+
+    leaderboard = _build_subject_leaderboard(dashboards)
+    current_rating = next(
+        (row for row in leaderboard if row.get("studentId") == student_id),
+        None,
+    )
+    back_url = url_for(
+        "dashboard",
+        student_id=student_id,
+        subject=requested_subject or subject_name,
+        group=requested_group or str(student.get("group", "")).strip(),
+    )
+
+    return render_template(
+        "rating_board.html",
+        current_student=student,
+        current_student_id=student_id,
+        current_rating=current_rating,
+        leaderboard=leaderboard,
+        subject_name=subject_name,
+        back_url=back_url,
     )
 
 

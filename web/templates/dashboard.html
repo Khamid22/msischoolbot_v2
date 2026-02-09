@@ -82,14 +82,14 @@
           {{ payload.student.fullName }}
           {% endif %}
         </h2>
-        <p class="student-rating">
+        <a class="student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
           Rating:
           {% if subject_rating and subject_rating.rank %}
           #{{ subject_rating.rank }}
           {% else %}
           N/A
           {% endif %}
-        </p>
+        </a>
       </section>
 
       <section class="program-grid">

@@ -15,6 +15,7 @@
   const subjectSelect = document.getElementById("subject-select");
   const groupSelect = document.getElementById("group-select");
   const studentSelect = document.getElementById("student-select");
+  const searchForm = document.querySelector(".login-form");
 
   if (!subjectSelect || !groupSelect || !studentSelect) {
     return;
@@ -24,8 +25,38 @@
   const studentsBySubjectGroup =
     window.studentsBySubjectGroup || readJsonScript("studentsBySubjectGroupJson", {});
   const initialFormData = window.initialFormData || readJsonScript("initialFormDataJson", {});
+  const LAST_SELECTION_STORAGE_KEY = "msi:lastSelection:v1";
   const groupPlaceholder = "Select morning or afternoon group";
   const studentPlaceholder = "Select student";
+
+  function loadStoredSelection() {
+    try {
+      const raw = window.localStorage.getItem(LAST_SELECTION_STORAGE_KEY);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function persistSelection(value) {
+    try {
+      window.localStorage.setItem(LAST_SELECTION_STORAGE_KEY, JSON.stringify(value));
+    } catch (_error) {
+      // Ignore local storage failures.
+    }
+  }
+
+  function persistCurrentSelection() {
+    persistSelection({
+      subject: subjectSelect.value || "",
+      group: groupSelect.value || "",
+      student_id: studentSelect.value || "",
+    });
+  }
 
   function createPlaceholderOption(label, selected) {
     const option = document.createElement("option");
@@ -103,16 +134,33 @@
   subjectSelect.addEventListener("change", function () {
     renderGroupOptions(subjectSelect.value, "");
     renderStudentOptions(subjectSelect.value, "", "");
+    persistCurrentSelection();
   });
 
   groupSelect.addEventListener("change", function () {
     renderStudentOptions(subjectSelect.value, groupSelect.value, "");
+    persistCurrentSelection();
   });
 
-  const initialSubject = initialFormData.subject || subjectSelect.value || "";
-  const initialGroup = initialFormData.group || "";
-  const initialStudentId = String(initialFormData.student_id || "");
+  studentSelect.addEventListener("change", function () {
+    persistCurrentSelection();
+  });
+
+  if (searchForm) {
+    searchForm.addEventListener("submit", function () {
+      persistCurrentSelection();
+    });
+  }
+
+  const storedSelection = loadStoredSelection();
+  const initialSubject =
+    initialFormData.subject || storedSelection.subject || subjectSelect.value || "";
+  const initialGroup = initialFormData.group || storedSelection.group || "";
+  const initialStudentId = String(
+    initialFormData.student_id || storedSelection.student_id || ""
+  );
 
   renderGroupOptions(initialSubject, initialGroup);
-  renderStudentOptions(initialSubject, initialGroup, initialStudentId);
+  renderStudentOptions(initialSubject, groupSelect.value || "", initialStudentId);
+  persistCurrentSelection();
 })();
