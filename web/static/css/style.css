@@ -702,18 +702,13 @@ body.rating-page.tg-miniapp .rating-table-wrap {
   color: #cd7f32;
 }
 
-.rating-page .rating-table tr.is-current {
-  position: relative;
+.rating-page .rating-table th,
+.rating-page .rating-table td {
+  vertical-align: middle;
 }
 
-.rating-page .rating-table tr.is-current::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: #000;
+.rating-page .rating-table tr.is-current td:first-child {
+  box-shadow: inset 4px 0 0 #000;
 }
 
 .rating-page .avg-cell {
