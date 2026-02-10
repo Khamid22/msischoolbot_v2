@@ -95,6 +95,9 @@
       </section>
     </main>
 
+    <!-- Add Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
   </body>
 </html>

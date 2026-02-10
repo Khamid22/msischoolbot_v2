@@ -247,6 +247,9 @@
       </section>
     </main>
 
+    <!-- Add Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script id="dashboardDataJson" type="application/json">{{ payload|default({}, true)|tojson|safe }}</script>
     <script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>
     <script defer src="{{ url_for('static', filename='js/dashboard.js', v=asset_version) }}"></script>

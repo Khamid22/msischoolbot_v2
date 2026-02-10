@@ -37,13 +37,21 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Make sure the html and body are completely fixed for Telegram */
 html.tg-miniapp,
 body.tg-miniapp {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100vh;
   height: var(--tg-app-height);
+  max-height: 100vh;
   max-height: var(--tg-app-height);
   overflow: hidden;
-  overscroll-behavior-y: none;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
+  touch-action: none; /* Prevent any touch actions on body */
 }
 
 body {
@@ -54,16 +62,10 @@ body {
   overscroll-behavior-y: contain;
 }
 
-body.tg-miniapp {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  touch-action: pan-x pan-y;
-}
-
 body.dashboard-page.tg-miniapp {
   display: flex;
   flex-direction: column;
+  touch-action: none; /* Critical: prevent pull-to-refresh */
 }
 
 body.dashboard-page.tg-miniapp .topbar {
@@ -75,8 +77,24 @@ body.dashboard-page.tg-miniapp .dashboard-wrap {
   min-height: 0;
   width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y; /* Allow only vertical scrolling within this container */
+}
+
+/* Also apply to home page */
+body.home-page.tg-miniapp {
+  position: fixed;
+  overflow: hidden;
+  touch-action: none;
+}
+
+body.home-page.tg-miniapp .home-wrap {
+  overflow-y: auto;
+  max-height: 100vh;
+  max-height: var(--tg-app-height);
+  touch-action: pan-y;
 }
 
 h1,
