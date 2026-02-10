@@ -386,6 +386,9 @@
       const ratio = (grade - yMin) / (yMax - yMin);
       return paddingTop + (1 - ratio) * plotHeight;
     };
+    const yTop = yScale(yMax);
+    const yBottom = yScale(yMin);
+    const clampY = (value) => Math.min(yBottom, Math.max(yTop, value));
 
     const points = scores.map((score, index) => ({
       x: xScale(index),
@@ -408,9 +411,9 @@
         const p3 = pts[i + 2] || p2;
 
         const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp1y = clampY(p1.y + (p2.y - p0.y) / 6);
         const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
+        const cp2y = clampY(p2.y - (p3.y - p1.y) / 6);
         d += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`;
       }
       return d;
