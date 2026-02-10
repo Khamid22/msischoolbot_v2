@@ -154,7 +154,7 @@
         }
 
         const pullingDown = currentY > touchStartY;
-        if (!pullingDown) {
+        if (!pullingDown || deltaY < 8) {
           return;
         }
 
