@@ -156,6 +156,27 @@ def _extract_numeric_average_grade(dashboard_payload: dict[str, Any]) -> float |
     return average_grade
 
 
+def _extract_exam_average_score(dashboard_payload: dict[str, Any]) -> float | None:
+    exam_scores: list[float] = []
+    for exam_result in dashboard_payload.get("examResults", []):
+        if not isinstance(exam_result, dict):
+            continue
+
+        raw_score = exam_result.get("score")
+        try:
+            numeric_score = float(raw_score)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(numeric_score):
+            continue
+
+        exam_scores.append(numeric_score)
+
+    if not exam_scores:
+        return None
+    return round(sum(exam_scores) / len(exam_scores), 1)
+
+
 def _collect_subject_dashboards_from_dataset(
     dataset: dict[str, Any],
     subject: str,
@@ -221,12 +242,12 @@ def _build_subject_rating(
         if not isinstance(current_student_id, int):
             continue
 
-        average_grade = _extract_numeric_average_grade(dashboard_payload)
-        if average_grade is None:
-            continue
+        avg_exam_score = _extract_exam_average_score(dashboard_payload)
+        if avg_exam_score is None:
+            avg_exam_score = 0.0
 
         full_name = _normalize(str(student.get("fullName", "")))
-        ranking_rows.append((current_student_id, average_grade, full_name))
+        ranking_rows.append((current_student_id, avg_exam_score, full_name))
 
     if not ranking_rows:
         return None
@@ -236,18 +257,18 @@ def _build_subject_rating(
     total = len(ranking_rows)
     position = 0
     current_rank = 0
-    previous_average: float | None = None
+    previous_avg_exam_score: float | None = None
 
-    for current_student_id, average_grade, _full_name in ranking_rows:
+    for current_student_id, avg_exam_score, _full_name in ranking_rows:
         position += 1
-        if previous_average is None or not math.isclose(
-            average_grade,
-            previous_average,
+        if previous_avg_exam_score is None or not math.isclose(
+            avg_exam_score,
+            previous_avg_exam_score,
             rel_tol=0.0,
             abs_tol=1e-9,
         ):
             current_rank = position
-            previous_average = average_grade
+            previous_avg_exam_score = avg_exam_score
 
         if current_student_id == student_id:
             return {"rank": current_rank, "total": total}
@@ -275,7 +296,7 @@ def _build_subject_leaderboard(
 
         average_grade = _extract_numeric_average_grade(dashboard_payload)
         if average_grade is None:
-            continue
+            average_grade = 0.0
 
         full_name = str(student.get("fullName", "")).strip()
         surname = str(student.get("surname", "")).strip()
@@ -283,21 +304,8 @@ def _build_subject_leaderboard(
         display_name = f"{surname} {name}".strip() if surname and name else full_name
         group_name = str(student.get("group", "")).strip()
 
-        exam_scores: list[float] = []
-        for exam_result in dashboard_payload.get("examResults", []):
-            if not isinstance(exam_result, dict):
-                continue
-            raw_score = exam_result.get("score")
-            try:
-                numeric_score = float(raw_score)
-            except (TypeError, ValueError):
-                continue
-            if not math.isfinite(numeric_score):
-                continue
-            exam_scores.append(numeric_score)
-
-        avg_exam_score = round(sum(exam_scores) / len(exam_scores), 1) if exam_scores else 0.0
-        exam_performance = _round_grade_half_up(avg_exam_score) if exam_scores else 0
+        avg_exam_score = _extract_exam_average_score(dashboard_payload) or 0.0
+        exam_performance = _round_grade_half_up(avg_exam_score) if avg_exam_score > 0 else 0
 
         attendance_record = dashboard_payload.get("attendanceRecord", {})
         if not isinstance(attendance_record, dict):
@@ -339,7 +347,7 @@ def _build_subject_leaderboard(
 
     ranking_rows.sort(
         key=lambda row: (
-            -float(row["averageGrade"]),
+            -float(row["avgExamScore"]),
             str(row["sortName"]),
             int(row["studentId"]),
         )
@@ -348,19 +356,20 @@ def _build_subject_leaderboard(
     leaderboard: list[dict[str, Any]] = []
     position = 0
     current_rank = 0
-    previous_average: float | None = None
+    previous_avg_exam_score: float | None = None
 
     for row in ranking_rows:
+        avg_exam_score = float(row["avgExamScore"])
         average_grade = float(row["averageGrade"])
         position += 1
-        if previous_average is None or not math.isclose(
-            average_grade,
-            previous_average,
+        if previous_avg_exam_score is None or not math.isclose(
+            avg_exam_score,
+            previous_avg_exam_score,
             rel_tol=0.0,
             abs_tol=1e-9,
         ):
             current_rank = position
-            previous_average = average_grade
+            previous_avg_exam_score = avg_exam_score
 
         leaderboard.append(
             {

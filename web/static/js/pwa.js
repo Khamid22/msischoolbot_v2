@@ -67,58 +67,81 @@
       webApp.onEvent("viewportChanged", applyViewportLock);
     }
 
-    if (!supportsSwipeLock) {
-      let touchStartY = 0;
+    let touchStartY = 0;
 
-      function findScrollableParent(target) {
-        let node = target;
-        while (node && node !== document.body) {
-          if (!(node instanceof HTMLElement)) {
-            node = node && node.parentElement;
-            continue;
-          }
-
-          const style = window.getComputedStyle(node);
-          const canScrollY =
-            (style.overflowY === "auto" || style.overflowY === "scroll") &&
-            node.scrollHeight > node.clientHeight + 1;
-          if (canScrollY) {
-            return node;
-          }
-          node = node.parentElement;
+    function findScrollableParent(target) {
+      let node = target;
+      while (node && node !== document.body) {
+        if (!(node instanceof HTMLElement)) {
+          node = node && node.parentElement;
+          continue;
         }
-        return null;
+
+        const style = window.getComputedStyle(node);
+        const canScrollY =
+          (style.overflowY === "auto" || style.overflowY === "scroll") &&
+          node.scrollHeight > node.clientHeight + 1;
+        if (canScrollY) {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    }
+
+    function resolveRootScroller() {
+      const dashboardWrap = document.querySelector(".dashboard-wrap");
+      if (dashboardWrap instanceof HTMLElement) {
+        return dashboardWrap;
       }
 
-      document.addEventListener(
-        "touchstart",
-        function (event) {
-          if (!event.touches || event.touches.length !== 1) {
-            return;
-          }
-          touchStartY = event.touches[0].clientY;
-        },
-        { passive: true }
-      );
+      const homeWrap = document.querySelector(".home-wrap");
+      if (homeWrap instanceof HTMLElement) {
+        return homeWrap;
+      }
 
-      document.addEventListener(
-        "touchmove",
-        function (event) {
-          if (!event.touches || event.touches.length !== 1) {
-            return;
-          }
-
-          const currentY = event.touches[0].clientY;
-          const pullingDown = currentY > touchStartY;
-          const scrollableParent = findScrollableParent(event.target);
-          const atTop = scrollableParent ? scrollableParent.scrollTop <= 0 : true;
-          if (pullingDown && atTop) {
-            event.preventDefault();
-          }
-        },
-        { passive: false }
-      );
+      return null;
     }
+
+    document.addEventListener(
+      "touchstart",
+      function (event) {
+        if (!event.touches || event.touches.length !== 1) {
+          return;
+        }
+        touchStartY = event.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    document.addEventListener(
+      "touchmove",
+      function (event) {
+        if (!event.touches || event.touches.length !== 1) {
+          return;
+        }
+
+        const currentY = event.touches[0].clientY;
+        const pullingDown = currentY > touchStartY;
+        if (!pullingDown) {
+          return;
+        }
+
+        const scrollableParent = findScrollableParent(event.target);
+        const rootScroller = resolveRootScroller();
+        const atTop = scrollableParent
+          ? scrollableParent.scrollTop <= 0
+          : rootScroller
+            ? rootScroller.scrollTop <= 0
+            : true;
+
+        if (atTop && event.cancelable) {
+          event.preventDefault();
+          applyViewportLock();
+        }
+      },
+      { passive: false }
+    );
   }
 
   if (document.readyState === "loading") {
