@@ -1,4 +1,14 @@
 (function () {
+  document.addEventListener("DOMContentLoaded", function () {
+    if (
+      typeof Telegram !== "undefined" &&
+      Telegram.WebApp &&
+      typeof Telegram.WebApp.disableVerticalSwipes === "function"
+    ) {
+      Telegram.WebApp.disableVerticalSwipes();
+    }
+  });
+
   function initTelegramMiniApp() {
     const telegram = window.Telegram;
     const webApp = telegram && telegram.WebApp;
