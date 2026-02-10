@@ -655,6 +655,23 @@ def dashboard(student_id: int):
     justified_absent = attendance_record.get("justifiedAbsentCount", 0)
     total = present + absent + justified_absent
     attendance_rate = round(((present + justified_absent) / total) * 100) if total else 0
+    exam_scores: list[float] = []
+    for exam_result in payload.get("examResults", []):
+        if not isinstance(exam_result, dict):
+            continue
+        raw_score = exam_result.get("score")
+        try:
+            numeric_score = float(raw_score)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(numeric_score):
+            continue
+        exam_scores.append(numeric_score)
+    exam_performance = (
+        _round_grade_half_up(sum(exam_scores) / len(exam_scores))
+        if exam_scores
+        else 0
+    )
     program_total_lessons = 180
     completed_lessons = min(
         len(payload.get("homeworkGrades", [])),
@@ -677,6 +694,7 @@ def dashboard(student_id: int):
         "dashboard.html",
         payload=payload,
         attendance_rate=attendance_rate,
+        exam_performance=exam_performance,
         program_completed_lessons=completed_lessons,
         program_completed_rate=program_completed_rate,
         subject_rating=subject_rating,

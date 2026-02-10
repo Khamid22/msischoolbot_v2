@@ -36,12 +36,22 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+html.tg-miniapp,
+body.tg-miniapp {
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+}
+
 body {
   font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
   line-height: 1.45;
   overscroll-behavior-y: contain;
+}
+
+body.tg-miniapp {
+  touch-action: pan-x pan-y;
 }
 
 h1,
@@ -450,7 +460,7 @@ button {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 

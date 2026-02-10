@@ -142,6 +142,19 @@
         </article>
 
         <article class="stat-card stat-card-compact">
+          <p class="stat-title title-inline icon-purple">
+            <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 3v18h18"></path>
+              <path d="M18 17V9"></path>
+              <path d="M13 17V5"></path>
+              <path d="M8 17v-3"></path>
+            </svg>
+            EP
+          </p>
+          <h3>{{ exam_performance|default(0, true) }}/9</h3>
+        </article>
+
+        <article class="stat-card stat-card-compact">
           <p class="stat-title title-inline icon-warning">
             <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="8"></circle>
