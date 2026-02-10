@@ -1,28 +1,61 @@
-(function() {
-  // Check if running in Telegram Mini App
-  if (window.Telegram && window.Telegram.WebApp) {
-    const tg = window.Telegram.WebApp;
-    
-    // Expand the mini app to full height
-    tg.expand();
-    
-    // Disable vertical swipes (prevents closing on scroll)
-    tg.disableVerticalSwipes();
-    
-    // Add class to html for CSS targeting
-    document.documentElement.classList.add('tg-miniapp');
-    document.body.classList.add('tg-miniapp');
-    
-    // Set the viewport height
-    const setAppHeight = () => {
-      const height = tg.viewportStableHeight || window.innerHeight;
-      document.documentElement.style.setProperty('--tg-app-height', `${height}px`);
-    };
-    
+(function () {
+  const telegram = window.Telegram;
+  const webApp = telegram && telegram.WebApp;
+  if (!webApp) {
+    return;
+  }
+
+  const initData = typeof webApp.initData === "string" ? webApp.initData.trim() : "";
+  const hasQueryInitData = /(?:^|[?&])tgWebAppData=/.test(window.location.search);
+  const isMiniApp = Boolean(initData) || hasQueryInitData;
+  if (!isMiniApp) {
+    return;
+  }
+
+  const setAppHeight = function () {
+    const stableHeight = Number(webApp.viewportStableHeight || 0);
+    const viewportHeight = Number(webApp.viewportHeight || 0);
+    const fallbackHeight = Number(window.innerHeight || 0);
+    const resolvedHeight =
+      (Number.isFinite(stableHeight) && stableHeight > 0 && stableHeight) ||
+      (Number.isFinite(viewportHeight) && viewportHeight > 0 && viewportHeight) ||
+      (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
+      0;
+    if (resolvedHeight > 0) {
+      document.documentElement.style.setProperty("--tg-app-height", `${Math.round(resolvedHeight)}px`);
+    }
+  };
+
+  const applyViewportLock = function () {
     setAppHeight();
-    tg.onEvent('viewportChanged', setAppHeight);
-    
-    // Tell Telegram the app is ready
-    tg.ready();
+    try {
+      webApp.expand();
+    } catch (_error) {
+      // Ignore Telegram viewport errors.
+    }
+    if (typeof webApp.disableVerticalSwipes === "function") {
+      try {
+        webApp.disableVerticalSwipes();
+      } catch (_error) {
+        // Ignore Telegram swipe setup errors.
+      }
+    }
+  };
+
+  document.documentElement.classList.add("tg-miniapp");
+  document.body.classList.add("tg-miniapp");
+  applyViewportLock();
+
+  if (typeof webApp.onEvent === "function") {
+    webApp.onEvent("viewportChanged", applyViewportLock);
+  }
+  window.addEventListener("resize", setAppHeight, { passive: true });
+  window.setTimeout(applyViewportLock, 120);
+  window.setTimeout(applyViewportLock, 360);
+
+  try {
+    webApp.ready();
+  } catch (_error) {
+    // Ignore Telegram ready errors.
   }
 })();

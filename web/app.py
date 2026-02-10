@@ -177,6 +177,40 @@ def _extract_exam_average_score(dashboard_payload: dict[str, Any]) -> float | No
     return round(sum(exam_scores) / len(exam_scores), 1)
 
 
+def _safe_nonnegative_int(value: Any) -> int:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(numeric):
+        return 0
+    return max(int(round(numeric)), 0)
+
+
+def _extract_attendance_rate(dashboard_payload: dict[str, Any]) -> int:
+    attendance_record = dashboard_payload.get("attendanceRecord", {})
+    if not isinstance(attendance_record, dict):
+        attendance_record = {}
+
+    present = _safe_nonnegative_int(attendance_record.get("presentCount", 0))
+    absent = _safe_nonnegative_int(attendance_record.get("absentCount", 0))
+    justified_absent = _safe_nonnegative_int(
+        attendance_record.get("justifiedAbsentCount", 0)
+    )
+    total = present + absent + justified_absent
+    if total <= 0:
+        return 0
+
+    return round(((present + justified_absent) / total) * 100)
+
+
+def _attendance_rate_to_score(attendance_rate: int) -> int:
+    bounded_rate = max(0, min(int(attendance_rate), 100))
+    if bounded_rate == 0:
+        return 0
+    return max(1, min(9, _round_grade_half_up((bounded_rate / 100) * 9)))
+
+
 def _collect_subject_dashboards_from_dataset(
     dataset: dict[str, Any],
     subject: str,
@@ -231,48 +265,11 @@ def _build_subject_rating(
     student_id: int,
     dashboards: list[dict[str, Any]],
 ) -> dict[str, int] | None:
-    ranking_rows: list[tuple[int, float, str]] = []
-
-    for dashboard_payload in dashboards:
-        student = dashboard_payload.get("student", {})
-        if not isinstance(student, dict):
-            continue
-
-        current_student_id = student.get("id")
-        if not isinstance(current_student_id, int):
-            continue
-
-        avg_exam_score = _extract_exam_average_score(dashboard_payload)
-        if avg_exam_score is None:
-            avg_exam_score = 0.0
-
-        full_name = _normalize(str(student.get("fullName", "")))
-        ranking_rows.append((current_student_id, avg_exam_score, full_name))
-
-    if not ranking_rows:
-        return None
-
-    ranking_rows.sort(key=lambda row: (-row[1], row[2], row[0]))
-
-    total = len(ranking_rows)
-    position = 0
-    current_rank = 0
-    previous_avg_exam_score: float | None = None
-
-    for current_student_id, avg_exam_score, _full_name in ranking_rows:
-        position += 1
-        if previous_avg_exam_score is None or not math.isclose(
-            avg_exam_score,
-            previous_avg_exam_score,
-            rel_tol=0.0,
-            abs_tol=1e-9,
-        ):
-            current_rank = position
-            previous_avg_exam_score = avg_exam_score
-
-        if current_student_id == student_id:
-            return {"rank": current_rank, "total": total}
-
+    leaderboard = _build_subject_leaderboard(dashboards)
+    total = len(leaderboard)
+    for row in leaderboard:
+        if int(row.get("studentId", -1)) == student_id:
+            return {"rank": int(row.get("rank", 0)), "total": total}
     return None
 
 
@@ -305,30 +302,13 @@ def _build_subject_leaderboard(
         group_name = str(student.get("group", "")).strip()
 
         avg_exam_score = _extract_exam_average_score(dashboard_payload) or 0.0
-        exam_performance = _round_grade_half_up(avg_exam_score) if avg_exam_score > 0 else 0
-
-        attendance_record = dashboard_payload.get("attendanceRecord", {})
-        if not isinstance(attendance_record, dict):
-            attendance_record = {}
-
-        def _safe_count(value: Any) -> int:
-            try:
-                numeric = float(value)
-            except (TypeError, ValueError):
-                return 0
-            if not math.isfinite(numeric):
-                return 0
-            return max(int(round(numeric)), 0)
-
-        present = _safe_count(attendance_record.get("presentCount", 0))
-        absent = _safe_count(attendance_record.get("absentCount", 0))
-        justified_absent = _safe_count(attendance_record.get("justifiedAbsentCount", 0))
-        attendance_total = present + absent + justified_absent
-        attendance_rate = (
-            round(((present + justified_absent) / attendance_total) * 100)
-            if attendance_total
-            else 0
+        exam_performance = (
+            _round_grade_half_up(avg_exam_score) if avg_exam_score > 0 else 0
         )
+        aap = _round_grade_half_up(average_grade)
+        attendance_rate = _extract_attendance_rate(dashboard_payload)
+        attendance_score = _attendance_rate_to_score(attendance_rate)
+        average_composite = round((exam_performance + aap + attendance_score) / 3, 1)
 
         ranking_rows.append(
             {
@@ -340,40 +320,32 @@ def _build_subject_leaderboard(
                 "avgExamScore": avg_exam_score,
                 "avgExamScoreDisplay": f"{avg_exam_score:.1f}",
                 "examPerformance": exam_performance,
-                "aap": _round_grade_half_up(average_grade),
+                "aap": aap,
                 "attendanceRate": attendance_rate,
+                "attendanceScore": attendance_score,
+                "averageComposite": average_composite,
+                "averageCompositeDisplay": f"{average_composite:.1f}",
             }
         )
 
     ranking_rows.sort(
         key=lambda row: (
-            -float(row["avgExamScore"]),
+            -float(row["averageComposite"]),
+            -int(row["examPerformance"]),
+            -int(row["aap"]),
+            -int(row["attendanceRate"]),
             str(row["sortName"]),
             int(row["studentId"]),
         )
     )
 
     leaderboard: list[dict[str, Any]] = []
-    position = 0
-    current_rank = 0
-    previous_avg_exam_score: float | None = None
-
-    for row in ranking_rows:
-        avg_exam_score = float(row["avgExamScore"])
+    for position, row in enumerate(ranking_rows, start=1):
         average_grade = float(row["averageGrade"])
-        position += 1
-        if previous_avg_exam_score is None or not math.isclose(
-            avg_exam_score,
-            previous_avg_exam_score,
-            rel_tol=0.0,
-            abs_tol=1e-9,
-        ):
-            current_rank = position
-            previous_avg_exam_score = avg_exam_score
 
         leaderboard.append(
             {
-                "rank": current_rank,
+                "rank": position,
                 "position": position,
                 "studentId": row["studentId"],
                 "displayName": row["displayName"],
@@ -382,6 +354,9 @@ def _build_subject_leaderboard(
                 "examPerformance": row["examPerformance"],
                 "aap": row["aap"],
                 "attendanceRate": row["attendanceRate"],
+                "attendanceScore": row["attendanceScore"],
+                "averageComposite": row["averageComposite"],
+                "averageCompositeDisplay": row["averageCompositeDisplay"],
                 "averageGrade": average_grade,
             }
         )

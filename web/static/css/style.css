@@ -33,8 +33,23 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  overflow-x: hidden;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+}
+
+html:not(.tg-miniapp),
+body:not(.tg-miniapp) {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  height: auto;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  touch-action: auto;
 }
 
 /* Make sure the html and body are completely fixed for Telegram */
@@ -59,7 +74,7 @@ body {
   color: var(--text);
   background: var(--bg);
   line-height: 1.45;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
 }
 
 body.dashboard-page.tg-miniapp {
@@ -461,6 +476,27 @@ button {
   text-transform: uppercase;
 }
 
+.rating-board-summary .rating-pill {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  border: 1px solid #000;
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 1);
+  background: #fff;
+  color: #111827;
+  padding: 6px 10px;
+  font-family: var(--font-display);
+  font-size: clamp(0.72rem, 3.2vw, 0.9rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
 .rating-table-wrap {
   margin-top: 12px;
   overflow-x: auto;
@@ -513,6 +549,11 @@ button {
 .rating-table tr.is-current td {
   background: #f8fafc;
   font-weight: 700;
+}
+
+.rating-table td.avg-cell {
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .rating-table th:nth-child(2),

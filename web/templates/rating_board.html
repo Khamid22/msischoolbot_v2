@@ -44,10 +44,10 @@
           {{ current_student.fullName }}
           {% endif %}
         </h2>
-        <p>
+        <p class="rating-pill">
           Rating:
           {% if current_rating %}
-          #{{ current_rating.rank }} of {{ leaderboard|length }}
+          #{{ current_rating.rank }} out of {{ leaderboard|length }}
           {% else %}
           N/A
           {% endif %}
@@ -80,7 +80,7 @@
                 <td>#{{ row.rank }}</td>
                 <td>{{ row.displayName }}</td>
                 <td>{{ row.group }}</td>
-                <td>{{ row.avgExamScoreDisplay }}/9</td>
+                <td class="avg-cell">{{ row.averageCompositeDisplay }}/9</td>
                 <td>{{ row.examPerformance }}/9</td>
                 <td>{{ row.aap }}/9</td>
                 <td>{{ row.attendanceRate }}%</td>

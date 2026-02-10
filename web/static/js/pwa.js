@@ -1,18 +1,29 @@
 (function () {
+  function isTelegramMiniApp(webApp) {
+    if (!webApp) {
+      return false;
+    }
+    const initData = typeof webApp.initData === "string" ? webApp.initData.trim() : "";
+    const hasQueryInitData = /(?:^|[?&])tgWebAppData=/.test(window.location.search);
+    return Boolean(initData) || hasQueryInitData;
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
+    const webApp = typeof Telegram !== "undefined" ? Telegram.WebApp : null;
     if (
-      typeof Telegram !== "undefined" &&
-      Telegram.WebApp &&
-      typeof Telegram.WebApp.disableVerticalSwipes === "function"
+      isTelegramMiniApp(webApp) &&
+      typeof webApp.disableVerticalSwipes === "function"
     ) {
-      Telegram.WebApp.disableVerticalSwipes();
+      webApp.disableVerticalSwipes();
     }
   });
 
   function initTelegramMiniApp() {
     const telegram = window.Telegram;
     const webApp = telegram && telegram.WebApp;
-    if (!webApp) {
+    if (!webApp || !isTelegramMiniApp(webApp)) {
+      document.documentElement.classList.remove("tg-miniapp");
+      document.body.classList.remove("tg-miniapp");
       return;
     }
 
@@ -78,6 +89,7 @@
     }
 
     let touchStartY = 0;
+    let touchStartX = 0;
 
     function findScrollableParent(target) {
       let node = target;
@@ -119,6 +131,7 @@
         if (!event.touches || event.touches.length !== 1) {
           return;
         }
+        touchStartX = event.touches[0].clientX;
         touchStartY = event.touches[0].clientY;
       },
       { passive: true }
@@ -131,7 +144,15 @@
           return;
         }
 
+        const currentX = event.touches[0].clientX;
         const currentY = event.touches[0].clientY;
+        const deltaX = currentX - touchStartX;
+        const deltaY = currentY - touchStartY;
+        const isHorizontalGesture = Math.abs(deltaX) > Math.abs(deltaY);
+        if (isHorizontalGesture) {
+          return;
+        }
+
         const pullingDown = currentY > touchStartY;
         if (!pullingDown) {
           return;
