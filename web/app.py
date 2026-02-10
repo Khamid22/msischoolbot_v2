@@ -262,7 +262,7 @@ def _round_grade_half_up(value: float) -> int:
 def _build_subject_leaderboard(
     dashboards: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    ranking_rows: list[tuple[int, float, str, str, str]] = []
+    ranking_rows: list[dict[str, Any]] = []
 
     for dashboard_payload in dashboards:
         student = dashboard_payload.get("student", {})
@@ -278,31 +278,80 @@ def _build_subject_leaderboard(
             continue
 
         full_name = str(student.get("fullName", "")).strip()
+        surname = str(student.get("surname", "")).strip()
+        name = str(student.get("name", "")).strip()
+        display_name = f"{surname} {name}".strip() if surname and name else full_name
         group_name = str(student.get("group", "")).strip()
-        ranking_rows.append(
-            (
-                student_id,
-                average_grade,
-                _normalize(full_name),
-                full_name,
-                group_name,
-            )
+
+        exam_scores: list[float] = []
+        for exam_result in dashboard_payload.get("examResults", []):
+            if not isinstance(exam_result, dict):
+                continue
+            raw_score = exam_result.get("score")
+            try:
+                numeric_score = float(raw_score)
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(numeric_score):
+                continue
+            exam_scores.append(numeric_score)
+
+        avg_exam_score = round(sum(exam_scores) / len(exam_scores), 1) if exam_scores else 0.0
+        exam_performance = _round_grade_half_up(avg_exam_score) if exam_scores else 0
+
+        attendance_record = dashboard_payload.get("attendanceRecord", {})
+        if not isinstance(attendance_record, dict):
+            attendance_record = {}
+
+        def _safe_count(value: Any) -> int:
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return 0
+            if not math.isfinite(numeric):
+                return 0
+            return max(int(round(numeric)), 0)
+
+        present = _safe_count(attendance_record.get("presentCount", 0))
+        absent = _safe_count(attendance_record.get("absentCount", 0))
+        justified_absent = _safe_count(attendance_record.get("justifiedAbsentCount", 0))
+        attendance_total = present + absent + justified_absent
+        attendance_rate = (
+            round(((present + justified_absent) / attendance_total) * 100)
+            if attendance_total
+            else 0
         )
 
-    ranking_rows.sort(key=lambda row: (-row[1], row[2], row[0]))
+        ranking_rows.append(
+            {
+                "studentId": student_id,
+                "averageGrade": average_grade,
+                "sortName": _normalize(display_name or full_name),
+                "displayName": display_name or full_name,
+                "group": group_name,
+                "avgExamScore": avg_exam_score,
+                "avgExamScoreDisplay": f"{avg_exam_score:.1f}",
+                "examPerformance": exam_performance,
+                "aap": _round_grade_half_up(average_grade),
+                "attendanceRate": attendance_rate,
+            }
+        )
+
+    ranking_rows.sort(
+        key=lambda row: (
+            -float(row["averageGrade"]),
+            str(row["sortName"]),
+            int(row["studentId"]),
+        )
+    )
 
     leaderboard: list[dict[str, Any]] = []
     position = 0
     current_rank = 0
     previous_average: float | None = None
 
-    for (
-        student_id,
-        average_grade,
-        _normalized_full_name,
-        full_name,
-        group_name,
-    ) in ranking_rows:
+    for row in ranking_rows:
+        average_grade = float(row["averageGrade"])
         position += 1
         if previous_average is None or not math.isclose(
             average_grade,
@@ -317,11 +366,14 @@ def _build_subject_leaderboard(
             {
                 "rank": current_rank,
                 "position": position,
-                "studentId": student_id,
-                "fullName": full_name,
-                "group": group_name,
+                "studentId": row["studentId"],
+                "displayName": row["displayName"],
+                "group": row["group"],
+                "avgExamScoreDisplay": row["avgExamScoreDisplay"],
+                "examPerformance": row["examPerformance"],
+                "aap": row["aap"],
+                "attendanceRate": row["attendanceRate"],
                 "averageGrade": average_grade,
-                "averageGradeRounded": _round_grade_half_up(average_grade),
             }
         )
 

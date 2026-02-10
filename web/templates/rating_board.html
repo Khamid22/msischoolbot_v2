@@ -37,7 +37,13 @@
 
     <main class="dashboard-wrap">
       <section class="rating-board-summary chart-card">
-        <h2>{{ current_student.fullName }}</h2>
+        <h2>
+          {% if current_student.surname and current_student.name %}
+          {{ current_student.surname }} {{ current_student.name }}
+          {% else %}
+          {{ current_student.fullName }}
+          {% endif %}
+        </h2>
         <p>
           Rating:
           {% if current_rating %}
@@ -59,19 +65,25 @@
           <table class="rating-table" aria-label="Student rating board">
             <thead>
               <tr>
-                <th>Rank</th>
-                <th>Student</th>
+                <th>Rating</th>
+                <th>Student Surname and Name</th>
                 <th>Group</th>
+                <th>AVG</th>
+                <th>EP</th>
                 <th>AAP</th>
+                <th>AR</th>
               </tr>
             </thead>
             <tbody>
               {% for row in leaderboard %}
               <tr class="{% if row.studentId == current_student_id %}is-current{% endif %}">
                 <td>#{{ row.rank }}</td>
-                <td>{{ row.fullName }}</td>
+                <td>{{ row.displayName }}</td>
                 <td>{{ row.group }}</td>
-                <td>{{ row.averageGradeRounded }}/9</td>
+                <td>{{ row.avgExamScoreDisplay }}/9</td>
+                <td>{{ row.examPerformance }}/9</td>
+                <td>{{ row.aap }}/9</td>
+                <td>{{ row.attendanceRate }}%</td>
               </tr>
               {% endfor %}
             </tbody>

@@ -10,8 +10,34 @@
     document.body.classList.add("tg-miniapp");
 
     const supportsSwipeLock = typeof webApp.disableVerticalSwipes === "function";
+    const resolveViewportHeight = function () {
+      const stableHeight = Number(webApp.viewportStableHeight || 0);
+      if (Number.isFinite(stableHeight) && stableHeight > 0) {
+        return stableHeight;
+      }
+
+      const viewportHeight = Number(webApp.viewportHeight || 0);
+      if (Number.isFinite(viewportHeight) && viewportHeight > 0) {
+        return viewportHeight;
+      }
+      return 0;
+    };
+
+    const applyViewportHeight = function () {
+      const viewportHeight = resolveViewportHeight();
+      if (viewportHeight <= 0) {
+        return;
+      }
+
+      const heightValue = `${Math.round(viewportHeight)}px`;
+      document.documentElement.style.setProperty("--tg-app-height", heightValue);
+      document.documentElement.style.height = heightValue;
+      document.body.style.height = heightValue;
+    };
 
     const applyViewportLock = function () {
+      applyViewportHeight();
+
       try {
         webApp.expand();
       } catch (_error) {
@@ -34,6 +60,8 @@
     }
 
     applyViewportLock();
+    window.setTimeout(applyViewportLock, 120);
+    window.setTimeout(applyViewportLock, 420);
 
     if (typeof webApp.onEvent === "function") {
       webApp.onEvent("viewportChanged", applyViewportLock);
@@ -41,6 +69,27 @@
 
     if (!supportsSwipeLock) {
       let touchStartY = 0;
+
+      function findScrollableParent(target) {
+        let node = target;
+        while (node && node !== document.body) {
+          if (!(node instanceof HTMLElement)) {
+            node = node && node.parentElement;
+            continue;
+          }
+
+          const style = window.getComputedStyle(node);
+          const canScrollY =
+            (style.overflowY === "auto" || style.overflowY === "scroll") &&
+            node.scrollHeight > node.clientHeight + 1;
+          if (canScrollY) {
+            return node;
+          }
+          node = node.parentElement;
+        }
+        return null;
+      }
+
       document.addEventListener(
         "touchstart",
         function (event) {
@@ -61,8 +110,8 @@
 
           const currentY = event.touches[0].clientY;
           const pullingDown = currentY > touchStartY;
-          const scrollElement = document.scrollingElement || document.documentElement;
-          const atTop = (scrollElement && scrollElement.scrollTop <= 0) || false;
+          const scrollableParent = findScrollableParent(event.target);
+          const atTop = scrollableParent ? scrollableParent.scrollTop <= 0 : true;
           if (pullingDown && atTop) {
             event.preventDefault();
           }

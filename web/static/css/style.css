@@ -20,6 +20,7 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+  --tg-app-height: 100dvh;
 }
 
 * {
@@ -38,6 +39,9 @@ body {
 
 html.tg-miniapp,
 body.tg-miniapp {
+  height: var(--tg-app-height);
+  max-height: var(--tg-app-height);
+  overflow: hidden;
   overscroll-behavior-y: none;
   overscroll-behavior-x: none;
 }
@@ -51,7 +55,28 @@ body {
 }
 
 body.tg-miniapp {
+  position: fixed;
+  inset: 0;
+  width: 100%;
   touch-action: pan-x pan-y;
+}
+
+body.dashboard-page.tg-miniapp {
+  display: flex;
+  flex-direction: column;
+}
+
+body.dashboard-page.tg-miniapp .topbar {
+  flex: 0 0 auto;
+}
+
+body.dashboard-page.tg-miniapp .dashboard-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 h1,
@@ -421,12 +446,31 @@ button {
 .rating-table-wrap {
   margin-top: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+}
+
+.rating-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.rating-table-wrap::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.rating-table-wrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
 }
 
 .rating-table {
   width: 100%;
-  min-width: 580px;
+  min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -434,15 +478,16 @@ button {
 .rating-table th,
 .rating-table td {
   border-bottom: 1px solid #e2e8f0;
-  padding: 10px 8px;
+  padding: 9px 7px;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
 
 .rating-table th {
   color: #334155;
   font-family: var(--font-display);
-  font-size: 0.64rem;
+  font-size: 0.58rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -450,6 +495,30 @@ button {
 .rating-table tr.is-current td {
   background: #f8fafc;
   font-weight: 700;
+}
+
+.rating-table th:nth-child(2),
+.rating-table td:nth-child(2) {
+  min-width: 190px;
+}
+
+@media (max-width: 560px) {
+  .rating-table {
+    min-width: 700px;
+  }
+
+  .rating-table th,
+  .rating-table td {
+    padding: 8px 6px;
+  }
+
+  .rating-table th {
+    font-size: 0.55rem;
+  }
+
+  .rating-table td {
+    font-size: 0.71rem;
+  }
 }
 
 .program-grid {
