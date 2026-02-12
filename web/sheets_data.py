@@ -33,6 +33,17 @@ SUBJECT_DISPLAY_ORDER = {
     "General English": 1,
 }
 
+EXCLUDED_HOMEWORK_LESSON_NUMBERS = {
+    21,
+    39,
+    54,
+    72,
+    87,
+    120,
+    153,
+    171,
+}
+
 EXACT_GROUP_DISPLAY_NAMES = {
     "MMG1": "Morning Group 1",
     "MMG2": "Morning Group 2",
@@ -565,6 +576,9 @@ def _build_homework_columns_metadata(
             continue
 
         label = _normalize_whitespace(raw_label.replace("\n", " "))
+        if _should_skip_homework_lesson(label):
+            continue
+
         next_label = _to_text(_cell_value(lesson_number_row, column_index + 1))
         if next_label:
             score_column_index = column_index
@@ -580,6 +594,22 @@ def _build_homework_columns_metadata(
         )
 
     return metadata
+
+
+def _extract_lesson_number(label):
+    # Supports labels like "L21", "L 21", or "Lesson 21".
+    match = re.search(r"\bL?\s*(\d{1,3})\b", str(label or "").upper())
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _should_skip_homework_lesson(label):
+    lesson_number = _extract_lesson_number(label)
+    return lesson_number in EXCLUDED_HOMEWORK_LESSON_NUMBERS
 
 
 def _build_exam_columns_metadata(
