@@ -59,12 +59,12 @@ class GroupInfo:
     group_display_name: str
 
 
-def _subject_sort_key(subject_name: str) -> tuple[int, str]:
+def _subject_sort_key(subject_name):
     normalized = subject_name.strip()
     return (SUBJECT_DISPLAY_ORDER.get(normalized, 999), normalized.casefold())
 
 
-def _group_sort_key(group_name: str) -> tuple[int, int, str]:
+def _group_sort_key(group_name):
     normalized = group_name.strip()
     normalized_lower = normalized.casefold()
 
@@ -80,7 +80,7 @@ def _group_sort_key(group_name: str) -> tuple[int, int, str]:
     return (part_order, group_number, normalized_lower)
 
 
-def get_school_dataset(force_refresh: bool = False) -> dict[str, Any]:
+def get_school_dataset(force_refresh = False):
     global _CACHE_DATA, _CACHE_EXPIRES_AT
 
     now = time.time()
@@ -98,7 +98,7 @@ def get_school_dataset(force_refresh: bool = False) -> dict[str, Any]:
         return dataset
 
 
-def _load_from_google_sheets() -> dict[str, Any]:
+def _load_from_google_sheets():
     spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()
     if not spreadsheet_id:
         raise SheetsDataError("GOOGLE_SHEETS_SPREADSHEET_ID is not set.")
@@ -182,6 +182,9 @@ def _load_from_google_sheets() -> dict[str, Any]:
             students.append(parsed["student"])
             dashboards_by_id[parsed["student"]["id"]] = parsed["dashboard"]
 
+    # Make coins global per student (sum from all enrolled subjects).
+    _merge_total_coins_across_subjects(students, dashboards_by_id)
+
     students.sort(
         key=lambda student: (
             _subject_sort_key(str(student.get("subject", ""))),
@@ -261,7 +264,7 @@ def _get_sheets_service():
     return _SERVICE
 
 
-def _parse_group_info(sheet_title: str) -> GroupInfo | None:
+def _parse_group_info(sheet_title):
     normalized_code = _normalize_group_code(sheet_title)
     if not normalized_code:
         return None
@@ -291,11 +294,11 @@ def _parse_group_info(sheet_title: str) -> GroupInfo | None:
     )
 
 
-def _normalize_group_code(raw_code: str) -> str:
+def _normalize_group_code(raw_code):
     return re.sub(r"[^A-Za-z0-9]", "", raw_code).upper()
 
 
-def _split_subject_and_suffix(normalized_code: str) -> tuple[str | None, str | None]:
+def _split_subject_and_suffix(normalized_code):
     subject_candidates = sorted(
         set(list(SUBJECT_NAMES.keys()) + list(SUBJECT_ALIASES.keys())),
         key=len,
@@ -305,13 +308,13 @@ def _split_subject_and_suffix(normalized_code: str) -> tuple[str | None, str | N
     for candidate in subject_candidates:
         if normalized_code.startswith(candidate):
             canonical_subject = SUBJECT_ALIASES.get(candidate, candidate)
-            suffix = normalized_code[len(candidate) :]
+            suffix = normalized_code[len(candidate):]
             return canonical_subject, suffix
 
     return None, None
 
 
-def _humanize_group_suffix(suffix: str) -> str:
+def _humanize_group_suffix(suffix):
     morning_match = re.fullmatch(r"MG(\d+)", suffix)
     if morning_match:
         return f"Morning Group {morning_match.group(1)}"
@@ -329,11 +332,11 @@ def _humanize_group_suffix(suffix: str) -> str:
     return fallback.title()
 
 
-def _is_supported_group_suffix(suffix: str) -> bool:
+def _is_supported_group_suffix(suffix):
     return bool(re.fullmatch(r"[A-Z]*G\d+", suffix))
 
 
-def _extract_title_from_a1_range(a1_range: str) -> str:
+def _extract_title_from_a1_range(a1_range):
     if "!" not in a1_range:
         return a1_range.strip().strip("'")
 
@@ -343,15 +346,15 @@ def _extract_title_from_a1_range(a1_range: str) -> str:
     return title_part
 
 
-def _escape_sheet_title(title: str) -> str:
+def _escape_sheet_title(title):
     return title.replace("'", "''")
 
 
 def _parse_group_rows(
-    group: GroupInfo,
-    rows: list[list[Any]],
-    used_student_ids: set[int],
-) -> list[dict[str, Any]]:
+    group,
+    rows,
+    used_student_ids,
+):
     if not rows:
         return []
 
@@ -487,23 +490,23 @@ def _parse_group_rows(
     return parsed_rows
 
 
-def _cell_value(row: list[Any], index: int) -> Any:
+def _cell_value(row, index):
     if index < 0 or index >= len(row):
         return None
     return row[index]
 
 
-def _to_text(value: Any) -> str:
+def _to_text(value):
     if value is None:
         return ""
     return str(value).strip()
 
 
-def _normalize_whitespace(value: str) -> str:
+def _normalize_whitespace(value):
     return " ".join(value.split())
 
 
-def _parse_numeric_score(value: Any) -> float | None:
+def _parse_numeric_score(value):
     if value is None:
         return None
 
@@ -524,7 +527,7 @@ def _parse_numeric_score(value: Any) -> float | None:
         return None
 
 
-def _parse_attendance_markers(value: Any) -> tuple[int, int, int]:
+def _parse_attendance_markers(value):
     if value is None:
         return 0, 0, 0
 
@@ -542,16 +545,16 @@ def _parse_attendance_markers(value: Any) -> tuple[int, int, int]:
     return present, absent, justified_absent
 
 
-def _is_student_data_row(row: list[Any]) -> bool:
+def _is_student_data_row(row):
     row_index_marker = _parse_numeric_score(_cell_value(row, 0))
     student_name = _normalize_whitespace(_to_text(_cell_value(row, 1)))
     return row_index_marker is not None and bool(student_name)
 
 
 def _build_homework_columns_metadata(
-    rows: list[list[Any]],
-    lesson_number_row: list[Any],
-) -> list[dict[str, Any]]:
+    rows,
+    lesson_number_row,
+):
     max_columns = max((len(row) for row in rows), default=0)
     start_column = 21  # V
 
@@ -580,9 +583,9 @@ def _build_homework_columns_metadata(
 
 
 def _build_exam_columns_metadata(
-    lesson_name_row: list[Any],
-    exam_columns: list[int],
-) -> list[dict[str, Any]]:
+    lesson_name_row,
+    exam_columns,
+):
     meta = []
     current_exam_name = ""
 
@@ -614,7 +617,7 @@ def _build_exam_columns_metadata(
     return meta
 
 
-def _normalize_exam_name(value: str) -> str:
+def _normalize_exam_name(value):
     if not value:
         return ""
 
@@ -623,7 +626,7 @@ def _normalize_exam_name(value: str) -> str:
     return normalized
 
 
-def _extract_coins_by_name(rows: list[list[Any]]) -> dict[str, int]:
+def _extract_coins_by_name(rows):
     coins_by_name: dict[str, int] = {}
 
     for row_number, row in enumerate(rows, start=1):
@@ -649,11 +652,59 @@ def _extract_coins_by_name(rows: list[list[Any]]) -> dict[str, int]:
     return coins_by_name
 
 
-def _normalize_name_key(name: str) -> str:
+def _normalize_name_key(name):
     return _normalize_whitespace(name).casefold()
 
 
-def _format_assessment_date(raw_value: Any, fallback_label: str) -> str:
+def _merge_total_coins_across_subjects(students, dashboards_by_id):
+    total_coins_by_name: dict[str, int] = {}
+
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        student_name_key = _normalize_name_key(student.get("fullName", ""))
+        if not student_name_key:
+            continue
+
+        raw_coins = student.get("coins", 0)
+        try:
+            numeric_coins = int(round(float(raw_coins)))
+        except (TypeError, ValueError):
+            numeric_coins = 0
+
+        total_coins_by_name[student_name_key] = (
+            total_coins_by_name.get(student_name_key, 0) + numeric_coins
+        )
+
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        student_name_key = _normalize_name_key(student.get("fullName", ""))
+        if not student_name_key:
+            continue
+        student["coins"] = int(total_coins_by_name.get(student_name_key, 0))
+
+    if not isinstance(dashboards_by_id, dict):
+        return
+
+    for dashboard_payload in dashboards_by_id.values():
+        if not isinstance(dashboard_payload, dict):
+            continue
+
+        payload_student = dashboard_payload.get("student", {})
+        if not isinstance(payload_student, dict):
+            continue
+
+        student_name_key = _normalize_name_key(payload_student.get("fullName", ""))
+        if not student_name_key:
+            continue
+
+        merged_coins = int(total_coins_by_name.get(student_name_key, 0))
+        payload_student["coins"] = merged_coins
+        dashboard_payload["coins"] = merged_coins
+
+
+def _format_assessment_date(raw_value, fallback_label):
     if raw_value is None or raw_value == "":
         return fallback_label
 
@@ -677,7 +728,7 @@ def _format_assessment_date(raw_value: Any, fallback_label: str) -> str:
     return raw_text
 
 
-def _split_student_name(full_name: str) -> dict[str, str]:
+def _split_student_name(full_name):
     parts = full_name.split()
     if not parts:
         return {"name": "", "surname": "", "initials": ""}
@@ -696,7 +747,7 @@ def _split_student_name(full_name: str) -> dict[str, str]:
     return {"name": name, "surname": surname, "initials": initials}
 
 
-def _build_stable_student_id(key: str, used_student_ids: set[int]) -> int:
+def _build_stable_student_id(key, used_student_ids):
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()
     candidate = int(digest[:8], 16)
     while candidate in used_student_ids:

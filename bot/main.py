@@ -14,13 +14,22 @@ from aiogram.types import (
 )
 
 from config import get_settings
+from web.auth_store import record_bot_user
 
 router = Router()
 settings = get_settings()
 
 
 @router.message(CommandStart())
-async def start_handler(message: Message) -> None:
+async def start_handler(message):
+    # Send Telegram button that opens the web mini app.
+    # Track unique bot users for admin statistics.
+    try:
+        record_bot_user(message.from_user)
+    except Exception:
+        # Do not fail /start if SQLite write has an issue.
+        pass
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -36,7 +45,8 @@ async def start_handler(message: Message) -> None:
         reply_markup=keyboard,
     )
 
-async def run_bot() -> None:
+async def run_bot():
+    # Configure bot and start polling updates from Telegram.
     logging.basicConfig(level=logging.INFO)
 
     bot = Bot(

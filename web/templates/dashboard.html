@@ -69,7 +69,21 @@
           <strong>{{ payload.student.fullName }}</strong>
           <span>{{ payload.student.group }}</span>
         </div>
-        <div class="avatar">{{ payload.student.initials }}</div>
+        <div class="profile-menu-root">
+          <button
+            type="button"
+            id="profileMenuToggle"
+            class="avatar avatar-btn"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="profileMenu"
+          >
+            {{ payload.student.initials }}
+          </button>
+          <div id="profileMenu" class="profile-menu" hidden>
+            <button type="button" id="logoutMenuItem" class="profile-menu-item">Logout</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -82,14 +96,45 @@
           {{ payload.student.fullName }}
           {% endif %}
         </h2>
-        <a class="student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
-          Rating:
-          {% if subject_rating and subject_rating.rank %}
-          #{{ subject_rating.rank }}
-          {% else %}
-          N/A
-          {% endif %}
-        </a>
+        <div class="student-title-actions">
+          <div class="subject-menu-root">
+            <button
+              type="button"
+              id="subjectMenuToggle"
+              class="subject-menu-toggle"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="subjectMenu"
+            >
+              <span>{{ current_subject_short_name }}</span>
+              <svg class="subject-menu-caret" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div id="subjectMenu" class="subject-menu" hidden>
+              {% for option in subject_switch_options %}
+              <a
+                class="subject-menu-item{% if option.is_current %} is-current{% endif %}"
+                href="{{ option.url }}"
+              >
+                <strong>{{ option.subject_short }}</strong>
+                {% if option.group %}
+                <span>{{ option.group }}</span>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+
+          <a class="student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
+            Rating:
+            {% if subject_rating and subject_rating.rank %}
+            #{{ subject_rating.rank }}
+            {% else %}
+            N/A
+            {% endif %}
+          </a>
+        </div>
       </section>
 
       <section class="program-grid">
@@ -251,6 +296,19 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script id="dashboardDataJson" type="application/json">{{ payload|default({}, true)|tojson|safe }}</script>
+    <form id="dashboardLogoutForm" action="{{ url_for('logout') }}" method="post" hidden></form>
+
+    <div id="logoutConfirmModal" class="confirm-modal" hidden>
+      <div class="confirm-modal-backdrop" data-close-modal="true"></div>
+      <div class="confirm-modal-card" role="dialog" aria-modal="true" aria-labelledby="logoutConfirmTitle">
+        <h3 id="logoutConfirmTitle">Confirm Logout</h3>
+        <p>Are you sure you want to logout?</p>
+        <div class="confirm-modal-actions">
+          <button type="button" id="logoutCancelBtn" class="secondary-btn">Cancel</button>
+          <button type="button" id="logoutConfirmBtn" class="primary-btn danger-btn">Logout</button>
+        </div>
+      </div>
+    </div>
     <script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>
     <script defer src="{{ url_for('static', filename='js/dashboard.js', v=asset_version) }}"></script>
     <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>

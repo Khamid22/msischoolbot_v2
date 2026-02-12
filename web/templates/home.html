@@ -34,12 +34,88 @@
             </svg>
           </div>
           <h1>MSI School Portal</h1>
+          {% if not auth_role %}
+          <p>Login to continue</p>
+          {% elif auth_role == "admin" %}
+          <p>Admin panel</p>
+          {% else %}
           <p>Select stream, group, and student</p>
+          {% endif %}
         </header>
+
+        {% if auth_error %}
+        <div class="form-error">{{ auth_error }}</div>
+        {% endif %}
 
         {% if error %}
         <div class="form-error">{{ error }}</div>
         {% endif %}
+
+        {% if not auth_role %}
+        <form action="{{ url_for('login') }}" method="post" class="login-form">
+          <label class="field">
+            <span>Login</span>
+            <input type="text" name="login" value="{{ auth_login_input|default('', true) }}" placeholder="Staff or Student ID" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required />
+          </label>
+
+          <button type="submit" class="primary-btn">Sign In</button>
+        </form>
+
+        {% elif auth_role == "admin" %}
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="secondary-btn">Logout</button>
+          </form>
+        </div>
+
+        <section class="admin-panel">
+          <div class="admin-stat-card">
+            <h2>Bot Users</h2>
+            <p>{{ bot_users_count }}</p>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Enrolled Course</th>
+                  <th>Student ID</th>
+                  <th>Password</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for student in admin_students %}
+                <tr>
+                  <td>{{ student.full_name }}</td>
+                  <td>{{ student.subjects }}</td>
+                  <td>{{ student.student_id }}</td>
+                  <td>{{ student.password }}</td>
+                </tr>
+                {% endfor %}
+                {% if not admin_students %}
+                <tr>
+                  <td colspan="4">No students found.</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {% else %}
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="secondary-btn">Logout</button>
+          </form>
+        </div>
 
         <form action="{{ url_for('search_student_form') }}" method="post" class="login-form">
           <label class="field">
@@ -80,9 +156,10 @@
 
           <button type="submit" class="primary-btn">Open Dashboard</button>
         </form>
+        {% endif %}
       </section>
     </main>
-    <!-- Add Telegram WebApp SDK -->
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>

@@ -1,30 +1,45 @@
-from __future__ import annotations
-
 import os
 import threading
 import time
 import math
-from types import SimpleNamespace
-from typing import Any
+import sys
 
-from flask import Flask, jsonify, make_response, redirect, render_template, request, url_for
+from flask import Flask, jsonify, make_response, redirect, request, session, url_for
 
 try:
-    # Package import path (used by `from web.app import ...`).
-    from .sheets_data import SheetsDataError, get_school_dataset
+    from config import get_web_settings
 except ImportError:
-    # If imported as a package (`python -m web.app`), propagate the original
-    # error (e.g. missing dependency) instead of masking it.
     if __package__:
         raise
-    # Script import path (used by `python web/app.py`).
+    # Allow running `python web/app.py` by adding project root to import path.
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from config import get_web_settings
+
+try:
+    from .sheets_data import SheetsDataError, get_school_dataset
+except ImportError:
+    if __package__:
+        raise
     from sheets_data import SheetsDataError, get_school_dataset
 
+try:
+    from .auth_store import init_storage
+except ImportError:
+    if __package__:
+        raise
+    from auth_store import init_storage
+
+# Main Flask application object.
 app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
+app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
+
+# Initialize auth-related SQLite tables on startup.
+init_storage()
 
 
-def _build_default_asset_version() -> str:
+def _build_default_asset_version():
+    # Build a simple asset version from the latest static/template file mtime.
     base_dir = os.path.dirname(__file__)
     candidate_paths = [
         os.path.join(base_dir, "app.py"),
@@ -53,10 +68,9 @@ if _asset_version_override and _asset_version_override != "1":
     ASSET_VERSION = _asset_version_override
 else:
     ASSET_VERSION = _build_default_asset_version()
-settings = SimpleNamespace(
-    flask_host=os.environ.get("FLASK_HOST", "0.0.0.0"),
-    flask_port=int(os.environ.get("PORT", os.environ.get("FLASK_PORT", "5000"))),
-)
+
+# Reuse shared root config so web uses the same source as main.py.
+settings = get_web_settings()
 GROUP_CACHE_TTL_SECONDS = int(
     os.environ.get(
         "GROUP_CACHE_TTL_SECONDS",
@@ -65,24 +79,25 @@ GROUP_CACHE_TTL_SECONDS = int(
 )
 
 _GROUP_CACHE_LOCK = threading.Lock()
-_GROUP_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+# In-memory cache keyed by (subject, group) to avoid repeated sheet calls.
+_GROUP_CACHE = {}
 
 
-def _normalize(value: str) -> str:
+def _normalize(value):
     return " ".join(value.strip().casefold().split())
 
 
-def _group_cache_key(subject: str, group: str) -> tuple[str, str]:
+def _group_cache_key(subject, group):
     return (_normalize(subject), _normalize(group))
 
 
-def _seed_group_cache_from_dataset(dataset: dict[str, Any]) -> None:
+def _seed_group_cache_from_dataset(dataset):
     students = dataset.get("students", [])
     dashboards_by_id = dataset.get("dashboards_by_id", {})
     if not isinstance(students, list) or not isinstance(dashboards_by_id, dict):
         return
 
-    grouped_entries: dict[tuple[str, str], dict[str, Any]] = {}
+    grouped_entries = {}
     for student in students:
         if not isinstance(student, dict):
             continue
@@ -121,7 +136,8 @@ def _seed_group_cache_from_dataset(dataset: dict[str, Any]) -> None:
         _GROUP_CACHE.update(grouped_entries)
 
 
-def _get_group_cache_entry(subject: str, group: str) -> tuple[dict[str, Any] | None, str | None]:
+def _get_group_cache_entry(subject, group):
+    # Try cached group first; if expired/missing, refresh from Google Sheets.
     key = _group_cache_key(subject, group)
     now = time.time()
 
@@ -144,7 +160,7 @@ def _get_group_cache_entry(subject: str, group: str) -> tuple[dict[str, Any] | N
     return None, "Selected group data was not found."
 
 
-def _extract_numeric_average_grade(dashboard_payload: dict[str, Any]) -> float | None:
+def _extract_numeric_average_grade(dashboard_payload):
     raw_value = dashboard_payload.get("averageGrade")
     try:
         average_grade = float(raw_value)
@@ -156,8 +172,8 @@ def _extract_numeric_average_grade(dashboard_payload: dict[str, Any]) -> float |
     return average_grade
 
 
-def _extract_exam_average_score(dashboard_payload: dict[str, Any]) -> float | None:
-    exam_scores: list[float] = []
+def _extract_exam_average_score(dashboard_payload):
+    exam_scores = []
     for exam_result in dashboard_payload.get("examResults", []):
         if not isinstance(exam_result, dict):
             continue
@@ -177,7 +193,7 @@ def _extract_exam_average_score(dashboard_payload: dict[str, Any]) -> float | No
     return round(sum(exam_scores) / len(exam_scores), 1)
 
 
-def _safe_nonnegative_int(value: Any) -> int:
+def _safe_nonnegative_int(value):
     try:
         numeric = float(value)
     except (TypeError, ValueError):
@@ -187,7 +203,7 @@ def _safe_nonnegative_int(value: Any) -> int:
     return max(int(round(numeric)), 0)
 
 
-def _extract_attendance_rate(dashboard_payload: dict[str, Any]) -> int:
+def _extract_attendance_rate(dashboard_payload):
     attendance_record = dashboard_payload.get("attendanceRecord", {})
     if not isinstance(attendance_record, dict):
         attendance_record = {}
@@ -204,7 +220,7 @@ def _extract_attendance_rate(dashboard_payload: dict[str, Any]) -> int:
     return round(((present + justified_absent) / total) * 100)
 
 
-def _attendance_rate_to_score(attendance_rate: int) -> int:
+def _attendance_rate_to_score(attendance_rate):
     bounded_rate = max(0, min(int(attendance_rate), 100))
     if bounded_rate == 0:
         return 0
@@ -212,15 +228,15 @@ def _attendance_rate_to_score(attendance_rate: int) -> int:
 
 
 def _collect_subject_dashboards_from_dataset(
-    dataset: dict[str, Any],
-    subject: str,
-) -> list[dict[str, Any]]:
+    dataset,
+    subject,
+):
     dashboards_by_id = dataset.get("dashboards_by_id", {})
     if not isinstance(dashboards_by_id, dict):
         return []
 
     subject_norm = _normalize(subject)
-    dashboards: list[dict[str, Any]] = []
+    dashboards = []
     for dashboard_payload in dashboards_by_id.values():
         if not isinstance(dashboard_payload, dict):
             continue
@@ -238,10 +254,10 @@ def _collect_subject_dashboards_from_dataset(
     return dashboards
 
 
-def _collect_subject_dashboards_from_cache(subject: str) -> list[dict[str, Any]]:
+def _collect_subject_dashboards_from_cache(subject):
     subject_norm = _normalize(subject)
     now = time.time()
-    dashboards: list[dict[str, Any]] = []
+    dashboards = []
 
     with _GROUP_CACHE_LOCK:
         for (cached_subject, _cached_group), cache_entry in _GROUP_CACHE.items():
@@ -262,9 +278,9 @@ def _collect_subject_dashboards_from_cache(subject: str) -> list[dict[str, Any]]
 
 
 def _build_subject_rating(
-    student_id: int,
-    dashboards: list[dict[str, Any]],
-) -> dict[str, int] | None:
+    student_id,
+    dashboards,
+):
     leaderboard = _build_subject_leaderboard(dashboards)
     total = len(leaderboard)
     for row in leaderboard:
@@ -273,14 +289,15 @@ def _build_subject_rating(
     return None
 
 
-def _round_grade_half_up(value: float) -> int:
+def _round_grade_half_up(value):
     return int(math.floor(value + 0.5))
 
 
 def _build_subject_leaderboard(
-    dashboards: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    ranking_rows: list[dict[str, Any]] = []
+    dashboards,
+):
+    # Each row stores raw values we need for sorting and final display.
+    ranking_rows = []
 
     for dashboard_payload in dashboards:
         student = dashboard_payload.get("student", {})
@@ -329,6 +346,7 @@ def _build_subject_leaderboard(
         )
 
     ranking_rows.sort(
+        # Sort by the same priority users see in the rating board.
         key=lambda row: (
             -float(row["averageComposite"]),
             -int(row["examPerformance"]),
@@ -339,7 +357,7 @@ def _build_subject_leaderboard(
         )
     )
 
-    leaderboard: list[dict[str, Any]] = []
+    leaderboard = []
     for position, row in enumerate(ranking_rows, start=1):
         average_grade = float(row["averageGrade"])
 
@@ -365,10 +383,10 @@ def _build_subject_leaderboard(
 
 
 def _compute_subject_rating(
-    student_id: int,
-    payload: dict[str, Any],
-    dataset: dict[str, Any] | None = None,
-) -> dict[str, int] | None:
+    student_id,
+    payload,
+    dataset = None,
+):
     student = payload.get("student", {})
     if not isinstance(student, dict):
         return None
@@ -377,7 +395,7 @@ def _compute_subject_rating(
     if not subject:
         return None
 
-    dashboards: list[dict[str, Any]] = []
+    dashboards = []
     if dataset:
         dashboards = _collect_subject_dashboards_from_dataset(dataset, subject)
 
@@ -394,7 +412,7 @@ def _compute_subject_rating(
     return _build_subject_rating(student_id=student_id, dashboards=dashboards)
 
 
-def _empty_form_data() -> dict[str, str]:
+def _empty_form_data():
     return {
         "student_id": "",
         "group": "",
@@ -402,17 +420,17 @@ def _empty_form_data() -> dict[str, str]:
     }
 
 
-def _is_full_form(form_data: dict[str, str]) -> bool:
+def _is_full_form(form_data):
     return all(form_data.values())
 
 
 def _search_student(
-    students: list[dict[str, Any]],
-    surname: str,
-    name: str,
-    group: str,
-    subject: str,
-) -> dict[str, Any] | None:
+    students,
+    surname,
+    name,
+    group,
+    subject,
+):
     surname_norm = _normalize(surname)
     name_norm = _normalize(name)
     group_norm = _normalize(group)
@@ -434,9 +452,9 @@ def _search_student(
 
 
 def _build_students_by_subject_group(
-    students: list[dict[str, Any]],
-) -> dict[str, dict[str, list[dict[str, Any]]]]:
-    students_by_subject_group: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    students,
+):
+    students_by_subject_group = {}
 
     sorted_students = sorted(
         students,
@@ -464,7 +482,8 @@ def _build_students_by_subject_group(
     return students_by_subject_group
 
 
-def _load_dataset() -> tuple[dict[str, Any] | None, str | None]:
+def _load_dataset():
+    # Single place that wraps data load errors from Google Sheets.
     try:
         return get_school_dataset(), None
     except SheetsDataError as exc:
@@ -472,11 +491,11 @@ def _load_dataset() -> tuple[dict[str, Any] | None, str | None]:
 
 
 def _load_dashboard_payload(
-    student_id: int,
-    requested_subject: str,
-    requested_group: str,
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str | None]:
-    dataset: dict[str, Any] | None = None
+    student_id,
+    requested_subject,
+    requested_group,
+):
+    dataset = None
     payload = None
     cache_error = None
 
@@ -499,12 +518,13 @@ def _load_dashboard_payload(
 
 
 @app.context_processor
-def inject_asset_version() -> dict[str, str]:
+def inject_asset_version():
     return {"asset_version": ASSET_VERSION}
 
 
 @app.after_request
 def add_common_headers(response):
+    # Apply shared security/cache headers for every response.
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
 
@@ -517,308 +537,78 @@ def add_common_headers(response):
     return response
 
 
-@app.get("/")
-def home() -> str:
-    dataset, load_error = _load_dataset()
-    groups = dataset["groups"] if dataset else []
-    groups_by_subject = dataset["groups_by_subject"] if dataset else {}
-    subjects = dataset["subjects"] if dataset else []
-    if dataset:
-        _seed_group_cache_from_dataset(dataset)
-    students_by_subject_group = (
-        _build_students_by_subject_group(dataset["students"]) if dataset else {}
-    )
-
-    return render_template(
-        "home.html",
-        groups=groups,
-        groups_by_subject=groups_by_subject,
-        subjects=subjects,
-        students_by_subject_group=students_by_subject_group,
-        error=load_error,
-        form_data=_empty_form_data(),
-    )
+def _is_authenticated_session():
+    auth_role = str(session.get("auth_role", "")).strip().lower()
+    if auth_role == "admin":
+        return bool(session.get("admin_id"))
+    if auth_role == "student":
+        return bool(session.get("student_db_id")) and bool(session.get("student_sheet_id"))
+    return False
 
 
-@app.post("/search")
-def search_student_form():
-    form_data = {
-        "student_id": request.form.get("student_id", "").strip(),
-        "group": request.form.get("group", "").strip(),
-        "subject": request.form.get("subject", "").strip(),
+@app.before_request
+def require_authentication_for_protected_routes():
+    endpoint = request.endpoint or ""
+    public_endpoints = {
+        "static",
+        "home",
+        "login",
+        "logout",
+        "manifest",
+        "service_worker",
     }
+    if endpoint in public_endpoints:
+        return None
 
-    if not _is_full_form(form_data):
-        dataset, load_error = _load_dataset()
-        if load_error or not dataset:
-            return (
-                render_template(
-                    "home.html",
-                    groups=[],
-                    groups_by_subject={},
-                    subjects=[],
-                    students_by_subject_group={},
-                    error=load_error or "Unable to load Google Sheets data.",
-                    form_data=form_data,
-                ),
-                503,
-            )
+    if _is_authenticated_session():
+        return None
 
-        return (
-            render_template(
-                "home.html",
-                groups=dataset["groups"],
-                groups_by_subject=dataset["groups_by_subject"],
-                subjects=dataset["subjects"],
-                students_by_subject_group=_build_students_by_subject_group(
-                    dataset["students"]
-                ),
-                error="Please fill all fields.",
-                form_data=form_data,
-            ),
-            400,
-        )
-
-    try:
-        requested_student_id = int(form_data["student_id"])
-    except ValueError:
-        dataset, load_error = _load_dataset()
-        if load_error or not dataset:
-            return (
-                render_template(
-                    "home.html",
-                    groups=[],
-                    groups_by_subject={},
-                    subjects=[],
-                    students_by_subject_group={},
-                    error=load_error or "Unable to load Google Sheets data.",
-                    form_data=form_data,
-                ),
-                503,
-            )
-
-        return (
-            render_template(
-                "home.html",
-                groups=dataset["groups"],
-                groups_by_subject=dataset["groups_by_subject"],
-                subjects=dataset["subjects"],
-                students_by_subject_group=_build_students_by_subject_group(
-                    dataset["students"]
-                ),
-                error="Please choose a valid student from the list.",
-                form_data=form_data,
-            ),
-            400,
-        )
-
-    group_cache_entry, cache_error = _get_group_cache_entry(
-        form_data["subject"],
-        form_data["group"],
-    )
-    if group_cache_entry and requested_student_id in group_cache_entry.get("dashboards_by_id", {}):
-        return redirect(
-            url_for(
-                "dashboard",
-                student_id=requested_student_id,
-                subject=form_data["subject"],
-                group=form_data["group"],
-            )
-        )
-
-    dataset, load_error = _load_dataset()
-    if load_error or not dataset:
-        return (
-            render_template(
-                "home.html",
-                groups=[],
-                groups_by_subject={},
-                subjects=[],
-                students_by_subject_group={},
-                error=load_error or cache_error or "Unable to load Google Sheets data.",
-                form_data=form_data,
-            ),
-            503,
-        )
-
-    return (
-        render_template(
-            "home.html",
-            groups=dataset["groups"],
-            groups_by_subject=dataset["groups_by_subject"],
-            subjects=dataset["subjects"],
-            students_by_subject_group=_build_students_by_subject_group(
-                dataset["students"]
-            ),
-            error="Student not found. Please check your details.",
-            form_data=form_data,
-        ),
-        404,
-    )
+    if request.path.startswith("/api/"):
+        return jsonify({"message": "Authentication required."}), 401
+    return redirect(url_for("home"))
 
 
-@app.get("/dashboard/<int:student_id>")
-def dashboard(student_id: int):
-    requested_subject = request.args.get("subject", "").strip()
-    requested_group = request.args.get("group", "").strip()
-
-    payload, dataset, payload_error = _load_dashboard_payload(
-        student_id=student_id,
-        requested_subject=requested_subject,
-        requested_group=requested_group,
-    )
-    if payload_error:
-        return (
-            render_template(
-                "not_found.html",
-                message=payload_error,
-            ),
-            503,
-        )
-
-    if not payload:
-        return (
-            render_template(
-                "not_found.html",
-                message="We could not retrieve data for this student. Please search again.",
-            ),
-            404,
-        )
-
-    attendance_record = payload["attendanceRecord"]
-    present = attendance_record.get("presentCount", 0)
-    absent = attendance_record.get("absentCount", 0)
-    justified_absent = attendance_record.get("justifiedAbsentCount", 0)
-    total = present + absent + justified_absent
-    attendance_rate = round(((present + justified_absent) / total) * 100) if total else 0
-    exam_scores: list[float] = []
-    for exam_result in payload.get("examResults", []):
-        if not isinstance(exam_result, dict):
-            continue
-        raw_score = exam_result.get("score")
-        try:
-            numeric_score = float(raw_score)
-        except (TypeError, ValueError):
-            continue
-        if not math.isfinite(numeric_score):
-            continue
-        exam_scores.append(numeric_score)
-    exam_performance = (
-        _round_grade_half_up(sum(exam_scores) / len(exam_scores))
-        if exam_scores
-        else 0
-    )
-    program_total_lessons = 180
-    completed_lessons = min(
-        len(payload.get("homeworkGrades", [])),
-        program_total_lessons,
-    )
-    program_completed_rate = round((completed_lessons / program_total_lessons) * 100)
-    subject_rating = _compute_subject_rating(
-        student_id=student_id,
-        payload=payload,
-        dataset=dataset,
-    )
-    rating_board_url = url_for(
-        "rating_board",
-        student_id=student_id,
-        subject=requested_subject or str(payload.get("student", {}).get("subject", "")).strip(),
-        group=requested_group or str(payload.get("student", {}).get("group", "")).strip(),
-    )
-
-    return render_template(
-        "dashboard.html",
-        payload=payload,
-        attendance_rate=attendance_rate,
-        exam_performance=exam_performance,
-        program_completed_lessons=completed_lessons,
-        program_completed_rate=program_completed_rate,
-        subject_rating=subject_rating,
-        rating_board_url=rating_board_url,
-    )
+try:
+    from .routes.dashboard import register_dashboard_routes
+    from .routes.home import register_home_routes
+    from .routes.rating_board import register_rating_board_routes
+except ImportError:
+    if __package__:
+        raise
+    from routes.dashboard import register_dashboard_routes
+    from routes.home import register_home_routes
+    from routes.rating_board import register_rating_board_routes
 
 
-@app.get("/dashboard/<int:student_id>/rating-board")
-def rating_board(student_id: int):
-    requested_subject = request.args.get("subject", "").strip()
-    requested_group = request.args.get("group", "").strip()
-
-    payload, dataset, payload_error = _load_dashboard_payload(
-        student_id=student_id,
-        requested_subject=requested_subject,
-        requested_group=requested_group,
-    )
-    if payload_error:
-        return (
-            render_template(
-                "not_found.html",
-                message=payload_error,
-            ),
-            503,
-        )
-
-    if not payload:
-        return (
-            render_template(
-                "not_found.html",
-                message="We could not retrieve data for this student. Please search again.",
-            ),
-            404,
-        )
-
-    student = payload.get("student", {})
-    if not isinstance(student, dict):
-        return (
-            render_template(
-                "not_found.html",
-                message="Student profile is unavailable.",
-            ),
-            404,
-        )
-
-    subject_name = str(student.get("subject", "")).strip()
-    dashboards = (
-        _collect_subject_dashboards_from_dataset(dataset, subject_name)
-        if dataset
-        else _collect_subject_dashboards_from_cache(subject_name)
-    )
-    if not dashboards:
-        refreshed_dataset, load_error = _load_dataset()
-        if load_error or not refreshed_dataset:
-            return (
-                render_template(
-                    "not_found.html",
-                    message=load_error or "Unable to load subject rating board.",
-                ),
-                503,
-            )
-        _seed_group_cache_from_dataset(refreshed_dataset)
-        dashboards = _collect_subject_dashboards_from_dataset(
-            refreshed_dataset,
-            subject_name,
-        )
-
-    leaderboard = _build_subject_leaderboard(dashboards)
-    current_rating = next(
-        (row for row in leaderboard if row.get("studentId") == student_id),
-        None,
-    )
-    back_url = url_for(
-        "dashboard",
-        student_id=student_id,
-        subject=requested_subject or subject_name,
-        group=requested_group or str(student.get("group", "")).strip(),
-    )
-
-    return render_template(
-        "rating_board.html",
-        current_student=student,
-        current_student_id=student_id,
-        current_rating=current_rating,
-        leaderboard=leaderboard,
-        subject_name=subject_name,
-        back_url=back_url,
-    )
+# Route modules register endpoint handlers on the shared app object.
+register_home_routes(
+    app,
+    load_dataset=_load_dataset,
+    seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
+    build_students_by_subject_group=_build_students_by_subject_group,
+    empty_form_data=_empty_form_data,
+    is_full_form=_is_full_form,
+    get_group_cache_entry=_get_group_cache_entry,
+    search_student=_search_student,
+)
+register_dashboard_routes(
+    app,
+    load_dashboard_payload=_load_dashboard_payload,
+    load_dataset=_load_dataset,
+    extract_attendance_rate=_extract_attendance_rate,
+    extract_exam_average_score=_extract_exam_average_score,
+    round_grade_half_up=_round_grade_half_up,
+    compute_subject_rating=_compute_subject_rating,
+)
+register_rating_board_routes(
+    app,
+    load_dashboard_payload=_load_dashboard_payload,
+    collect_subject_dashboards_from_dataset=_collect_subject_dashboards_from_dataset,
+    collect_subject_dashboards_from_cache=_collect_subject_dashboards_from_cache,
+    load_dataset=_load_dataset,
+    seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
+    build_subject_leaderboard=_build_subject_leaderboard,
+)
 
 
 @app.get("/manifest.webmanifest")
@@ -835,64 +625,6 @@ def service_worker():
     response.headers["Content-Type"] = "application/javascript"
     response.headers["Cache-Control"] = "no-cache"
     return response
-
-
-@app.get("/api/metadata")
-def api_metadata():
-    dataset, load_error = _load_dataset()
-    if load_error or not dataset:
-        return jsonify({"message": load_error or "Unable to load Google Sheets data."}), 503
-
-    return jsonify(
-        {
-            "groups": dataset["groups"],
-            "groupsBySubject": dataset["groups_by_subject"],
-            "studentsBySubjectGroup": _build_students_by_subject_group(
-                dataset["students"]
-            ),
-            "subjects": dataset["subjects"],
-        }
-    )
-
-
-@app.get("/api/students/search")
-def api_search_student():
-    surname = request.args.get("surname", "").strip()
-    name = request.args.get("name", "").strip()
-    group = request.args.get("group", "").strip()
-    subject = request.args.get("subject", "").strip()
-
-    if not all([surname, name, group, subject]):
-        return jsonify({"message": "All fields are required."}), 400
-
-    dataset, load_error = _load_dataset()
-    if load_error or not dataset:
-        return jsonify({"message": load_error or "Unable to load Google Sheets data."}), 503
-
-    student = _search_student(
-        dataset["students"],
-        surname=surname,
-        name=name,
-        group=group,
-        subject=subject,
-    )
-    if not student:
-        return jsonify({"message": "Student not found"}), 404
-
-    return jsonify(student)
-
-
-@app.get("/api/students/<int:student_id>/dashboard")
-def api_student_dashboard(student_id: int):
-    dataset, load_error = _load_dataset()
-    if load_error or not dataset:
-        return jsonify({"message": load_error or "Unable to load Google Sheets data."}), 503
-
-    payload = dataset["dashboards_by_id"].get(student_id)
-    if not payload:
-        return jsonify({"message": "Student not found"}), 404
-
-    return jsonify(payload)
 
 
 if __name__ == "__main__":

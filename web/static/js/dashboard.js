@@ -14,6 +14,143 @@
 
   const data = window.dashboardData || readJsonScript("dashboardDataJson", null);
 
+  const profileMenuToggle = document.getElementById("profileMenuToggle");
+  const profileMenu = document.getElementById("profileMenu");
+  const subjectMenuToggle = document.getElementById("subjectMenuToggle");
+  const subjectMenu = document.getElementById("subjectMenu");
+  const logoutMenuItem = document.getElementById("logoutMenuItem");
+  const logoutConfirmModal = document.getElementById("logoutConfirmModal");
+  const logoutConfirmBtn = document.getElementById("logoutConfirmBtn");
+  const logoutCancelBtn = document.getElementById("logoutCancelBtn");
+  const dashboardLogoutForm = document.getElementById("dashboardLogoutForm");
+
+  function closeProfileMenu() {
+    if (!profileMenu || !profileMenuToggle) {
+      return;
+    }
+    profileMenu.hidden = true;
+    profileMenuToggle.setAttribute("aria-expanded", "false");
+  }
+
+  function openProfileMenu() {
+    if (!profileMenu || !profileMenuToggle) {
+      return;
+    }
+    profileMenu.hidden = false;
+    profileMenuToggle.setAttribute("aria-expanded", "true");
+  }
+
+  function closeSubjectMenu() {
+    if (!subjectMenu || !subjectMenuToggle) {
+      return;
+    }
+    subjectMenu.hidden = true;
+    subjectMenuToggle.setAttribute("aria-expanded", "false");
+  }
+
+  function openSubjectMenu() {
+    if (!subjectMenu || !subjectMenuToggle) {
+      return;
+    }
+    subjectMenu.hidden = false;
+    subjectMenuToggle.setAttribute("aria-expanded", "true");
+  }
+
+  function closeLogoutModal() {
+    if (!logoutConfirmModal) {
+      return;
+    }
+    logoutConfirmModal.hidden = true;
+  }
+
+  function openLogoutModal() {
+    if (!logoutConfirmModal) {
+      return;
+    }
+    logoutConfirmModal.hidden = false;
+  }
+
+  if (profileMenuToggle && profileMenu) {
+    profileMenuToggle.addEventListener("click", function () {
+      if (profileMenu.hidden) {
+        closeSubjectMenu();
+        openProfileMenu();
+      } else {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("click", function (event) {
+      if (
+        !profileMenu.hidden &&
+        !profileMenu.contains(event.target) &&
+        !profileMenuToggle.contains(event.target)
+      ) {
+        closeProfileMenu();
+      }
+    });
+  }
+
+  if (subjectMenuToggle && subjectMenu) {
+    subjectMenuToggle.addEventListener("click", function () {
+      if (subjectMenu.hidden) {
+        closeProfileMenu();
+        openSubjectMenu();
+      } else {
+        closeSubjectMenu();
+      }
+    });
+
+    document.addEventListener("click", function (event) {
+      if (
+        !subjectMenu.hidden &&
+        !subjectMenu.contains(event.target) &&
+        !subjectMenuToggle.contains(event.target)
+      ) {
+        closeSubjectMenu();
+      }
+    });
+  }
+
+  if (logoutMenuItem) {
+    logoutMenuItem.addEventListener("click", function () {
+      closeProfileMenu();
+      openLogoutModal();
+    });
+  }
+
+  if (logoutCancelBtn) {
+    logoutCancelBtn.addEventListener("click", function () {
+      closeLogoutModal();
+    });
+  }
+
+  if (logoutConfirmModal) {
+    logoutConfirmModal.addEventListener("click", function (event) {
+      const target = event.target;
+      if (target && target.getAttribute("data-close-modal") === "true") {
+        closeLogoutModal();
+      }
+    });
+  }
+
+  if (logoutConfirmBtn) {
+    logoutConfirmBtn.addEventListener("click", function () {
+      if (dashboardLogoutForm) {
+        dashboardLogoutForm.submit();
+      }
+    });
+  }
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") {
+      return;
+    }
+    closeProfileMenu();
+    closeSubjectMenu();
+    closeLogoutModal();
+  });
+
   const progressFill = document.getElementById("programProgressFill");
   if (progressFill) {
     const rawRate = Number(progressFill.dataset.rate || "0");
