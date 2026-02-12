@@ -101,7 +101,7 @@
             <button
               type="button"
               id="subjectMenuToggle"
-              class="subject-menu-toggle"
+              class="title-pill subject-menu-toggle"
               aria-haspopup="true"
               aria-expanded="false"
               aria-controls="subjectMenu"
@@ -126,8 +126,8 @@
             </div>
           </div>
 
-          <a class="student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
-            Rating:
+          <a class="title-pill student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
+            Rating
             {% if subject_rating and subject_rating.rank %}
             #{{ subject_rating.rank }}
             {% else %}

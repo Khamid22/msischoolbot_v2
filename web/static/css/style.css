@@ -612,6 +612,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .student-title-block h2 {
@@ -620,34 +621,49 @@ button {
   font-size: clamp(1.08rem, 4.8vw, 1.5rem);
   letter-spacing: 0.03em;
   text-transform: none;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .student-title-actions {
   flex: 0 0 auto;
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  align-items: stretch;
+  gap: 6px;
 }
 
 .student-rating {
   flex: 0 0 auto;
   margin: 0;
+}
+
+.title-pill {
+  width: 100px;
+  min-height: 34px;
   border: 1px solid #000;
   border-radius: 999px;
   box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 1);
   background: #fff;
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-display);
-  font-size: clamp(0.76rem, 3.3vw, 0.95rem);
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 5px 10px;
+  line-height: 1;
+  padding: 5px 8px;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .student-rating-btn {
-  text-decoration: none;
-  color: #000;
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
@@ -920,13 +936,11 @@ body.rating-page.tg-miniapp .rating-table-wrap {
 }
 
 @media (max-width: 560px) {
-  .student-title-block {
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
-  .student-title-actions {
-    margin-left: auto;
+  .title-pill {
+    width: 90px;
+    min-height: 32px;
+    font-size: 0.68rem;
+    padding: 4px 6px;
   }
 
   .rating-table {
@@ -1235,30 +1249,13 @@ body.rating-page.tg-miniapp .rating-table-wrap {
 }
 
 .subject-menu-toggle {
-  min-height: 0;
-  border: 1px solid #000;
-  border-radius: 999px;
-  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 1);
-  background: #fff;
-  color: #000;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 4px;
-  padding: 5px 9px;
-  white-space: nowrap;
 }
 
 .subject-menu-toggle span {
   display: inline-block;
-  font-family: var(--font-display);
-  font-size: clamp(0.72rem, 3vw, 0.9rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  max-width: 60px;
+  max-width: 54px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
