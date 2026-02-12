@@ -1,4 +1,4 @@
-# Telegram Mini App Sample (`aiogram` + `Flask`)
+# Telegram Mini App (`aiogram` + `Flask`)
 
 This project includes:
 - Telegram bot on `aiogram` (polling mode)
