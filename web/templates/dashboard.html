@@ -20,7 +20,6 @@
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}" />
     <style>
-      /* Enhanced icon styles */
       .widget-icon {
         width: 20px;
         height: 20px;
@@ -73,14 +72,24 @@
           <button
             type="button"
             id="profileMenuToggle"
-            class="avatar avatar-btn"
+            class="avatar-btn"
             aria-haspopup="true"
             aria-expanded="false"
             aria-controls="profileMenu"
           >
-            {{ payload.student.initials }}
+            <img
+              class="avatar avatar-img"
+              src="{{ student_profile.photo_url }}"
+              alt="Profile photo"
+              {% if not student_profile.photo_url %}hidden{% endif %}
+              onerror="this.hidden=true; if (this.nextElementSibling) { this.nextElementSibling.hidden=false; }"
+            />
+            <span class="avatar avatar-fallback" {% if student_profile.photo_url %}hidden{% endif %}>
+              {{ payload.student.initials }}
+            </span>
           </button>
           <div id="profileMenu" class="profile-menu" hidden>
+            <button type="button" id="profileMenuItem" class="profile-menu-item">Profile</button>
             <button type="button" id="logoutMenuItem" class="profile-menu-item">Logout</button>
           </div>
         </div>
@@ -161,7 +170,11 @@
       </section>
 
       <section class="stats-grid">
-        <article class="stat-card stat-card-compact">
+        <a
+          class="stat-card stat-card-compact stat-card-link"
+          href="{{ aap_lessons_url }}"
+          aria-label="Open AAP lesson mastery table"
+        >
           <p class="stat-title title-inline icon-success">
             <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
@@ -170,7 +183,7 @@
             AAP
           </p>
           <h3>{{ (payload.averageGrade|float + 0.5)|int }}/9</h3>
-        </article>
+        </a>
 
         <article class="stat-card stat-card-compact">
           <p class="stat-title title-inline icon-info">
@@ -306,6 +319,54 @@
         <div class="confirm-modal-actions">
           <button type="button" id="logoutCancelBtn" class="secondary-btn">Cancel</button>
           <button type="button" id="logoutConfirmBtn" class="primary-btn danger-btn">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="studentProfileModal" class="confirm-modal" hidden>
+      <div class="confirm-modal-backdrop" data-close-profile-modal="true"></div>
+      <div class="confirm-modal-card profile-modal-card" role="dialog" aria-modal="true" aria-labelledby="studentProfileTitle">
+        <h3 id="studentProfileTitle">Profile</h3>
+        <div class="profile-modal-body">
+          {% if student_profile.photo_url %}
+          <img class="profile-photo" src="{{ student_profile.photo_url }}" alt="Student photo" />
+          {% else %}
+          <div class="profile-photo profile-photo-fallback" aria-hidden="true">{{ payload.student.initials }}</div>
+          {% endif %}
+
+          <div class="profile-kv">
+            <span>Group</span>
+            <strong>{{ student_profile.group_name if student_profile.group_name else "-" }}</strong>
+          </div>
+          <div class="profile-kv">
+            <span>School</span>
+            <strong>{{ student_profile.school_name if student_profile.school_name else "-" }}</strong>
+          </div>
+          <div class="profile-kv">
+            <span>Teacher</span>
+            <strong>{{ student_profile.teacher_name if student_profile.teacher_name else "-" }}</strong>
+          </div>
+          <div class="profile-kv">
+            <span>Group mates</span>
+            {% if student_profile.classmates %}
+            <ul class="profile-classmates-list">
+              {% for classmate in student_profile.classmates %}
+              <li>{{ classmate }}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <strong>-</strong>
+            {% endif %}
+          </div>
+          {% if student_profile.profile_description %}
+          <div class="profile-kv">
+            <span>Description</span>
+            <p>{{ student_profile.profile_description }}</p>
+          </div>
+          {% endif %}
+        </div>
+        <div class="confirm-modal-actions">
+          <button type="button" id="profileCloseBtn" class="secondary-btn">Close</button>
         </div>
       </div>
     </div>

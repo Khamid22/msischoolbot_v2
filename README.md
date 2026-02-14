@@ -26,7 +26,7 @@ Create `.env` in the project root:
 - `PORT` (overrides `FLASK_PORT`)
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
-- `AUTH_DB_PATH` (optional path for SQLite, default: `web/app_data.sqlite3`)
+- `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
 - `OWNER_ADMIN_LOGIN` (default: `staff280902`)
 - `OWNER_ADMIN_PASSWORD` (default: `Khamid007`)
 
@@ -64,11 +64,13 @@ Create `.env` in the project root:
 
 Main tables used for auth and admin data:
 - `admins`
-- `students` (required columns: ID, Full Name, Student ID, Password, Subjects)
+- `students` (required columns: ID, Full Name, Student ID, Password, Subjects, Telegram User ID)
 - `student_auth` (hashed password storage)
 - `students_sheet_map` (Google Sheets student mapping)
 - `bot_users`
 - `app_meta`
+- `subject_summaries` (daily snapshot for bot quick summary: subject, AAP, AR, EP, rating, total coins)
+- `lesson_catalog` (daily snapshot of lesson number/topic per subject for AAP lesson table)
 
 ## Run Locally
 
@@ -82,21 +84,19 @@ Or run separately:
 
 Web:
 ```bash
-python -m web.app
-```
-
-Bot:
-```bash
-python -m bot.main
+python -m web.server
 ```
 
 ## Project Structure
 
 - `config.py` - shared config
 - `main.py` - starts Flask thread + bot loop
-- `bot/main.py` - Telegram handlers and bot startup
-- `web/app.py` - Flask app, helpers, auth guard, route registration
+- `bot/handlers/start.py` - `/start` handler
+- `bot/keyboards/inline_keyboard.py` - inline keyboard builders
+- `web/server.py` - Flask app, helpers, auth guard, route registration
 - `web/auth_store.py` - SQLite auth, daily sync, bot-user tracking
+- `web/subject_summary_store.py` - daily Google Sheets -> SQLite sync for bot quick summary
+- `web/lesson_catalog_store.py` - daily Google Sheets -> SQLite sync for lesson number/topic catalog
 - `web/routes/home.py` - login/logout, home, search APIs
 - `web/routes/dashboard.py` - dashboard endpoints
 - `web/routes/rating_board.py` - rating board page

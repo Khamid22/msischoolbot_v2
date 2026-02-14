@@ -19,9 +19,12 @@
   const subjectMenuToggle = document.getElementById("subjectMenuToggle");
   const subjectMenu = document.getElementById("subjectMenu");
   const logoutMenuItem = document.getElementById("logoutMenuItem");
+  const profileMenuItem = document.getElementById("profileMenuItem");
   const logoutConfirmModal = document.getElementById("logoutConfirmModal");
   const logoutConfirmBtn = document.getElementById("logoutConfirmBtn");
   const logoutCancelBtn = document.getElementById("logoutCancelBtn");
+  const studentProfileModal = document.getElementById("studentProfileModal");
+  const profileCloseBtn = document.getElementById("profileCloseBtn");
   const dashboardLogoutForm = document.getElementById("dashboardLogoutForm");
 
   function closeProfileMenu() {
@@ -68,6 +71,20 @@
       return;
     }
     logoutConfirmModal.hidden = false;
+  }
+
+  function closeProfileModal() {
+    if (!studentProfileModal) {
+      return;
+    }
+    studentProfileModal.hidden = true;
+  }
+
+  function openProfileModal() {
+    if (!studentProfileModal) {
+      return;
+    }
+    studentProfileModal.hidden = false;
   }
 
   if (profileMenuToggle && profileMenu) {
@@ -119,6 +136,13 @@
     });
   }
 
+  if (profileMenuItem) {
+    profileMenuItem.addEventListener("click", function () {
+      closeProfileMenu();
+      openProfileModal();
+    });
+  }
+
   if (logoutCancelBtn) {
     logoutCancelBtn.addEventListener("click", function () {
       closeLogoutModal();
@@ -131,6 +155,21 @@
       if (target && target.getAttribute("data-close-modal") === "true") {
         closeLogoutModal();
       }
+    });
+  }
+
+  if (studentProfileModal) {
+    studentProfileModal.addEventListener("click", function (event) {
+      const target = event.target;
+      if (target && target.getAttribute("data-close-profile-modal") === "true") {
+        closeProfileModal();
+      }
+    });
+  }
+
+  if (profileCloseBtn) {
+    profileCloseBtn.addEventListener("click", function () {
+      closeProfileModal();
     });
   }
 
@@ -149,6 +188,7 @@
     closeProfileMenu();
     closeSubjectMenu();
     closeLogoutModal();
+    closeProfileModal();
   });
 
   const progressFill = document.getElementById("programProgressFill");

@@ -1,1 +1,1 @@
-# Package marker for `python -m bot.main`.
+# Package marker for `bot` modules.

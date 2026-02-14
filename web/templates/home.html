@@ -47,12 +47,18 @@
         <div class="form-error">{{ auth_error }}</div>
         {% endif %}
 
+        {% if admin_notice %}
+        <div class="form-notice">{{ admin_notice }}</div>
+        {% endif %}
+
         {% if error %}
         <div class="form-error">{{ error }}</div>
         {% endif %}
 
         {% if not auth_role %}
         <form action="{{ url_for('login') }}" method="post" class="login-form">
+          <input type="hidden" id="loginTelegramUserId" name="telegram_user_id" value="" />
+
           <label class="field">
             <span>Login</span>
             <input type="text" name="login" value="{{ auth_login_input|default('', true) }}" placeholder="Staff or Student ID" autocomplete="username" required />
@@ -74,29 +80,134 @@
           </form>
         </div>
 
-        <section class="admin-panel">
-          <div class="admin-stat-card">
-            <h2>Bot Users</h2>
-            <p>{{ bot_users_count }}</p>
+        <section class="admin-panel admin-panel-{{ admin_panel }}">
+          <div class="admin-switch-row">
+            <a
+              href="{{ url_for('home', panel='students') }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel != 'teachers' %}is-active{% endif %}"
+            >
+              Students
+            </a>
+            <a
+              href="{{ url_for('home', panel='teachers') }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
+            >
+              Teachers
+            </a>
           </div>
 
+          {% if admin_panel == "teachers" %}
+          <div class="admin-card teacher-form-card">
+            <h2 class="admin-card-title">Teacher Assignment</h2>
+            <form id="teacherForm" action="{{ url_for('add_teacher') }}" method="post" class="login-form">
+              {% if admin_teacher_edit %}
+              {% set teacher_initial_mode = "add" %}
+              {% else %}
+              {% set teacher_initial_mode = "select" %}
+              {% endif %}
+              <input type="hidden" id="teacherModeInput" name="teacher_mode" value="{{ teacher_initial_mode }}" />
+              <input type="hidden" name="teacher_edit_id" value="{{ admin_teacher_edit.id if admin_teacher_edit else '' }}" />
+
+              <div class="teacher-mode-switch">
+                <button type="button" id="teacherModeSelectBtn" class="secondary-btn teacher-mode-btn {% if teacher_initial_mode == 'select' %}is-active{% endif %}">Select</button>
+                <button type="button" id="teacherModeAddBtn" class="secondary-btn teacher-mode-btn {% if teacher_initial_mode == 'add' %}is-active{% endif %}">Add New</button>
+                {% if admin_teacher_edit %}
+                <a href="{{ url_for('home', panel='teachers') }}" class="secondary-btn teacher-mode-btn teacher-cancel-btn">Cancel Edit</a>
+                {% endif %}
+              </div>
+
+              <div id="teacherModeSelectPane" class="teacher-mode-pane" {% if teacher_initial_mode != "select" %}hidden{% endif %}>
+                <label class="field">
+                  <span>Select Teacher</span>
+                  <select id="teacherSelectedName" name="teacher_selected_name" required>
+                    <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select from existing teachers</option>
+                    {% for teacher_name in admin_teacher_name_options %}
+                    <option value="{{ teacher_name }}" {% if admin_teacher_edit and teacher_name == admin_teacher_edit.full_name %}selected{% endif %}>{{ teacher_name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
+
+              <div id="teacherModeAddPane" class="teacher-mode-pane" {% if teacher_initial_mode != "add" %}hidden{% endif %}>
+                <label class="field">
+                  <span>Teacher Full Name</span>
+                  <input id="teacherFullNameInput" type="text" name="teacher_full_name" placeholder="Teacher full name" value="{{ admin_teacher_edit.full_name if admin_teacher_edit else '' }}" />
+                </label>
+                <label class="field">
+                  <span>Pay Rate</span>
+                  <input id="teacherPayRateInput" type="number" name="teacher_pay_rate" step="0.01" min="0" placeholder="0.00" value="{{ admin_teacher_edit.pay_rate if admin_teacher_edit else '' }}" />
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Assign To Group</span>
+                <select name="teacher_assigned_group" required>
+                  <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select group</option>
+                  {% for group_name in admin_groups %}
+                  <option value="{{ group_name }}" {% if admin_teacher_edit and group_name == admin_teacher_edit.assigned_group %}selected{% endif %}>{{ group_name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit" class="primary-btn teacher-save-btn">Save changes</button>
+            </form>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table teachers-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Pay Rate</th>
+                  <th>Assigned Group</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for teacher in admin_teachers %}
+                <tr>
+                  <td>{{ teacher.id }}</td>
+                  <td>{{ teacher.full_name }}</td>
+                  <td>{{ teacher.pay_rate }}</td>
+                  <td>{{ teacher.assigned_group }}</td>
+                  <td class="teachers-actions-cell">
+                    <a class="secondary-btn teachers-action-btn" href="{{ url_for('home', panel='teachers', edit_teacher_id=teacher.id) }}">Edit</a>
+                    <form action="{{ url_for('delete_teacher', teacher_id=teacher.id) }}" method="post" onsubmit="return confirm('Delete this teacher?');">
+                      <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% if not admin_teachers %}
+                <tr>
+                  <td colspan="5">No teachers yet.</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
           <div class="admin-table-wrap">
             <table class="admin-table">
               <thead>
                 <tr>
+                  <th>ID</th>
                   <th>Full Name</th>
-                  <th>Enrolled Course</th>
                   <th>Student ID</th>
-                  <th>Password</th>
+                  <th>Subjects</th>
                 </tr>
               </thead>
               <tbody>
                 {% for student in admin_students %}
                 <tr>
-                  <td>{{ student.full_name }}</td>
-                  <td>{{ student.subjects }}</td>
+                  <td>{{ student.id }}</td>
+                  <td>
+                    <a class="admin-student-link" href="{{ url_for('admin_student_profile', student_row_id=student.id) }}">
+                      {{ student.full_name }}
+                    </a>
+                  </td>
                   <td>{{ student.student_id }}</td>
-                  <td>{{ student.password }}</td>
+                  <td>{{ student.subjects }}</td>
                 </tr>
                 {% endfor %}
                 {% if not admin_students %}
@@ -107,6 +218,8 @@
               </tbody>
             </table>
           </div>
+
+          {% endif %}
         </section>
 
         {% else %}
@@ -166,6 +279,62 @@
     <script id="studentsBySubjectGroupJson" type="application/json">{{ students_by_subject_group|default({}, true)|tojson|safe }}</script>
     <script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
     <script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+    <script>
+      (function () {
+        const modeInput = document.getElementById("teacherModeInput");
+        if (!modeInput) {
+          return;
+        }
+
+        const selectBtn = document.getElementById("teacherModeSelectBtn");
+        const addBtn = document.getElementById("teacherModeAddBtn");
+        const selectPane = document.getElementById("teacherModeSelectPane");
+        const addPane = document.getElementById("teacherModeAddPane");
+        const selectedName = document.getElementById("teacherSelectedName");
+        const fullName = document.getElementById("teacherFullNameInput");
+        const payRate = document.getElementById("teacherPayRateInput");
+
+        function setMode(mode) {
+          const isSelect = mode === "select";
+          modeInput.value = isSelect ? "select" : "add";
+
+          if (selectPane) {
+            selectPane.hidden = !isSelect;
+          }
+          if (addPane) {
+            addPane.hidden = isSelect;
+          }
+          if (selectedName) {
+            selectedName.required = isSelect;
+          }
+          if (fullName) {
+            fullName.required = !isSelect;
+          }
+          if (payRate) {
+            payRate.required = !isSelect;
+          }
+          if (selectBtn) {
+            selectBtn.classList.toggle("is-active", isSelect);
+          }
+          if (addBtn) {
+            addBtn.classList.toggle("is-active", !isSelect);
+          }
+        }
+
+        if (selectBtn) {
+          selectBtn.addEventListener("click", function () {
+            setMode("select");
+          });
+        }
+        if (addBtn) {
+          addBtn.addEventListener("click", function () {
+            setMode("add");
+          });
+        }
+
+        setMode(modeInput.value === "add" ? "add" : "select");
+      })();
+    </script>
     <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
   </body>
 </html>

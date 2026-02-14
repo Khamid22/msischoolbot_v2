@@ -11,7 +11,7 @@ try:
 except ImportError:
     if __package__:
         raise
-    # Allow running `python web/app.py` by adding project root to import path.
+    # Allow running `python web/server.py` by adding project root to import path.
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from config import get_web_settings
 
@@ -42,7 +42,7 @@ def _build_default_asset_version():
     # Build a simple asset version from the latest static/template file mtime.
     base_dir = os.path.dirname(__file__)
     candidate_paths = [
-        os.path.join(base_dir, "app.py"),
+        os.path.join(base_dir, "server.py"),
         os.path.join(base_dir, "templates", "dashboard.html"),
         os.path.join(base_dir, "templates", "home.html"),
         os.path.join(base_dir, "static", "js", "dashboard.js"),
@@ -625,11 +625,3 @@ def service_worker():
     response.headers["Content-Type"] = "application/javascript"
     response.headers["Cache-Control"] = "no-cache"
     return response
-
-
-if __name__ == "__main__":
-    app.run(
-        host=settings.flask_host,
-        port=settings.flask_port,
-        debug=os.environ.get("FLASK_DEBUG") == "1",
-    )

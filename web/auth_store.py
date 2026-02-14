@@ -1,19 +1,25 @@
 import os
-import sqlite3
 import threading
 from datetime import datetime
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-# SQLite file for auth and local app data.
-_DB_PATH = os.environ.get(
-    "AUTH_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "app_data.sqlite3"),
-)
+try:
+    from utils.databaseStorage import connect_auth_db
+except ImportError:
+    import sys
 
-# Main owner credentials (can be overridden via env if needed).
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from utils.databaseStorage import connect_auth_db
+
+try:
+    from . import db_requests
+except ImportError:
+    import db_requests
+
 _OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "staff280902") or "staff280902").strip()
 _OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "Khamid007") or "Khamid007").strip()
+_DEFAULT_SCHOOL_NAME = "School 5"
 
 _DB_LOCK = threading.Lock()
 _SYNC_LOCK = threading.Lock()
@@ -28,101 +34,32 @@ def _utc_today_iso():
 
 
 def _connect():
-    conn = sqlite3.connect(_DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    return connect_auth_db()
 
 
 def init_storage():
     with _DB_LOCK:
         with _connect() as conn:
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS admins (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    login TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'admin',
-                    is_owner INTEGER NOT NULL DEFAULT 0 CHECK (is_owner IN (0, 1)),
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS students (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    full_name TEXT NOT NULL,
-                    student_id TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                    password TEXT NOT NULL,
-                    subjects TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS students_sheet_map (
-                    sheet_student_id INTEGER PRIMARY KEY,
-                    student_row_id INTEGER NOT NULL UNIQUE,
-                    FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS student_auth (
-                    student_row_id INTEGER PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS bot_users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    telegram_user_id INTEGER NOT NULL UNIQUE,
-                    username TEXT,
-                    first_name TEXT,
-                    last_name TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_meta (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                )
-                """
-            )
+            db_requests.create_tables(conn)
+            _ensure_students_schema(conn)
             _ensure_owner_admin(conn)
             conn.commit()
 
 
+def _ensure_students_schema(conn):
+    db_requests.ensure_students_schema(conn)
+
+
 def _ensure_owner_admin(conn):
-    owner = conn.execute(
-        "SELECT id FROM admins WHERE lower(login) = lower(?)",
-        (_OWNER_LOGIN,),
-    ).fetchone()
+    owner = db_requests.get_admin_id_by_login(conn, _OWNER_LOGIN)
     if owner:
         return
 
-    conn.execute(
-        """
-        INSERT INTO admins (login, password_hash, role, is_owner, created_at)
-        VALUES (?, ?, ?, 1, ?)
-        """,
-        (
-            _OWNER_LOGIN,
-            generate_password_hash(_OWNER_PASSWORD),
-            "owner",
-            _utc_now_iso(),
-        ),
+    db_requests.insert_owner_admin(
+        conn,
+        _OWNER_LOGIN,
+        generate_password_hash(_OWNER_PASSWORD),
+        _utc_now_iso(),
     )
 
 
@@ -138,14 +75,10 @@ def detect_login_role(login):
 def verify_admin_credentials(login, password):
     init_storage()
     with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT id, login, password_hash, role, is_owner
-            FROM admins
-            WHERE lower(login) = lower(?)
-            """,
-            ((login or "").strip(),),
-        ).fetchone()
+        row = db_requests.get_admin_credentials_row(
+            conn,
+            (login or "").strip(),
+        )
 
     if not row:
         return None
@@ -165,23 +98,7 @@ def verify_student_credentials(login, password):
     student_login = (login or "").strip().upper()
 
     with _connect() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                s.id,
-                s.full_name,
-                s.student_id,
-                s.password,
-                s.subjects,
-                a.password_hash,
-                m.sheet_student_id
-            FROM students s
-            JOIN student_auth a ON a.student_row_id = s.id
-            LEFT JOIN students_sheet_map m ON m.student_row_id = s.id
-            WHERE upper(s.student_id) = upper(?)
-            """,
-            (student_login,),
-        ).fetchone()
+        row = db_requests.get_student_login_row(conn, student_login)
 
     if not row:
         return None
@@ -195,41 +112,25 @@ def verify_student_credentials(login, password):
         "full_name": str(row["full_name"]),
         "student_id": str(row["student_id"]),
         "subjects": str(row["subjects"]),
+        "telegram_user_id": (
+            int(row["telegram_user_id"])
+            if row["telegram_user_id"] is not None
+            else None
+        ),
         "sheet_student_id": int(row["sheet_student_id"]),
     }
 
 
 def _next_student_code(conn):
-    row = conn.execute(
-        """
-        SELECT MAX(CAST(SUBSTR(student_id, 4) AS INTEGER)) AS max_num
-        FROM students
-        WHERE upper(student_id) LIKE 'MSI%'
-        """
-    ).fetchone()
-    next_num = int(row["max_num"] or 0) + 1
-    return f"MSI{next_num:05d}"
+    return db_requests.get_next_student_code(conn)
 
 
 def _upsert_meta(conn, key, value):
-    conn.execute(
-        """
-        INSERT INTO app_meta (key, value)
-        VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """,
-        (key, value),
-    )
+    db_requests.upsert_meta(conn, key, value)
 
 
 def _get_meta(conn, key):
-    row = conn.execute(
-        "SELECT value FROM app_meta WHERE key = ?",
-        (key,),
-    ).fetchone()
-    if not row:
-        return ""
-    return str(row["value"])
+    return db_requests.get_meta(conn, key)
 
 
 def _normalize_subject_label(subject_name):
@@ -239,6 +140,17 @@ def _normalize_subject_label(subject_name):
     if normalized in {"general english", "english"}:
         return "English"
     return (subject_name or "").strip()
+
+
+def _normalize_name(value):
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def _split_subjects(subjects_value):
+    normalized = str(subjects_value or "").replace(";", ",")
+    parts = [part.strip() for part in normalized.split(",")]
+    cleaned = [part for part in parts if part]
+    return cleaned
 
 
 def sync_students_from_dataset(dataset):
@@ -268,52 +180,38 @@ def sync_students_from_dataset(dataset):
                 if not subject_label:
                     subject_label = "Unknown"
 
-                mapping = conn.execute(
-                    """
-                    SELECT student_row_id
-                    FROM students_sheet_map
-                    WHERE sheet_student_id = ?
-                    """,
-                    (sheet_student_id,),
-                ).fetchone()
+                mapping = db_requests.get_students_sheet_map_row(conn, sheet_student_id)
 
                 if mapping:
                     student_row_id = int(mapping["student_row_id"])
-                    conn.execute(
-                        """
-                        UPDATE students
-                        SET full_name = ?, subjects = ?
-                        WHERE id = ?
-                        """,
-                        (full_name, subject_label, student_row_id),
+                    db_requests.update_student_profile(
+                        conn,
+                        full_name,
+                        subject_label,
+                        student_row_id,
                     )
                     updated += 1
                     continue
 
                 student_code = _next_student_code(conn)
                 default_password = student_code
-                inserted = conn.execute(
-                    """
-                    INSERT INTO students (full_name, student_id, password, subjects)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (full_name, student_code, default_password, subject_label),
+                student_row_id = db_requests.insert_student(
+                    conn,
+                    full_name,
+                    student_code,
+                    default_password,
+                    subject_label,
                 )
-                student_row_id = int(inserted.lastrowid)
-
-                conn.execute(
-                    """
-                    INSERT INTO student_auth (student_row_id, password_hash, updated_at)
-                    VALUES (?, ?, ?)
-                    """,
-                    (student_row_id, generate_password_hash(default_password), _utc_now_iso()),
+                db_requests.insert_student_auth(
+                    conn,
+                    student_row_id,
+                    generate_password_hash(default_password),
+                    _utc_now_iso(),
                 )
-                conn.execute(
-                    """
-                    INSERT INTO students_sheet_map (sheet_student_id, student_row_id)
-                    VALUES (?, ?)
-                    """,
-                    (sheet_student_id, student_row_id),
+                db_requests.insert_students_sheet_map(
+                    conn,
+                    sheet_student_id,
+                    student_row_id,
                 )
                 added += 1
 
@@ -358,13 +256,84 @@ def sync_students_if_needed(load_dataset):
 def list_students_for_admin():
     init_storage()
     with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, full_name, student_id, password, subjects
-            FROM students
-            ORDER BY full_name COLLATE NOCASE ASC, id ASC
-            """
-        ).fetchall()
+        rows = db_requests.list_students_for_admin_rows(conn)
+
+    grouped = {}
+    for row in rows:
+        full_name = str(row["full_name"]).strip()
+        key = _normalize_name(full_name)
+        item = grouped.get(key)
+
+        row_subjects = _split_subjects(row["subjects"])
+        if item is None:
+            grouped[key] = {
+                "id": int(row["id"]),
+                "full_name": full_name,
+                "student_id": str(row["student_id"]),
+                "password": str(row["password"]),
+                "subjects_set": set(row_subjects),
+                "telegram_user_id": (
+                    int(row["telegram_user_id"])
+                    if row["telegram_user_id"] is not None
+                    else None
+                ),
+            }
+            continue
+
+        item["subjects_set"].update(row_subjects)
+
+    results = []
+    for key in sorted(grouped.keys()):
+        item = grouped[key]
+        subjects_sorted = sorted(item["subjects_set"], key=lambda value: value.casefold())
+        results.append(
+            {
+                "id": int(item["id"]),
+                "full_name": str(item["full_name"]),
+                "student_id": str(item["student_id"]),
+                "password": str(item["password"]),
+                "subjects": ", ".join(subjects_sorted),
+                "telegram_user_id": item["telegram_user_id"],
+            }
+        )
+    return results
+
+
+def update_student_admin_profile(
+    student_row_id,
+    photo_url,
+    profile_description,
+    class_name,
+    school_name,
+    teacher_name,
+):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return False
+
+    init_storage()
+    with _DB_LOCK:
+        with _connect() as conn:
+            existing = db_requests.get_student_admin_row(conn, student_row_id)
+            if not existing:
+                return False
+
+            db_requests.update_student_admin_profile(
+                conn,
+                student_row_id,
+                str(photo_url or "").strip(),
+                str(profile_description or "").strip(),
+                str(class_name or "").strip(),
+                str(school_name or "").strip(),
+                str(teacher_name or "").strip(),
+            )
+            conn.commit()
+    return True
+
+
+def list_teachers():
+    init_storage()
+    with _connect() as conn:
+        rows = db_requests.list_teachers_rows(conn)
 
     results = []
     for row in rows:
@@ -372,19 +341,363 @@ def list_students_for_admin():
             {
                 "id": int(row["id"]),
                 "full_name": str(row["full_name"]),
-                "student_id": str(row["student_id"]),
-                "password": str(row["password"]),
-                "subjects": str(row["subjects"]),
+                "pay_rate": float(row["pay_rate"] or 0),
+                "assigned_group": str(row["assigned_group"]),
             }
         )
     return results
 
 
+def get_teacher_by_id(teacher_id):
+    if not isinstance(teacher_id, int) or teacher_id <= 0:
+        return None
+
+    init_storage()
+    with _connect() as conn:
+        row = db_requests.get_teacher_by_id_row(conn, teacher_id)
+    if not row:
+        return None
+    return {
+        "id": int(row["id"]),
+        "full_name": str(row["full_name"]),
+        "pay_rate": float(row["pay_rate"] or 0),
+        "assigned_group": str(row["assigned_group"]),
+    }
+
+
+def upsert_teacher(full_name, pay_rate, assigned_group):
+    normalized_name = str(full_name or "").strip()
+    normalized_group = str(assigned_group or "").strip()
+    if not normalized_name or not normalized_group:
+        return False
+
+    try:
+        safe_pay_rate = float(pay_rate)
+    except (TypeError, ValueError):
+        return False
+
+    if safe_pay_rate < 0:
+        safe_pay_rate = 0
+
+    init_storage()
+    now = _utc_now_iso()
+    with _DB_LOCK:
+        with _connect() as conn:
+            db_requests.insert_teacher_row(
+                conn,
+                normalized_name,
+                safe_pay_rate,
+                normalized_group,
+                now,
+                now,
+            )
+            conn.commit()
+    return True
+
+
+def update_teacher_by_id(teacher_id, full_name, pay_rate, assigned_group):
+    if not isinstance(teacher_id, int) or teacher_id <= 0:
+        return False, "Teacher not found."
+
+    normalized_name = str(full_name or "").strip()
+    normalized_group = str(assigned_group or "").strip()
+    if not normalized_name or not normalized_group:
+        return False, "Teacher full name and group are required."
+
+    try:
+        safe_pay_rate = float(pay_rate)
+    except (TypeError, ValueError):
+        return False, "Pay rate must be a number."
+    if safe_pay_rate < 0:
+        safe_pay_rate = 0
+
+    init_storage()
+    now = _utc_now_iso()
+    with _DB_LOCK:
+        with _connect() as conn:
+            existing = db_requests.get_teacher_by_id_row(conn, teacher_id)
+            if not existing:
+                return False, "Teacher not found."
+
+            group_owner = db_requests.get_teacher_by_group_row(conn, normalized_group)
+            if group_owner and int(group_owner["id"]) != teacher_id:
+                return False, "Selected group is already assigned to another teacher."
+
+            db_requests.update_teacher_row_by_id(
+                conn,
+                teacher_id,
+                normalized_name,
+                safe_pay_rate,
+                normalized_group,
+                now,
+            )
+            conn.commit()
+    return True, ""
+
+
+def delete_teacher_by_id(teacher_id):
+    if not isinstance(teacher_id, int) or teacher_id <= 0:
+        return False
+
+    init_storage()
+    with _DB_LOCK:
+        with _connect() as conn:
+            existing = db_requests.get_teacher_by_id_row(conn, teacher_id)
+            if not existing:
+                return False
+            db_requests.delete_teacher_row_by_id(conn, teacher_id)
+            conn.commit()
+    return True
+
+
+def get_teacher_name_by_group(group_name):
+    normalized_group = str(group_name or "").strip()
+    if not normalized_group:
+        return ""
+
+    init_storage()
+    with _connect() as conn:
+        row = db_requests.get_teacher_by_group_row(conn, normalized_group)
+    if not row:
+        return ""
+    return str(row["full_name"]).strip()
+
+
+def assign_teacher_to_group(group_name, teacher_name):
+    normalized_group = str(group_name or "").strip()
+    if not normalized_group:
+        return False
+
+    normalized_teacher = str(teacher_name or "").strip()
+    init_storage()
+    now = _utc_now_iso()
+
+    with _DB_LOCK:
+        with _connect() as conn:
+            if not normalized_teacher:
+                db_requests.delete_teacher_by_group(conn, normalized_group)
+                conn.commit()
+                return True
+
+            existing_teacher = db_requests.get_teacher_by_full_name_row(
+                conn,
+                normalized_teacher,
+            )
+            pay_rate = (
+                float(existing_teacher["pay_rate"])
+                if existing_teacher is not None
+                else 0.0
+            )
+            db_requests.insert_teacher_row(
+                conn,
+                normalized_teacher,
+                pay_rate,
+                normalized_group,
+                now,
+                now,
+            )
+            conn.commit()
+    return True
+
+
+def _split_name(full_name):
+    parts = [part for part in str(full_name or "").strip().split() if part]
+    if not parts:
+        return {"surname": "", "name": ""}
+    if len(parts) == 1:
+        return {"surname": parts[0], "name": ""}
+    return {"surname": parts[0], "name": " ".join(parts[1:])}
+
+
+def _extract_auto_student_context(full_name, load_dataset):
+    context = {
+        "groups": [],
+        "group": "",
+        "classmates": [],
+    }
+    if load_dataset is None:
+        return context
+
+    dataset, load_error = load_dataset()
+    if load_error or not dataset:
+        return context
+
+    students = dataset.get("students", [])
+    if not isinstance(students, list):
+        return context
+
+    normalized_full_name = _normalize_name(full_name)
+    matched = [
+        student
+        for student in students
+        if isinstance(student, dict)
+        and _normalize_name(student.get("fullName", "")) == normalized_full_name
+    ]
+    if not matched:
+        return context
+
+    groups = sorted(
+        {
+            str(student.get("group", "")).strip()
+            for student in matched
+            if str(student.get("group", "")).strip()
+        },
+        key=lambda value: value.casefold(),
+    )
+    group_name = groups[0] if groups else ""
+
+    subject_name = str(matched[0].get("subject", "")).strip()
+    classmates = []
+    seen = set()
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        if str(student.get("group", "")).strip() != group_name:
+            continue
+        if str(student.get("subject", "")).strip() != subject_name:
+            continue
+
+        classmate_name = str(student.get("fullName", "")).strip()
+        if not classmate_name:
+            continue
+        if _normalize_name(classmate_name) == normalized_full_name:
+            continue
+        key = _normalize_name(classmate_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        classmates.append(classmate_name)
+
+    classmates.sort(key=lambda value: value.casefold())
+    context["groups"] = groups
+    context["group"] = group_name
+    context["classmates"] = classmates
+    return context
+
+
+def get_admin_student_profile(student_row_id, load_dataset):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return None
+
+    init_storage()
+    with _connect() as conn:
+        row = db_requests.get_student_admin_row(conn, student_row_id)
+    if not row:
+        return None
+
+    full_name = str(row["full_name"]).strip()
+    auto_context = _extract_auto_student_context(full_name, load_dataset)
+    teacher_name = get_teacher_name_by_group(auto_context.get("group", ""))
+    split_name = _split_name(full_name)
+
+    return {
+        "id": int(row["id"]),
+        "full_name": full_name,
+        "surname": split_name["surname"],
+        "name": split_name["name"],
+        "student_id": str(row["student_id"]).strip(),
+        "subjects": str(row["subjects"]).strip(),
+        "photo_url": str(row["photo_url"] or "").strip(),
+        "profile_description": str(row["profile_description"] or "").strip(),
+        "class_name": str(row["class_name"] or "").strip(),
+        "school_name": _DEFAULT_SCHOOL_NAME,
+        "group": str(auto_context.get("group", "")).strip(),
+        "groups": list(auto_context.get("groups", [])),
+        "classmates": list(auto_context.get("classmates", [])),
+        "teacher_name": teacher_name,
+    }
+
+
+def get_dashboard_student_profile(
+    student_db_id,
+    full_name,
+    group_name,
+    subject_name,
+    load_dataset,
+):
+    profile = {
+        "full_name": str(full_name or "").strip(),
+        "photo_url": "",
+        "profile_description": "",
+        "class_name": "",
+        "school_name": _DEFAULT_SCHOOL_NAME,
+        "group_name": str(group_name or "").strip(),
+        "teacher_name": "",
+        "classmates": [],
+    }
+
+    if isinstance(student_db_id, int) and student_db_id > 0:
+        init_storage()
+        with _connect() as conn:
+            row = db_requests.get_student_admin_row(conn, student_db_id)
+        if row:
+            profile["photo_url"] = str(row["photo_url"] or "").strip()
+            profile["profile_description"] = str(row["profile_description"] or "").strip()
+            profile["class_name"] = str(row["class_name"] or "").strip()
+            profile["school_name"] = _DEFAULT_SCHOOL_NAME
+
+    profile["teacher_name"] = get_teacher_name_by_group(group_name)
+
+    if load_dataset is None:
+        return profile
+
+    dataset, load_error = load_dataset()
+    if load_error or not dataset:
+        return profile
+
+    students = dataset.get("students", [])
+    if not isinstance(students, list):
+        return profile
+
+    normalized_self = _normalize_name(full_name)
+    classmates = []
+    seen = set()
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        if str(student.get("group", "")).strip() != str(group_name or "").strip():
+            continue
+        if str(student.get("subject", "")).strip() != str(subject_name or "").strip():
+            continue
+        classmate_name = str(student.get("fullName", "")).strip()
+        if not classmate_name:
+            continue
+        if _normalize_name(classmate_name) == normalized_self:
+            continue
+        key = _normalize_name(classmate_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        classmates.append(classmate_name)
+
+    classmates.sort(key=lambda value: value.casefold())
+    profile["classmates"] = classmates
+    return profile
+
+
+def get_student_db_id_by_sheet_student_id(sheet_student_id):
+    try:
+        normalized_sheet_student_id = int(sheet_student_id)
+    except (TypeError, ValueError):
+        return None
+    if normalized_sheet_student_id <= 0:
+        return None
+
+    init_storage()
+    with _connect() as conn:
+        mapping = db_requests.get_students_sheet_map_row(conn, normalized_sheet_student_id)
+    if not mapping:
+        return None
+    try:
+        return int(mapping["student_row_id"])
+    except (TypeError, ValueError, KeyError):
+        return None
+
+
 def get_bot_users_count():
     init_storage()
     with _connect() as conn:
-        row = conn.execute("SELECT COUNT(*) AS total FROM bot_users").fetchone()
-    return int(row["total"] if row else 0)
+        return db_requests.get_bot_users_count(conn)
 
 
 def record_bot_user(telegram_user):
@@ -404,23 +717,62 @@ def record_bot_user(telegram_user):
 
     with _DB_LOCK:
         with _connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO bot_users (
-                    telegram_user_id,
-                    username,
-                    first_name,
-                    last_name,
-                    created_at,
-                    updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(telegram_user_id) DO UPDATE SET
-                    username = excluded.username,
-                    first_name = excluded.first_name,
-                    last_name = excluded.last_name,
-                    updated_at = excluded.updated_at
-                """,
-                (user_id, username, first_name, last_name, now, now),
+            db_requests.upsert_bot_user(
+                conn,
+                user_id,
+                username,
+                first_name,
+                last_name,
+                now,
             )
             conn.commit()
+
+
+def link_student_telegram_user(student_row_id, telegram_user_id):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return False
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return False
+
+    init_storage()
+
+    with _DB_LOCK:
+        with _connect() as conn:
+            existing = db_requests.get_student_conflict_by_telegram_id(
+                conn,
+                telegram_user_id,
+                student_row_id,
+            )
+            if existing:
+                return False
+
+            db_requests.update_student_telegram_user(
+                conn,
+                telegram_user_id,
+                student_row_id,
+            )
+            conn.commit()
+    return True
+
+
+def get_student_by_telegram_user_id(telegram_user_id):
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return None
+
+    init_storage()
+    with _connect() as conn:
+        row = db_requests.get_student_by_telegram_id(conn, telegram_user_id)
+
+    if not row:
+        return None
+    return {
+        "id": int(row["id"]),
+        "full_name": str(row["full_name"]),
+        "student_id": str(row["student_id"]),
+        "subjects": str(row["subjects"]),
+        "sheet_student_id": (
+            int(row["sheet_student_id"])
+            if row["sheet_student_id"] is not None
+            else None
+        ),
+    }

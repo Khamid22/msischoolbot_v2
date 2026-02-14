@@ -33,7 +33,7 @@ def _int_env(name, default):
 
 
 def get_web_settings():
-    # Shared Flask host/port config used by both root main.py and web/app.py.
+    # Shared Flask host/port config used by both root main.py and web/server.py.
     flask_port = _int_env("PORT", _int_env("FLASK_PORT", 8080))
     return WebSettings(
         flask_host=getenv("FLASK_HOST", "0.0.0.0"),

@@ -175,6 +175,8 @@ def _load_from_google_sheets():
     dashboards_by_id: dict[int, dict[str, Any]] = {}
     groups_set: set[str] = set()
     groups_by_subject: dict[str, set[str]] = {}
+    lesson_catalog_by_subject: dict[str, list[dict[str, Any]]] = {}
+    lesson_catalog_by_subject_group: dict[str, dict[str, list[dict[str, Any]]]] = {}
     subjects_set: set[str] = set()
     used_student_ids: set[int] = set()
 
@@ -184,7 +186,7 @@ def _load_from_google_sheets():
         groups_by_subject.setdefault(group.subject_name, set()).add(group.group_display_name)
         subjects_set.add(group.subject_name)
 
-        parsed_students = _parse_group_rows(
+        parsed_students, group_lesson_catalog = _parse_group_rows(
             group=group,
             rows=rows,
             used_student_ids=used_student_ids,
@@ -192,6 +194,80 @@ def _load_from_google_sheets():
         for parsed in parsed_students:
             students.append(parsed["student"])
             dashboards_by_id[parsed["student"]["id"]] = parsed["dashboard"]
+
+        subject_group_lessons = lesson_catalog_by_subject_group.setdefault(
+            group.subject_name, {}
+        )
+        group_lessons = subject_group_lessons.setdefault(group.group_display_name, [])
+        group_seen_numbers = {
+            str(lesson.get("lesson_number", "")).strip().casefold()
+            for lesson in group_lessons
+            if isinstance(lesson, dict)
+        }
+        group_existing_by_number = {
+            str(lesson.get("lesson_number", "")).strip().casefold(): lesson
+            for lesson in group_lessons
+            if isinstance(lesson, dict)
+        }
+
+        subject_lessons = lesson_catalog_by_subject.setdefault(group.subject_name, [])
+        seen_numbers = {
+            str(lesson.get("lesson_number", "")).strip().casefold()
+            for lesson in subject_lessons
+            if isinstance(lesson, dict)
+        }
+        existing_by_number = {
+            str(lesson.get("lesson_number", "")).strip().casefold(): lesson
+            for lesson in subject_lessons
+            if isinstance(lesson, dict)
+        }
+        for lesson in group_lesson_catalog:
+            if not isinstance(lesson, dict):
+                continue
+            lesson_number = str(lesson.get("lesson_number", "")).strip()
+            lesson_topic = str(lesson.get("lesson_topic", "")).strip()
+            lesson_date = str(lesson.get("lesson_date", "")).strip()
+            if not lesson_number or not lesson_topic:
+                continue
+            dedupe_key = lesson_number.casefold()
+
+            if dedupe_key in group_seen_numbers:
+                existing_group_lesson = group_existing_by_number.get(dedupe_key)
+                if (
+                    existing_group_lesson is not None
+                    and lesson_date
+                    and not str(existing_group_lesson.get("lesson_date", "")).strip()
+                ):
+                    existing_group_lesson["lesson_date"] = lesson_date
+            else:
+                group_seen_numbers.add(dedupe_key)
+                grouped_lesson = {
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic,
+                    "lesson_date": lesson_date,
+                    "lesson_order": int(lesson.get("lesson_order", len(group_lessons) + 1)),
+                }
+                group_lessons.append(grouped_lesson)
+                group_existing_by_number[dedupe_key] = grouped_lesson
+
+            if dedupe_key in seen_numbers:
+                existing_lesson = existing_by_number.get(dedupe_key)
+                if (
+                    existing_lesson is not None
+                    and lesson_date
+                    and not str(existing_lesson.get("lesson_date", "")).strip()
+                ):
+                    existing_lesson["lesson_date"] = lesson_date
+                continue
+            seen_numbers.add(dedupe_key)
+            merged_lesson = {
+                "lesson_number": lesson_number,
+                "lesson_topic": lesson_topic,
+                "lesson_date": lesson_date,
+                "lesson_order": int(lesson.get("lesson_order", len(subject_lessons) + 1)),
+            }
+            subject_lessons.append(merged_lesson)
+            existing_by_number[dedupe_key] = merged_lesson
 
     # Make coins global per student (sum from all enrolled subjects).
     _merge_total_coins_across_subjects(students, dashboards_by_id)
@@ -209,12 +285,39 @@ def _load_from_google_sheets():
         subject: sorted(groups_by_subject.get(subject, set()), key=_group_sort_key)
         for subject in ordered_subjects
     }
+    ordered_lesson_catalog_by_subject: dict[str, list[dict[str, Any]]] = {}
+    ordered_lesson_catalog_by_subject_group: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for subject in ordered_subjects:
+        lessons = lesson_catalog_by_subject.get(subject, [])
+        ordered_lessons = sorted(
+            lessons,
+            key=lambda lesson: (
+                int(lesson.get("lesson_order", 0)),
+                str(lesson.get("lesson_number", "")).casefold(),
+            ),
+        )
+        ordered_lesson_catalog_by_subject[subject] = ordered_lessons
+
+        subject_group_map = lesson_catalog_by_subject_group.get(subject, {})
+        ordered_group_map: dict[str, list[dict[str, Any]]] = {}
+        for group_name in sorted(subject_group_map.keys(), key=_group_sort_key):
+            group_lessons = subject_group_map.get(group_name, [])
+            ordered_group_map[group_name] = sorted(
+                group_lessons,
+                key=lambda lesson: (
+                    int(lesson.get("lesson_order", 0)),
+                    str(lesson.get("lesson_number", "")).casefold(),
+                ),
+            )
+        ordered_lesson_catalog_by_subject_group[subject] = ordered_group_map
 
     return {
         "students": students,
         "dashboards_by_id": dashboards_by_id,
         "groups": sorted(groups_set, key=_group_sort_key),
         "groups_by_subject": ordered_groups_by_subject,
+        "lesson_catalog_by_subject": ordered_lesson_catalog_by_subject,
+        "lesson_catalog_by_subject_group": ordered_lesson_catalog_by_subject_group,
         "subjects": ordered_subjects,
     }
 
@@ -367,14 +470,31 @@ def _parse_group_rows(
     used_student_ids,
 ):
     if not rows:
-        return []
+        return [], []
 
+    lesson_date_row = rows[0] if len(rows) > 0 else []
     lesson_number_row = rows[1] if len(rows) > 1 else []
     lesson_name_row = rows[2] if len(rows) > 2 else []
     exam_columns = list(range(2, 20))  # C..T
     exam_column_meta = _build_exam_columns_metadata(lesson_name_row, exam_columns)
-    homework_columns_meta = _build_homework_columns_metadata(rows, lesson_number_row)
+    homework_columns_meta = _build_homework_columns_metadata(
+        rows,
+        lesson_number_row,
+        lesson_name_row,
+        lesson_date_row,
+    )
     coins_by_name = _extract_coins_by_name(rows)
+
+    lesson_catalog = []
+    for lesson_order, lesson_meta in enumerate(homework_columns_meta, start=1):
+        lesson_catalog.append(
+            {
+                "lesson_number": str(lesson_meta.get("label", "")).strip(),
+                "lesson_topic": str(lesson_meta.get("topic", "")).strip(),
+                "lesson_date": str(lesson_meta.get("date", "")).strip(),
+                "lesson_order": lesson_order,
+            }
+        )
 
     parsed_rows = []
     for row_number, row in enumerate(rows, start=1):
@@ -421,6 +541,8 @@ def _parse_group_rows(
                 homework_grades.append(
                     {
                         "lesson": lesson_meta["label"],
+                        "topic": lesson_meta.get("topic", ""),
+                        "date": lesson_meta.get("date", ""),
                         "score": score,
                     }
                 )
@@ -498,7 +620,7 @@ def _parse_group_rows(
 
         parsed_rows.append({"student": student, "dashboard": dashboard})
 
-    return parsed_rows
+    return parsed_rows, lesson_catalog
 
 
 def _cell_value(row, index):
@@ -565,6 +687,8 @@ def _is_student_data_row(row):
 def _build_homework_columns_metadata(
     rows,
     lesson_number_row,
+    lesson_topic_row,
+    lesson_date_row,
 ):
     max_columns = max((len(row) for row in rows), default=0)
     start_column = 21  # V
@@ -585,15 +709,52 @@ def _build_homework_columns_metadata(
         else:
             score_column_index = min(column_index + 1, max_columns - 1)
 
+        raw_topic = _to_text(_cell_value(lesson_topic_row, column_index))
+        if not raw_topic and score_column_index != column_index:
+            raw_topic = _to_text(_cell_value(lesson_topic_row, score_column_index))
+
+        raw_date = _cell_value(lesson_date_row, column_index)
+        if (
+            (raw_date is None or _to_text(raw_date) == "")
+            and score_column_index != column_index
+        ):
+            raw_date = _cell_value(lesson_date_row, score_column_index)
+        lesson_date = _format_lesson_date(raw_date)
+
+        topic = _normalize_whitespace(raw_topic.replace("\n", " "))
+        if not topic:
+            topic = "Topic"
+        if _is_cancelled_homework_lesson(label, topic):
+            continue
+
         metadata.append(
             {
                 "attendance_column_index": column_index,
                 "score_column_index": score_column_index,
                 "label": label,
+                "topic": topic,
+                "date": lesson_date,
             }
         )
 
     return metadata
+
+
+def _format_lesson_date(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, (int, float)):
+        # Convert Google Sheets serial dates when possible.
+        numeric = float(value)
+        if numeric > 0:
+            try:
+                return (datetime(1899, 12, 30) + timedelta(days=numeric)).date().isoformat()
+            except (OverflowError, ValueError):
+                return str(value).strip()
+        return ""
+
+    return _normalize_whitespace(str(value).replace("\n", " ").strip())
 
 
 def _extract_lesson_number(label):
@@ -610,6 +771,11 @@ def _extract_lesson_number(label):
 def _should_skip_homework_lesson(label):
     lesson_number = _extract_lesson_number(label)
     return lesson_number in EXCLUDED_HOMEWORK_LESSON_NUMBERS
+
+
+def _is_cancelled_homework_lesson(label, topic):
+    normalized = f"{label} {topic}".casefold()
+    return "cancelled" in normalized or "canceled" in normalized
 
 
 def _build_exam_columns_metadata(

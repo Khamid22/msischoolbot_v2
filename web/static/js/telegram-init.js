@@ -46,6 +46,20 @@
   document.body.classList.add("tg-miniapp");
   applyViewportLock();
 
+  const loginTelegramUserIdInput = document.getElementById("loginTelegramUserId");
+  const telegramUserId =
+    webApp &&
+    webApp.initDataUnsafe &&
+    webApp.initDataUnsafe.user &&
+    Number(webApp.initDataUnsafe.user.id);
+  if (
+    loginTelegramUserIdInput &&
+    Number.isInteger(telegramUserId) &&
+    telegramUserId > 0
+  ) {
+    loginTelegramUserIdInput.value = String(telegramUserId);
+  }
+
   if (typeof webApp.onEvent === "function") {
     webApp.onEvent("viewportChanged", applyViewportLock);
   }
