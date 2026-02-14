@@ -738,14 +738,17 @@ def link_student_telegram_user(student_row_id, telegram_user_id):
 
     with _DB_LOCK:
         with _connect() as conn:
-            existing = db_requests.get_student_conflict_by_telegram_id(
+            student_exists = db_requests.get_student_admin_row(conn, student_row_id)
+            if not student_exists:
+                return False
+
+            # Mini app login is the source of truth:
+            # one Telegram user can be linked to only one student profile at a time.
+            db_requests.clear_student_telegram_user_conflicts(
                 conn,
                 telegram_user_id,
                 student_row_id,
             )
-            if existing:
-                return False
-
             db_requests.update_student_telegram_user(
                 conn,
                 telegram_user_id,

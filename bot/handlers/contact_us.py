@@ -55,7 +55,10 @@ def _target_by_key(target_key):
 async def contact_us_callback(query, state):
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
-        await query.answer("Please login in the mini app first.", show_alert=True)
+        await query.answer(
+            "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
         return
 
     await state.clear()
@@ -70,7 +73,10 @@ async def contact_us_callback(query, state):
 async def contact_target_course_leader_callback(query, state):
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
-        await query.answer("Please login in the mini app first.", show_alert=True)
+        await query.answer(
+            "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
         await state.clear()
         return
 
@@ -88,7 +94,10 @@ async def contact_target_course_leader_callback(query, state):
 async def contact_target_admin_callback(query, state):
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
-        await query.answer("Please login in the mini app first.", show_alert=True)
+        await query.answer(
+            "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
         await state.clear()
         return
 
@@ -107,7 +116,9 @@ async def collect_contact_message(message, state):
     linked_student = _linked_student_from_user(message.from_user)
     if not linked_student:
         await state.clear()
-        await message.answer("Please login in the mini app first.")
+        await message.answer(
+            "Authentication is only through the mini app. Please sign in there first."
+        )
         return
 
     message_text = str(message.text or "").strip()
@@ -148,7 +159,10 @@ async def confirm_contact_send_callback(query, state):
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
         await state.clear()
-        await query.answer("Please login in the mini app first.", show_alert=True)
+        await query.answer(
+            "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
         return
 
     student_full_name = str(query.from_user.full_name or "").strip()

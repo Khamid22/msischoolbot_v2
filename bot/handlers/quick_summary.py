@@ -27,7 +27,10 @@ def _linked_student_from_user(user):
 async def quick_summary_callback(query):
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
-        await query.answer("Please login in the mini app first.", show_alert=True)
+        await query.answer(
+            "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
         return
 
     await query.answer("Preparing summary...")

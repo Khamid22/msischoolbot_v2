@@ -609,6 +609,18 @@ def get_student_conflict_by_telegram_id(conn, telegram_user_id, student_row_id):
     ).fetchone()
 
 
+def clear_student_telegram_user_conflicts(conn, telegram_user_id, student_row_id):
+    conn.execute(
+        """
+        UPDATE students
+        SET telegram_user_id = NULL
+        WHERE telegram_user_id = ?
+          AND id != ?
+        """,
+        (telegram_user_id, student_row_id),
+    )
+
+
 def update_student_telegram_user(conn, telegram_user_id, student_row_id):
     conn.execute(
         """

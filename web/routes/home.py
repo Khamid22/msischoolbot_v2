@@ -315,12 +315,21 @@ def register_home_routes(
         telegram_user_id = _parse_telegram_user_id(
             request.form.get("telegram_user_id")
         )
-        if telegram_user_id is not None:
-            # Best-effort link. Student can still login even if link exists for another account.
-            link_student_telegram_user(
-                int(student["id"]),
-                telegram_user_id,
-            )
+        if telegram_user_id is None:
+            return _render_login_page(
+                auth_error="Student authentication is available only through the Telegram mini app.",
+                auth_login_input=login_value,
+            ), 401
+
+        linked = link_student_telegram_user(
+            int(student["id"]),
+            telegram_user_id,
+        )
+        if not linked:
+            return _render_login_page(
+                auth_error="Unable to link Telegram account. Please try again from the mini app.",
+                auth_login_input=login_value,
+            ), 500
 
         session.clear()
         session["auth_role"] = "student"

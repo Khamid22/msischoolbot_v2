@@ -40,7 +40,8 @@ async def start_handler(message, state):
     if not linked_student:
         await message.answer(
             "👋 <b>Welcome!</b>\n\n"
-            "Please open the mini app and login first.",
+            "Authentication is available only through the mini app.\n"
+            "Please open the mini app and sign in first.",
             reply_markup=registration_keyboard(settings.mini_app_url),
         )
         return
