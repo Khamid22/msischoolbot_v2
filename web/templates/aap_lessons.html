@@ -39,6 +39,7 @@
           <table class="aap-table">
             <thead>
               <tr>
+                <th>Lesson Date</th>
                 <th>Lesson Number</th>
                 <th>Lesson Topic</th>
                 <th>H/W Grades</th>
@@ -54,7 +55,7 @@
                   <div class="aap-score-row">
                     <strong>{{ row.aap_display }}</strong>
                     <div class="aap-progress-track" aria-hidden="true">
-                      <span class="aap-progress-fill" style="width: {{ row.progress_width }}%"></span>
+                      <span class="aap-progress-fill" style="width: {{row.progress_width}}%"></span>
                     </div>
                   </div>
                   <p class="aap-remark {{ row.remark_class }}">
