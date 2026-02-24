@@ -171,9 +171,32 @@
                   <td>{{ teacher.pay_rate }}</td>
                   <td>{{ teacher.assigned_group }}</td>
                   <td class="teachers-actions-cell">
-                    <a class="secondary-btn teachers-action-btn" href="{{ url_for('home', panel='teachers', edit_teacher_id=teacher.id) }}">Edit</a>
+                    <a
+                      class="secondary-btn teachers-action-btn teachers-icon-btn"
+                      href="{{ url_for('home', panel='teachers', edit_teacher_id=teacher.id) }}"
+                      aria-label="Edit teacher"
+                      title="Edit teacher"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25Z"></path>
+                        <path d="M14.05 4.95l3.75 3.75"></path>
+                      </svg>
+                    </a>
                     <form action="{{ url_for('delete_teacher', teacher_id=teacher.id) }}" method="post" onsubmit="return confirm('Delete this teacher?');">
-                      <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger">Delete</button>
+                      <button
+                        type="submit"
+                        class="secondary-btn teachers-action-btn teachers-action-danger teachers-icon-btn"
+                        aria-label="Delete teacher"
+                        title="Delete teacher"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M3 6h18"></path>
+                          <path d="M8 6V4h8v2"></path>
+                          <path d="M19 6l-1 14H6L5 6"></path>
+                          <path d="M10 10v7"></path>
+                          <path d="M14 10v7"></path>
+                        </svg>
+                      </button>
                     </form>
                   </td>
                 </tr>
@@ -188,7 +211,7 @@
           </div>
           {% else %}
           <div class="admin-table-wrap">
-            <table class="admin-table">
+            <table class="admin-table students-table">
               <thead>
                 <tr>
                   <th>ID</th>
@@ -200,7 +223,7 @@
               <tbody>
                 {% for student in admin_students %}
                 <tr>
-                  <td>{{ student.id }}</td>
+                  <td>{{ student.display_id }}</td>
                   <td>
                     <a class="admin-student-link" href="{{ url_for('admin_student_profile', student_row_id=student.id) }}">
                       {{ student.full_name }}

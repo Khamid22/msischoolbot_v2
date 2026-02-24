@@ -20,11 +20,15 @@
   const subjectMenu = document.getElementById("subjectMenu");
   const logoutMenuItem = document.getElementById("logoutMenuItem");
   const profileMenuItem = document.getElementById("profileMenuItem");
+  const changePasswordMenuItem = document.getElementById("changePasswordMenuItem");
   const logoutConfirmModal = document.getElementById("logoutConfirmModal");
   const logoutConfirmBtn = document.getElementById("logoutConfirmBtn");
   const logoutCancelBtn = document.getElementById("logoutCancelBtn");
   const studentProfileModal = document.getElementById("studentProfileModal");
   const profileCloseBtn = document.getElementById("profileCloseBtn");
+  const profileOpenPasswordBtn = document.getElementById("profileOpenPasswordBtn");
+  const changePasswordModal = document.getElementById("changePasswordModal");
+  const changePasswordCancelBtn = document.getElementById("changePasswordCancelBtn");
   const dashboardLogoutForm = document.getElementById("dashboardLogoutForm");
 
   function closeProfileMenu() {
@@ -87,6 +91,20 @@
     studentProfileModal.hidden = false;
   }
 
+  function closePasswordModal() {
+    if (!changePasswordModal) {
+      return;
+    }
+    changePasswordModal.hidden = true;
+  }
+
+  function openPasswordModal() {
+    if (!changePasswordModal) {
+      return;
+    }
+    changePasswordModal.hidden = false;
+  }
+
   if (profileMenuToggle && profileMenu) {
     profileMenuToggle.addEventListener("click", function () {
       if (profileMenu.hidden) {
@@ -143,6 +161,13 @@
     });
   }
 
+  if (changePasswordMenuItem) {
+    changePasswordMenuItem.addEventListener("click", function () {
+      closeProfileMenu();
+      openPasswordModal();
+    });
+  }
+
   if (logoutCancelBtn) {
     logoutCancelBtn.addEventListener("click", function () {
       closeLogoutModal();
@@ -167,9 +192,31 @@
     });
   }
 
+  if (changePasswordModal) {
+    changePasswordModal.addEventListener("click", function (event) {
+      const target = event.target;
+      if (target && target.getAttribute("data-close-password-modal") === "true") {
+        closePasswordModal();
+      }
+    });
+  }
+
   if (profileCloseBtn) {
     profileCloseBtn.addEventListener("click", function () {
       closeProfileModal();
+    });
+  }
+
+  if (profileOpenPasswordBtn) {
+    profileOpenPasswordBtn.addEventListener("click", function () {
+      closeProfileModal();
+      openPasswordModal();
+    });
+  }
+
+  if (changePasswordCancelBtn) {
+    changePasswordCancelBtn.addEventListener("click", function () {
+      closePasswordModal();
     });
   }
 
@@ -189,6 +236,7 @@
     closeSubjectMenu();
     closeLogoutModal();
     closeProfileModal();
+    closePasswordModal();
   });
 
   const progressFill = document.getElementById("programProgressFill");

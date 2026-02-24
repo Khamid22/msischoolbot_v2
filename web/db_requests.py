@@ -402,7 +402,7 @@ def list_students_for_admin_rows(conn):
             class_name,
             school_name
         FROM students
-        ORDER BY full_name COLLATE NOCASE ASC, id ASC
+        ORDER BY id ASC
         """
     ).fetchall()
 
@@ -414,6 +414,7 @@ def get_student_admin_row(conn, student_row_id):
             id,
             full_name,
             student_id,
+            password,
             subjects,
             photo_url,
             profile_description,
@@ -425,6 +426,42 @@ def get_student_admin_row(conn, student_row_id):
         """,
         (student_row_id,),
     ).fetchone()
+
+
+def get_student_auth_row_by_id(conn, student_row_id):
+    return conn.execute(
+        """
+        SELECT
+            s.id,
+            s.student_id,
+            a.password_hash
+        FROM students s
+        JOIN student_auth a ON a.student_row_id = s.id
+        WHERE s.id = ?
+        """,
+        (student_row_id,),
+    ).fetchone()
+
+
+def update_student_password(conn, student_row_id, plain_password, password_hash, updated_at):
+    conn.execute(
+        """
+        UPDATE students
+        SET password = ?
+        WHERE id = ?
+        """,
+        (plain_password, student_row_id),
+    )
+    conn.execute(
+        """
+        UPDATE student_auth
+        SET
+            password_hash = ?,
+            updated_at = ?
+        WHERE student_row_id = ?
+        """,
+        (password_hash, updated_at, student_row_id),
+    )
 
 
 def update_student_admin_profile(

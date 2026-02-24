@@ -90,6 +90,7 @@
           </button>
           <div id="profileMenu" class="profile-menu" hidden>
             <button type="button" id="profileMenuItem" class="profile-menu-item">Profile</button>
+            <button type="button" id="changePasswordMenuItem" class="profile-menu-item">Change Password</button>
             <button type="button" id="logoutMenuItem" class="profile-menu-item">Logout</button>
           </div>
         </div>
@@ -97,6 +98,13 @@
     </header>
 
     <main class="dashboard-wrap">
+      {% if profile_error %}
+      <div class="form-error">{{ profile_error }}</div>
+      {% endif %}
+      {% if profile_notice %}
+      <div class="form-notice">{{ profile_notice }}</div>
+      {% endif %}
+
       <section class="student-title-block">
         <h2>
           {% if payload.student.surname and payload.student.name %}
@@ -366,8 +374,59 @@
           {% endif %}
         </div>
         <div class="confirm-modal-actions">
+          <button type="button" id="profileOpenPasswordBtn" class="secondary-btn">Change Password</button>
           <button type="button" id="profileCloseBtn" class="secondary-btn">Close</button>
         </div>
+      </div>
+    </div>
+
+    <div id="changePasswordModal" class="confirm-modal" hidden>
+      <div class="confirm-modal-backdrop" data-close-password-modal="true"></div>
+      <div class="confirm-modal-card profile-modal-card" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
+        <h3 id="changePasswordTitle">Change Password</h3>
+        <form action="{{ url_for('profile_change_password') }}" method="post" class="profile-password-form">
+          <input type="hidden" name="student_id" value="{{ payload.student.id }}" />
+          <input type="hidden" name="subject" value="{{ current_subject_name }}" />
+          <input type="hidden" name="group" value="{{ payload.student.group }}" />
+
+          <label class="field">
+            <span>Current Password</span>
+            <input
+              type="password"
+              name="current_password"
+              autocomplete="current-password"
+              placeholder="Current password"
+              required
+            />
+          </label>
+          <label class="field">
+            <span>New Password</span>
+            <input
+              type="password"
+              name="new_password"
+              autocomplete="new-password"
+              placeholder="At least 6 characters"
+              minlength="6"
+              required
+            />
+          </label>
+          <label class="field">
+            <span>Confirm Password</span>
+            <input
+              type="password"
+              name="confirm_password"
+              autocomplete="new-password"
+              placeholder="Repeat new password"
+              minlength="6"
+              required
+            />
+          </label>
+
+          <div class="confirm-modal-actions">
+            <button type="button" id="changePasswordCancelBtn" class="secondary-btn">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
       </div>
     </div>
     <script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>

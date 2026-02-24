@@ -3,6 +3,7 @@ import threading
 import time
 import math
 import sys
+from datetime import timedelta
 
 from flask import Flask, jsonify, make_response, redirect, request, session, url_for
 
@@ -33,6 +34,9 @@ except ImportError:
 app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
+    days=int(os.environ.get("SESSION_LIFETIME_DAYS", "365"))
+)
 
 # Initialize auth-related SQLite tables on startup.
 init_storage()
@@ -561,6 +565,7 @@ def require_authentication_for_protected_routes():
         return None
 
     if _is_authenticated_session():
+        session.permanent = True
         return None
 
     if request.path.startswith("/api/"):

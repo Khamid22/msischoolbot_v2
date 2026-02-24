@@ -93,6 +93,16 @@
                 </div>
 
                 <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Username</span>
+                  <p>{{ student.student_id if student.student_id else "-" }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Password</span>
+                  <p>{{ student.password if student.password else "-" }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
                   <span class="admin-meta-label">Group</span>
                   <p>{{ student.group if student.group else "-" }}</p>
                 </div>

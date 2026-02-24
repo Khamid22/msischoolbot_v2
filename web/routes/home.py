@@ -7,15 +7,18 @@ from werkzeug.utils import secure_filename
 try:
     from ..auth_store import (
         assign_teacher_to_group,
+        change_student_password,
         delete_teacher_by_id,
         detect_login_role,
         get_admin_student_profile,
         get_bot_users_count,
+        get_student_by_telegram_user_id,
         get_teacher_by_id,
         init_storage,
         link_student_telegram_user,
         list_students_for_admin,
         list_teachers,
+        unlink_student_telegram_user,
         sync_students_if_needed,
         update_teacher_by_id,
         update_student_admin_profile,
@@ -26,15 +29,18 @@ try:
 except ImportError:
     from auth_store import (
         assign_teacher_to_group,
+        change_student_password,
         delete_teacher_by_id,
         detect_login_role,
         get_admin_student_profile,
         get_bot_users_count,
+        get_student_by_telegram_user_id,
         get_teacher_by_id,
         init_storage,
         link_student_telegram_user,
         list_students_for_admin,
         list_teachers,
+        unlink_student_telegram_user,
         sync_students_if_needed,
         update_teacher_by_id,
         update_student_admin_profile,
@@ -73,6 +79,13 @@ def register_home_routes(
         except (TypeError, ValueError):
             return None
 
+    def _current_student_db_id():
+        raw_value = session.get("student_db_id")
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError):
+            return None
+
     def _parse_telegram_user_id(raw_value):
         try:
             parsed = int(str(raw_value).strip())
@@ -81,6 +94,61 @@ def register_home_routes(
         if parsed <= 0:
             return None
         return parsed
+
+    def _set_admin_session(admin):
+        session.clear()
+        session["auth_role"] = "admin"
+        session["auth_login"] = str(admin.get("login", "")).strip()
+        session["admin_id"] = int(admin["id"])
+        session["admin_is_owner"] = bool(admin.get("is_owner"))
+        session.permanent = True
+
+    def _set_student_session(student, telegram_user_id):
+        if not isinstance(student, dict):
+            return False
+        try:
+            student_db_id = int(student["id"])
+            sheet_student_id = int(student["sheet_student_id"])
+        except (KeyError, TypeError, ValueError):
+            return False
+
+        if student_db_id <= 0 or sheet_student_id <= 0:
+            return False
+
+        session.clear()
+        session["auth_role"] = "student"
+        session["auth_login"] = str(student.get("student_id", "")).strip()
+        session["student_db_id"] = student_db_id
+        session["student_id"] = str(student.get("student_id", "")).strip()
+        session["student_sheet_id"] = sheet_student_id
+        session["student_full_name"] = str(student.get("full_name", "")).strip()
+        session["telegram_user_id"] = telegram_user_id
+        session.permanent = True
+        return True
+
+    def _try_auto_login_student_by_telegram(telegram_user_id):
+        if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+            return False
+
+        student = get_student_by_telegram_user_id(telegram_user_id)
+        if not student:
+            return False
+        return _set_student_session(student, telegram_user_id)
+
+    def _build_dashboard_url(student_sheet_id, subject="", group="", **extra_params):
+        route_params = {
+            "student_id": int(student_sheet_id),
+        }
+        normalized_subject = str(subject or "").strip()
+        normalized_group = str(group or "").strip()
+        if normalized_subject:
+            route_params["subject"] = normalized_subject
+        if normalized_group:
+            route_params["group"] = normalized_group
+        for key, value in extra_params.items():
+            if str(value or "").strip():
+                route_params[key] = str(value).strip()
+        return url_for("dashboard", **route_params)
 
     def _delete_uploaded_student_photo(photo_url):
         raw_url = str(photo_url or "").strip()
@@ -262,6 +330,21 @@ def register_home_routes(
                 ), 401
             return redirect(url_for("dashboard", student_id=own_sheet_student_id))
 
+        auto_login_allowed = request.args.get("logged_out", "").strip() != "1"
+        telegram_user_id = _parse_telegram_user_id(request.args.get("tg_user_id"))
+        if (
+            auto_login_allowed
+            and telegram_user_id
+            and _try_auto_login_student_by_telegram(telegram_user_id)
+        ):
+            own_sheet_student_id = _current_student_sheet_id()
+            if own_sheet_student_id is not None:
+                return redirect(
+                    _build_dashboard_url(
+                        own_sheet_student_id,
+                    )
+                )
+
         return _render_login_page()
 
     @app.post("/login")
@@ -290,11 +373,7 @@ def register_home_routes(
                     auth_login_input=login_value,
                 ), 401
 
-            session.clear()
-            session["auth_role"] = "admin"
-            session["auth_login"] = admin["login"]
-            session["admin_id"] = admin["id"]
-            session["admin_is_owner"] = bool(admin.get("is_owner"))
+            _set_admin_session(admin)
             return redirect(url_for("home"))
 
         sync_result = sync_students_if_needed(load_dataset)
@@ -331,14 +410,11 @@ def register_home_routes(
                 auth_login_input=login_value,
             ), 500
 
-        session.clear()
-        session["auth_role"] = "student"
-        session["auth_login"] = student["student_id"]
-        session["student_db_id"] = student["id"]
-        session["student_id"] = student["student_id"]
-        session["student_sheet_id"] = student["sheet_student_id"]
-        session["student_full_name"] = student["full_name"]
-        session["telegram_user_id"] = telegram_user_id
+        if not _set_student_session(student, telegram_user_id):
+            return _render_login_page(
+                auth_error="Unable to initialize student session.",
+                auth_login_input=login_value,
+            ), 500
         return redirect(
             url_for(
                 "dashboard",
@@ -346,10 +422,66 @@ def register_home_routes(
             )
         )
 
+    @app.post("/profile/password")
+    def profile_change_password():
+        if _current_auth_role() != "student":
+            return redirect(url_for("home"))
+
+        student_db_id = _current_student_db_id()
+        student_sheet_id = _current_student_sheet_id()
+        if student_db_id is None or student_sheet_id is None:
+            session.clear()
+            return redirect(url_for("home"))
+
+        subject = request.form.get("subject", "").strip()
+        group = request.form.get("group", "").strip()
+
+        current_password_value = request.form.get("current_password", "")
+        new_password_value = request.form.get("new_password", "")
+        confirm_password_value = request.form.get("confirm_password", "")
+
+        if new_password_value != confirm_password_value:
+            return redirect(
+                _build_dashboard_url(
+                    student_sheet_id,
+                    subject=subject,
+                    group=group,
+                    profile_error="New password and confirmation do not match.",
+                )
+            )
+
+        updated, update_error = change_student_password(
+            student_db_id,
+            current_password=current_password_value,
+            new_password=new_password_value,
+        )
+        if not updated:
+            return redirect(
+                _build_dashboard_url(
+                    student_sheet_id,
+                    subject=subject,
+                    group=group,
+                    profile_error=update_error or "Unable to change password.",
+                )
+            )
+
+        return redirect(
+            _build_dashboard_url(
+                student_sheet_id,
+                subject=subject,
+                group=group,
+                profile_notice="Password changed successfully.",
+            )
+        )
+
     @app.post("/logout")
     def logout():
+        if _current_auth_role() == "student":
+            student_db_id = _current_student_db_id()
+            if student_db_id is not None:
+                unlink_student_telegram_user(student_db_id)
         session.clear()
-        return redirect(url_for("home"))
+        return redirect(url_for("home", logged_out=1))
 
     @app.get("/admin/students/<int:student_row_id>")
     def admin_student_profile(student_row_id):

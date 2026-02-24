@@ -147,6 +147,8 @@ def register_dashboard_routes(
     def dashboard(student_id):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
+        profile_notice = request.args.get("profile_notice", "").strip()
+        profile_error = request.args.get("profile_error", "").strip()
 
         payload, dataset, payload_error = load_dashboard_payload(
             student_id=student_id,
@@ -289,6 +291,8 @@ def register_dashboard_routes(
             current_subject_short_name=current_subject_short_name,
             subject_switch_options=subject_switch_options,
             student_profile=student_profile,
+            profile_notice=profile_notice,
+            profile_error=profile_error,
         )
 
     @app.get("/dashboard/<int:student_id>/aap-lessons")

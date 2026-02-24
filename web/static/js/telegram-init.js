@@ -58,6 +58,15 @@
     telegramUserId > 0
   ) {
     loginTelegramUserIdInput.value = String(telegramUserId);
+
+    const currentUrl = new URL(window.location.href);
+    const loggedOut = currentUrl.searchParams.get("logged_out") === "1";
+    const currentTelegramUserId = Number(currentUrl.searchParams.get("tg_user_id"));
+    if (!loggedOut && currentTelegramUserId !== telegramUserId) {
+      currentUrl.searchParams.set("tg_user_id", String(telegramUserId));
+      window.location.replace(currentUrl.toString());
+      return;
+    }
   }
 
   if (typeof webApp.onEvent === "function") {

@@ -521,9 +521,11 @@ button {
 
 .teachers-actions-cell {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
   gap: 4px;
-  min-width: 124px;
+  min-width: 78px;
 }
 
 .teachers-actions-cell form {
@@ -532,9 +534,27 @@ button {
 
 .teachers-action-btn {
   min-height: 28px;
-  padding: 4px 8px;
-  font-size: 0.62rem;
-  letter-spacing: 0.03em;
+  padding: 4px 6px;
+  font-size: 0.58rem;
+  letter-spacing: 0.02em;
+}
+
+.teachers-icon-btn {
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.teachers-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .teachers-action-danger {
@@ -553,27 +573,55 @@ button {
 .admin-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 560px;
 }
 
 .admin-table th,
 .admin-table td {
   border-bottom: 1px solid #e2e8f0;
-  padding: 10px 8px;
+  padding: 7px 6px;
   text-align: left;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   white-space: nowrap;
 }
 
 .admin-table th {
   font-family: var(--font-display);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #334155;
   position: sticky;
   top: 0;
   background: #f8fafc;
+  z-index: 2;
+}
+
+.students-table {
+  min-width: 510px;
+}
+
+.students-table th:nth-child(1),
+.students-table td:nth-child(1) {
+  width: 44px;
+  text-align: center;
+}
+
+.students-table th:nth-child(2),
+.students-table td:nth-child(2) {
+  max-width: 180px;
+}
+
+.students-table th:nth-child(3),
+.students-table td:nth-child(3) {
+  max-width: 120px;
+}
+
+.students-table th:nth-child(4),
+.students-table td:nth-child(4) {
+  max-width: 160px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-student-link {
@@ -1090,6 +1138,17 @@ button {
   justify-content: flex-end;
 }
 
+.profile-password-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-password-form .field input {
+  min-height: 42px;
+}
+
 .danger-btn {
   background: #b91c1c;
 }
@@ -1464,7 +1523,11 @@ body.rating-page.tg-miniapp .rating-table-wrap {
   }
 
   .teachers-actions-cell {
-    min-width: 112px;
+    min-width: 72px;
+  }
+
+  .students-table {
+    min-width: 470px;
   }
 
   .admin-meta-grid {

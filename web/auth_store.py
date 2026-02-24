@@ -283,11 +283,15 @@ def list_students_for_admin():
         item["subjects_set"].update(row_subjects)
 
     results = []
-    for key in sorted(grouped.keys()):
-        item = grouped[key]
+    grouped_items = sorted(
+        grouped.values(),
+        key=lambda item: (int(item.get("id", 0)), _normalize_name(item.get("full_name", ""))),
+    )
+    for index, item in enumerate(grouped_items, start=1):
         subjects_sorted = sorted(item["subjects_set"], key=lambda value: value.casefold())
         results.append(
             {
+                "display_id": index,
                 "id": int(item["id"]),
                 "full_name": str(item["full_name"]),
                 "student_id": str(item["student_id"]),
@@ -596,6 +600,7 @@ def get_admin_student_profile(student_row_id, load_dataset):
         "surname": split_name["surname"],
         "name": split_name["name"],
         "student_id": str(row["student_id"]).strip(),
+        "password": str(row["password"]).strip(),
         "subjects": str(row["subjects"]).strip(),
         "photo_url": str(row["photo_url"] or "").strip(),
         "profile_description": str(row["profile_description"] or "").strip(),
@@ -758,6 +763,25 @@ def link_student_telegram_user(student_row_id, telegram_user_id):
     return True
 
 
+def unlink_student_telegram_user(student_row_id):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return False
+
+    init_storage()
+    with _DB_LOCK:
+        with _connect() as conn:
+            student_exists = db_requests.get_student_admin_row(conn, student_row_id)
+            if not student_exists:
+                return False
+            db_requests.update_student_telegram_user(
+                conn,
+                None,
+                student_row_id,
+            )
+            conn.commit()
+    return True
+
+
 def get_student_by_telegram_user_id(telegram_user_id):
     if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
         return None
@@ -779,3 +803,43 @@ def get_student_by_telegram_user_id(telegram_user_id):
             else None
         ),
     }
+
+
+def change_student_password(student_row_id, current_password, new_password):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return False, "Invalid student session."
+
+    current_password_value = str(current_password or "")
+    new_password_value = str(new_password or "")
+    if not current_password_value:
+        return False, "Current password is required."
+    if not new_password_value:
+        return False, "New password is required."
+    if len(new_password_value) < 6:
+        return False, "New password must be at least 6 characters."
+    if current_password_value == new_password_value:
+        return False, "New password must be different from current password."
+
+    init_storage()
+    with _DB_LOCK:
+        with _connect() as conn:
+            auth_row = db_requests.get_student_auth_row_by_id(conn, student_row_id)
+            if not auth_row:
+                return False, "Student account was not found."
+
+            if not check_password_hash(
+                str(auth_row["password_hash"] or ""),
+                current_password_value,
+            ):
+                return False, "Current password is incorrect."
+
+            db_requests.update_student_password(
+                conn,
+                student_row_id,
+                new_password_value,
+                generate_password_hash(new_password_value),
+                _utc_now_iso(),
+            )
+            conn.commit()
+
+    return True, ""
