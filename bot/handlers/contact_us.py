@@ -1,4 +1,5 @@
 import html
+import logging
 import os
 
 from aiogram import F, Router
@@ -14,8 +15,7 @@ from web.auth_store import get_student_by_telegram_user_id
 
 router = Router()
 
-COURSE_LEADER_CHAT = (os.environ.get("COURSE_LEADER_CHAT", "@py_ds") or "@py_ds").strip()
-ADMIN_CHAT = (os.environ.get("ADMIN_CHAT", "@msischool_admin") or "@msischool_admin").strip()
+logger = logging.getLogger(__name__)
 
 
 class ContactState(StatesGroup):
@@ -38,15 +38,23 @@ def _linked_student_from_user(user):
 
 
 def _target_by_key(target_key):
+    def _chat_from_env(name):
+        raw_value = str(os.getenv(name, "") or "").strip()
+        if not raw_value:
+            return ""
+        if raw_value.lstrip("-").isdigit():
+            return int(raw_value)
+        return raw_value
+
     if target_key == "course_leader":
         return {
             "label": "Course Leader",
-            "chat_id": COURSE_LEADER_CHAT,
+            "chat_id": _chat_from_env("COURSE_LEADER_CHAT"),
         }
     if target_key == "admin":
         return {
             "label": "Administration",
-            "chat_id": ADMIN_CHAT,
+            "chat_id": _chat_from_env("ADMIN_CHAT"),
         }
     return None
 
@@ -80,6 +88,15 @@ async def contact_target_course_leader_callback(query, state):
         await state.clear()
         return
 
+    target = _target_by_key("course_leader")
+    if not target or not target.get("chat_id"):
+        await query.answer(
+            "Course Leader chat is not configured yet. Please contact support.",
+            show_alert=True,
+        )
+        await state.clear()
+        return
+
     await state.set_state(ContactState.waiting_message)
     await state.update_data(contact_target_key="course_leader")
     await query.answer()
@@ -96,6 +113,15 @@ async def contact_target_admin_callback(query, state):
     if not linked_student:
         await query.answer(
             "Authentication is only through the mini app. Please sign in there first.",
+            show_alert=True,
+        )
+        await state.clear()
+        return
+
+    target = _target_by_key("admin")
+    if not target or not target.get("chat_id"):
+        await query.answer(
+            "Administration chat is not configured yet. Please contact support.",
             show_alert=True,
         )
         await state.clear()
@@ -132,6 +158,12 @@ async def collect_contact_message(message, state):
         await state.clear()
         await message.answer("Session expired. Please open Contact US again.")
         return
+    if not target.get("chat_id"):
+        await state.clear()
+        await message.answer(
+            "⚠️ Contact destination is not configured yet. Please try again later."
+        )
+        return
 
     await state.update_data(contact_message_text=message_text)
     await state.set_state(ContactState.waiting_confirmation)
@@ -154,6 +186,13 @@ async def confirm_contact_send_callback(query, state):
         await state.clear()
         await query.answer()
         await query.message.answer("Session expired. Please open Contact US again.")
+        return
+    if not target.get("chat_id"):
+        await state.clear()
+        await query.answer()
+        await query.message.answer(
+            "⚠️ Contact destination is not configured yet. Please try again later."
+        )
         return
 
     linked_student = _linked_student_from_user(query.from_user)
@@ -201,6 +240,12 @@ async def confirm_contact_send_callback(query, state):
             reply_markup=reply_to_student_keyboard(reply_url),
         )
     except Exception:
+        logger.exception(
+            "Failed to deliver contact message (target=%s, chat_id=%r, from_user=%s)",
+            target["label"],
+            target["chat_id"],
+            query.from_user.id,
+        )
         await query.answer()
         await query.message.answer(
             "⚠️ Could not deliver your message right now. Please try again later."
