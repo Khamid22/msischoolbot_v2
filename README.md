@@ -26,6 +26,7 @@ Create `.env` in the project root:
 - `FLASK_HOST` (default: `0.0.0.0`)
 - `FLASK_PORT` (default: `8080`)
 - `PORT` (overrides `FLASK_PORT`)
+- `WAITRESS_THREADS` (default: `4`, used by production WSGI server)
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
 - `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
@@ -92,7 +93,7 @@ python -m web.server
 ## Project Structure
 
 - `config.py` - shared config
-- `main.py` - starts Flask thread + bot loop
+- `main.py` - starts Waitress (WSGI) web server thread + bot loop
 - `bot/handlers/start.py` - `/start` handler
 - `bot/keyboards/inline_keyboard.py` - inline keyboard builders
 - `web/server.py` - Flask app, helpers, auth guard, route registration

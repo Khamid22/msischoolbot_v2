@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 
 from aiogram import Bot, Dispatcher
@@ -14,20 +15,30 @@ from bot.handlers.contact_us import router as contact_us_router
 from bot.handlers.quick_summary import router as quick_summary_router
 from bot.handlers.start import router as start_router
 from bot.settings import settings as bot_settings
+from waitress import serve
 from web.server import app, settings as web_settings
 
 
-def run_flask():
-    app.run(
+def _waitress_threads():
+    raw_value = str(os.getenv("WAITRESS_THREADS", "4") or "").strip()
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        logging.warning("Invalid WAITRESS_THREADS=%r, using 4", raw_value)
+        return 4
+    return max(parsed, 1)
+
+
+def run_web_server():
+    serve(
+        app,
         host=web_settings.flask_host,
         port=web_settings.flask_port,
-        debug=False,
-        use_reloader=False,
+        threads=_waitress_threads(),
     )
 
 
 async def run_bot():
-    # Configure bot and start polling updates from Telegram.
     logging.basicConfig(level=logging.INFO)
 
     bot = Bot(
@@ -50,6 +61,6 @@ async def run_bot():
 
 
 if __name__ == "__main__":
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread = threading.Thread(target=run_web_server, daemon=True)
     flask_thread.start()
     asyncio.run(run_bot())
