@@ -16,8 +16,6 @@ from web.auth_store import get_student_by_telegram_user_id
 router = Router()
 
 logger = logging.getLogger(__name__)
-DEFAULT_COURSE_LEADER_TARGET = "@py_ds"
-DEFAULT_ADMIN_TARGET = "@msischool_admin"
 
 
 class ContactState(StatesGroup):
@@ -40,40 +38,28 @@ def _linked_student_from_user(user):
 
 
 def _target_by_key(target_key):
-    def _chat_from_env(name, default_value):
+    def _chat_from_env(name):
         raw_value = str(os.getenv(name, "") or "").strip()
-        value = raw_value or default_value
-        if not value:
-            return ""
-
-        # Allow full t.me links and plain usernames.
-        if value.startswith("https://t.me/"):
-            value = value.removeprefix("https://t.me/")
-        elif value.startswith("http://t.me/"):
-            value = value.removeprefix("http://t.me/")
-        value = value.strip("/")
-
-        if value.lstrip("-").isdigit():
-            return int(value)
-        if not value.startswith("@"):
-            return f"@{value}"
-        return value
+        if not raw_value:
+            return None
+        if raw_value.lstrip("-").isdigit():
+            return int(raw_value)
+        logger.warning(
+            "Invalid %s value %r: only numeric Telegram IDs are supported",
+            name,
+            raw_value,
+        )
+        return None
 
     if target_key == "course_leader":
         return {
             "label": "Course Leader",
-            "chat_id": _chat_from_env(
-                "COURSE_LEADER_CHAT",
-                DEFAULT_COURSE_LEADER_TARGET,
-            ),
+            "chat_id": _chat_from_env("COURSE_LEADER_CHAT"),
         }
     if target_key == "admin":
         return {
             "label": "Administration",
-            "chat_id": _chat_from_env(
-                "ADMIN_CHAT",
-                DEFAULT_ADMIN_TARGET,
-            ),
+            "chat_id": _chat_from_env("ADMIN_CHAT"),
         }
     return None
 
@@ -110,7 +96,7 @@ async def contact_target_course_leader_callback(query, state):
     target = _target_by_key("course_leader")
     if not target or not target.get("chat_id"):
         await query.answer(
-            "Course Leader chat is not configured yet. Please contact support.",
+            "Course Leader chat is not configured yet. Use numeric Telegram ID.",
             show_alert=True,
         )
         await state.clear()
@@ -140,7 +126,7 @@ async def contact_target_admin_callback(query, state):
     target = _target_by_key("admin")
     if not target or not target.get("chat_id"):
         await query.answer(
-            "Administration chat is not configured yet. Please contact support.",
+            "Administration chat is not configured yet. Use numeric Telegram ID.",
             show_alert=True,
         )
         await state.clear()
