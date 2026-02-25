@@ -21,8 +21,8 @@ pip install -r requirements.txt
 Create `.env` in the project root:
 - `BOT_TOKEN`
 - `MINI_APP_URL`
-- `COURSE_LEADER_CHAT` (required for Contact US delivery; chat ID or channel/supergroup username)
-- `ADMIN_CHAT` (required for Contact US delivery; chat ID or channel/supergroup username)
+- `COURSE_LEADER_CHAT` (optional for Contact US; accepts chat ID, `@username`, or `https://t.me/username`; default: `@py_ds`)
+- `ADMIN_CHAT` (optional for Contact US; accepts chat ID, `@username`, or `https://t.me/username`; default: `@msischool_admin`)
 - `FLASK_HOST` (default: `0.0.0.0`)
 - `FLASK_PORT` (default: `8080`)
 - `PORT` (overrides `FLASK_PORT`)

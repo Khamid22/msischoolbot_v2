@@ -16,6 +16,8 @@ from web.auth_store import get_student_by_telegram_user_id
 router = Router()
 
 logger = logging.getLogger(__name__)
+DEFAULT_COURSE_LEADER_TARGET = "@py_ds"
+DEFAULT_ADMIN_TARGET = "@msischool_admin"
 
 
 class ContactState(StatesGroup):
@@ -38,23 +40,40 @@ def _linked_student_from_user(user):
 
 
 def _target_by_key(target_key):
-    def _chat_from_env(name):
+    def _chat_from_env(name, default_value):
         raw_value = str(os.getenv(name, "") or "").strip()
-        if not raw_value:
+        value = raw_value or default_value
+        if not value:
             return ""
-        if raw_value.lstrip("-").isdigit():
-            return int(raw_value)
-        return raw_value
+
+        # Allow full t.me links and plain usernames.
+        if value.startswith("https://t.me/"):
+            value = value.removeprefix("https://t.me/")
+        elif value.startswith("http://t.me/"):
+            value = value.removeprefix("http://t.me/")
+        value = value.strip("/")
+
+        if value.lstrip("-").isdigit():
+            return int(value)
+        if not value.startswith("@"):
+            return f"@{value}"
+        return value
 
     if target_key == "course_leader":
         return {
             "label": "Course Leader",
-            "chat_id": _chat_from_env("COURSE_LEADER_CHAT"),
+            "chat_id": _chat_from_env(
+                "COURSE_LEADER_CHAT",
+                DEFAULT_COURSE_LEADER_TARGET,
+            ),
         }
     if target_key == "admin":
         return {
             "label": "Administration",
-            "chat_id": _chat_from_env("ADMIN_CHAT"),
+            "chat_id": _chat_from_env(
+                "ADMIN_CHAT",
+                DEFAULT_ADMIN_TARGET,
+            ),
         }
     return None
 
