@@ -45,8 +45,13 @@ def register_student_routes(
         role = current_auth_role()
 
         if role == "admin":
-            panel = request.args.get("panel", "overview")
-            school_filter = request.args.get("school", "all")
+            panel_arg = str(request.args.get("panel", "")).strip().lower()
+            school_arg = str(request.args.get("school", "")).strip().lower()
+            saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
+            saved_school = str(session.get("admin_last_school", "all")).strip().lower()
+
+            panel = panel_arg or saved_panel or "overview"
+            school_filter = school_arg or saved_school or "all"
             edit_teacher_id = request.args.get("edit_teacher_id", "").strip()
             selected_teacher_edit = None
             if panel == "teachers" and edit_teacher_id:

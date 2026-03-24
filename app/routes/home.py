@@ -150,6 +150,8 @@ def register_home_routes(
         session["auth_login"] = str(admin.get("login", "")).strip()
         session["admin_id"] = int(admin["id"])
         session["admin_is_owner"] = bool(admin.get("is_owner"))
+        session["admin_last_panel"] = "overview"
+        session["admin_last_school"] = "all"
         session.permanent = True
 
     def _set_student_session(student, telegram_user_id):
@@ -1102,6 +1104,9 @@ def register_home_routes(
             panel = "overview"
 
         school_filter = _normalize_admin_school_filter(admin_school)
+        if _current_auth_role() == "admin":
+            session["admin_last_panel"] = panel
+            session["admin_last_school"] = school_filter
         dataset_scope = "all" if panel == "overview" else school_filter
         force_refresh = _should_force_refresh()
         sync_errors = []

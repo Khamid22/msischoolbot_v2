@@ -163,6 +163,8 @@ def register_dashboard_routes(
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
+        admin_return_panel = request.args.get("admin_return_panel", "").strip().lower()
+        admin_return_school = request.args.get("admin_return_school", "").strip().lower()
         profile_notice = request.args.get("profile_notice", "").strip()
         profile_error = request.args.get("profile_error", "").strip()
         force_refresh = _should_force_refresh()
@@ -321,6 +323,19 @@ def register_dashboard_routes(
             group=requested_group or current_group_name,
             school=current_school_code,
         )
+        dashboard_back_url = url_for("home")
+        if _current_auth_role() == "admin":
+            return_panel = admin_return_panel or "students"
+            return_school = admin_return_school or str(
+                session.get("admin_last_school", "all")
+            ).strip().casefold() or "all"
+            session["admin_last_panel"] = return_panel
+            session["admin_last_school"] = return_school
+            dashboard_back_url = url_for(
+                "home",
+                panel=return_panel,
+                school=return_school,
+            )
 
         return render_template(
             "student/dashboard.html",
@@ -338,6 +353,7 @@ def register_dashboard_routes(
             student_profile=student_profile,
             profile_notice=profile_notice,
             profile_error=profile_error,
+            dashboard_back_url=dashboard_back_url,
         )
 
     @app.get("/dashboard/<int:student_id>/aap-lessons")

@@ -1,7 +1,7 @@
 import os
 import time
 
-from flask import redirect, request, url_for
+from flask import redirect, request, session, url_for
 from werkzeug.utils import secure_filename
 
 
@@ -120,6 +120,12 @@ def register_admin_routes(
         if current_auth_role() != "admin":
             return redirect(url_for("home"))
 
+        requested_school = str(request.args.get("school", "")).strip().casefold()
+        if not requested_school:
+            requested_school = str(session.get("admin_last_school", "all")).strip().casefold() or "all"
+        session["admin_last_panel"] = "students"
+        session["admin_last_school"] = requested_school
+
         resolved, resolve_error, status_code = _resolve_sheet_student_for_admin(student_row_id)
         if resolve_error:
             return (
@@ -137,6 +143,8 @@ def register_admin_routes(
                 subject=resolved.get("subject", ""),
                 group=resolved.get("group", ""),
                 school=resolved.get("school", ""),
+                admin_return_panel="students",
+                admin_return_school=requested_school,
             )
         )
 

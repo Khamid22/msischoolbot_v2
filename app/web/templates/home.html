@@ -505,10 +505,8 @@
                 <tr>
                   <th>ID</th>
                   <th>Full Name</th>
-                  <th>Student ID</th>
                   <th>Subjects</th>
                   <th>School</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -519,26 +517,20 @@
                 >
                   <td>{{ student.display_id }}</td>
                   <td>
-                    <a class="admin-student-link" href="{{ url_for('admin_student_profile', student_row_id=student.id) }}">
+                    <a class="admin-student-link" href="{{ url_for('admin_student_dashboard', student_row_id=student.id, school=admin_school|default('all', true)) }}">
                       {{ student.full_name }}
                     </a>
                   </td>
-                  <td>{{ student.student_id }}</td>
                   <td>{{ student.subjects }}</td>
                   <td>{{ student.school_name }}</td>
-                  <td>
-                    <a class="secondary-btn teachers-action-btn" href="{{ url_for('admin_student_dashboard', student_row_id=student.id) }}">
-                      View Dashboard
-                    </a>
-                  </td>
                 </tr>
                 {% endfor %}
                 <tr id="adminStudentsNoResultsRow" hidden>
-                  <td colspan="6">No students match your search.</td>
+                  <td colspan="4">No students match your search.</td>
                 </tr>
                 {% if not admin_students %}
                 <tr>
-                  <td colspan="6">No students found.</td>
+                  <td colspan="4">No students found.</td>
                 </tr>
                 {% endif %}
               </tbody>

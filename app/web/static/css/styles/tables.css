@@ -125,43 +125,35 @@
 
 /* ─── Students Table ─── */
 .students-table {
-  min-width: 760px;
+  min-width: 560px;
 }
 
 .students-table th:nth-child(1),
 .students-table td:nth-child(1) {
-  width: 44px;
+  width: 52px;
   text-align: center;
 }
 
 .students-table th:nth-child(2),
 .students-table td:nth-child(2) {
-  max-width: 180px;
+  max-width: 220px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .students-table th:nth-child(3),
 .students-table td:nth-child(3) {
-  max-width: 120px;
+  max-width: 190px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .students-table th:nth-child(4),
 .students-table td:nth-child(4) {
-  max-width: 160px;
+  max-width: 130px;
   white-space: normal;
   overflow-wrap: anywhere;
-}
-
-.students-table th:nth-child(5),
-.students-table td:nth-child(5) {
-  max-width: 120px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.students-table th:nth-child(6),
-.students-table td:nth-child(6) {
-  width: 132px;
-  text-align: center;
 }
 
 .admin-panel-students .admin-table-wrap {
@@ -459,13 +451,9 @@ body.rating-page.tg-miniapp .rating-table-wrap {
     min-width: 72px;
   }
 
-  .admin-panel-students .admin-table-wrap {
-    overflow-x: hidden;
-  }
-
   .admin-panel-students .admin-table,
   .students-table {
-    min-width: 0;
+    min-width: 460px;
     width: 100%;
     table-layout: fixed;
   }
@@ -493,42 +481,21 @@ body.rating-page.tg-miniapp .rating-table-wrap {
 
   .students-table th:nth-child(2),
   .students-table td:nth-child(2) {
-    width: 28%;
+    width: 44%;
     max-width: none;
     white-space: normal;
   }
 
   .students-table th:nth-child(3),
   .students-table td:nth-child(3) {
-    width: 16%;
+    width: 34%;
     max-width: none;
   }
 
   .students-table th:nth-child(4),
   .students-table td:nth-child(4) {
-    width: 22%;
-    max-width: none;
-  }
-
-  .students-table th:nth-child(5),
-  .students-table td:nth-child(5) {
     width: 14%;
     max-width: none;
-  }
-
-  .students-table th:nth-child(6),
-  .students-table td:nth-child(6) {
-    width: 12%;
-    max-width: none;
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-
-  .admin-panel-students .teachers-action-btn {
-    min-height: 26px;
-    padding: 4px 6px;
-    font-size: 0.58rem;
-    white-space: nowrap;
   }
 }
 
