@@ -566,7 +566,7 @@
               maxRotation: 0,
               minRotation: 0,
               autoSkip: false,
-              font: { size: 10 },
+              font: { size: 8 },
             },
             grid: {
               display: false,
@@ -680,7 +680,7 @@
               maxRotation: 0,
               minRotation: 0,
               autoSkip: false,
-              font: { size: 10 },
+              font: { size: 8 },
             },
             grid: {
               display: false,
@@ -697,8 +697,8 @@
               color: "#e2e8f0",
             },
             title: {
-              display: true,
-              text: "AAP",
+              display: false,
+              text: "",
               color: "#64748b",
               font: { size: 10 },
             },
