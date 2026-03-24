@@ -3,15 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0a0a0a" />
     <title>AAP Lesson Mastery</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/base.css', v=asset_version) }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/dashboard.css', v=asset_version) }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/tables.css', v=asset_version) }}" />
@@ -20,9 +17,7 @@
     <header class="topbar">
       <div class="topbar-left">
         <a href="{{ back_url }}" class="back-link" aria-label="Back to dashboard">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
         </a>
         <div>
           <h1>Average Academic Performance</h1>
@@ -30,23 +25,13 @@
         </div>
       </div>
     </header>
-
     <main class="dashboard-wrap aap-wrap">
       <section class="chart-card aap-table-card">
-        <div class="card-head">
-          <h3>Subject Curriculum</h3>
-        </div>
+        <div class="card-head"><h3>Subject Curriculum</h3></div>
         {% if lesson_rows %}
         <div class="aap-table-scroll">
           <table class="aap-table">
-            <thead>
-              <tr>
-                <th>Lesson Date</th>
-                <th>Lesson Number</th>
-                <th>Lesson Topic</th>
-                <th>H/W Grades</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Lesson Date</th><th>Lesson Number</th><th>Lesson Topic</th><th>H/W Grades</th></tr></thead>
             <tbody>
               {% for row in lesson_rows %}
               <tr>
@@ -56,13 +41,9 @@
                 <td>
                   <div class="aap-score-row">
                     <strong>{{ row.aap_display }}</strong>
-                    <div class="aap-progress-track" aria-hidden="true">
-                      <span class="aap-progress-fill" style="width: {{row.progress_width}}%"></span>
-                    </div>
+                    <div class="aap-progress-track" aria-hidden="true"><span class="aap-progress-fill" style="width: {{ row.progress_width | default(0, true) | int }}%;"></span></div>
                   </div>
-                  <p class="aap-remark {{ row.remark_class }}">
-                    {{ row.remark }}
-                  </p>
+                  <p class="aap-remark {{ row.remark_class }}">{{ row.remark }}</p>
                 </td>
               </tr>
               {% endfor %}
@@ -74,7 +55,6 @@
         {% endif %}
       </section>
     </main>
-
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
   </body>

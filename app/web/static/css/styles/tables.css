@@ -459,8 +459,76 @@ body.rating-page.tg-miniapp .rating-table-wrap {
     min-width: 72px;
   }
 
+  .admin-panel-students .admin-table-wrap {
+    overflow-x: hidden;
+  }
+
+  .admin-panel-students .admin-table,
   .students-table {
-    min-width: 640px;
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .students-table th,
+  .students-table td {
+    padding: 7px 6px;
+    font-size: 0.66rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+  }
+
+  .students-table th {
+    font-size: 0.5rem;
+    line-height: 1.2;
+  }
+
+  .students-table th:nth-child(1),
+  .students-table td:nth-child(1) {
+    width: 8%;
+    max-width: none;
+  }
+
+  .students-table th:nth-child(2),
+  .students-table td:nth-child(2) {
+    width: 28%;
+    max-width: none;
+    white-space: normal;
+  }
+
+  .students-table th:nth-child(3),
+  .students-table td:nth-child(3) {
+    width: 16%;
+    max-width: none;
+  }
+
+  .students-table th:nth-child(4),
+  .students-table td:nth-child(4) {
+    width: 22%;
+    max-width: none;
+  }
+
+  .students-table th:nth-child(5),
+  .students-table td:nth-child(5) {
+    width: 14%;
+    max-width: none;
+  }
+
+  .students-table th:nth-child(6),
+  .students-table td:nth-child(6) {
+    width: 12%;
+    max-width: none;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .admin-panel-students .teachers-action-btn {
+    min-height: 26px;
+    padding: 4px 6px;
+    font-size: 0.58rem;
+    white-space: nowrap;
   }
 }
 

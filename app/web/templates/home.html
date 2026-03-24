@@ -41,13 +41,6 @@
             <p>Admin panel</p>
           </header>
 
-          <div class="session-toolbar admin-session-toolbar">
-            <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
-            <form action="{{ url_for('logout') }}" method="post">
-              <button type="submit" class="secondary-btn">Logout</button>
-            </form>
-          </div>
-
           <nav class="admin-switch-row admin-main-nav" aria-label="Admin navigation">
             <a
               href="{{ url_for('home', panel='overview', school=admin_school|default('all', true)) }}"
@@ -67,6 +60,15 @@
             >
               Teachers
             </a>
+            <form action="{{ url_for('logout') }}" method="post" class="admin-logout-form">
+              <button type="submit" class="secondary-btn admin-tab-btn admin-logout-icon-btn" aria-label="Logout" title="Logout">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                  <path d="M10 17l5-5-5-5"></path>
+                  <path d="M15 12H3"></path>
+                </svg>
+              </button>
+            </form>
           </nav>
         </div>
         {% else %}
@@ -141,7 +143,7 @@
           <section class="admin-insights-grid">
             <article class="admin-info-card admin-info-card-wide">
               <h3>School Info</h3>
-              <ul class="admin-mini-list">
+              <ul class="admin-mini-list admin-mini-list-schools">
                 {% for row in admin_school_info %}
                 <li>
                   <span>{{ row.school_name }}</span>

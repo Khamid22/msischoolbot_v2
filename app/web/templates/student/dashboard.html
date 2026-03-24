@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0a0a0a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -62,11 +62,11 @@
               {{ payload.student.initials }}
             </span>
           </button>
-          <div id="profileMenu" class="profile-menu" hidden>
+          <nav id="profileMenu" class="profile-menu" hidden aria-label="Profile actions">
             <button type="button" id="profileMenuItem" class="profile-menu-item">Profile</button>
             <button type="button" id="changePasswordMenuItem" class="profile-menu-item">Change Password</button>
             <button type="button" id="logoutMenuItem" class="profile-menu-item">Logout</button>
-          </div>
+          </nav>
         </div>
       </div>
     </header>
@@ -102,7 +102,7 @@
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
-            <div id="subjectMenu" class="subject-menu" hidden>
+            <nav id="subjectMenu" class="subject-menu" hidden aria-label="Subject switcher">
               {% for option in subject_switch_options %}
               <a
                 class="subject-menu-item{% if option.is_current %} is-current{% endif %}"
@@ -114,7 +114,7 @@
                 {% endif %}
               </a>
               {% endfor %}
-            </div>
+            </nav>
           </div>
 
           <a class="title-pill student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
@@ -137,7 +137,7 @@
                 <circle cx="12" cy="12" r="6"></circle>
                 <circle cx="12" cy="12" r="2"></circle>
               </svg>
-              Program Completion Rate
+              Program Completion
             </h3>
           </div>
           <div class="progress-track" aria-hidden="true">
@@ -174,7 +174,6 @@
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
               <line x1="3" y1="10" x2="21" y2="10"></line>
-              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"></path>
             </svg>
             AR
           </p>
@@ -197,13 +196,10 @@
         <article class="stat-card stat-card-compact">
           <p class="stat-title title-inline icon-warning">
             <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              <path d="M8.5 8.5c.5-1 1.5-1.5 3.5-1.5s3 .5 3.5 1.5"></path>
-              <path d="M8.5 15.5c.5 1 1.5 1.5 3.5 1.5s3-.5 3.5-1.5"></path>
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 8v4M12 16h.01"></path>
             </svg>
-            Total Coins
+            Coins
           </p>
           <h3>{{ payload.coins|default(0, true) }}</h3>
         </article>
@@ -217,7 +213,7 @@
                 <path d="M9 11l3 3L22 4"></path>
                 <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
               </svg>
-              Attendance Rate Chart
+              Attendance Rate
             </h3>
             <p>Total Sessions: {{ payload.attendanceRecord.totalCount }}</p>
           </div>
@@ -237,7 +233,7 @@
             </div>
             <div class="justified">
               <strong>{{ payload.attendanceRecord.justifiedAbsentCount|default(0, true) }}</strong>
-              <span>Justified Absent</span>
+              <span>Justified</span>
             </div>
           </div>
         </article>
@@ -287,7 +283,6 @@
       </section>
     </main>
 
-    <!-- Add Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script id="dashboardDataJson" type="application/json">{{ payload|default({}, true)|tojson|safe }}</script>
@@ -365,35 +360,15 @@
 
           <label class="field">
             <span>Current Password</span>
-            <input
-              type="password"
-              name="current_password"
-              autocomplete="current-password"
-              placeholder="Current password"
-              required
-            />
+            <input type="password" name="current_password" autocomplete="current-password" placeholder="Current password" required />
           </label>
           <label class="field">
             <span>New Password</span>
-            <input
-              type="password"
-              name="new_password"
-              autocomplete="new-password"
-              placeholder="At least 6 characters"
-              minlength="6"
-              required
-            />
+            <input type="password" name="new_password" autocomplete="new-password" placeholder="At least 6 characters" minlength="6" required />
           </label>
           <label class="field">
             <span>Confirm Password</span>
-            <input
-              type="password"
-              name="confirm_password"
-              autocomplete="new-password"
-              placeholder="Repeat new password"
-              minlength="6"
-              required
-            />
+            <input type="password" name="confirm_password" autocomplete="new-password" placeholder="Repeat new password" minlength="6" required />
           </label>
 
           <div class="confirm-modal-actions">

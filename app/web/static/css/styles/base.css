@@ -2,19 +2,28 @@
   --font-display: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', sans-serif;
 
-  --bg: #f8fafc;
+  --bg: #f5f5f5;
   --surface: #ffffff;
-  --text: #000000;
-  --muted: #64748b;
-  --border: #000000;
-  --hairline: rgba(15, 23, 42, 0.16);
+  --text: #0a0a0a;
+  --text-secondary: #404040;
+  --muted: #737373;
+  --border: #0a0a0a;
+  --hairline: rgba(10, 10, 10, 0.08);
+  --hover-bg: rgba(10, 10, 10, 0.04);
 
-  --radius-xl: 24px;
-  --radius-lg: 18px;
+  --radius-xl: 20px;
+  --radius-lg: 16px;
   --radius-md: 12px;
+  --radius-sm: 8px;
 
-  --card-shadow: 3px 3px 0 0 rgba(0, 0, 0, 1);
-  --card-shadow-soft: 0 14px 30px rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --card-shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --card-shadow-neo: 3px 3px 0 0 rgba(0, 0, 0, 1);
+
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -40,6 +49,8 @@ body {
   overflow-x: hidden;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html:not(.tg-miniapp),
@@ -56,7 +67,6 @@ body:not(.tg-miniapp) {
   touch-action: auto;
 }
 
-/* Make sure the html and body are completely fixed for Telegram */
 html.tg-miniapp,
 body.tg-miniapp {
   position: fixed;
@@ -70,21 +80,21 @@ body.tg-miniapp {
   max-height: var(--tg-app-height);
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: none; /* Prevent any touch actions on body */
+  touch-action: none;
 }
 
 body {
   font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
-  line-height: 1.45;
+  line-height: 1.5;
   overscroll-behavior-y: auto;
 }
 
 body.dashboard-page.tg-miniapp {
   display: flex;
   flex-direction: column;
-  touch-action: none; /* Critical: prevent pull-to-refresh */
+  touch-action: none;
 }
 
 body.dashboard-page.tg-miniapp .topbar {
@@ -99,10 +109,9 @@ body.dashboard-page.tg-miniapp .dashboard-wrap {
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y; /* Allow only vertical scrolling within this container */
+  touch-action: pan-y;
 }
 
-/* Also apply to home page */
 body.home-page.tg-miniapp {
   position: fixed;
   overflow: hidden;
@@ -116,71 +125,68 @@ body.home-page.tg-miniapp .home-wrap {
   touch-action: pan-y;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  line-height: 1.15;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 p {
   margin: 0;
 }
 
-a,
-button,
-select,
-input {
+a, button, select, input {
   touch-action: manipulation;
 }
 
-button,
-a {
+button, a {
   -webkit-user-select: none;
   user-select: none;
 }
 
-input,
-select,
-button {
+input, select, button {
   font: inherit;
 }
 
-
+/* ─── Alerts ─── */
 .form-error {
-  border: 1px solid #ef4444;
-  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
   color: #991b1b;
   border-radius: var(--radius-md);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  padding: 10px 12px;
+  padding: 12px 14px;
   margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
 }
 
 .form-notice {
-  border: 1px solid #16a34a;
-  background: #dcfce7;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
   color: #166534;
   border-radius: var(--radius-md);
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  padding: 10px 12px;
+  padding: 12px 14px;
   margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
 }
 
+/* ─── Session Toolbar ─── */
 .session-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
@@ -192,26 +198,31 @@ button {
 }
 
 .session-badge {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #1f2937;
+  color: var(--muted);
   word-break: break-word;
   flex: 1 1 auto;
   min-width: 0;
 }
 
+.session-badge strong {
+  color: var(--text);
+}
+
+/* ─── Forms ─── */
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .field-grid-2 {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 
 .field {
@@ -221,10 +232,10 @@ button {
 }
 
 .field span {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(15, 23, 42, 0.76);
+  letter-spacing: 0.05em;
+  color: var(--muted);
   text-transform: uppercase;
   padding-left: 2px;
 }
@@ -232,22 +243,28 @@ button {
 .field input,
 .field select,
 .field textarea {
-  border: 1px solid rgba(15, 23, 42, 0.34);
+  border: 1.5px solid rgba(10, 10, 10, 0.16);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--surface);
   font-size: 16px;
   min-height: 48px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  color: var(--text);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: #000;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+  border-color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.06);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #a3a3a3;
 }
 
 .field textarea {
@@ -255,77 +272,112 @@ button {
   resize: vertical;
 }
 
+/* ─── Buttons ─── */
 .primary-btn {
-  margin-top: 3px;
+  margin-top: 4px;
   min-height: 50px;
   border: 0;
   border-radius: var(--radius-md);
-  background: #000;
-  color: #fff;
+  background: var(--text);
+  color: var(--surface);
   font-family: var(--font-display);
-  font-size: 0.94rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
   font-weight: 700;
-  box-shadow: var(--card-shadow);
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
   display: inline-flex;
   justify-content: center;
   align-items: center;
   text-decoration: none;
-  padding-inline: 14px;
+  padding-inline: 20px;
+  box-shadow: var(--card-shadow);
 }
 
 .primary-btn:hover {
-  opacity: 0.94;
+  box-shadow: var(--card-shadow-hover);
+  transform: translateY(-1px);
 }
 
 .primary-btn:active {
-  transform: translateY(1px);
-  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 1);
+  transform: translateY(0);
+  box-shadow: var(--card-shadow);
+  opacity: 0.9;
 }
 
 .secondary-btn {
-  min-height: 40px;
-  border: 1px solid #000;
+  min-height: 38px;
+  border: 1.5px solid rgba(10, 10, 10, 0.2);
   border-radius: var(--radius-md);
-  background: #fff;
-  color: #000;
+  background: var(--surface);
+  color: var(--text);
   font-family: var(--font-display);
-  font-size: 0.76rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  font-weight: 600;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 8px 14px;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
   flex-shrink: 0;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
+.secondary-btn:hover {
+  background: var(--hover-bg);
+  border-color: rgba(10, 10, 10, 0.3);
+}
+
+.secondary-btn:active {
+  transform: scale(0.98);
+}
+
+/* ─── Profile Photo Fallback ─── */
 .profile-photo-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
   font-weight: 700;
-  color: #fff;
-  background: #000;
+  color: var(--surface);
+  background: var(--text);
 }
 
+/* ─── Badge ─── */
 .badge {
   margin-top: 7px;
   display: inline-flex;
-  background: #f1f5f9;
-  color: #334155;
+  background: rgba(10, 10, 10, 0.06);
+  color: var(--text-secondary);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+}
+
+/* ─── Fade-in animation ─── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in {
+    animation: none;
+  }
 }
