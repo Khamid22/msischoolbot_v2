@@ -515,9 +515,13 @@
                   data-student-row
                   data-student-search="{{ (student.full_name ~ ' ' ~ student.student_id ~ ' ' ~ student.subjects ~ ' ' ~ student.school_name)|lower }}"
                 >
-                  <td>{{ student.display_id }}</td>
                   <td>
-                    <a class="admin-student-link" href="{{ url_for('admin_student_dashboard', student_row_id=student.id, school=admin_school|default('all', true)) }}">
+                    <a class="admin-student-id-link" href="{{ url_for('admin_student_dashboard', student_row_id=student.id, school=admin_school|default('all', true)) }}">
+                      {{ student.display_id }}
+                    </a>
+                  </td>
+                  <td>
+                    <a class="admin-student-link" href="{{ url_for('admin_student_profile', student_row_id=student.id) }}">
                       {{ student.full_name }}
                     </a>
                   </td>
