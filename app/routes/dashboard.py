@@ -82,12 +82,7 @@ def register_dashboard_routes(
         return str(session.get("student_full_name", "")).strip()
 
     def _should_force_refresh():
-        refresh_flag = str(request.args.get("refresh", "")).strip().casefold()
-        if refresh_flag in {"1", "true", "yes", "on"}:
-            return True
-
-        force_header = str(request.headers.get("X-Force-Refresh", "")).strip().casefold()
-        return force_header in {"1", "true", "yes", "on"}
+        return False
 
     def _is_student_owner_of_payload(student_id, payload):
         # Allow student access only to dashboards that belong to the same full name.

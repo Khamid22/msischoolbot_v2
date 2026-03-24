@@ -55,7 +55,7 @@
               Students
             </a>
             <a
-              href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true)) }}"
+              href="{{ url_for('home', panel='teachers', school='all') }}"
               class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
             >
               Teachers
@@ -342,7 +342,7 @@
               {% else %}
               {% set teacher_initial_mode = "select" %}
               {% endif %}
-              {% set teacher_initial_school = admin_teacher_edit_school or (admin_school if admin_school != "all" else "") %}
+              {% set teacher_initial_school = admin_teacher_edit_school or "" %}
               <input type="hidden" id="teacherModeInput" name="teacher_mode" value="{{ teacher_initial_mode }}" />
               <input type="hidden" name="teacher_edit_id" value="{{ admin_teacher_edit.id if admin_teacher_edit else '' }}" />
 

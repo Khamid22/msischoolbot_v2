@@ -238,12 +238,7 @@ def register_home_routes(
             return None
 
     def _should_force_refresh():
-        refresh_flag = str(request.args.get("refresh", "")).strip().casefold()
-        if refresh_flag in {"1", "true", "yes", "on"}:
-            return True
-
-        force_header = str(request.headers.get("X-Force-Refresh", "")).strip().casefold()
-        return force_header in {"1", "true", "yes", "on"}
+        return False
 
     def _merge_admin_datasets(datasets):
         merged_students = []
@@ -997,14 +992,30 @@ def register_home_routes(
             if isinstance(row, dict) and str(row.get("assigned_group", "")).strip()
         }
         group_pairs = set()
-        for row in aggregated_rows:
-            if not isinstance(row, dict):
-                continue
-            school_name = str(row.get("school_name", "")).strip() or "School"
-            for group_name in row.get("groups", []):
-                normalized_group = str(group_name or "").strip()
-                if normalized_group:
-                    group_pairs.add((school_name, normalized_group))
+        dataset_students = dataset.get("students", []) if isinstance(dataset, dict) else []
+        if isinstance(dataset_students, list):
+            for student_row in dataset_students:
+                if not isinstance(student_row, dict):
+                    continue
+                group_name = str(student_row.get("group", "")).strip()
+                if not group_name:
+                    continue
+                school_name = str(
+                    student_row.get("schoolName")
+                    or student_row.get("school_name")
+                    or "School"
+                ).strip() or "School"
+                group_pairs.add((school_name, group_name))
+
+        if not group_pairs:
+            for row in aggregated_rows:
+                if not isinstance(row, dict):
+                    continue
+                school_name = str(row.get("school_name", "")).strip() or "School"
+                for group_name in row.get("groups", []):
+                    normalized_group = str(group_name or "").strip()
+                    if normalized_group:
+                        group_pairs.add((school_name, normalized_group))
 
         for school_name, group_name in sorted(
             group_pairs,
@@ -1107,11 +1118,11 @@ def register_home_routes(
         if _current_auth_role() == "admin":
             session["admin_last_panel"] = panel
             session["admin_last_school"] = school_filter
-        dataset_scope = "all" if panel == "overview" else school_filter
+        dataset_scope = "all" if panel in {"overview", "teachers"} else school_filter
         force_refresh = _should_force_refresh()
         sync_errors = []
         sync_results_by_code = {}
-        should_sync_students = panel == "overview" or force_refresh
+        should_sync_students = False
         if should_sync_students:
             school_codes_to_sync = (
                 available_school_codes

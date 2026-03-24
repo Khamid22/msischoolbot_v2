@@ -22,6 +22,37 @@ def register_admin_routes(
     upsert_teacher,
     delete_teacher_by_id,
 ):
+    def _normalize_school_code(value):
+        normalized = str(value or "").strip().casefold()
+        if normalized in {"school_5", "school-5", "school 5", "school5"}:
+            return "school5"
+        if normalized in {"sehriyo", "sehriyo school"}:
+            return "sehriyo"
+        return normalized
+
+    def _group_belongs_to_school(group_name, school_code):
+        normalized_group = str(group_name or "").strip()
+        normalized_school = _normalize_school_code(school_code)
+        if not normalized_group or not normalized_school or normalized_school == "all":
+            return True
+
+        try:
+            dataset, _load_error = load_dataset(school_code=normalized_school)
+        except TypeError:
+            dataset, _load_error = load_dataset()
+
+        if not isinstance(dataset, dict):
+            return True
+        dataset_groups = dataset.get("groups", [])
+        if not isinstance(dataset_groups, list):
+            return True
+        normalized_dataset_groups = {
+            " ".join(str(row or "").strip().casefold().split())
+            for row in dataset_groups
+            if str(row or "").strip()
+        }
+        return " ".join(normalized_group.casefold().split()) in normalized_dataset_groups
+
     def _school_code_from_name(school_name):
         normalized = str(school_name or "").strip().casefold()
         if normalized == "sehriyo":
@@ -282,6 +313,9 @@ def register_admin_routes(
 
         mode = str(request.form.get("teacher_mode", "select")).strip().lower()
         assigned_group = request.form.get("teacher_assigned_group", "").strip()
+        assigned_school = _normalize_school_code(
+            request.form.get("teacher_assigned_school", "")
+        )
         if not assigned_group:
             selected_teacher_edit = get_teacher_by_id(edit_teacher_id) if edit_teacher_id > 0 else None
             return (
@@ -292,6 +326,17 @@ def register_admin_routes(
                 ),
                 400,
             )
+        if assigned_school and assigned_school != "all":
+            if not _group_belongs_to_school(assigned_group, assigned_school):
+                selected_teacher_edit = get_teacher_by_id(edit_teacher_id) if edit_teacher_id > 0 else None
+                return (
+                    render_admin_page(
+                        auth_error="Selected group does not belong to the selected school.",
+                        admin_panel="teachers",
+                        admin_teacher_edit=selected_teacher_edit,
+                    ),
+                    400,
+                )
 
         if mode == "add":
             candidate_full_name = request.form.get("teacher_full_name", "").strip()
