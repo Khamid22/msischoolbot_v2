@@ -2,7 +2,8 @@
 
 This project has two parts:
 - Telegram bot (`aiogram`) in `bot/`
-- Web dashboard (`Flask`) in `web/`
+- Backend dashboard app (`Flask`) in `app/`
+- Frontend assets/templates in `app/web/`
 
 The bot opens the web app as a Telegram Mini App.
 
@@ -14,7 +15,7 @@ Use the root requirements file as the single source of dependencies:
 pip install -r requirements.txt
 ```
 
-`web/requirements.txt` points to the root requirements file.
+`app/requirements.txt` points to the root requirements file.
 
 ## Environment Variables
 
@@ -63,6 +64,35 @@ Create `.env` in the project root:
 - Default password for new student is same as student ID.
 - Password verification uses hashed values.
 
+### Webhook-Based Sync (Recommended)
+
+- Endpoint: `POST /webhooks/google-sheets`
+- Auth header: `X-Webhook-Token: <your token>`
+- Required env: `GOOGLE_SHEETS_WEBHOOK_TOKEN`
+- Optional env:
+- `SHEETS_WEBHOOK_CACHE_ENABLED=1` (force webhook cache mode; auto-enabled when token is set)
+- `SHEETS_WEBHOOK_MAX_STALE_SECONDS=21600` (fallback hard refresh window when webhook is missed)
+
+Webhook payload supports one or many schools:
+
+```json
+{
+  "school": "sehriyo"
+}
+```
+
+```json
+{
+  "schools": ["school5", "sehriyo"]
+}
+```
+
+```json
+{
+  "spreadsheetId": "your_google_spreadsheet_id"
+}
+```
+
 ## SQLite Tables
 
 Main tables used for auth and admin data:
@@ -87,7 +117,7 @@ Or run separately:
 
 Web:
 ```bash
-python -m web.server
+python -m app.server
 ```
 
 ## Project Structure
@@ -96,11 +126,12 @@ python -m web.server
 - `main.py` - starts Waitress (WSGI) web server thread + bot loop
 - `bot/handlers/start.py` - `/start` handler
 - `bot/keyboards/inline_keyboard.py` - inline keyboard builders
-- `web/server.py` - Flask app, helpers, auth guard, route registration
-- `web/auth_store.py` - SQLite auth, daily sync, bot-user tracking
-- `web/subject_summary_store.py` - daily Google Sheets -> SQLite sync for bot quick summary
-- `web/lesson_catalog_store.py` - daily Google Sheets -> SQLite sync for lesson number/topic catalog
-- `web/routes/home.py` - login/logout, home, search APIs
-- `web/routes/dashboard.py` - dashboard endpoints
-- `web/routes/rating_board.py` - rating board page
-- `web/sheets_data.py` - Google Sheets parser
+- `app/server.py` - Flask app, helpers, auth guard, route registration
+- `app/services/auth_service.py` - auth + student/admin/teacher business logic
+- `app/services/subject_summary_service.py` - daily Google Sheets -> SQLite subject summary sync
+- `app/services/lesson_catalog_service.py` - daily Google Sheets -> SQLite lesson catalog sync
+- `app/routes/home.py` - login/logout, home, search APIs
+- `app/routes/dashboard.py` - dashboard endpoints
+- `app/routes/rating_board.py` - rating board page
+- `app/routes/webhooks.py` - Google Sheets webhook endpoint for cache invalidation + DB sync
+- `app/integrations/sheets_data.py` - Google Sheets parser

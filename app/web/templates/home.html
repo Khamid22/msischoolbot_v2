@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="MSI School student portal for quick mobile-friendly academic access." />
+    <title>MSI School Portal</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
+    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/base.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/pages.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/tables.css', v=asset_version) }}" />
+  </head>
+  <body class="home-page {% if auth_role == 'admin' %}home-page-admin{% elif auth_role == 'student' %}home-page-student{% else %}home-page-login{% endif %}">
+    <div class="bg-shape bg-shape-top"></div>
+    <div class="bg-shape bg-shape-bottom"></div>
+
+    <main class="home-wrap">
+      <section class="login-card">
+        <header class="login-header">
+          <div class="logo-block" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
+              <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
+            </svg>
+          </div>
+          <h1>MSI School Portal</h1>
+          {% if not auth_role %}
+          <p>Login to continue</p>
+          {% elif auth_role == "admin" %}
+          <p>Admin panel</p>
+          {% else %}
+          <p>Select stream, group, and student</p>
+          {% endif %}
+        </header>
+
+        {% if auth_error %}
+        <div class="form-error">{{ auth_error }}</div>
+        {% endif %}
+
+        {% if admin_notice %}
+        <div class="form-notice">{{ admin_notice }}</div>
+        {% endif %}
+
+        {% if error %}
+        <div class="form-error">{{ error }}</div>
+        {% endif %}
+
+        {% if not auth_role %}
+        <form action="{{ url_for('login') }}" method="post" class="login-form">
+          <input type="hidden" id="loginTelegramUserId" name="telegram_user_id" value="" />
+
+          <label class="field">
+            <span>Login</span>
+            <input type="text" name="login" value="{{ auth_login_input|default('', true) }}" placeholder="Staff or Student ID" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required />
+          </label>
+
+          <button type="submit" class="primary-btn">Sign In</button>
+        </form>
+
+        {% elif auth_role == "admin" %}
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="secondary-btn">Logout</button>
+          </form>
+        </div>
+
+        <section class="admin-panel admin-panel-{{ admin_panel }}">
+          <div class="admin-switch-row ">
+            <a
+              href="{{ url_for('home', panel='overview', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'overview' %}is-active{% endif %}"
+            >
+              Overview
+            </a>
+            <a
+              href="{{ url_for('home', panel='students', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'students' %}is-active{% endif %}"
+            >
+              Students
+            </a>
+            <a
+              href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
+            >
+              Teachers
+            </a>
+          </div>
+
+          {% if admin_panel == "overview" %}
+          <section class="admin-overview-grid">
+            <article class="admin-stat-card">
+              <h2>Total Students</h2>
+              <p>{{ admin_quick_stats.total_students }}</p>
+            </article>
+            <article class="admin-stat-card">
+              <h2>Total Schools</h2>
+              <p>{{ admin_quick_stats.total_schools }}</p>
+            </article>
+            <article class="admin-stat-card">
+              <h2>Total Teachers</h2>
+              <p>{{ admin_quick_stats.total_teachers }}</p>
+            </article>
+            <article class="admin-stat-card">
+              <h2>Total Subjects</h2>
+              <p>{{ admin_quick_stats.total_subjects }}</p>
+            </article>
+          </section>
+
+          <section class="admin-insights-grid">
+            <article class="admin-info-card admin-info-card-wide">
+              <h3>School Info</h3>
+              <ul class="admin-mini-list">
+                {% for row in admin_school_info %}
+                <li>
+                  <span>{{ row.school_name }}</span>
+                  <small>
+                    {{ row.total_students }} students ·
+                    {{ row.total_subjects }} subjects ·
+                    {{ row.total_groups }} groups ·
+                    AAP {{ row.avg_aap if row.avg_aap is not none else "-" }} ·
+                    AR {{ row.avg_ar if row.avg_ar is not none else "-" }}%
+                  </small>
+                </li>
+                {% endfor %}
+                {% if not admin_school_info %}
+                <li><span>No school statistics available.</span></li>
+                {% endif %}
+              </ul>
+            </article>
+
+            <article class="admin-info-card admin-info-card-wide">
+              <div class="admin-subject-header">
+                <h3>Subject Overview</h3>
+                {% if admin_subject_info %}
+                <div class="admin-subject-controls">
+                  <div class="admin-subject-filter admin-subject-filter-inline">
+                    <span class="admin-subject-filter-label">School:</span>
+                    <select id="adminSchoolSelect">
+                      {% for option in admin_school_options %}
+                      {% if option.code != "all" %}
+                      <option value="{{ option.code }}">{{ option.label }}</option>
+                      {% endif %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="admin-subject-filter admin-subject-filter-inline">
+                    <span class="admin-subject-filter-label">Subject:</span>
+                    <select id="adminSubjectSelect">
+                      <option value="" selected disabled>Select subject</option>
+                    </select>
+                  </div>
+                  <div id="adminGradeSwitchWrap" class="admin-grade-switch" hidden>
+                    <span class="admin-subject-filter-label">Grade:</span>
+                    <div class="admin-grade-switch-buttons">
+                      <button type="button" class="admin-grade-switch-btn" data-grade="7">7 Graders</button>
+                      <button type="button" class="admin-grade-switch-btn" data-grade="8">8 Graders</button>
+                    </div>
+                  </div>
+                </div>
+                {% else %}
+                <div class="admin-subject-controls">
+                  <div class="admin-subject-filter admin-subject-filter-inline">
+                    <span class="admin-subject-filter-label">School:</span>
+                    <select id="adminSchoolSelect" disabled>
+                      <option value="" selected>No schools</option>
+                    </select>
+                  </div>
+                  <div class="admin-subject-filter admin-subject-filter-inline">
+                    <span class="admin-subject-filter-label">Subject:</span>
+                    <select id="adminSubjectSelect" disabled>
+                      <option value="" selected>No subjects</option>
+                    </select>
+                  </div>
+                </div>
+                {% endif %}
+              </div>
+
+              {% if admin_subject_info %}
+              <div class="admin-subject-charts-grid">
+                <div class="admin-chart-card admin-chart-card-primary">
+                  <h4 class="admin-info-subtitle">
+                    Group AAP and AR:
+                    <span id="adminSubjectSelectedLabel">-</span>
+                  </h4>
+                  <div class="admin-chart-canvas-wrap">
+                    <canvas id="adminSubjectPerformanceChart"></canvas>
+                  </div>
+                </div>
+
+                <div class="admin-chart-card admin-chart-card-secondary">
+                  <h4 class="admin-info-subtitle">Students Distribution by Group</h4>
+                  <div class="admin-chart-table-wrap">
+                    <table class="admin-subject-table">
+                      <thead>
+                        <tr>
+                          <th>Group</th>
+                          <th>Students</th>
+                          <th>AAP</th>
+                          <th>AR</th>
+                        </tr>
+                      </thead>
+                      <tbody id="adminSubjectDistributionTableBody"></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="admin-chart-card admin-chart-card-wide">
+                  <h4 class="admin-info-subtitle">Monthly Group AAP Progress</h4>
+                  <div id="adminSubjectGroupsLegend" class="admin-chart-legend" aria-live="polite"></div>
+                  <div class="admin-chart-canvas-wrap admin-chart-canvas-wrap-tall">
+                    <div id="adminSubjectGroupsChartTrack" class="admin-chart-scroll-track">
+                      <canvas id="adminSubjectGroupsChart"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% else %}
+              <p class="admin-chart-empty">No subject statistics available.</p>
+              {% endif %}
+            </article>
+
+            <article class="admin-info-card">
+              <h3>Top Groups</h3>
+              <h4 class="admin-info-subtitle">By AAP</h4>
+              <ul class="admin-mini-list">
+                {% for row in admin_group_highlights.top_aap[:4] %}
+                <li>
+                  <span>{{ row.group_name }} ({{ row.school_name }})</span>
+                  <small>AAP {{ row.avg_aap }} · AR {{ row.avg_ar if row.avg_ar is not none else "-" }}%</small>
+                </li>
+                {% endfor %}
+                {% if not admin_group_highlights.top_aap %}
+                <li><span>No group rating data yet.</span></li>
+                {% endif %}
+              </ul>
+
+              <h4 class="admin-info-subtitle">By AR</h4>
+              <ul class="admin-mini-list">
+                {% for row in admin_group_highlights.top_ar[:4] %}
+                <li>
+                  <span>{{ row.group_name }} ({{ row.school_name }})</span>
+                  <small>AR {{ row.avg_ar }}% · AAP {{ row.avg_aap if row.avg_aap is not none else "-" }}</small>
+                </li>
+                {% endfor %}
+                {% if not admin_group_highlights.top_ar %}
+                <li><span>No group attendance data yet.</span></li>
+                {% endif %}
+              </ul>
+            </article>
+
+            <article class="admin-info-card">
+              <h3>Students Rating</h3>
+              <ul class="admin-mini-list">
+                {% for row in admin_student_ratings.global[:6] %}
+                <li>
+                  <span>#{{ row.rank }} {{ row.full_name }} ({{ row.school_name }})</span>
+                  <small>AAP {{ row.avg_aap if row.avg_aap is not none else "-" }} · AR {{ row.avg_ar if row.avg_ar is not none else "-" }}%</small>
+                </li>
+                {% endfor %}
+                {% if not admin_student_ratings.global %}
+                <li><span>No student rating data yet.</span></li>
+                {% endif %}
+              </ul>
+            </article>
+
+            <article class="admin-info-card">
+              <h3>Attention: Low AAP / AR</h3>
+              <ul class="admin-mini-list">
+                {% for row in admin_attention.low_aap[:4] %}
+                <li>
+                  <span>{{ row.full_name }} ({{ row.school_name }})</span>
+                  <small>AAP {{ row.value }}</small>
+                </li>
+                {% endfor %}
+                {% for row in admin_attention.low_ar[:4] %}
+                <li>
+                  <span>{{ row.full_name }} ({{ row.school_name }})</span>
+                  <small>AR {{ row.value }}%</small>
+                </li>
+                {% endfor %}
+                {% if not admin_attention.low_aap and not admin_attention.low_ar %}
+                <li><span>No students in alert range.</span></li>
+                {% endif %}
+              </ul>
+            </article>
+
+            <article class="admin-info-card">
+              <h3>Groups Without Teacher</h3>
+              <ul class="admin-mini-list">
+                {% for group_name in admin_attention.groups_without_teacher[:8] %}
+                <li><span>{{ group_name }}</span></li>
+                {% endfor %}
+                {% if not admin_attention.groups_without_teacher %}
+                <li><span>All groups are assigned.</span></li>
+                {% endif %}
+              </ul>
+            </article>
+          </section>
+
+          {% endif %}
+
+          {% if admin_panel == "teachers" %}
+          <div class="admin-card teacher-form-card">
+            <h2 class="admin-card-title">Teacher Assignment</h2>
+            <form id="teacherForm" action="{{ url_for('add_teacher') }}" method="post" class="login-form">
+              {% if admin_teacher_edit %}
+              {% set teacher_initial_mode = "add" %}
+              {% else %}
+              {% set teacher_initial_mode = "select" %}
+              {% endif %}
+              <input type="hidden" id="teacherModeInput" name="teacher_mode" value="{{ teacher_initial_mode }}" />
+              <input type="hidden" name="teacher_edit_id" value="{{ admin_teacher_edit.id if admin_teacher_edit else '' }}" />
+
+              <div class="teacher-mode-switch">
+                <button type="button" id="teacherModeSelectBtn" class="secondary-btn teacher-mode-btn {% if teacher_initial_mode == 'select' %}is-active{% endif %}">Select</button>
+                <button type="button" id="teacherModeAddBtn" class="secondary-btn teacher-mode-btn {% if teacher_initial_mode == 'add' %}is-active{% endif %}">Add New</button>
+                {% if admin_teacher_edit %}
+                <a href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true)) }}" class="secondary-btn teacher-mode-btn teacher-cancel-btn">Cancel Edit</a>
+                {% endif %}
+              </div>
+
+              <div id="teacherModeSelectPane" class="teacher-mode-pane" {% if teacher_initial_mode != "select" %}hidden{% endif %}>
+                <label class="field">
+                  <span>Select Teacher</span>
+                  <select id="teacherSelectedName" name="teacher_selected_name" required>
+                    <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select from existing teachers</option>
+                    {% for teacher_name in admin_teacher_name_options %}
+                    <option value="{{ teacher_name }}" {% if admin_teacher_edit and teacher_name == admin_teacher_edit.full_name %}selected{% endif %}>{{ teacher_name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+              </div>
+
+              <div id="teacherModeAddPane" class="teacher-mode-pane" {% if teacher_initial_mode != "add" %}hidden{% endif %}>
+                <label class="field">
+                  <span>Teacher Full Name</span>
+                  <input id="teacherFullNameInput" type="text" name="teacher_full_name" placeholder="Teacher full name" value="{{ admin_teacher_edit.full_name if admin_teacher_edit else '' }}" />
+                </label>
+                <label class="field">
+                  <span>Pay Rate</span>
+                  <input id="teacherPayRateInput" type="number" name="teacher_pay_rate" step="0.01" min="0" placeholder="0.00" value="{{ admin_teacher_edit.pay_rate if admin_teacher_edit else '' }}" />
+                </label>
+              </div>
+
+              <label class="field">
+                <span>Assign To Group</span>
+                <select name="teacher_assigned_group" required>
+                  <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select group</option>
+                  {% for group_name in admin_groups %}
+                  <option value="{{ group_name }}" {% if admin_teacher_edit and group_name == admin_teacher_edit.assigned_group %}selected{% endif %}>{{ group_name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <button type="submit" class="primary-btn teacher-save-btn">Save changes</button>
+            </form>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table teachers-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Pay Rate</th>
+                  <th>Assigned Group</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for teacher in admin_teachers %}
+                <tr>
+                  <td>{{ teacher.id }}</td>
+                  <td>{{ teacher.full_name }}</td>
+                  <td>{{ teacher.pay_rate }}</td>
+                  <td>{{ teacher.assigned_group }}</td>
+                  <td class="teachers-actions-cell">
+                    <a
+                      class="secondary-btn teachers-action-btn teachers-icon-btn"
+                      href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true), edit_teacher_id=teacher.id) }}"
+                      aria-label="Edit teacher"
+                      title="Edit teacher"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25Z"></path>
+                        <path d="M14.05 4.95l3.75 3.75"></path>
+                      </svg>
+                    </a>
+                    <form action="{{ url_for('delete_teacher', teacher_id=teacher.id) }}" method="post" onsubmit="return confirm('Delete this teacher?');">
+                      <button
+                        type="submit"
+                        class="secondary-btn teachers-action-btn teachers-action-danger teachers-icon-btn"
+                        aria-label="Delete teacher"
+                        title="Delete teacher"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M3 6h18"></path>
+                          <path d="M8 6V4h8v2"></path>
+                          <path d="M19 6l-1 14H6L5 6"></path>
+                          <path d="M10 10v7"></path>
+                          <path d="M14 10v7"></path>
+                        </svg>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% if not admin_teachers %}
+                <tr>
+                  <td colspan="5">No teachers yet.</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          {% elif admin_panel == "students" %}
+          <div class="admin-switch-row">
+            {% for school_option in admin_school_options %}
+            <a
+              href="{{ url_for('home', panel='students', school=school_option.code) }}"
+              class="secondary-btn admin-tab-btn {% if admin_school == school_option.code %}is-active{% endif %}"
+            >
+              {{ school_option.label }}
+            </a>
+            {% endfor %}
+          </div>
+
+          <div class="admin-students-toolbar">
+            <label class="field admin-search-field">
+              <span>Search Student</span>
+              <input
+                id="adminStudentSearchInput"
+                type="text"
+                placeholder="Name, student ID, subject, or school"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+
+          <div class="admin-table-wrap">
+            <table class="admin-table students-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Full Name</th>
+                  <th>Student ID</th>
+                  <th>Subjects</th>
+                  <th>School</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for student in admin_students %}
+                <tr
+                  data-student-row
+                  data-student-search="{{ (student.full_name ~ ' ' ~ student.student_id ~ ' ' ~ student.subjects ~ ' ' ~ student.school_name)|lower }}"
+                >
+                  <td>{{ student.display_id }}</td>
+                  <td>
+                    <a class="admin-student-link" href="{{ url_for('admin_student_profile', student_row_id=student.id) }}">
+                      {{ student.full_name }}
+                    </a>
+                  </td>
+                  <td>{{ student.student_id }}</td>
+                  <td>{{ student.subjects }}</td>
+                  <td>{{ student.school_name }}</td>
+                  <td>
+                    <a class="secondary-btn teachers-action-btn" href="{{ url_for('admin_student_dashboard', student_row_id=student.id) }}">
+                      View Dashboard
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+                <tr id="adminStudentsNoResultsRow" hidden>
+                  <td colspan="6">No students match your search.</td>
+                </tr>
+                {% if not admin_students %}
+                <tr>
+                  <td colspan="6">No students found.</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+
+          {% endif %}
+        </section>
+
+        {% else %}
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <form action="{{ url_for('logout') }}" method="post">
+            <button type="submit" class="secondary-btn">Logout</button>
+          </form>
+        </div>
+
+        <form action="{{ url_for('search_student_form') }}" method="post" class="login-form">
+          <label class="field">
+            <span>Subject</span>
+            <select id="subject-select" name="subject" required>
+              <option value="" disabled {% if not form_data.subject %}selected{% endif %}>Select subject stream</option>
+              {% for subject_name in subjects %}
+              {% if subject_name == "English" %}
+              {% set subject_label = "General English" %}
+              {% else %}
+              {% set subject_label = subject_name %}
+              {% endif %}
+              <option value="{{ subject_name }}" {% if form_data.subject == subject_name %}selected{% endif %}>{{ subject_label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Group</span>
+            <select id="group-select" name="group" {% if not form_data.subject %}disabled{% endif %} required>
+              <option value="" disabled {% if not form_data.group %}selected{% endif %}>Select morning or afternoon group</option>
+              {% for group_name in groups %}
+              <option value="{{ group_name }}" {% if form_data.group == group_name %}selected{% endif %}>{{ group_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Student</span>
+            {% set selected_students = students_by_subject_group.get(form_data.subject, {}).get(form_data.group, []) %}
+            <select id="student-select" name="student_id" {% if not form_data.group %}disabled{% endif %} required>
+              <option value="" disabled {% if not form_data.student_id %}selected{% endif %}>Select student</option>
+              {% for student in selected_students %}
+              <option value="{{ student.id }}" {% if form_data.student_id|string == student.id|string %}selected{% endif %}>{{ student.fullName }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <button type="submit" class="primary-btn">Open Dashboard</button>
+        </form>
+        {% endif %}
+      </section>
+    </main>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+    <script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>
+    <script id="studentsBySubjectGroupJson" type="application/json">{{ students_by_subject_group|default({}, true)|tojson|safe }}</script>
+    <script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
+    <script id="adminSubjectInfoJson" type="application/json">{{ admin_subject_info|default([], true)|tojson|safe }}</script>
+    {% if auth_role == "admin" and admin_panel == "overview" %}
+    <script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>
+    {% endif %}
+    <script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+    <script>
+      (function () {
+        const modeInput = document.getElementById("teacherModeInput");
+        if (!modeInput) {
+          return;
+        }
+
+        const selectBtn = document.getElementById("teacherModeSelectBtn");
+        const addBtn = document.getElementById("teacherModeAddBtn");
+        const selectPane = document.getElementById("teacherModeSelectPane");
+        const addPane = document.getElementById("teacherModeAddPane");
+        const selectedName = document.getElementById("teacherSelectedName");
+        const fullName = document.getElementById("teacherFullNameInput");
+        const payRate = document.getElementById("teacherPayRateInput");
+
+        function setMode(mode) {
+          const isSelect = mode === "select";
+          modeInput.value = isSelect ? "select" : "add";
+
+          if (selectPane) {
+            selectPane.hidden = !isSelect;
+          }
+          if (addPane) {
+            addPane.hidden = isSelect;
+          }
+          if (selectedName) {
+            selectedName.required = isSelect;
+          }
+          if (fullName) {
+            fullName.required = !isSelect;
+          }
+          if (payRate) {
+            payRate.required = !isSelect;
+          }
+          if (selectBtn) {
+            selectBtn.classList.toggle("is-active", isSelect);
+          }
+          if (addBtn) {
+            addBtn.classList.toggle("is-active", !isSelect);
+          }
+        }
+
+        if (selectBtn) {
+          selectBtn.addEventListener("click", function () {
+            setMode("select");
+          });
+        }
+        if (addBtn) {
+          addBtn.addEventListener("click", function () {
+            setMode("add");
+          });
+        }
+
+        setMode(modeInput.value === "add" ? "add" : "select");
+      })();
+
+      (function () {
+        const searchInput = document.getElementById("adminStudentSearchInput");
+        if (!searchInput) {
+          return;
+        }
+
+        const rows = Array.from(document.querySelectorAll("tr[data-student-row]"));
+        const emptyRow = document.getElementById("adminStudentsNoResultsRow");
+        if (!rows.length) {
+          return;
+        }
+
+        const applyFilter = function () {
+          const query = String(searchInput.value || "").trim().toLowerCase();
+          let visibleCount = 0;
+
+          rows.forEach(function (row) {
+            const rowText = String(row.getAttribute("data-student-search") || "").toLowerCase();
+            const isVisible = !query || rowText.includes(query);
+            row.hidden = !isVisible;
+            if (isVisible) {
+              visibleCount += 1;
+            }
+          });
+
+          if (emptyRow) {
+            emptyRow.hidden = visibleCount > 0;
+          }
+        };
+
+        searchInput.addEventListener("input", applyFilter, { passive: true });
+        applyFilter();
+      })();
+    </script>
+    <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
+  </body>
+</html>

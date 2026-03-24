@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Edit Student Profile</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
+    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/base.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/pages.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/tables.css', v=asset_version) }}" />
+  </head>
+  <body class="home-page edit-profile-page">
+    <div class="bg-shape bg-shape-top"></div>
+    <div class="bg-shape bg-shape-bottom"></div>
+
+    <main class="home-wrap edit-profile-wrap">
+      <section class="login-card edit-profile-card">
+        <header class="login-header edit-profile-header">
+          <h1>Edit Student Profile</h1>
+          <p>{{ student.full_name }}</p>
+        </header>
+
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <div class="session-toolbar-actions">
+            <a href="{{ url_for('admin_student_dashboard', student_row_id=student.id) }}" class="secondary-btn">View Dashboard</a>
+            <a href="{{ url_for('home', panel='students') }}" class="secondary-btn">Back</a>
+          </div>
+        </div>
+
+        {% if auth_error %}
+        <div class="form-error">{{ auth_error }}</div>
+        {% endif %}
+
+        {% if admin_notice %}
+        <div class="form-notice">{{ admin_notice }}</div>
+        {% endif %}
+
+        <form
+          action="{{ url_for('save_admin_student_profile', student_row_id=student.id) }}"
+          method="post"
+          class="login-form"
+          enctype="multipart/form-data"
+        >
+          <input type="hidden" name="photo_url" id="photoUrlInput" value="{{ student.photo_url }}" />
+          <input type="hidden" name="remove_photo" id="removePhotoInput" value="0" />
+
+          <div class="admin-card edit-profile-top-card">
+            <div class="edit-profile-main-grid">
+              <div class="edit-profile-photo-col">
+                <span class="admin-meta-label">Profile Picture</span>
+                <div class="profile-photo-wrap">
+                  <label for="photoFileInput" class="profile-photo-click">
+                    <div
+                      class="profile-photo profile-photo-fallback"
+                      id="profilePhotoFallback"
+                      aria-hidden="true"
+                      {% if student.photo_url %}hidden{% endif %}
+                    >
+                      {{ (student.surname[:1] ~ student.name[:1])|trim|upper if student.surname or student.name else "ST" }}
+                    </div>
+                    <img
+                      class="profile-photo"
+                      id="profilePhotoPreview"
+                      src="{{ student.photo_url }}"
+                      alt="Student photo"
+                      {% if not student.photo_url %}hidden{% endif %}
+                    />
+                  </label>
+                  <input
+                    id="photoFileInput"
+                    class="photo-file-input"
+                    type="file"
+                    name="photo_file"
+                    accept=".png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif"
+                    hidden
+                  />
+                </div>
+                <button type="button" class="secondary-btn edit-profile-photo-delete" id="deletePhotoBtn">Delete photo</button>
+              </div>
+
+              <div class="edit-profile-meta-col">
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label ">Surname and Name</span>
+                  <p>{{ student.surname }} {{ student.name }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Username</span>
+                  <p>{{ student.student_id if student.student_id else "-" }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Password</span>
+                  <p>{{ student.password if student.password else "-" }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Group</span>
+                  <p>{{ student.group if student.group else "-" }}</p>
+                </div>
+
+                <div class="edit-profile-meta-item">
+                  <span class="admin-meta-label">Teacher</span>
+                  <select id="teacherSelect" name="teacher_name">
+                    <option value="__none__" {% if not student.teacher_name %}selected{% endif %}>No teacher</option>
+                    {% for teacher_name in teacher_name_options %}
+                    <option value="{{ teacher_name }}" {% if student.teacher_name and teacher_name == student.teacher_name %}selected{% endif %}>
+                      {{ teacher_name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <span class="admin-meta-label">Classmates</span>
+            {% if student.classmates %}
+            <ul class="admin-classmates-list edit-profile-classmates-list">
+              {% for classmate in student.classmates %}
+              <li>{{ classmate }}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="edit-profile-empty">-</p>
+            {% endif %}
+          </div>
+
+          <label class="field">
+            <span>Description</span>
+            <textarea name="profile_description" rows="4" placeholder="Enter student profile description...">{{ student.profile_description }}</textarea>
+          </label>
+
+          <div class="edit-profile-actions">
+            <button type="submit" class="primary-btn edit-profile-save-btn">Save changes</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+    <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
+    <script>
+      (function () {
+        const photoFileInput = document.getElementById("photoFileInput");
+        const profilePhotoPreview = document.getElementById("profilePhotoPreview");
+        const profilePhotoFallback = document.getElementById("profilePhotoFallback");
+        const deletePhotoBtn = document.getElementById("deletePhotoBtn");
+        const removePhotoInput = document.getElementById("removePhotoInput");
+        if (!photoFileInput || !profilePhotoPreview) {
+          return;
+        }
+
+        function showFallback() {
+          profilePhotoPreview.src = "";
+          profilePhotoPreview.hidden = true;
+          if (profilePhotoFallback) {
+            profilePhotoFallback.hidden = false;
+          }
+        }
+
+        photoFileInput.addEventListener("change", function () {
+          const file = photoFileInput.files && photoFileInput.files[0];
+          if (!file) {
+            return;
+          }
+          if (removePhotoInput) {
+            removePhotoInput.value = "0";
+          }
+          const objectUrl = URL.createObjectURL(file);
+          profilePhotoPreview.src = objectUrl;
+          profilePhotoPreview.hidden = false;
+          if (profilePhotoFallback) {
+            profilePhotoFallback.hidden = true;
+          }
+        });
+
+        if (deletePhotoBtn) {
+          deletePhotoBtn.addEventListener("click", function () {
+            photoFileInput.value = "";
+            if (removePhotoInput) {
+              removePhotoInput.value = "1";
+            }
+            showFallback();
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

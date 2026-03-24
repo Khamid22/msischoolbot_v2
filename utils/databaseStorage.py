@@ -4,7 +4,10 @@ import sqlite3
 # Shared auth DB location for both web and telegram modules.
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DEFAULT_AUTH_DB_PATH = os.path.join(_PROJECT_ROOT, "utils", "app_data.sqlite3")
-_LEGACY_AUTH_DB_PATH = os.path.join(_PROJECT_ROOT, "web", "app_data.sqlite3")
+_LEGACY_AUTH_DB_PATHS = (
+    os.path.join(_PROJECT_ROOT, "app", "app_data.sqlite3"),
+    os.path.join(_PROJECT_ROOT, "web", "app_data.sqlite3"),
+)
 
 
 def get_auth_db_path():
@@ -19,12 +22,14 @@ def _migrate_legacy_db_if_needed(db_path):
         return
     if os.path.exists(db_path):
         return
-    if not os.path.exists(_LEGACY_AUTH_DB_PATH):
+
+    legacy_path = next((path for path in _LEGACY_AUTH_DB_PATHS if os.path.exists(path)), "")
+    if not legacy_path:
         return
 
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     try:
-        os.replace(_LEGACY_AUTH_DB_PATH, db_path)
+        os.replace(legacy_path, db_path)
     except OSError:
         # Keep app running even if migration cannot move the file.
         return

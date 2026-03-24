@@ -1,10 +1,11 @@
 import html
+import math
 
 from aiogram import F, Router
 
-from web.auth_store import get_student_by_telegram_user_id
-from web.sheets_data import get_school_dataset
-from web.subject_summary_store import get_subject_summaries_for_student
+from app.services.auth_service import get_student_by_telegram_user_id
+from app.services.dataset_service import load_all_schools_dataset
+from app.services.subject_summary_service import get_subject_summaries_for_student
 
 router = Router()
 
@@ -23,6 +24,16 @@ def _linked_student_from_user(user):
         return None
 
 
+def _round_grade_half_up(value):
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(numeric):
+        return 0
+    return int(math.floor(numeric + 0.5))
+
+
 @router.callback_query(F.data == "student_quick_summary")
 async def quick_summary_callback(query):
     linked_student = _linked_student_from_user(query.from_user)
@@ -37,7 +48,7 @@ async def quick_summary_callback(query):
 
     summary_rows, summary_error = get_subject_summaries_for_student(
         full_name=str(linked_student.get("full_name", "")),
-        load_dataset=get_school_dataset,
+        load_dataset=load_all_schools_dataset,
     )
     if summary_error:
         await query.message.answer(
@@ -66,7 +77,7 @@ async def quick_summary_callback(query):
         lines.append("")
         lines.append(f"📘 <b>Subject: {_escape(subject_name)}</b>")
         lines.append(f"• Student Rating: <b>{_escape(rating_text)}</b>")
-        lines.append(f"• AAP: <b>{int(row.get('aap', 0))}</b>")
+        lines.append(f"• AAP: <b>{_round_grade_half_up(row.get('aap', 0))}</b>")
         lines.append(f"• AR: <b>{int(row.get('ar', 0))}%</b>")
         lines.append(f"• EP: <b>{int(row.get('ep', 0))}</b>")
         lines.append(f"• Total Coins: <b>{int(row.get('total_coins', 0))}</b>")

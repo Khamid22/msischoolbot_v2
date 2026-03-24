@@ -16,7 +16,8 @@ from bot.handlers.quick_summary import router as quick_summary_router
 from bot.handlers.start import router as start_router
 from bot.settings import settings as bot_settings
 from waitress import serve
-from web.server import app, settings as web_settings
+from app.main import app, settings as web_settings
+from app.services.auth_service import init_storage
 
 
 def _waitress_threads():
@@ -61,6 +62,7 @@ async def run_bot():
 
 
 if __name__ == "__main__":
+    init_storage()
     flask_thread = threading.Thread(target=run_web_server, daemon=True)
     flask_thread.start()
     asyncio.run(run_bot())
