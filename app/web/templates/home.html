@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0a0a0a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -27,7 +27,49 @@
     <div class="bg-shape bg-shape-bottom"></div>
 
     <main class="home-wrap">
-      <section class="login-card">
+      <section class="login-card animate-in">
+        {% if auth_role == "admin" %}
+        <div class="admin-sticky-header admin-sticky-header-full">
+          <header class="login-header admin-login-header">
+            <div class="logo-block" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
+                <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
+              </svg>
+            </div>
+            <h1>MSI School Portal</h1>
+            <p>Admin panel</p>
+          </header>
+
+          <div class="session-toolbar admin-session-toolbar">
+            <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+            <form action="{{ url_for('logout') }}" method="post">
+              <button type="submit" class="secondary-btn">Logout</button>
+            </form>
+          </div>
+
+          <nav class="admin-switch-row admin-main-nav" aria-label="Admin navigation">
+            <a
+              href="{{ url_for('home', panel='overview', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'overview' %}is-active{% endif %}"
+            >
+              Overview
+            </a>
+            <a
+              href="{{ url_for('home', panel='students', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'students' %}is-active{% endif %}"
+            >
+              Students
+            </a>
+            <a
+              href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true)) }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
+            >
+              Teachers
+            </a>
+          </nav>
+        </div>
+        {% else %}
         <header class="login-header">
           <div class="logo-block" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,12 +80,11 @@
           <h1>MSI School Portal</h1>
           {% if not auth_role %}
           <p>Login to continue</p>
-          {% elif auth_role == "admin" %}
-          <p>Admin panel</p>
           {% else %}
           <p>Select stream, group, and student</p>
           {% endif %}
         </header>
+        {% endif %}
 
         {% if auth_error %}
         <div class="form-error">{{ auth_error }}</div>
@@ -75,34 +116,7 @@
         </form>
 
         {% elif auth_role == "admin" %}
-        <div class="session-toolbar">
-          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
-          <form action="{{ url_for('logout') }}" method="post">
-            <button type="submit" class="secondary-btn">Logout</button>
-          </form>
-        </div>
-
         <section class="admin-panel admin-panel-{{ admin_panel }}">
-          <div class="admin-switch-row ">
-            <a
-              href="{{ url_for('home', panel='overview', school=admin_school|default('all', true)) }}"
-              class="secondary-btn admin-tab-btn {% if admin_panel == 'overview' %}is-active{% endif %}"
-            >
-              Overview
-            </a>
-            <a
-              href="{{ url_for('home', panel='students', school=admin_school|default('all', true)) }}"
-              class="secondary-btn admin-tab-btn {% if admin_panel == 'students' %}is-active{% endif %}"
-            >
-              Students
-            </a>
-            <a
-              href="{{ url_for('home', panel='teachers', school=admin_school|default('all', true)) }}"
-              class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
-            >
-              Teachers
-            </a>
-          </div>
 
           {% if admin_panel == "overview" %}
           <section class="admin-overview-grid">
@@ -326,6 +340,7 @@
               {% else %}
               {% set teacher_initial_mode = "select" %}
               {% endif %}
+              {% set teacher_initial_school = admin_teacher_edit_school or (admin_school if admin_school != "all" else "") %}
               <input type="hidden" id="teacherModeInput" name="teacher_mode" value="{{ teacher_initial_mode }}" />
               <input type="hidden" name="teacher_edit_id" value="{{ admin_teacher_edit.id if admin_teacher_edit else '' }}" />
 
@@ -337,13 +352,36 @@
                 {% endif %}
               </div>
 
+              <label class="field">
+                <span>Select School</span>
+                <select id="teacherAssignedSchool" name="teacher_assigned_school" required>
+                  <option value="" disabled {% if not teacher_initial_school %}selected{% endif %}>Select school</option>
+                  {% for school_option in admin_school_options %}
+                  {% if school_option.code != "all" %}
+                  <option
+                    value="{{ school_option.code }}"
+                    {% if teacher_initial_school and school_option.code == teacher_initial_school %}selected{% endif %}
+                  >
+                    {{ school_option.label }}
+                  </option>
+                  {% endif %}
+                  {% endfor %}
+                </select>
+              </label>
+
               <div id="teacherModeSelectPane" class="teacher-mode-pane" {% if teacher_initial_mode != "select" %}hidden{% endif %}>
                 <label class="field">
                   <span>Select Teacher</span>
                   <select id="teacherSelectedName" name="teacher_selected_name" required>
                     <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select from existing teachers</option>
-                    {% for teacher_name in admin_teacher_name_options %}
-                    <option value="{{ teacher_name }}" {% if admin_teacher_edit and teacher_name == admin_teacher_edit.full_name %}selected{% endif %}>{{ teacher_name }}</option>
+                    {% for teacher_option in admin_teacher_options %}
+                    <option
+                      value="{{ teacher_option.name }}"
+                      data-school-codes="{{ teacher_option.school_codes|join(',') }}"
+                      {% if admin_teacher_edit and teacher_option.name == admin_teacher_edit.full_name %}selected{% endif %}
+                    >
+                      {{ teacher_option.name }}
+                    </option>
                     {% endfor %}
                   </select>
                 </label>
@@ -361,11 +399,17 @@
               </div>
 
               <label class="field">
-                <span>Assign To Group</span>
-                <select name="teacher_assigned_group" required>
+                <span>Select Group</span>
+                <select id="teacherAssignedGroup" name="teacher_assigned_group" required>
                   <option value="" disabled {% if not admin_teacher_edit %}selected{% endif %}>Select group</option>
-                  {% for group_name in admin_groups %}
-                  <option value="{{ group_name }}" {% if admin_teacher_edit and group_name == admin_teacher_edit.assigned_group %}selected{% endif %}>{{ group_name }}</option>
+                  {% for group_option in admin_group_options %}
+                  <option
+                    value="{{ group_option.name }}"
+                    data-school-codes="{{ group_option.school_codes|join(',') }}"
+                    {% if admin_teacher_edit and group_option.name == admin_teacher_edit.assigned_group %}selected{% endif %}
+                  >
+                    {{ group_option.name }}
+                  </option>
                   {% endfor %}
                 </select>
               </label>
@@ -431,17 +475,6 @@
             </table>
           </div>
           {% elif admin_panel == "students" %}
-          <div class="admin-switch-row">
-            {% for school_option in admin_school_options %}
-            <a
-              href="{{ url_for('home', panel='students', school=school_option.code) }}"
-              class="secondary-btn admin-tab-btn {% if admin_school == school_option.code %}is-active{% endif %}"
-            >
-              {{ school_option.label }}
-            </a>
-            {% endfor %}
-          </div>
-
           <div class="admin-students-toolbar">
             <label class="field admin-search-field">
               <span>Search Student</span>
@@ -452,6 +485,16 @@
                 autocomplete="off"
               />
             </label>
+            <nav class="admin-switch-row admin-school-filter-row" aria-label="School filter">
+              {% for school_option in admin_school_options %}
+              <a
+                href="{{ url_for('home', panel='students', school=school_option.code) }}"
+                class="secondary-btn admin-tab-btn {% if admin_school == school_option.code %}is-active{% endif %}"
+              >
+                {{ school_option.label }}
+              </a>
+              {% endfor %}
+            </nav>
           </div>
 
           <div class="admin-table-wrap">
@@ -566,90 +609,116 @@
     <script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
     <script>
       (function () {
-        const modeInput = document.getElementById("teacherModeInput");
-        if (!modeInput) {
-          return;
+        var modeInput = document.getElementById("teacherModeInput");
+        if (!modeInput) return;
+        var selectBtn = document.getElementById("teacherModeSelectBtn");
+        var addBtn = document.getElementById("teacherModeAddBtn");
+        var selectPane = document.getElementById("teacherModeSelectPane");
+        var addPane = document.getElementById("teacherModeAddPane");
+        var selectedName = document.getElementById("teacherSelectedName");
+        var fullName = document.getElementById("teacherFullNameInput");
+        var payRate = document.getElementById("teacherPayRateInput");
+        var schoolSelect = document.getElementById("teacherAssignedSchool");
+        var groupSelect = document.getElementById("teacherAssignedGroup");
+        var teacherPanel = document.querySelector(".admin-panel-teachers");
+        var teacherCard = teacherPanel ? teacherPanel.querySelector(".teacher-form-card") : null;
+        var teacherTableWrap = teacherPanel ? teacherPanel.querySelector(".admin-table-wrap") : null;
+
+        function parseSchoolCodes(option) {
+          if (!option) return [];
+          var rawCodes = String(option.getAttribute("data-school-codes") || "").trim();
+          if (!rawCodes) return [];
+          return rawCodes
+            .split(",")
+            .map(function (value) { return String(value || "").trim().toLowerCase(); })
+            .filter(Boolean);
         }
 
-        const selectBtn = document.getElementById("teacherModeSelectBtn");
-        const addBtn = document.getElementById("teacherModeAddBtn");
-        const selectPane = document.getElementById("teacherModeSelectPane");
-        const addPane = document.getElementById("teacherModeAddPane");
-        const selectedName = document.getElementById("teacherSelectedName");
-        const fullName = document.getElementById("teacherFullNameInput");
-        const payRate = document.getElementById("teacherPayRateInput");
-
-        function setMode(mode) {
-          const isSelect = mode === "select";
-          modeInput.value = isSelect ? "select" : "add";
-
-          if (selectPane) {
-            selectPane.hidden = !isSelect;
-          }
-          if (addPane) {
-            addPane.hidden = isSelect;
-          }
-          if (selectedName) {
-            selectedName.required = isSelect;
-          }
-          if (fullName) {
-            fullName.required = !isSelect;
-          }
-          if (payRate) {
-            payRate.required = !isSelect;
-          }
-          if (selectBtn) {
-            selectBtn.classList.toggle("is-active", isSelect);
-          }
-          if (addBtn) {
-            addBtn.classList.toggle("is-active", !isSelect);
-          }
+        function optionMatchesSchool(option, schoolCode) {
+          if (!option || !option.value) return true;
+          if (!schoolCode) return true;
+          var optionSchoolCodes = parseSchoolCodes(option);
+          if (!optionSchoolCodes.length) return true;
+          return optionSchoolCodes.indexOf(schoolCode) !== -1;
         }
 
-        if (selectBtn) {
-          selectBtn.addEventListener("click", function () {
-            setMode("select");
-          });
-        }
-        if (addBtn) {
-          addBtn.addEventListener("click", function () {
-            setMode("add");
-          });
-        }
-
-        setMode(modeInput.value === "add" ? "add" : "select");
-      })();
-
-      (function () {
-        const searchInput = document.getElementById("adminStudentSearchInput");
-        if (!searchInput) {
-          return;
-        }
-
-        const rows = Array.from(document.querySelectorAll("tr[data-student-row]"));
-        const emptyRow = document.getElementById("adminStudentsNoResultsRow");
-        if (!rows.length) {
-          return;
-        }
-
-        const applyFilter = function () {
-          const query = String(searchInput.value || "").trim().toLowerCase();
-          let visibleCount = 0;
-
-          rows.forEach(function (row) {
-            const rowText = String(row.getAttribute("data-student-search") || "").toLowerCase();
-            const isVisible = !query || rowText.includes(query);
-            row.hidden = !isVisible;
-            if (isVisible) {
-              visibleCount += 1;
+        function filterSelectBySchool(selectNode, schoolCode) {
+          if (!selectNode) return;
+          var currentValue = selectNode.value;
+          var hasCurrentVisible = false;
+          Array.prototype.forEach.call(selectNode.options, function (option) {
+            if (!option.value) {
+              option.hidden = false;
+              return;
+            }
+            var visible = optionMatchesSchool(option, schoolCode);
+            option.hidden = !visible;
+            if (visible && option.value === currentValue) {
+              hasCurrentVisible = true;
             }
           });
-
-          if (emptyRow) {
-            emptyRow.hidden = visibleCount > 0;
+          if (currentValue && !hasCurrentVisible) {
+            selectNode.value = "";
           }
-        };
+        }
 
+        function applySchoolFilters() {
+          var schoolCode = schoolSelect
+            ? String(schoolSelect.value || "").trim().toLowerCase()
+            : "";
+          filterSelectBySchool(selectedName, schoolCode);
+          filterSelectBySchool(groupSelect, schoolCode);
+        }
+
+        function syncTeacherTableHeight() {
+          if (!teacherCard || !teacherTableWrap) return;
+          if (window.innerWidth < 641) {
+            teacherTableWrap.style.removeProperty("height");
+            return;
+          }
+          var cardHeight = Math.round(teacherCard.getBoundingClientRect().height || 0);
+          if (cardHeight > 0) {
+            teacherTableWrap.style.height = cardHeight + "px";
+          }
+        }
+
+        function setMode(mode) {
+          var isSelect = mode === "select";
+          modeInput.value = isSelect ? "select" : "add";
+          if (selectPane) selectPane.hidden = !isSelect;
+          if (addPane) addPane.hidden = isSelect;
+          if (selectedName) selectedName.required = isSelect;
+          if (fullName) fullName.required = !isSelect;
+          if (payRate) payRate.required = !isSelect;
+          if (selectBtn) selectBtn.classList.toggle("is-active", isSelect);
+          if (addBtn) addBtn.classList.toggle("is-active", !isSelect);
+          syncTeacherTableHeight();
+        }
+        if (selectBtn) selectBtn.addEventListener("click", function () { setMode("select"); });
+        if (addBtn) addBtn.addEventListener("click", function () { setMode("add"); });
+        if (schoolSelect) schoolSelect.addEventListener("change", applySchoolFilters);
+        window.addEventListener("resize", syncTeacherTableHeight);
+        applySchoolFilters();
+        setMode(modeInput.value === "add" ? "add" : "select");
+        syncTeacherTableHeight();
+      })();
+      (function () {
+        var searchInput = document.getElementById("adminStudentSearchInput");
+        if (!searchInput) return;
+        var rows = Array.from(document.querySelectorAll("tr[data-student-row]"));
+        var emptyRow = document.getElementById("adminStudentsNoResultsRow");
+        if (!rows.length) return;
+        var applyFilter = function () {
+          var query = String(searchInput.value || "").trim().toLowerCase();
+          var visibleCount = 0;
+          rows.forEach(function (row) {
+            var rowText = String(row.getAttribute("data-student-search") || "").toLowerCase();
+            var isVisible = !query || rowText.includes(query);
+            row.hidden = !isVisible;
+            if (isVisible) visibleCount += 1;
+          });
+          if (emptyRow) emptyRow.hidden = visibleCount > 0;
+        };
         searchInput.addEventListener("input", applyFilter, { passive: true });
         applyFilter();
       })();

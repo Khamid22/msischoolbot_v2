@@ -1055,10 +1055,12 @@ def register_home_routes(
             admin_students=[],
             admin_panel="overview",
             admin_teachers=[],
-            admin_teacher_name_options=[],
+            admin_teacher_options=[],
+            admin_group_options=[],
             admin_groups=[],
             admin_selected_student=None,
             admin_teacher_edit=None,
+            admin_teacher_edit_school="",
             admin_school="all",
             admin_school_options=admin_school_options,
             admin_notice="",
@@ -1103,83 +1105,197 @@ def register_home_routes(
         dataset_scope = "all" if panel == "overview" else school_filter
         force_refresh = _should_force_refresh()
         sync_errors = []
-        school_codes_to_sync = (
-            available_school_codes
-            if dataset_scope == "all"
-            else [dataset_scope]
-        )
         sync_results_by_code = {}
-        for school_code in school_codes_to_sync:
-            sync_result = sync_students_if_needed(
-                load_dataset,
-                school_code=school_code,
+        should_sync_students = panel == "overview" or force_refresh
+        if should_sync_students:
+            school_codes_to_sync = (
+                available_school_codes
+                if dataset_scope == "all"
+                else [dataset_scope]
+            )
+            for school_code in school_codes_to_sync:
+                sync_result = sync_students_if_needed(
+                    load_dataset,
+                    school_code=school_code,
+                    force_refresh=force_refresh,
+                )
+                sync_results_by_code[school_code] = sync_result
+                sync_error = str(sync_result.get("error", "")).strip()
+                if sync_error:
+                    sync_errors.append(sync_error)
+
+        dataset = None
+        load_error = ""
+        groups = []
+        if panel in {"overview", "teachers"}:
+            dataset, load_error = _load_admin_dataset_for_filter(
+                dataset_scope,
                 force_refresh=force_refresh,
             )
-            sync_results_by_code[school_code] = sync_result
-            sync_error = str(sync_result.get("error", "")).strip()
-            if sync_error:
-                sync_errors.append(sync_error)
-
-        dataset, load_error = _load_admin_dataset_for_filter(
-            dataset_scope,
-            force_refresh=force_refresh,
-        )
-        groups = dataset["groups"] if dataset else []
+            groups = dataset["groups"] if dataset else []
 
         admin_teachers = list_teachers()
         admin_students = list_students_for_admin(
             school_filter=school_filter if panel == "students" else "all"
         )
-        admin_teacher_name_options = sorted(
-            {
-                str(row.get("full_name", "")).strip()
-                for row in admin_teachers
-                if str(row.get("full_name", "")).strip()
-            },
-            key=lambda value: value.casefold(),
-        )
+        group_school_sets = {}
+        dataset_students = dataset.get("students", []) if isinstance(dataset, dict) else []
+        if isinstance(dataset_students, list):
+            for student_row in dataset_students:
+                if not isinstance(student_row, dict):
+                    continue
+                group_name = str(student_row.get("group", "")).strip()
+                if not group_name:
+                    continue
+                school_code = str(
+                    student_row.get("schoolCode")
+                    or student_row.get("school_code")
+                    or student_row.get("schoolKey")
+                    or student_row.get("school_key")
+                    or ""
+                ).strip().casefold()
+                if school_code not in available_school_codes:
+                    continue
+                group_school_sets.setdefault(group_name, set()).add(school_code)
 
-        def _load_all_schools_dataset(force_refresh = False):
-            dataset, load_error = _load_admin_dataset_for_filter(
-                "all",
+        if not group_school_sets:
+            fallback_school_code = (
+                school_filter
+                if school_filter in available_school_codes
+                else (available_school_codes[0] if len(available_school_codes) == 1 else "")
+            )
+            if fallback_school_code:
+                for group_name in groups:
+                    normalized_group = str(group_name or "").strip()
+                    if normalized_group:
+                        group_school_sets.setdefault(normalized_group, set()).add(
+                            fallback_school_code
+                        )
+
+        admin_group_options = []
+        for group_name in groups:
+            normalized_group = str(group_name or "").strip()
+            if not normalized_group:
+                continue
+            school_codes = sorted(
+                group_school_sets.get(normalized_group, set()),
+                key=lambda value: value.casefold(),
+            )
+            if not school_codes and school_filter in available_school_codes:
+                school_codes = [school_filter]
+            elif not school_codes and len(available_school_codes) == 1:
+                school_codes = [available_school_codes[0]]
+            admin_group_options.append(
+                {
+                    "name": normalized_group,
+                    "school_codes": school_codes,
+                }
+            )
+
+        teacher_name_to_schools = {}
+        for teacher_row in admin_teachers:
+            teacher_name = str(teacher_row.get("full_name", "")).strip()
+            if not teacher_name:
+                continue
+            teacher_group = str(teacher_row.get("assigned_group", "")).strip()
+            teacher_school_codes = group_school_sets.get(teacher_group, set())
+            school_set = teacher_name_to_schools.setdefault(teacher_name, set())
+            school_set.update(teacher_school_codes)
+
+        admin_teacher_options = []
+        for teacher_name in sorted(teacher_name_to_schools, key=lambda value: value.casefold()):
+            school_codes = sorted(
+                teacher_name_to_schools.get(teacher_name, set()),
+                key=lambda value: value.casefold(),
+            )
+            if not school_codes and school_filter in available_school_codes:
+                school_codes = [school_filter]
+            elif not school_codes and len(available_school_codes) == 1:
+                school_codes = [available_school_codes[0]]
+            admin_teacher_options.append(
+                {
+                    "name": teacher_name,
+                    "school_codes": school_codes,
+                }
+            )
+
+        admin_teacher_edit_school = ""
+        if isinstance(admin_teacher_edit, dict):
+            edit_group_name = str(admin_teacher_edit.get("assigned_group", "")).strip()
+            edit_group_schools = sorted(
+                group_school_sets.get(edit_group_name, set()),
+                key=lambda value: value.casefold(),
+            )
+            if edit_group_schools:
+                admin_teacher_edit_school = edit_group_schools[0]
+            elif school_filter in available_school_codes:
+                admin_teacher_edit_school = school_filter
+            elif available_school_codes:
+                admin_teacher_edit_school = available_school_codes[0]
+
+        admin_quick_stats = {
+            "total_students": 0,
+            "total_schools": 0,
+            "total_teachers": 0,
+            "total_subjects": 0,
+            "school_counts": [],
+        }
+        admin_school_info = []
+        admin_subject_info = []
+        admin_group_highlights = {
+            "top_aap": [],
+            "top_ar": [],
+        }
+        admin_student_ratings = {
+            "global": [],
+            "local": [],
+        }
+        admin_attention = {
+            "low_aap": [],
+            "low_ar": [],
+            "groups_without_teacher": [],
+        }
+        if panel == "overview":
+            def _load_all_schools_dataset(force_refresh = False):
+                loaded_dataset, loaded_error = _load_admin_dataset_for_filter(
+                    "all",
+                    force_refresh=force_refresh,
+                )
+                if loaded_dataset:
+                    return loaded_dataset, ""
+                return None, loaded_error
+
+            summary_sync_result = sync_subject_summaries_if_needed(
+                _load_all_schools_dataset,
                 force_refresh=force_refresh,
             )
-            if dataset:
-                return dataset, ""
-            return None, load_error
+            summary_sync_error = str(summary_sync_result.get("error", "")).strip()
+            if summary_sync_error:
+                sync_errors.append(summary_sync_error)
 
-        summary_sync_result = sync_subject_summaries_if_needed(
-            _load_all_schools_dataset,
-            force_refresh=force_refresh,
-        )
-        summary_sync_error = str(summary_sync_result.get("error", "")).strip()
-        if summary_sync_error:
-            sync_errors.append(summary_sync_error)
-
-        summary_school_filter = "all" if panel == "overview" else school_filter
-        summary_rows = list_subject_summaries(summary_school_filter)
-        overview_metrics = _extract_overview_student_metrics(summary_rows)
-        admin_school_info = _build_admin_school_info(overview_metrics)
-        admin_subject_info = _build_admin_subject_info(overview_metrics, dataset)
-        admin_group_highlights = _build_admin_group_highlights(overview_metrics)
-        admin_student_ratings = _build_admin_student_ratings(overview_metrics)
-        admin_attention = _build_admin_attention(
-            admin_student_ratings,
-            dataset,
-            admin_teachers,
-        )
-        total_subjects = len(
-            {
-                str(item.get("subject", "")).strip().casefold()
-                for item in overview_metrics
-                if str(item.get("subject", "")).strip()
-            }
-        )
-        admin_quick_stats = _build_admin_quick_stats(
-            admin_school_info,
-            admin_teachers,
-            total_subjects,
-        )
+            summary_rows = list_subject_summaries("all")
+            overview_metrics = _extract_overview_student_metrics(summary_rows)
+            admin_school_info = _build_admin_school_info(overview_metrics)
+            admin_subject_info = _build_admin_subject_info(overview_metrics, dataset)
+            admin_group_highlights = _build_admin_group_highlights(overview_metrics)
+            admin_student_ratings = _build_admin_student_ratings(overview_metrics)
+            admin_attention = _build_admin_attention(
+                admin_student_ratings,
+                dataset,
+                admin_teachers,
+            )
+            total_subjects = len(
+                {
+                    str(item.get("subject", "")).strip().casefold()
+                    for item in overview_metrics
+                    if str(item.get("subject", "")).strip()
+                }
+            )
+            admin_quick_stats = _build_admin_quick_stats(
+                admin_school_info,
+                admin_teachers,
+                total_subjects,
+            )
         admin_sync_statuses = []
         for school_code in available_school_codes:
             school_label = school_option_catalog.get(school_code, school_code.title())
@@ -1239,10 +1355,12 @@ def register_home_routes(
             admin_students=admin_students,
             admin_panel=panel,
             admin_teachers=admin_teachers,
-            admin_teacher_name_options=admin_teacher_name_options,
+            admin_teacher_options=admin_teacher_options,
+            admin_group_options=admin_group_options,
             admin_groups=groups,
             admin_selected_student=admin_selected_student,
             admin_teacher_edit=admin_teacher_edit,
+            admin_teacher_edit_school=admin_teacher_edit_school,
             admin_school=school_filter,
             admin_school_options=admin_school_options,
             admin_notice=admin_notice or load_error or "",
@@ -1328,10 +1446,12 @@ def register_home_routes(
             admin_students=[],
             admin_panel="overview",
             admin_teachers=[],
-            admin_teacher_name_options=[],
+            admin_teacher_options=[],
+            admin_group_options=[],
             admin_groups=[],
             admin_selected_student=None,
             admin_teacher_edit=None,
+            admin_teacher_edit_school="",
             admin_school="all",
             admin_school_options=admin_school_options,
             admin_notice="",
