@@ -661,6 +661,10 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   margin-bottom: 8px;
 }
 
+.rating-page .rating-board-wrap {
+  max-width: min(1480px, 100%);
+}
+
 .dashboard-main {
   width: 100%;
 }
@@ -703,15 +707,20 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   }
 
   .student-title-block {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 8px;
   }
 
   .student-title-actions {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    margin-left: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    justify-self: end;
   }
 
   .title-pill {

@@ -3,12 +3,12 @@ import math
 from flask import jsonify, render_template, request, session, url_for
 
 try:
-    from ..services.lesson_catalog_service import get_lessons_for_subject
+    from ...services.lesson_catalog_service import get_lessons_for_subject
 except ImportError:
     from services.lesson_catalog_service import get_lessons_for_subject
 
 try:
-    from ..services.auth_service import (
+    from ...services.auth_service import (
         get_dashboard_student_profile,
         get_student_db_id_by_sheet_student_id,
     )
@@ -19,8 +19,8 @@ except ImportError:
     )
 
 try:
-    from ..services.dataset_service import load_all_schools_dataset
-    from ..services.subject_summary_service import sync_subject_summaries_if_needed
+    from ...services.dataset_service import load_all_schools_dataset
+    from ...services.subject_summary_service import sync_subject_summaries_if_needed
 except ImportError:
     from services.dataset_service import load_all_schools_dataset
     from services.subject_summary_service import sync_subject_summaries_if_needed

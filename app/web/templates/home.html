@@ -253,81 +253,103 @@
               {% endif %}
             </article>
 
-            <article class="admin-info-card">
-              <h3>Top Groups</h3>
-              <h4 class="admin-info-subtitle">By AAP</h4>
-              <ul class="admin-mini-list">
-                {% for row in admin_group_highlights.top_aap[:4] %}
-                <li>
-                  <span>{{ row.group_name }} ({{ row.school_name }})</span>
-                  <small>AAP {{ row.avg_aap }} · AR {{ row.avg_ar if row.avg_ar is not none else "-" }}%</small>
-                </li>
-                {% endfor %}
-                {% if not admin_group_highlights.top_aap %}
-                <li><span>No group rating data yet.</span></li>
-                {% endif %}
-              </ul>
-
-              <h4 class="admin-info-subtitle">By AR</h4>
-              <ul class="admin-mini-list">
-                {% for row in admin_group_highlights.top_ar[:4] %}
-                <li>
-                  <span>{{ row.group_name }} ({{ row.school_name }})</span>
-                  <small>AR {{ row.avg_ar }}% · AAP {{ row.avg_aap if row.avg_aap is not none else "-" }}</small>
-                </li>
-                {% endfor %}
-                {% if not admin_group_highlights.top_ar %}
-                <li><span>No group attendance data yet.</span></li>
-                {% endif %}
-              </ul>
+            <article class="admin-info-card admin-info-card-wide admin-zone-card zone-green">
+              <h3>Green Zone</h3>
+              <div class="admin-table-wrap admin-zone-table-wrap">
+                <table class="admin-table admin-zone-table">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th>Subject</th>
+                      <th>AAP</th>
+                      <th>AR</th>
+                      <th>School</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in admin_group_zones.green %}
+                    <tr>
+                      <td>{{ row.group_name }}</td>
+                      <td>{{ row.subject_name }}</td>
+                      <td>{{ row.aap if row.aap is not none else "-" }}</td>
+                      <td>{{ row.ar if row.ar is not none else "-" }}</td>
+                      <td>{{ row.school_name }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not admin_group_zones.green %}
+                    <tr>
+                      <td colspan="5">No groups in this zone.</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
             </article>
 
-            <article class="admin-info-card">
-              <h3>Students Rating</h3>
-              <ul class="admin-mini-list">
-                {% for row in admin_student_ratings.global[:6] %}
-                <li>
-                  <span>#{{ row.rank }} {{ row.full_name }} ({{ row.school_name }})</span>
-                  <small>AAP {{ row.avg_aap if row.avg_aap is not none else "-" }} · AR {{ row.avg_ar if row.avg_ar is not none else "-" }}%</small>
-                </li>
-                {% endfor %}
-                {% if not admin_student_ratings.global %}
-                <li><span>No student rating data yet.</span></li>
-                {% endif %}
-              </ul>
+            <article class="admin-info-card admin-info-card-wide admin-zone-card zone-yellow">
+              <h3>Yellow Zone</h3>
+              <div class="admin-table-wrap admin-zone-table-wrap">
+                <table class="admin-table admin-zone-table">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th>Subject</th>
+                      <th>AAP</th>
+                      <th>AR</th>
+                      <th>School</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in admin_group_zones.yellow %}
+                    <tr>
+                      <td>{{ row.group_name }}</td>
+                      <td>{{ row.subject_name }}</td>
+                      <td>{{ row.aap if row.aap is not none else "-" }}</td>
+                      <td>{{ row.ar if row.ar is not none else "-" }}</td>
+                      <td>{{ row.school_name }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not admin_group_zones.yellow %}
+                    <tr>
+                      <td colspan="5">No groups in this zone.</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
             </article>
 
-            <article class="admin-info-card">
-              <h3>Attention: Low AAP / AR</h3>
-              <ul class="admin-mini-list">
-                {% for row in admin_attention.low_aap[:4] %}
-                <li>
-                  <span>{{ row.full_name }} ({{ row.school_name }})</span>
-                  <small>AAP {{ row.value }}</small>
-                </li>
-                {% endfor %}
-                {% for row in admin_attention.low_ar[:4] %}
-                <li>
-                  <span>{{ row.full_name }} ({{ row.school_name }})</span>
-                  <small>AR {{ row.value }}%</small>
-                </li>
-                {% endfor %}
-                {% if not admin_attention.low_aap and not admin_attention.low_ar %}
-                <li><span>No students in alert range.</span></li>
-                {% endif %}
-              </ul>
-            </article>
-
-            <article class="admin-info-card">
-              <h3>Groups Without Teacher</h3>
-              <ul class="admin-mini-list">
-                {% for group_name in admin_attention.groups_without_teacher[:8] %}
-                <li><span>{{ group_name }}</span></li>
-                {% endfor %}
-                {% if not admin_attention.groups_without_teacher %}
-                <li><span>All groups are assigned.</span></li>
-                {% endif %}
-              </ul>
+            <article class="admin-info-card admin-info-card-wide admin-zone-card zone-red">
+              <h3>Red Zone</h3>
+              <div class="admin-table-wrap admin-zone-table-wrap">
+                <table class="admin-table admin-zone-table">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th>Subject</th>
+                      <th>AAP</th>
+                      <th>AR</th>
+                      <th>School</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in admin_group_zones.red %}
+                    <tr>
+                      <td>{{ row.group_name }}</td>
+                      <td>{{ row.subject_name }}</td>
+                      <td>{{ row.aap if row.aap is not none else "-" }}</td>
+                      <td>{{ row.ar if row.ar is not none else "-" }}</td>
+                      <td>{{ row.school_name }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not admin_group_zones.red %}
+                    <tr>
+                      <td colspan="5">No groups in this zone.</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
             </article>
           </section>
 

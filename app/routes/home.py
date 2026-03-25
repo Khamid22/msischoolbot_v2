@@ -48,11 +48,11 @@ except ImportError:
     )
 
 try:
-    from .admins import register_admin_routes
-    from .students import register_student_routes
+    from .admin.admins import register_admin_routes
+    from .students.students import register_student_routes
 except ImportError:
-    from admins import register_admin_routes
-    from students import register_student_routes
+    from admin.admins import register_admin_routes
+    from students.students import register_student_routes
 
 try:
     from ..config.schools import get_configured_school_spreadsheets
@@ -496,6 +496,94 @@ def register_home_routes(
             "top_aap": top_aap[:8],
             "top_ar": top_ar[:8],
         }
+
+    def _build_admin_group_zones(metrics):
+        grouped_rows = {}
+        for item in metrics:
+            school_name = str(item.get("school_name", "")).strip() or "School"
+            subject_name = str(item.get("subject", "")).strip()
+            group_name = str(item.get("group", "")).strip()
+            if not subject_name or not group_name:
+                continue
+
+            key = (school_name, subject_name, group_name)
+            bucket = grouped_rows.setdefault(
+                key,
+                {
+                    "school_name": school_name,
+                    "subject_name": subject_name,
+                    "group_name": group_name,
+                    "aap_values": [],
+                    "ar_values": [],
+                },
+            )
+
+            aap_value = item.get("aap")
+            if aap_value is not None:
+                bucket["aap_values"].append(float(aap_value))
+
+            ar_value = item.get("ar")
+            if ar_value is not None:
+                bucket["ar_values"].append(float(ar_value))
+
+        zone_rows = []
+        for bucket in grouped_rows.values():
+            avg_aap = _average_or_none(bucket["aap_values"])
+            if avg_aap is None:
+                continue
+
+            zone_rows.append(
+                {
+                    "school_name": bucket["school_name"],
+                    "subject_name": bucket["subject_name"],
+                    "group_name": bucket["group_name"],
+                    "aap": avg_aap,
+                    "ar": _average_or_none(bucket["ar_values"]),
+                }
+            )
+
+        zones = {
+            "green": [],
+            "yellow": [],
+            "red": [],
+        }
+        for row in zone_rows:
+            aap_value = float(row.get("aap") or 0)
+            if aap_value > 7:
+                zones["green"].append(row)
+            elif aap_value < 5:
+                zones["red"].append(row)
+            else:
+                zones["yellow"].append(row)
+
+        zones["green"].sort(
+            key=lambda row: (
+                -float(row.get("aap") or 0),
+                -float(row.get("ar") or 0),
+                _normalize_text(row.get("school_name", "")),
+                _normalize_text(row.get("subject_name", "")),
+                _normalize_text(row.get("group_name", "")),
+            )
+        )
+        zones["yellow"].sort(
+            key=lambda row: (
+                -float(row.get("aap") or 0),
+                -float(row.get("ar") or 0),
+                _normalize_text(row.get("school_name", "")),
+                _normalize_text(row.get("subject_name", "")),
+                _normalize_text(row.get("group_name", "")),
+            )
+        )
+        zones["red"].sort(
+            key=lambda row: (
+                float(row.get("aap") or 0),
+                float(row.get("ar") or 0),
+                _normalize_text(row.get("school_name", "")),
+                _normalize_text(row.get("subject_name", "")),
+                _normalize_text(row.get("group_name", "")),
+            )
+        )
+        return zones
 
     def _build_admin_subject_info(metrics, dataset = None):
         def _normalize_school_key(raw_value, school_name = ""):
@@ -1090,6 +1178,11 @@ def register_home_routes(
                 "top_aap": [],
                 "top_ar": [],
             },
+            admin_group_zones={
+                "green": [],
+                "yellow": [],
+                "red": [],
+            },
             admin_student_ratings={
                 "global": [],
                 "local": [],
@@ -1262,6 +1355,11 @@ def register_home_routes(
             "top_aap": [],
             "top_ar": [],
         }
+        admin_group_zones = {
+            "green": [],
+            "yellow": [],
+            "red": [],
+        }
         admin_student_ratings = {
             "global": [],
             "local": [],
@@ -1294,6 +1392,7 @@ def register_home_routes(
             admin_school_info = _build_admin_school_info(overview_metrics)
             admin_subject_info = _build_admin_subject_info(overview_metrics, dataset)
             admin_group_highlights = _build_admin_group_highlights(overview_metrics)
+            admin_group_zones = _build_admin_group_zones(overview_metrics)
             admin_student_ratings = _build_admin_student_ratings(overview_metrics)
             admin_attention = _build_admin_attention(
                 admin_student_ratings,
@@ -1384,6 +1483,7 @@ def register_home_routes(
             admin_school_info=admin_school_info,
             admin_subject_info=admin_subject_info,
             admin_group_highlights=admin_group_highlights,
+            admin_group_zones=admin_group_zones,
             admin_student_ratings=admin_student_ratings,
             admin_attention=admin_attention,
             admin_sync_statuses=admin_sync_statuses,
@@ -1483,6 +1583,11 @@ def register_home_routes(
             admin_group_highlights={
                 "top_aap": [],
                 "top_ar": [],
+            },
+            admin_group_zones={
+                "green": [],
+                "yellow": [],
+                "red": [],
             },
             admin_student_ratings={
                 "global": [],

@@ -664,16 +664,16 @@ def require_authentication_for_protected_routes():
 
 
 try:
-    from .routes.dashboard import register_dashboard_routes
+    from .routes.students.dashboard import register_dashboard_routes
     from .routes.home import register_home_routes
-    from .routes.rating_board import register_rating_board_routes
+    from .routes.students.rating_board import register_rating_board_routes
     from .routes.webhooks import register_webhook_routes
 except ImportError:
     if __package__:
         raise
-    from routes.dashboard import register_dashboard_routes
+    from routes.students.dashboard import register_dashboard_routes
     from routes.home import register_home_routes
-    from routes.rating_board import register_rating_board_routes
+    from routes.students.rating_board import register_rating_board_routes
     from routes.webhooks import register_webhook_routes
 
 

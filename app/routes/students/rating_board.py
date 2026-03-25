@@ -40,7 +40,6 @@ def register_rating_board_routes(
         own_sheet_student_id = _current_student_sheet_id()
         return own_sheet_student_id is not None and int(student_id) == own_sheet_student_id
 
-    # Subject leaderboard page for the current student's subject.
     @app.get("/dashboard/<int:student_id>/rating-board")
     def rating_board(student_id):
         requested_subject = request.args.get("subject", "").strip()
