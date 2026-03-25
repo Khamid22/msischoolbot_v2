@@ -637,6 +637,114 @@
   justify-content: flex-end;
 }
 
+/* ─── Resources Panel ─── */
+.admin-resources-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.admin-resource-card {
+  padding: 12px 14px;
+}
+
+.admin-resource-card .admin-card-title {
+  margin-top: 2px;
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.admin-resource-type-form,
+.admin-resource-form {
+  gap: 10px;
+}
+
+.admin-resource-local-notice {
+  margin-bottom: 10px;
+}
+
+.admin-resource-upload-status {
+  margin: 0 0 4px;
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.admin-resource-type-form .field input,
+.admin-resource-form .field input,
+.admin-resource-form .field select,
+.admin-resource-form .field textarea {
+  min-height: 40px;
+}
+
+.admin-resource-form .field textarea {
+  min-height: 84px;
+}
+
+.admin-resource-submit-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  align-self: flex-start;
+}
+
+.admin-resource-loading-state {
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-resource-loading-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e5e5;
+  overflow: hidden;
+}
+
+.admin-resource-loading-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+  animation: admin-resource-loading 1.1s ease-in-out infinite;
+}
+
+.admin-resource-loading-state p {
+  margin: 0;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.admin-resource-form.is-submitting .admin-resource-submit-btn {
+  opacity: 0.85;
+  cursor: wait;
+}
+
+@keyframes admin-resource-loading {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.admin-resource-card-wide {
+  grid-column: 1 / -1;
+}
+
 /* ─── Teacher Form ─── */
 .teacher-form-card {
   padding: 12px 14px;
@@ -1172,6 +1280,10 @@
     width: 100%;
     margin-left: 0;
     justify-content: flex-start;
+  }
+
+  .admin-resources-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-subject-charts-grid {

@@ -311,6 +311,13 @@ def register_dashboard_routes(
             group=requested_group or current_group_name,
             school=current_school_code,
         )
+        resources_url = url_for(
+            "student_resources",
+            student_id=student_id,
+            subject=requested_subject or current_subject_name,
+            group=requested_group or current_group_name,
+            school=current_school_code,
+        )
         aap_lessons_url = url_for(
             "aap_lessons",
             student_id=student_id,
@@ -341,6 +348,7 @@ def register_dashboard_routes(
             program_completed_rate=program_completed_rate,
             subject_rating=subject_rating,
             rating_board_url=rating_board_url,
+            resources_url=resources_url,
             aap_lessons_url=aap_lessons_url,
             current_subject_name=current_subject_name,
             current_subject_short_name=current_subject_short_name,

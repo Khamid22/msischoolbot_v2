@@ -667,6 +667,7 @@ try:
     from .routes.students.dashboard import register_dashboard_routes
     from .routes.home import register_home_routes
     from .routes.students.rating_board import register_rating_board_routes
+    from .routes.students.resources import register_resources_routes
     from .routes.webhooks import register_webhook_routes
 except ImportError:
     if __package__:
@@ -674,6 +675,7 @@ except ImportError:
     from routes.students.dashboard import register_dashboard_routes
     from routes.home import register_home_routes
     from routes.students.rating_board import register_rating_board_routes
+    from routes.students.resources import register_resources_routes
     from routes.webhooks import register_webhook_routes
 
 
@@ -705,6 +707,10 @@ register_rating_board_routes(
     load_dataset=_load_dataset,
     seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
     build_subject_leaderboard=_build_subject_leaderboard,
+)
+register_resources_routes(
+    app,
+    load_dashboard_payload=_load_dashboard_payload,
 )
 register_webhook_routes(
     app,

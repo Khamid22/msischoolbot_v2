@@ -85,6 +85,58 @@ def create_tables(conn):
     )
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS resource_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
+            display_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_name TEXT NOT NULL,
+            subject_key TEXT NOT NULL DEFAULT '',
+            resource_type_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            resource_url TEXT NOT NULL DEFAULT '',
+            resource_file_path TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            created_by_admin_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(resource_type_id) REFERENCES resource_types(id),
+            FOREIGN KEY(created_by_admin_id) REFERENCES admins(id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_types_display_order
+        ON resource_types(is_active, display_order, name)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resources_subject_key
+        ON resources(subject_key, is_active, updated_at)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resources_type
+        ON resources(resource_type_id, is_active, updated_at)
+        """
+    )
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS subject_summaries (
             sheet_student_id INTEGER PRIMARY KEY,
             full_name TEXT NOT NULL,
@@ -511,10 +563,175 @@ def ensure_subject_summaries_schema(conn):
     )
 
 
+def ensure_resources_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
+            display_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject_name TEXT NOT NULL,
+            subject_key TEXT NOT NULL DEFAULT '',
+            resource_type_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            resource_url TEXT NOT NULL DEFAULT '',
+            resource_file_path TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+            created_by_admin_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(resource_type_id) REFERENCES resource_types(id),
+            FOREIGN KEY(created_by_admin_id) REFERENCES admins(id)
+        )
+        """
+    )
+
+    resource_type_columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(resource_types)").fetchall()
+    }
+    if resource_type_columns:
+        if "is_active" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
+            )
+        if "is_system" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0"
+            )
+        if "display_order" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0"
+            )
+        if "slug" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN slug TEXT NOT NULL DEFAULT ''"
+            )
+        if "created_at" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN created_at TEXT NOT NULL DEFAULT ''"
+            )
+        if "updated_at" not in resource_type_columns:
+            conn.execute(
+                "ALTER TABLE resource_types ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            """
+            UPDATE resource_types
+            SET slug = lower(replace(trim(name), ' ', '-'))
+            WHERE trim(coalesce(slug, '')) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE resource_types
+            SET created_at = updated_at
+            WHERE trim(coalesce(created_at, '')) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE resource_types
+            SET updated_at = created_at
+            WHERE trim(coalesce(updated_at, '')) = ''
+            """
+        )
+
+    resource_columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(resources)").fetchall()
+    }
+    if resource_columns:
+        if "subject_key" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN subject_key TEXT NOT NULL DEFAULT ''"
+            )
+        if "description" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN description TEXT NOT NULL DEFAULT ''"
+            )
+        if "resource_url" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN resource_url TEXT NOT NULL DEFAULT ''"
+            )
+        if "resource_file_path" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN resource_file_path TEXT NOT NULL DEFAULT ''"
+            )
+        if "is_active" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1"
+            )
+        if "created_by_admin_id" not in resource_columns:
+            conn.execute("ALTER TABLE resources ADD COLUMN created_by_admin_id INTEGER")
+        if "created_at" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN created_at TEXT NOT NULL DEFAULT ''"
+            )
+        if "updated_at" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"
+            )
+        conn.execute(
+            """
+            UPDATE resources
+            SET subject_key = lower(trim(subject_name))
+            WHERE trim(coalesce(subject_key, '')) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE resources
+            SET created_at = updated_at
+            WHERE trim(coalesce(created_at, '')) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE resources
+            SET updated_at = created_at
+            WHERE trim(coalesce(updated_at, '')) = ''
+            """
+        )
+
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_types_display_order
+        ON resource_types(is_active, display_order, name)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resources_subject_key
+        ON resources(subject_key, is_active, updated_at)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resources_type
+        ON resources(resource_type_id, is_active, updated_at)
+        """
+    )
+
+
 __all__ = [
     "create_tables",
     "ensure_students_schema",
     "ensure_students_sheet_map_schema",
     "ensure_lesson_catalog_schema",
     "ensure_subject_summaries_schema",
+    "ensure_resources_schema",
 ]

@@ -60,6 +60,12 @@
             >
               Teachers
             </a>
+            <a
+              href="{{ url_for('home', panel='resources', school='all') }}"
+              class="secondary-btn admin-tab-btn {% if admin_panel == 'resources' %}is-active{% endif %}"
+            >
+              Resources
+            </a>
             <form action="{{ url_for('logout') }}" method="post" class="admin-logout-form">
               <button type="submit" class="secondary-btn admin-tab-btn admin-logout-icon-btn" aria-label="Logout" title="Logout">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -498,6 +504,171 @@
               </tbody>
             </table>
           </div>
+          {% elif admin_panel == "resources" %}
+          <section class="admin-resources-grid">
+            <article class="admin-card admin-resource-card">
+              <h2 class="admin-card-title">Resource Types</h2>
+              <form action="{{ url_for('add_resource_type') }}" method="post" class="login-form admin-resource-type-form">
+                <label class="field">
+                  <span>Type Name</span>
+                  <input
+                    type="text"
+                    name="resource_type_name"
+                    placeholder="Video, Definitions, Worksheet..."
+                    autocomplete="off"
+                    required
+                  />
+                </label>
+                <button type="submit" class="primary-btn admin-resource-submit-btn">Add Type</button>
+              </form>
+
+              <div class="admin-table-wrap admin-resource-types-wrap">
+                <table class="admin-table admin-resource-types-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for type_row in admin_resource_types %}
+                    <tr>
+                      <td>{{ type_row.name }}</td>
+                      <td>
+                        <form action="{{ url_for('delete_resource_type_route', resource_type_id=type_row.id) }}" method="post" onsubmit="return confirm('Delete this resource type?');">
+                          <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not admin_resource_types %}
+                    <tr>
+                      <td colspan="2">No resource types yet.</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="admin-card admin-resource-card">
+              <h2 class="admin-card-title">Add Resource</h2>
+              {% if admin_notice and ("saved" in admin_notice|lower) %}
+              <div class="form-notice admin-resource-local-notice">{{ admin_notice }}</div>
+              {% endif %}
+              <form action="{{ url_for('add_resource') }}" method="post" enctype="multipart/form-data" class="login-form admin-resource-form">
+                <p class="admin-resource-upload-status">
+                  {% if admin_resource_upload_enabled %}
+                  R2 Upload: Enabled
+                  {% else %}
+                  R2 Upload: Not Configured
+                  {% endif %}
+                </p>
+                <label class="field">
+                  <span>Subject</span>
+                  <input
+                    type="text"
+                    name="resource_subject_name"
+                    list="adminResourceSubjectsList"
+                    placeholder="Math, English, Chemistry..."
+                    autocomplete="off"
+                    required
+                  />
+                  <datalist id="adminResourceSubjectsList">
+                    {% for subject_name in admin_resource_subject_options %}
+                    <option value="{{ subject_name }}"></option>
+                    {% endfor %}
+                  </datalist>
+                </label>
+                <label class="field">
+                  <span>Resource Type</span>
+                  <select name="resource_type_id" required>
+                    <option value="" disabled selected>Select type</option>
+                    {% for type_row in admin_resource_active_types %}
+                    <option value="{{ type_row.id }}">{{ type_row.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Title</span>
+                  <input type="text" name="resource_title" placeholder="Resource title" autocomplete="off" required />
+                </label>
+                <label class="field">
+                  <span>Resource Link</span>
+                  <input type="url" name="resource_url" placeholder="https://... (optional if file uploaded)" autocomplete="off" />
+                </label>
+                <label class="field">
+                  <span>Upload File</span>
+                  <input type="file" name="resource_file" />
+                </label>
+                <label class="field">
+                  <span>Description</span>
+                  <textarea name="resource_description" placeholder="Optional short description"></textarea>
+                </label>
+                <div class="admin-resource-loading-state" data-resource-loading-state hidden aria-hidden="true">
+                  <div class="admin-resource-loading-track">
+                    <span class="admin-resource-loading-bar"></span>
+                  </div>
+                  <p>Saving resource...</p>
+                </div>
+                <button type="submit" class="primary-btn admin-resource-submit-btn">Save Resource</button>
+              </form>
+            </article>
+
+            <article class="admin-card admin-resource-card admin-resource-card-wide">
+              <h2 class="admin-card-title">Resources</h2>
+              <div class="admin-table-wrap admin-resources-table-wrap">
+                <table class="admin-table admin-resources-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Subject</th>
+                      <th>Type</th>
+                      <th>Title</th>
+                      <th>File</th>
+                      <th>Link</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for resource in admin_resources %}
+                    <tr>
+                      <td>{{ resource.id }}</td>
+                      <td>{{ resource.subject_name }}</td>
+                      <td>{{ resource.resource_type_name }}</td>
+                      <td>{{ resource.title }}</td>
+                      <td>
+                        {% if resource.resource_file_url %}
+                        <a href="{{ resource.resource_file_url }}" target="_blank" rel="noopener noreferrer">Open file</a>
+                        {% else %}
+                        -
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if resource.resource_url %}
+                        <a href="{{ resource.resource_url }}" target="_blank" rel="noopener noreferrer">Open link</a>
+                        {% else %}
+                        -
+                        {% endif %}
+                      </td>
+                      <td>
+                        <form action="{{ url_for('delete_resource_route', resource_id=resource.id) }}" method="post" onsubmit="return confirm('Delete this resource?');">
+                          <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger">Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not admin_resources %}
+                    <tr>
+                      <td colspan="7">No resources yet.</td>
+                    </tr>
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+
           {% elif admin_panel == "students" %}
           <div class="admin-students-toolbar">
             <label class="field admin-search-field">
@@ -741,6 +912,29 @@
         };
         searchInput.addEventListener("input", applyFilter, { passive: true });
         applyFilter();
+      })();
+      (function () {
+        var resourceForm = document.querySelector("form.admin-resource-form");
+        if (!resourceForm) return;
+        var submitButton = resourceForm.querySelector("button[type='submit']");
+        var loadingState = resourceForm.querySelector("[data-resource-loading-state]");
+
+        resourceForm.addEventListener("submit", function (event) {
+          if (resourceForm.getAttribute("data-submitting") === "1") {
+            event.preventDefault();
+            return;
+          }
+          resourceForm.setAttribute("data-submitting", "1");
+          resourceForm.classList.add("is-submitting");
+          if (loadingState) {
+            loadingState.hidden = false;
+            loadingState.setAttribute("aria-hidden", "false");
+          }
+          if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Saving...";
+          }
+        });
       })();
     </script>
     <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>

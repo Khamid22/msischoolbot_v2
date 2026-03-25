@@ -70,6 +70,36 @@ except ImportError:
         sync_subject_summaries_if_needed,
     )
 
+try:
+    from ..services.resources_service import (
+        create_resource,
+        create_resource_type,
+        delete_resource,
+        delete_resource_type,
+        is_resource_upload_enabled,
+        list_resource_subject_names,
+        list_resource_types,
+        list_resources,
+        normalize_subject_name,
+    )
+except ImportError:
+    from services.resources_service import (
+        create_resource,
+        create_resource_type,
+        delete_resource,
+        delete_resource_type,
+        is_resource_upload_enabled,
+        list_resource_subject_names,
+        list_resource_types,
+        list_resources,
+        normalize_subject_name,
+    )
+
+try:
+    from ..services.r2_storage_service import upload_resource_file
+except ImportError:
+    from services.r2_storage_service import upload_resource_file
+
 
 def register_home_routes(
     app,
@@ -1139,6 +1169,48 @@ def register_home_routes(
             "school_counts": school_counts,
         }
 
+    def _build_admin_resource_subject_options(summary_rows, resource_rows):
+        subject_priority = {
+            "math": 0,
+            "english": 1,
+            "chemistry": 2,
+            "biology": 3,
+            "physics": 4,
+        }
+
+        subject_map = {}
+        if isinstance(summary_rows, list):
+            for row in summary_rows:
+                if not isinstance(row, dict):
+                    continue
+                subject_name = normalize_subject_name(row.get("subject_name", ""))
+                subject_key = _normalize_text(subject_name)
+                if subject_name and subject_key and subject_key not in subject_map:
+                    subject_map[subject_key] = subject_name
+
+        if isinstance(resource_rows, list):
+            for row in resource_rows:
+                if not isinstance(row, dict):
+                    continue
+                subject_name = normalize_subject_name(row.get("subject_name", ""))
+                subject_key = _normalize_text(subject_name)
+                if subject_name and subject_key and subject_key not in subject_map:
+                    subject_map[subject_key] = subject_name
+
+        for subject_name in list_resource_subject_names():
+            normalized_name = normalize_subject_name(subject_name)
+            subject_key = _normalize_text(normalized_name)
+            if normalized_name and subject_key and subject_key not in subject_map:
+                subject_map[subject_key] = normalized_name
+
+        return sorted(
+            subject_map.values(),
+            key=lambda value: (
+                subject_priority.get(_normalize_text(value), 999),
+                _normalize_text(value),
+            ),
+        )
+
     def _render_login_page(auth_error="", auth_login_input=""):
         return render_template(
             "home.html",
@@ -1193,6 +1265,11 @@ def register_home_routes(
                 "groups_without_teacher": [],
             },
             admin_sync_statuses=[],
+            admin_resource_types=[],
+            admin_resource_active_types=[],
+            admin_resources=[],
+            admin_resource_subject_options=[],
+            admin_resource_upload_enabled=False,
         )
 
     def _render_admin_page(
@@ -1204,7 +1281,7 @@ def register_home_routes(
         admin_school="all",
     ):
         panel = str(admin_panel or "overview").strip().lower()
-        if panel not in {"overview", "students", "teachers"}:
+        if panel not in {"overview", "students", "teachers", "resources"}:
             panel = "overview"
 
         school_filter = _normalize_admin_school_filter(admin_school)
@@ -1369,6 +1446,11 @@ def register_home_routes(
             "low_ar": [],
             "groups_without_teacher": [],
         }
+        admin_resource_types = []
+        admin_resource_active_types = []
+        admin_resources = []
+        admin_resource_subject_options = []
+        admin_resource_upload_enabled = False
         if panel == "overview":
             def _load_all_schools_dataset(force_refresh = False):
                 loaded_dataset, loaded_error = _load_admin_dataset_for_filter(
@@ -1411,6 +1493,18 @@ def register_home_routes(
                 admin_teachers,
                 total_subjects,
             )
+        elif panel == "resources":
+            summary_rows = list_subject_summaries("all")
+            admin_resource_types = list_resource_types(include_inactive=True)
+            admin_resource_active_types = [
+                row for row in admin_resource_types if bool(row.get("is_active"))
+            ]
+            admin_resources = list_resources(include_inactive=True)
+            admin_resource_subject_options = _build_admin_resource_subject_options(
+                summary_rows,
+                admin_resources,
+            )
+            admin_resource_upload_enabled = is_resource_upload_enabled()
         admin_sync_statuses = []
         for school_code in available_school_codes:
             school_label = school_option_catalog.get(school_code, school_code.title())
@@ -1487,6 +1581,11 @@ def register_home_routes(
             admin_student_ratings=admin_student_ratings,
             admin_attention=admin_attention,
             admin_sync_statuses=admin_sync_statuses,
+            admin_resource_types=admin_resource_types,
+            admin_resource_active_types=admin_resource_active_types,
+            admin_resources=admin_resources,
+            admin_resource_subject_options=admin_resource_subject_options,
+            admin_resource_upload_enabled=admin_resource_upload_enabled,
         )
 
     def _render_edit_student_page(student_row_id, auth_error="", admin_notice=""):
@@ -1599,6 +1698,11 @@ def register_home_routes(
                 "groups_without_teacher": [],
             },
             admin_sync_statuses=[],
+            admin_resource_types=[],
+            admin_resource_active_types=[],
+            admin_resources=[],
+            admin_resource_subject_options=[],
+            admin_resource_upload_enabled=False,
         )
 
     register_admin_routes(
@@ -1616,6 +1720,11 @@ def register_home_routes(
         update_teacher_by_id=update_teacher_by_id,
         upsert_teacher=upsert_teacher,
         delete_teacher_by_id=delete_teacher_by_id,
+        create_resource_type=create_resource_type,
+        delete_resource_type=delete_resource_type,
+        create_resource=create_resource,
+        delete_resource=delete_resource,
+        upload_resource_file=upload_resource_file,
     )
 
     register_student_routes(

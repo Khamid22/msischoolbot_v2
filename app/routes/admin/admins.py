@@ -21,6 +21,11 @@ def register_admin_routes(
     update_teacher_by_id,
     upsert_teacher,
     delete_teacher_by_id,
+    create_resource_type,
+    delete_resource_type,
+    create_resource,
+    delete_resource,
+    upload_resource_file,
 ):
     def _normalize_school_code(value):
         normalized = str(value or "").strip().casefold()
@@ -421,4 +426,115 @@ def register_admin_routes(
         return render_admin_page(
             admin_notice="Teacher deleted.",
             admin_panel="teachers",
+        )
+
+    @app.post("/admin/resources/types/add")
+    def add_resource_type():
+        if current_auth_role() != "admin":
+            return redirect(url_for("home"))
+
+        resource_type_name = request.form.get("resource_type_name", "").strip()
+        created, create_error = create_resource_type(resource_type_name)
+        if not created:
+            return (
+                render_admin_page(
+                    auth_error=create_error or "Unable to save resource type.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+
+        return render_admin_page(
+            admin_notice="Resource type saved.",
+            admin_panel="resources",
+        )
+
+    @app.post("/admin/resources/types/<int:resource_type_id>/delete")
+    def delete_resource_type_route(resource_type_id):
+        if current_auth_role() != "admin":
+            return redirect(url_for("home"))
+
+        deleted, delete_error = delete_resource_type(resource_type_id)
+        if not deleted:
+            return (
+                render_admin_page(
+                    auth_error=delete_error or "Unable to delete resource type.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+
+        return render_admin_page(
+            admin_notice="Resource type deleted.",
+            admin_panel="resources",
+        )
+
+    @app.post("/admin/resources/add")
+    def add_resource():
+        if current_auth_role() != "admin":
+            return redirect(url_for("home"))
+
+        subject_name = request.form.get("resource_subject_name", "").strip()
+        resource_type_id = request.form.get("resource_type_id", "").strip()
+        title = request.form.get("resource_title", "").strip()
+        description = request.form.get("resource_description", "").strip()
+        resource_url = request.form.get("resource_url", "").strip()
+
+        uploaded_resource = request.files.get("resource_file")
+        uploaded_file_path = ""
+        if uploaded_resource and str(uploaded_resource.filename or "").strip():
+            uploaded_file_path, upload_error = upload_resource_file(
+                uploaded_resource,
+                subject_name=subject_name,
+            )
+            if upload_error:
+                return (
+                    render_admin_page(
+                        auth_error=upload_error,
+                        admin_panel="resources",
+                    ),
+                    400,
+                )
+
+        created, create_error = create_resource(
+            subject_name=subject_name,
+            resource_type_id=resource_type_id,
+            title=title,
+            description=description,
+            resource_url=resource_url,
+            resource_file_path=uploaded_file_path,
+            created_by_admin_id=session.get("admin_id"),
+        )
+        if not created:
+            return (
+                render_admin_page(
+                    auth_error=create_error or "Unable to save resource.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+
+        return render_admin_page(
+            admin_notice="Resource saved.",
+            admin_panel="resources",
+        )
+
+    @app.post("/admin/resources/<int:resource_id>/delete")
+    def delete_resource_route(resource_id):
+        if current_auth_role() != "admin":
+            return redirect(url_for("home"))
+
+        deleted, delete_error = delete_resource(resource_id)
+        if not deleted:
+            return (
+                render_admin_page(
+                    auth_error=delete_error or "Unable to delete resource.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+
+        return render_admin_page(
+            admin_notice="Resource deleted.",
+            admin_panel="resources",
         )

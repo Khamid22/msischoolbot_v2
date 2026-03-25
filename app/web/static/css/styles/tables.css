@@ -4,6 +4,72 @@
   min-height: 0;
 }
 
+.admin-resource-types-wrap {
+  margin-top: 10px;
+  max-height: min(42vh, 360px);
+}
+
+.admin-resource-types-table {
+  min-width: 360px;
+}
+
+.admin-resource-types-table th:nth-child(1),
+.admin-resource-types-table td:nth-child(1) {
+  width: 46%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-resource-types-table th:nth-child(2),
+.admin-resource-types-table td:nth-child(2) {
+  width: 54%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-resources-table-wrap {
+  margin-top: 8px;
+  max-height: min(55vh, 520px);
+}
+
+.admin-resources-table {
+  min-width: 980px;
+}
+
+.admin-resources-table th:nth-child(1),
+.admin-resources-table td:nth-child(1) {
+  width: 56px;
+  text-align: center;
+}
+
+.admin-resources-table th:nth-child(2),
+.admin-resources-table td:nth-child(2) {
+  width: 140px;
+}
+
+.admin-resources-table th:nth-child(3),
+.admin-resources-table td:nth-child(3) {
+  width: 130px;
+}
+
+.admin-resources-table th:nth-child(4),
+.admin-resources-table td:nth-child(4) {
+  min-width: 180px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-resources-table th:nth-child(5),
+.admin-resources-table td:nth-child(5),
+.admin-resources-table th:nth-child(6),
+.admin-resources-table td:nth-child(6),
+.admin-resources-table th:nth-child(7),
+.admin-resources-table td:nth-child(7) {
+  width: 100px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .admin-panel-teachers .admin-table {
   min-width: 520px;
 }

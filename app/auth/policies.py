@@ -1,6 +1,3 @@
-"""Authorization/session policy helpers."""
-
-
 def normalize_auth_role(role):
     normalized = str(role or "").strip().casefold()
     if normalized in {"admin", "student"}:

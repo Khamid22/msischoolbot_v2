@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Subject Resources</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
+    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/base.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/dashboard.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/overlays.css', v=asset_version) }}" />
+  </head>
+  <body class="dashboard-page resources-page">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="{{ back_url }}" class="back-link" aria-label="Back to dashboard">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </a>
+        <div>
+          <h1>Subject Resources</h1>
+          <span>{{ subject_name }}</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="student-meta">
+          <strong>{{ current_student.fullName }}</strong>
+          <span>{{ current_student.group }}</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="dashboard-wrap resources-wrap">
+      <article class="chart-card">
+        <div class="card-head">
+          <h3>Resources Library</h3>
+          <p>Shared by subject, available to all enrolled students.</p>
+        </div>
+      </article>
+
+      {% if grouped_resources %}
+      {% for type_bucket in grouped_resources %}
+      <article class="chart-card resource-type-card">
+        <div class="card-head">
+          <h3>{{ type_bucket.resource_type_name }}</h3>
+          <p>{{ type_bucket.resources|length }} item{{ "s" if type_bucket.resources|length != 1 else "" }}</p>
+        </div>
+        <ul class="resource-list">
+          {% for resource in type_bucket.resources %}
+          <li class="resource-item">
+            <div class="resource-item-main">
+              <strong>{{ resource.title }}</strong>
+              {% if resource.description %}
+              <p>{{ resource.description }}</p>
+              {% endif %}
+            </div>
+            <div class="resource-item-actions">
+              {% if resource.resource_file_url %}
+              {% if resource.resource_file_kind == "video" %}
+              <button
+                type="button"
+                class="secondary-btn resource-open-btn"
+                data-video-src="{{ resource.resource_file_url }}"
+                data-video-title="{{ resource.title }}"
+              >
+                Play Video
+              </button>
+              {% else %}
+              <a
+                class="secondary-btn resource-open-btn"
+                href="{{ resource.resource_file_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open File
+              </a>
+              {% endif %}
+              {% endif %}
+              {% if resource.resource_url %}
+              <a
+                class="secondary-btn resource-open-btn"
+                href="{{ resource.resource_url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Link
+              </a>
+              {% endif %}
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
+      {% endfor %}
+      {% else %}
+      <article class="chart-card">
+        <p class="chart-empty">No resources are available for this subject yet.</p>
+      </article>
+      {% endif %}
+    </main>
+
+    <div id="resourceVideoModal" class="confirm-modal resource-video-modal" hidden>
+      <div class="confirm-modal-backdrop" data-close-resource-video="true"></div>
+      <div class="confirm-modal-card resource-video-modal-card" role="dialog" aria-modal="true" aria-labelledby="resourceVideoModalTitle">
+        <div class="resource-video-modal-head">
+          <h3 id="resourceVideoModalTitle">Video</h3>
+          <button type="button" id="resourceVideoCloseBtn" class="secondary-btn">Close</button>
+        </div>
+        <div class="resource-video-modal-body">
+          <video id="resourceVideoPlayer" class="resource-video-modal-player" controls playsinline preload="metadata"></video>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var modal = document.getElementById("resourceVideoModal");
+        var player = document.getElementById("resourceVideoPlayer");
+        var title = document.getElementById("resourceVideoModalTitle");
+        var closeBtn = document.getElementById("resourceVideoCloseBtn");
+        if (!modal || !player) return;
+
+        function closeModal() {
+          player.pause();
+          player.removeAttribute("src");
+          player.load();
+          modal.hidden = true;
+          document.body.classList.remove("has-open-modal");
+        }
+
+        function openModal(videoSrc, videoTitle) {
+          if (!videoSrc) return;
+          player.setAttribute("src", videoSrc);
+          title.textContent = videoTitle || "Video";
+          modal.hidden = false;
+          document.body.classList.add("has-open-modal");
+          player.load();
+          var playPromise = player.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(function () {});
+          }
+        }
+
+        document.querySelectorAll("[data-video-src]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            openModal(
+              String(button.getAttribute("data-video-src") || "").trim(),
+              String(button.getAttribute("data-video-title") || "").trim()
+            );
+          });
+        });
+
+        if (closeBtn) {
+          closeBtn.addEventListener("click", closeModal);
+        }
+        modal.addEventListener("click", function (event) {
+          var target = event.target;
+          if (target && target.getAttribute("data-close-resource-video") === "true") {
+            closeModal();
+          }
+        });
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape" && !modal.hidden) {
+            closeModal();
+          }
+        });
+      })();
+    </script>
+    <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
+  </body>
+</html>
