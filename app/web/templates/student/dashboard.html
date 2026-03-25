@@ -64,7 +64,8 @@
           </button>
           <nav id="profileMenu" class="profile-menu" hidden aria-label="Profile actions">
             <button type="button" id="profileMenuItem" class="profile-menu-item">Profile</button>
-            <button type="button" id="changePasswordMenuItem" class="profile-menu-item">Change Password</button>
+            <button type="button" id="ratingMenuItem" class="profile-menu-item" data-url="{{ rating_board_url }}">Rating</button>
+            <button type="button" id="resourcesMenuItem" class="profile-menu-item" data-url="{{ resources_url }}">Resources</button>
             <button type="button" id="logoutMenuItem" class="profile-menu-item">Logout</button>
           </nav>
         </div>
@@ -116,18 +117,6 @@
               {% endfor %}
             </nav>
           </div>
-
-          <a class="title-pill student-rating student-rating-btn" href="{{ rating_board_url }}" aria-label="Open subject rating board">
-            Rating
-            {% if subject_rating and subject_rating.rank %}
-            #{{ subject_rating.rank }}
-            {% else %}
-            N/A
-            {% endif %}
-          </a>
-          <a class="title-pill student-rating student-rating-btn" href="{{ resources_url }}" aria-label="Open subject resources">
-            Resources
-          </a>
         </div>
       </section>
 

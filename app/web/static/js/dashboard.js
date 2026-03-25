@@ -20,7 +20,8 @@
   const subjectMenu = document.getElementById("subjectMenu");
   const logoutMenuItem = document.getElementById("logoutMenuItem");
   const profileMenuItem = document.getElementById("profileMenuItem");
-  const changePasswordMenuItem = document.getElementById("changePasswordMenuItem");
+  const ratingMenuItem = document.getElementById("ratingMenuItem");
+  const resourcesMenuItem = document.getElementById("resourcesMenuItem");
   const logoutConfirmModal = document.getElementById("logoutConfirmModal");
   const logoutConfirmBtn = document.getElementById("logoutConfirmBtn");
   const logoutCancelBtn = document.getElementById("logoutCancelBtn");
@@ -161,10 +162,23 @@
     });
   }
 
-  if (changePasswordMenuItem) {
-    changePasswordMenuItem.addEventListener("click", function () {
+  if (ratingMenuItem) {
+    ratingMenuItem.addEventListener("click", function () {
       closeProfileMenu();
-      openPasswordModal();
+      const targetUrl = String(ratingMenuItem.getAttribute("data-url") || "").trim();
+      if (targetUrl) {
+        window.location.href = targetUrl;
+      }
+    });
+  }
+
+  if (resourcesMenuItem) {
+    resourcesMenuItem.addEventListener("click", function () {
+      closeProfileMenu();
+      const targetUrl = String(resourcesMenuItem.getAttribute("data-url") || "").trim();
+      if (targetUrl) {
+        window.location.href = targetUrl;
+      }
     });
   }
 
