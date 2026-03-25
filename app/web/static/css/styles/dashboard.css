@@ -406,11 +406,16 @@
   max-width: min(980px, 100%);
 }
 
+.resources-page .dashboard-wrap {
+  gap: 12px;
+}
+
 .resource-type-card .card-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .resource-list {
@@ -427,22 +432,30 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: 10px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 10px;
 }
 
 .resource-item-actions {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: center;
+  min-width: 132px;
+  max-width: 180px;
+}
+
+.resource-item-actions:empty {
+  display: none;
 }
 
 .resource-item-main {
   min-width: 0;
+  width: 100%;
 }
 
 .resource-item-main strong {
@@ -518,6 +531,8 @@
   font-size: 0.64rem;
   text-decoration: none;
   white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 
 /* ─── Widget Icons ─── */
@@ -873,14 +888,18 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   }
 
   .resource-item {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .resource-item-actions {
     width: 100%;
-    justify-content: stretch;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
     gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .resource-open-btn {
@@ -1151,21 +1170,38 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   }
 
   .resource-open-btn {
-    min-height: 32px;
-    padding: 5px 10px;
-    font-size: 0.6rem;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.62rem;
+  }
+
+  .resource-video-modal {
+    padding: 0;
   }
 
   .resource-video-modal-card {
-    width: min(96vw, 560px);
-    padding: 10px;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left));
+    display: flex;
+    flex-direction: column;
   }
 
   .resource-video-modal-head h3 {
     font-size: 0.82rem;
   }
 
+  .resource-video-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+  }
+
   .resource-video-modal-player {
-    max-height: min(58vh, 420px);
+    width: 100%;
+    height: 100%;
+    max-height: none;
   }
 }
