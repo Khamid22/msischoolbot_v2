@@ -1476,6 +1476,202 @@
   }
 }
 
+@media (max-width: 640px) {
+  .home-page {
+    padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  }
+
+  .home-page-admin .home-wrap {
+    max-width: 100%;
+  }
+
+  .home-page-admin .login-card,
+  .edit-profile-page .login-card {
+    padding: 14px 12px;
+    border-radius: var(--radius-lg);
+  }
+
+  .admin-sticky-header {
+    margin: 0 0 8px;
+    padding: calc(6px + var(--safe-top)) 0 8px;
+  }
+
+  .admin-sticky-header-full .admin-login-header {
+    margin-bottom: 8px;
+  }
+
+  .admin-login-header .logo-block {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 10px;
+  }
+
+  .admin-login-header .logo-block svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .admin-login-header h1 {
+    font-size: clamp(1.02rem, 5vw, 1.2rem);
+  }
+
+  .admin-login-header p {
+    margin-top: 4px;
+    font-size: 0.64rem;
+  }
+
+  .admin-main-nav {
+    gap: 4px;
+    padding-bottom: 2px;
+  }
+
+  .admin-main-nav .admin-tab-btn {
+    min-width: 74px;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 0.64rem;
+  }
+
+  .admin-logout-icon-btn {
+    width: 30px;
+    min-width: 30px;
+    min-height: 30px;
+  }
+
+  .admin-subject-controls {
+    gap: 6px;
+  }
+
+  .admin-subject-filter select {
+    min-height: 32px;
+    font-size: 0.7rem;
+    padding: 5px 9px;
+  }
+
+  .admin-info-card,
+  .admin-chart-card,
+  .admin-card {
+    padding: 10px;
+  }
+
+  .admin-info-card h3 {
+    font-size: 0.67rem;
+  }
+
+  .admin-info-subtitle {
+    font-size: 0.56rem;
+  }
+
+  .admin-mini-list li {
+    padding: 3px 0;
+    gap: 6px;
+  }
+
+  .admin-mini-list-schools li {
+    display: grid;
+    grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 8px;
+  }
+
+  .admin-mini-list-schools li > span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-mini-list-schools li > small {
+    text-align: left;
+  }
+
+  .admin-chart-card-primary,
+  .admin-chart-card-secondary {
+    height: 232px;
+  }
+
+  .admin-chart-card-primary .admin-chart-canvas-wrap {
+    height: 162px;
+    min-height: 162px;
+    max-height: 162px;
+    flex-basis: 162px;
+  }
+
+  .admin-chart-canvas-wrap {
+    height: 154px;
+  }
+
+  .admin-chart-canvas-wrap-tall {
+    height: 196px;
+  }
+
+  .admin-students-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .admin-school-filter-row {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 5px;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-school-filter-row .admin-tab-btn {
+    flex: 0 0 auto;
+  }
+
+  .admin-search-field input {
+    min-height: 38px;
+    font-size: 0.8rem;
+  }
+
+  .teacher-form-card .field span {
+    font-size: 0.56rem;
+  }
+
+  .teacher-mode-switch {
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .teacher-mode-btn {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.58rem;
+  }
+
+  .teacher-save-btn {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  .edit-profile-page .session-toolbar {
+    align-items: flex-start;
+  }
+
+  .edit-profile-page .session-toolbar-actions {
+    width: 100%;
+  }
+
+  .edit-profile-page .session-toolbar-actions .secondary-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .edit-profile-actions {
+    justify-content: stretch;
+  }
+
+  .edit-profile-save-btn {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bg-shape {
     filter: none;

@@ -298,3 +298,48 @@
 .subject-menu-item.is-current strong {
   font-weight: 800;
 }
+
+@media (max-width: 640px) {
+  .confirm-modal {
+    padding: 10px;
+  }
+
+  .confirm-modal-card {
+    max-width: 100%;
+    padding: 16px 14px;
+    border-radius: var(--radius-lg);
+  }
+
+  .confirm-modal-card h3 {
+    font-size: 0.94rem;
+  }
+
+  .confirm-modal-card p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .confirm-modal-actions {
+    flex-wrap: wrap;
+    justify-content: stretch;
+    gap: 6px;
+  }
+
+  .confirm-modal-actions .secondary-btn,
+  .confirm-modal-actions .primary-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .profile-modal-card {
+    max-height: min(84vh, 680px);
+  }
+
+  .profile-menu {
+    min-width: 132px;
+  }
+
+  .subject-menu {
+    max-width: min(72vw, 220px);
+  }
+}

@@ -1021,3 +1021,151 @@ body.rating-page.tg-miniapp .dashboard-wrap {
     height: clamp(240px, 18vw, 340px);
   }
 }
+
+@media (max-width: 640px) {
+  .topbar {
+    align-items: flex-start;
+    gap: 8px;
+    padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 8px calc(10px + var(--safe-left));
+  }
+
+  .topbar-left {
+    gap: 8px;
+  }
+
+  .topbar-left h1 {
+    font-size: 0.88rem;
+    line-height: 1.25;
+  }
+
+  .topbar-left span {
+    font-size: 0.6rem;
+  }
+
+  .topbar-right {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .back-link {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  .avatar-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 10px;
+  }
+
+  .dashboard-wrap {
+    gap: 10px;
+    padding: 12px calc(10px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  }
+
+  .student-title-block h2 {
+    font-size: clamp(0.98rem, 4.8vw, 1.2rem);
+    -webkit-line-clamp: 3;
+  }
+
+  .student-title-actions {
+    gap: 5px;
+  }
+
+  .title-pill {
+    min-width: 78px;
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 0.62rem;
+  }
+
+  .stats-grid {
+    gap: 6px;
+  }
+
+  .stat-card {
+    padding: 10px;
+  }
+
+  .stat-title {
+    font-size: 0.54rem;
+  }
+
+  .stat-card h3 {
+    margin-top: 4px;
+    font-size: clamp(0.84rem, 4.2vw, 1.08rem);
+  }
+
+  .chart-card {
+    padding: 12px;
+    border-radius: var(--radius-lg);
+  }
+
+  .card-head h3 {
+    font-size: 0.82rem;
+  }
+
+  .card-head p {
+    font-size: 0.64rem;
+  }
+
+  .chart-box,
+  .chart-box-pie,
+  .chart-box-exam {
+    margin-top: 10px;
+    min-height: 156px;
+    height: clamp(156px, 46vw, 200px);
+  }
+
+  .chart-homework-shell {
+    margin-top: 10px;
+  }
+
+  .chart-homework-yaxis {
+    width: 30px;
+    min-width: 30px;
+    flex-basis: 30px;
+  }
+
+  .chart-box-homework {
+    min-height: 184px;
+  }
+
+  .resource-type-card .card-head {
+    align-items: flex-start;
+  }
+
+  .resource-item {
+    padding: 8px;
+  }
+
+  .resource-item-main strong {
+    font-size: 0.8rem;
+  }
+
+  .resource-item-main p {
+    font-size: 0.66rem;
+  }
+
+  .resource-open-btn {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 0.6rem;
+  }
+
+  .resource-video-modal-card {
+    width: min(96vw, 560px);
+    padding: 10px;
+  }
+
+  .resource-video-modal-head h3 {
+    font-size: 0.82rem;
+  }
+
+  .resource-video-modal-player {
+    max-height: min(58vh, 420px);
+  }
+}

@@ -910,3 +910,183 @@ body.rating-page.tg-miniapp .rating-table-wrap {
     max-height: min(70vh, 820px);
   }
 }
+
+body.tg-miniapp .admin-table-wrap,
+body.tg-miniapp .rating-table-wrap,
+body.tg-miniapp .aap-table-scroll,
+body.tg-miniapp .admin-chart-table-wrap {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 768px) {
+  .home-page-admin .admin-table-wrap,
+  .rating-table-wrap,
+  .aap-table-scroll,
+  .admin-chart-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .home-page-admin .admin-table,
+  .home-page-admin .students-table {
+    min-width: 560px;
+    table-layout: auto;
+  }
+
+  .home-page-admin .teachers-table {
+    min-width: 660px;
+    table-layout: auto;
+  }
+
+  .home-page-admin .admin-resources-table {
+    min-width: 900px;
+  }
+
+  .home-page-admin .admin-resource-types-table {
+    min-width: 380px;
+  }
+
+  .home-page-admin .admin-zone-table {
+    min-width: 620px;
+    table-layout: auto;
+  }
+
+  .rating-table {
+    min-width: 860px;
+    table-layout: fixed;
+  }
+
+  .aap-table {
+    min-width: 640px;
+    table-layout: fixed;
+  }
+
+  .aap-table th,
+  .aap-table td {
+    padding: 9px 10px;
+    font-size: 0.75rem;
+  }
+
+  .home-page-admin .admin-table th,
+  .home-page-admin .admin-table td {
+    padding: 8px 7px;
+    font-size: 0.67rem;
+    line-height: 1.28;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .home-page-admin .admin-table th {
+    font-size: 0.53rem;
+  }
+
+  .students-table th:nth-child(2),
+  .students-table td:nth-child(2),
+  .students-table th:nth-child(3),
+  .students-table td:nth-child(3),
+  .students-table th:nth-child(4),
+  .students-table td:nth-child(4) {
+    min-width: 120px;
+  }
+
+  .teachers-table th:nth-child(2),
+  .teachers-table td:nth-child(2) {
+    min-width: 180px;
+  }
+
+  .teachers-table th:nth-child(4),
+  .teachers-table td:nth-child(4) {
+    min-width: 150px;
+  }
+
+  .rating-table th,
+  .rating-table td {
+    padding: 8px 8px;
+    font-size: 0.68rem;
+  }
+
+  .rating-table th {
+    font-size: 0.54rem;
+  }
+
+  .rating-table th:nth-child(2),
+  .rating-table td:nth-child(2) {
+    min-width: 220px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .rating-table th:nth-child(3),
+  .rating-table td:nth-child(3) {
+    min-width: 120px;
+    white-space: normal;
+  }
+
+  .rating-table th:first-child,
+  .rating-table td:first-child {
+    position: sticky;
+    left: 0;
+  }
+
+  .rating-table th:first-child {
+    z-index: 4;
+    background: var(--bg);
+  }
+
+  .rating-table td:first-child {
+    z-index: 1;
+    background: var(--surface);
+  }
+
+  .home-page-admin .students-table th:first-child,
+  .home-page-admin .students-table td:first-child,
+  .home-page-admin .teachers-table th:first-child,
+  .home-page-admin .teachers-table td:first-child {
+    position: sticky;
+    left: 0;
+  }
+
+  .home-page-admin .students-table th:first-child,
+  .home-page-admin .teachers-table th:first-child {
+    z-index: 4;
+    background: var(--bg);
+  }
+
+  .home-page-admin .students-table td:first-child,
+  .home-page-admin .teachers-table td:first-child {
+    z-index: 1;
+    background: var(--surface);
+  }
+}
+
+@media (max-width: 560px) {
+  .home-page-admin .admin-table,
+  .home-page-admin .students-table {
+    min-width: 520px;
+  }
+
+  .home-page-admin .teachers-table {
+    min-width: 620px;
+  }
+
+  .home-page-admin .admin-zone-table {
+    min-width: 560px;
+  }
+
+  .rating-table {
+    min-width: 820px;
+  }
+
+  .aap-table {
+    min-width: 580px;
+  }
+
+  .aap-progress-track {
+    flex-basis: 110px;
+  }
+}
