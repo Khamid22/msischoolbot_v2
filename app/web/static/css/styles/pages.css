@@ -195,14 +195,20 @@
 }
 
 .admin-main-nav .admin-tab-btn {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 78px;
   white-space: nowrap;
 }
 
 .admin-logout-form {
   margin: 0;
   flex: 0 0 auto;
+}
+
+@media (min-width: 561px) {
+  .admin-logout-form {
+    margin-left: auto;
+  }
 }
 
 .admin-logout-icon-btn {
@@ -1081,6 +1087,8 @@
   }
 
   .admin-main-nav .admin-tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
     font-size: 0.68rem;
     padding: 5px 10px;
     min-height: 32px;
