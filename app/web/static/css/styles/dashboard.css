@@ -21,6 +21,17 @@
   transition: background-color var(--transition-normal);
 }
 
+.academic-dashboard-page .topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.academic-dashboard-page .dashboard-wrap {
+  padding-top: calc(84px + var(--safe-top));
+}
+
 .topbar-left,
 .topbar-right {
   display: flex;
@@ -1207,6 +1218,10 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   .dashboard-wrap {
     padding: 24px calc(24px + var(--safe-right)) calc(48px + var(--safe-bottom)) calc(24px + var(--safe-left));
     gap: 18px;
+  }
+
+  .academic-dashboard-page .dashboard-wrap {
+    padding-top: calc(92px + var(--safe-top));
   }
 
   .chart-box {
