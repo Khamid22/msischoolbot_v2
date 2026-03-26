@@ -408,6 +408,23 @@
 
 .resources-page .dashboard-wrap {
   gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.resources-page .chart-card,
+.resources-page .resource-type-card,
+.resources-page .resource-list,
+.resources-page .resource-item,
+.resources-page .resource-item-main,
+.resources-page .resource-item-actions,
+.resources-page .resource-open-btn {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.resources-page .resource-list {
+  width: 100%;
 }
 
 .resource-type-card .card-head {
@@ -462,6 +479,8 @@
   display: block;
   font-size: 0.86rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .resource-item-main p {
@@ -469,6 +488,7 @@
   font-size: 0.72rem;
   color: var(--muted);
   line-height: 1.45;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -530,9 +550,16 @@
   padding: 6px 12px;
   font-size: 0.64rem;
   text-decoration: none;
-  white-space: nowrap;
+  white-space: normal;
   width: 100%;
   justify-content: center;
+  text-align: center;
+}
+
+.resources-page .topbar-left h1,
+.resources-page .topbar-left span {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ─── Widget Icons ─── */
@@ -888,6 +915,7 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   }
 
   .resource-item {
+    width: 100%;
     grid-template-columns: 1fr;
     gap: 8px;
   }
@@ -905,6 +933,10 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   .resource-open-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .resources-wrap {
+    max-width: 100%;
   }
 }
 
@@ -1159,6 +1191,10 @@ body.rating-page.tg-miniapp .dashboard-wrap {
 
   .resource-item {
     padding: 8px;
+  }
+
+  .resource-list {
+    gap: 6px;
   }
 
   .resource-item-main strong {
