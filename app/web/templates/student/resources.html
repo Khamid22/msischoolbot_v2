@@ -48,11 +48,21 @@
           <h3>Resources Library</h3>
           <p>Shared by subject, available to all enrolled students.</p>
         </div>
+        {% if grouped_resources %}
+        <nav class="resource-category-nav" aria-label="Jump to resource category">
+          {% for type_bucket in grouped_resources %}
+          <a href="#resource-cat-{{ loop.index }}" class="resource-category-chip">
+            <span>{{ type_bucket.resource_type_name }}</span>
+            <small>{{ type_bucket.resources|length }}</small>
+          </a>
+          {% endfor %}
+        </nav>
+        {% endif %}
       </article>
 
       {% if grouped_resources %}
       {% for type_bucket in grouped_resources %}
-      <article class="chart-card resource-type-card">
+      <article class="chart-card resource-type-card" id="resource-cat-{{ loop.index }}">
         <div class="card-head">
           <h3>{{ type_bucket.resource_type_name }}</h3>
           <p>{{ type_bucket.resources|length }} item{{ "s" if type_bucket.resources|length != 1 else "" }}</p>

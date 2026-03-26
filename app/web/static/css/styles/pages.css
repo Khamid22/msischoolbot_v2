@@ -641,12 +641,12 @@
 .admin-resources-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
   align-items: start;
 }
 
 .admin-resource-card {
-  padding: 12px 14px;
+  padding: 16px 18px;
 }
 
 .admin-resource-card .admin-card-title {
@@ -658,7 +658,7 @@
 
 .admin-resource-type-form,
 .admin-resource-form {
-  gap: 10px;
+  gap: 12px;
 }
 
 .admin-resource-local-notice {
@@ -686,11 +686,12 @@
 }
 
 .admin-resource-submit-btn {
-  min-height: 36px;
-  padding: 6px 14px;
-  font-size: 0.7rem;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 0.72rem;
   letter-spacing: 0.04em;
   align-self: flex-start;
+  margin-top: 4px;
 }
 
 .admin-resource-loading-state {
@@ -1284,6 +1285,7 @@
 
   .admin-resources-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .admin-subject-charts-grid {
@@ -1403,8 +1405,17 @@
   .home-page-admin .admin-panel-teachers {
     display: grid;
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-    gap: 12px;
+    gap: 14px;
     align-items: stretch;
+  }
+
+  .admin-resources-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .admin-resource-card {
+    padding: 14px 16px;
   }
 }
 
@@ -1470,9 +1481,17 @@
 
   .home-page-admin .admin-panel-teachers {
     display: grid;
-    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+    gap: 16px;
     align-items: stretch;
+  }
+
+  .admin-resources-grid {
+    gap: 16px;
+  }
+
+  .admin-resource-card {
+    padding: 18px 20px;
   }
 }
 
@@ -1551,7 +1570,7 @@
   .admin-info-card,
   .admin-chart-card,
   .admin-card {
-    padding: 10px;
+    padding: 12px;
   }
 
   .admin-info-card h3 {
