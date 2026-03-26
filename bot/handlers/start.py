@@ -5,7 +5,11 @@ from aiogram.filters import CommandStart
 
 from bot.keyboards.inline_keyboard import registration_keyboard, student_menu_keyboard
 from bot.settings import settings
-from app.services.auth_service import get_student_by_telegram_user_id, record_bot_user
+from app.services.auth_service import (
+    get_admin_by_telegram_user_id,
+    get_student_by_telegram_user_id,
+    record_bot_user,
+)
 
 router = Router()
 
@@ -24,6 +28,16 @@ def _linked_student_from_user(user):
         return None
 
 
+def _linked_admin_from_user(user):
+    telegram_user_id = getattr(user, "id", None)
+    if not isinstance(telegram_user_id, int):
+        return None
+    try:
+        return get_admin_by_telegram_user_id(telegram_user_id)
+    except Exception:
+        return None
+
+
 @router.message(CommandStart())
 async def start_handler(message, state):
     # Clear any pending FSM state when user starts over.
@@ -35,6 +49,20 @@ async def start_handler(message, state):
     except Exception:
         # Do not fail /start if SQLite write has an issue.
         pass
+
+    linked_admin = _linked_admin_from_user(message.from_user)
+    if linked_admin:
+        admin_login = str(linked_admin.get("login", "")).strip()
+        admin_role = str(linked_admin.get("role", "admin")).strip() or "admin"
+        admin_line = f"Login: <b>{_escape(admin_login)}</b>\n" if admin_login else ""
+        await message.answer(
+            "🛡️ <b>Admin status: active</b>\n\n"
+            f"{admin_line}"
+            f"Role: <b>{_escape(admin_role)}</b>\n\n"
+            "Use the mini app to open the admin panel.",
+            reply_markup=registration_keyboard(settings.mini_app_url),
+        )
+        return
 
     linked_student = _linked_student_from_user(message.from_user)
     if not linked_student:

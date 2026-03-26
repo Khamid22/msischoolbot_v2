@@ -21,6 +21,7 @@ def register_student_routes(
     sync_students_if_needed,
     load_dataset,
     link_student_telegram_user,
+    link_admin_telegram_user,
     change_student_password,
     unlink_student_telegram_user,
     is_full_form,
@@ -118,6 +119,20 @@ def register_student_routes(
                     auth_error="Invalid admin credentials.",
                     auth_login_input=login_value,
                 ), 401
+
+            telegram_user_id = parse_telegram_user_id(
+                request.form.get("telegram_user_id")
+            )
+            if telegram_user_id is not None:
+                linked = link_admin_telegram_user(
+                    int(admin["id"]),
+                    telegram_user_id,
+                )
+                if not linked:
+                    return render_login_page(
+                        auth_error="Unable to link Telegram account for this admin login.",
+                        auth_login_input=login_value,
+                    ), 500
 
             set_admin_session(admin)
             return redirect(url_for("home"))

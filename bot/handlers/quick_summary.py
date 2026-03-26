@@ -3,7 +3,10 @@ import math
 
 from aiogram import F, Router
 
-from app.services.auth_service import get_student_by_telegram_user_id
+from app.services.auth_service import (
+    get_admin_by_telegram_user_id,
+    get_student_by_telegram_user_id,
+)
 from app.services.dataset_service import load_all_schools_dataset
 from app.services.subject_summary_service import get_subject_summaries_for_student
 
@@ -24,6 +27,16 @@ def _linked_student_from_user(user):
         return None
 
 
+def _linked_admin_from_user(user):
+    telegram_user_id = getattr(user, "id", None)
+    if not isinstance(telegram_user_id, int):
+        return None
+    try:
+        return get_admin_by_telegram_user_id(telegram_user_id)
+    except Exception:
+        return None
+
+
 def _round_grade_half_up(value):
     try:
         numeric = float(value)
@@ -36,6 +49,13 @@ def _round_grade_half_up(value):
 
 @router.callback_query(F.data == "student_quick_summary")
 async def quick_summary_callback(query):
+    if _linked_admin_from_user(query.from_user):
+        await query.answer(
+            "This quick summary is available only for student accounts.",
+            show_alert=True,
+        )
+        return
+
     linked_student = _linked_student_from_user(query.from_user)
     if not linked_student:
         await query.answer(

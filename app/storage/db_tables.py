@@ -7,6 +7,7 @@ def create_tables(conn):
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'admin',
             is_owner INTEGER NOT NULL DEFAULT 0 CHECK (is_owner IN (0, 1)),
+            telegram_user_id INTEGER,
             created_at TEXT NOT NULL
         )
         """
@@ -243,6 +244,23 @@ def ensure_students_schema(conn):
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_students_telegram_user_id
         ON students(telegram_user_id)
+        WHERE telegram_user_id IS NOT NULL
+        """
+    )
+
+
+def ensure_admins_schema(conn):
+    columns = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(admins)").fetchall()
+    }
+    if "telegram_user_id" not in columns:
+        conn.execute("ALTER TABLE admins ADD COLUMN telegram_user_id INTEGER")
+
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_telegram_user_id
+        ON admins(telegram_user_id)
         WHERE telegram_user_id IS NOT NULL
         """
     )
@@ -729,6 +747,7 @@ def ensure_resources_schema(conn):
 
 __all__ = [
     "create_tables",
+    "ensure_admins_schema",
     "ensure_students_schema",
     "ensure_students_sheet_map_schema",
     "ensure_lesson_catalog_schema",

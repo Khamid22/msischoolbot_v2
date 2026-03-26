@@ -50,6 +50,7 @@ def init_storage():
             return
         with _connect() as conn:
             queries.create_tables(conn)
+            queries.ensure_admins_schema(conn)
             _ensure_students_schema(conn)
             queries.ensure_lesson_catalog_schema(conn)
             queries.ensure_subject_summaries_schema(conn)
@@ -860,6 +861,11 @@ def link_student_telegram_user(student_row_id, telegram_user_id):
                 telegram_user_id,
                 student_row_id,
             )
+            # Student/admin link is mutually exclusive for one Telegram account.
+            queries.clear_admin_telegram_user_conflicts(
+                conn,
+                telegram_user_id,
+            )
             queries.update_student_telegram_user(
                 conn,
                 telegram_user_id,
@@ -867,6 +873,58 @@ def link_student_telegram_user(student_row_id, telegram_user_id):
             )
             conn.commit()
     return True
+
+
+def link_admin_telegram_user(admin_id, telegram_user_id):
+    if not isinstance(admin_id, int) or admin_id <= 0:
+        return False
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return False
+
+    init_storage()
+
+    with _DB_LOCK:
+        with _connect() as conn:
+            admin_exists = queries.get_admin_row_by_id(conn, admin_id)
+            if not admin_exists:
+                return False
+
+            # Student/admin link is mutually exclusive for one Telegram account.
+            queries.clear_student_telegram_user_conflicts(
+                conn,
+                telegram_user_id,
+                -1,
+            )
+            queries.clear_admin_telegram_user_conflicts(
+                conn,
+                telegram_user_id,
+                admin_id,
+            )
+            queries.update_admin_telegram_user(
+                conn,
+                telegram_user_id,
+                admin_id,
+            )
+            conn.commit()
+    return True
+
+
+def get_admin_by_telegram_user_id(telegram_user_id):
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return None
+
+    init_storage()
+    with _connect() as conn:
+        row = queries.get_admin_by_telegram_id(conn, telegram_user_id)
+
+    if not row:
+        return None
+    return {
+        "id": int(row["id"]),
+        "login": str(row["login"]),
+        "role": str(row["role"]),
+        "is_owner": bool(row["is_owner"]),
+    }
 
 
 def unlink_student_telegram_user(student_row_id):
