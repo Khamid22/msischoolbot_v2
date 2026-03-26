@@ -71,23 +71,24 @@
           {% for resource in type_bucket.resources %}
           <li class="resource-item">
             <div class="resource-item-main">
+              {% if resource.resource_file_url and resource.resource_file_kind == "video" %}
+              <button
+                type="button"
+                class="resource-title-btn"
+                data-video-src="{{ resource.resource_file_url }}"
+                data-video-title="{{ resource.title }}"
+              >
+                {{ resource.title }}
+              </button>
+              {% else %}
               <strong>{{ resource.title }}</strong>
+              {% endif %}
               {% if resource.description %}
               <p>{{ resource.description }}</p>
               {% endif %}
             </div>
             <div class="resource-item-actions">
-              {% if resource.resource_file_url %}
-              {% if resource.resource_file_kind == "video" %}
-              <button
-                type="button"
-                class="secondary-btn resource-open-btn"
-                data-video-src="{{ resource.resource_file_url }}"
-                data-video-title="{{ resource.title }}"
-              >
-                Play Video
-              </button>
-              {% else %}
+              {% if resource.resource_file_url and resource.resource_file_kind != "video" %}
               <a
                 class="secondary-btn resource-open-btn"
                 href="{{ resource.resource_file_url }}"
@@ -96,7 +97,6 @@
               >
                 Open File
               </a>
-              {% endif %}
               {% endif %}
               {% if resource.resource_url %}
               <a

@@ -406,6 +406,10 @@
   max-width: min(980px, 100%);
 }
 
+.resources-page {
+  overflow-x: hidden;
+}
+
 .resources-page .dashboard-wrap {
   gap: 16px;
   min-width: 0;
@@ -418,7 +422,8 @@
 .resources-page .resource-item,
 .resources-page .resource-item-main,
 .resources-page .resource-item-actions,
-.resources-page .resource-open-btn {
+.resources-page .resource-open-btn,
+.resources-page .resource-title-btn {
   min-width: 0;
   max-width: 100%;
 }
@@ -513,6 +518,37 @@
   word-break: break-word;
 }
 
+.resource-title-btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.resource-title-btn:hover {
+  text-decoration: underline;
+}
+
+.resource-title-btn:active {
+  opacity: 0.8;
+}
+
+.resource-title-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .resource-item-main p {
   margin-top: 4px;
   font-size: 0.74rem;
@@ -591,6 +627,15 @@
 .resources-page .topbar-left span {
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.resources-page .topbar-left {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.resources-page .topbar-left > div {
+  min-width: 0;
 }
 
 /* ─── Widget Icons ─── */
@@ -1030,16 +1075,32 @@ body.rating-page.tg-miniapp .dashboard-wrap {
     max-width: 100%;
     min-width: 0;
     justify-content: flex-start;
-    gap: 8px;
-    flex-direction: row;
+    gap: 6px;
+    flex-direction: column;
     align-items: stretch;
   }
 
   .resource-open-btn {
-    flex: 1 1 0;
+    flex: 1 1 auto;
     min-height: 38px;
     padding: 8px 12px;
     font-size: 0.66rem;
+    width: 100%;
+  }
+
+  .resources-page .dashboard-wrap {
+    padding: 12px calc(10px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(10px + var(--safe-left));
+    gap: 12px;
+  }
+
+  .resources-page .chart-card,
+  .resources-page .resource-type-card {
+    padding: 12px;
+  }
+
+  .resource-title-btn,
+  .resource-item-main strong {
+    font-size: 0.8rem;
   }
 
   .resource-list {
@@ -1066,6 +1127,7 @@ body.rating-page.tg-miniapp .dashboard-wrap {
     width: 100vw;
     max-width: 100vw;
     height: 100dvh;
+    box-sizing: border-box;
     border-radius: 0;
     padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left));
     display: flex;
@@ -1321,11 +1383,18 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   .resource-category-chip {
     padding: 6px 11px;
     font-size: 0.68rem;
+    max-width: 100%;
   }
 
   .resource-category-chip small {
     min-width: 18px;
     height: 18px;
     font-size: 0.58rem;
+  }
+
+  .resource-category-chip span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
