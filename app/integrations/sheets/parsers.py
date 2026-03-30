@@ -258,7 +258,9 @@ def build_homework_column_meta(
     lesson_topic_row,
     lesson_date_row,
 ):
-    max_columns = len(lesson_number_row) if lesson_number_row else 0
+    # Use full row width so trailing score columns are not dropped when
+    # header rows are shorter than student rows.
+    max_columns = max((len(row) for row in rows), default=0)
     if is_sehriyo_chemistry_group(group):
         return build_sehriyo_chemistry_homework_column_meta(
             rows,
