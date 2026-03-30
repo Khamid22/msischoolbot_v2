@@ -1,2 +1,0 @@
-# Keep a single source of dependencies in the project root.
--r ../requirements.txt

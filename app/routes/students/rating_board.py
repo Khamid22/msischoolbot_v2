@@ -1,8 +1,10 @@
-from flask import render_template, request, session, url_for
+from flask import render_template, request, url_for
+
+from app.routes.students.services import payload_service
 
 
 def register_rating_board_routes(
-    app,
+    students,
     *,
     load_dashboard_payload,
     collect_subject_dashboards_from_dataset,
@@ -11,84 +13,36 @@ def register_rating_board_routes(
     seed_group_cache_from_dataset,
     build_subject_leaderboard,
 ):
-    def _normalize_text(value):
-        return " ".join(str(value or "").strip().casefold().split())
-
-    def _current_auth_role():
-        return str(session.get("auth_role", "")).strip().lower()
-
-    def _current_student_sheet_id():
-        raw_value = session.get("student_sheet_id")
-        try:
-            return int(raw_value)
-        except (TypeError, ValueError):
-            return None
-
-    def _current_student_full_name():
-        return str(session.get("student_full_name", "")).strip()
-
     def _should_force_refresh():
         return False
 
-    def _is_student_owner_of_payload(student_id, payload):
-        own_full_name = _normalize_text(_current_student_full_name())
-        if own_full_name:
-            payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
-            payload_full_name = _normalize_text(payload_student.get("fullName", ""))
-            return bool(payload_full_name) and payload_full_name == own_full_name
-
-        own_sheet_student_id = _current_student_sheet_id()
-        return own_sheet_student_id is not None and int(student_id) == own_sheet_student_id
-
-    @app.get("/dashboard/<int:student_id>/rating-board")
+    @students.get("/dashboard/<int:student_id>/rating-board")
     def rating_board(student_id):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
         force_refresh = _should_force_refresh()
 
-        payload, dataset, payload_error = load_dashboard_payload(
+        payload, dataset, error_message, status_code = payload_service.load_student_payload_for_view(
             student_id=student_id,
             requested_subject=requested_subject,
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
+            load_dashboard_payload=load_dashboard_payload,
+            missing_message=(
+                "We could not retrieve data for this student. Please search again."
+            ),
+            session_invalid_message="Student session is invalid. Please login again.",
+            forbidden_message="Access denied: you can open only your own rating board.",
         )
-        if payload_error:
+        if error_message:
             return (
                 render_template(
                     "student/not_found.html",
-                    message=payload_error,
+                    message=error_message,
                 ),
-                503,
-            )
-
-        if not payload:
-            return (
-                render_template(
-                    "student/not_found.html",
-                    message="We could not retrieve data for this student. Please search again.",
-                ),
-                404,
-            )
-
-        if _current_auth_role() == "student" and not _is_student_owner_of_payload(
-            student_id, payload
-        ):
-            if not _current_student_sheet_id() and not _current_student_full_name():
-                return (
-                    render_template(
-                        "student/not_found.html",
-                        message="Student session is invalid. Please login again.",
-                    ),
-                    401,
-                )
-            return (
-                render_template(
-                    "student/not_found.html",
-                    message="Access denied: you can open only your own rating board.",
-                ),
-                403,
+                status_code,
             )
 
         student = payload.get("student", {})
@@ -138,7 +92,7 @@ def register_rating_board_routes(
             None,
         )
         back_url = url_for(
-            "dashboard",
+            "student.dashboard",
             student_id=student_id,
             subject=requested_subject or subject_name,
             group=requested_group or str(student.get("group", "")).strip(),

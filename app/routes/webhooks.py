@@ -1,37 +1,18 @@
 import hmac
 import os
 
-from flask import jsonify, request
+from flask import Blueprint, jsonify, request
 
-try:
-    from ..config.schools import get_configured_school_spreadsheets
-except ImportError:
-    from app.config.schools import get_configured_school_spreadsheets
-
-try:
-    from ..integrations.sheets_data import mark_school_dataset_dirty
-except ImportError:
-    from app.integrations.sheets_data import mark_school_dataset_dirty
-
-try:
-    from ..services.auth_service import sync_students_if_needed
-except ImportError:
-    from app.services.auth_service import sync_students_if_needed
-
-try:
-    from ..services.dataset_service import SheetsDataError, load_all_schools_dataset
-except ImportError:
-    from app.services.dataset_service import SheetsDataError, load_all_schools_dataset
-
-try:
-    from ..services.lesson_catalog_service import sync_lesson_catalog_if_needed
-except ImportError:
-    from app.services.lesson_catalog_service import sync_lesson_catalog_if_needed
-
-try:
-    from ..services.subject_summary_service import sync_subject_summaries_if_needed
-except ImportError:
-    from app.services.subject_summary_service import sync_subject_summaries_if_needed
+from app.config.schools import get_configured_school_spreadsheets
+from app.extensions import csrf
+from app.integrations.sheets_data import mark_school_dataset_dirty
+from app.routes.students.services import (
+    auth_service,
+    dataset_service,
+    lesson_catalog_service,
+    normalization_service,
+    subject_summary_service,
+)
 
 
 def register_webhook_routes(
@@ -40,13 +21,7 @@ def register_webhook_routes(
     load_dataset,
     clear_group_cache,
 ):
-    def _normalize_school_code(value):
-        normalized = str(value or "").strip().casefold()
-        if normalized in {"school_5", "school-5", "school 5", "school5"}:
-            return "school5"
-        if normalized in {"sehriyo", "sehriyo school"}:
-            return "sehriyo"
-        return normalized
+    webhook_blueprint = Blueprint("webhooks", __name__)
 
     def _split_csv(value):
         text = str(value or "").strip()
@@ -65,7 +40,7 @@ def register_webhook_routes(
         resolved_codes = []
 
         def _add_school_code(raw_value):
-            code = _normalize_school_code(raw_value)
+            code = normalization_service.normalize_school_code(raw_value)
             if code and code in configured_map and code not in resolved_codes:
                 resolved_codes.append(code)
 
@@ -127,16 +102,18 @@ def register_webhook_routes(
             return False, "Webhook token is invalid."
         return True, ""
 
-    def _load_all_schools_from_cache(force_refresh = False):
+    def _load_all_schools_from_cache(force_refresh=False):
+        _ = force_refresh
         # Keep existing in-memory data for schools that were not changed by this webhook.
         try:
-            return load_all_schools_dataset(force_refresh=False), ""
-        except SheetsDataError as exc:
+            return dataset_service.load_all_schools_dataset(force_refresh=False), ""
+        except dataset_service.SheetsDataError as exc:
             return None, str(exc)
         except Exception as exc:
             return None, str(exc)
 
-    @app.post("/webhooks/google-sheets")
+    @webhook_blueprint.post("/webhooks/google-sheets")
+    @csrf.exempt
     def google_sheets_webhook():
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
@@ -165,7 +142,7 @@ def register_webhook_routes(
         students_sync_results = {}
         webhook_errors = []
         for school_code in target_school_codes:
-            sync_result = sync_students_if_needed(
+            sync_result = auth_service.sync_students_if_needed(
                 load_dataset,
                 school_code=school_code,
                 force_refresh=True,
@@ -180,7 +157,7 @@ def register_webhook_routes(
             if sync_error:
                 webhook_errors.append(f"{school_code}: {sync_error}")
 
-        summary_sync_result = sync_subject_summaries_if_needed(
+        summary_sync_result = subject_summary_service.sync_subject_summaries_if_needed(
             _load_all_schools_from_cache,
             force_refresh=True,
         )
@@ -188,7 +165,7 @@ def register_webhook_routes(
         if summary_sync_error:
             webhook_errors.append(f"subject_summaries: {summary_sync_error}")
 
-        lesson_sync_result = sync_lesson_catalog_if_needed(
+        lesson_sync_result = lesson_catalog_service.sync_lesson_catalog_if_needed(
             _load_all_schools_from_cache,
             force_refresh=True,
         )
@@ -217,3 +194,5 @@ def register_webhook_routes(
             ),
             200 if not webhook_errors else 207,
         )
+
+    app.register_blueprint(webhook_blueprint)

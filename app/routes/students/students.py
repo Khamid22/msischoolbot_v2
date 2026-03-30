@@ -1,210 +1,71 @@
 from flask import jsonify, redirect, request, session, url_for
 
+from app.auth.forms import StudentPasswordChangeForm
+from app.routes.students.services.auth_service import change_student_password
+from app.routes.students.services.session_state_service import (
+    build_dashboard_url,
+    current_auth_role,
+    current_student_db_id,
+    current_student_school_code,
+    current_student_sheet_id,
+)
+
 
 def register_student_routes(
-    app,
+    students,
     *,
-    current_auth_role,
-    current_student_sheet_id,
-    current_student_db_id,
-    parse_telegram_user_id,
-    set_admin_session,
-    set_student_session,
-    try_auto_login_student_by_telegram,
-    build_dashboard_url,
-    render_login_page,
-    render_admin_page,
-    get_teacher_by_id,
-    detect_login_role,
-    verify_admin_credentials,
-    verify_student_credentials,
-    sync_students_if_needed,
     load_dataset,
-    link_student_telegram_user,
-    link_admin_telegram_user,
-    change_student_password,
-    unlink_student_telegram_user,
     is_full_form,
     render_student_panel,
     get_group_cache_entry,
     build_students_by_subject_group,
     search_student,
 ):
-    def _normalize_school_code(value):
-        normalized = str(value or "").strip().casefold()
-        if normalized in {"school_5", "school-5", "school 5", "school5"}:
-            return "school5"
-        if normalized in {"sehriyo", "sehriyo school"}:
-            return "sehriyo"
-        return normalized
+    student_only_endpoints = {
+        "student.profile_change_password",
+        "student.search_student_form",
+    }
 
-    def _current_student_school_code():
-        return _normalize_school_code(session.get("student_school_code", ""))
+    @students.before_request
+    def ensure_student_role_for_student_actions():
+        endpoint = str(request.endpoint or "").strip()
+        if endpoint not in student_only_endpoints:
+            return None
+        if current_auth_role() == "student":
+            return None
+        return redirect(url_for("student.home"))
 
-    @app.get("/")
-    def home():
-        role = current_auth_role()
-
-        if role == "admin":
-            panel_arg = str(request.args.get("panel", "")).strip().lower()
-            school_arg = str(request.args.get("school", "")).strip().lower()
-            saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
-            saved_school = str(session.get("admin_last_school", "all")).strip().lower()
-
-            panel = panel_arg or saved_panel or "overview"
-            school_filter = school_arg or saved_school or "all"
-            edit_teacher_id = request.args.get("edit_teacher_id", "").strip()
-            selected_teacher_edit = None
-            if panel == "teachers" and edit_teacher_id:
-                try:
-                    parsed_teacher_id = int(edit_teacher_id)
-                except ValueError:
-                    parsed_teacher_id = 0
-                if parsed_teacher_id > 0:
-                    selected_teacher_edit = get_teacher_by_id(parsed_teacher_id)
-            return render_admin_page(
-                admin_panel=panel,
-                admin_teacher_edit=selected_teacher_edit,
-                admin_school=school_filter,
-            )
-
-        if role == "student":
-            own_sheet_student_id = current_student_sheet_id()
-            if own_sheet_student_id is None:
-                session.clear()
-                return render_login_page(
-                    auth_error="Student session is invalid. Please login again.",
-                ), 401
-            return redirect(build_dashboard_url(own_sheet_student_id))
-
-        auto_login_allowed = request.args.get("logged_out", "").strip() != "1"
-        telegram_user_id = parse_telegram_user_id(request.args.get("tg_user_id"))
-        if (
-            auto_login_allowed
-            and telegram_user_id
-            and try_auto_login_student_by_telegram(telegram_user_id)
-        ):
-            own_sheet_student_id = current_student_sheet_id()
-            if own_sheet_student_id is not None:
-                return redirect(
-                    build_dashboard_url(
-                        own_sheet_student_id,
-                    )
-                )
-
-        return render_login_page()
-
-    @app.post("/login")
-    def login():
-        login_value = request.form.get("login", "").strip()
-        password_value = request.form.get("password", "").strip()
-
-        if not login_value or not password_value:
-            return render_login_page(
-                auth_error="Please enter both login and password.",
-                auth_login_input=login_value,
-            ), 400
-
-        role_hint = detect_login_role(login_value)
-        if not role_hint:
-            return render_login_page(
-                auth_error="Login must start with Staff#####, MSI#####, or MSIS#####.",
-                auth_login_input=login_value,
-            ), 400
-
-        if role_hint == "admin":
-            admin = verify_admin_credentials(login_value, password_value)
-            if not admin:
-                return render_login_page(
-                    auth_error="Invalid admin credentials.",
-                    auth_login_input=login_value,
-                ), 401
-
-            telegram_user_id = parse_telegram_user_id(
-                request.form.get("telegram_user_id")
-            )
-            if telegram_user_id is not None:
-                linked = link_admin_telegram_user(
-                    int(admin["id"]),
-                    telegram_user_id,
-                )
-                if not linked:
-                    return render_login_page(
-                        auth_error="Unable to link Telegram account for this admin login.",
-                        auth_login_input=login_value,
-                    ), 500
-
-            set_admin_session(admin)
-            return redirect(url_for("home"))
-
-        normalized_login = login_value.strip().casefold()
-        school_code = "sehriyo" if normalized_login.startswith("msis") else "school5"
-        sync_result = sync_students_if_needed(
-            load_dataset,
-            school_code=school_code,
-        )
-        sync_error = str(sync_result.get("error", "")).strip()
-        if sync_error:
-            return render_login_page(
-                auth_error=sync_error,
-                auth_login_input=login_value,
-            ), 503
-
-        student = verify_student_credentials(login_value, password_value)
-        if not student:
-            return render_login_page(
-                auth_error="Invalid student credentials.",
-                auth_login_input=login_value,
-            ), 401
-
-        telegram_user_id = parse_telegram_user_id(
-            request.form.get("telegram_user_id")
-        )
-        if telegram_user_id is None:
-            return render_login_page(
-                auth_error="Student authentication is available only through the Telegram mini app.",
-                auth_login_input=login_value,
-            ), 401
-
-        linked = link_student_telegram_user(
-            int(student["id"]),
-            telegram_user_id,
-        )
-        if not linked:
-            return render_login_page(
-                auth_error="Unable to link Telegram account. Please try again from the mini app.",
-                auth_login_input=login_value,
-            ), 500
-
-        if not set_student_session(student, telegram_user_id):
-            return render_login_page(
-                auth_error="Unable to initialize student session.",
-                auth_login_input=login_value,
-            ), 500
-        return redirect(
-            build_dashboard_url(
-                student["sheet_student_id"],
-                school=student.get("school_code", ""),
-            )
-        )
-
-    @app.post("/profile/password")
+    @students.post("/profile/password")
     def profile_change_password():
-        if current_auth_role() != "student":
-            return redirect(url_for("home"))
-
+        password_form = StudentPasswordChangeForm()
         student_db_id = current_student_db_id()
         student_sheet_id = current_student_sheet_id()
         if student_db_id is None or student_sheet_id is None:
             session.clear()
-            return redirect(url_for("home"))
+            return redirect(url_for("student.home"))
 
         subject = request.form.get("subject", "").strip()
         group = request.form.get("group", "").strip()
 
-        current_password_value = request.form.get("current_password", "")
-        new_password_value = request.form.get("new_password", "")
-        confirm_password_value = request.form.get("confirm_password", "")
+        if not password_form.validate_on_submit():
+            if password_form.csrf_token.errors:
+                profile_error = (
+                    "Form security token is missing or invalid. Please refresh and try again."
+                )
+            else:
+                profile_error = "Please fill all password fields."
+            return redirect(
+                build_dashboard_url(
+                    student_sheet_id,
+                    subject=subject,
+                    group=group,
+                    profile_error=profile_error,
+                )
+            )
+
+        current_password_value = str(password_form.current_password.data or "")
+        new_password_value = str(password_form.new_password.data or "")
+        confirm_password_value = str(password_form.confirm_password.data or "")
 
         if new_password_value != confirm_password_value:
             return redirect(
@@ -240,20 +101,8 @@ def register_student_routes(
             )
         )
 
-    @app.post("/logout")
-    def logout():
-        if current_auth_role() == "student":
-            student_db_id = current_student_db_id()
-            if student_db_id is not None:
-                unlink_student_telegram_user(student_db_id)
-        session.clear()
-        return redirect(url_for("home", logged_out=1))
-
-    @app.post("/search")
+    @students.post("/search")
     def search_student_form():
-        if current_auth_role() != "student":
-            return redirect(url_for("home"))
-
         form_data = {
             "student_id": request.form.get("student_id", "").strip(),
             "group": request.form.get("group", "").strip(),
@@ -274,7 +123,7 @@ def register_student_routes(
                 panel_error="Please choose a valid student from the list.",
             ), 400
 
-        school_code = _current_student_school_code()
+        school_code = current_student_school_code()
         group_cache_entry, cache_error = get_group_cache_entry(
             form_data["subject"],
             form_data["group"],
@@ -290,7 +139,7 @@ def register_student_routes(
             }
             if school_code:
                 route_params["school"] = school_code
-            return redirect(url_for("dashboard", **route_params))
+            return redirect(url_for("student.dashboard", **route_params))
 
         if school_code:
             dataset, load_error = load_dataset(school_code=school_code)
@@ -309,9 +158,9 @@ def register_student_routes(
             panel_error="Student not found. Please check your details.",
         ), 404
 
-    @app.get("/api/metadata")
+    @students.get("/api/metadata")
     def api_metadata():
-        school_code = _current_student_school_code()
+        school_code = current_student_school_code()
         if school_code:
             dataset, load_error = load_dataset(school_code=school_code)
         else:
@@ -332,7 +181,7 @@ def register_student_routes(
             }
         )
 
-    @app.get("/api/students/search")
+    @students.get("/api/students/search")
     def api_search_student():
         surname = request.args.get("surname", "").strip()
         name = request.args.get("name", "").strip()
@@ -342,7 +191,7 @@ def register_student_routes(
         if not all([surname, name, group, subject]):
             return jsonify({"message": "All fields are required."}), 400
 
-        school_code = _current_student_school_code()
+        school_code = current_student_school_code()
         if school_code:
             dataset, load_error = load_dataset(school_code=school_code)
         else:

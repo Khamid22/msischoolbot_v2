@@ -1,0 +1,155 @@
+/* ─── Extra Small Screen Compression ─── */
+@media (max-width: 560px) {
+  .dashboard-page .topbar {
+    gap: 8px;
+    padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 8px calc(10px + var(--safe-left));
+  }
+
+  .dashboard-page .topbar-left {
+    gap: 8px;
+  }
+
+  .dashboard-page .topbar-left h1 {
+    font-size: 0.84rem;
+    line-height: 1.15;
+  }
+
+  .dashboard-page .topbar-left span {
+    font-size: 0.58rem;
+    line-height: 1.1;
+  }
+
+  .dashboard-page .back-link,
+  .dashboard-page .avatar-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 10px;
+  }
+
+  .dashboard-page .dashboard-wrap {
+    gap: 10px;
+    padding: 10px calc(10px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  }
+
+  .academic-dashboard-page .dashboard-wrap {
+    padding-top: calc(72px + var(--safe-top));
+  }
+
+  .dashboard-page .chart-card,
+  .dashboard-page .stat-card {
+    padding: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .dashboard-page .card-head {
+    gap: 6px;
+  }
+
+  .dashboard-page .card-head h3 {
+    font-size: 0.78rem;
+  }
+
+  .dashboard-page .card-head p {
+    font-size: 0.58rem;
+  }
+
+  .dashboard-page .stat-title {
+    font-size: 0.5rem;
+  }
+
+  .dashboard-page .stat-card h3 {
+    margin-top: 4px;
+    font-size: clamp(0.82rem, 3.8vw, 1rem);
+  }
+
+  .dashboard-page .stat-note {
+    font-size: 0.5rem;
+  }
+
+  .resources-page .resource-item {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .resources-page .resource-item-main p {
+    margin-top: 3px;
+    font-size: 0.64rem;
+  }
+
+  .resources-page .resource-title-btn,
+  .resources-page .resource-item-main strong {
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+
+  .resources-page .resource-open-btn {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 0.62rem;
+  }
+
+  .resources-page .resource-category-chip {
+    padding: 5px 9px;
+    font-size: 0.62rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-page .topbar {
+    padding: calc(7px + var(--safe-top)) calc(8px + var(--safe-right)) 7px calc(8px + var(--safe-left));
+  }
+
+  .dashboard-page .topbar-left h1 {
+    font-size: 0.78rem;
+  }
+
+  .dashboard-page .topbar-left span {
+    font-size: 0.54rem;
+  }
+
+  .dashboard-page .dashboard-wrap {
+    gap: 8px;
+    padding: 8px calc(8px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  }
+
+  .academic-dashboard-page .dashboard-wrap {
+    padding-top: calc(66px + var(--safe-top));
+  }
+
+  .dashboard-page .chart-card,
+  .dashboard-page .stat-card {
+    padding: 8px;
+  }
+
+  .dashboard-page .card-head h3 {
+    font-size: 0.72rem;
+  }
+
+  .dashboard-page .card-head p {
+    font-size: 0.54rem;
+  }
+
+  .dashboard-page .stat-title {
+    font-size: 0.46rem;
+  }
+
+  .resources-page .resource-item {
+    padding: 7px;
+  }
+
+  .resources-page .resource-title-btn,
+  .resources-page .resource-item-main strong {
+    font-size: 0.71rem;
+  }
+
+  .resources-page .resource-item-main p {
+    font-size: 0.6rem;
+  }
+
+  .resources-page .resource-open-btn {
+    min-height: 32px;
+    font-size: 0.58rem;
+  }
+}

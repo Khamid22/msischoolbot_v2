@@ -2,15 +2,8 @@
 
 from typing import Any
 
-try:
-    from ..config.schools import DEFAULT_SCHOOL_CODE, get_configured_school_spreadsheets
-except ImportError:
-    from app.config.schools import DEFAULT_SCHOOL_CODE, get_configured_school_spreadsheets
-
-try:
-    from ..integrations.sheets_data import SheetsDataError, get_school_dataset
-except ImportError:
-    from app.integrations.sheets_data import SheetsDataError, get_school_dataset
+from app.config.schools import DEFAULT_SCHOOL_CODE, get_configured_school_spreadsheets
+from app.integrations.sheets_data import SheetsDataError, get_school_dataset
 
 
 def _merge_datasets(datasets):

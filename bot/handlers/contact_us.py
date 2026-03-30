@@ -11,7 +11,7 @@ from bot.keyboards.inline_keyboard import (
     contact_targets_keyboard,
     reply_to_student_keyboard,
 )
-from app.services.auth_service import get_student_by_telegram_user_id
+from app.routes.students.services.auth_service import get_student_by_telegram_user_id
 
 router = Router()
 

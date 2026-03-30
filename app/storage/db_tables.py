@@ -105,6 +105,7 @@ def create_tables(conn):
             subject_name TEXT NOT NULL,
             subject_key TEXT NOT NULL DEFAULT '',
             resource_type_id INTEGER NOT NULL,
+            folder_path TEXT NOT NULL DEFAULT '',
             title TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
             resource_url TEXT NOT NULL DEFAULT '',
@@ -603,6 +604,7 @@ def ensure_resources_schema(conn):
             subject_name TEXT NOT NULL,
             subject_key TEXT NOT NULL DEFAULT '',
             resource_type_id INTEGER NOT NULL,
+            folder_path TEXT NOT NULL DEFAULT '',
             title TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
             resource_url TEXT NOT NULL DEFAULT '',
@@ -677,6 +679,10 @@ def ensure_resources_schema(conn):
             conn.execute(
                 "ALTER TABLE resources ADD COLUMN subject_key TEXT NOT NULL DEFAULT ''"
             )
+        if "folder_path" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN folder_path TEXT NOT NULL DEFAULT ''"
+            )
         if "description" not in resource_columns:
             conn.execute(
                 "ALTER TABLE resources ADD COLUMN description TEXT NOT NULL DEFAULT ''"
@@ -708,6 +714,17 @@ def ensure_resources_schema(conn):
             UPDATE resources
             SET subject_key = lower(trim(subject_name))
             WHERE trim(coalesce(subject_key, '')) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE resources
+            SET folder_path = (
+                SELECT coalesce(trim(t.name), '')
+                FROM resource_types t
+                WHERE t.id = resources.resource_type_id
+            )
+            WHERE trim(coalesce(folder_path, '')) = ''
             """
         )
         conn.execute(

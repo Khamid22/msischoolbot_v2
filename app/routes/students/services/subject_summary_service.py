@@ -2,10 +2,7 @@ import math
 import threading
 from datetime import datetime
 
-try:
-    from ..storage import queries
-except ImportError:
-    from app.storage import queries
+from app.storage import queries
 
 _DB_LOCK = threading.Lock()
 _SYNC_LOCK = threading.Lock()

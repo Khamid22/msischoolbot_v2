@@ -1,0 +1,24 @@
+{% extends "layouts/portal.html" %}
+{% set body_class = "home-page home-page-login" %}
+
+{% block header %}
+<header class="login-header">
+  <div class="logo-block" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
+      <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
+    </svg>
+  </div>
+  <h1>MSI School Portal</h1>
+  <p>Login to continue</p>
+</header>
+{% endblock %}
+
+{% block content %}
+{% include "auth/_login_content.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+{% endblock %}

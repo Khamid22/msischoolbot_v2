@@ -1,0 +1,79 @@
+/* ─── Resource Category Navigation ─── */
+.resource-category-nav {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1.5px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.resource-category-chip:hover {
+  background: var(--text);
+  color: var(--surface);
+  border-color: var(--text);
+}
+
+.resource-category-chip:active {
+  transform: scale(0.97);
+}
+
+.resource-category-chip small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(10, 10, 10, 0.06);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.resource-category-chip:hover small {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 640px) {
+  .resource-category-nav {
+    margin-top: 12px;
+    gap: 6px;
+  }
+
+  .resource-category-chip {
+    padding: 6px 11px;
+    font-size: 0.68rem;
+    max-width: 100%;
+  }
+
+  .resource-category-chip small {
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.58rem;
+  }
+
+  .resource-category-chip span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+

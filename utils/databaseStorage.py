@@ -10,6 +10,41 @@ _LEGACY_AUTH_DB_PATHS = (
 )
 
 
+def _connect_via_flask_sqlalchemy():
+    try:
+        from flask import current_app, has_app_context
+    except Exception:
+        return None
+
+    if not has_app_context():
+        return None
+
+    try:
+        if "sqlalchemy" not in getattr(current_app, "extensions", {}):
+            return None
+    except RuntimeError:
+        return None
+
+    try:
+        try:
+            from app.extensions import db
+        except ImportError:
+            from extensions import db
+
+        raw_conn = db.engine.raw_connection()
+    except Exception:
+        return None
+
+    driver_connection = getattr(raw_conn, "driver_connection", None)
+    if driver_connection is None:
+        driver_connection = getattr(raw_conn, "connection", None)
+    if driver_connection is not None and hasattr(driver_connection, "row_factory"):
+        driver_connection.row_factory = sqlite3.Row
+
+    raw_conn.execute("PRAGMA foreign_keys = ON")
+    return raw_conn
+
+
 def get_auth_db_path():
     custom_path = os.environ.get("AUTH_DB_PATH", "").strip()
     if custom_path:
@@ -36,6 +71,10 @@ def _migrate_legacy_db_if_needed(db_path):
 
 
 def connect_auth_db():
+    sqlalchemy_conn = _connect_via_flask_sqlalchemy()
+    if sqlalchemy_conn is not None:
+        return sqlalchemy_conn
+
     db_path = os.path.abspath(get_auth_db_path())
     _migrate_legacy_db_if_needed(db_path)
 

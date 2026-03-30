@@ -122,16 +122,6 @@
   background: var(--hover-bg);
 }
 
-.teachers-icon-btn svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .teachers-action-danger {
   border-color: #fca5a5;
   color: #b91c1c;
@@ -142,15 +132,20 @@
   border-color: #b91c1c;
 }
 
-/* ─── Admin Table ─── */
-.admin-table-wrap {
+.admin-table-wrap,
+.rating-table-wrap,
+.aap-table-scroll {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+}
+
+/* ─── Admin Table ─── */
+.admin-table-wrap {
   overflow: auto;
   max-height: 55vh;
   scrollbar-gutter: stable both-edges;
   background: var(--surface);
-  box-shadow: var(--card-shadow);
 }
 
 .admin-table {
@@ -181,11 +176,15 @@
   font-weight: 600;
 }
 
-.admin-table tbody tr {
+.admin-table tbody tr,
+.rating-table tbody tr,
+.aap-table tbody tr {
   transition: background-color var(--transition-fast);
 }
 
-.admin-table tbody tr:hover {
+.admin-table tbody tr:hover,
+.rating-table tbody tr:hover,
+.aap-table tbody tr:hover {
   background: var(--hover-bg);
 }
 
@@ -243,58 +242,43 @@
   width: 30%;
 }
 
-.admin-zone-card.zone-green {
-  border-color: #86efac;
-  background: #f0fdf4;
+.admin-zone-card[class*="zone-"] {
+  border-color: var(--zone-border);
+  background: var(--zone-bg);
 }
 
-.admin-zone-card.zone-green h3 {
-  color: #166534;
+.admin-zone-card[class*="zone-"] h3 {
+  color: var(--zone-title);
 }
 
-.admin-zone-card.zone-green .admin-zone-table-wrap {
-  border-color: #86efac;
+.admin-zone-card[class*="zone-"] .admin-zone-table-wrap {
+  border-color: var(--zone-border);
   background: #ffffff;
 }
 
-.admin-zone-card.zone-green .admin-zone-table thead th {
-  background: #dcfce7;
+.admin-zone-card[class*="zone-"] .admin-zone-table thead th {
+  background: var(--zone-head-bg);
+}
+
+.admin-zone-card.zone-green {
+  --zone-border: #86efac;
+  --zone-bg: #f0fdf4;
+  --zone-title: #166534;
+  --zone-head-bg: #dcfce7;
 }
 
 .admin-zone-card.zone-yellow {
-  border-color: #fde68a;
-  background: #fffbeb;
-}
-
-.admin-zone-card.zone-yellow h3 {
-  color: #92400e;
-}
-
-.admin-zone-card.zone-yellow .admin-zone-table-wrap {
-  border-color: #fde68a;
-  background: #ffffff;
-}
-
-.admin-zone-card.zone-yellow .admin-zone-table thead th {
-  background: #fef3c7;
+  --zone-border: #fde68a;
+  --zone-bg: #fffbeb;
+  --zone-title: #92400e;
+  --zone-head-bg: #fef3c7;
 }
 
 .admin-zone-card.zone-red {
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.admin-zone-card.zone-red h3 {
-  color: #991b1b;
-}
-
-.admin-zone-card.zone-red .admin-zone-table-wrap {
-  border-color: #fecaca;
-  background: #ffffff;
-}
-
-.admin-zone-card.zone-red .admin-zone-table thead th {
-  background: #fee2e2;
+  --zone-border: #fecaca;
+  --zone-bg: #fef2f2;
+  --zone-title: #991b1b;
+  --zone-head-bg: #fee2e2;
 }
 
 /* ─── Students Table ─── */
@@ -342,13 +326,10 @@
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
   scrollbar-width: thin;
   scrollbar-color: #a3a3a3 #e5e5e5;
   max-height: min(68vh, 760px);
   overflow: auto;
-  box-shadow: var(--card-shadow);
 }
 
 .rating-table-wrap::-webkit-scrollbar {
@@ -393,14 +374,6 @@
   top: 0;
   background: var(--bg);
   z-index: 2;
-}
-
-.rating-table tbody tr {
-  transition: background-color var(--transition-fast);
-}
-
-.rating-table tbody tr:hover {
-  background: var(--hover-bg);
 }
 
 .rating-table tr.is-current td {
@@ -518,9 +491,6 @@ body.rating-page.tg-miniapp .rating-table-wrap {
   width: 100%;
   overflow: auto;
   max-height: min(72vh, 680px);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--card-shadow);
 }
 
 .aap-table {
@@ -542,14 +512,6 @@ body.rating-page.tg-miniapp .rating-table-wrap {
 .aap-table tbody td {
   text-align: center;
   vertical-align: middle;
-}
-
-.aap-table tbody tr {
-  transition: background-color var(--transition-fast);
-}
-
-.aap-table tbody tr:hover {
-  background: var(--hover-bg);
 }
 
 .aap-table thead th {

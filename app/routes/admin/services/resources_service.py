@@ -2,25 +2,14 @@ import re
 import threading
 from datetime import datetime
 
-try:
-    from ..storage import queries
-except ImportError:
-    from app.storage import queries
+from app.storage import queries
 
-try:
-    from .r2_storage_service import (
-        build_resource_file_url,
-        delete_resource_file,
-        infer_resource_mime_type,
-        is_r2_configured,
-    )
-except ImportError:
-    from app.services.r2_storage_service import (
-        build_resource_file_url,
-        delete_resource_file,
-        infer_resource_mime_type,
-        is_r2_configured,
-    )
+from .r2_storage_service import (
+    build_resource_file_url,
+    delete_resource_file,
+    infer_resource_mime_type,
+    is_r2_configured,
+)
 
 _DB_LOCK = threading.Lock()
 
@@ -73,6 +62,29 @@ def _canonical_subject(subject_name):
     return subject_key, subject_label
 
 
+def _canonical_folder_path(folder_path):
+    raw_value = str(folder_path or "").strip()
+    if not raw_value:
+        return ""
+
+    segments = []
+    for part in re.split(r"[\\/]+", raw_value):
+        cleaned = " ".join(str(part or "").strip().split())
+        if cleaned:
+            segments.append(cleaned)
+
+    if not segments:
+        return ""
+    return "/".join(segments)
+
+
+def _resource_sort_key(row):
+    return (
+        str(row.get("title", "")).casefold(),
+        int(row.get("id", 0)),
+    )
+
+
 def _ensure_storage(conn):
     queries.create_tables(conn)
     queries.ensure_resources_schema(conn)
@@ -103,6 +115,7 @@ def _row_field(row, key, default=None):
 
 def _to_resource(row):
     resource_file_path = str(_row_field(row, "resource_file_path", "") or "").strip()
+    folder_path = _canonical_folder_path(_row_field(row, "folder_path", "") or "")
     resource_file_mime = infer_resource_mime_type(resource_file_path)
     resource_file_kind = "file"
     if resource_file_mime.startswith("video/"):
@@ -121,6 +134,7 @@ def _to_resource(row):
         "resource_type_display_order": int(
             _row_field(row, "resource_type_display_order", 0) or 0
         ),
+        "folder_path": folder_path,
         "title": str(_row_field(row, "title", "") or "").strip(),
         "description": str(_row_field(row, "description", "") or "").strip(),
         "resource_url": str(_row_field(row, "resource_url", "") or "").strip(),
@@ -284,6 +298,7 @@ def create_resource(
     subject_name,
     resource_type_id,
     title,
+    folder_path="",
     description="",
     resource_url="",
     resource_file_path="",
@@ -302,6 +317,10 @@ def create_resource(
     normalized_description = str(description or "").strip()
     if len(normalized_description) > 2000:
         return False, "Description is too long."
+
+    normalized_folder_path = _canonical_folder_path(folder_path)
+    if len(normalized_folder_path) > 240:
+        return False, "Folder path is too long."
 
     normalized_url = str(resource_url or "").strip()
     normalized_file_path = str(resource_file_path or "").strip()
@@ -333,12 +352,15 @@ def create_resource(
                 return False, "Resource type was not found."
             if not bool(resource_type["is_active"]):
                 return False, "Selected resource type is inactive."
+            if not normalized_folder_path:
+                normalized_folder_path = str(resource_type["name"] or "").strip() or "General"
 
             queries.insert_resource_row(
                 conn,
                 subject_name=subject_label,
                 subject_key=subject_key,
                 resource_type_id=type_id,
+                folder_path=normalized_folder_path,
                 title=normalized_title,
                 description=normalized_description,
                 resource_url=normalized_url,
@@ -446,12 +468,71 @@ def list_resources_grouped_by_type(subject_name):
         )
     )
     for bucket in grouped:
-        bucket["resources"].sort(
-            key=lambda row: (
-                str(row.get("title", "")).casefold(),
-                int(row.get("id", 0)),
-            )
+        bucket["resources"].sort(key=_resource_sort_key)
+    return grouped
+
+
+def list_resources_grouped_for_library(subject_name):
+    resources = list_resources(
+        include_inactive=False,
+        subject_name=subject_name,
+    )
+    grouped = []
+    root_by_key = {}
+
+    for row in resources:
+        folder_path = _canonical_folder_path(row.get("folder_path", ""))
+        if not folder_path:
+            folder_path = str(row.get("resource_type_name", "") or "").strip() or "General"
+        folder_segments = [part for part in folder_path.split("/") if part]
+        if not folder_segments:
+            folder_segments = ["General"]
+
+        root_folder_name = folder_segments[0]
+        root_folder_key = _normalize(root_folder_name) or root_folder_name.casefold()
+        root_bucket = root_by_key.get(root_folder_key)
+        if root_bucket is None:
+            root_bucket = {
+                "folder_name": root_folder_name,
+                "folder_slug": _slugify(root_folder_name) or "general",
+                "total_resources": 0,
+                "resources": [],
+                "subfolders": [],
+                "_subfolder_by_key": {},
+            }
+            root_by_key[root_folder_key] = root_bucket
+            grouped.append(root_bucket)
+
+        root_bucket["total_resources"] += 1
+        subfolder_path = "/".join(folder_segments[1:])
+        if not subfolder_path:
+            root_bucket["resources"].append(row)
+            continue
+
+        subfolder_key = _normalize(subfolder_path) or subfolder_path.casefold()
+        subfolder_bucket = root_bucket["_subfolder_by_key"].get(subfolder_key)
+        if subfolder_bucket is None:
+            subfolder_bucket = {
+                "folder_name": folder_segments[-1],
+                "folder_path": subfolder_path,
+                "full_path": folder_path,
+                "resources": [],
+            }
+            root_bucket["_subfolder_by_key"][subfolder_key] = subfolder_bucket
+            root_bucket["subfolders"].append(subfolder_bucket)
+
+        subfolder_bucket["resources"].append(row)
+
+    grouped.sort(key=lambda row: str(row.get("folder_name", "")).casefold())
+    for root_bucket in grouped:
+        root_bucket["resources"].sort(key=_resource_sort_key)
+        root_bucket["subfolders"].sort(
+            key=lambda row: str(row.get("full_path", "")).casefold()
         )
+        for subfolder_bucket in root_bucket["subfolders"]:
+            subfolder_bucket["resources"].sort(key=_resource_sort_key)
+        root_bucket.pop("_subfolder_by_key", None)
+
     return grouped
 
 
@@ -468,4 +549,5 @@ __all__ = [
     "delete_resource",
     "list_resources",
     "list_resources_grouped_by_type",
+    "list_resources_grouped_for_library",
 ]

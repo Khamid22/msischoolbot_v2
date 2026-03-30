@@ -1,21 +1,21 @@
-"""Google Sheets school configuration helpers."""
+"""Google Sheets integration API."""
 
-try:
-    from ...config.schools import (
-        DEFAULT_SCHOOL_CODE,
-        SCHOOL_SPREADSHEET_ENV_KEYS,
-        get_configured_school_spreadsheets,
-        get_school_spreadsheet_id,
-    )
-except ImportError:
-    from app.config.schools import (
-        DEFAULT_SCHOOL_CODE,
-        SCHOOL_SPREADSHEET_ENV_KEYS,
-        get_configured_school_spreadsheets,
-        get_school_spreadsheet_id,
-    )
+from app.config.schools import (
+    DEFAULT_SCHOOL_CODE,
+    SCHOOL_SPREADSHEET_ENV_KEYS,
+    get_configured_school_spreadsheets,
+    get_school_spreadsheet_id,
+)
+
+from .auth import SheetsDataError
+from .cache import get_school_dataset, mark_school_dataset_dirty
+from .parsers import GroupInfo
 
 __all__ = [
+    "get_school_dataset",
+    "mark_school_dataset_dirty",
+    "SheetsDataError",
+    "GroupInfo",
     "DEFAULT_SCHOOL_CODE",
     "SCHOOL_SPREADSHEET_ENV_KEYS",
     "get_school_spreadsheet_id",

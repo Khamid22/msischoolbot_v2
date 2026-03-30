@@ -2,33 +2,24 @@ import os
 import threading
 import time
 import math
-import sys
 from datetime import timedelta
 
-from flask import Flask, jsonify, make_response, redirect, request, session, url_for
+from flask import Flask, jsonify, redirect, request, session, url_for
+from flask_login import current_user
+from flask_wtf.csrf import CSRFError
 
-try:
-    from .config.settings import get_web_settings
-except ImportError:
-    if __package__:
-        raise
-    # Allow running `python app/server.py` by adding project root to import path.
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-    from config import get_web_settings
-
-try:
-    from .config.schools import get_configured_school_spreadsheets
-except ImportError:
-    if __package__:
-        raise
-    from config.schools import get_configured_school_spreadsheets
-
-try:
-    from .services.dataset_service import SheetsDataError, get_school_dataset
-except ImportError:
-    if __package__:
-        raise
-    from services.dataset_service import SheetsDataError, get_school_dataset
+from app.auth.policies import is_authenticated_session as is_authenticated_policy_session
+from app.auth.session import configure_login_manager
+from app.config.schools import get_configured_school_spreadsheets
+from app.config.settings import get_web_settings
+from app.extensions import init_extensions, login_manager
+from app.routes.admin.admin_page import register_admin_page_routes
+from app.routes.admin.upload_progress_ws import register_admin_upload_progress_ws
+from app.routes.system_routes import register_system_routes
+from app.routes.students.student_page import register_student_page_routes
+from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
+from app.routes.webhooks import register_webhook_routes
+from app.storage.db_config import get_auth_db_path
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
@@ -47,6 +38,12 @@ app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-prod
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
     days=int(os.environ.get("SESSION_LIFETIME_DAYS", "365"))
 )
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.abspath(get_auth_db_path())
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["WTF_CSRF_TIME_LIMIT"] = None
+
+init_extensions(app)
+configure_login_manager(login_manager)
 
 
 def _build_default_asset_version():
@@ -55,6 +52,10 @@ def _build_default_asset_version():
         os.path.join(_BACKEND_DIR, "server.py"),
         os.path.join(_TEMPLATE_DIR, "student", "dashboard.html"),
         os.path.join(_TEMPLATE_DIR, "home.html"),
+        os.path.join(_TEMPLATE_DIR, "auth", "login.html"),
+        os.path.join(_TEMPLATE_DIR, "student", "home.html"),
+        os.path.join(_TEMPLATE_DIR, "admin", "home.html"),
+        os.path.join(_TEMPLATE_DIR, "layouts", "portal.html"),
         os.path.join(_STATIC_DIR, "js", "dashboard.js"),
         os.path.join(_STATIC_DIR, "js", "home.js"),
         os.path.join(_STATIC_DIR, "js", "pwa.js"),
@@ -463,14 +464,6 @@ def _compute_subject_rating(
     return _build_subject_rating(student_id=student_id, dashboards=dashboards)
 
 
-def _empty_form_data():
-    return {
-        "student_id": "",
-        "group": "",
-        "subject": "",
-    }
-
-
 def _is_full_form(form_data):
     return all(form_data.values())
 
@@ -631,17 +624,15 @@ def add_common_headers(response):
 
 
 def _is_authenticated_session():
-    auth_role = str(session.get("auth_role", "")).strip().lower()
-    if auth_role == "admin":
-        return bool(session.get("admin_id"))
-    if auth_role == "student":
-        return bool(session.get("student_db_id")) and bool(session.get("student_sheet_id"))
-    return False
+    if bool(getattr(current_user, "is_authenticated", False)):
+        return True
+    return bool(is_authenticated_policy_session(session))
 
 
 @app.before_request
 def require_authentication_for_protected_routes():
     endpoint = request.endpoint or ""
+    endpoint_name = endpoint.split(".")[-1] if endpoint else ""
     public_endpoints = {
         "static",
         "home",
@@ -651,7 +642,7 @@ def require_authentication_for_protected_routes():
         "service_worker",
         "google_sheets_webhook",
     }
-    if endpoint in public_endpoints:
+    if endpoint in public_endpoints or endpoint_name in public_endpoints:
         return None
 
     if _is_authenticated_session():
@@ -660,76 +651,43 @@ def require_authentication_for_protected_routes():
 
     if request.path.startswith("/api/"):
         return jsonify({"message": "Authentication required."}), 401
-    return redirect(url_for("home"))
+    return redirect(url_for("student.home"))
 
 
-try:
-    from .routes.students.dashboard import register_dashboard_routes
-    from .routes.home import register_home_routes
-    from .routes.students.rating_board import register_rating_board_routes
-    from .routes.students.resources import register_resources_routes
-    from .routes.webhooks import register_webhook_routes
-except ImportError:
-    if __package__:
-        raise
-    from routes.students.dashboard import register_dashboard_routes
-    from routes.home import register_home_routes
-    from routes.students.rating_board import register_rating_board_routes
-    from routes.students.resources import register_resources_routes
-    from routes.webhooks import register_webhook_routes
+@app.errorhandler(CSRFError)
+def handle_csrf_error(_error):
+    if request.path.startswith("/api/"):
+        return jsonify({"message": "Invalid or missing CSRF token."}), 400
+    return redirect(url_for("student.home"))
 
 
 # Route modules register endpoint handlers on the shared app object.
-register_home_routes(
+render_admin_page = register_admin_page_routes(
     app,
+    load_dataset=_load_dataset,
+)
+register_student_page_routes(
+    app,
+    render_admin_page=render_admin_page,
     load_dataset=_load_dataset,
     seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
     build_students_by_subject_group=_build_students_by_subject_group,
-    empty_form_data=_empty_form_data,
     is_full_form=_is_full_form,
     get_group_cache_entry=_get_group_cache_entry,
     search_student=_search_student,
-)
-register_dashboard_routes(
-    app,
     load_dashboard_payload=_load_dashboard_payload,
-    load_dataset=_load_dataset,
+    collect_subject_dashboards_from_dataset=_collect_subject_dashboards_from_dataset,
+    collect_subject_dashboards_from_cache=_collect_subject_dashboards_from_cache,
     extract_attendance_rate=_extract_attendance_rate,
     extract_exam_average_score=_extract_exam_average_score,
     round_grade_half_up=_round_grade_half_up,
     compute_subject_rating=_compute_subject_rating,
-)
-register_rating_board_routes(
-    app,
-    load_dashboard_payload=_load_dashboard_payload,
-    collect_subject_dashboards_from_dataset=_collect_subject_dashboards_from_dataset,
-    collect_subject_dashboards_from_cache=_collect_subject_dashboards_from_cache,
-    load_dataset=_load_dataset,
-    seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
     build_subject_leaderboard=_build_subject_leaderboard,
-)
-register_resources_routes(
-    app,
-    load_dashboard_payload=_load_dashboard_payload,
 )
 register_webhook_routes(
     app,
     load_dataset=_load_dataset,
     clear_group_cache=_clear_group_cache,
 )
-
-
-@app.get("/manifest.webmanifest")
-def manifest():
-    response = make_response(app.send_static_file("manifest.webmanifest"))
-    response.headers["Content-Type"] = "application/manifest+json"
-    response.headers["Cache-Control"] = "public, max-age=86400"
-    return response
-
-
-@app.get("/sw.js")
-def service_worker():
-    response = make_response(app.send_static_file("js/sw.js"))
-    response.headers["Content-Type"] = "application/javascript"
-    response.headers["Cache-Control"] = "no-cache"
-    return response
+register_system_routes(app)
+register_admin_upload_progress_ws()

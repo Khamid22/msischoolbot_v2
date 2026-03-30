@@ -1,0 +1,48 @@
+        <div class="session-toolbar">
+          <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
+          <form action="{{ url_for('student.logout') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button type="submit" class="secondary-btn">Logout</button>
+          </form>
+        </div>
+
+        <form action="{{ url_for('student.search_student_form') }}" method="post" class="login-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <label class="field">
+            <span>Subject</span>
+            <select id="subject-select" name="subject" required>
+              <option value="" disabled {% if not form_data.subject %}selected{% endif %}>Select subject stream</option>
+              {% for subject_name in subjects %}
+              {% if subject_name == "English" %}
+              {% set subject_label = "General English" %}
+              {% else %}
+              {% set subject_label = subject_name %}
+              {% endif %}
+              <option value="{{ subject_name }}" {% if form_data.subject == subject_name %}selected{% endif %}>{{ subject_label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Group</span>
+            <select id="group-select" name="group" {% if not form_data.subject %}disabled{% endif %} required>
+              <option value="" disabled {% if not form_data.group %}selected{% endif %}>Select morning or afternoon group</option>
+              {% for group_name in groups %}
+              <option value="{{ group_name }}" {% if form_data.group == group_name %}selected{% endif %}>{{ group_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Student</span>
+            {% set selected_students = students_by_subject_group.get(form_data.subject, {}).get(form_data.group, []) %}
+            <select id="student-select" name="student_id" {% if not form_data.group %}disabled{% endif %} required>
+              <option value="" disabled {% if not form_data.student_id %}selected{% endif %}>Select student</option>
+              {% for student in selected_students %}
+              <option value="{{ student.id }}" {% if form_data.student_id|string == student.id|string %}selected{% endif %}>{{ student.fullName }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <button type="submit" class="primary-btn">Open Dashboard</button>
+        </form>

@@ -1,0 +1,28 @@
+{% extends "layouts/portal.html" %}
+{% set body_class = "home-page home-page-student" %}
+
+{% block header %}
+<header class="login-header">
+  <div class="logo-block" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
+      <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
+    </svg>
+  </div>
+  <h1>MSI School Portal</h1>
+  <p>Select stream, group, and student</p>
+</header>
+{% endblock %}
+
+{% block content %}
+{% include "student/_panel_content.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+<script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>
+<script id="studentsBySubjectGroupJson" type="application/json">{{ students_by_subject_group|default({}, true)|tojson|safe }}</script>
+<script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
+<script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+{% endblock %}

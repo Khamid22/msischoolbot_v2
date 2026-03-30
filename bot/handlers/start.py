@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart
 
 from bot.keyboards.inline_keyboard import registration_keyboard, student_menu_keyboard
 from bot.settings import settings
-from app.services.auth_service import (
+from app.routes.students.services.auth_service import (
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
     record_bot_user,

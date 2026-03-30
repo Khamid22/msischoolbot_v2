@@ -3,12 +3,12 @@ import math
 
 from aiogram import F, Router
 
-from app.services.auth_service import (
+from app.routes.students.services.auth_service import (
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
 )
-from app.services.dataset_service import load_all_schools_dataset
-from app.services.subject_summary_service import get_subject_summaries_for_student
+from app.routes.students.services.dataset_service import load_all_schools_dataset
+from app.routes.students.services.subject_summary_service import get_subject_summaries_for_student
 
 router = Router()
 

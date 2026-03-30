@@ -24,7 +24,6 @@ def get_school_spreadsheet_id(school_code = DEFAULT_SCHOOL_CODE):
     env_key = SCHOOL_SPREADSHEET_ENV_KEYS.get(normalized)
     spreadsheet_id = os.environ.get(str(env_key or ""), "").strip() if env_key else ""
 
-    # Backward-compatible fallback for School 5 legacy env naming.
     if not spreadsheet_id and normalized == "school5":
         spreadsheet_id = os.environ.get("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()
 

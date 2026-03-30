@@ -1,0 +1,17 @@
+        <form action="{{ url_for('student.login') }}" method="post" class="login-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input type="hidden" id="loginTelegramUserId" name="telegram_user_id" value="" />
+
+          <label class="field">
+            <span>Login</span>
+            <input type="text" name="login" value="{{ auth_login_input|default('', true) }}" placeholder="Staff or Student ID" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required />
+          </label>
+
+          <button type="submit" class="primary-btn">Sign In</button>
+        </form>
+

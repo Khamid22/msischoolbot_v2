@@ -10,7 +10,7 @@
     <meta name="format-detection" content="telephone=no" />
     <title>Edit Student Profile</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
-    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="manifest" href="{{ url_for('system.manifest') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -30,13 +30,14 @@
         <div class="session-toolbar">
           <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
           <div class="session-toolbar-actions">
-            <a href="{{ url_for('admin_student_dashboard', student_row_id=student.id) }}" class="secondary-btn">View Dashboard</a>
-            <a href="{{ url_for('home', panel='students') }}" class="secondary-btn">Back</a>
+            <a href="{{ url_for('admin.admin_student_dashboard', student_row_id=student.id) }}" class="secondary-btn">View Dashboard</a>
+            <a href="{{ url_for('student.home', panel='students') }}" class="secondary-btn">Back</a>
           </div>
         </div>
         {% if auth_error %}<div class="form-error">{{ auth_error }}</div>{% endif %}
         {% if admin_notice %}<div class="form-notice">{{ admin_notice }}</div>{% endif %}
-        <form action="{{ url_for('save_admin_student_profile', student_row_id=student.id) }}" method="post" class="login-form" enctype="multipart/form-data">
+        <form action="{{ url_for('admin.save_admin_student_profile', student_row_id=student.id) }}" method="post" class="login-form" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <input type="hidden" name="photo_url" id="photoUrlInput" value="{{ student.photo_url }}" />
           <input type="hidden" name="remove_photo" id="removePhotoInput" value="0" />
           <div class="admin-card edit-profile-top-card">

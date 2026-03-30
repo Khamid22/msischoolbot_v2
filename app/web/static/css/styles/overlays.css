@@ -2,18 +2,37 @@
   position: relative;
 }
 
+.profile-menu,
+.subject-menu,
+.confirm-modal-card {
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  box-shadow: var(--card-shadow-elevated);
+}
+
+.profile-menu,
+.subject-menu {
+  overflow: hidden;
+  animation: menuSlideIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.profile-menu-item,
+.subject-menu-item {
+  transition: background-color var(--transition-fast);
+}
+
+.profile-menu-item:hover,
+.subject-menu-item:hover {
+  background: var(--hover-bg);
+}
+
 .profile-menu {
   position: absolute;
   top: 48px;
   right: 0;
   min-width: 140px;
-  border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--card-shadow-elevated);
-  overflow: hidden;
   z-index: 60;
-  animation: menuSlideIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes menuSlideIn {
@@ -27,10 +46,6 @@
   }
 }
 
-.profile-menu[hidden] {
-  display: none !important;
-}
-
 .profile-menu-item {
   width: 100%;
   border: 0;
@@ -41,16 +56,11 @@
   text-align: left;
   padding: 10px 14px;
   cursor: pointer;
-  transition: background-color var(--transition-fast);
   border-bottom: 1px solid var(--hairline);
 }
 
 .profile-menu-item:last-child {
   border-bottom: 0;
-}
-
-.profile-menu-item:hover {
-  background: var(--hover-bg);
 }
 
 .profile-menu-item:active {
@@ -74,10 +84,6 @@
   to { opacity: 1; }
 }
 
-.confirm-modal[hidden] {
-  display: none !important;
-}
-
 .confirm-modal-backdrop {
   position: absolute;
   inset: 0;
@@ -90,10 +96,7 @@
   position: relative;
   width: 100%;
   max-width: 380px;
-  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--card-shadow-elevated);
   padding: 22px 20px;
   animation: modalCardSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -248,17 +251,8 @@
   right: 0;
   min-width: 155px;
   max-width: 230px;
-  border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--card-shadow-elevated);
-  overflow: hidden;
   z-index: 70;
-  animation: menuSlideIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.subject-menu[hidden] {
-  display: none !important;
 }
 
 .subject-menu-item {
@@ -269,7 +263,6 @@
   text-decoration: none;
   color: var(--text);
   border-top: 1px solid var(--hairline);
-  transition: background-color var(--transition-fast);
 }
 
 .subject-menu-item:first-child {
@@ -285,10 +278,6 @@
   font-size: 0.62rem;
   color: var(--muted);
   line-height: 1.2;
-}
-
-.subject-menu-item:hover {
-  background: var(--hover-bg);
 }
 
 .subject-menu-item.is-current {

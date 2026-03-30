@@ -22,7 +22,6 @@ class WebSettings:
 
 
 def _int_env(name, default):
-    # Read integer environment variables with fallback support.
     value = getenv(name)
     if value is None:
         return default
@@ -33,7 +32,6 @@ def _int_env(name, default):
 
 
 def get_web_settings():
-    # Shared Flask host/port config used by both root main.py and app/server.py.
     flask_port = _int_env("PORT", _int_env("FLASK_PORT", 8080))
     return WebSettings(
         flask_host=getenv("FLASK_HOST", "0.0.0.0"),
@@ -42,7 +40,6 @@ def get_web_settings():
 
 
 def get_settings():
-    # Full config used by the Telegram bot.
     bot_token = getenv("BOT_TOKEN", "").strip()
     mini_app_url = getenv("MINI_APP_URL", "").strip()
 

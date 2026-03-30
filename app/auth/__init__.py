@@ -1,8 +1,34 @@
 """Authentication and authorization layer."""
 
-try:
-    from ..services.auth_service import *  # noqa: F401,F403
-except ImportError:
-    from app.services.auth_service import *  # noqa: F401,F403
+from .forms import LoginForm, StudentPasswordChangeForm
+from .models import Admin, Student, StudentsSheetMap
+from .policies import (
+    is_admin_role,
+    is_authenticated_session,
+    is_student_role,
+    normalize_auth_role,
+)
+from .session import (
+    PortalUser,
+    build_admin_user,
+    build_student_user,
+    configure_login_manager,
+    load_portal_user,
+)
 
-from .policies import *  # noqa: F401,F403
+__all__ = [
+    "Admin",
+    "Student",
+    "StudentsSheetMap",
+    "LoginForm",
+    "StudentPasswordChangeForm",
+    "PortalUser",
+    "build_admin_user",
+    "build_student_user",
+    "load_portal_user",
+    "configure_login_manager",
+    "normalize_auth_role",
+    "is_admin_role",
+    "is_student_role",
+    "is_authenticated_session",
+]

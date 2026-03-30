@@ -94,6 +94,19 @@ def _slugify(value):
     return re.sub(r"[^a-z0-9]+", "-", normalized).strip("-")
 
 
+def _folder_slug_segments(folder_path):
+    raw_value = str(folder_path or "").strip()
+    if not raw_value:
+        return []
+
+    segments = []
+    for part in re.split(r"[\\/]+", raw_value):
+        segment_slug = _slugify(part)
+        if segment_slug:
+            segments.append(segment_slug)
+    return segments
+
+
 def _safe_file_name(name):
     lowered = str(name or "").strip().lower()
     lowered = re.sub(r"[^a-z0-9._-]+", "-", lowered)
@@ -126,7 +139,8 @@ def _max_upload_bytes():
 
 
 def _video_optimize_enabled():
-    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE", "1").strip().lower()
+    # Default is disabled for faster admin uploads; enable explicitly when needed.
+    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE", "0").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
 
 
@@ -187,6 +201,19 @@ def _video_preset():
 def _video_faststart_remux_enabled():
     raw_value = _env("RESOURCE_VIDEO_FASTSTART_REMUX", "1").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
+
+
+def _ffmpeg_binary():
+    global _FFMPEG_MISSING_LOGGED
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        return ffmpeg_path
+    if not _FFMPEG_MISSING_LOGGED:
+        _FFMPEG_MISSING_LOGGED = True
+        print(
+            "[resources] ffmpeg is not installed; uploading video without processing."
+        )
+    return ""
 
 
 def _signed_url_ttl():
@@ -266,28 +293,73 @@ def _cache_control_header():
     return "public, max-age=31536000, immutable"
 
 
-def _build_object_key(subject_name, original_name):
+def _report_progress(
+    progress_callback,
+    *,
+    percent,
+    stage,
+    message,
+    eta_seconds=None,
+):
+    if not callable(progress_callback):
+        return
+
+    try:
+        progress_callback(
+            percent=float(percent),
+            stage=str(stage or "").strip(),
+            message=str(message or "").strip(),
+            eta_seconds=eta_seconds,
+        )
+    except Exception:
+        return
+
+
+def _build_object_key(subject_name, original_name, folder_path=""):
     now = datetime.utcnow()
     subject_slug = _slugify(subject_name) or "general"
+    folder_slug = "/".join(_folder_slug_segments(folder_path))
     safe_name = _safe_file_name(original_name)
     dot_index = safe_name.rfind(".")
     ext = safe_name[dot_index:] if dot_index > 0 else ""
     stem = safe_name[:dot_index] if dot_index > 0 else safe_name
     unique_token = now.strftime("%Y%m%d%H%M%S%f")
+    folder_prefix = f"{folder_slug}/" if folder_slug else ""
     return (
         f"resources/"
         f"{now.strftime('%Y/%m')}/"
         f"{subject_slug}/"
+        f"{folder_prefix}"
         f"{stem}-{unique_token}{ext}"
     )
 
 
-def _read_limited_bytes(uploaded_file, limit_bytes):
+def _read_limited_bytes(
+    uploaded_file,
+    limit_bytes,
+    *,
+    progress_callback=None,
+    stage_start_percent=12.0,
+    stage_end_percent=52.0,
+):
     stream = uploaded_file.stream
     try:
         stream.seek(0)
     except Exception:
         pass
+
+    expected_total = 0
+    try:
+        expected_total = int(uploaded_file.content_length or 0)
+    except Exception:
+        expected_total = 0
+    if expected_total <= 0:
+        try:
+            expected_total = int(getattr(stream, "content_length", 0) or 0)
+        except Exception:
+            expected_total = 0
+    if expected_total > limit_bytes:
+        expected_total = limit_bytes
 
     total = 0
     chunks = []
@@ -299,23 +371,101 @@ def _read_limited_bytes(uploaded_file, limit_bytes):
         if total > limit_bytes:
             return None, total
         chunks.append(chunk)
+        if expected_total > 0:
+            ratio = min(total / expected_total, 1.0)
+            percent = stage_start_percent + (
+                (stage_end_percent - stage_start_percent) * ratio
+            )
+            _report_progress(
+                progress_callback,
+                percent=percent,
+                stage="receiving",
+                message="Receiving uploaded file...",
+            )
+
+    _report_progress(
+        progress_callback,
+        percent=stage_end_percent,
+        stage="received",
+        message="Uploaded file received.",
+    )
     return b"".join(chunks), total
 
 
-def _optimize_video_payload(payload, source_extension):
-    global _FFMPEG_MISSING_LOGGED
+def _faststart_remux_video_payload(payload, source_extension, ffmpeg_path=""):
+    if not payload:
+        return payload, source_extension
+    if not _video_faststart_remux_enabled():
+        return payload, source_extension
+    if source_extension not in _VIDEO_EXTENSIONS:
+        return payload, source_extension
+
+    resolved_ffmpeg = str(ffmpeg_path or "").strip() or _ffmpeg_binary()
+    if not resolved_ffmpeg:
+        return payload, source_extension
+
+    input_temp = None
+    output_temp = None
+
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=source_extension) as input_file:
+            input_temp = input_file.name
+            input_file.write(payload)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as output_file:
+            output_temp = output_file.name
+
+        remux_command = [
+            resolved_ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            input_temp,
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            output_temp,
+        ]
+        subprocess.run(
+            remux_command,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=_video_faststart_timeout_seconds(),
+        )
+        with open(output_temp, "rb") as optimized_file:
+            optimized_payload = optimized_file.read()
+        if optimized_payload:
+            return optimized_payload, ".mp4"
+    except Exception:
+        return payload, source_extension
+    finally:
+        for temp_path in (input_temp, output_temp):
+            if not temp_path:
+                continue
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    return payload, source_extension
+
+
+def _optimize_video_payload(payload, source_extension, ffmpeg_path=""):
     if not payload:
         return payload, source_extension
     if not _video_optimize_enabled():
         return payload, source_extension
 
-    ffmpeg_path = shutil.which("ffmpeg")
-    if not ffmpeg_path:
-        if not _FFMPEG_MISSING_LOGGED:
-            _FFMPEG_MISSING_LOGGED = True
-            print(
-                "[resources] ffmpeg is not installed; uploading video without optimization."
-            )
+    resolved_ffmpeg = str(ffmpeg_path or "").strip() or _ffmpeg_binary()
+    if not resolved_ffmpeg:
         return payload, source_extension
 
     input_extension = source_extension if source_extension in _VIDEO_EXTENSIONS else ".mp4"
@@ -369,7 +519,7 @@ def _optimize_video_payload(payload, source_extension):
 
         scale_filter = f"scale='min({_video_max_width()},iw)':-2"
         command = [
-            ffmpeg_path,
+            resolved_ffmpeg,
             "-y",
             "-hide_banner",
             "-loglevel",
@@ -425,7 +575,18 @@ def _optimize_video_payload(payload, source_extension):
     return payload, source_extension
 
 
-def upload_resource_file(uploaded_file, subject_name=""):
+def upload_resource_file(
+    uploaded_file,
+    subject_name="",
+    folder_path="",
+    progress_callback=None,
+):
+    _report_progress(
+        progress_callback,
+        percent=5.0,
+        stage="validating",
+        message="Checking uploaded file...",
+    )
     if uploaded_file is None or not str(uploaded_file.filename or "").strip():
         return "", "No file was uploaded."
     if not is_r2_configured():
@@ -438,7 +599,17 @@ def upload_resource_file(uploaded_file, subject_name=""):
         return "", "File type is not supported for resources."
 
     max_upload_size = _max_upload_bytes()
-    payload, payload_size = _read_limited_bytes(uploaded_file, max_upload_size)
+    _report_progress(
+        progress_callback,
+        percent=10.0,
+        stage="receiving",
+        message="Receiving uploaded file...",
+    )
+    payload, payload_size = _read_limited_bytes(
+        uploaded_file,
+        max_upload_size,
+        progress_callback=progress_callback,
+    )
     if payload is None:
         return "", (
             "Uploaded file is too large. "
@@ -456,7 +627,35 @@ def upload_resource_file(uploaded_file, subject_name=""):
     stem = safe_name[:dot_index] if dot_index > 0 else safe_name
 
     if extension in _VIDEO_EXTENSIONS:
-        payload, extension = _optimize_video_payload(payload, extension)
+        _report_progress(
+            progress_callback,
+            percent=60.0,
+            stage="video",
+            message="Preparing video for web playback...",
+        )
+        ffmpeg_path = _ffmpeg_binary()
+        payload, extension = _faststart_remux_video_payload(
+            payload,
+            extension,
+            ffmpeg_path=ffmpeg_path,
+        )
+        _report_progress(
+            progress_callback,
+            percent=75.0,
+            stage="video",
+            message="Optimizing video...",
+        )
+        payload, extension = _optimize_video_payload(
+            payload,
+            extension,
+            ffmpeg_path=ffmpeg_path,
+        )
+        _report_progress(
+            progress_callback,
+            percent=84.0,
+            stage="video",
+            message="Video optimization finished.",
+        )
         safe_name = f"{stem}{extension}"
 
     content_type = (
@@ -464,7 +663,13 @@ def upload_resource_file(uploaded_file, subject_name=""):
         or str(uploaded_file.mimetype or "").strip()
         or "application/octet-stream"
     )
-    object_key = _build_object_key(subject_name, safe_name)
+    _report_progress(
+        progress_callback,
+        percent=90.0,
+        stage="cloud_upload",
+        message="Uploading file to storage...",
+    )
+    object_key = _build_object_key(subject_name, safe_name, folder_path=folder_path)
     client = _get_r2_client()
     if client is None:
         return "", "Unable to initialize R2 client."
@@ -481,6 +686,12 @@ def upload_resource_file(uploaded_file, subject_name=""):
     except (BotoCoreError, ClientError):
         return "", "Failed to upload resource file to R2."
 
+    _report_progress(
+        progress_callback,
+        percent=97.0,
+        stage="cloud_upload",
+        message="File uploaded. Finalizing...",
+    )
     return object_key, ""
 
 

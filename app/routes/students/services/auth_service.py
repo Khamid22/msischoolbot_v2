@@ -4,10 +4,7 @@ from datetime import datetime
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
-try:
-    from ..storage import queries
-except ImportError:
-    from app.storage import queries
+from app.storage import queries
 
 _OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "staff280902") or "staff280902").strip()
 _OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "Khamid007") or "Khamid007").strip()

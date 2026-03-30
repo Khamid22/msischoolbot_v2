@@ -11,7 +11,7 @@
     <meta name="description" content="Mobile-optimized MSI School dashboard with attendance and performance charts." />
     <title>Academic Dashboard</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
-    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="manifest" href="{{ url_for('system.manifest') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -26,7 +26,7 @@
   <body class="dashboard-page academic-dashboard-page">
     <header class="topbar">
       <div class="topbar-left">
-        <a href="{{ dashboard_back_url|default(url_for('home'), true) }}" class="back-link" aria-label="Back to search">
+        <a href="{{ dashboard_back_url|default(url_for('student.home'), true) }}" class="back-link" aria-label="Back to search">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
@@ -278,7 +278,9 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script id="dashboardDataJson" type="application/json">{{ payload|default({}, true)|tojson|safe }}</script>
-    <form id="dashboardLogoutForm" action="{{ url_for('logout') }}" method="post" hidden></form>
+    <form id="dashboardLogoutForm" action="{{ url_for('student.logout') }}" method="post" hidden>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    </form>
 
     <div id="logoutConfirmModal" class="confirm-modal" hidden>
       <div class="confirm-modal-backdrop" data-close-modal="true"></div>
@@ -345,7 +347,8 @@
       <div class="confirm-modal-backdrop" data-close-password-modal="true"></div>
       <div class="confirm-modal-card profile-modal-card" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
         <h3 id="changePasswordTitle">Change Password</h3>
-        <form action="{{ url_for('profile_change_password') }}" method="post" class="profile-password-form">
+        <form action="{{ url_for('student.profile_change_password') }}" method="post" class="profile-password-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
           <input type="hidden" name="student_id" value="{{ payload.student.id }}" />
           <input type="hidden" name="subject" value="{{ current_subject_name }}" />
           <input type="hidden" name="group" value="{{ payload.student.group }}" />

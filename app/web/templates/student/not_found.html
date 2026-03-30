@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Student Not Found</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
-    <link rel="manifest" href="{{ url_for('manifest') }}" />
+    <link rel="manifest" href="{{ url_for('system.manifest') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -29,7 +29,7 @@
         </div>
         <h1>Student Not Found</h1>
         <p>{{ message or 'We could not retrieve data for this student. Please search again.' }}</p>
-        <a href="{{ url_for('home') }}" class="primary-btn">Return to Search</a>
+        <a href="{{ url_for('student.home') }}" class="primary-btn">Return to Search</a>
       </section>
     </main>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>

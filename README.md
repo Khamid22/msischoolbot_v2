@@ -27,7 +27,10 @@ Create `.env` in the project root:
 - `FLASK_HOST` (default: `0.0.0.0`)
 - `FLASK_PORT` (default: `8080`)
 - `PORT` (overrides `FLASK_PORT`)
-- `WAITRESS_THREADS` (default: `4`, used by production WSGI server)
+- `WAITRESS_THREADS` (default: `8`, used by production WSGI server)
+- `WAITRESS_CONNECTION_LIMIT` (default: `256`)
+- `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
+- `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
 - `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
@@ -107,17 +110,32 @@ Main tables used for auth and admin data:
 
 ## Run Locally
 
-Run both bot + web:
+Run both bot + web in one process:
 
 ```bash
 python main.py
 ```
 
-Or run separately:
+Run only web:
 
-Web:
 ```bash
-python -m app.server
+python main.py web
+```
+
+Run only bot:
+
+```bash
+python main.py bot
+```
+
+Recommended in production (separate processes):
+
+```bash
+# terminal 1
+python main.py web
+
+# terminal 2
+python main.py bot
 ```
 
 ## Project Structure
@@ -127,9 +145,9 @@ python -m app.server
 - `bot/handlers/start.py` - `/start` handler
 - `bot/keyboards/inline_keyboard.py` - inline keyboard builders
 - `app/server.py` - Flask app, helpers, auth guard, route registration
-- `app/services/auth_service.py` - auth + student/admin/teacher business logic
-- `app/services/subject_summary_service.py` - daily Google Sheets -> SQLite subject summary sync
-- `app/services/lesson_catalog_service.py` - daily Google Sheets -> SQLite lesson catalog sync
+- `app/routes/students/services/auth_service.py` - auth + student/admin/teacher business logic
+- `app/routes/students/services/subject_summary_service.py` - daily Google Sheets -> SQLite subject summary sync
+- `app/routes/students/services/lesson_catalog_service.py` - daily Google Sheets -> SQLite lesson catalog sync
 - `app/routes/home.py` - login/logout, home, search APIs
 - `app/routes/dashboard.py` - dashboard endpoints
 - `app/routes/rating_board.py` - rating board page

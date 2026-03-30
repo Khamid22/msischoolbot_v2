@@ -213,6 +213,7 @@ def insert_resource_row(
     subject_name,
     subject_key,
     resource_type_id,
+    folder_path,
     title,
     description,
     resource_url,
@@ -227,6 +228,7 @@ def insert_resource_row(
             subject_name,
             subject_key,
             resource_type_id,
+            folder_path,
             title,
             description,
             resource_url,
@@ -236,12 +238,13 @@ def insert_resource_row(
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         """,
         (
             subject_name,
             subject_key,
             int(resource_type_id),
+            folder_path,
             title,
             description,
             resource_url,
@@ -304,6 +307,7 @@ def get_resource_row_by_id(conn, resource_id):
             r.subject_name,
             r.subject_key,
             r.resource_type_id,
+            r.folder_path,
             r.title,
             r.description,
             r.resource_url,
@@ -347,6 +351,7 @@ def list_resource_rows(conn, include_inactive=False, subject_key=""):
             r.subject_name,
             r.subject_key,
             r.resource_type_id,
+            r.folder_path,
             r.title,
             r.description,
             r.resource_url,
@@ -364,6 +369,7 @@ def list_resource_rows(conn, include_inactive=False, subject_key=""):
         {where_sql}
         ORDER BY
             lower(r.subject_name) ASC,
+            lower(r.folder_path) ASC,
             t.display_order ASC,
             lower(t.name) ASC,
             lower(r.title) ASC,
