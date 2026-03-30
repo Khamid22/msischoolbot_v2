@@ -2,9 +2,7 @@ from flask import jsonify, render_template, request
 
 from app.routes.students.services import (
     dashboard_service,
-    dataset_service,
     payload_service,
-    subject_summary_service,
 )
 
 
@@ -44,11 +42,6 @@ def register_dashboard_routes(
             ),
             session_invalid_message="Student session is invalid. Please login again.",
             forbidden_message="Access denied: you can open only your own dashboard.",
-        )
-
-        subject_summary_service.sync_subject_summaries_if_needed(
-            dataset_service.load_all_schools_dataset,
-            force_refresh=force_refresh,
         )
 
         if error_message:

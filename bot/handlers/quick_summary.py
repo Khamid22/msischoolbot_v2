@@ -7,7 +7,6 @@ from app.routes.students.services.auth_service import (
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
 )
-from app.routes.students.services.dataset_service import load_all_schools_dataset
 from app.routes.students.services.subject_summary_service import get_subject_summaries_for_student
 
 router = Router()
@@ -68,7 +67,6 @@ async def quick_summary_callback(query):
 
     summary_rows, summary_error = get_subject_summaries_for_student(
         full_name=str(linked_student.get("full_name", "")),
-        load_dataset=load_all_schools_dataset,
     )
     if summary_error:
         await query.message.answer(

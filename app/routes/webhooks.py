@@ -145,7 +145,6 @@ def register_webhook_routes(
             sync_result = auth_service.sync_students_if_needed(
                 load_dataset,
                 school_code=school_code,
-                force_refresh=True,
             )
             students_sync_results[school_code] = {
                 "synced": bool(sync_result.get("synced", False)),
@@ -159,7 +158,6 @@ def register_webhook_routes(
 
         summary_sync_result = subject_summary_service.sync_subject_summaries_if_needed(
             _load_all_schools_from_cache,
-            force_refresh=True,
         )
         summary_sync_error = str(summary_sync_result.get("error", "")).strip()
         if summary_sync_error:
@@ -167,7 +165,6 @@ def register_webhook_routes(
 
         lesson_sync_result = lesson_catalog_service.sync_lesson_catalog_if_needed(
             _load_all_schools_from_cache,
-            force_refresh=True,
         )
         lesson_sync_error = str(lesson_sync_result.get("error", "")).strip()
         if lesson_sync_error:

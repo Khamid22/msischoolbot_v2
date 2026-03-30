@@ -29,10 +29,6 @@ def _utc_now_iso():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _utc_today_iso():
-    return datetime.utcnow().date().isoformat()
-
-
 def _connect():
     return queries.connect_auth_db()
 
@@ -168,14 +164,6 @@ def _next_student_code(conn, school_code):
     )
 
 
-def _upsert_meta(conn, key, value):
-    queries.upsert_meta(conn, key, value)
-
-
-def _get_meta(conn, key):
-    return queries.get_meta(conn, key)
-
-
 def _normalize_subject_label(subject_name):
     normalized = (subject_name or "").strip().casefold()
     if normalized in {"igcse mathematics a", "mathematics", "math"}:
@@ -293,23 +281,17 @@ def sync_students_from_dataset(dataset):
 
 
 def sync_students_if_needed(load_dataset, school_code = None, force_refresh = False):
+    _ = force_refresh
     init_storage()
     normalized_school_code = _normalize_school_code(
         school_code or os.environ.get("ACTIVE_SCHOOL_CODE", _DEFAULT_SCHOOL_CODE)
     )
-    sync_meta_key = f"students_sync_date:{normalized_school_code}"
 
     with _SYNC_LOCK:
-        with _connect() as conn:
-            today = _utc_today_iso()
-            last_sync_date = _get_meta(conn, sync_meta_key)
-            if not force_refresh and last_sync_date == today:
-                return {"synced": False, "error": "", "added": 0, "updated": 0}
-
         try:
             dataset, load_error = load_dataset(
                 school_code=normalized_school_code,
-                force_refresh=force_refresh,
+                force_refresh=True,
             )
         except TypeError:
             dataset, load_error = load_dataset()
@@ -322,10 +304,6 @@ def sync_students_if_needed(load_dataset, school_code = None, force_refresh = Fa
             }
 
         sync_result = sync_students_from_dataset(dataset)
-
-        with _connect() as conn:
-            _upsert_meta(conn, sync_meta_key, _utc_today_iso())
-            conn.commit()
 
         return {
             "synced": True,

@@ -7,7 +7,6 @@ from app.routes.students.services.auth_service import (
     get_teacher_by_id,
     link_admin_telegram_user,
     link_student_telegram_user,
-    sync_students_if_needed,
     unlink_student_telegram_user,
     verify_admin_credentials,
     verify_student_credentials,
@@ -29,7 +28,6 @@ def register_user_auth_routes(
     *,
     render_login_page,
     render_admin_page,
-    load_dataset,
 ):
     @students.get("/")
     def home():
@@ -129,19 +127,6 @@ def register_user_auth_routes(
 
             set_admin_session(admin)
             return redirect(url_for("student.home"))
-
-        normalized_login = login_value.strip().casefold()
-        school_code = "sehriyo" if normalized_login.startswith("msis") else "school5"
-        sync_result = sync_students_if_needed(
-            load_dataset,
-            school_code=school_code,
-        )
-        sync_error = str(sync_result.get("error", "")).strip()
-        if sync_error:
-            return render_login_page(
-                auth_error=sync_error,
-                auth_login_input=login_value,
-            ), 503
 
         student = verify_student_credentials(login_value, password_value)
         if not student:

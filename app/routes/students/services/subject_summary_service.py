@@ -41,10 +41,6 @@ def _utc_now_iso():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _utc_today_iso():
-    return datetime.utcnow().date().isoformat()
-
-
 def _normalize(value):
     return " ".join(str(value or "").strip().casefold().split())
 
@@ -266,18 +262,14 @@ def _build_subject_summary_rows(dataset):
 
 
 def sync_subject_summaries_if_needed(load_dataset, force_refresh=False):
+    _ = force_refresh
     with _SYNC_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
 
-            today = _utc_today_iso()
-            last_sync_date = queries.get_meta(conn, "subject_summary_sync_date")
-            if not force_refresh and last_sync_date == today:
-                return {"synced": False, "error": "", "count": 0}
-
         dataset, load_error = _load_dataset(
             load_dataset,
-            force_refresh=force_refresh,
+            force_refresh=True,
         )
         if load_error or not dataset:
             return {
@@ -292,7 +284,6 @@ def sync_subject_summaries_if_needed(load_dataset, force_refresh=False):
             with _connect() as conn:
                 _ensure_storage(conn)
                 queries.replace_subject_summary_rows(conn, summary_rows)
-                queries.upsert_meta(conn, "subject_summary_sync_date", _utc_today_iso())
                 conn.commit()
 
         return {"synced": True, "error": "", "count": len(summary_rows)}
@@ -369,27 +360,9 @@ def list_subject_summaries(school_key = ""):
     return results
 
 
-def get_subject_summaries_for_student(full_name, load_dataset):
-    sync_result = sync_subject_summaries_if_needed(load_dataset)
-    sync_error = str(sync_result.get("error", "")).strip()
-    if sync_error:
-        return [], sync_error
-
+def get_subject_summaries_for_student(full_name, load_dataset=None):
+    _ = load_dataset
     rows = list_subject_summaries_by_full_name(full_name)
-    if rows:
-        return rows, ""
-
-    # If cache says up-to-date but rows are empty, refresh once as fallback.
-    if not bool(sync_result.get("synced", False)):
-        fallback_sync = sync_subject_summaries_if_needed(
-            load_dataset,
-            force_refresh=True,
-        )
-        fallback_error = str(fallback_sync.get("error", "")).strip()
-        if fallback_error:
-            return [], fallback_error
-        rows = list_subject_summaries_by_full_name(full_name)
-
     return rows, ""
 
 

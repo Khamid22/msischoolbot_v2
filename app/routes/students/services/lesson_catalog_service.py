@@ -15,10 +15,6 @@ def _utc_now_iso():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _utc_today_iso():
-    return datetime.utcnow().date().isoformat()
-
-
 def _is_cancelled_text(value):
     normalized = str(value or "").strip().casefold()
     return "cancelled" in normalized or "canceled" in normalized
@@ -162,17 +158,14 @@ def _build_catalog_rows(dataset):
 
 
 def sync_lesson_catalog_if_needed(load_dataset, force_refresh=False):
+    _ = force_refresh
     with _SYNC_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
-            today = _utc_today_iso()
-            last_sync_date = queries.get_meta(conn, "lesson_catalog_sync_date")
-            if not force_refresh and last_sync_date == today:
-                return {"synced": False, "error": "", "count": 0}
 
         dataset, load_error = _load_dataset(
             load_dataset,
-            force_refresh=force_refresh,
+            force_refresh=True,
         )
         if load_error or not dataset:
             return {
@@ -187,7 +180,6 @@ def sync_lesson_catalog_if_needed(load_dataset, force_refresh=False):
             with _connect() as conn:
                 _ensure_storage(conn)
                 queries.replace_lesson_catalog_rows(conn, catalog_rows)
-                queries.upsert_meta(conn, "lesson_catalog_sync_date", _utc_today_iso())
                 conn.commit()
 
         return {"synced": True, "error": "", "count": len(catalog_rows)}
@@ -228,21 +220,7 @@ def list_lessons_by_subject(subject_name, group_name=""):
     return results
 
 
-def get_lessons_for_subject(subject_name, group_name, load_dataset):
-    sync_result = sync_lesson_catalog_if_needed(load_dataset)
-    sync_error = str(sync_result.get("error", "")).strip()
-    if sync_error:
-        return [], sync_error
-
+def get_lessons_for_subject(subject_name, group_name, load_dataset=None):
+    _ = load_dataset
     rows = list_lessons_by_subject(subject_name, group_name)
-    if rows:
-        return rows, ""
-
-    if not bool(sync_result.get("synced", False)):
-        fallback_sync = sync_lesson_catalog_if_needed(load_dataset, force_refresh=True)
-        fallback_error = str(fallback_sync.get("error", "")).strip()
-        if fallback_error:
-            return [], fallback_error
-        rows = list_lessons_by_subject(subject_name, group_name)
-
     return rows, ""

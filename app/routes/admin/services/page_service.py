@@ -9,7 +9,6 @@ from .auth_service import (
 from .normalization_service import normalize_text
 from .subject_summary_service import (
     list_subject_summaries,
-    sync_subject_summaries_if_needed,
 )
 
 from .insights_service import (
@@ -369,25 +368,6 @@ def build_admin_page_context(
     admin_resource_upload_enabled = False
 
     if panel == "overview":
-        def _load_all_schools_dataset(force_refresh=False):
-            loaded_dataset, loaded_error = _load_admin_dataset_for_filter(
-                "all",
-                available_school_codes=available_school_codes,
-                load_dataset=load_dataset,
-                force_refresh=force_refresh,
-            )
-            if loaded_dataset:
-                return loaded_dataset, ""
-            return None, loaded_error
-
-        summary_sync_result = sync_subject_summaries_if_needed(
-            _load_all_schools_dataset,
-            force_refresh=force_refresh,
-        )
-        summary_sync_error = str(summary_sync_result.get("error", "")).strip()
-        if summary_sync_error:
-            sync_errors.append(summary_sync_error)
-
         summary_rows = list_subject_summaries("all")
         overview_metrics = extract_overview_student_metrics(
             summary_rows,

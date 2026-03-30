@@ -71,7 +71,6 @@ def register_student_page_routes(
         students,
         render_login_page=render_login_page,
         render_admin_page=render_admin_page,
-        load_dataset=load_dataset,
     )
     register_student_routes(
         students,
