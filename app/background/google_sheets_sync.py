@@ -15,7 +15,7 @@ from app.routes.students.services import (
 
 JOB_TYPE_GOOGLE_SHEETS_SYNC = "google_sheets_sync"
 _ACTIVE_SYNC_LOCK = threading.Lock()
-_ACTIVE_SYNC_KEYS = set()
+_SYNC_STATE_BY_KEY = {}
 
 
 def normalize_target_school_codes(target_school_codes):
@@ -159,36 +159,69 @@ def start_google_sheets_sync_background(target_school_codes):
 
     job_key = ",".join(sorted(normalized_codes))
     with _ACTIVE_SYNC_LOCK:
-        if job_key in _ACTIVE_SYNC_KEYS:
+        state = _SYNC_STATE_BY_KEY.setdefault(
+            job_key,
+            {
+                "running": False,
+                "rerun_requested": False,
+            },
+        )
+        if bool(state.get("running", False)):
+            state["rerun_requested"] = True
             return {
                 "started": True,
-                "queued": False,
+                "queued": True,
                 "schools": normalized_codes,
-                "message": "Matching sync is already running.",
+                "message": "Matching sync is already running; rerun queued.",
             }
-        _ACTIVE_SYNC_KEYS.add(job_key)
+        state["running"] = True
+        state["rerun_requested"] = False
 
-    # Native thread is intentional: request returns immediately while sync runs.
-    # gevent monkey patch (applied in main.py) still patches socket/ssl I/O.
     def _run():
-        started_at = time.time()
-        logging.info("Google Sheets sync started for schools=%s", normalized_codes)
-        try:
-            result = run_google_sheets_sync(normalized_codes)
-            elapsed_ms = int((time.time() - started_at) * 1000)
+        run_index = 0
+        while True:
+            run_index += 1
+            started_at = time.time()
             logging.info(
-                "Google Sheets sync finished for schools=%s ok=%s elapsed_ms=%s",
+                "Google Sheets sync started for schools=%s run=%s",
                 normalized_codes,
-                bool(result.get("ok", False)),
-                elapsed_ms,
+                run_index,
             )
-        except Exception:
-            logging.exception(
-                "Google Sheets sync crashed for schools=%s", normalized_codes
-            )
-        finally:
+            try:
+                result = run_google_sheets_sync(normalized_codes)
+                elapsed_ms = int((time.time() - started_at) * 1000)
+                logging.info(
+                    "Google Sheets sync finished for schools=%s run=%s ok=%s elapsed_ms=%s errors=%s",
+                    normalized_codes,
+                    run_index,
+                    bool(result.get("ok", False)),
+                    elapsed_ms,
+                    result.get("errors", []),
+                )
+            except Exception:
+                logging.exception(
+                    "Google Sheets sync crashed for schools=%s run=%s",
+                    normalized_codes,
+                    run_index,
+                )
+
             with _ACTIVE_SYNC_LOCK:
-                _ACTIVE_SYNC_KEYS.discard(job_key)
+                state = _SYNC_STATE_BY_KEY.get(job_key, {})
+                rerun_requested = bool(state.get("rerun_requested", False))
+                if rerun_requested:
+                    state["rerun_requested"] = False
+                else:
+                    state["running"] = False
+                    _SYNC_STATE_BY_KEY.pop(job_key, None)
+
+            if not rerun_requested:
+                break
+
+            logging.info(
+                "Google Sheets sync rerun scheduled for schools=%s next_run=%s",
+                normalized_codes,
+                run_index + 1,
+            )
 
     worker = threading.Thread(
         target=_run,

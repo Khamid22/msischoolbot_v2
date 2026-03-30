@@ -346,20 +346,35 @@ def build_aap_lessons_page_context(
 
     if not lesson_catalog:
         lesson_catalog = []
-        seen = set()
-        for index, lesson_number in enumerate(grade_by_lesson.keys(), start=1):
-            dedupe_key = lesson_number.casefold()
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            lesson_catalog.append(
-                {
-                    "lesson_number": lesson_number,
-                    "lesson_topic": topic_by_lesson.get(lesson_number, ""),
-                    "lesson_date": date_by_lesson.get(lesson_number, ""),
-                    "lesson_order": index,
-                }
-            )
+
+    seen = set()
+    max_lesson_order = 0
+    for lesson in lesson_catalog:
+        if not isinstance(lesson, dict):
+            continue
+        lesson_number = str(lesson.get("lesson_number", "")).strip()
+        if not lesson_number:
+            continue
+        seen.add(lesson_number.casefold())
+        try:
+            max_lesson_order = max(max_lesson_order, int(lesson.get("lesson_order", 0)))
+        except (TypeError, ValueError):
+            continue
+
+    for lesson_number in grade_by_lesson.keys():
+        dedupe_key = lesson_number.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        max_lesson_order += 1
+        lesson_catalog.append(
+            {
+                "lesson_number": lesson_number,
+                "lesson_topic": topic_by_lesson.get(lesson_number, ""),
+                "lesson_date": date_by_lesson.get(lesson_number, ""),
+                "lesson_order": max_lesson_order,
+            }
+        )
 
     lesson_rows = []
     for lesson in lesson_catalog:

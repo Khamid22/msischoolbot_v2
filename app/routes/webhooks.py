@@ -1,4 +1,5 @@
 import hmac
+import logging
 import os
 
 from flask import Blueprint, jsonify, request
@@ -105,6 +106,11 @@ def register_webhook_routes(
 
         token_ok, token_error = _validate_webhook_token(payload)
         if not token_ok:
+            logging.warning(
+                "Google Sheets webhook rejected: %s (remote_addr=%s)",
+                token_error,
+                request.remote_addr,
+            )
             status_code = 503 if "not configured" in token_error else 401
             return jsonify({"ok": False, "message": token_error}), status_code
 
@@ -120,10 +126,15 @@ def register_webhook_routes(
                 400,
             )
 
+        logging.info(
+            "Google Sheets webhook accepted for schools=%s",
+            target_school_codes,
+        )
         clear_group_cache()
         mark_school_dataset_dirty(target_school_codes, clear_cached_data=False)
 
         sync_state = start_google_sheets_sync_background(target_school_codes)
+        logging.info("Google Sheets background sync state=%s", sync_state)
         started = bool(sync_state.get("started", False))
         return jsonify({"ok": started, **sync_state}), (202 if started else 503)
 

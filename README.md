@@ -30,11 +30,10 @@ Create `.env` in the project root:
 - `WAITRESS_THREADS` (default: `8`, used by production WSGI server)
 - `WAITRESS_CONNECTION_LIMIT` (default: `256`)
 - `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
-- `RUN_MODE` (`both`, `web`, `bot`, `worker`; default: `both`)
-- `ASYNC_WEBHOOK_SYNC_ENABLED` (default: `1`, enqueue webhook sync jobs instead of blocking request)
-- `EMBEDDED_WORKER_ENABLED` (default: `1`, start background worker thread inside web process)
-- `BACKGROUND_WORKER_IDLE_SECONDS` (default: `1.0`, polling interval for job worker)
-- `BACKGROUND_WORKER_STALE_SECONDS` (default: `900`, stale running job recovery timeout)
+- `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
+- `GOOGLE_SHEETS_WEBHOOK_TOKEN` (required for webhook auth)
+- `SHEETS_WEBHOOK_CACHE_ENABLED` (optional; defaults to enabled when token is set)
+- `SHEETS_WEBHOOK_MAX_STALE_SECONDS` (default: `21600`)
 - `STUDENT_METADATA_CACHE_SECONDS` (default: `30`, cache `/api/metadata` payload)
 - `STUDENT_PANEL_CONTEXT_CACHE_SECONDS` (default: `30`, cache student home panel context)
 - `ADMIN_PAGE_CONTEXT_CACHE_SECONDS` (default: `15`, cache admin panel context)
@@ -69,7 +68,7 @@ Create `.env` in the project root:
 ## Student Sync From Google Sheets
 
 - Students are synced from Google Sheets into SQLite.
-- Sync is webhook-driven and processed by the background worker queue.
+- Sync is webhook-driven and runs in an in-process background thread.
 - New students get generated unique IDs: `MSI#####`.
 - Default password for new student is same as student ID.
 - Password verification uses hashed values.
@@ -77,14 +76,12 @@ Create `.env` in the project root:
 ### Webhook-Based Sync (Recommended)
 
 - Endpoint: `POST /webhooks/google-sheets`
-- Status endpoint: `GET /webhooks/google-sheets/jobs/<job_id>`
 - Auth header: `X-Webhook-Token: <your token>`
 - Required env: `GOOGLE_SHEETS_WEBHOOK_TOKEN`
+- Behavior: endpoint returns immediately (`202`) and sync runs in background.
 - Optional env:
-- `SHEETS_WEBHOOK_CACHE_ENABLED=1` (force webhook cache mode; auto-enabled when token is set)
-- `SHEETS_WEBHOOK_MAX_STALE_SECONDS=21600` (fallback hard refresh window when webhook is missed)
-- `ASYNC_WEBHOOK_SYNC_ENABLED=1` (default; return `202` quickly and run sync in worker)
-- `EMBEDDED_WORKER_ENABLED=1` (default; worker runs inside web process)
+- `SHEETS_WEBHOOK_CACHE_ENABLED=1`
+- `SHEETS_WEBHOOK_MAX_STALE_SECONDS=21600`
 
 Webhook payload supports one or many schools:
 
@@ -105,6 +102,18 @@ Webhook payload supports one or many schools:
   "spreadsheetId": "your_google_spreadsheet_id"
 }
 ```
+
+### Google Sheets Trigger Setup (Apps Script)
+
+Google Sheets does not push webhooks natively. Use Apps Script installable triggers.
+
+1. Open your spreadsheet -> Extensions -> Apps Script.
+2. Paste `scripts/google_sheets_webhook.gs` into the project.
+3. In Script Properties, set:
+- `WEBHOOK_URL=https://<your-domain>/webhooks/google-sheets`
+- `WEBHOOK_TOKEN=<same value as GOOGLE_SHEETS_WEBHOOK_TOKEN>`
+4. Run `setupInstallableTriggers()` once and grant permissions.
+5. Optionally run `testWebhook()` to verify the endpoint returns success.
 
 ## SQLite Tables
 
@@ -146,9 +155,6 @@ python main.py web
 
 # terminal 2
 python main.py bot
-
-# terminal 3
-python main.py worker
 ```
 
 ## Project Structure
