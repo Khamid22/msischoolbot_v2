@@ -127,7 +127,6 @@ def parse_sehriyo_group_info(sheet_title):
     if not re.fullmatch(r"[0-9]+[A-Z]+", class_name):
         return None
 
-    # Allow accidental Cyrillic lookalikes in subject tokens: СH / МATH, etc.
     subject_token = subject_token.translate(
         str.maketrans(
             {
@@ -259,7 +258,7 @@ def build_homework_column_meta(
     lesson_topic_row,
     lesson_date_row,
 ):
-    max_columns = max((len(row) for row in rows), default=0)
+    max_columns = len(lesson_number_row) if lesson_number_row else 0
     if is_sehriyo_chemistry_group(group):
         return build_sehriyo_chemistry_homework_column_meta(
             rows,
