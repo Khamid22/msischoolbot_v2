@@ -1,4 +1,7 @@
 import json
+import logging
+import threading
+import time
 
 from app.config.schools import get_configured_school_spreadsheets
 from app.integrations.sheets_data import SheetsDataError, get_school_dataset, mark_school_dataset_dirty
@@ -11,6 +14,8 @@ from app.routes.students.services import (
 )
 
 JOB_TYPE_GOOGLE_SHEETS_SYNC = "google_sheets_sync"
+_ACTIVE_SYNC_LOCK = threading.Lock()
+_ACTIVE_SYNC_KEYS = set()
 
 
 def normalize_target_school_codes(target_school_codes):
@@ -142,10 +147,68 @@ def run_google_sheets_sync(target_school_codes):
     }
 
 
+def start_google_sheets_sync_background(target_school_codes):
+    normalized_codes = normalize_target_school_codes(target_school_codes)
+    if not normalized_codes:
+        return {
+            "started": False,
+            "queued": False,
+            "schools": [],
+            "message": "No target schools configured.",
+        }
+
+    job_key = ",".join(sorted(normalized_codes))
+    with _ACTIVE_SYNC_LOCK:
+        if job_key in _ACTIVE_SYNC_KEYS:
+            return {
+                "started": True,
+                "queued": False,
+                "schools": normalized_codes,
+                "message": "Matching sync is already running.",
+            }
+        _ACTIVE_SYNC_KEYS.add(job_key)
+
+    # Native thread is intentional: request returns immediately while sync runs.
+    # gevent monkey patch (applied in main.py) still patches socket/ssl I/O.
+    def _run():
+        started_at = time.time()
+        logging.info("Google Sheets sync started for schools=%s", normalized_codes)
+        try:
+            result = run_google_sheets_sync(normalized_codes)
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            logging.info(
+                "Google Sheets sync finished for schools=%s ok=%s elapsed_ms=%s",
+                normalized_codes,
+                bool(result.get("ok", False)),
+                elapsed_ms,
+            )
+        except Exception:
+            logging.exception(
+                "Google Sheets sync crashed for schools=%s", normalized_codes
+            )
+        finally:
+            with _ACTIVE_SYNC_LOCK:
+                _ACTIVE_SYNC_KEYS.discard(job_key)
+
+    worker = threading.Thread(
+        target=_run,
+        daemon=True,
+        name=f"google-sheets-sync-{job_key or 'all'}",
+    )
+    worker.start()
+    return {
+        "started": True,
+        "queued": True,
+        "schools": normalized_codes,
+        "message": "Sync started in background.",
+    }
+
+
 __all__ = [
     "JOB_TYPE_GOOGLE_SHEETS_SYNC",
     "normalize_target_school_codes",
     "build_google_sheets_sync_payload",
     "parse_google_sheets_sync_payload",
     "run_google_sheets_sync",
+    "start_google_sheets_sync_background",
 ]

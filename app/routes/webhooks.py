@@ -3,7 +3,7 @@ import os
 
 from flask import Blueprint, jsonify, request
 
-from app.background import run_google_sheets_sync
+from app.background import start_google_sheets_sync_background
 from app.config.schools import get_configured_school_spreadsheets
 from app.extensions import csrf
 from app.integrations.sheets_data import mark_school_dataset_dirty
@@ -123,7 +123,8 @@ def register_webhook_routes(
         clear_group_cache()
         mark_school_dataset_dirty(target_school_codes, clear_cached_data=False)
 
-        sync_result = run_google_sheets_sync(target_school_codes)
-        return jsonify(sync_result), (200 if sync_result.get("ok", False) else 207)
+        sync_state = start_google_sheets_sync_background(target_school_codes)
+        started = bool(sync_state.get("started", False))
+        return jsonify({"ok": started, **sync_state}), (202 if started else 503)
 
     app.register_blueprint(webhook_blueprint)
