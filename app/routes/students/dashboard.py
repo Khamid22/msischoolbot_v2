@@ -1,4 +1,8 @@
-from flask import jsonify, render_template, request
+from datetime import datetime, timezone
+
+from flask import jsonify, render_template, request, url_for
+
+from app.integrations.sheets_data import get_school_dataset_last_updated
 
 from app.routes.students.services import (
     dashboard_service,
@@ -16,8 +20,25 @@ def register_dashboard_routes(
     round_grade_half_up,
     compute_subject_rating,
 ):
+    def _is_refresh_requested():
+        refresh_value = str(request.args.get("refresh", "")).strip().casefold()
+        return refresh_value in {"1", "true", "yes", "y", "on"}
+
+    def _format_last_updated_label(last_updated_at):
+        if last_updated_at is None:
+            return "Last updated: --"
+        try:
+            timestamp = float(last_updated_at)
+        except (TypeError, ValueError):
+            return "Last updated: --"
+        if timestamp <= 0:
+            return "Last updated: --"
+
+        updated_at_utc = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        return "Last updated: " + updated_at_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+
     def should_force_refresh():
-        return False
+        return _is_refresh_requested()
 
     @students.get("/dashboard/<int:student_id>")
     def dashboard(student_id):
@@ -71,6 +92,31 @@ def register_dashboard_routes(
             compute_subject_rating=compute_subject_rating,
             force_refresh=force_refresh,
         )
+
+        payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
+        school_code = str(payload_student.get("schoolCode", "")).strip() or requested_school
+        last_updated_at = get_school_dataset_last_updated(school_code=school_code)
+
+        refresh_subject = requested_subject or str(payload_student.get("subject", "")).strip()
+        refresh_group = requested_group or str(payload_student.get("group", "")).strip()
+        refresh_params = {
+            "student_id": student_id,
+            "refresh": "1",
+        }
+        if refresh_subject:
+            refresh_params["subject"] = refresh_subject
+        if refresh_group:
+            refresh_params["group"] = refresh_group
+        if school_code:
+            refresh_params["school"] = school_code
+        if admin_return_panel:
+            refresh_params["admin_return_panel"] = admin_return_panel
+        if admin_return_school:
+            refresh_params["admin_return_school"] = admin_return_school
+
+        context["refresh_url"] = url_for("student.dashboard", **refresh_params)
+        context["last_updated_label"] = _format_last_updated_label(last_updated_at)
+
         return render_template("student/dashboard.html", **context)
 
     @students.get("/dashboard/<int:student_id>/aap-lessons")

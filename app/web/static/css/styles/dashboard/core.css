@@ -39,6 +39,54 @@
   gap: 10px;
 }
 
+.dashboard-refresh-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dashboard-refresh-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--card-shadow);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.dashboard-refresh-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dashboard-refresh-btn:hover {
+  transform: rotate(-18deg);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.dashboard-refresh-btn:focus {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.dashboard-last-updated {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .topbar-left h1 {
   font-size: 1rem;
   font-weight: 700;
@@ -86,6 +134,30 @@
 .student-meta span {
   font-size: 0.72rem;
   color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .dashboard-refresh-meta {
+    gap: 6px;
+  }
+
+  .dashboard-refresh-btn {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+  }
+
+  .dashboard-last-updated {
+    max-width: 120px;
+    font-size: 0.56rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-last-updated {
+    display: none;
+  }
 }
 
 /* ─── Avatar ─── */
@@ -400,4 +472,3 @@
   color: var(--muted);
   gap: 4px;
 }
-

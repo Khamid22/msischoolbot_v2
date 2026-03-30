@@ -35,6 +35,20 @@
       </div>
 
       <div class="topbar-right">
+        <div class="dashboard-refresh-meta">
+          <a
+            href="{{ refresh_url }}"
+            class="dashboard-refresh-btn"
+            aria-label="Refresh dashboard data"
+            title="Refresh dashboard data from Google Sheets"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 10-3.2 6.9"></path>
+              <polyline points="21 3 21 9 15 9"></polyline>
+            </svg>
+          </a>
+          <span class="dashboard-last-updated">{{ last_updated_label }}</span>
+        </div>
         <div class="student-meta">
           <strong>{{ payload.student.fullName }}</strong>
           <span>{{ payload.student.group }}</span>

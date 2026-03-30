@@ -1211,3 +1211,157 @@ body.tg-miniapp .admin-chart-table-wrap {
     font-size: 0.62rem;
   }
 }
+
+/* ─── Telegram Mini App Table Compression ─── */
+@media (max-width: 640px) {
+  body.tg-miniapp .rating-table-wrap,
+  body.tg-miniapp .aap-table-scroll {
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body.tg-miniapp .rating-table,
+  body.tg-miniapp .aap-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table th,
+  body.tg-miniapp .aap-table td {
+    padding: 5px 4px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.15;
+  }
+
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .aap-table thead th {
+    font-size: 0.44rem;
+    letter-spacing: 0.03em;
+  }
+
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table td {
+    font-size: 0.58rem;
+  }
+
+  body.tg-miniapp .rating-page .table-header-icon {
+    width: 10px;
+    height: 10px;
+    margin-right: 2px;
+  }
+
+  body.tg-miniapp .rating-page .rating-th-content {
+    justify-content: center;
+    gap: 2px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  body.tg-miniapp .rating-page .rank-badge {
+    justify-content: center;
+    gap: 2px;
+  }
+
+  body.tg-miniapp .rating-page .rank-badge svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(1),
+  body.tg-miniapp .rating-table td:nth-child(1) {
+    width: 10%;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(2),
+  body.tg-miniapp .rating-table td:nth-child(2) {
+    width: 24%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(3),
+  body.tg-miniapp .rating-table td:nth-child(3) {
+    width: 14%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(4),
+  body.tg-miniapp .rating-table td:nth-child(4),
+  body.tg-miniapp .rating-table th:nth-child(5),
+  body.tg-miniapp .rating-table td:nth-child(5),
+  body.tg-miniapp .rating-table th:nth-child(6),
+  body.tg-miniapp .rating-table td:nth-child(6),
+  body.tg-miniapp .rating-table th:nth-child(7),
+  body.tg-miniapp .rating-table td:nth-child(7) {
+    width: 13%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(1),
+  body.tg-miniapp .aap-table td:nth-child(1) {
+    width: 19%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(2),
+  body.tg-miniapp .aap-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(3),
+  body.tg-miniapp .aap-table td:nth-child(3) {
+    width: 37%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(4),
+  body.tg-miniapp .aap-table td:nth-child(4) {
+    width: 28%;
+  }
+
+  body.tg-miniapp .aap-score-row {
+    gap: 6px;
+  }
+
+  body.tg-miniapp .aap-score-row strong {
+    font-size: 0.72rem;
+  }
+
+  body.tg-miniapp .aap-progress-track {
+    flex-basis: 72px;
+    height: 6px;
+  }
+
+  body.tg-miniapp .aap-remark {
+    margin-top: 4px;
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 420px) {
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .aap-table thead th {
+    font-size: 0.4rem;
+  }
+
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table td {
+    font-size: 0.54rem;
+    padding: 4px 3px;
+  }
+
+  body.tg-miniapp .rating-page .table-header-icon {
+    display: none;
+  }
+
+  body.tg-miniapp .aap-progress-track {
+    flex-basis: 60px;
+    height: 5px;
+  }
+}

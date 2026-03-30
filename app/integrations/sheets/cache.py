@@ -37,6 +37,16 @@ class SheetCache:
             return None
         return entry.dataset
 
+    def get_last_updated(self, school_code):
+        entry = self._entries.get(school_code)
+        if entry is None:
+            return None
+
+        updated_at = float(entry.updated_at or 0.0)
+        if updated_at <= 0:
+            return None
+        return updated_at
+
     def set(self, school_code, dataset, now):
         entry = self._entries.setdefault(school_code, CacheEntry())
         entry.dataset = dataset
@@ -136,3 +146,13 @@ def get_school_dataset(force_refresh = False, school_code = None):
 
         SHEET_CACHE.set(normalized_school_code, loaded_dataset, now=now)
         return loaded_dataset
+
+
+def get_school_dataset_last_updated(school_code = None):
+    normalized_school_code = normalize_school_code(
+        school_code
+        or os.environ.get("ACTIVE_SCHOOL_CODE", DEFAULT_SCHOOL_CODE)
+        or DEFAULT_SCHOOL_CODE
+    )
+    with SHEET_CACHE.lock:
+        return SHEET_CACHE.get_last_updated(normalized_school_code)
