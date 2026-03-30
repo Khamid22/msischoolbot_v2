@@ -61,8 +61,10 @@ def _build_default_asset_version():
         os.path.join(_STATIC_DIR, "js", "pwa.js"),
         os.path.join(_STATIC_DIR, "js", "sw.js"),
         os.path.join(_STATIC_DIR, "css", "styles", "base.css"),
+        os.path.join(_STATIC_DIR, "css", "styles", "portal.css"),
         os.path.join(_STATIC_DIR, "css", "styles", "pages.css"),
         os.path.join(_STATIC_DIR, "css", "styles", "dashboard.css"),
+        os.path.join(_STATIC_DIR, "css", "styles", "dashboard_page.css"),
         os.path.join(_STATIC_DIR, "css", "styles", "tables.css"),
         os.path.join(_STATIC_DIR, "css", "styles", "overlays.css"),
     ]

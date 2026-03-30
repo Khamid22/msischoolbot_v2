@@ -58,8 +58,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+<script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+<script defer src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
 <script id="adminSubjectInfoJson" type="application/json">{{ admin_subject_info|default([], true)|tojson|safe }}</script>
 {% if admin_panel == "overview" %}
 <script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>

@@ -1,37 +1,17 @@
-const CACHE_VERSION = 'msi-mobile-v27';
+const CACHE_VERSION = "msi-mobile-v28";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 
-const PRECACHE_URLS = [
-  '/',
-  '/manifest.webmanifest',
-  '/static/css/styles/base.css',
-  '/static/css/styles/pages.css',
-  '/static/css/styles/dashboard.css',
-  '/static/css/styles/tables.css',
-  '/static/css/styles/overlays.css',
-  '/static/js/dashboard.js',
-  '/static/js/home.js',
-  '/static/js/pwa.js',
-  '/static/vendor/chart.umd.min.js',
-  '/static/images/favicon.png',
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches
-      .open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
@@ -46,62 +26,48 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-async function cacheFirst(request) {
+async function staleWhileRevalidate(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request);
+
+  const networkPromise = fetch(request)
+    .then((response) => {
+      if (response && response.ok) {
+        cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => null);
+
   if (cached) {
+    networkPromise.catch(() => null);
     return cached;
   }
 
-  const response = await fetch(request);
-  if (response.ok) {
-    cache.put(request, response.clone());
+  const networkResponse = await networkPromise;
+  if (networkResponse) {
+    return networkResponse;
   }
 
-  return response;
+  throw new Error("Network unavailable and no cached asset.");
 }
 
-async function networkFirst(request) {
-  const cache = await caches.open(STATIC_CACHE);
-
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (_error) {
-    const cached = await cache.match(request);
-    if (cached) {
-      return cached;
-    }
-    return cache.match('/');
-  }
-}
-
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
   const { request } = event;
-
-  if (request.method !== 'GET') {
+  if (request.method !== "GET") {
     return;
   }
 
   const url = new URL(request.url);
-
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith("/api/")) {
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
-  if (url.pathname.startsWith('/static/') || url.pathname === '/manifest.webmanifest') {
-    event.respondWith(cacheFirst(request));
+  if (url.pathname.startsWith("/static/") || url.pathname === "/manifest.webmanifest") {
+    event.respondWith(staleWhileRevalidate(request));
   }
 });
