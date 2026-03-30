@@ -3,6 +3,7 @@
 from ..db_config import *
 from ..db_tables import *
 from .admin_queries import *
+from .background_job_queries import *
 from .bot_user_queries import *
 from .lesson_catalog_queries import *
 from .meta_queries import *

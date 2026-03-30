@@ -1,5 +1,9 @@
 """View-model builders for admin pages."""
 
+import os
+import threading
+import time
+
 from app.config.schools import get_configured_school_spreadsheets
 from .auth_service import (
     get_admin_student_profile,
@@ -25,6 +29,77 @@ from .resources_service import (
     list_resources,
     normalize_subject_name,
 )
+
+
+_ADMIN_PAGE_CONTEXT_CACHE_LOCK = threading.Lock()
+_ADMIN_PAGE_CONTEXT_CACHE = {}
+
+
+def _admin_page_context_cache_ttl_seconds():
+    raw_value = str(os.environ.get("ADMIN_PAGE_CONTEXT_CACHE_SECONDS", "15") or "").strip()
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        parsed = 15
+    return max(parsed, 0)
+
+
+def _teacher_edit_cache_key(admin_teacher_edit):
+    if not isinstance(admin_teacher_edit, dict):
+        return ""
+
+    return "|".join(
+        [
+            str(admin_teacher_edit.get("id", "")).strip(),
+            str(admin_teacher_edit.get("full_name", "")).strip().casefold(),
+            str(admin_teacher_edit.get("assigned_group", "")).strip().casefold(),
+            str(admin_teacher_edit.get("pay_rate", "")).strip(),
+        ]
+    )
+
+
+def _build_admin_page_context_cache_key(panel, school_filter, admin_teacher_edit):
+    return (
+        str(panel or "").strip().casefold(),
+        str(school_filter or "").strip().casefold(),
+        _teacher_edit_cache_key(admin_teacher_edit),
+    )
+
+
+def _get_cached_admin_page_context(cache_key):
+    now = time.time()
+    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
+        cached_entry = _ADMIN_PAGE_CONTEXT_CACHE.get(cache_key)
+        if cached_entry and now < float(cached_entry.get("expires_at", 0)):
+            return cached_entry.get("context")
+    return None
+
+
+def _set_cached_admin_page_context(cache_key, context):
+    ttl_seconds = _admin_page_context_cache_ttl_seconds()
+    if ttl_seconds <= 0:
+        return
+
+    now = time.time()
+    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
+        _ADMIN_PAGE_CONTEXT_CACHE[cache_key] = {
+            "context": context,
+            "expires_at": now + ttl_seconds,
+        }
+        expired_keys = [
+            key
+            for key, entry in _ADMIN_PAGE_CONTEXT_CACHE.items()
+            if float(entry.get("expires_at", 0)) <= now
+        ]
+        for key in expired_keys:
+            _ADMIN_PAGE_CONTEXT_CACHE.pop(key, None)
+        if len(_ADMIN_PAGE_CONTEXT_CACHE) > 128:
+            ordered_entries = sorted(
+                _ADMIN_PAGE_CONTEXT_CACHE.items(),
+                key=lambda item: float(item[1].get("expires_at", 0)),
+            )
+            for key, _entry in ordered_entries[: len(_ADMIN_PAGE_CONTEXT_CACHE) - 128]:
+                _ADMIN_PAGE_CONTEXT_CACHE.pop(key, None)
 
 
 def build_school_configuration():
@@ -234,6 +309,16 @@ def build_admin_page_context(
     school_filter = normalize_admin_school_filter(admin_school, admin_school_options)
     dataset_scope = "all" if panel in {"overview", "teachers"} else school_filter
 
+    cache_key = _build_admin_page_context_cache_key(
+        panel,
+        school_filter,
+        admin_teacher_edit,
+    )
+    if not force_refresh:
+        cached_context = _get_cached_admin_page_context(cache_key)
+        if cached_context is not None:
+            return cached_context
+
     sync_errors = []
     dataset = None
     load_error = ""
@@ -405,7 +490,7 @@ def build_admin_page_context(
         )
         admin_resource_upload_enabled = is_resource_upload_enabled()
 
-    return {
+    context = {
         "panel": panel,
         "school_filter": school_filter,
         "sync_errors": sync_errors,
@@ -427,6 +512,9 @@ def build_admin_page_context(
         "admin_resource_subject_options": admin_resource_subject_options,
         "admin_resource_upload_enabled": admin_resource_upload_enabled,
     }
+    if not force_refresh:
+        _set_cached_admin_page_context(cache_key, context)
+    return context
 
 
 def build_edit_student_page_context(student_row_id, load_dataset):

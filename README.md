@@ -30,7 +30,14 @@ Create `.env` in the project root:
 - `WAITRESS_THREADS` (default: `8`, used by production WSGI server)
 - `WAITRESS_CONNECTION_LIMIT` (default: `256`)
 - `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
-- `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
+- `RUN_MODE` (`both`, `web`, `bot`, `worker`; default: `both`)
+- `ASYNC_WEBHOOK_SYNC_ENABLED` (default: `1`, enqueue webhook sync jobs instead of blocking request)
+- `EMBEDDED_WORKER_ENABLED` (default: `1`, start background worker thread inside web process)
+- `BACKGROUND_WORKER_IDLE_SECONDS` (default: `1.0`, polling interval for job worker)
+- `BACKGROUND_WORKER_STALE_SECONDS` (default: `900`, stale running job recovery timeout)
+- `STUDENT_METADATA_CACHE_SECONDS` (default: `30`, cache `/api/metadata` payload)
+- `STUDENT_PANEL_CONTEXT_CACHE_SECONDS` (default: `30`, cache student home panel context)
+- `ADMIN_PAGE_CONTEXT_CACHE_SECONDS` (default: `15`, cache admin panel context)
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
 - `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
@@ -62,7 +69,7 @@ Create `.env` in the project root:
 ## Student Sync From Google Sheets
 
 - Students are synced from Google Sheets into SQLite.
-- Sync runs at most once per UTC day (`students_sync_date` in `app_meta`) to reduce API usage.
+- Sync is webhook-driven and processed by the background worker queue.
 - New students get generated unique IDs: `MSI#####`.
 - Default password for new student is same as student ID.
 - Password verification uses hashed values.
@@ -70,11 +77,14 @@ Create `.env` in the project root:
 ### Webhook-Based Sync (Recommended)
 
 - Endpoint: `POST /webhooks/google-sheets`
+- Status endpoint: `GET /webhooks/google-sheets/jobs/<job_id>`
 - Auth header: `X-Webhook-Token: <your token>`
 - Required env: `GOOGLE_SHEETS_WEBHOOK_TOKEN`
 - Optional env:
 - `SHEETS_WEBHOOK_CACHE_ENABLED=1` (force webhook cache mode; auto-enabled when token is set)
 - `SHEETS_WEBHOOK_MAX_STALE_SECONDS=21600` (fallback hard refresh window when webhook is missed)
+- `ASYNC_WEBHOOK_SYNC_ENABLED=1` (default; return `202` quickly and run sync in worker)
+- `EMBEDDED_WORKER_ENABLED=1` (default; worker runs inside web process)
 
 Webhook payload supports one or many schools:
 
@@ -110,7 +120,7 @@ Main tables used for auth and admin data:
 
 ## Run Locally
 
-Run both bot + web in one process:
+Run both bot + web in one process (dev only):
 
 ```bash
 python main.py
@@ -136,6 +146,9 @@ python main.py web
 
 # terminal 2
 python main.py bot
+
+# terminal 3
+python main.py worker
 ```
 
 ## Project Structure

@@ -98,11 +98,15 @@ GROUP_CACHE_TTL_SECONDS = int(
 _GROUP_CACHE_LOCK = threading.Lock()
 # In-memory cache keyed by (subject, group) to avoid repeated sheet calls.
 _GROUP_CACHE = {}
+_SEEDED_DATASET_TOKENS = {}
+_STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
 
 
 def _clear_group_cache():
     with _GROUP_CACHE_LOCK:
         _GROUP_CACHE.clear()
+        _SEEDED_DATASET_TOKENS.clear()
+        _STUDENTS_BY_SUBJECT_GROUP_CACHE.clear()
 
 
 def _normalize(value):
@@ -145,6 +149,14 @@ def _seed_group_cache_from_dataset(dataset):
     if not isinstance(students, list) or not isinstance(dashboards_by_id, dict):
         return
 
+    now = time.time()
+    dataset_token = int(id(dataset))
+
+    with _GROUP_CACHE_LOCK:
+        token_expires_at = float(_SEEDED_DATASET_TOKENS.get(dataset_token, 0))
+        if now < token_expires_at:
+            return
+
     grouped_entries = {}
     for student in students:
         if not isinstance(student, dict):
@@ -175,13 +187,30 @@ def _seed_group_cache_from_dataset(dataset):
         if dashboard_payload:
             entry["dashboards_by_id"][student_id] = dashboard_payload
 
-    expires_at = time.time() + GROUP_CACHE_TTL_SECONDS
+    expires_at = now + GROUP_CACHE_TTL_SECONDS
     for entry in grouped_entries.values():
         entry["students"].sort(key=lambda item: _normalize(str(item.get("fullName", ""))))
         entry["expires_at"] = expires_at
 
     with _GROUP_CACHE_LOCK:
         _GROUP_CACHE.update(grouped_entries)
+        _SEEDED_DATASET_TOKENS[dataset_token] = expires_at
+
+        # Prune expired/old dataset tokens to keep memory bounded.
+        expired_tokens = [
+            token
+            for token, token_expiry in _SEEDED_DATASET_TOKENS.items()
+            if float(token_expiry) <= now
+        ]
+        for token in expired_tokens:
+            _SEEDED_DATASET_TOKENS.pop(token, None)
+        if len(_SEEDED_DATASET_TOKENS) > 512:
+            ordered_tokens = sorted(
+                _SEEDED_DATASET_TOKENS.items(),
+                key=lambda item: float(item[1]),
+            )
+            for token, _expiry in ordered_tokens[: len(_SEEDED_DATASET_TOKENS) - 512]:
+                _SEEDED_DATASET_TOKENS.pop(token, None)
 
 
 def _get_group_cache_entry(subject, group, school_code = "", force_refresh = False):
@@ -498,6 +527,16 @@ def _search_student(
 def _build_students_by_subject_group(
     students,
 ):
+    if not isinstance(students, list):
+        return {}
+
+    now = time.time()
+    cache_key = (int(id(students)), len(students))
+    with _GROUP_CACHE_LOCK:
+        cached_entry = _STUDENTS_BY_SUBJECT_GROUP_CACHE.get(cache_key)
+        if cached_entry and now < float(cached_entry.get("expires_at", 0)):
+            return cached_entry.get("value", {})
+
     students_by_subject_group = {}
 
     sorted_students = sorted(
@@ -522,6 +561,28 @@ def _build_students_by_subject_group(
                 "fullName": str(student.get("fullName", "")).strip(),
             }
         )
+
+    expires_at = now + GROUP_CACHE_TTL_SECONDS
+    with _GROUP_CACHE_LOCK:
+        _STUDENTS_BY_SUBJECT_GROUP_CACHE[cache_key] = {
+            "value": students_by_subject_group,
+            "expires_at": expires_at,
+        }
+        # Keep cache small and drop expired entries.
+        expired_keys = [
+            key
+            for key, entry in _STUDENTS_BY_SUBJECT_GROUP_CACHE.items()
+            if float(entry.get("expires_at", 0)) <= now
+        ]
+        for key in expired_keys:
+            _STUDENTS_BY_SUBJECT_GROUP_CACHE.pop(key, None)
+        if len(_STUDENTS_BY_SUBJECT_GROUP_CACHE) > 64:
+            ordered_entries = sorted(
+                _STUDENTS_BY_SUBJECT_GROUP_CACHE.items(),
+                key=lambda item: float(item[1].get("expires_at", 0)),
+            )
+            for key, _entry in ordered_entries[: len(_STUDENTS_BY_SUBJECT_GROUP_CACHE) - 64]:
+                _STUDENTS_BY_SUBJECT_GROUP_CACHE.pop(key, None)
 
     return students_by_subject_group
 
@@ -641,6 +702,7 @@ def require_authentication_for_protected_routes():
         "manifest",
         "service_worker",
         "google_sheets_webhook",
+        "google_sheets_webhook_job_status",
     }
     if endpoint in public_endpoints or endpoint_name in public_endpoints:
         return None

@@ -49,7 +49,11 @@ def register_admin_page_routes(
         admin_school="all",
     ):
         _ = admin_selected_student  # Kept for backward compatibility.
-        force_refresh = should_force_refresh()
+        force_refresh = should_force_refresh() or bool(
+            str(auth_error or "").strip()
+            or str(admin_notice or "").strip()
+            or isinstance(admin_teacher_edit, dict)
+        )
         page_context = build_admin_page_context(
             admin_panel=admin_panel,
             admin_school=admin_school,

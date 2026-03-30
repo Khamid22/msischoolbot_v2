@@ -3,16 +3,16 @@ import os
 
 from flask import Blueprint, jsonify, request
 
+from app.background import (
+    enqueue_google_sheets_sync_job,
+    get_background_job_status,
+    is_async_webhook_sync_enabled,
+    run_google_sheets_sync,
+)
 from app.config.schools import get_configured_school_spreadsheets
 from app.extensions import csrf
 from app.integrations.sheets_data import mark_school_dataset_dirty
-from app.routes.students.services import (
-    auth_service,
-    dataset_service,
-    lesson_catalog_service,
-    normalization_service,
-    subject_summary_service,
-)
+from app.routes.students.services import normalization_service
 
 
 def register_webhook_routes(
@@ -21,6 +21,7 @@ def register_webhook_routes(
     load_dataset,
     clear_group_cache,
 ):
+    _ = load_dataset
     webhook_blueprint = Blueprint("webhooks", __name__)
 
     def _split_csv(value):
@@ -102,15 +103,19 @@ def register_webhook_routes(
             return False, "Webhook token is invalid."
         return True, ""
 
-    def _load_all_schools_from_cache(force_refresh=False):
-        _ = force_refresh
-        # Keep existing in-memory data for schools that were not changed by this webhook.
-        try:
-            return dataset_service.load_all_schools_dataset(force_refresh=False), ""
-        except dataset_service.SheetsDataError as exc:
-            return None, str(exc)
-        except Exception as exc:
-            return None, str(exc)
+    @webhook_blueprint.get("/webhooks/google-sheets/jobs/<int:job_id>")
+    @csrf.exempt
+    def google_sheets_webhook_job_status(job_id):
+        token_ok, token_error = _validate_webhook_token({})
+        if not token_ok:
+            status_code = 503 if "not configured" in token_error else 401
+            return jsonify({"ok": False, "message": token_error}), status_code
+
+        status = get_background_job_status(job_id)
+        if not status:
+            return jsonify({"ok": False, "message": "Job not found."}), 404
+
+        return jsonify({"ok": True, "job": status}), 200
 
     @webhook_blueprint.post("/webhooks/google-sheets")
     @csrf.exempt
@@ -139,57 +144,38 @@ def register_webhook_routes(
         clear_group_cache()
         mark_school_dataset_dirty(target_school_codes, clear_cached_data=False)
 
-        students_sync_results = {}
-        webhook_errors = []
-        for school_code in target_school_codes:
-            sync_result = auth_service.sync_students_if_needed(
-                load_dataset,
-                school_code=school_code,
+        if is_async_webhook_sync_enabled():
+            job_id, queued = enqueue_google_sheets_sync_job(target_school_codes)
+            if not job_id:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "message": "Failed to enqueue Google Sheets sync job.",
+                        }
+                    ),
+                    500,
+                )
+
+            return (
+                jsonify(
+                    {
+                        "ok": True,
+                        "queued": True,
+                        "job_id": int(job_id),
+                        "schools": target_school_codes,
+                        "status_url": f"/webhooks/google-sheets/jobs/{int(job_id)}",
+                        "message": (
+                            "Sync job queued."
+                            if queued
+                            else "Matching sync job is already pending."
+                        ),
+                    }
+                ),
+                202,
             )
-            students_sync_results[school_code] = {
-                "synced": bool(sync_result.get("synced", False)),
-                "added": int(sync_result.get("added", 0)),
-                "updated": int(sync_result.get("updated", 0)),
-                "error": str(sync_result.get("error", "")).strip(),
-            }
-            sync_error = str(sync_result.get("error", "")).strip()
-            if sync_error:
-                webhook_errors.append(f"{school_code}: {sync_error}")
 
-        summary_sync_result = subject_summary_service.sync_subject_summaries_if_needed(
-            _load_all_schools_from_cache,
-        )
-        summary_sync_error = str(summary_sync_result.get("error", "")).strip()
-        if summary_sync_error:
-            webhook_errors.append(f"subject_summaries: {summary_sync_error}")
-
-        lesson_sync_result = lesson_catalog_service.sync_lesson_catalog_if_needed(
-            _load_all_schools_from_cache,
-        )
-        lesson_sync_error = str(lesson_sync_result.get("error", "")).strip()
-        if lesson_sync_error:
-            webhook_errors.append(f"lesson_catalog: {lesson_sync_error}")
-
-        return (
-            jsonify(
-                {
-                    "ok": not webhook_errors,
-                    "schools": target_school_codes,
-                    "students_sync": students_sync_results,
-                    "subject_summaries_sync": {
-                        "synced": bool(summary_sync_result.get("synced", False)),
-                        "count": int(summary_sync_result.get("count", 0)),
-                        "error": summary_sync_error,
-                    },
-                    "lesson_catalog_sync": {
-                        "synced": bool(lesson_sync_result.get("synced", False)),
-                        "count": int(lesson_sync_result.get("count", 0)),
-                        "error": lesson_sync_error,
-                    },
-                    "errors": webhook_errors,
-                }
-            ),
-            200 if not webhook_errors else 207,
-        )
+        sync_result = run_google_sheets_sync(target_school_codes)
+        return jsonify(sync_result), (200 if sync_result.get("ok", False) else 207)
 
     app.register_blueprint(webhook_blueprint)
