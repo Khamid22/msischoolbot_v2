@@ -198,6 +198,14 @@
   white-space: nowrap;
 }
 
+.admin-main-nav .tab-label-short {
+  display: none;
+}
+
+.admin-main-nav .tab-label-full {
+  display: inline;
+}
+
 .admin-logout-form {
   margin: 0;
   flex: 0 0 auto;
@@ -215,6 +223,13 @@
   min-height: 34px;
   padding: 0;
   border-radius: 10px;
+}
+
+.admin-exit-btn {
+  width: auto;
+  min-width: 68px;
+  gap: 6px;
+  padding: 0 10px;
 }
 
 .admin-overview-grid {
@@ -615,6 +630,21 @@
 .admin-school-filter-row {
   margin-left: auto;
   justify-content: flex-end;
+}
+
+.admin-school-filter-form {
+  margin-left: auto;
+  width: min(220px, 100%);
+}
+
+.admin-school-filter-form .field {
+  gap: 5px;
+}
+
+.admin-school-filter-form .field select {
+  min-height: 38px;
+  font-size: 0.72rem;
+  padding: 6px 10px;
 }
 
 /* ─── Resources Panel ─── */
@@ -1498,16 +1528,35 @@
   }
 
   .admin-main-nav .admin-tab-btn {
-    min-width: 74px;
-    min-height: 30px;
-    padding: 4px 8px;
-    font-size: 0.64rem;
+    min-width: 0;
+    min-height: 28px;
+    padding: 4px 4px;
+    font-size: 0.55rem;
+    flex: 1 1 0;
   }
 
   .admin-logout-icon-btn {
-    width: 30px;
-    min-width: 30px;
-    min-height: 30px;
+    min-height: 28px;
+  }
+
+  .admin-main-nav .tab-label-full {
+    display: none;
+  }
+
+  .admin-main-nav .tab-label-short {
+    display: inline;
+  }
+
+  .admin-exit-btn {
+    min-width: 52px;
+    padding: 0 6px;
+    gap: 4px;
+    flex: 0 0 auto !important;
+  }
+
+  .admin-exit-btn svg {
+    width: 11px;
+    height: 11px;
   }
 
   .admin-subject-controls {
@@ -1597,9 +1646,25 @@
     flex: 0 0 auto;
   }
 
+  .admin-school-filter-form {
+    margin-left: 0;
+    width: min(150px, 100%);
+  }
+
+  .admin-school-filter-form .field span {
+    font-size: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-school-filter-form .field select {
+    min-height: 32px;
+    font-size: 0.64rem;
+    padding: 4px 8px;
+  }
+
   .admin-search-field input {
     min-height: 38px;
-    font-size: 0.8rem;
+    font-size: 0.74rem;
   }
 
   .teacher-form-card .field span {
@@ -1641,6 +1706,40 @@
 
   .edit-profile-save-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-main-nav {
+    gap: 2px;
+  }
+
+  .admin-main-nav .admin-tab-btn {
+    font-size: 0.5rem;
+    min-height: 26px;
+    padding: 3px 3px;
+  }
+
+  .admin-exit-btn {
+    min-width: 44px;
+    padding: 0 4px;
+    gap: 3px;
+  }
+
+  .admin-school-filter-form {
+    width: min(134px, 100%);
+  }
+
+  .admin-school-filter-form .field select {
+    min-height: 30px;
+    font-size: 0.6rem;
+    padding: 4px 6px;
+  }
+
+  .admin-search-field input {
+    min-height: 34px;
+    font-size: 0.7rem;
+    padding: 6px 10px;
   }
 }
 

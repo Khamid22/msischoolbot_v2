@@ -223,12 +223,12 @@ def build_admin_group_zones(metrics):
     }
     for row in zone_rows:
         aap_value = float(row.get("aap") or 0)
-        if aap_value > 7:
+        if aap_value >= 7:
             zones["green"].append(row)
-        elif aap_value < 5:
-            zones["red"].append(row)
-        else:
+        elif aap_value >= 5:
             zones["yellow"].append(row)
+        else:
+            zones["red"].append(row)
 
     zones["green"].sort(
         key=lambda row: (

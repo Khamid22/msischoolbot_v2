@@ -19,34 +19,39 @@
       href="{{ url_for('student.home', panel='overview', school=admin_school|default('all', true)) }}"
       class="secondary-btn admin-tab-btn {% if admin_panel == 'overview' %}is-active{% endif %}"
     >
-      Overview
+      <span class="tab-label-full">Overview</span>
+      <span class="tab-label-short">Over</span>
     </a>
     <a
       href="{{ url_for('student.home', panel='students', school=admin_school|default('all', true)) }}"
       class="secondary-btn admin-tab-btn {% if admin_panel == 'students' %}is-active{% endif %}"
     >
-      Students
+      <span class="tab-label-full">Students</span>
+      <span class="tab-label-short">Stud</span>
     </a>
     <a
       href="{{ url_for('student.home', panel='teachers', school='all') }}"
       class="secondary-btn admin-tab-btn {% if admin_panel == 'teachers' %}is-active{% endif %}"
     >
-      Teachers
+      <span class="tab-label-full">Teachers</span>
+      <span class="tab-label-short">Teach</span>
     </a>
     <a
       href="{{ url_for('student.home', panel='resources', school='all') }}"
       class="secondary-btn admin-tab-btn {% if admin_panel == 'resources' %}is-active{% endif %}"
     >
-      Resources
+      <span class="tab-label-full">Resources</span>
+      <span class="tab-label-short">Res</span>
     </a>
     <form action="{{ url_for('student.logout') }}" method="post" class="admin-logout-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <button type="submit" class="secondary-btn admin-tab-btn admin-logout-icon-btn" aria-label="Logout" title="Logout">
+      <button type="submit" class="secondary-btn admin-tab-btn admin-logout-icon-btn admin-exit-btn" aria-label="Exit" title="Exit">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
           <path d="M10 17l5-5-5-5"></path>
           <path d="M15 12H3"></path>
         </svg>
+        <span>Exit</span>
       </button>
     </form>
   </nav>

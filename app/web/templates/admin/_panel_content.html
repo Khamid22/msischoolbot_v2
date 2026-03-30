@@ -134,7 +134,7 @@
             </article>
 
             <article class="admin-info-card admin-info-card-wide admin-zone-card zone-green">
-              <h3>Green Zone</h3>
+              <h3>Green Zone (AAP &ge; 7)</h3>
               <div class="admin-table-wrap admin-zone-table-wrap">
                 <table class="admin-table admin-zone-table">
                   <thead>
@@ -167,7 +167,7 @@
             </article>
 
             <article class="admin-info-card admin-info-card-wide admin-zone-card zone-yellow">
-              <h3>Yellow Zone</h3>
+              <h3>Yellow Zone (5 &le; AAP &lt; 7)</h3>
               <div class="admin-table-wrap admin-zone-table-wrap">
                 <table class="admin-table admin-zone-table">
                   <thead>
@@ -200,7 +200,7 @@
             </article>
 
             <article class="admin-info-card admin-info-card-wide admin-zone-card zone-red">
-              <h3>Red Zone</h3>
+              <h3>Red Zone (AAP &lt; 5)</h3>
               <div class="admin-table-wrap admin-zone-table-wrap">
                 <table class="admin-table admin-zone-table">
                   <thead>
@@ -502,7 +502,6 @@
                       <th>ID</th>
                       <th>Subject</th>
                       <th>Type</th>
-                      <th>Title</th>
                       <th>File</th>
                       <th>Link</th>
                       <th>Action</th>
@@ -514,10 +513,13 @@
                       <td>{{ resource.id }}</td>
                       <td>{{ resource.subject_name }}</td>
                       <td>{{ resource.resource_type_name }}</td>
-                      <td>{{ resource.title }}</td>
-                      <td>
+                      <td class="admin-resource-file-cell">
                         {% if resource.resource_file_url %}
-                        <a href="{{ resource.resource_file_url }}" target="_blank" rel="noopener noreferrer">Open file</a>
+                        <a href="{{ resource.resource_file_url }}" target="_blank" rel="noopener noreferrer">
+                          {{ resource.title if resource.title else "Open file" }}
+                        </a>
+                        {% elif resource.title %}
+                        <span class="admin-resource-file-title">{{ resource.title }}</span>
                         {% else %}
                         -
                         {% endif %}
@@ -539,7 +541,7 @@
                     {% endfor %}
                     {% if not admin_resources %}
                     <tr>
-                      <td colspan="7">No resources yet.</td>
+                      <td colspan="6">No resources yet.</td>
                     </tr>
                     {% endif %}
                   </tbody>
@@ -559,16 +561,19 @@
                 autocomplete="off"
               />
             </label>
-            <nav class="admin-switch-row admin-school-filter-row" aria-label="School filter">
-              {% for school_option in admin_school_options %}
-              <a
-                href="{{ url_for('student.home', panel='students', school=school_option.code) }}"
-                class="secondary-btn admin-tab-btn {% if admin_school == school_option.code %}is-active{% endif %}"
-              >
-                {{ school_option.label }}
-              </a>
-              {% endfor %}
-            </nav>
+            <form class="admin-school-filter-form" method="get" action="{{ url_for('student.home') }}">
+              <input type="hidden" name="panel" value="students" />
+              <label class="field">
+                <span>School</span>
+                <select name="school" onchange="this.form.submit()">
+                  {% for school_option in admin_school_options %}
+                  <option value="{{ school_option.code }}" {% if admin_school == school_option.code %}selected{% endif %}>
+                    {{ school_option.label }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </label>
+            </form>
           </div>
 
           <div class="admin-table-wrap">
