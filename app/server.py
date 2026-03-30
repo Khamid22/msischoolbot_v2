@@ -704,7 +704,6 @@ def require_authentication_for_protected_routes():
         "manifest",
         "service_worker",
         "google_sheets_webhook",
-        "google_sheets_webhook_job_status",
     }
     if endpoint in public_endpoints or endpoint_name in public_endpoints:
         return None
@@ -750,7 +749,6 @@ register_student_page_routes(
 )
 register_webhook_routes(
     app,
-    load_dataset=_load_dataset,
     clear_group_cache=_clear_group_cache,
 )
 register_system_routes(app)

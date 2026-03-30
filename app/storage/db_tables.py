@@ -191,39 +191,6 @@ def create_tables(conn):
         ON lesson_catalog(subject_name, group_name, lesson_order)
         """
     )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS background_jobs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            job_type TEXT NOT NULL,
-            job_key TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'pending',
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            result_json TEXT NOT NULL DEFAULT '{}',
-            error_text TEXT NOT NULL DEFAULT '',
-            attempts INTEGER NOT NULL DEFAULT 0,
-            max_attempts INTEGER NOT NULL DEFAULT 3,
-            created_at REAL NOT NULL,
-            updated_at REAL NOT NULL,
-            started_at REAL NOT NULL DEFAULT 0,
-            finished_at REAL NOT NULL DEFAULT 0
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_background_jobs_status_created
-        ON background_jobs(status, created_at, id)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_background_jobs_type_key_status
-        ON background_jobs(job_type, job_key, status, id)
-        """
-    )
-
-
 def ensure_students_schema(conn):
     columns = {
         str(row["name"])

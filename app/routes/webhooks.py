@@ -3,12 +3,7 @@ import os
 
 from flask import Blueprint, jsonify, request
 
-from app.background import (
-    enqueue_google_sheets_sync_job,
-    get_background_job_status,
-    is_async_webhook_sync_enabled,
-    run_google_sheets_sync,
-)
+from app.background import run_google_sheets_sync
 from app.config.schools import get_configured_school_spreadsheets
 from app.extensions import csrf
 from app.integrations.sheets_data import mark_school_dataset_dirty
@@ -18,10 +13,8 @@ from app.routes.students.services import normalization_service
 def register_webhook_routes(
     app,
     *,
-    load_dataset,
     clear_group_cache,
 ):
-    _ = load_dataset
     webhook_blueprint = Blueprint("webhooks", __name__)
 
     def _split_csv(value):
@@ -103,20 +96,6 @@ def register_webhook_routes(
             return False, "Webhook token is invalid."
         return True, ""
 
-    @webhook_blueprint.get("/webhooks/google-sheets/jobs/<int:job_id>")
-    @csrf.exempt
-    def google_sheets_webhook_job_status(job_id):
-        token_ok, token_error = _validate_webhook_token({})
-        if not token_ok:
-            status_code = 503 if "not configured" in token_error else 401
-            return jsonify({"ok": False, "message": token_error}), status_code
-
-        status = get_background_job_status(job_id)
-        if not status:
-            return jsonify({"ok": False, "message": "Job not found."}), 404
-
-        return jsonify({"ok": True, "job": status}), 200
-
     @webhook_blueprint.post("/webhooks/google-sheets")
     @csrf.exempt
     def google_sheets_webhook():
@@ -143,37 +122,6 @@ def register_webhook_routes(
 
         clear_group_cache()
         mark_school_dataset_dirty(target_school_codes, clear_cached_data=False)
-
-        if is_async_webhook_sync_enabled():
-            job_id, queued = enqueue_google_sheets_sync_job(target_school_codes)
-            if not job_id:
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "message": "Failed to enqueue Google Sheets sync job.",
-                        }
-                    ),
-                    500,
-                )
-
-            return (
-                jsonify(
-                    {
-                        "ok": True,
-                        "queued": True,
-                        "job_id": int(job_id),
-                        "schools": target_school_codes,
-                        "status_url": f"/webhooks/google-sheets/jobs/{int(job_id)}",
-                        "message": (
-                            "Sync job queued."
-                            if queued
-                            else "Matching sync job is already pending."
-                        ),
-                    }
-                ),
-                202,
-            )
 
         sync_result = run_google_sheets_sync(target_school_codes)
         return jsonify(sync_result), (200 if sync_result.get("ok", False) else 207)

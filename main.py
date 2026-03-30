@@ -1,14 +1,52 @@
-import asyncio
-import logging
 import os
 import sys
+
+
+def _resolve_bootstrap_run_mode():
+    raw_mode = ""
+    if len(sys.argv) > 1:
+        raw_mode = str(sys.argv[1] or "").strip().lower()
+    if not raw_mode:
+        raw_mode = str(os.getenv("RUN_MODE", "both") or "").strip().lower()
+
+    aliases = {
+        "both": "both",
+        "all": "both",
+        "web": "web",
+        "server": "web",
+        "bot": "bot",
+    }
+    return aliases.get(raw_mode, "both")
+
+
+def _is_gevent_patch_enabled():
+    raw_value = str(os.getenv("GEVENT_MONKEY_PATCH", "1") or "").strip()
+    return raw_value.casefold() in {"1", "true", "yes", "on"}
+
+
+def _bootstrap_gevent_monkey_patch():
+    if not _is_gevent_patch_enabled():
+        return
+
+    run_mode = _resolve_bootstrap_run_mode()
+    if run_mode not in {"web", "both"}:
+        return
+
+    import gevent.monkey
+
+    gevent.monkey.patch_all(thread=False)
+
+
+_bootstrap_gevent_monkey_patch()
+
+import asyncio
+import logging
 import threading
 
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.handler import WebSocketHandler
 
 from app.main import app, settings as web_settings
-from app.background import run_background_worker
 from app.routes.students.services.auth_service import init_storage
 
 
@@ -32,25 +70,6 @@ def _waitress_connection_limit():
 
 def _waitress_channel_timeout():
     return _env_positive_int("WAITRESS_CHANNEL_TIMEOUT", 120)
-
-
-def _is_embedded_worker_enabled():
-    raw_value = str(os.getenv("EMBEDDED_WORKER_ENABLED", "1") or "").strip()
-    return raw_value.casefold() in {"1", "true", "yes", "on"}
-
-
-def _start_embedded_worker_if_enabled():
-    if not _is_embedded_worker_enabled():
-        return None
-
-    worker_thread = threading.Thread(
-        target=run_background_worker,
-        daemon=True,
-        name="background-worker",
-    )
-    worker_thread.start()
-    logging.info("Embedded background worker thread started")
-    return worker_thread
 
 
 def _is_wildcard_host(host):
@@ -224,15 +243,13 @@ def _resolve_run_mode():
         "web": "web",
         "server": "web",
         "bot": "bot",
-        "worker": "worker",
-        "jobs": "worker",
     }
     resolved = aliases.get(raw_mode)
     if resolved:
         return resolved
 
     logging.warning(
-        "Unknown run mode %r. Supported: both, web, bot, worker. Falling back to both.",
+        "Unknown run mode %r. Supported: both, web, bot. Falling back to both.",
         raw_mode,
     )
     return "both"
@@ -244,18 +261,14 @@ if __name__ == "__main__":
 
     run_mode = _resolve_run_mode()
     if run_mode == "web":
-        _start_embedded_worker_if_enabled()
         run_web_server()
     elif run_mode == "bot":
         asyncio.run(run_bot())
-    elif run_mode == "worker":
-        run_background_worker()
     else:
-        _start_embedded_worker_if_enabled()
         logging.info(
             "Running bot + web in one process. "
             "For better concurrency use separate processes: "
-            "`python main.py web`, `python main.py bot`, and `python main.py worker`."
+            "`python main.py web` and `python main.py bot`."
         )
         flask_thread = threading.Thread(target=run_web_server, daemon=True)
         flask_thread.start()
