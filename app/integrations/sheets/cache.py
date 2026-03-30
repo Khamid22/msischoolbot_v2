@@ -112,10 +112,21 @@ def get_school_dataset(force_refresh = False, school_code = None):
         or os.environ.get("ACTIVE_SCHOOL_CODE", DEFAULT_SCHOOL_CODE)
         or DEFAULT_SCHOOL_CODE
     )
-    now = time.time()
-    cached_dataset = SHEET_CACHE.get(normalized_school_code)
-    if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
-        return cached_dataset
+    with SHEET_CACHE.lock:
+        now = time.time()
+        cached_dataset = SHEET_CACHE.get(normalized_school_code)
+        if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
+            return cached_dataset
+
+    # Never hold the global cache lock during remote I/O.
+    try:
+        loaded_dataset = load_from_google_sheets(normalized_school_code)
+    except SheetsDataError:
+        with SHEET_CACHE.lock:
+            fallback_dataset = SHEET_CACHE.get(normalized_school_code)
+            if fallback_dataset:
+                return fallback_dataset
+        raise
 
     with SHEET_CACHE.lock:
         now = time.time()
@@ -123,12 +134,5 @@ def get_school_dataset(force_refresh = False, school_code = None):
         if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
             return cached_dataset
 
-        try:
-            dataset = load_from_google_sheets(normalized_school_code)
-        except SheetsDataError:
-            if cached_dataset:
-                return cached_dataset
-            raise
-
-        SHEET_CACHE.set(normalized_school_code, dataset, now=now)
-        return dataset
+        SHEET_CACHE.set(normalized_school_code, loaded_dataset, now=now)
+        return loaded_dataset

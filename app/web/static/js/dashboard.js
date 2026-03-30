@@ -344,137 +344,148 @@
   function createExamResultsChart() {
     const canvas = document.getElementById("examResultsChart");
     if (!canvas) {
-      return;
+        return;
     }
 
     const rawExamResults = Array.isArray(data.examResults) ? data.examResults : [];
     if (!rawExamResults.length) {
-      showChartMessage(canvas, "No exam results yet.");
-      return;
+        showChartMessage(canvas, "No exam results yet.");
+        return;
     }
 
     const examNames = [];
     const attemptToExamScores = new Map();
 
     for (const item of rawExamResults) {
-      const examName = item.examName || item.label || "Exam";
-      const attempt = item.attempt || "Attempt";
-      const score = Number(item.score);
+        const examName = item.examName || item.label || "Exam";
+        const attempt = item.attempt || "Attempt";
+        const score = Number(item.score);
 
-      if (!Number.isFinite(score)) {
-        continue;
-      }
+        if (!Number.isFinite(score)) {
+            continue;
+        }
 
-      if (!examNames.includes(examName)) {
-        examNames.push(examName);
-      }
+        if (!examNames.includes(examName)) {
+            examNames.push(examName);
+        }
 
-      if (!attemptToExamScores.has(attempt)) {
-        attemptToExamScores.set(attempt, {});
-      }
-      attemptToExamScores.get(attempt)[examName] = score;
+        if (!attemptToExamScores.has(attempt)) {
+            attemptToExamScores.set(attempt, {});
+        }
+        attemptToExamScores.get(attempt)[examName] = score;
     }
 
     if (!examNames.length) {
-      showChartMessage(canvas, "No exam results yet.");
-      return;
+        showChartMessage(canvas, "No exam results yet.");
+        return;
     }
 
     const preferredAttemptOrder = {
-      "First Attempt": 1,
-      "Second Attempt": 2,
-      Attempt: 3,
+        "First Attempt": 1,
+        "Second Attempt": 2,
+        Attempt: 3,
     };
 
     const attempts = [...attemptToExamScores.keys()].sort((a, b) => {
-      const rankA = preferredAttemptOrder[a] || 99;
-      const rankB = preferredAttemptOrder[b] || 99;
-      if (rankA !== rankB) {
-        return rankA - rankB;
-      }
-      return a.localeCompare(b);
+        const rankA = preferredAttemptOrder[a] || 99;
+        const rankB = preferredAttemptOrder[b] || 99;
+        if (rankA !== rankB) {
+            return rankA - rankB;
+        }
+        return a.localeCompare(b);
     });
 
     const attemptColors = {
-      "First Attempt": "#6b7280",
-      "Second Attempt": "#111827",
-      Attempt: "#374151",
+        "First Attempt": "#6b7280",
+        "Second Attempt": "#111827",
+        Attempt: "#374151",
     };
 
     const datasets = attempts.map((attempt) => {
-      const scoreMap = attemptToExamScores.get(attempt);
-      return {
-        label: attempt,
-        data: examNames.map((examName) =>
-          Object.prototype.hasOwnProperty.call(scoreMap, examName) ? scoreMap[examName] : null
-        ),
-        borderColor: "#000000",
-        backgroundColor: attemptColors[attempt] || "#374151",
-        borderWidth: 1.2,
-        borderRadius: 6,
-        maxBarThickness: isNarrowScreen ? 34 : 44,
-        barPercentage: 0.84,
-        categoryPercentage: 0.86,
-      };
+        const scoreMap = attemptToExamScores.get(attempt);
+        return {
+            label: attempt,
+            data: examNames.map((examName) =>
+                Object.prototype.hasOwnProperty.call(scoreMap, examName) ? scoreMap[examName] : null
+            ),
+            borderColor: "#000000",
+            backgroundColor: attemptColors[attempt] || "#374151",
+            borderWidth: 1.2,
+            borderRadius: 6,
+            maxBarThickness: isNarrowScreen ? 34 : 44,
+            barPercentage: 0.84,
+            categoryPercentage: 0.86,
+        };
     });
 
     new Chart(canvas, {
-      type: "bar",
-      data: {
-        labels: examNames,
-        datasets,
-      },
-      plugins: [barValuePlugin],
-      options: {
-        normalized: true,
-        responsive: true,
-        maintainAspectRatio: false,
-        devicePixelRatio: dpr,
-        animation: prefersReducedMotion || isNarrowScreen ? false : { duration: 700 },
-        plugins: {
-          legend: {
-            display: datasets.length > 1,
-            position: "bottom",
-            labels: {
-              color: "#334155",
-              padding: isNarrowScreen ? 10 : 14,
-              boxWidth: isNarrowScreen ? 10 : 14,
-              font: { size: isNarrowScreen ? 11 : 12 },
-            },
-          },
-          tooltip: {
-            backgroundColor: "rgba(255,255,255,0.96)",
-            titleColor: "#334155",
-            bodyColor: "#000000",
-            borderColor: "rgba(148,163,184,0.2)",
-            borderWidth: 1,
-            padding: isNarrowScreen ? 10 : 12,
-          },
+        type: "bar",
+        data: {
+            labels: examNames,
+            datasets,
         },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              color: "#64748b",
-              autoSkip: true,
-              maxRotation: 0,
-              minRotation: 0,
-              maxTicksLimit: isNarrowScreen ? 6 : 12,
-              font: { size: isNarrowScreen ? 9 : 10 },
+        plugins: [barValuePlugin],
+        options: {
+            normalized: true,
+            responsive: true,
+            maintainAspectRatio: false,
+            devicePixelRatio: dpr,
+            animation: prefersReducedMotion || isNarrowScreen ? false : { duration: 700 },
+            plugins: {
+                legend: {
+                    display: datasets.length > 1,
+                    position: "bottom",
+                    labels: {
+                        color: "#334155",
+                        padding: isNarrowScreen ? 10 : 14,
+                        boxWidth: isNarrowScreen ? 10 : 14,
+                        font: { size: isNarrowScreen ? 11 : 12 },
+                    },
+                },
+                tooltip: {
+                    backgroundColor: "rgba(255,255,255,0.96)",
+                    titleColor: "#334155",
+                    bodyColor: "#000000",
+                    borderColor: "rgba(148,163,184,0.2)",
+                    borderWidth: 1,
+                    padding: isNarrowScreen ? 10 : 12,
+                },
             },
-          },
-          y: {
-            min: 1,
-            max: 9,
-            ticks: {
-              color: "#64748b",
-              stepSize: 1,
-              font: { size: isNarrowScreen ? 9 : 10 },
+            // ✅ ADD THIS SECTION (Layout Padding)
+            layout: {
+                padding: {
+                    top: 30,
+                    bottom: 10,
+                    left: 10,
+                    right: 10,
+                },
             },
-            grid: { color: "#e2e8f0" },
-          },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: "#64748b",
+                        autoSkip: true,
+                        maxRotation: 0,
+                        minRotation: 0,
+                        maxTicksLimit: isNarrowScreen ? 6 : 12,
+                        font: { size: isNarrowScreen ? 9 : 10 },
+                    },
+                },
+                y: {
+                    // ✅ CHANGE THESE LINES (Y-Axis Fix)
+                    min: 0,
+                    max: 10,
+                    beginAtZero: true,
+                    ticks: {
+                        color: "#64748b",
+                        stepSize: 1,
+                        font: { size: isNarrowScreen ? 9 : 10 },
+                    },
+                    grid: { color: "#e2e8f0" },
+                },
+            },
         },
-      },
     });
   }
 
