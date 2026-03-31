@@ -1748,3 +1748,33 @@
     filter: none;
   }
 }
+
+/* ─── Merged from responsive-fixes.css ─── */
+@media (max-width: 560px) {
+  .admin-resources-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .admin-resource-card {
+    padding: 10px 10px;
+  }
+
+  .admin-resource-type-form .field input,
+  .admin-resource-form .field input,
+  .admin-resource-form .field select,
+  .admin-resource-form .field textarea {
+    min-height: 36px;
+    font-size: 0.78rem;
+  }
+
+  .admin-resource-form .field textarea {
+    min-height: 68px;
+  }
+
+  .admin-resource-submit-btn {
+    min-height: 36px;
+    font-size: 0.68rem;
+    padding: 6px 14px;
+  }
+}

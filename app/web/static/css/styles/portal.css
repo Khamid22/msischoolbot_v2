@@ -3610,3 +3610,211 @@ body.tg-miniapp .admin-chart-table-wrap {
     padding: 4px 3px;
   }
 }
+
+/* ─── Merged from responsive-fixes.css ─── */
+.admin-resources-table {
+  min-width: 520px;
+  table-layout: fixed;
+}
+
+.admin-table.admin-resources-table th,
+.admin-table.admin-resources-table td {
+  padding: 6px 4px;
+  font-size: 0.66rem;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+  .admin-resources-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: min(60vh, 520px);
+  }
+
+  .home-page-admin .admin-resources-table {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .home-page-admin .admin-resources-table th,
+  .home-page-admin .admin-resources-table td {
+    padding: 4px 3px;
+    font-size: 0.52rem;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .home-page-admin .admin-resources-table th {
+    font-size: 0.4rem;
+    letter-spacing: 0.02em;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(1),
+  .home-page-admin .admin-resources-table td:nth-child(1) {
+    width: 7%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(2),
+  .home-page-admin .admin-resources-table td:nth-child(2) {
+    width: 18%;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(3),
+  .home-page-admin .admin-resources-table td:nth-child(3) {
+    width: 14%;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(4),
+  .home-page-admin .admin-resources-table td:nth-child(4) {
+    width: 25%;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(5),
+  .home-page-admin .admin-resources-table td:nth-child(5),
+  .home-page-admin .admin-resources-table th:nth-child(6),
+  .home-page-admin .admin-resources-table td:nth-child(6),
+  .home-page-admin .admin-resources-table th:nth-child(7),
+  .home-page-admin .admin-resources-table td:nth-child(7) {
+    width: 12%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-resources-table td form {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .home-page-admin .admin-resources-table .teachers-action-btn {
+    min-height: 22px;
+    font-size: 0.48rem;
+    padding: 2px 4px;
+  }
+
+  .admin-resource-types-table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-resource-types-wrap {
+    max-height: min(40vh, 340px);
+  }
+
+  body.tg-miniapp .admin-resources-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  body.tg-miniapp .admin-resources-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  body.tg-miniapp .admin-resources-table th,
+  body.tg-miniapp .admin-resources-table td {
+    padding: 4px 3px;
+    font-size: 0.5rem;
+    line-height: 1.15;
+    text-align: center;
+    vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  body.tg-miniapp .admin-resources-table th {
+    font-size: 0.38rem;
+    letter-spacing: 0.02em;
+  }
+
+  body.tg-miniapp .admin-resource-file-cell,
+  body.tg-miniapp .admin-resource-file-cell a,
+  body.tg-miniapp .admin-resource-file-title {
+    font-size: 0.48rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 420px) {
+  .home-page-admin .admin-resources-table th {
+    font-size: 0.36rem;
+    padding: 3px 2px;
+    letter-spacing: 0.01em;
+  }
+
+  .home-page-admin .admin-resources-table td {
+    font-size: 0.48rem;
+    padding: 3px 2px;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(1),
+  .home-page-admin .admin-resources-table td:nth-child(1) {
+    width: 6%;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(4),
+  .home-page-admin .admin-resources-table td:nth-child(4) {
+    width: 22%;
+  }
+
+  .home-page-admin .admin-resources-table th:nth-child(5),
+  .home-page-admin .admin-resources-table td:nth-child(5),
+  .home-page-admin .admin-resources-table th:nth-child(6),
+  .home-page-admin .admin-resources-table td:nth-child(6),
+  .home-page-admin .admin-resources-table th:nth-child(7),
+  .home-page-admin .admin-resources-table td:nth-child(7) {
+    width: 13%;
+  }
+
+  body.tg-miniapp .admin-resources-table th {
+    font-size: 0.34rem;
+  }
+
+  body.tg-miniapp .admin-resources-table td {
+    font-size: 0.46rem;
+    padding: 3px 2px;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-resources-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .admin-resource-card {
+    padding: 10px 10px;
+  }
+
+  .admin-resource-type-form .field input,
+  .admin-resource-form .field input,
+  .admin-resource-form .field select,
+  .admin-resource-form .field textarea {
+    min-height: 36px;
+    font-size: 0.78rem;
+  }
+
+  .admin-resource-form .field textarea {
+    min-height: 68px;
+  }
+
+  .admin-resource-submit-btn {
+    min-height: 36px;
+    font-size: 0.68rem;
+    padding: 6px 14px;
+  }
+}
