@@ -62,9 +62,11 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.dashboard-refresh-btn svg {
-  width: 16px;
-  height: 16px;
+.dashboard-refresh-icon {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .dashboard-refresh-btn:hover {

@@ -25,17 +25,35 @@ def register_dashboard_routes(
         return refresh_value in {"1", "true", "yes", "y", "on"}
 
     def _format_last_updated_label(last_updated_at):
+        def _format_relative_age(seconds_elapsed):
+            units = (
+                (31536000, "year"),
+                (2592000, "month"),
+                (604800, "week"),
+                (86400, "day"),
+                (3600, "hour"),
+                (60, "minute"),
+            )
+            for unit_seconds, unit_name in units:
+                if seconds_elapsed >= unit_seconds:
+                    amount = seconds_elapsed // unit_seconds
+                    suffix = "" if amount == 1 else "s"
+                    return f"{amount} {unit_name}{suffix} ago"
+            return "moments ago"
+
         if last_updated_at is None:
-            return "Last updated: --"
+            return "Last Update: --."
         try:
             timestamp = float(last_updated_at)
         except (TypeError, ValueError):
-            return "Last updated: --"
+            return "Last Update: --."
         if timestamp <= 0:
-            return "Last updated: --"
+            return "Last Update: --."
 
         updated_at_utc = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        return "Last updated: " + updated_at_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+        now_utc = datetime.now(timezone.utc)
+        seconds_elapsed = max(0, int((now_utc - updated_at_utc).total_seconds()))
+        return "Last Update: " + _format_relative_age(seconds_elapsed) + "."
 
     def should_force_refresh():
         return _is_refresh_requested()
