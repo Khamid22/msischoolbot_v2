@@ -247,6 +247,55 @@ def set_resource_type_active(resource_type_id, is_active):
     return True, ""
 
 
+def rename_resource_type(resource_type_id, name):
+    try:
+        type_id = int(resource_type_id)
+    except (TypeError, ValueError):
+        return False, "Invalid resource type."
+    if type_id <= 0:
+        return False, "Invalid resource type."
+
+    normalized_name = str(name or "").strip()
+    if not normalized_name:
+        return False, "Resource type name is required."
+    if len(normalized_name) > 80:
+        return False, "Resource type name is too long."
+
+    slug_base = _slugify(normalized_name)
+    if not slug_base:
+        return False, "Resource type name is invalid."
+
+    now = _utc_now_iso()
+    with _DB_LOCK:
+        with _connect() as conn:
+            _ensure_storage(conn)
+            existing = queries.get_resource_type_by_id_row(conn, type_id)
+            if not existing:
+                return False, "Resource type was not found."
+
+            existing_by_name = queries.get_resource_type_by_name_row(conn, normalized_name)
+            if existing_by_name and int(existing_by_name["id"]) != type_id:
+                return False, "Resource type already exists."
+
+            slug = slug_base
+            suffix = 2
+            slug_conflict = queries.get_resource_type_by_slug_row(conn, slug)
+            while slug_conflict and int(slug_conflict["id"]) != type_id:
+                slug = f"{slug_base}-{suffix}"
+                suffix += 1
+                slug_conflict = queries.get_resource_type_by_slug_row(conn, slug)
+
+            queries.update_resource_type_row(
+                conn,
+                type_id,
+                normalized_name,
+                slug,
+                now,
+            )
+            conn.commit()
+    return True, ""
+
+
 def delete_resource_type(resource_type_id):
     try:
         type_id = int(resource_type_id)
@@ -261,8 +310,6 @@ def delete_resource_type(resource_type_id):
             existing = queries.get_resource_type_by_id_row(conn, type_id)
             if not existing:
                 return False, "Resource type was not found."
-            if bool(existing["is_system"]):
-                return False, "Default resource types cannot be deleted."
 
             usage_count = queries.count_resources_by_type(conn, type_id)
             if usage_count > 0:
@@ -542,6 +589,7 @@ __all__ = [
     "list_resource_types",
     "create_resource_type",
     "set_resource_type_active",
+    "rename_resource_type",
     "delete_resource_type",
     "list_resource_subject_names",
     "create_resource",

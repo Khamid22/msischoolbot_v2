@@ -15,16 +15,44 @@
 
 .admin-resource-types-table th:nth-child(1),
 .admin-resource-types-table td:nth-child(1) {
-  width: 46%;
+  width: 34%;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 .admin-resource-types-table th:nth-child(2),
 .admin-resource-types-table td:nth-child(2) {
-  width: 54%;
+  width: 66%;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.admin-resource-type-actions-cell {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-resource-type-rename-form {
+  margin: 0;
+}
+
+.admin-resource-type-rename-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.admin-resource-type-action-buttons {
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .admin-resources-table-wrap {
@@ -1477,12 +1505,26 @@
   }
 
   .admin-resource-types-table {
-    min-width: 0;
+    min-width: 460px;
     width: 100%;
   }
 
   .admin-resource-types-wrap {
     max-height: min(40vh, 340px);
+  }
+
+  .admin-resource-type-actions-cell {
+    gap: 6px;
+  }
+
+  .admin-resource-type-rename-form input {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.62rem;
+  }
+
+  .admin-resource-type-action-buttons {
+    gap: 4px;
   }
 
 }
@@ -1693,9 +1735,15 @@
     min-width: 700px;
   }
 
-  .rating-page .rating-table th:first-child,
   .rating-page .rating-table td:first-child {
     position: static;
+  }
+
+  .rating-page .rating-table thead th:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 7;
+    background: var(--bg);
   }
 
   .rating-page .rating-table th {

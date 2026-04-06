@@ -161,6 +161,26 @@ def update_resource_type_active(conn, resource_type_id, is_active, updated_at):
     return int(updated.rowcount or 0)
 
 
+def update_resource_type_row(conn, resource_type_id, name, slug, updated_at):
+    updated = conn.execute(
+        """
+        UPDATE resource_types
+        SET
+            name = ?,
+            slug = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            name,
+            slug,
+            updated_at,
+            int(resource_type_id),
+        ),
+    )
+    return int(updated.rowcount or 0)
+
+
 def delete_resource_type_row_by_id(conn, resource_type_id):
     deleted = conn.execute(
         """
@@ -387,6 +407,7 @@ __all__ = [
     "get_next_resource_type_display_order",
     "insert_resource_type_row",
     "update_resource_type_active",
+    "update_resource_type_row",
     "delete_resource_type_row_by_id",
     "ensure_default_resource_types",
     "list_resource_subject_names",

@@ -1,5 +1,6 @@
 from flask import render_template, request, url_for
 
+from app.config.schools import get_configured_school_spreadsheets
 from app.routes.students.services import payload_service
 
 
@@ -40,6 +41,105 @@ def register_rating_board_routes(
                 filtered_dashboards.append(dashboard_payload)
 
         return filtered_dashboards
+
+    def _dashboard_cache_key(dashboard_payload):
+        student = dashboard_payload.get("student", {})
+        if not isinstance(student, dict):
+            return None
+
+        student_id = student.get("id")
+        return (
+            _normalize_text(student.get("schoolCode", "")),
+            _normalize_text(student.get("schoolName", "")),
+            int(student_id) if isinstance(student_id, int) else _normalize_text(student_id),
+            _normalize_text(student.get("fullName", "")),
+            _normalize_text(student.get("group", "")),
+        )
+
+    def _extend_unique_dashboards(target_dashboards, seen_keys, dashboards):
+        for dashboard_payload in dashboards:
+            cache_key = _dashboard_cache_key(dashboard_payload)
+            if cache_key is not None and cache_key in seen_keys:
+                continue
+            if cache_key is not None:
+                seen_keys.add(cache_key)
+            target_dashboards.append(dashboard_payload)
+
+    def _load_subject_dashboards_for_school(subject_name, school_code, force_refresh):
+        normalized_school_code = str(school_code or "").strip()
+        if normalized_school_code:
+            dataset, load_error = load_dataset(
+                school_code=normalized_school_code,
+                force_refresh=force_refresh,
+            )
+        else:
+            dataset, load_error = load_dataset(force_refresh=force_refresh)
+        if load_error or not dataset:
+            return [], load_error or "Unable to load subject rating board."
+
+        seed_group_cache_from_dataset(dataset)
+        return collect_subject_dashboards_from_dataset(dataset, subject_name), None
+
+    def _load_subject_dashboards_across_schools(
+        subject_name,
+        *,
+        primary_dataset=None,
+        primary_school_code="",
+        force_refresh=False,
+    ):
+        dashboards = []
+        seen_keys = set()
+        first_load_error = ""
+
+        if primary_dataset:
+            _extend_unique_dashboards(
+                dashboards,
+                seen_keys,
+                collect_subject_dashboards_from_dataset(primary_dataset, subject_name),
+            )
+
+        configured_school_codes = list(get_configured_school_spreadsheets().keys())
+        if not configured_school_codes:
+            configured_school_codes = [str(primary_school_code or "").strip()]
+
+        normalized_primary_school_code = _normalize_text(primary_school_code)
+        for school_code in configured_school_codes:
+            normalized_school_code = _normalize_text(school_code)
+            if primary_dataset and normalized_school_code == normalized_primary_school_code:
+                continue
+
+            if normalized_school_code:
+                dataset, load_error = load_dataset(
+                    school_code=normalized_school_code,
+                    force_refresh=force_refresh,
+                )
+            else:
+                dataset, load_error = load_dataset(force_refresh=force_refresh)
+            if load_error or not dataset:
+                if load_error and not first_load_error:
+                    first_load_error = load_error
+                continue
+
+            seed_group_cache_from_dataset(dataset)
+            _extend_unique_dashboards(
+                dashboards,
+                seen_keys,
+                collect_subject_dashboards_from_dataset(dataset, subject_name),
+            )
+
+        if dashboards:
+            return dashboards, None
+
+        cached_dashboards = []
+        _extend_unique_dashboards(
+            cached_dashboards,
+            set(),
+            collect_subject_dashboards_from_cache(subject_name),
+        )
+        if cached_dashboards:
+            return cached_dashboards, None
+
+        return [], first_load_error or "Unable to load subject rating board."
 
     @students.get("/dashboard/<int:student_id>/rating-board")
     def rating_board(student_id):
@@ -85,44 +185,42 @@ def register_rating_board_routes(
         school_code = str(student.get("schoolCode", "")).strip() or requested_school
         school_name = str(student.get("schoolName", "")).strip()
         rating_scope = "local" if requested_scope == "local" else "global"
-        dashboards = (
-            collect_subject_dashboards_from_dataset(dataset, subject_name)
-            if dataset
-            else collect_subject_dashboards_from_cache(subject_name)
-        )
-        if not dashboards:
-            if school_code:
-                refreshed_dataset, load_error = load_dataset(
-                    school_code=school_code,
-                    force_refresh=force_refresh,
-                )
-            else:
-                refreshed_dataset, load_error = load_dataset(
-                    force_refresh=force_refresh,
-                )
-            if load_error or not refreshed_dataset:
-                return (
-                    render_template(
-                        "student/not_found.html",
-                        message=load_error or "Unable to load subject rating board.",
-                    ),
-                    503,
-                )
-            seed_group_cache_from_dataset(refreshed_dataset)
-            dashboards = collect_subject_dashboards_from_dataset(
-                refreshed_dataset,
+        load_error = ""
+        if rating_scope == "global":
+            dashboards, load_error = _load_subject_dashboards_across_schools(
                 subject_name,
+                primary_dataset=dataset,
+                primary_school_code=school_code,
+                force_refresh=force_refresh,
             )
-
-        scoped_dashboards = dashboards
-        if rating_scope == "local":
-            scoped_dashboards = _filter_dashboards_for_school(
+        else:
+            dashboards = (
+                collect_subject_dashboards_from_dataset(dataset, subject_name)
+                if dataset
+                else []
+            )
+            if not dashboards:
+                dashboards, load_error = _load_subject_dashboards_for_school(
+                    subject_name,
+                    school_code,
+                    force_refresh,
+                )
+            dashboards = _filter_dashboards_for_school(
                 dashboards,
                 school_code,
                 school_name,
             )
 
-        leaderboard = build_subject_leaderboard(scoped_dashboards)
+        if load_error and not dashboards:
+            return (
+                render_template(
+                    "student/not_found.html",
+                    message=load_error or "Unable to load subject rating board.",
+                ),
+                503,
+            )
+
+        leaderboard = build_subject_leaderboard(dashboards)
         current_rating = next(
             (row for row in leaderboard if row.get("studentId") == student_id),
             None,

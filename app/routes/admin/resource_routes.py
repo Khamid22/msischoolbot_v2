@@ -6,6 +6,7 @@ from app.routes.admin.services.resources_service import (
     create_resource_type,
     delete_resource,
     delete_resource_type,
+    rename_resource_type,
 )
 from app.routes.admin.services.upload_progress_service import (
     begin_upload,
@@ -53,6 +54,24 @@ def register_admin_resource_routes(
 
         return render_admin_page(
             admin_notice="Resource type deleted.",
+            admin_panel="resources",
+        )
+
+    @router.post("/admin/resources/types/<int:resource_type_id>/rename")
+    def rename_resource_type_route(resource_type_id):
+        resource_type_name = request.form.get("resource_type_name", "").strip()
+        renamed, rename_error = rename_resource_type(resource_type_id, resource_type_name)
+        if not renamed:
+            return (
+                render_admin_page(
+                    auth_error=rename_error or "Unable to rename resource type.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+
+        return render_admin_page(
+            admin_notice="Resource type renamed.",
             admin_panel="resources",
         )
 
