@@ -202,8 +202,31 @@ def ensure_default_resource_types(conn, created_at):
     ]
 
     for order_index, (name, slug, is_system) in enumerate(defaults, start=1):
+        existing = get_resource_type_by_slug_row(conn, slug)
+        if existing:
+            continue
+
         existing = get_resource_type_by_name_row(conn, name)
         if existing:
+            conn.execute(
+                """
+                UPDATE resource_types
+                SET
+                    slug = ?,
+                    is_system = ?,
+                    display_order = CASE
+                        WHEN display_order <= 0 THEN ?
+                        ELSE display_order
+                    END
+                WHERE id = ?
+                """,
+                (
+                    slug,
+                    int(bool(is_system)),
+                    int(order_index),
+                    int(existing["id"]),
+                ),
+            )
             continue
         insert_resource_type_row(
             conn,

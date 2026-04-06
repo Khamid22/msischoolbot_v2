@@ -409,33 +409,45 @@
                   </thead>
                   <tbody>
                     {% for type_row in admin_resource_types %}
-                    <tr>
-                      <td>{{ type_row.name }}</td>
+                    <tr data-resource-type-row>
+                      <td class="admin-resource-type-name-cell">
+                        <span class="admin-resource-type-name-text" data-resource-type-display>{{ type_row.name }}</span>
+                        <form
+                          id="resourceTypeRenameForm{{ type_row.id }}"
+                          action="{{ url_for('admin.rename_resource_type_route', resource_type_id=type_row.id) }}"
+                          method="post"
+                          class="admin-resource-type-rename-form"
+                          data-resource-type-rename-form
+                          hidden
+                        >
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                          <input
+                            type="text"
+                            name="resource_type_name"
+                            value="{{ type_row.name }}"
+                            maxlength="80"
+                            autocomplete="off"
+                            aria-label="Rename {{ type_row.name }}"
+                            data-resource-type-input
+                            required
+                          />
+                        </form>
+                      </td>
                       <td>
                         <div class="admin-resource-type-actions-cell">
-                          <form
-                            id="resourceTypeRenameForm{{ type_row.id }}"
-                            action="{{ url_for('admin.rename_resource_type_route', resource_type_id=type_row.id) }}"
-                            method="post"
-                            class="admin-resource-type-rename-form"
-                          >
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                            <input
-                              type="text"
-                              name="resource_type_name"
-                              value="{{ type_row.name }}"
-                              maxlength="80"
-                              autocomplete="off"
-                              aria-label="Rename {{ type_row.name }}"
-                              required
-                            />
-                          </form>
                           <div class="teachers-actions-cell admin-resource-type-action-buttons">
-                            <button type="submit" form="resourceTypeRenameForm{{ type_row.id }}" class="secondary-btn teachers-action-btn">Rename</button>
-                            <form action="{{ url_for('admin.delete_resource_type_route', resource_type_id=type_row.id) }}" method="post" onsubmit="return confirm('Delete this resource type?');">
+                            <button type="button" class="secondary-btn teachers-action-btn" data-resource-type-edit-btn>Rename</button>
+                            <form
+                              action="{{ url_for('admin.delete_resource_type_route', resource_type_id=type_row.id) }}"
+                              method="post"
+                              onsubmit="return confirm('Delete this resource type?');"
+                              data-resource-type-delete-form
+                            >
                               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                              <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger">Delete</button>
+                              <button type="submit" class="secondary-btn teachers-action-btn teachers-action-danger" data-resource-type-delete-btn>Delete</button>
                             </form>
+                            <button type="submit" form="resourceTypeRenameForm{{ type_row.id }}" class="secondary-btn teachers-action-btn" data-resource-type-save-btn hidden>Done</button>
+                            <button type="button" class="secondary-btn teachers-action-btn" data-resource-type-cancel-btn hidden>Cancel</button>
                           </div>
                         </div>
                       </td>

@@ -277,13 +277,15 @@ def rename_resource_type(resource_type_id, name):
             if existing_by_name and int(existing_by_name["id"]) != type_id:
                 return False, "Resource type already exists."
 
-            slug = slug_base
-            suffix = 2
-            slug_conflict = queries.get_resource_type_by_slug_row(conn, slug)
-            while slug_conflict and int(slug_conflict["id"]) != type_id:
-                slug = f"{slug_base}-{suffix}"
-                suffix += 1
+            slug = str(existing["slug"] or "").strip()
+            if not slug or not bool(existing["is_system"]):
+                slug = slug_base
+                suffix = 2
                 slug_conflict = queries.get_resource_type_by_slug_row(conn, slug)
+                while slug_conflict and int(slug_conflict["id"]) != type_id:
+                    slug = f"{slug_base}-{suffix}"
+                    suffix += 1
+                    slug_conflict = queries.get_resource_type_by_slug_row(conn, slug)
 
             queries.update_resource_type_row(
                 conn,
@@ -318,7 +320,15 @@ def delete_resource_type(resource_type_id):
                     "Delete resources that use this type first.",
                 )
 
-            queries.delete_resource_type_row_by_id(conn, type_id)
+            if bool(existing["is_system"]):
+                queries.update_resource_type_active(
+                    conn,
+                    type_id,
+                    False,
+                    _utc_now_iso(),
+                )
+            else:
+                queries.delete_resource_type_row_by_id(conn, type_id)
             conn.commit()
     return True, ""
 

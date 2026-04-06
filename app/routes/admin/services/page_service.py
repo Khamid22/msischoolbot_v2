@@ -479,10 +479,8 @@ def build_admin_page_context(
         )
     elif panel == "resources":
         summary_rows = list_subject_summaries("all")
-        admin_resource_types = list_resource_types(include_inactive=True)
-        admin_resource_active_types = [
-            row for row in admin_resource_types if bool(row.get("is_active"))
-        ]
+        admin_resource_types = list_resource_types(include_inactive=False)
+        admin_resource_active_types = list(admin_resource_types)
         admin_resources = list_resources(include_inactive=True)
         admin_resource_subject_options = build_admin_resource_subject_options(
             summary_rows,

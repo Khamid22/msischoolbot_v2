@@ -28,13 +28,25 @@
 }
 
 .admin-resource-type-actions-cell {
-  display: grid;
-  gap: 8px;
+  display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .admin-resource-type-rename-form {
   margin: 0;
+}
+
+.admin-resource-type-name-cell {
+  text-align: left;
+}
+
+.admin-resource-type-name-text {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-resource-type-rename-form input {
@@ -53,6 +65,7 @@
   justify-content: center;
   gap: 6px;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .admin-resources-table-wrap {
@@ -1513,10 +1526,6 @@
     max-height: min(40vh, 340px);
   }
 
-  .admin-resource-type-actions-cell {
-    gap: 6px;
-  }
-
   .admin-resource-type-rename-form input {
     min-height: 28px;
     padding: 4px 8px;
@@ -1525,6 +1534,7 @@
 
   .admin-resource-type-action-buttons {
     gap: 4px;
+    flex-wrap: wrap;
   }
 
 }

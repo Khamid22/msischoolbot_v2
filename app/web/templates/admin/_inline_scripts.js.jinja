@@ -427,3 +427,86 @@
           }
         });
       })();
+      (function () {
+        var rows = Array.from(document.querySelectorAll("[data-resource-type-row]"));
+        if (!rows.length) return;
+
+        function setEditing(row, isEditing) {
+          var display = row.querySelector("[data-resource-type-display]");
+          var renameForm = row.querySelector("[data-resource-type-rename-form]");
+          var input = row.querySelector("[data-resource-type-input]");
+          var editBtn = row.querySelector("[data-resource-type-edit-btn]");
+          var deleteForm = row.querySelector("[data-resource-type-delete-form]");
+          var saveBtn = row.querySelector("[data-resource-type-save-btn]");
+          var cancelBtn = row.querySelector("[data-resource-type-cancel-btn]");
+          var originalValue = row.getAttribute("data-resource-type-original") || "";
+
+          row.classList.toggle("is-editing", isEditing);
+          if (display) display.hidden = isEditing;
+          if (renameForm) renameForm.hidden = !isEditing;
+          if (editBtn) editBtn.hidden = isEditing;
+          if (deleteForm) deleteForm.hidden = isEditing;
+          if (saveBtn) saveBtn.hidden = !isEditing;
+          if (cancelBtn) cancelBtn.hidden = !isEditing;
+
+          if (!input) return;
+          if (isEditing) {
+            input.value = originalValue;
+            window.setTimeout(function () {
+              input.focus();
+              input.select();
+            }, 0);
+            return;
+          }
+          input.value = originalValue;
+        }
+
+        function closeOtherRows(activeRow) {
+          rows.forEach(function (row) {
+            if (row === activeRow) return;
+            setEditing(row, false);
+          });
+        }
+
+        rows.forEach(function (row) {
+          var display = row.querySelector("[data-resource-type-display]");
+          var renameForm = row.querySelector("[data-resource-type-rename-form]");
+          var input = row.querySelector("[data-resource-type-input]");
+          var editBtn = row.querySelector("[data-resource-type-edit-btn]");
+          var cancelBtn = row.querySelector("[data-resource-type-cancel-btn]");
+          var saveBtn = row.querySelector("[data-resource-type-save-btn]");
+          var originalValue = display ? String(display.textContent || "").trim() : "";
+
+          row.setAttribute("data-resource-type-original", originalValue);
+          setEditing(row, false);
+
+          if (editBtn) {
+            editBtn.addEventListener("click", function () {
+              closeOtherRows(row);
+              setEditing(row, true);
+            });
+          }
+
+          if (cancelBtn) {
+            cancelBtn.addEventListener("click", function () {
+              setEditing(row, false);
+            });
+          }
+
+          if (input) {
+            input.addEventListener("keydown", function (event) {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setEditing(row, false);
+              }
+            });
+          }
+
+          if (renameForm) {
+            renameForm.addEventListener("submit", function () {
+              if (saveBtn) saveBtn.disabled = true;
+              if (cancelBtn) cancelBtn.disabled = true;
+            });
+          }
+        });
+      })();
