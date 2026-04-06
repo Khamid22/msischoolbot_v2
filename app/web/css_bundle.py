@@ -37,11 +37,7 @@ def _resolve_css_sources(entry_path):
     return resolved
 
 
-def build_css_bundle(entry_path, output_path):
-    entry_file = Path(entry_path).resolve()
-    output_file = Path(output_path).resolve()
-    source_files = _resolve_css_sources(entry_file)
-
+def _build_bundle_text(entry_file, output_file, source_files):
     sections = [
         "/* Generated file. Do not edit directly. */",
         f"/* Source manifest: {entry_file.name} */",
@@ -57,7 +53,14 @@ def build_css_bundle(entry_path, output_path):
         sections.append(source_text)
         sections.append("")
 
-    bundled_text = "\n".join(sections).rstrip() + "\n"
+    return "\n".join(sections).rstrip() + "\n"
+
+
+def build_css_bundle(entry_path, output_path):
+    entry_file = Path(entry_path).resolve()
+    output_file = Path(output_path).resolve()
+    source_files = _resolve_css_sources(entry_file)
+    bundled_text = _build_bundle_text(entry_file, output_file, source_files)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(bundled_text, encoding="utf-8")
     return source_files
@@ -71,19 +74,33 @@ def ensure_css_bundle(entry_path, output_path):
     if not source_files:
         raise FileNotFoundError(f"No CSS sources resolved from {entry_file}")
 
+    expected_bundle = _build_bundle_text(entry_file, output_file, source_files)
+
     if not output_file.exists():
-        build_css_bundle(entry_file, output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(expected_bundle, encoding="utf-8")
         return True
 
     try:
         output_mtime = output_file.stat().st_mtime
     except OSError:
-        build_css_bundle(entry_file, output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(expected_bundle, encoding="utf-8")
         return True
 
     latest_source_mtime = max(source_file.stat().st_mtime for source_file in source_files)
     if latest_source_mtime > output_mtime:
-        build_css_bundle(entry_file, output_file)
+        output_file.write_text(expected_bundle, encoding="utf-8")
+        return True
+
+    try:
+        current_output = output_file.read_text(encoding="utf-8")
+    except OSError:
+        output_file.write_text(expected_bundle, encoding="utf-8")
+        return True
+
+    if current_output != expected_bundle:
+        output_file.write_text(expected_bundle, encoding="utf-8")
         return True
 
     return False
