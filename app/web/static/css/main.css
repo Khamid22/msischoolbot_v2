@@ -62,6 +62,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+a,
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 /* Source: elements/typography.css */
 /* Base typography and text element defaults. */
 

@@ -20,3 +20,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+a,
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
