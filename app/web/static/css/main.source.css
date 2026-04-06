@@ -1,0 +1,16 @@
+/* Main CSS source manifest. Keep modular imports here. */
+
+@import url("./settings/tokens.css");
+@import url("./generic/reset.css");
+@import url("./elements/typography.css");
+@import url("./layouts/app-shell.css");
+@import url("./components/alerts.css");
+@import url("./components/forms.css");
+@import url("./components/buttons.css");
+@import url("./components/tables.css");
+@import url("./components/overlays.css");
+@import url("./components/avatar-badges.css");
+@import url("./pages/portal-admin.css");
+@import url("./pages/student-dashboard.css");
+@import url("./platform/telegram.css");
+@import url("./utilities/motion.css");

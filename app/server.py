@@ -20,13 +20,16 @@ from app.routes.students.student_page import register_student_page_routes
 from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
 from app.routes.webhooks import register_webhook_routes
 from app.storage.db_config import get_auth_db_path
+from app.web.css_bundle import ensure_css_bundle
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
 _TEMPLATE_DIR = os.path.join(_FRONTEND_DIR, "templates")
 _STATIC_DIR = os.path.join(_FRONTEND_DIR, "static")
+_CSS_DIR = os.path.join(_STATIC_DIR, "css")
+_MAIN_CSS_SOURCE = os.path.join(_CSS_DIR, "main.source.css")
+_MAIN_CSS_OUTPUT = os.path.join(_CSS_DIR, "main.css")
 
-# Main Flask application object.
 app = Flask(
     __name__,
     template_folder=_TEMPLATE_DIR,
@@ -86,6 +89,7 @@ _asset_version_override = os.environ.get("ASSET_VERSION", "").strip()
 
 
 def _resolve_asset_version():
+    ensure_css_bundle(_MAIN_CSS_SOURCE, _MAIN_CSS_OUTPUT)
     if _asset_version_override and _asset_version_override != "1":
         return _asset_version_override
     return _build_default_asset_version()

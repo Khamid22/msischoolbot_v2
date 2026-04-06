@@ -20,14 +20,16 @@
 
 ## How To Add A New Component
 1. Add a file in `components/` with a clear plain-text name.
-2. Add its `@import` to `main.css` in the components section.
+2. Add its `@import` to `main.source.css` in the components section.
 3. Keep responsive rules in the same file as the base selector.
-4. Reuse existing tokens (`--radius-*`, `--muted`, etc.) before adding new values.
+4. Run `python3 scripts/build_css_bundle.py` or restart the app to rebuild `main.css`.
+5. Reuse existing tokens (`--radius-*`, `--muted`, etc.) before adding new values.
 
 ## How To Add A New Page
 1. Add a file in `pages/` with a clear plain-text name.
 2. Scope page-specific rules to the page wrapper class.
-3. Import it in `main.css` after shared components.
+3. Import it in `main.source.css` after shared components.
+4. Run `python3 scripts/build_css_bundle.py` or restart the app to rebuild `main.css`.
 
 ## Debugging: "Where Is This Style Coming From?"
 1. Inspect element in browser devtools.
@@ -41,3 +43,4 @@
 - Do not duplicate the same selector in multiple layer folders.
 - Do not add random breakpoints; reuse existing project breakpoints.
 - Do not edit `legacy` unless running a controlled fallback.
+- Do not add new runtime `@import` chains to files linked from templates.
