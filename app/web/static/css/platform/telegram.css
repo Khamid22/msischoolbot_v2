@@ -96,8 +96,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 @media (max-width: 640px) {
   body.tg-miniapp .rating-table-wrap,
   body.tg-miniapp .aap-table-scroll {
-    max-height: none;
-    overflow-x: hidden;
+    max-height: 100%;
+    overflow-x: auto;
     overflow-y: auto;
   }
 
@@ -123,8 +123,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 
   body.tg-miniapp .rating-table th,
   body.tg-miniapp .aap-table thead th {
-    font-size: 0.44rem;
-    letter-spacing: 0.03em;
+    font-size: 0.4rem;
+    letter-spacing: 0.02em;
   }
 
   body.tg-miniapp .rating-table td,
@@ -132,17 +132,23 @@ body.tg-miniapp .admin-chart-table-wrap {
     font-size: 0.58rem;
   }
 
+  body.tg-miniapp .rating-page .rating-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--bg);
+  }
+
   body.tg-miniapp .rating-page .table-header-icon {
-    width: 10px;
-    height: 10px;
-    margin-right: 2px;
+    display: none;
   }
 
   body.tg-miniapp .rating-page .rating-th-content {
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     text-align: center;
-    white-space: normal;
+    flex-wrap: nowrap;
+    white-space: nowrap;
   }
 
   body.tg-miniapp .rating-page .rank-badge {
@@ -295,8 +301,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 
 @media (max-width: 640px) {
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
-    font-size: 0.6rem;
-    padding-inline: 6px;
+    font-size: 0.54rem;
+    padding-inline: 4px;
   }
 
   body.home-page-admin.tg-miniapp .admin-exit-btn {

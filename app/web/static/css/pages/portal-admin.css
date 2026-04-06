@@ -200,6 +200,7 @@
 
 .admin-main-nav .tab-label-short {
   display: none;
+  letter-spacing: -0.02em;
 }
 
 .admin-main-nav .tab-label-full {
@@ -1560,8 +1561,8 @@
   .admin-main-nav .admin-tab-btn {
     min-width: 0;
     min-height: 28px;
-    padding: 4px 6px;
-    font-size: 0.58rem;
+    padding: 4px 4px;
+    font-size: 0.52rem;
     flex: 1 1 0;
   }
 
@@ -1764,9 +1765,9 @@
   }
 
   .admin-main-nav .admin-tab-btn {
-    font-size: 0.52rem;
+    font-size: 0.46rem;
     min-height: 26px;
-    padding: 3px 4px;
+    padding: 3px 3px;
   }
 
   .admin-exit-btn {

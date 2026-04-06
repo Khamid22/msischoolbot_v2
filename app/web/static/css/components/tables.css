@@ -1532,6 +1532,13 @@
   vertical-align: middle;
 }
 
+.rating-page .rating-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+}
+
 .rating-page .rating-table th:nth-child(2),
 .rating-page .rating-table td:nth-child(2),
 .rating-page .rating-table th:nth-child(3),
@@ -1556,7 +1563,8 @@
 
 .rating-page .rating-th-content {
   gap: 3px;
-  white-space: normal;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .rating-page .rating-table tr.is-current td:first-child {
@@ -1675,7 +1683,8 @@
   }
 
   .rating-page .rating-table-wrap {
-    max-height: none;
+    max-height: 100%;
+    height: 100%;
     overflow-x: auto;
     overflow-y: auto;
   }
@@ -1687,6 +1696,17 @@
   .rating-page .rating-table th:first-child,
   .rating-page .rating-table td:first-child {
     position: static;
+  }
+
+  .rating-page .rating-table th {
+    font-size: 0.42rem;
+    letter-spacing: 0.02em;
+  }
+
+  .rating-page .table-header-icon {
+    width: 9px;
+    height: 9px;
+    margin-right: 0;
   }
 
   .rating-page .rating-table th:nth-child(1),
@@ -1768,6 +1788,10 @@
   .rating-page .rating-table th,
   .rating-page .rating-table td {
     padding: 6px 4px;
+  }
+
+  .rating-page .rating-table th {
+    font-size: 0.38rem;
   }
 
   .rating-page .rating-table th:nth-child(2),

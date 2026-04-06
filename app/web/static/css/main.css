@@ -1851,6 +1851,13 @@ button {
   vertical-align: middle;
 }
 
+.rating-page .rating-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+}
+
 .rating-page .rating-table th:nth-child(2),
 .rating-page .rating-table td:nth-child(2),
 .rating-page .rating-table th:nth-child(3),
@@ -1875,7 +1882,8 @@ button {
 
 .rating-page .rating-th-content {
   gap: 3px;
-  white-space: normal;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .rating-page .rating-table tr.is-current td:first-child {
@@ -1994,7 +2002,8 @@ button {
   }
 
   .rating-page .rating-table-wrap {
-    max-height: none;
+    max-height: 100%;
+    height: 100%;
     overflow-x: auto;
     overflow-y: auto;
   }
@@ -2006,6 +2015,17 @@ button {
   .rating-page .rating-table th:first-child,
   .rating-page .rating-table td:first-child {
     position: static;
+  }
+
+  .rating-page .rating-table th {
+    font-size: 0.42rem;
+    letter-spacing: 0.02em;
+  }
+
+  .rating-page .table-header-icon {
+    width: 9px;
+    height: 9px;
+    margin-right: 0;
   }
 
   .rating-page .rating-table th:nth-child(1),
@@ -2087,6 +2107,10 @@ button {
   .rating-page .rating-table th,
   .rating-page .rating-table td {
     padding: 6px 4px;
+  }
+
+  .rating-page .rating-table th {
+    font-size: 0.38rem;
   }
 
   .rating-page .rating-table th:nth-child(2),
@@ -2679,6 +2703,7 @@ button {
 
 .admin-main-nav .tab-label-short {
   display: none;
+  letter-spacing: -0.02em;
 }
 
 .admin-main-nav .tab-label-full {
@@ -4039,8 +4064,8 @@ button {
   .admin-main-nav .admin-tab-btn {
     min-width: 0;
     min-height: 28px;
-    padding: 4px 6px;
-    font-size: 0.58rem;
+    padding: 4px 4px;
+    font-size: 0.52rem;
     flex: 1 1 0;
   }
 
@@ -4243,9 +4268,9 @@ button {
   }
 
   .admin-main-nav .admin-tab-btn {
-    font-size: 0.52rem;
+    font-size: 0.46rem;
     min-height: 26px;
-    padding: 3px 4px;
+    padding: 3px 3px;
   }
 
   .admin-exit-btn {
@@ -5262,19 +5287,22 @@ button {
 
 .rating-page .rating-card-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .rating-page .rating-card-copy {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .rating-page .rating-scope-switch {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 6px;
   margin-left: auto;
 }
@@ -5533,17 +5561,19 @@ button {
 
   .rating-page .rating-card-head {
     gap: 10px;
+    align-items: center;
   }
 
   .rating-page .rating-scope-switch {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
     justify-content: flex-end;
   }
 
   .rating-page .rating-scope-btn {
-    min-height: 30px;
-    padding: 5px 11px;
-    font-size: 0.6rem;
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 0.56rem;
   }
 
   .resource-video-modal {
@@ -6172,8 +6202,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 @media (max-width: 640px) {
   body.tg-miniapp .rating-table-wrap,
   body.tg-miniapp .aap-table-scroll {
-    max-height: none;
-    overflow-x: hidden;
+    max-height: 100%;
+    overflow-x: auto;
     overflow-y: auto;
   }
 
@@ -6199,8 +6229,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 
   body.tg-miniapp .rating-table th,
   body.tg-miniapp .aap-table thead th {
-    font-size: 0.44rem;
-    letter-spacing: 0.03em;
+    font-size: 0.4rem;
+    letter-spacing: 0.02em;
   }
 
   body.tg-miniapp .rating-table td,
@@ -6208,17 +6238,23 @@ body.tg-miniapp .admin-chart-table-wrap {
     font-size: 0.58rem;
   }
 
+  body.tg-miniapp .rating-page .rating-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--bg);
+  }
+
   body.tg-miniapp .rating-page .table-header-icon {
-    width: 10px;
-    height: 10px;
-    margin-right: 2px;
+    display: none;
   }
 
   body.tg-miniapp .rating-page .rating-th-content {
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     text-align: center;
-    white-space: normal;
+    flex-wrap: nowrap;
+    white-space: nowrap;
   }
 
   body.tg-miniapp .rating-page .rank-badge {
@@ -6371,8 +6407,8 @@ body.tg-miniapp .admin-chart-table-wrap {
 
 @media (max-width: 640px) {
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
-    font-size: 0.6rem;
-    padding-inline: 6px;
+    font-size: 0.54rem;
+    padding-inline: 4px;
   }
 
   body.home-page-admin.tg-miniapp .admin-exit-btn {
