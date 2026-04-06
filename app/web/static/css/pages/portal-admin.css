@@ -226,10 +226,10 @@
 }
 
 .admin-exit-btn {
-  width: auto;
-  min-width: 68px;
-  gap: 6px;
-  padding: 0 10px;
+  width: 34px;
+  min-width: 34px;
+  gap: 0;
+  padding: 0;
 }
 
 .admin-overview-grid {
@@ -1560,8 +1560,8 @@
   .admin-main-nav .admin-tab-btn {
     min-width: 0;
     min-height: 28px;
-    padding: 4px 4px;
-    font-size: 0.55rem;
+    padding: 4px 6px;
+    font-size: 0.58rem;
     flex: 1 1 0;
   }
 
@@ -1578,15 +1578,16 @@
   }
 
   .admin-exit-btn {
-    min-width: 52px;
-    padding: 0 6px;
-    gap: 4px;
+    min-width: 28px;
+    width: 28px;
+    padding: 0;
+    gap: 0;
     flex: 0 0 auto !important;
   }
 
   .admin-exit-btn svg {
-    width: 11px;
-    height: 11px;
+    width: 13px;
+    height: 13px;
   }
 
   .admin-subject-controls {
@@ -1657,8 +1658,9 @@
 
   .admin-students-toolbar {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(104px, 122px);
     gap: 8px;
+    align-items: end;
   }
 
   .admin-school-filter-row {
@@ -1678,7 +1680,7 @@
 
   .admin-school-filter-form {
     margin-left: 0;
-    width: min(150px, 100%);
+    width: 100%;
   }
 
   .admin-school-filter-form .field span {
@@ -1694,6 +1696,23 @@
 
   .admin-search-field input {
     min-height: 38px;
+    font-size: 0.74rem;
+  }
+
+  .admin-resource-card .admin-card-title {
+    font-size: 0.66rem;
+  }
+
+  .admin-resource-type-form .field span,
+  .admin-resource-form .field span {
+    font-size: 0.54rem;
+    letter-spacing: 0.04em;
+  }
+
+  .admin-resource-type-form .field input,
+  .admin-resource-form .field input,
+  .admin-resource-form .field select,
+  .admin-resource-form .field textarea {
     font-size: 0.74rem;
   }
 
@@ -1745,19 +1764,20 @@
   }
 
   .admin-main-nav .admin-tab-btn {
-    font-size: 0.5rem;
+    font-size: 0.52rem;
     min-height: 26px;
-    padding: 3px 3px;
+    padding: 3px 4px;
   }
 
   .admin-exit-btn {
-    min-width: 44px;
-    padding: 0 4px;
-    gap: 3px;
+    min-width: 26px;
+    width: 26px;
+    padding: 0;
+    gap: 0;
   }
 
   .admin-school-filter-form {
-    width: min(134px, 100%);
+    width: 100%;
   }
 
   .admin-school-filter-form .field select {
@@ -1770,6 +1790,10 @@
     min-height: 34px;
     font-size: 0.7rem;
     padding: 6px 10px;
+  }
+
+  .admin-students-toolbar {
+    grid-template-columns: minmax(0, 1fr) 96px;
   }
 }
 

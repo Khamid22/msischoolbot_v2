@@ -1519,3 +1519,278 @@
   }
 
 }
+
+/* ─── Final mobile table fit overrides ─── */
+.rating-page {
+  --rating-rank-column-width: 56px;
+}
+
+.rating-page .rating-table th,
+.rating-page .rating-table td {
+  padding: 8px 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.rating-page .rating-table th:nth-child(2),
+.rating-page .rating-table td:nth-child(2),
+.rating-page .rating-table th:nth-child(3),
+.rating-page .rating-table td:nth-child(3) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rating-page .rating-table th:nth-child(2),
+.rating-page .rating-table td:nth-child(2),
+.rating-page .rating-table th:nth-child(3),
+.rating-page .rating-table td:nth-child(3) {
+  text-align: center;
+}
+
+.rating-page .rating-th-content,
+.rating-page .rank-badge {
+  width: 100%;
+  justify-content: center;
+}
+
+.rating-page .rating-th-content {
+  gap: 3px;
+  white-space: normal;
+}
+
+.rating-page .rating-table tr.is-current td:first-child {
+  box-shadow: none;
+}
+
+.rating-page .rating-table tr.is-current td:nth-child(2) {
+  box-shadow: inset 3px 0 0 var(--text);
+}
+
+@media (max-width: 640px) {
+  .home-page-admin .admin-panel-students .admin-table-wrap,
+  .home-page-admin .admin-panel-teachers .admin-table-wrap {
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .home-page-admin .admin-panel-students .students-table,
+  .home-page-admin .admin-panel-teachers .teachers-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th,
+  .home-page-admin .admin-panel-students .students-table td {
+    padding: 6px 5px;
+    font-size: 0.62rem;
+    line-height: 1.22;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: middle;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th {
+    font-size: 0.46rem;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th:nth-child(1),
+  .home-page-admin .admin-panel-students .students-table td:nth-child(1) {
+    width: 11%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th:nth-child(2),
+  .home-page-admin .admin-panel-students .students-table td:nth-child(2) {
+    width: 35%;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th:nth-child(3),
+  .home-page-admin .admin-panel-students .students-table td:nth-child(3) {
+    width: 30%;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th:nth-child(4),
+  .home-page-admin .admin-panel-students .students-table td:nth-child(4) {
+    width: 24%;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th,
+  .home-page-admin .admin-panel-teachers .teachers-table td {
+    padding: 6px 5px;
+    font-size: 0.66rem;
+    line-height: 1.24;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: middle;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th {
+    font-size: 0.48rem;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th:nth-child(1),
+  .home-page-admin .admin-panel-teachers .teachers-table td:nth-child(1) {
+    width: 10%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th:nth-child(2),
+  .home-page-admin .admin-panel-teachers .teachers-table td:nth-child(2) {
+    width: 32%;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th:nth-child(3),
+  .home-page-admin .admin-panel-teachers .teachers-table td:nth-child(3) {
+    width: 15%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th:nth-child(4),
+  .home-page-admin .admin-panel-teachers .teachers-table td:nth-child(4) {
+    width: 27%;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table th:nth-child(5),
+  .home-page-admin .admin-panel-teachers .teachers-table td:nth-child(5) {
+    width: 16%;
+    text-align: center;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-actions-cell {
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-icon-btn {
+    width: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .rating-page .rating-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  .rating-page .rating-table {
+    min-width: 700px;
+  }
+
+  .rating-page .rating-table th:first-child,
+  .rating-page .rating-table td:first-child {
+    position: static;
+  }
+
+  .rating-page .rating-table th:nth-child(1),
+  .rating-page .rating-table td:nth-child(1) {
+    width: var(--rating-rank-column-width);
+    min-width: var(--rating-rank-column-width);
+    max-width: var(--rating-rank-column-width);
+  }
+
+  .rating-page .rating-table th:nth-child(2),
+  .rating-page .rating-table td:nth-child(2) {
+    width: 180px;
+    min-width: 180px;
+    position: sticky;
+    left: var(--rating-rank-column-width);
+  }
+
+  .rating-page .rating-table th:nth-child(2) {
+    z-index: 4;
+    background: var(--bg);
+  }
+
+  .rating-page .rating-table td:nth-child(2) {
+    z-index: 1;
+    background: var(--surface);
+  }
+
+  .rating-page .rating-table tbody tr:hover td:nth-child(2) {
+    background: var(--hover-bg);
+  }
+
+  .rating-page .rating-table tr.is-current td:nth-child(2) {
+    background: rgba(10, 10, 10, 0.03);
+  }
+
+  .rating-page .rating-table th:nth-child(3),
+  .rating-page .rating-table td:nth-child(3) {
+    width: 96px;
+    min-width: 96px;
+  }
+
+  .rating-page .rating-table th:nth-child(4),
+  .rating-page .rating-table td:nth-child(4),
+  .rating-page .rating-table th:nth-child(5),
+  .rating-page .rating-table td:nth-child(5),
+  .rating-page .rating-table th:nth-child(6),
+  .rating-page .rating-table td:nth-child(6),
+  .rating-page .rating-table th:nth-child(7),
+  .rating-page .rating-table td:nth-child(7) {
+    width: 78px;
+    min-width: 78px;
+  }
+}
+
+@media (max-width: 420px) {
+  .rating-page {
+    --rating-rank-column-width: 52px;
+  }
+
+  .home-page-admin .admin-panel-students .students-table th,
+  .home-page-admin .admin-panel-teachers .teachers-table th {
+    font-size: 0.42rem;
+  }
+
+  .home-page-admin .admin-panel-students .students-table td {
+    font-size: 0.58rem;
+    padding: 5px 4px;
+  }
+
+  .home-page-admin .admin-panel-teachers .teachers-table td {
+    font-size: 0.62rem;
+    padding: 5px 4px;
+  }
+
+  .rating-page .rating-table {
+    min-width: 652px;
+  }
+
+  .rating-page .rating-table th,
+  .rating-page .rating-table td {
+    padding: 6px 4px;
+  }
+
+  .rating-page .rating-table th:nth-child(2),
+  .rating-page .rating-table td:nth-child(2) {
+    width: 164px;
+    min-width: 164px;
+  }
+
+  .rating-page .rating-table th:nth-child(3),
+  .rating-page .rating-table td:nth-child(3) {
+    width: 84px;
+    min-width: 84px;
+  }
+
+  .rating-page .rating-table th:nth-child(4),
+  .rating-page .rating-table td:nth-child(4),
+  .rating-page .rating-table th:nth-child(5),
+  .rating-page .rating-table td:nth-child(5),
+  .rating-page .rating-table th:nth-child(6),
+  .rating-page .rating-table td:nth-child(6),
+  .rating-page .rating-table th:nth-child(7),
+  .rating-page .rating-table td:nth-child(7) {
+    width: 72px;
+    min-width: 72px;
+  }
+}

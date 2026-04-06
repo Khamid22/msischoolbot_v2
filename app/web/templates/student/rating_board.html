@@ -46,17 +46,24 @@
 
     <main class="dashboard-wrap rating-board-wrap">
       <section class="chart-card">
-        <div class="card-head">
-          <h3 class="title-inline icon-purple">
-            <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 3v18h18"></path>
-              <path d="M18 17V9"></path>
-              <path d="M13 17V5"></path>
-              <path d="M8 17v-3"></path>
-            </svg>
-            Subject Ranking
-          </h3>
-          <p>Top performers in {{ subject_name }}</p>
+        <div class="card-head rating-card-head">
+          <div class="rating-card-copy">
+            <h3 class="title-inline icon-purple">
+              <svg class="widget-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 3v18h18"></path>
+                <path d="M18 17V9"></path>
+                <path d="M13 17V5"></path>
+                <path d="M8 17v-3"></path>
+              </svg>
+              Subject Ranking
+            </h3>
+            <p>Top performers in {{ subject_name }}. {{ rating_scope_label }}</p>
+          </div>
+          <nav class="rating-scope-switch" aria-label="Rating scope">
+            {% for option in scope_options %}
+            <a href="{{ option.url }}" class="rating-scope-btn{% if option.is_current %} is-active{% endif %}">{{ option.label }}</a>
+            {% endfor %}
+          </nav>
         </div>
 
         {% if leaderboard %}
