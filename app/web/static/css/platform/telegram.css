@@ -1,0 +1,294 @@
+/* Telegram Mini App-specific overrides. Keep all .tg-miniapp rules here. */
+
+html:not(.tg-miniapp),
+body:not(.tg-miniapp) {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  height: auto;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  touch-action: auto;
+}
+
+html.tg-miniapp,
+body.tg-miniapp {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100vh;
+  height: var(--tg-app-height);
+  max-height: 100vh;
+  max-height: var(--tg-app-height);
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+body.dashboard-page.tg-miniapp {
+  display: flex;
+  flex-direction: column;
+  touch-action: none;
+}
+
+body.dashboard-page.tg-miniapp .topbar {
+  flex: 0 0 auto;
+}
+
+body.dashboard-page.tg-miniapp .dashboard-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+body.home-page.tg-miniapp {
+  position: fixed;
+  overflow: hidden;
+  touch-action: none;
+}
+
+body.home-page.tg-miniapp .home-wrap {
+  overflow-y: auto;
+  max-height: 100vh;
+  max-height: var(--tg-app-height);
+  touch-action: pan-y;
+}
+
+body.rating-page.tg-miniapp {
+  touch-action: pan-y;
+}
+
+body.rating-page.tg-miniapp .dashboard-wrap {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+body.dashboard-page.tg-miniapp .dashboard-wrap,
+body.rating-page.tg-miniapp .dashboard-wrap {
+  padding-bottom: calc(26px + var(--safe-bottom));
+}
+
+body.rating-page.tg-miniapp .rating-table-wrap {
+  touch-action: pan-x pan-y;
+}
+
+body.tg-miniapp .admin-table-wrap,
+body.tg-miniapp .rating-table-wrap,
+body.tg-miniapp .aap-table-scroll,
+body.tg-miniapp .admin-chart-table-wrap {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 640px) {
+  body.tg-miniapp .rating-table-wrap,
+  body.tg-miniapp .aap-table-scroll {
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body.tg-miniapp .rating-table,
+  body.tg-miniapp .aap-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table th,
+  body.tg-miniapp .aap-table td {
+    padding: 5px 4px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.15;
+  }
+
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .aap-table thead th {
+    font-size: 0.44rem;
+    letter-spacing: 0.03em;
+  }
+
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table td {
+    font-size: 0.58rem;
+  }
+
+  body.tg-miniapp .rating-page .table-header-icon {
+    width: 10px;
+    height: 10px;
+    margin-right: 2px;
+  }
+
+  body.tg-miniapp .rating-page .rating-th-content {
+    justify-content: center;
+    gap: 2px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  body.tg-miniapp .rating-page .rank-badge {
+    justify-content: center;
+    gap: 2px;
+  }
+
+  body.tg-miniapp .rating-page .rank-badge svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(1),
+  body.tg-miniapp .rating-table td:nth-child(1) {
+    width: 10%;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(2),
+  body.tg-miniapp .rating-table td:nth-child(2) {
+    width: 24%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(3),
+  body.tg-miniapp .rating-table td:nth-child(3) {
+    width: 14%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(4),
+  body.tg-miniapp .rating-table td:nth-child(4),
+  body.tg-miniapp .rating-table th:nth-child(5),
+  body.tg-miniapp .rating-table td:nth-child(5),
+  body.tg-miniapp .rating-table th:nth-child(6),
+  body.tg-miniapp .rating-table td:nth-child(6),
+  body.tg-miniapp .rating-table th:nth-child(7),
+  body.tg-miniapp .rating-table td:nth-child(7) {
+    width: 13%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(1),
+  body.tg-miniapp .aap-table td:nth-child(1) {
+    width: 19%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(2),
+  body.tg-miniapp .aap-table td:nth-child(2) {
+    width: 16%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(3),
+  body.tg-miniapp .aap-table td:nth-child(3) {
+    width: 37%;
+  }
+
+  body.tg-miniapp .aap-table th:nth-child(4),
+  body.tg-miniapp .aap-table td:nth-child(4) {
+    width: 28%;
+  }
+
+  body.tg-miniapp .aap-score-row {
+    gap: 6px;
+  }
+
+  body.tg-miniapp .aap-score-row strong {
+    font-size: 0.72rem;
+  }
+
+  body.tg-miniapp .aap-progress-track {
+    flex-basis: 72px;
+    height: 6px;
+  }
+
+  body.tg-miniapp .aap-remark {
+    margin-top: 4px;
+    font-size: 0.5rem;
+  }
+
+  body.tg-miniapp .admin-resources-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  body.tg-miniapp .admin-resources-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  body.tg-miniapp .admin-resources-table th,
+  body.tg-miniapp .admin-resources-table td {
+    padding: 4px 3px;
+    font-size: 0.5rem;
+    line-height: 1.15;
+    text-align: center;
+    vertical-align: middle;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  body.tg-miniapp .admin-resources-table th {
+    font-size: 0.38rem;
+    letter-spacing: 0.02em;
+  }
+
+  body.tg-miniapp .admin-resource-file-cell,
+  body.tg-miniapp .admin-resource-file-cell a,
+  body.tg-miniapp .admin-resource-file-title {
+    font-size: 0.48rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 420px) {
+  body.tg-miniapp .rating-table th,
+  body.tg-miniapp .aap-table thead th {
+    font-size: 0.4rem;
+  }
+
+  body.tg-miniapp .rating-table td,
+  body.tg-miniapp .aap-table td {
+    font-size: 0.54rem;
+    padding: 4px 3px;
+  }
+
+  body.tg-miniapp .rating-page .table-header-icon {
+    display: none;
+  }
+
+  body.tg-miniapp .aap-progress-track {
+    flex-basis: 60px;
+    height: 5px;
+  }
+
+  body.tg-miniapp .admin-resources-table th {
+    font-size: 0.34rem;
+  }
+
+  body.tg-miniapp .admin-resources-table td {
+    font-size: 0.46rem;
+    padding: 3px 2px;
+  }
+}

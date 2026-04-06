@@ -1,3 +1,5 @@
+/* Form controls and field composition components. */
+
 .login-form {
   display: flex;
   flex-direction: column;

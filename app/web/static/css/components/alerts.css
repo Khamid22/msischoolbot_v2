@@ -1,3 +1,5 @@
+/* Alert and notice feedback components. */
+
 .form-error,
 .form-notice {
   border-radius: var(--radius-md);

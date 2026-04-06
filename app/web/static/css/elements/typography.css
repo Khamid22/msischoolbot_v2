@@ -1,3 +1,5 @@
+/* Base typography and text element defaults. */
+
 body {
   font-family: var(--font-body);
   color: var(--text);

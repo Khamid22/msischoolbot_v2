@@ -1148,6 +1148,26 @@
 
 .home-page-admin .login-card {
   padding: 24px 20px;
+  overflow: visible;
+}
+
+@keyframes adminFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.home-page-admin .login-card.animate-in {
+  animation: adminFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform: none;
+}
+
+.home-page-admin .admin-sticky-header {
+  top: 0;
+  z-index: 80;
 }
 
 .home-page-admin .admin-switch-row {
@@ -1157,6 +1177,15 @@
 .home-page-admin .admin-main-nav {
   justify-content: flex-start;
   flex-wrap: nowrap;
+  position: sticky;
+  top: calc(8px + var(--safe-top));
+  z-index: 82;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
 }
 
 /* ─── Responsive ─── */
@@ -1524,7 +1553,8 @@
 
   .admin-main-nav {
     gap: 4px;
-    padding-bottom: 2px;
+    top: calc(6px + var(--safe-top));
+    padding: 2px;
   }
 
   .admin-main-nav .admin-tab-btn {

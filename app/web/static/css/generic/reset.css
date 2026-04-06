@@ -1,3 +1,5 @@
+/* Global reset and browser normalization. */
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;

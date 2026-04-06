@@ -902,6 +902,38 @@ def get_admin_by_telegram_user_id(telegram_user_id):
     }
 
 
+def unlink_telegram_user_links(telegram_user_id):
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return {
+            "success": False,
+            "had_student_link": False,
+            "had_admin_link": False,
+        }
+
+    init_storage()
+    with _DB_LOCK:
+        with _connect() as conn:
+            student_row = queries.get_student_by_telegram_id(conn, telegram_user_id)
+            admin_row = queries.get_admin_by_telegram_id(conn, telegram_user_id)
+
+            queries.clear_student_telegram_user_conflicts(
+                conn,
+                telegram_user_id,
+                -1,
+            )
+            queries.clear_admin_telegram_user_conflicts(
+                conn,
+                telegram_user_id,
+            )
+            conn.commit()
+
+    return {
+        "success": True,
+        "had_student_link": bool(student_row),
+        "had_admin_link": bool(admin_row),
+    }
+
+
 def unlink_student_telegram_user(student_row_id):
     if not isinstance(student_row_id, int) or student_row_id <= 0:
         return False

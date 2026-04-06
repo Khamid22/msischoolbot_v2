@@ -1,6 +1,5 @@
-/* Dashboard stylesheet bundle: merged from dashboard modules. */
+/* Student dashboard page styles. */
 
-/* source: dashboard/core.css */
 .dashboard-page {
   min-height: 100vh;
   min-height: 100dvh;
@@ -405,7 +404,6 @@
 }
 
 
-/* source: dashboard/resources.css */
 /* ─── Resources Page ─── */
 .resources-wrap {
   max-width: min(980px, 100%);
@@ -641,7 +639,6 @@
   min-width: 0;
 }
 
-/* source: dashboard/analytics.css */
 /* ─── Widget Icons ─── */
 .title-inline {
   display: inline-flex;
@@ -809,7 +806,6 @@
 }
 
 
-/* source: dashboard/rating.css */
 /* ─── Progress Card ─── */
 .progress-card {
   display: flex;
@@ -841,17 +837,6 @@
 }
 
 /* ─── Rating Board ─── */
-body.rating-page.tg-miniapp {
-  touch-action: pan-y;
-}
-
-body.rating-page.tg-miniapp .dashboard-wrap {
-  overflow-y: auto !important;
-  overflow-x: hidden;
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-}
 
 .rating-page .subject-badge {
   display: inline-flex;
@@ -912,13 +897,7 @@ body.rating-page.tg-miniapp .dashboard-wrap {
   width: 100%;
 }
 
-body.dashboard-page.tg-miniapp .dashboard-wrap,
-body.rating-page.tg-miniapp .dashboard-wrap {
-  padding-bottom: calc(26px + var(--safe-bottom));
-}
 
-
-/* source: dashboard/responsive.css */
 /* ─── Responsive: Small ─── */
 @media (max-width: 560px) {
   .title-pill {
@@ -1333,7 +1312,6 @@ body.rating-page.tg-miniapp .dashboard-wrap {
 }
 
 
-/* source: dashboard/resource_nav.css */
 /* ─── Resource Category Navigation ─── */
 .resource-category-nav {
   margin-top: 14px;
@@ -1414,7 +1392,6 @@ body.rating-page.tg-miniapp .dashboard-wrap {
 }
 
 
-/* source: dashboard/mobile_compact.css */
 /* ─── Extra Small Screen Compression ─── */
 @media (max-width: 560px) {
   .dashboard-page .topbar {

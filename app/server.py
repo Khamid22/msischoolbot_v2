@@ -60,14 +60,16 @@ def _build_default_asset_version():
         os.path.join(_STATIC_DIR, "js", "home.js"),
         os.path.join(_STATIC_DIR, "js", "pwa.js"),
         os.path.join(_STATIC_DIR, "js", "sw.js"),
-        os.path.join(_STATIC_DIR, "css", "styles", "base.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "portal.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "pages.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "dashboard.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "dashboard_page.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "tables.css"),
-        os.path.join(_STATIC_DIR, "css", "styles", "overlays.css"),
+        os.path.join(_STATIC_DIR, "css", "main.css"),
     ]
+
+    css_root = os.path.join(_STATIC_DIR, "css")
+    for root_dir, _dir_names, file_names in os.walk(css_root):
+        for file_name in file_names:
+            if not file_name.endswith(".css"):
+                continue
+            candidate_paths.append(os.path.join(root_dir, file_name))
+
     mtimes = []
     for path in candidate_paths:
         try:

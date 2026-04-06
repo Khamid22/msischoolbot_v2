@@ -64,8 +64,6 @@ def normalize_sehriyo_class_name(raw_class):
 
 
 def legacy_sehriyo_class_key(class_name):
-    # Backward compatibility for older sheets that used Cyrillic "Б"
-    # while preserving English display labels like "8B".
     match = re.fullmatch(r"([0-9]+)([A-Z]+)", class_name)
     if not match:
         return class_name
@@ -255,7 +253,6 @@ def normalize_exam_name(value):
 def build_student_row_key(group, full_name):
     if getattr(group, "school_code", DEFAULT_SCHOOL_CODE) == "sehriyo":
         return f"sehriyo|{group.normalized_code}|{full_name}"
-    # Keep School 5 key stable so existing IDs do not remap.
     return f"{group.normalized_code}|{full_name}"
 
 

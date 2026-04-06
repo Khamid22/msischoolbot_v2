@@ -18,7 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles/dashboard_page.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v=asset_version) }}" />
   </head>
   <body class="dashboard-page academic-dashboard-page">
     <header class="topbar">
@@ -28,24 +28,22 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </a>
-        <div>
-          <h1>Academic Dashboard</h1>
-          <span>MSI School Portal</span>
+        <div class="dashboard-title-stack">
+          <div class="dashboard-title-row">
+            <a
+              href="{{ refresh_url }}"
+              class="dashboard-refresh-title-btn"
+              aria-label="Refresh dashboard data"
+              title="Refresh dashboard data from Google Sheets"
+            >
+              <h1>Academic Dashboard</h1>
+            </a>
+          </div>
+          <p class="dashboard-last-updated">{{ last_updated_label }}</p>
         </div>
       </div>
 
       <div class="topbar-right">
-        <div class="dashboard-refresh-meta">
-          <a
-            href="{{ refresh_url }}"
-            class="dashboard-refresh-btn"
-            aria-label="Refresh dashboard data"
-            title="Refresh dashboard data from Google Sheets"
-          >
-            <span class="dashboard-refresh-icon" aria-hidden="true">&lt;</span>
-          </a>
-          <span class="dashboard-last-updated">{{ last_updated_label }}</span>
-        </div>
         <div class="student-meta">
           <strong>{{ payload.student.fullName }}</strong>
           <span>{{ payload.student.group }}</span>

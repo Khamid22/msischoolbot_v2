@@ -10,17 +10,25 @@ def student_menu_keyboard():
     )
 
 
-def registration_keyboard(mini_app_url):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def registration_keyboard(mini_app_url, show_test_admin=False):
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="Open Mini App",
+                web_app=WebAppInfo(url=mini_app_url),
+            )
+        ]
+    ]
+    if show_test_admin:
+        rows.append(
             [
                 InlineKeyboardButton(
-                    text="Open Mini App",
-                    web_app=WebAppInfo(url=mini_app_url),
+                    text="🛡️ Admin (Test)",
+                    callback_data="test_admin_login",
                 )
             ]
-        ]
-    )
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def contact_targets_keyboard():

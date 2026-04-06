@@ -206,6 +206,7 @@ async def run_bot():
         WebAppInfo,
     )
 
+    from bot.handlers.account_link import router as account_link_router
     from bot.handlers.contact_us import router as contact_us_router
     from bot.handlers.quick_summary import router as quick_summary_router
     from bot.handlers.start import router as start_router
@@ -217,6 +218,7 @@ async def run_bot():
     )
     dp = Dispatcher()
     dp.include_router(start_router)
+    dp.include_router(account_link_router)
     dp.include_router(quick_summary_router)
     dp.include_router(contact_us_router)
 

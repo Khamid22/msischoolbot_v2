@@ -22,6 +22,10 @@ pip install -r requirements.txt
 Create `.env` in the project root:
 - `BOT_TOKEN`
 - `MINI_APP_URL`
+- `ENABLE_TEST_ADMIN_LOGIN` (optional; `1`/`0`, default: `1`; enables `/admin` + Admin(Test) button)
+- `TEST_ADMIN_LOGIN` (optional; default: `staff280902`)
+- `TEST_ADMIN_PASSWORD` (optional; default falls back to `OWNER_ADMIN_PASSWORD`)
+- `TEST_ADMIN_TELEGRAM_IDS` (optional comma-separated allowlist for test admin login)
 - `COURSE_LEADER_CHAT` (optional for Contact US; numeric Telegram ID only, e.g. `123456789` or `-1001234567890`)
 - `ADMIN_CHAT` (optional for Contact US; numeric Telegram ID only, e.g. `123456789` or `-1001234567890`)
 - `FLASK_HOST` (default: `0.0.0.0`)

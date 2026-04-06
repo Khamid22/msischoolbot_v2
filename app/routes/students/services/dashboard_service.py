@@ -1,4 +1,5 @@
 import math
+import re
 
 from flask import session, url_for
 
@@ -46,6 +47,50 @@ def extract_aap_remark(score):
     if score <= 7:
         return "Satisfactory", "remark-satisfactory"
     return "Excellent", "remark-excellent"
+
+
+def _parse_lesson_number(raw_value):
+    text = str(raw_value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"\d+", text)
+    if not match:
+        return None
+    try:
+        lesson_number = int(match.group(0))
+    except (TypeError, ValueError):
+        return None
+    if lesson_number <= 0:
+        return None
+    return lesson_number
+
+
+def extract_last_completed_lesson(payload):
+    homework_grades = payload.get("homeworkGrades", []) if isinstance(payload, dict) else []
+    if not isinstance(homework_grades, list):
+        homework_grades = []
+
+    max_lesson_number = 0
+    for item in homework_grades:
+        if not isinstance(item, dict):
+            continue
+        for candidate in (
+            item.get("lesson"),
+            item.get("lessonNumber"),
+            item.get("lessonLabel"),
+            item.get("label"),
+        ):
+            lesson_number = _parse_lesson_number(candidate)
+            if lesson_number is None:
+                continue
+            if lesson_number > max_lesson_number:
+                max_lesson_number = lesson_number
+            break
+
+    if max_lesson_number > 0:
+        return max_lesson_number
+
+    return len(homework_grades)
 
 
 def build_subject_switch_options(
@@ -209,7 +254,7 @@ def build_dashboard_page_context(
         else 0
     )
     completed_lessons = min(
-        len(payload.get("homeworkGrades", [])),
+        extract_last_completed_lesson(payload),
         PROGRAM_TOTAL_LESSONS,
     )
     program_completed_rate = round((completed_lessons / PROGRAM_TOTAL_LESSONS) * 100)
