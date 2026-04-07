@@ -18,10 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    {% include "layouts/app_styles.html" %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/overlays.css', v=asset_version) }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/student-shell.css', v=asset_version) }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/student-dashboard.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/student-dashboard.css', v=asset_version) }}" />
   </head>
   <body class="dashboard-page academic-dashboard-page">
     <header class="topbar">

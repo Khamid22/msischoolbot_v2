@@ -9,10 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    {% include "layouts/app_styles.html" %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css', v=asset_version) }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/student-shell.css', v=asset_version) }}" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/student-aap.css', v=asset_version) }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/student-aap.css', v=asset_version) }}" />
   </head>
   <body class="dashboard-page">
     <header class="topbar">

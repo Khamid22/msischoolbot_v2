@@ -12,6 +12,7 @@ from flask_wtf.csrf import CSRFError
 
 from app.auth.policies import is_authenticated_session as is_authenticated_policy_session
 from app.auth.session import configure_login_manager
+from app.css_bundles import ensure_css_bundles
 from app.config.schools import get_configured_school_spreadsheets
 from app.config.settings import get_web_settings
 from app.extensions import init_extensions, login_manager
@@ -45,11 +46,13 @@ app.config["WTF_CSRF_TIME_LIMIT"] = None
 
 init_extensions(app)
 configure_login_manager(login_manager)
+ensure_css_bundles(_STATIC_DIR)
 
 
 def _build_default_asset_version():
     # Build a simple asset version from the latest static/template file mtime.
     candidate_paths = [
+        os.path.join(_BACKEND_DIR, "css_bundles.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
         os.path.join(_TEMPLATE_DIR, "student", "dashboard.html"),
         os.path.join(_TEMPLATE_DIR, "home.html"),
