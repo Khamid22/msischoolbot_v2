@@ -22,16 +22,12 @@ from app.routes.students.student_page import register_student_page_routes
 from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
 from app.routes.webhooks import register_webhook_routes
 from app.storage.db_config import get_auth_db_path
-from app.web.css_bundle import ensure_css_bundle
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
 _TEMPLATE_DIR = os.path.join(_FRONTEND_DIR, "templates")
 _STATIC_DIR = os.path.join(_FRONTEND_DIR, "static")
 _CSS_DIR = os.path.join(_STATIC_DIR, "css")
-_MAIN_CSS_SOURCE = os.path.join(_CSS_DIR, "main.source.css")
-_MAIN_CSS_OUTPUT = os.path.join(_CSS_DIR, "main.css")
-
 app = Flask(
     __name__,
     template_folder=_TEMPLATE_DIR,
@@ -65,7 +61,6 @@ def _build_default_asset_version():
         os.path.join(_STATIC_DIR, "js", "home.js"),
         os.path.join(_STATIC_DIR, "js", "pwa.js"),
         os.path.join(_STATIC_DIR, "js", "sw.js"),
-        os.path.join(_STATIC_DIR, "css", "main.css"),
     ]
 
     css_root = os.path.join(_STATIC_DIR, "css")
@@ -88,7 +83,6 @@ def _build_default_asset_version():
 
 
 _asset_version_override = os.environ.get("ASSET_VERSION", "").strip()
-ensure_css_bundle(_MAIN_CSS_SOURCE, _MAIN_CSS_OUTPUT)
 _ASSET_VERSION = (
     _asset_version_override
     if _asset_version_override and _asset_version_override != "1"
@@ -758,7 +752,6 @@ def handle_csrf_error(_error):
     return redirect(url_for("student.home"))
 
 
-# Route modules register endpoint handlers on the shared app object.
 render_admin_page = register_admin_page_routes(
     app,
     load_dataset=_load_dataset,

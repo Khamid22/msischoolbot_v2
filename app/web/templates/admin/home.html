@@ -1,6 +1,14 @@
 {% extends "layouts/portal.html" %}
 {% set body_class = "home-page home-page-admin" %}
 
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css', v=asset_version) }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-core.css', v=asset_version) }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/portal-admin.css', v=asset_version) }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-overview.css', v=asset_version) }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-management.css', v=asset_version) }}" />
+{% endblock %}
+
 {% block header %}
 <div class="admin-sticky-header admin-sticky-header-full">
   <header class="login-header admin-login-header">

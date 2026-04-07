@@ -15,7 +15,8 @@
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css', v=asset_version) }}" />
+    {% include "layouts/app_styles.html" %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/portal-shell.css', v=asset_version) }}" />
   </head>
   <body class="not-found-page">
     <main class="not-found-wrap">

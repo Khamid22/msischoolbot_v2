@@ -1,0 +1,223 @@
+/* Shared portal shell for auth, student search, admin shell, and not-found pages. */
+
+:root {
+  --z-base: 1;
+  --z-sticky-profile-header: 24;
+  --z-sticky-header: 42;
+  --z-sticky-header-elevated: 44;
+  --z-app-sticky: 80;
+  --z-app-nav: 82;
+
+  --bg-shape-strong: rgba(10, 10, 10, 0.04);
+  --bg-shape-soft: rgba(10, 10, 10, 0.03);
+  --bg-hover-strong: rgba(10, 10, 10, 0.06);
+  --border-strong: rgba(10, 10, 10, 0.16);
+  --surface-glass: rgba(255, 255, 255, 0.92);
+  --surface-glass-strong: rgba(255, 255, 255, 0.94);
+  --surface-glass-elevated: rgba(255, 255, 255, 0.96);
+  --surface-border-subtle: rgba(255, 255, 255, 0.6);
+  --color-danger: #b91c1c;
+  --color-danger-border: #fca5a5;
+  --color-danger-bg: #fef2f2;
+  --color-track: #e5e5e5;
+  --color-progress-start: #2563eb;
+  --color-progress-end: #38bdf8;
+  --bg-progress-accent: linear-gradient(90deg, var(--color-progress-start) 0%, var(--color-progress-end) 100%);
+}
+
+.home-page {
+  min-height: 100dvh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+}
+
+.bg-shape {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.bg-shape-top {
+  top: -100px;
+  right: -100px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--bg-shape-strong) 0%, transparent 70%);
+}
+
+.bg-shape-bottom {
+  left: -140px;
+  bottom: -140px;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, var(--bg-shape-soft) 0%, transparent 70%);
+}
+
+.home-wrap {
+  position: relative;
+  z-index: var(--z-base);
+  width: 100%;
+  max-width: 470px;
+}
+
+.login-card {
+  border: 1px solid var(--surface-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--card-shadow-elevated);
+  padding: 28px 22px;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .login-card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+.login-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.logo-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 14px;
+  background: var(--text);
+  color: var(--surface);
+  box-shadow: var(--card-shadow);
+  transition: transform var(--transition-spring);
+}
+
+.logo-block:hover {
+  transform: rotate(0deg) scale(1.05);
+}
+
+.logo-block svg {
+  width: 26px;
+  height: 26px;
+}
+
+.login-header h1 {
+  font-size: clamp(1.4rem, 3.8vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.login-header p {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.not-found-page {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
+  background: var(--bg);
+}
+
+.not-found-wrap {
+  width: 100%;
+  max-width: 460px;
+}
+
+.not-found-card {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--card-shadow-elevated);
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.not-found-card h1 {
+  font-size: clamp(1.4rem, 7vw, 1.65rem);
+  letter-spacing: -0.02em;
+}
+
+.not-found-card p {
+  margin: 10px 0 22px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.home-page-login .home-wrap {
+  max-width: 470px;
+}
+
+.home-page-student .home-wrap {
+  max-width: 560px;
+}
+
+@media (max-width: 640px) {
+  .home-page {
+    padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .field-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .login-card {
+    padding: 32px 28px;
+  }
+
+  .home-page {
+    padding-top: calc(24px + var(--safe-top));
+    padding-bottom: calc(24px + var(--safe-bottom));
+  }
+
+  .bg-shape-top {
+    width: 400px;
+    height: 400px;
+  }
+
+  .bg-shape-bottom {
+    width: 540px;
+    height: 540px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .field-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .login-card {
+    padding: 32px 28px;
+  }
+
+  .home-page {
+    padding-top: calc(24px + var(--safe-top));
+    padding-bottom: calc(24px + var(--safe-bottom));
+  }
+
+  .bg-shape-top {
+    width: 400px;
+    height: 400px;
+  }
+
+  .bg-shape-bottom {
+    width: 540px;
+    height: 540px;
+  }
+}

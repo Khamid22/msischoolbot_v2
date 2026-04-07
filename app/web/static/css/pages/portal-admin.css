@@ -1,128 +1,42 @@
-.home-page {
-  min-height: 100vh;
-  min-height: 100dvh;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
-}
+/* Admin shell and navigation styles. */
 
 .home-page-admin {
   align-items: flex-start;
   justify-content: center;
   height: 100dvh;
-  min-height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
 }
 
-.bg-shape {
-  position: absolute;
-  border-radius: 999px;
-  pointer-events: none;
-  will-change: transform;
-}
-
-.bg-shape-top {
-  width: 300px;
-  height: 300px;
-  right: -100px;
-  top: -100px;
-  background: radial-gradient(circle, rgba(10, 10, 10, 0.04) 0%, transparent 70%);
-}
-
-.bg-shape-bottom {
-  width: 360px;
-  height: 360px;
-  left: -140px;
-  bottom: -140px;
-  background: radial-gradient(circle, rgba(10, 10, 10, 0.03) 0%, transparent 70%);
-}
-
-.home-wrap {
-  width: 100%;
-  max-width: 470px;
-  position: relative;
-  z-index: 1;
-}
-
 .home-page-admin .home-wrap {
   margin-inline: auto;
+  max-width: min(1320px, 100%);
 }
 
-.login-card {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--card-shadow-elevated);
-  padding: 28px 22px;
-}
-
-.login-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.edit-profile-page .login-header {
-  position: sticky;
-  top: calc(8px + var(--safe-top));
-  z-index: 24;
-  padding: 12px 10px 14px;
-  margin: -10px -10px 16px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--hairline);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+.home-page-admin .login-card {
+  padding: 24px 20px;
+  overflow: visible;
 }
 
 .home-page-admin .login-header {
   margin-bottom: 16px;
 }
 
-.logo-block {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
-  background: var(--text);
-  color: var(--surface);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--card-shadow);
-  transition: transform var(--transition-spring);
+@keyframes adminFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
-.logo-block:hover {
-  transform: rotate(0deg) scale(1.05);
+.home-page-admin .login-card.animate-in {
+  animation: adminFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+  transform: none;
 }
 
-.logo-block svg {
-  width: 26px;
-  height: 26px;
-}
-
-.login-header h1 {
-  font-size: clamp(1.4rem, 3.8vw, 1.75rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.login-header p {
-  margin-top: 6px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-/* ─── Admin Panel ─── */
 .admin-panel {
   display: flex;
   flex-direction: column;
@@ -132,17 +46,28 @@
 .admin-sticky-header {
   position: sticky;
   top: 0;
-  z-index: 42;
+  z-index: var(--z-sticky-header);
   margin: 0 0 10px;
   padding: calc(8px + var(--safe-top)) 0 10px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--surface);
   border-bottom: 1px solid var(--hairline);
 }
 
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .admin-sticky-header {
+    background: var(--surface-glass-strong);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
+
+.home-page-admin .admin-sticky-header {
+  top: 0;
+  z-index: var(--z-app-sticky);
+}
+
 .admin-sticky-header-full {
-  z-index: 44;
+  z-index: var(--z-sticky-header-elevated);
 }
 
 .admin-sticky-header-full .admin-login-header {
@@ -153,22 +78,18 @@
   font-size: clamp(1.2rem, 2.8vw, 1.55rem);
 }
 
-.admin-session-toolbar {
-  margin-bottom: 8px;
-}
-
 .admin-switch-row {
   display: flex;
-  gap: 6px;
   flex-wrap: wrap;
+  gap: 6px;
 }
 
 .admin-tab-btn {
-  transition: all var(--transition-fast);
-  border-radius: var(--radius-sm);
-  font-size: 0.5rem;
-  padding: 6px 14px;
   min-height: 34px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
 }
 
 .admin-tab-btn.is-active,
@@ -181,11 +102,27 @@
 
 .admin-main-nav {
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: auto;
+  position: sticky;
+  top: calc(8px + var(--safe-top));
+  z-index: var(--z-app-nav);
+  padding: 4px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .home-page-admin .admin-main-nav {
+    background: var(--surface-glass-elevated);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 .admin-main-nav::-webkit-scrollbar {
@@ -212,12 +149,6 @@
   flex: 0 0 auto;
 }
 
-@media (min-width: 561px) {
-  .admin-logout-form {
-    margin-left: auto;
-  }
-}
-
 .admin-logout-icon-btn {
   width: 34px;
   min-width: 34px;
@@ -233,1292 +164,12 @@
   padding: 0;
 }
 
-.admin-overview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.admin-stat-card,
-.admin-info-card {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  padding: 14px;
-}
-
-.admin-stat-card {
-  transition: box-shadow var(--transition-fast);
-}
-
-.admin-stat-card:hover {
-  box-shadow: var(--card-shadow-hover);
-}
-
-.admin-stat-card h2 {
-  font-size: 0.65rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.admin-stat-card p {
-  margin-top: 6px;
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.admin-insights-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.admin-info-card h3 {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.admin-info-subtitle {
-  margin-top: 8px;
-  margin-bottom: 4px;
-  font-size: 0.62rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.admin-info-card-wide {
-  grid-column: 1 / -1;
-}
-
-.admin-mini-list {
-  list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.admin-mini-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: var(--text);
-  padding: 4px 0;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.admin-mini-list li:last-child {
-  border-bottom: 0;
-}
-
-.admin-mini-list small {
-  font-size: 0.69rem;
-  color: var(--muted);
-  text-align: right;
-  line-height: 1.3;
-}
-
-.admin-mini-list-schools li {
-  align-items: center;
-  gap: 10px;
-}
-
-.admin-mini-list-schools li > span {
-  white-space: nowrap;
-  font-weight: 700;
-  flex: 0 0 auto;
-}
-
-.admin-mini-list-schools li > small {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* ─── Admin Subject Area ─── */
-.admin-subject-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.admin-subject-filter {
-  min-width: 170px;
-  margin: 0;
-}
-
-.admin-subject-filter-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.admin-subject-filter-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.admin-subject-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.admin-grade-switch {
-  display: none;
-  align-items: center;
-  gap: 6px;
-}
-
-.admin-grade-switch.is-visible {
-  display: inline-flex;
-}
-
-.admin-grade-switch-buttons {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-}
-
-.admin-grade-switch-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.67rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.admin-grade-switch-btn:hover {
-  background: rgba(10, 10, 10, 0.06);
-}
-
-.admin-grade-switch-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.admin-subject-filter select {
-  min-height: 34px;
-  padding: 6px 10px;
-  font-size: 0.74rem;
-}
-
-.admin-subject-charts-grid {
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.65fr);
-  gap: 10px;
-  align-items: start;
-  min-width: 0;
-}
-
-.admin-chart-card {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--bg);
-  padding: 10px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.admin-chart-card-secondary {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100%;
-  justify-self: end;
-}
-
-.admin-chart-card-primary .admin-info-subtitle,
-.admin-chart-card-secondary .admin-info-subtitle {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.admin-chart-card-primary {
-  display: flex;
-  flex-direction: column;
-}
-
-.admin-chart-card-primary,
-.admin-chart-card-secondary {
-  height: 286px;
-}
-
-.admin-chart-card-primary .admin-chart-canvas-wrap {
-  margin-top: 0;
-  height: 216px;
-  min-height: 216px;
-  max-height: 216px;
-  flex: 0 0 216px;
-}
-
-.admin-chart-card-wide {
-  grid-column: 1 / -1;
-  min-width: 0;
-}
-
-.admin-chart-canvas-wrap {
-  margin-top: 6px;
-  height: 168px;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-}
-
-.admin-chart-legend {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  min-height: 18px;
-}
-
-.admin-chart-legend-title {
-  color: var(--muted);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  align-self: center;
-}
-
-.admin-chart-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-size: 0.66rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.admin-chart-legend-swatch {
-  width: 12px;
-  height: 3px;
-  border-radius: 2px;
-  flex: 0 0 12px;
-}
-
-.admin-chart-canvas-wrap-tall {
-  margin-top: 4px;
-  height: 300px;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-
-.admin-chart-scroll-track {
-  display: block;
-  height: 100%;
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
-}
-
-.admin-chart-canvas-wrap canvas {
-  width: 100% !important;
-  height: 100% !important;
-  display: block;
-}
-
-.admin-chart-table-wrap {
-  margin-top: 0;
-  width: 100%;
-  flex: 1;
-  height: auto;
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.admin-subject-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.72rem;
-}
-
-.admin-subject-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--bg);
-  color: var(--text-secondary);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 0.62rem;
-}
-
-.admin-subject-table th,
-.admin-subject-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--hairline);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.admin-subject-table td:nth-child(2),
-.admin-subject-table td:nth-child(3),
-.admin-subject-table td:nth-child(4),
-.admin-subject-table th:nth-child(2),
-.admin-subject-table th:nth-child(3),
-.admin-subject-table th:nth-child(4) {
-  text-align: center;
-}
-
-.admin-chart-empty {
-  margin-top: 8px;
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.admin-sync-list li.is-error small {
-  color: #b91c1c;
-  font-weight: 700;
-}
-
-.admin-students-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.admin-search-field {
-  flex: 1 1 320px;
-  width: 100%;
-  max-width: 420px;
-}
-
-.admin-search-field input {
-  min-height: 40px;
-  font-size: 0.84rem;
-  padding: 8px 12px;
-}
-
-.admin-school-filter-row {
-  margin-left: auto;
-  justify-content: flex-end;
-}
-
-.admin-school-filter-form {
-  margin-left: auto;
-  width: min(220px, 100%);
-}
-
-.admin-school-filter-form .field {
-  gap: 5px;
-}
-
-.admin-school-filter-form .field select {
-  min-height: 38px;
-  font-size: 0.72rem;
-  padding: 6px 10px;
-}
-
-/* ─── Resources Panel ─── */
-.admin-resources-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  align-items: start;
-}
-
-.admin-resource-card {
-  padding: 16px 18px;
-}
-
-.admin-resource-card .admin-card-title,
-.teacher-form-card .admin-card-title {
-  margin-top: 2px;
-  margin-bottom: 10px;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-}
-
-.admin-resource-type-form,
-.admin-resource-form,
-.teacher-form-card .login-form {
-  gap: 12px;
-}
-
-.admin-resource-local-notice {
-  margin-bottom: 10px;
-}
-
-.admin-resource-upload-status {
-  margin: 0 0 4px;
-  font-size: 0.64rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.admin-resource-type-form .field input,
-.admin-resource-form .field input,
-.admin-resource-form .field select,
-.admin-resource-form .field textarea {
-  min-height: 40px;
-}
-
-.admin-resource-form .field textarea {
-  min-height: 84px;
-}
-
-.admin-resource-submit-btn {
-  min-height: 40px;
-  padding: 8px 18px;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  align-self: flex-start;
-  margin-top: 4px;
-}
-
-.admin-resource-loading-state {
-  margin-top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.admin-resource-loading-track {
-  position: relative;
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #e5e5e5;
-  overflow: hidden;
-}
-
-.admin-resource-loading-bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
-  transition: width 0.18s linear;
-}
-
-.admin-resource-loading-state p {
-  margin: 0;
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.admin-resource-form.is-submitting .admin-resource-submit-btn {
-  opacity: 0.85;
-  cursor: wait;
-}
-
-.admin-resource-card-wide {
-  grid-column: 1 / -1;
-}
-
-/* ─── Teacher Form ─── */
-.teacher-form-card {
-  padding: 12px 14px;
-}
-
-.teacher-form-card .field span {
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-}
-
-.teacher-mode-switch {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-  margin-bottom: 6px;
-}
-
-.teacher-mode-btn {
-  min-height: 32px;
-  padding: 5px 12px;
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
-  width: auto;
-  border-radius: var(--radius-sm);
-}
-
-.teacher-cancel-btn {
-  text-decoration: none;
-}
-
-.teacher-form-card .field input,
-.teacher-form-card .field select {
-  min-height: 42px;
-}
-
-.home-page-admin .admin-panel-teachers > .teacher-form-card,
-.home-page-admin .admin-panel-teachers > .admin-table-wrap {
-  height: 100%;
-}
-
-.teacher-save-btn,
-.edit-profile-save-btn {
-  min-height: 38px;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-}
-
-.teacher-save-btn {
-  padding: 6px 14px;
-  align-self: flex-end;
-  margin-top: 2px;
-}
-
-.teacher-mode-pane[hidden] {
-  display: none !important;
-}
-
-.admin-student-link {
-  color: var(--text);
-  font-weight: 700;
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--transition-fast);
-}
-
-.admin-student-link:hover {
-  border-bottom-color: var(--text);
-}
-
-.admin-student-id-link {
-  min-width: 28px;
-  min-height: 24px;
-  padding: 2px 6px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 0.64rem;
-  font-weight: 700;
-  line-height: 1;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.admin-student-id-link:hover {
-  background: var(--hover-bg);
-  border-color: var(--text);
-}
-
-/* ─── Admin Card ─── */
-.admin-card {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  padding: 14px;
-}
-
-.admin-card-title {
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.admin-card-subtitle {
-  margin-top: 4px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.admin-meta-grid {
-  margin: 12px 0 14px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.admin-meta-grid input,
-.admin-meta-grid select {
-  margin-top: 4px;
-  width: 100%;
-  border: 1.5px solid rgba(10, 10, 10, 0.16);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-size: 0.88rem;
-  min-height: 42px;
-  padding: 8px 12px;
-}
-
-.admin-meta-grid input:disabled,
-.admin-meta-grid select:disabled {
-  background: var(--bg);
-  color: var(--muted);
-}
-
-.admin-meta-grid p {
-  margin-top: 4px;
-  font-size: 0.8rem;
-  word-break: break-word;
-}
-
-.admin-meta-label {
-  display: inline-block;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.admin-classmates-list {
-  margin: 6px 0 0;
-  padding-left: 16px;
-  max-height: 100px;
-  overflow: auto;
-  font-size: 0.78rem;
-  word-break: break-word;
-}
-
-.profile-photo-wrap {
-  margin-top: 6px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.profile-photo-click {
-  display: inline-flex;
-  cursor: pointer;
-  position: relative;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 50%;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.profile-photo-click:hover {
-  transform: scale(1.03);
-  box-shadow: var(--card-shadow-hover);
-}
-
-.edit-profile-page .profile-photo-click > .profile-photo,
-.edit-profile-page .profile-photo-click > .profile-photo-fallback {
-  position: absolute;
-  inset: 0;
-}
-
-.photo-file-input {
-  display: none;
-}
-
-/* ─── Edit Student Profile ─── */
-.edit-profile-page {
-  align-items: flex-start;
-  padding-top: calc(16px + var(--safe-top));
-}
-
-.edit-profile-wrap {
-  max-width: 780px;
-}
-
-.edit-profile-card {
-  padding: 22px 18px;
-}
-
-.edit-profile-header {
-  margin-bottom: 14px;
-  text-align: center;
-}
-
-.edit-profile-header h1 {
-  font-size: clamp(1.15rem, 3.8vw, 1.5rem);
-  word-break: break-word;
-}
-
-.edit-profile-header p {
-  margin-top: 6px;
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  word-break: break-word;
-  color: var(--muted);
-}
-
-.edit-profile-top-card {
-  padding: 16px 14px;
-}
-
-.edit-profile-main-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
-  align-items: stretch;
-}
-
-.edit-profile-photo-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-}
-
-.edit-profile-photo-col .admin-meta-label {
-  text-align: center;
-}
-
-.edit-profile-page .profile-photo {
-  width: 110px;
-  height: 110px;
-  object-fit: cover;
-  border-radius: 50%;
-  border: 2px solid var(--hairline);
-  background: var(--bg);
-}
-
-.edit-profile-page .profile-photo-fallback {
-  width: 110px;
-  height: 110px;
-  font-size: 2rem;
-  border-radius: 50%;
-}
-
-.edit-profile-page .profile-photo-click {
-  width: 110px;
-  height: 110px;
-}
-
-.edit-profile-meta-col {
-  display: grid;
-  grid-template-rows: auto;
-  gap: 14px;
-}
-
-.edit-profile-meta-item {
-  min-width: 0;
-}
-
-.edit-profile-meta-item p {
-  margin-top: 4px;
-  font-size: 0.88rem;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  text-align: left;
-}
-
-.edit-profile-meta-item select {
-  margin-top: 4px;
-  width: 100%;
-  border: 1.5px solid rgba(10, 10, 10, 0.16);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-size: 0.85rem;
-  min-height: 42px;
-  padding: 8px 12px;
-}
-
-.edit-profile-photo-delete {
-  min-height: 34px;
-  padding: 6px 12px;
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  width: 100%;
-  max-width: 150px;
-  color: #b91c1c;
-  border-color: #fca5a5;
-}
-
-.edit-profile-photo-delete:hover {
-  background: #fef2f2;
-  border-color: #b91c1c;
-}
-
-.edit-profile-classmates-list {
-  margin-top: 6px;
-  max-height: 190px;
-  overflow: auto;
-  padding-left: 18px;
-  word-break: break-word;
-}
-
-.edit-profile-classmates-list li {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.45;
-  margin-bottom: 6px;
-  text-align: left;
-}
-
-.edit-profile-empty {
-  margin-top: 6px;
-  font-size: 0.82rem;
-  text-align: left;
-  color: var(--muted);
-}
-
-.edit-profile-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 6px;
-}
-
-.edit-profile-save-btn {
-  padding: 6px 18px;
-}
-
-/* ─── Not Found ─── */
-.not-found-page {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
-  background: var(--bg);
-}
-
-.not-found-wrap {
-  width: 100%;
-  max-width: 460px;
-}
-
-.not-found-card {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--card-shadow-elevated);
-  background: var(--surface);
-  padding: 32px 24px;
-  text-align: center;
-}
-
-.not-found-card h1 {
-  font-size: clamp(1.4rem, 7vw, 1.65rem);
-  letter-spacing: -0.02em;
-}
-
-.not-found-card p {
-  margin: 10px 0 22px;
-  color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.5;
-}
-
-/* ─── Layout Variants ─── */
-.home-page-login .home-wrap {
-  max-width: 470px;
-}
-
-.home-page-student .home-wrap {
-  max-width: 560px;
-}
-
-.home-page-admin .home-wrap {
-  max-width: min(1320px, 100%);
-}
-
-.home-page-admin .login-card {
-  padding: 24px 20px;
-  overflow: visible;
-}
-
-@keyframes adminFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.home-page-admin .login-card.animate-in {
-  animation: adminFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
-  transform: none;
-}
-
-.home-page-admin .admin-sticky-header {
-  top: 0;
-  z-index: 80;
-}
-
-.home-page-admin .admin-switch-row {
-  flex-wrap: wrap;
-}
-
-.home-page-admin .admin-main-nav {
-  justify-content: flex-start;
-  flex-wrap: nowrap;
-  position: sticky;
-  top: calc(8px + var(--safe-top));
-  z-index: 82;
-  padding: 4px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-}
-
-/* ─── Responsive ─── */
-@media (min-width: 560px) {
-  .field-grid-2 {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .login-card {
-    padding: 32px 28px;
-  }
-
-  .admin-overview-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .admin-overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-insights-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-mini-list small {
-    text-align: left;
-  }
-
-  .admin-main-nav .admin-tab-btn {
-    flex: 1 1 0;
-    min-width: 0;
-    font-size: 0.68rem;
-    padding: 5px 10px;
-    min-height: 32px;
-  }
-
-  .admin-logout-icon-btn {
-    width: 32px;
-    min-width: 32px;
-    min-height: 32px;
-    padding: 0;
-  }
-
-  .admin-mini-list-schools li {
-    gap: 8px;
-  }
-
-  .admin-mini-list-schools li > span {
-    white-space: nowrap;
-  }
-
-  .admin-mini-list-schools li > small {
-    text-align: right;
-  }
-
-  .admin-subject-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-subject-filter {
-    width: 100%;
-  }
-
-  .admin-subject-controls {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-subject-filter-inline {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
-  }
-
-  .admin-grade-switch {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .admin-grade-switch-buttons {
-    width: 100%;
-  }
-
-  .admin-grade-switch-btn {
-    flex: 1 1 0;
-    text-align: center;
-  }
-
-  .admin-students-toolbar {
-    align-items: stretch;
-  }
-
-  .admin-search-field {
-    max-width: none;
-    flex: 1 1 100%;
-  }
-
-  .admin-school-filter-row {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
-
-  .admin-resources-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .admin-subject-charts-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-chart-card-secondary {
-    width: 100%;
-    justify-self: stretch;
-  }
-
-  .admin-chart-card-primary,
-  .admin-chart-card-secondary {
-    height: 248px;
-  }
-
-  .admin-chart-card-wide {
-    grid-column: auto;
-  }
-
-  .admin-chart-canvas-wrap {
-    height: 168px;
-  }
-
-  .admin-chart-card-primary .admin-chart-canvas-wrap {
-    height: 176px;
-    min-height: 176px;
-    max-height: 176px;
-    flex: 0 0 176px;
-  }
-
-  .admin-chart-table-wrap {
-    min-height: 0;
-    height: auto;
-  }
-
-  .admin-chart-canvas-wrap-tall {
-    height: 210px;
-  }
-
-  .admin-chart-card {
-    overflow: hidden;
-  }
-
-  .admin-chart-canvas-wrap,
-  .admin-chart-canvas-wrap canvas {
-    width: 100% !important;
+@media (max-width: 640px) {
+  .home-page-admin .home-wrap {
     max-width: 100%;
-  }
-
-  .teacher-mode-btn {
-    min-height: 30px;
-    padding: 4px 10px;
-    font-size: 0.62rem;
-  }
-
-  .teacher-form-card .field input,
-  .teacher-form-card .field select {
-    min-height: 40px;
-  }
-
-  .teacher-save-btn {
-    min-height: 34px;
-    font-size: 0.68rem;
-    padding: 5px 12px;
-  }
-
-  .admin-meta-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .edit-profile-page .profile-photo,
-  .edit-profile-page .profile-photo-fallback,
-  .edit-profile-page .profile-photo-click {
-    width: 100px;
-    height: 100px;
-  }
-
-  .edit-profile-page .profile-photo-fallback {
-    font-size: 1.8rem;
-  }
-
-  .edit-profile-meta-item p {
-    font-size: 0.82rem;
-  }
-
-  .edit-profile-meta-item select {
-    min-height: 40px;
-    font-size: 0.8rem;
-    padding: 7px 10px;
-  }
-
-  .edit-profile-photo-delete {
-    min-height: 32px;
-    padding: 5px 10px;
-    font-size: 0.64rem;
-    max-width: 140px;
-  }
-
-  .edit-profile-classmates-list {
-    max-height: 168px;
-    padding-left: 14px;
-  }
-
-  .edit-profile-save-btn {
-    min-height: 36px;
-    font-size: 0.68rem;
-    padding: 5px 14px;
-  }
-}
-
-@media (min-width: 641px) and (max-width: 1023px) {
-  .home-page-admin .home-wrap {
-    max-width: min(1080px, 100%);
-  }
-
-  .home-page-admin .admin-panel-teachers {
-    display: grid;
-    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-    gap: 14px;
-    align-items: stretch;
-  }
-
-  .admin-resources-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .admin-resource-card {
-    padding: 14px 16px;
-  }
-}
-
-@media (min-width: 768px) {
-  .home-page {
-    padding-top: calc(24px + var(--safe-top));
-    padding-bottom: calc(24px + var(--safe-bottom));
-  }
-
-  .bg-shape-top {
-    width: 400px;
-    height: 400px;
-  }
-
-  .bg-shape-bottom {
-    width: 540px;
-    height: 540px;
-  }
-
-  .edit-profile-main-grid {
-    grid-template-columns: 130px minmax(0, 1fr);
-    gap: 20px;
-  }
-
-  .edit-profile-page .profile-photo,
-  .edit-profile-page .profile-photo-fallback,
-  .edit-profile-page .profile-photo-click {
-    width: 120px;
-    height: 120px;
-  }
-
-  .edit-profile-page .profile-photo-fallback {
-    font-size: 2.2rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .home-page-admin .home-wrap {
-    max-width: min(1440px, 100%);
-  }
-
-  .home-page-admin .admin-insights-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .home-page-admin .admin-zone-card {
-    grid-column: auto;
-    display: flex;
-    flex-direction: column;
-    height: clamp(360px, 40vh, 440px);
-  }
-
-  .home-page-admin .admin-zone-card .admin-zone-table-wrap {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: auto;
-    max-height: none;
   }
 
   .home-page-admin .login-card {
-    padding: 28px 24px;
-  }
-
-  .home-page-admin .admin-panel-teachers {
-    display: grid;
-    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
-    gap: 16px;
-    align-items: stretch;
-  }
-
-  .admin-resources-grid {
-    gap: 16px;
-  }
-
-  .admin-resource-card {
-    padding: 18px 20px;
-  }
-}
-
-@media (max-width: 640px) {
-  .home-page {
-    padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
-  }
-
-  .home-page-admin .home-wrap {
-    max-width: 100%;
-  }
-
-  .home-page-admin .login-card,
-  .edit-profile-page .login-card {
     padding: 14px 12px;
     border-radius: var(--radius-lg);
   }
@@ -1549,21 +200,22 @@
 
   .admin-login-header p {
     margin-top: 4px;
-    font-size: 0.64rem;
+    font-size: 0.75rem;
   }
 
   .admin-main-nav {
-    gap: 4px;
+    gap: 6px;
     top: calc(6px + var(--safe-top));
-    padding: 2px;
+    padding: 3px;
   }
 
-  .admin-main-nav .admin-tab-btn {
-    min-width: 0;
-    min-height: 28px;
-    padding: 4px 4px;
-    font-size: 0.50rem;
-    flex: 1 1 0;
+  .admin-main-nav .admin-tab-btn,
+  body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
+    flex: 0 0 auto;
+    min-width: max-content;
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: 0.68rem;
   }
 
   .admin-logout-icon-btn {
@@ -1571,265 +223,54 @@
   }
 
   .admin-main-nav .tab-label-full {
-    display: none;
-  }
-
-  .admin-main-nav .tab-label-short {
     display: inline;
   }
 
+  .admin-main-nav .tab-label-short {
+    display: none;
+  }
+
   .admin-exit-btn {
-    min-width: 28px;
     width: 28px;
-    padding: 0;
-    gap: 0;
-    flex: 0 0 auto !important;
+    min-width: 28px;
+  }
+
+  .admin-main-nav .admin-exit-btn {
+    flex: 0 0 auto;
   }
 
   .admin-exit-btn svg {
     width: 13px;
     height: 13px;
   }
+}
 
-  .admin-subject-controls {
-    gap: 6px;
+@media (min-width: 641px) and (max-width: 1023px) {
+  .home-page-admin .home-wrap {
+    max-width: min(1080px, 100%);
   }
 
-  .admin-subject-filter select {
-    min-height: 32px;
-    font-size: 0.7rem;
-    padding: 5px 9px;
-  }
-
-  .admin-info-card,
-  .admin-chart-card,
-  .admin-card {
-    padding: 12px;
-  }
-
-  .admin-info-card h3 {
-    font-size: 0.67rem;
-  }
-
-  .admin-info-subtitle {
-    font-size: 0.56rem;
-  }
-
-  .admin-mini-list li {
-    padding: 3px 0;
-    gap: 6px;
-  }
-
-  .admin-mini-list-schools li {
-    display: grid;
-    grid-template-columns: minmax(88px, max-content) minmax(0, 1fr);
-    align-items: start;
-    column-gap: 8px;
-  }
-
-  .admin-mini-list-schools li > span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .admin-mini-list-schools li > small {
-    text-align: left;
-  }
-
-  .admin-chart-card-primary,
-  .admin-chart-card-secondary {
-    height: 232px;
-  }
-
-  .admin-chart-card-primary .admin-chart-canvas-wrap {
-    height: 162px;
-    min-height: 162px;
-    max-height: 162px;
-    flex-basis: 162px;
-  }
-
-  .admin-chart-canvas-wrap {
-    height: 154px;
-  }
-
-  .admin-chart-canvas-wrap-tall {
-    height: 196px;
-  }
-
-  .admin-students-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(104px, 122px);
-    gap: 8px;
-    align-items: end;
-  }
-
-  .admin-school-filter-row {
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    gap: 5px;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .admin-school-filter-row .admin-tab-btn {
-    flex: 0 0 auto;
-  }
-
-  .admin-school-filter-form {
-    margin-left: 0;
-    width: 100%;
-  }
-
-  .admin-school-filter-form .field span {
-    font-size: 0.5rem;
-    letter-spacing: 0.05em;
-  }
-
-  .admin-school-filter-form .field select {
-    min-height: 32px;
-    font-size: 0.64rem;
-    padding: 4px 8px;
-  }
-
-  .admin-search-field input {
-    min-height: 38px;
-    font-size: 0.74rem;
-  }
-
-  .admin-resource-card .admin-card-title {
-    font-size: 0.66rem;
-  }
-
-  .admin-resource-type-form .field span,
-  .admin-resource-form .field span {
-    font-size: 0.54rem;
-    letter-spacing: 0.04em;
-  }
-
-  .admin-resource-type-form .field input,
-  .admin-resource-form .field input,
-  .admin-resource-form .field select,
-  .admin-resource-form .field textarea {
-    font-size: 0.74rem;
-  }
-
-  .teacher-form-card .field span {
-    font-size: 0.56rem;
-  }
-
-  .teacher-mode-switch {
-    gap: 4px;
-    margin-bottom: 4px;
-  }
-
-  .teacher-mode-btn {
-    min-height: 28px;
-    padding: 4px 8px;
-    font-size: 0.58rem;
-  }
-
-  .teacher-save-btn {
-    width: 100%;
-    align-self: stretch;
-  }
-
-  .edit-profile-page .session-toolbar {
-    align-items: flex-start;
-  }
-
-  .edit-profile-page .session-toolbar-actions {
-    width: 100%;
-  }
-
-  .edit-profile-page .session-toolbar-actions .secondary-btn {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  .edit-profile-actions {
-    justify-content: stretch;
-  }
-
-  .edit-profile-save-btn {
-    width: 100%;
+  .admin-logout-form {
+    margin-left: auto;
   }
 }
 
-@media (max-width: 420px) {
-  .admin-main-nav {
-    gap: 2px;
+@media (min-width: 1024px) {
+  .home-page-admin .home-wrap {
+    max-width: min(1440px, 100%);
   }
 
-  .admin-main-nav .admin-tab-btn {
-    font-size: 0.46rem;
-    min-height: 26px;
-    padding: 3px 3px;
+  .admin-logout-form {
+    margin-left: auto;
   }
 
-  .admin-exit-btn {
-    min-width: 26px;
-    width: 26px;
-    padding: 0;
-    gap: 0;
-  }
-
-  .admin-school-filter-form {
-    width: 100%;
-  }
-
-  .admin-school-filter-form .field select {
-    min-height: 30px;
-    font-size: 0.6rem;
-    padding: 4px 6px;
-  }
-
-  .admin-search-field input {
-    min-height: 34px;
-    font-size: 0.7rem;
-    padding: 6px 10px;
-  }
-
-  .admin-students-toolbar {
-    grid-template-columns: minmax(0, 1fr) 96px;
+  .home-page-admin .login-card {
+    padding: 28px 24px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .bg-shape {
     filter: none;
-  }
-}
-
-/* ─── Merged from responsive-fixes.css ─── */
-@media (max-width: 560px) {
-  .admin-resources-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .admin-resource-card {
-    padding: 10px 10px;
-  }
-
-  .admin-resource-type-form .field input,
-  .admin-resource-form .field input,
-  .admin-resource-form .field select,
-  .admin-resource-form .field textarea {
-    min-height: 36px;
-    font-size: 0.78rem;
-  }
-
-  .admin-resource-form .field textarea {
-    min-height: 68px;
-  }
-
-  .admin-resource-submit-btn {
-    min-height: 36px;
-    font-size: 0.68rem;
-    padding: 6px 14px;
   }
 }

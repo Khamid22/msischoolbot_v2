@@ -1,5 +1,3 @@
-/* Telegram Mini App-specific overrides. Keep all .tg-miniapp rules here. */
-
 html:not(.tg-miniapp),
 body:not(.tg-miniapp) {
   position: static;
@@ -94,6 +92,19 @@ body.tg-miniapp .admin-chart-table-wrap {
 }
 
 @media (max-width: 640px) {
+  body.tg-miniapp {
+    --tg-rating-rank-column: clamp(48px, 13vw, 52px);
+    --tg-aap-progress-track: clamp(60px, 16vw, 72px);
+    --tg-rating-table-head-size: 0.4rem;
+    --tg-rating-table-cell-size: clamp(0.54rem, 2.1vw, 0.58rem);
+    --tg-admin-resource-head-size: clamp(0.34rem, 1.1vw, 0.38rem);
+    --tg-admin-resource-cell-size: clamp(0.46rem, 1.4vw, 0.5rem);
+    --tg-students-head-size: clamp(0.4rem, 1.3vw, 0.44rem);
+    --tg-students-cell-size: clamp(0.56rem, 1.8vw, 0.6rem);
+    --tg-teachers-head-size: clamp(0.4rem, 1.4vw, 0.46rem);
+    --tg-teachers-cell-size: clamp(0.6rem, 1.9vw, 0.64rem);
+  }
+
   body.tg-miniapp .rating-table-wrap,
   body.tg-miniapp .aap-table-scroll {
     max-height: 100%;
@@ -102,7 +113,10 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.tg-miniapp .rating-table,
-  body.tg-miniapp .aap-table {
+  body.tg-miniapp .aap-table,
+  body.home-page-admin.tg-miniapp .students-table,
+  body.home-page-admin.tg-miniapp .teachers-table,
+  body.tg-miniapp .admin-resources-table {
     width: 100%;
     min-width: 0;
     table-layout: fixed;
@@ -112,7 +126,7 @@ body.tg-miniapp .admin-chart-table-wrap {
   body.tg-miniapp .rating-table td,
   body.tg-miniapp .aap-table th,
   body.tg-miniapp .aap-table td {
-    padding: 5px 4px;
+    padding: 4px 3px;
     text-align: center;
     vertical-align: middle;
     white-space: normal;
@@ -123,13 +137,13 @@ body.tg-miniapp .admin-chart-table-wrap {
 
   body.tg-miniapp .rating-table th,
   body.tg-miniapp .aap-table thead th {
-    font-size: 0.4rem;
+    font-size: var(--tg-rating-table-head-size);
     letter-spacing: 0.02em;
   }
 
   body.tg-miniapp .rating-table td,
   body.tg-miniapp .aap-table td {
-    font-size: 0.58rem;
+    font-size: var(--tg-rating-table-cell-size);
   }
 
   body.tg-miniapp .rating-page .rating-table thead th {
@@ -161,16 +175,35 @@ body.tg-miniapp .admin-chart-table-wrap {
     height: 12px;
   }
 
+  body.tg-miniapp .rating-table th:first-child,
+  body.tg-miniapp .rating-table td:first-child {
+    position: static;
+  }
+
   body.tg-miniapp .rating-table th:nth-child(1),
   body.tg-miniapp .rating-table td:nth-child(1) {
-    width: 10%;
+    width: var(--tg-rating-rank-column);
+    min-width: var(--tg-rating-rank-column);
+    max-width: var(--tg-rating-rank-column);
   }
 
   body.tg-miniapp .rating-table th:nth-child(2),
   body.tg-miniapp .rating-table td:nth-child(2) {
-    width: 24%;
+    width: 28%;
     min-width: 0;
+    position: sticky;
+    left: var(--tg-rating-rank-column);
     text-align: center;
+  }
+
+  body.tg-miniapp .rating-table th:nth-child(2) {
+    z-index: 4;
+    background: var(--bg);
+  }
+
+  body.tg-miniapp .rating-table td:nth-child(2) {
+    z-index: 1;
+    background: var(--surface);
   }
 
   body.tg-miniapp .rating-table th:nth-child(3),
@@ -188,7 +221,7 @@ body.tg-miniapp .admin-chart-table-wrap {
   body.tg-miniapp .rating-table td:nth-child(6),
   body.tg-miniapp .rating-table th:nth-child(7),
   body.tg-miniapp .rating-table td:nth-child(7) {
-    width: 13%;
+    width: 11.5%;
   }
 
   body.tg-miniapp .aap-table th:nth-child(1),
@@ -220,8 +253,8 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.tg-miniapp .aap-progress-track {
-    flex-basis: 72px;
-    height: 6px;
+    flex-basis: var(--tg-aap-progress-track);
+    height: clamp(5px, 1.3vw, 6px);
   }
 
   body.tg-miniapp .aap-remark {
@@ -235,16 +268,10 @@ body.tg-miniapp .admin-chart-table-wrap {
     overflow-y: auto;
   }
 
-  body.tg-miniapp .admin-resources-table {
-    width: 100%;
-    min-width: 0;
-    table-layout: fixed;
-  }
-
   body.tg-miniapp .admin-resources-table th,
   body.tg-miniapp .admin-resources-table td {
-    padding: 4px 3px;
-    font-size: 0.5rem;
+    padding: 3px 2px;
+    font-size: var(--tg-admin-resource-cell-size);
     line-height: 1.15;
     text-align: center;
     vertical-align: middle;
@@ -254,52 +281,19 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.tg-miniapp .admin-resources-table th {
-    font-size: 0.38rem;
+    font-size: var(--tg-admin-resource-head-size);
     letter-spacing: 0.02em;
   }
 
   body.tg-miniapp .admin-resource-file-cell,
   body.tg-miniapp .admin-resource-file-cell a,
   body.tg-miniapp .admin-resource-file-title {
-    font-size: 0.48rem;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-}
-
-@media (max-width: 420px) {
-  body.tg-miniapp .rating-table th,
-  body.tg-miniapp .aap-table thead th {
-    font-size: 0.4rem;
+    font-size: 0.48rem;
   }
 
-  body.tg-miniapp .rating-table td,
-  body.tg-miniapp .aap-table td {
-    font-size: 0.54rem;
-    padding: 4px 3px;
-  }
-
-  body.tg-miniapp .rating-page .table-header-icon {
-    display: none;
-  }
-
-  body.tg-miniapp .aap-progress-track {
-    flex-basis: 60px;
-    height: 5px;
-  }
-
-  body.tg-miniapp .admin-resources-table th {
-    font-size: 0.34rem;
-  }
-
-  body.tg-miniapp .admin-resources-table td {
-    font-size: 0.46rem;
-    padding: 3px 2px;
-  }
-}
-
-@media (max-width: 640px) {
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
     font-size: 0.50rem;
     padding-inline: 4px;
@@ -313,7 +307,7 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.home-page-admin.tg-miniapp .admin-students-toolbar {
-    grid-template-columns: minmax(0, 1fr) 108px;
+    grid-template-columns: minmax(0, 1fr) clamp(96px, 28vw, 108px);
     align-items: end;
   }
 
@@ -347,13 +341,6 @@ body.tg-miniapp .admin-chart-table-wrap {
     overflow-y: auto;
   }
 
-  body.home-page-admin.tg-miniapp .students-table,
-  body.home-page-admin.tg-miniapp .teachers-table {
-    width: 100%;
-    min-width: 0;
-    table-layout: fixed;
-  }
-
   body.home-page-admin.tg-miniapp .students-table th,
   body.home-page-admin.tg-miniapp .students-table td {
     padding: 6px 5px;
@@ -365,11 +352,11 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.home-page-admin.tg-miniapp .students-table th {
-    font-size: 0.44rem;
+    font-size: var(--tg-students-head-size);
   }
 
   body.home-page-admin.tg-miniapp .students-table td {
-    font-size: 0.6rem;
+    font-size: var(--tg-students-cell-size);
   }
 
   body.home-page-admin.tg-miniapp .students-table th:nth-child(1),
@@ -403,11 +390,11 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.home-page-admin.tg-miniapp .teachers-table th {
-    font-size: 0.46rem;
+    font-size: var(--tg-teachers-head-size);
   }
 
   body.home-page-admin.tg-miniapp .teachers-table td {
-    font-size: 0.64rem;
+    font-size: var(--tg-teachers-cell-size);
   }
 
   body.home-page-admin.tg-miniapp .teachers-table th:nth-child(1),
@@ -456,85 +443,5 @@ body.tg-miniapp .admin-chart-table-wrap {
 
   body.home-page-admin.tg-miniapp .admin-resource-form .field textarea {
     min-height: 72px;
-  }
-
-  body.tg-miniapp .rating-table th:first-child,
-  body.tg-miniapp .rating-table td:first-child {
-    position: static;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(1),
-  body.tg-miniapp .rating-table td:nth-child(1) {
-    width: 52px;
-    min-width: 52px;
-    max-width: 52px;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(2),
-  body.tg-miniapp .rating-table td:nth-child(2) {
-    width: 28%;
-    min-width: 0;
-    position: sticky;
-    left: 52px;
-    text-align: center;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(2) {
-    z-index: 4;
-    background: var(--bg);
-  }
-
-  body.tg-miniapp .rating-table td:nth-child(2) {
-    z-index: 1;
-    background: var(--surface);
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(3),
-  body.tg-miniapp .rating-table td:nth-child(3) {
-    width: 14%;
-    min-width: 0;
-    text-align: center;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(4),
-  body.tg-miniapp .rating-table td:nth-child(4),
-  body.tg-miniapp .rating-table th:nth-child(5),
-  body.tg-miniapp .rating-table td:nth-child(5),
-  body.tg-miniapp .rating-table th:nth-child(6),
-  body.tg-miniapp .rating-table td:nth-child(6),
-  body.tg-miniapp .rating-table th:nth-child(7),
-  body.tg-miniapp .rating-table td:nth-child(7) {
-    width: 11.5%;
-  }
-}
-
-@media (max-width: 420px) {
-  body.home-page-admin.tg-miniapp .admin-students-toolbar {
-    grid-template-columns: minmax(0, 1fr) 96px;
-  }
-
-  body.home-page-admin.tg-miniapp .students-table th,
-  body.home-page-admin.tg-miniapp .teachers-table th {
-    font-size: 0.4rem;
-  }
-
-  body.home-page-admin.tg-miniapp .students-table td {
-    font-size: 0.56rem;
-  }
-
-  body.home-page-admin.tg-miniapp .teachers-table td {
-    font-size: 0.6rem;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(1),
-  body.tg-miniapp .rating-table td:nth-child(1) {
-    width: 48px;
-    min-width: 48px;
-    max-width: 48px;
-  }
-
-  body.tg-miniapp .rating-table th:nth-child(2),
-  body.tg-miniapp .rating-table td:nth-child(2) {
-    left: 48px;
   }
 }
