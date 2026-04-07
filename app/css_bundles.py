@@ -23,11 +23,16 @@ CSS_BUNDLES: Dict[str, tuple[str, ...]] = {
     "portal.css": _CORE_SOURCES + (
         "css/pages/portal-shell.css",
     ),
-    "admin-home.css": (
+    "admin-overview.css": (
         "css/components/tables.css",
         "css/pages/admin-core.css",
         "css/pages/portal-admin.css",
         "css/pages/admin-overview.css",
+    ),
+    "admin-management.css": (
+        "css/components/tables.css",
+        "css/pages/admin-core.css",
+        "css/pages/portal-admin.css",
         "css/pages/admin-management.css",
     ),
     "admin-profile.css": _CORE_SOURCES + (
@@ -76,6 +81,14 @@ def _read_sources(static_root: str, relative_paths: Iterable[str]) -> str:
 def ensure_css_bundles(static_root: str) -> dict[str, str]:
     bundles_root = os.path.join(static_root, "css", "bundles")
     os.makedirs(bundles_root, exist_ok=True)
+
+    expected_names = set(CSS_BUNDLES)
+    for file_name in os.listdir(bundles_root):
+        if not file_name.endswith(".css") or file_name in expected_names:
+            continue
+        stale_path = os.path.join(bundles_root, file_name)
+        if os.path.isfile(stale_path):
+            os.remove(stale_path)
 
     created_paths = {}
     for bundle_name, relative_paths in CSS_BUNDLES.items():

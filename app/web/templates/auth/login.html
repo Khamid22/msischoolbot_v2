@@ -19,6 +19,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script defer src="https://telegram.org/js/telegram-web-app.js"></script>
-<script defer src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
+<script defer src="{{ url_for('static', filename='js/bundles/telegram-base.js', v=asset_version) }}"></script>
 {% endblock %}

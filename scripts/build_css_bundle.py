@@ -8,10 +8,12 @@ if _ROOT_DIR not in sys.path:
 
 
 from app.css_bundles import ensure_css_bundles
+from app.js_bundles import ensure_js_bundles
 
 
 def main():
     ensure_css_bundles("app/web/static")
+    ensure_js_bundles("app/web/static")
 
 
 if __name__ == "__main__":

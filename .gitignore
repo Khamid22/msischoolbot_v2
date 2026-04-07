@@ -21,3 +21,4 @@ utils/app_data.sqlite3
 web/static/uploads/
 app/web/static/uploads/
 app/web/static/css/bundles/
+app/web/static/js/bundles/

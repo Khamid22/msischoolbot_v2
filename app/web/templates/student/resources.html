@@ -11,8 +11,10 @@
     <title>Subject Resources</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
     <link rel="manifest" href="{{ url_for('system.manifest') }}" />
+    <link rel="preconnect" href="https://telegram.org" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -131,9 +133,6 @@
         </div>
       </div>
     </div>
-
-    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script defer src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
     <script>
       (function () {
         var modal = document.getElementById("resourceVideoModal");
@@ -188,6 +187,6 @@
         });
       })();
     </script>
-    <script defer src="{{ url_for('static', filename='js/pwa.js', v=asset_version) }}"></script>
+    <script defer src="{{ url_for('static', filename='js/bundles/telegram-base.js', v=asset_version) }}"></script>
   </body>
 </html>

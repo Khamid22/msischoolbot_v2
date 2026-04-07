@@ -19,10 +19,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script defer src="https://telegram.org/js/telegram-web-app.js"></script>
-<script defer src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
 <script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>
 <script id="studentsBySubjectGroupJson" type="application/json">{{ students_by_subject_group|default({}, true)|tojson|safe }}</script>
 <script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
-<script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+<script defer src="{{ url_for('static', filename='js/bundles/student-home.js', v=asset_version) }}"></script>
 {% endblock %}

@@ -22,6 +22,7 @@
   let scheduledFrame = 0;
   let lastHeightValue = "";
   let viewportPrepared = false;
+  let fullscreenRequested = false;
 
   const setAppHeight = function () {
     const stableHeight = Number(webApp.viewportStableHeight || 0);
@@ -60,6 +61,28 @@
       } catch (_error) {
         // Ignore Telegram swipe setup errors.
       }
+    }
+  };
+
+  const requestFullscreenIfAvailable = function () {
+    if (fullscreenRequested) {
+      return;
+    }
+
+    if (webApp.isFullscreen === true) {
+      fullscreenRequested = true;
+      return;
+    }
+
+    if (typeof webApp.requestFullscreen !== "function") {
+      return;
+    }
+
+    fullscreenRequested = true;
+    try {
+      webApp.requestFullscreen();
+    } catch (_error) {
+      // Ignore Telegram fullscreen errors on clients that reject the request.
     }
   };
 
@@ -102,6 +125,7 @@
 
   if (typeof webApp.onEvent === "function") {
     webApp.onEvent("viewportChanged", scheduleHeightSync);
+    webApp.onEvent("fullscreenChanged", scheduleHeightSync);
   }
   window.addEventListener("resize", scheduleHeightSync, { passive: true });
   window.setTimeout(setAppHeight, 180);
@@ -111,4 +135,9 @@
   } catch (_error) {
     // Ignore Telegram ready errors.
   }
+
+  window.setTimeout(function () {
+    requestFullscreenIfAvailable();
+    scheduleHeightSync();
+  }, 40);
 })();

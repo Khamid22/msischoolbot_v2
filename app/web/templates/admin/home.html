@@ -1,7 +1,13 @@
 {% extends "layouts/portal.html" %}
 {% set body_class = "home-page home-page-admin" %}
 
-{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/admin-home.css', v=asset_version) }}" />{% endblock %}
+{% block styles %}
+{% if admin_panel == "overview" %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/admin-overview.css', v=asset_version) }}" />
+{% else %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/admin-management.css', v=asset_version) }}" />
+{% endif %}
+{% endblock %}
 
 {% block header %}
 <div class="admin-sticky-header admin-sticky-header-full">
@@ -64,13 +70,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script defer src="https://telegram.org/js/telegram-web-app.js"></script>
-<script defer src="{{ url_for('static', filename='js/telegram-init.js', v=asset_version) }}"></script>
 <script id="adminSubjectInfoJson" type="application/json">{{ admin_subject_info|default([], true)|tojson|safe }}</script>
-{% if admin_panel == "overview" %}
-<script defer src="{{ url_for('static', filename='vendor/chart.umd.min.js', v=asset_version) }}"></script>
-{% endif %}
-<script defer src="{{ url_for('static', filename='js/home.js', v=asset_version) }}"></script>
+<script defer src="{{ url_for('static', filename='js/bundles/admin-home.js', v=asset_version) }}"></script>
 <script>
 {% include "admin/_inline_scripts.js.jinja" %}
 </script>

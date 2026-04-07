@@ -13,6 +13,7 @@ from flask_wtf.csrf import CSRFError
 from app.auth.policies import is_authenticated_session as is_authenticated_policy_session
 from app.auth.session import configure_login_manager
 from app.css_bundles import ensure_css_bundles
+from app.js_bundles import ensure_js_bundles
 from app.config.schools import get_configured_school_spreadsheets
 from app.config.settings import get_web_settings
 from app.extensions import init_extensions, login_manager
@@ -47,12 +48,14 @@ app.config["WTF_CSRF_TIME_LIMIT"] = None
 init_extensions(app)
 configure_login_manager(login_manager)
 ensure_css_bundles(_STATIC_DIR)
+ensure_js_bundles(_STATIC_DIR)
 
 
 def _build_default_asset_version():
     # Build a simple asset version from the latest static/template file mtime.
     candidate_paths = [
         os.path.join(_BACKEND_DIR, "css_bundles.py"),
+        os.path.join(_BACKEND_DIR, "js_bundles.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
         os.path.join(_TEMPLATE_DIR, "student", "dashboard.html"),
         os.path.join(_TEMPLATE_DIR, "home.html"),
@@ -60,10 +63,6 @@ def _build_default_asset_version():
         os.path.join(_TEMPLATE_DIR, "student", "home.html"),
         os.path.join(_TEMPLATE_DIR, "admin", "home.html"),
         os.path.join(_TEMPLATE_DIR, "layouts", "portal.html"),
-        os.path.join(_STATIC_DIR, "js", "dashboard.js"),
-        os.path.join(_STATIC_DIR, "js", "home.js"),
-        os.path.join(_STATIC_DIR, "js", "pwa.js"),
-        os.path.join(_STATIC_DIR, "js", "sw.js"),
     ]
 
     css_root = os.path.join(_STATIC_DIR, "css")
@@ -72,6 +71,17 @@ def _build_default_asset_version():
             if not file_name.endswith(".css"):
                 continue
             candidate_paths.append(os.path.join(root_dir, file_name))
+
+    js_roots = [
+        os.path.join(_STATIC_DIR, "js"),
+        os.path.join(_STATIC_DIR, "vendor"),
+    ]
+    for js_root in js_roots:
+        for root_dir, _dir_names, file_names in os.walk(js_root):
+            for file_name in file_names:
+                if not file_name.endswith(".js"):
+                    continue
+                candidate_paths.append(os.path.join(root_dir, file_name))
 
     mtimes = []
     for path in candidate_paths:
