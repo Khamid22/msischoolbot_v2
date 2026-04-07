@@ -36,6 +36,12 @@
   transition: background-color var(--transition-normal);
 }
 
+body.tg-miniapp .topbar {
+  background: rgba(245, 245, 245, 0.98);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .academic-dashboard-page .topbar {
   position: fixed;
   inset: 0 0 auto;

@@ -1,4 +1,8 @@
 (function () {
+  if (window.__msiTelegramMiniAppInitDone) {
+    return;
+  }
+
   const telegram = window.Telegram;
   const webApp = telegram && telegram.WebApp;
   if (!webApp) {
@@ -12,6 +16,13 @@
     return;
   }
 
+  window.__msiTelegramMiniAppInitDone = true;
+  window.__msiIsTelegramMiniApp = true;
+
+  let scheduledFrame = 0;
+  let lastHeightValue = "";
+  let viewportPrepared = false;
+
   const setAppHeight = function () {
     const stableHeight = Number(webApp.viewportStableHeight || 0);
     const viewportHeight = Number(webApp.viewportHeight || 0);
@@ -22,11 +33,21 @@
       (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
       0;
     if (resolvedHeight > 0) {
-      document.documentElement.style.setProperty("--tg-app-height", `${Math.round(resolvedHeight)}px`);
+      const nextHeightValue = `${Math.round(resolvedHeight)}px`;
+      if (nextHeightValue !== lastHeightValue) {
+        lastHeightValue = nextHeightValue;
+        document.documentElement.style.setProperty("--tg-app-height", nextHeightValue);
+      }
     }
   };
 
-  const applyViewportLock = function () {
+  const prepareViewport = function () {
+    setAppHeight();
+    if (viewportPrepared) {
+      return;
+    }
+
+    viewportPrepared = true;
     setAppHeight();
     try {
       webApp.expand();
@@ -42,9 +63,19 @@
     }
   };
 
+  const scheduleHeightSync = function () {
+    if (scheduledFrame) {
+      return;
+    }
+    scheduledFrame = window.requestAnimationFrame(function () {
+      scheduledFrame = 0;
+      setAppHeight();
+    });
+  };
+
   document.documentElement.classList.add("tg-miniapp");
   document.body.classList.add("tg-miniapp");
-  applyViewportLock();
+  prepareViewport();
 
   const loginTelegramUserIdInput = document.getElementById("loginTelegramUserId");
   const telegramUserId =
@@ -70,11 +101,10 @@
   }
 
   if (typeof webApp.onEvent === "function") {
-    webApp.onEvent("viewportChanged", applyViewportLock);
+    webApp.onEvent("viewportChanged", scheduleHeightSync);
   }
-  window.addEventListener("resize", setAppHeight, { passive: true });
-  window.setTimeout(applyViewportLock, 120);
-  window.setTimeout(applyViewportLock, 360);
+  window.addEventListener("resize", scheduleHeightSync, { passive: true });
+  window.setTimeout(setAppHeight, 180);
 
   try {
     webApp.ready();

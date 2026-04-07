@@ -1,4 +1,9 @@
 (function () {
+  const isTelegramMiniApp =
+    Boolean(window.__msiIsTelegramMiniApp) ||
+    document.documentElement.classList.contains("tg-miniapp") ||
+    (document.body && document.body.classList.contains("tg-miniapp"));
+
   function readJsonScript(id, fallbackValue) {
     const node = document.getElementById(id);
     if (!node) {
@@ -20,6 +25,10 @@
   function asPositiveNumber(value) {
     const parsed = asNumber(value);
     return parsed !== null && parsed > 0 ? parsed : null;
+  }
+
+  function getViewportWidth() {
+    return Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
   }
 
   function initStudentSearchPanel() {
@@ -960,10 +969,46 @@
       renderCharts(findRow(selectedSchool, subjectSelect.value || ""));
     });
 
+    let monthlyResizeTimer = 0;
+    let lastMonthlyViewportWidth = Math.max(
+      0,
+      Math.round(
+        (monthlyScrollViewport ? monthlyScrollViewport.clientWidth : 0) || getViewportWidth()
+      )
+    );
+
+    function scheduleMonthlyResize(force) {
+      const nextViewportWidth = Math.max(
+        0,
+        Math.round(
+          (monthlyScrollViewport ? monthlyScrollViewport.clientWidth : 0) || getViewportWidth()
+        )
+      );
+
+      if (!force && Math.abs(nextViewportWidth - lastMonthlyViewportWidth) < 2) {
+        return;
+      }
+
+      if (nextViewportWidth > 0) {
+        lastMonthlyViewportWidth = nextViewportWidth;
+      }
+
+      if (monthlyResizeTimer) {
+        window.clearTimeout(monthlyResizeTimer);
+      }
+
+      monthlyResizeTimer = window.setTimeout(function () {
+        syncMonthlyScrollWidth(monthlyChart.data.labels.length);
+        monthlyChart.resize();
+      }, isTelegramMiniApp ? 180 : 120);
+    }
+
     window.addEventListener("resize", function () {
-      syncMonthlyScrollWidth(monthlyChart.data.labels.length);
-      monthlyChart.resize();
-    });
+      scheduleMonthlyResize(false);
+    }, { passive: true });
+    window.addEventListener("orientationchange", function () {
+      scheduleMonthlyResize(true);
+    }, { passive: true });
 
     gradeSwitchButtons.forEach(function (button) {
       button.addEventListener("click", function () {

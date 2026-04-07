@@ -13,6 +13,10 @@
   }
 
   const data = window.dashboardData || readJsonScript("dashboardDataJson", null);
+  const isTelegramMiniApp =
+    Boolean(window.__msiIsTelegramMiniApp) ||
+    document.documentElement.classList.contains("tg-miniapp") ||
+    (document.body && document.body.classList.contains("tg-miniapp"));
 
   const profileMenuToggle = document.getElementById("profileMenuToggle");
   const profileMenu = document.getElementById("profileMenu");
@@ -286,10 +290,15 @@
     canvases.forEach((canvas) => showChartMessage(canvas, "Chart library failed to load."));
   }
 
-  const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const prefersReducedMotion =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function getViewportWidth() {
+    return Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+  }
 
   function getViewportProfile() {
-    const width = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+    const width = getViewportWidth();
     return {
       width,
       isPhone: width <= 640,
@@ -301,6 +310,7 @@
   const initialViewport = getViewportProfile();
   const isNarrowScreen = initialViewport.isPhone;
   const dpr = Math.min(window.devicePixelRatio || 1, initialViewport.isPhone ? 1.5 : 2);
+  const disableChartAnimations = prefersReducedMotion || isNarrowScreen || isTelegramMiniApp;
 
   const barValuePlugin = {
     id: "barValuePlugin",
@@ -430,7 +440,7 @@
             responsive: true,
             maintainAspectRatio: false,
             devicePixelRatio: dpr,
-            animation: prefersReducedMotion || isNarrowScreen ? false : { duration: 700 },
+            animation: disableChartAnimations ? false : { duration: 700 },
             plugins: {
                 legend: {
                     display: datasets.length > 1,
@@ -526,7 +536,7 @@
         responsive: true,
         maintainAspectRatio: false,
         devicePixelRatio: dpr,
-        animation: prefersReducedMotion || isNarrowScreen ? false : { duration: 700 },
+        animation: disableChartAnimations ? false : { duration: 700 },
         cutout: isNarrowScreen ? "64%" : "66%",
         plugins: {
           legend: {
@@ -879,6 +889,7 @@
 
   let resizeTimer = 0;
   let resizeBound = false;
+  let lastHomeworkViewportWidth = getViewportWidth();
 
   function bindHomeworkResizeHandler() {
     if (resizeBound) {
@@ -895,8 +906,22 @@
       }, 140);
     };
 
-    window.addEventListener("resize", redrawHomework, { passive: true });
-    window.addEventListener("orientationchange", redrawHomework, { passive: true });
+    const handleResize = function () {
+      const nextViewportWidth = getViewportWidth();
+      if (Math.abs(nextViewportWidth - lastHomeworkViewportWidth) < 2) {
+        return;
+      }
+      lastHomeworkViewportWidth = nextViewportWidth;
+      redrawHomework();
+    };
+
+    const handleOrientationChange = function () {
+      lastHomeworkViewportWidth = getViewportWidth();
+      redrawHomework();
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+    window.addEventListener("orientationchange", handleOrientationChange, { passive: true });
   }
 
   if (document.readyState === "loading") {
