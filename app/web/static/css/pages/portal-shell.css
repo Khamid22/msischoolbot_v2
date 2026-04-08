@@ -35,7 +35,7 @@
   padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
 }
 
-body.tg-miniapp.home-page {
+body.tg-miniapp.home-page:not(.home-page-admin) {
   padding:
     calc(16px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
     calc(16px + var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
@@ -201,7 +201,7 @@ body.tg-miniapp.not-found-page {
     padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
   }
 
-  body.tg-miniapp.home-page {
+  body.tg-miniapp.home-page:not(.home-page-admin) {
     padding:
       calc(10px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
       calc(10px + var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))

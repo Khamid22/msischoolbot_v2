@@ -6,11 +6,15 @@
 
 .admin-resource-types-wrap {
   margin-top: 10px;
+  width: 100%;
+  min-width: 0;
   max-height: min(46vh, 400px);
 }
 
 .admin-resource-types-table {
-  min-width: 360px;
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
 }
 
 .admin-resource-types-table th:nth-child(1),
@@ -31,6 +35,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
 }
 
 .admin-resource-type-rename-form {
@@ -64,17 +70,21 @@
 .admin-resource-type-action-buttons {
   justify-content: center;
   gap: 6px;
+  width: 100%;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .admin-resources-table-wrap {
   margin-top: 10px;
+  width: 100%;
+  min-width: 0;
   max-height: min(60vh, 580px);
 }
 
 .admin-resources-table {
-  min-width: 760px;
+  width: 100%;
+  min-width: 0;
   table-layout: fixed;
 }
 
@@ -966,8 +976,8 @@
   }
 
   .admin-resource-types-table {
-    min-width: 460px;
     width: 100%;
+    min-width: 0;
   }
 
   .admin-resource-types-wrap {
