@@ -6,6 +6,7 @@
   height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
+  padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(12px + var(--safe-left));
 }
 
 .home-page-admin .home-wrap {
@@ -181,28 +182,32 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
 }
 
 @media (max-width: 640px) {
+  .home-page-admin {
+    padding: calc(4px + var(--safe-top)) calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  }
+
   .home-page-admin .home-wrap {
     max-width: 100%;
   }
 
   .home-page-admin .login-card {
-    padding: 14px 12px;
+    padding: 10px 9px;
     border-radius: var(--radius-lg);
   }
 
   .admin-sticky-header {
-    margin: 0 0 8px;
-    padding: calc(6px + var(--safe-top)) 0 8px;
+    margin: 0 0 6px;
+    padding: calc(4px + var(--safe-top)) 0 5px;
   }
 
   .admin-sticky-header-full .admin-login-header {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .admin-login-header .logo-block {
     width: 46px;
     height: 46px;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
   }
 
   .admin-login-header .logo-block svg {
@@ -220,9 +225,9 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
   }
 
   .admin-main-nav {
-    gap: 6px;
-    top: calc(6px + var(--safe-top));
-    padding: 3px;
+    gap: 5px;
+    top: calc(4px + var(--safe-top));
+    padding: 2px;
   }
 
   .admin-main-nav .admin-tab-btn,

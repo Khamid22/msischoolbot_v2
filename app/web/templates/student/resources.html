@@ -53,12 +53,21 @@
           <p>Shared by subject, available to all enrolled students.</p>
         </div>
         {% if grouped_resources %}
-        <nav class="resource-category-nav" aria-label="Jump to resource category">
+        <nav class="resource-category-nav" aria-label="Filter resources by type">
+          <button type="button" class="resource-category-chip is-active" data-resource-filter="all" aria-pressed="true">
+            <span>All</span>
+            <small>{{ grouped_resources|map(attribute='resources')|map('length')|sum }}</small>
+          </button>
           {% for type_bucket in grouped_resources %}
-          <a href="#resource-cat-{{ loop.index }}" class="resource-category-chip">
+          <button
+            type="button"
+            class="resource-category-chip"
+            data-resource-filter="group-{{ loop.index }}"
+            aria-pressed="false"
+          >
             <span>{{ type_bucket.resource_type_name }}</span>
             <small>{{ type_bucket.resources|length }}</small>
-          </a>
+          </button>
           {% endfor %}
         </nav>
         {% endif %}
@@ -66,7 +75,11 @@
 
       {% if grouped_resources %}
       {% for type_bucket in grouped_resources %}
-      <article class="chart-card resource-type-card" id="resource-cat-{{ loop.index }}">
+      <article
+        class="chart-card resource-type-card"
+        id="resource-cat-{{ loop.index }}"
+        data-resource-group="group-{{ loop.index }}"
+      >
         <div class="card-head">
           <h3>{{ type_bucket.resource_type_name }}</h3>
           <p>{{ type_bucket.resources|length }} item{{ "s" if type_bucket.resources|length != 1 else "" }}</p>
@@ -174,6 +187,34 @@
             );
           });
         });
+
+        var filterButtons = Array.from(document.querySelectorAll("[data-resource-filter]"));
+        var resourceCards = Array.from(document.querySelectorAll("[data-resource-group]"));
+
+        function setActiveFilter(filterValue) {
+          var normalizedFilter = String(filterValue || "all").trim() || "all";
+
+          filterButtons.forEach(function (button) {
+            var isActive = button.getAttribute("data-resource-filter") === normalizedFilter;
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-pressed", isActive ? "true" : "false");
+          });
+
+          resourceCards.forEach(function (card) {
+            var shouldShow =
+              normalizedFilter === "all" ||
+              card.getAttribute("data-resource-group") === normalizedFilter;
+            card.hidden = !shouldShow;
+          });
+        }
+
+        filterButtons.forEach(function (button) {
+          button.addEventListener("click", function () {
+            setActiveFilter(button.getAttribute("data-resource-filter"));
+          });
+        });
+
+        setActiveFilter("all");
 
         if (closeBtn) {
           closeBtn.addEventListener("click", closeModal);

@@ -254,10 +254,14 @@
   min-width: 0;
   max-width: 100%;
   white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
   transition: all var(--transition-fast);
 }
 
-.resource-category-chip:hover {
+.resource-category-chip:hover,
+.resource-category-chip.is-active {
   background: var(--text);
   color: var(--surface);
   border-color: var(--text);
@@ -287,7 +291,8 @@
   text-overflow: ellipsis;
 }
 
-.resource-category-chip:hover small {
+.resource-category-chip:hover small,
+.resource-category-chip.is-active small {
   background: var(--student-color-resource-chip-count-hover);
 }
 
