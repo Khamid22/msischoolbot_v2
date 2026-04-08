@@ -16,8 +16,17 @@
 
 .dashboard-page {
   --student-topbar-offset: 84px;
+  --student-tg-content-top: 0px;
+  --student-tg-content-left: 0px;
+  --student-tg-content-right: 0px;
   min-height: 100dvh;
   background: var(--bg);
+}
+
+body.tg-miniapp.dashboard-page {
+  --student-tg-content-top: var(--tg-content-safe-area-inset-top, 0px);
+  --student-tg-content-left: var(--tg-content-safe-area-inset-left, 0px);
+  --student-tg-content-right: var(--tg-content-safe-area-inset-right, 0px);
 }
 
 .topbar {
@@ -28,7 +37,11 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: calc(12px + var(--safe-top)) calc(16px + var(--safe-right)) 12px calc(16px + var(--safe-left));
+  padding:
+    calc(12px + var(--safe-top) + var(--student-tg-content-top))
+    calc(16px + var(--safe-right) + var(--student-tg-content-right))
+    12px
+    calc(16px + var(--safe-left) + var(--student-tg-content-left));
   border-bottom: 1px solid var(--hairline);
   background: var(--student-topbar-bg);
   backdrop-filter: blur(20px);
@@ -48,7 +61,7 @@ body.tg-miniapp .topbar {
 }
 
 .academic-dashboard-page .dashboard-wrap {
-  padding-top: calc(var(--student-topbar-offset) + var(--safe-top));
+  padding-top: calc(var(--student-topbar-offset) + var(--safe-top) + var(--student-tg-content-top));
 }
 
 .topbar-left,
@@ -141,6 +154,14 @@ body.tg-miniapp .topbar {
 
 .back-link:active {
   transform: scale(0.94);
+}
+
+body.tg-miniapp.tg-native-back .topbar .back-link {
+  display: none;
+}
+
+body.tg-miniapp.tg-native-back .topbar-left {
+  gap: 0;
 }
 
 .avatar {
@@ -360,7 +381,11 @@ body.tg-miniapp .topbar {
   .topbar {
     align-items: flex-start;
     gap: 8px;
-    padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 8px calc(10px + var(--safe-left));
+    padding:
+      calc(8px + var(--safe-top) + var(--student-tg-content-top))
+      calc(10px + var(--safe-right) + var(--student-tg-content-right))
+      8px
+      calc(10px + var(--safe-left) + var(--student-tg-content-left));
   }
 
   .topbar-left {
@@ -425,7 +450,11 @@ body.tg-miniapp .topbar {
 
   .topbar {
     gap: 16px;
-    padding: calc(14px + var(--safe-top)) calc(24px + var(--safe-right)) 14px calc(24px + var(--safe-left));
+    padding:
+      calc(14px + var(--safe-top) + var(--student-tg-content-top))
+      calc(24px + var(--safe-right) + var(--student-tg-content-right))
+      14px
+      calc(24px + var(--safe-left) + var(--student-tg-content-left));
   }
 
   .topbar-left h1 {
@@ -450,7 +479,11 @@ body.tg-miniapp .topbar {
 
   .topbar {
     gap: 16px;
-    padding: calc(14px + var(--safe-top)) calc(24px + var(--safe-right)) 14px calc(24px + var(--safe-left));
+    padding:
+      calc(14px + var(--safe-top) + var(--student-tg-content-top))
+      calc(24px + var(--safe-right) + var(--student-tg-content-right))
+      14px
+      calc(24px + var(--safe-left) + var(--student-tg-content-left));
   }
 
   .topbar-left h1 {

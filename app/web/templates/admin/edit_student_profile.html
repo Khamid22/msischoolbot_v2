@@ -18,7 +18,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/admin-profile.css', v=asset_version) }}" />
   </head>
-  <body class="home-page edit-profile-page">
+  <body
+    class="home-page edit-profile-page"
+    data-tg-back-mode="history"
+    data-tg-back-url="{{ url_for('student.home', panel='students') }}"
+  >
     <div class="bg-shape bg-shape-top"></div>
     <div class="bg-shape bg-shape-bottom"></div>
     <main class="home-wrap edit-profile-wrap">
@@ -31,7 +35,7 @@
           <div class="session-badge">Logged in as <strong>{{ auth_login }}</strong></div>
           <div class="session-toolbar-actions">
             <a href="{{ url_for('admin.admin_student_dashboard', student_row_id=student.id) }}" class="secondary-btn">View Dashboard</a>
-            <a href="{{ url_for('student.home', panel='students') }}" class="secondary-btn">Back</a>
+            <a href="{{ url_for('student.home', panel='students') }}" class="secondary-btn edit-profile-back-btn">Back</a>
           </div>
         </div>
         {% if auth_error %}<div class="form-error">{{ auth_error }}</div>{% endif %}

@@ -35,6 +35,14 @@
   padding: calc(16px + var(--safe-top)) calc(16px + var(--safe-right)) calc(16px + var(--safe-bottom)) calc(16px + var(--safe-left));
 }
 
+body.tg-miniapp.home-page {
+  padding:
+    calc(16px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
+    calc(16px + var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
+    calc(16px + var(--safe-bottom))
+    calc(16px + var(--safe-left) + var(--tg-content-safe-area-inset-left, 0px));
+}
+
 .bg-shape {
   position: absolute;
   border-radius: 999px;
@@ -146,6 +154,14 @@ body.tg-miniapp .bg-shape {
   background: var(--bg);
 }
 
+body.tg-miniapp.not-found-page {
+  padding:
+    calc(16px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
+    calc(16px + var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
+    calc(16px + var(--safe-bottom))
+    calc(16px + var(--safe-left) + var(--tg-content-safe-area-inset-left, 0px));
+}
+
 .not-found-wrap {
   width: 100%;
   max-width: 460px;
@@ -183,6 +199,14 @@ body.tg-miniapp .bg-shape {
 @media (max-width: 640px) {
   .home-page {
     padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(10px + var(--safe-left));
+  }
+
+  body.tg-miniapp.home-page {
+    padding:
+      calc(10px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
+      calc(10px + var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
+      calc(12px + var(--safe-bottom))
+      calc(10px + var(--safe-left) + var(--tg-content-safe-area-inset-left, 0px));
   }
 }
 

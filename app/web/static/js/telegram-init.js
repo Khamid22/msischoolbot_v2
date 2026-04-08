@@ -23,6 +23,8 @@
   let lastHeightValue = "";
   let viewportPrepared = false;
   let fullscreenRequested = false;
+  let nativeBackHandler = null;
+  let backFallbackTimer = 0;
 
   const setAppHeight = function () {
     const stableHeight = Number(webApp.viewportStableHeight || 0);
@@ -86,6 +88,94 @@
     }
   };
 
+  const clearBackFallbackTimer = function () {
+    if (!backFallbackTimer) {
+      return;
+    }
+
+    window.clearTimeout(backFallbackTimer);
+    backFallbackTimer = 0;
+  };
+
+  const hideNativeBackButton = function () {
+    const backButton = webApp.BackButton;
+    clearBackFallbackTimer();
+    document.body.classList.remove("tg-native-back");
+    if (!backButton) {
+      nativeBackHandler = null;
+      return;
+    }
+
+    if (nativeBackHandler && typeof backButton.offClick === "function") {
+      try {
+        backButton.offClick(nativeBackHandler);
+      } catch (_error) {
+        // Ignore Telegram back button cleanup errors.
+      }
+    }
+
+    if (typeof backButton.hide === "function") {
+      try {
+        backButton.hide();
+      } catch (_error) {
+        // Ignore Telegram back button visibility errors.
+      }
+    }
+
+    nativeBackHandler = null;
+  };
+
+  const configureNativeBackButton = function () {
+    const backButton = webApp.BackButton;
+    const backMode = String(document.body.dataset.tgBackMode || "").trim().toLowerCase();
+    const fallbackUrl = String(document.body.dataset.tgBackUrl || "").trim();
+
+    if (!backButton || (!backMode && !fallbackUrl)) {
+      hideNativeBackButton();
+      return;
+    }
+
+    hideNativeBackButton();
+
+    nativeBackHandler = function () {
+      if ((backMode === "history" || backMode === "auto") && window.history.length > 1) {
+        const currentHref = window.location.href;
+        clearBackFallbackTimer();
+        if (fallbackUrl) {
+          backFallbackTimer = window.setTimeout(function () {
+            backFallbackTimer = 0;
+            if (window.location.href === currentHref) {
+              window.location.assign(fallbackUrl);
+            }
+          }, 220);
+        }
+        window.history.back();
+        return;
+      }
+
+      if (fallbackUrl) {
+        window.location.assign(fallbackUrl);
+      }
+    };
+
+    if (typeof backButton.onClick === "function") {
+      try {
+        backButton.onClick(nativeBackHandler);
+      } catch (_error) {
+        nativeBackHandler = null;
+      }
+    }
+
+    if (typeof backButton.show === "function") {
+      try {
+        backButton.show();
+        document.body.classList.add("tg-native-back");
+      } catch (_error) {
+        // Ignore Telegram back button visibility errors.
+      }
+    }
+  };
+
   const scheduleHeightSync = function () {
     if (scheduledFrame) {
       return;
@@ -99,6 +189,7 @@
   document.documentElement.classList.add("tg-miniapp");
   document.body.classList.add("tg-miniapp");
   prepareViewport();
+  configureNativeBackButton();
 
   const loginTelegramUserIdInput = document.getElementById("loginTelegramUserId");
   const telegramUserId =
@@ -126,8 +217,11 @@
   if (typeof webApp.onEvent === "function") {
     webApp.onEvent("viewportChanged", scheduleHeightSync);
     webApp.onEvent("fullscreenChanged", scheduleHeightSync);
+    webApp.onEvent("safeAreaChanged", scheduleHeightSync);
+    webApp.onEvent("contentSafeAreaChanged", scheduleHeightSync);
   }
   window.addEventListener("resize", scheduleHeightSync, { passive: true });
+  window.addEventListener("pagehide", clearBackFallbackTimer, { passive: true });
   window.setTimeout(setAppHeight, 180);
 
   try {

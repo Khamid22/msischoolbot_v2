@@ -22,7 +22,11 @@
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/student-rating.css', v=asset_version) }}" />
   </head>
-  <body class="dashboard-page rating-page">
+  <body
+    class="dashboard-page rating-page"
+    data-tg-back-mode="history"
+    data-tg-back-url="{{ back_url }}"
+  >
     <header class="topbar">
       <div class="topbar-left">
         <a href="{{ back_url }}" class="back-link" aria-label="Back to dashboard">

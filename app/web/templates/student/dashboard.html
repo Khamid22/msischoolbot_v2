@@ -22,7 +22,11 @@
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/student-dashboard.css', v=asset_version) }}" />
   </head>
-  <body class="dashboard-page academic-dashboard-page">
+  <body
+    class="dashboard-page academic-dashboard-page"
+    data-tg-back-mode="history"
+    data-tg-back-url="{{ dashboard_back_url|default(url_for('student.home'), true) }}"
+  >
     <header class="topbar">
       <div class="topbar-left">
         <a href="{{ dashboard_back_url|default(url_for('student.home'), true) }}" class="back-link" aria-label="Back to search">

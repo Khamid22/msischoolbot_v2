@@ -52,7 +52,11 @@ body.home-page-admin.tg-miniapp .login-card.animate-in {
   top: 0;
   z-index: var(--z-sticky-header);
   margin: 0 0 10px;
-  padding: calc(8px + var(--safe-top)) 0 10px;
+  padding:
+    calc(8px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
+    calc(var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
+    10px
+    calc(var(--safe-left) + var(--tg-content-safe-area-inset-left, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--hairline);
 }
@@ -117,7 +121,7 @@ body.home-page-admin.tg-miniapp .admin-sticky-header {
   overflow-x: auto;
   overflow-y: auto;
   position: sticky;
-  top: calc(8px + var(--safe-top));
+  top: calc(8px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px));
   z-index: var(--z-app-nav);
   padding: 4px;
   border: 1px solid var(--hairline);
@@ -192,7 +196,11 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
 
   .admin-sticky-header {
     margin: 0 0 8px;
-    padding: calc(6px + var(--safe-top)) 0 8px;
+    padding:
+      calc(6px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px))
+      calc(var(--safe-right) + var(--tg-content-safe-area-inset-right, 0px))
+      8px
+      calc(var(--safe-left) + var(--tg-content-safe-area-inset-left, 0px));
   }
 
   .admin-sticky-header-full .admin-login-header {
@@ -221,7 +229,7 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
 
   .admin-main-nav {
     gap: 6px;
-    top: calc(6px + var(--safe-top));
+    top: calc(6px + var(--safe-top) + var(--tg-content-safe-area-inset-top, 0px));
     padding: 3px;
   }
 
