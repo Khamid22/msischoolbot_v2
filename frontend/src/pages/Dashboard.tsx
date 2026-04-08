@@ -196,7 +196,7 @@ export default function DashboardPage(props: DashboardPageProps) {
       }
     >
       <div
-        className="space-y-4"
+        className="space-y-4 pt-2 sm:pt-0"
         onClick={() => {
           setProfileOpen(false);
           setSubjectOpen(false);

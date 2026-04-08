@@ -63,6 +63,10 @@
     --tg-top-offset: 0px;
     --tg-safe-offset: 0px;
     --tg-nav-inline-offset: 0px;
+    --student-topbar-offset-mobile: 6rem;
+    --student-topbar-offset-desktop: 6.25rem;
+    --admin-topbar-offset-mobile: 5.5rem;
+    --admin-topbar-offset-desktop: 5.75rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;

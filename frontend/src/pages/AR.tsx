@@ -17,6 +17,15 @@ interface ArPageProps {
   lessonRows?: LessonRow[];
 }
 
+function formatLessonNumber(value: string) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/^lesson\s*/i, "")
+    .replace(/^l\s*/i, "")
+    .trim();
+  return normalized || "—";
+}
+
 function getStatusClasses(status: string) {
   const normalized = String(status || "").trim().toLowerCase();
   if (normalized === "present") {
@@ -54,17 +63,19 @@ export default function ARPage(props: ArPageProps) {
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="text-[10px] font-medium text-muted-foreground">{row.lesson_date_display}</span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">
-                        L{row.lesson_number}
+                        Lesson {formatLessonNumber(row.lesson_number)}
                       </span>
                     </div>
-                    <p className="mb-2 text-xs font-bold leading-snug">{row.lesson_topic}</p>
-                    <span
-                      className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusClasses(
-                        row.attendance_status,
-                      )}`}
-                    >
-                      {row.attendance_display}
-                    </span>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="flex-1 text-xs font-bold leading-snug">{row.lesson_topic}</p>
+                      <span
+                        className={`inline-flex min-h-7 shrink-0 items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusClasses(
+                          row.attendance_status,
+                        )}`}
+                      >
+                        {row.attendance_display}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -83,7 +94,7 @@ export default function ARPage(props: ArPageProps) {
                     {lessonRows.map((row) => (
                       <tr key={`${row.lesson_number}-${row.lesson_topic}`} className="border-b border-foreground/5">
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">{row.lesson_date_display}</td>
-                        <td className="px-3 py-2.5 text-xs font-medium">{row.lesson_number}</td>
+                        <td className="px-3 py-2.5 text-xs font-medium">{formatLessonNumber(row.lesson_number)}</td>
                         <td className="px-3 py-2.5 text-xs font-medium">{row.lesson_topic}</td>
                         <td className="px-3 py-2.5">
                           <span

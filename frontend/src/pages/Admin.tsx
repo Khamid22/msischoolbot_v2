@@ -623,7 +623,7 @@ export default function AdminPage(props: AdminPageProps) {
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 pb-4 pt-[calc(4.75rem+var(--tg-safe-offset))] sm:px-4 sm:pt-[calc(5rem+var(--tg-safe-offset))] md:px-6">
+      <main className="mx-auto w-full max-w-6xl px-3 pb-4 pt-[calc(var(--admin-topbar-offset-mobile)+var(--tg-safe-offset))] sm:px-4 sm:pt-[calc(var(--admin-topbar-offset-desktop)+var(--tg-safe-offset))] md:px-6">
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
         {resourceUploadState.active && activeTab !== "resources" ? (

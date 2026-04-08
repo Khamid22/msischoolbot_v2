@@ -74,7 +74,7 @@ export default function RatingPage(props: RatingPageProps) {
                     {["#", "Student", "Group", "AVG", "EP", "AAP", "AR"].map((heading) => (
                       <th
                         key={heading}
-                        className="sticky top-[calc(5rem+var(--tg-safe-offset))] z-10 bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:top-[calc(5.25rem+var(--tg-safe-offset))]"
+                        className="sticky top-[calc(var(--student-topbar-offset-mobile)+var(--tg-safe-offset))] z-10 bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:top-[calc(var(--student-topbar-offset-desktop)+var(--tg-safe-offset))]"
                       >
                         {heading}
                       </th>
@@ -82,12 +82,12 @@ export default function RatingPage(props: RatingPageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {leaderboard.map((row) => (
+                  {leaderboard.map((row, index) => (
                     <tr
-                      key={row.studentId}
+                      key={`${row.rank}-${row.studentId}-${row.group}-${row.displayName}`}
                       className={`border-b border-foreground/5 ${row.studentId === props.currentStudentId ? "bg-info/5" : "hover:bg-muted/40"}`}
                     >
-                      <td className="px-3 py-2.5 text-xs font-bold">{row.rank}</td>
+                      <td className="px-3 py-2.5 text-xs font-bold">{index + 1}</td>
                       <td className="max-w-[200px] px-3 py-2.5 text-xs font-medium leading-snug sm:text-sm">
                         <span className="inline-block whitespace-normal break-words">{row.displayName}</span>
                       </td>

@@ -20,6 +20,15 @@ interface AapPageProps {
   lessonRows?: LessonRow[];
 }
 
+function formatLessonNumber(value: string) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/^lesson\s*/i, "")
+    .replace(/^l\s*/i, "")
+    .trim();
+  return normalized || "—";
+}
+
 export default function AAPPage(props: AapPageProps) {
   const lessonRows = Array.isArray(props.lessonRows) ? props.lessonRows : [];
 
@@ -43,7 +52,7 @@ export default function AAPPage(props: AapPageProps) {
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="text-[10px] font-medium text-muted-foreground">{row.lesson_date_display}</span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">
-                        L{row.lesson_number}
+                        Lesson {formatLessonNumber(row.lesson_number)}
                       </span>
                     </div>
                     <p className="mb-2 text-xs font-bold leading-snug">{row.lesson_topic}</p>
@@ -70,7 +79,7 @@ export default function AAPPage(props: AapPageProps) {
                     {lessonRows.map((row) => (
                       <tr key={`${row.lesson_number}-${row.lesson_topic}`} className="border-b border-foreground/5">
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">{row.lesson_date_display}</td>
-                        <td className="px-3 py-2.5 text-xs font-medium">{row.lesson_number}</td>
+                        <td className="px-3 py-2.5 text-xs font-medium">{formatLessonNumber(row.lesson_number)}</td>
                         <td className="px-3 py-2.5 text-xs font-medium">{row.lesson_topic}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
