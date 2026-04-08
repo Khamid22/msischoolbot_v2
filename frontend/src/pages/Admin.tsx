@@ -565,7 +565,7 @@ export default function AdminPage(props: AdminPageProps) {
   return (
     <div className="min-h-[100dvh] bg-background">
       <header className="tg-safe-top fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
+        <div className="tg-miniapp-nav-offset mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
           <a href={`/?panel=overview&school=${encodeURIComponent(currentSchool)}`} className="flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold">
             <GraduationCap className="h-5 w-5" />
             MSI
@@ -604,7 +604,7 @@ export default function AdminPage(props: AdminPageProps) {
           </form>
         </div>
         {mobileNavOpen ? (
-          <div id="admin-mobile-nav" className="border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
+          <div id="admin-mobile-nav" className="tg-miniapp-nav-offset border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
             <nav className="grid grid-cols-2 gap-2" aria-label="Admin mobile navigation">
               {tabs.map((tab) => (
                 <button
