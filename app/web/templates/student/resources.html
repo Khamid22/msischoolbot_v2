@@ -87,45 +87,57 @@
         <ul class="resource-list">
           {% for resource in type_bucket.resources %}
           <li class="resource-item">
-            <div class="resource-item-main">
-              {% if resource.resource_file_url and resource.resource_file_kind == "video" %}
-              <button
-                type="button"
-                class="resource-title-btn"
-                data-video-src="{{ resource.resource_file_url }}"
-                data-video-title="{{ resource.title }}"
-              >
-                {{ resource.title }}
-              </button>
-              {% else %}
-              <strong>{{ resource.title }}</strong>
-              {% endif %}
-              {% if resource.description %}
-              <p>{{ resource.description }}</p>
-              {% endif %}
+            <div class="resource-item-head">
+              <div class="resource-item-main">
+                {% if resource.resource_file_url and resource.resource_file_kind == "video" %}
+                <button
+                  type="button"
+                  class="resource-title-btn"
+                  data-video-src="{{ resource.resource_file_url }}"
+                  data-video-title="{{ resource.title }}"
+                >
+                  {{ resource.title }}
+                </button>
+                {% else %}
+                <strong>{{ resource.title }}</strong>
+                {% endif %}
+              </div>
+              <div class="resource-item-actions">
+                {% if resource.resource_file_url and resource.resource_file_kind == "video" %}
+                <button
+                  type="button"
+                  class="secondary-btn resource-open-btn"
+                  data-video-src="{{ resource.resource_file_url }}"
+                  data-video-title="{{ resource.title }}"
+                >
+                  Watch Video
+                </button>
+                {% endif %}
+                {% if resource.resource_file_url and resource.resource_file_kind != "video" %}
+                <a
+                  class="secondary-btn resource-open-btn"
+                  href="{{ resource.resource_file_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open File
+                </a>
+                {% endif %}
+                {% if resource.resource_url %}
+                <a
+                  class="secondary-btn resource-open-btn"
+                  href="{{ resource.resource_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open Link
+                </a>
+                {% endif %}
+              </div>
             </div>
-            <div class="resource-item-actions">
-              {% if resource.resource_file_url and resource.resource_file_kind != "video" %}
-              <a
-                class="secondary-btn resource-open-btn"
-                href="{{ resource.resource_file_url }}"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open File
-              </a>
-              {% endif %}
-              {% if resource.resource_url %}
-              <a
-                class="secondary-btn resource-open-btn"
-                href="{{ resource.resource_url }}"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open Link
-              </a>
-              {% endif %}
-            </div>
+            {% if resource.description %}
+            <p class="resource-item-description">{{ resource.description }}</p>
+            {% endif %}
           </li>
           {% endfor %}
         </ul>
