@@ -1,5 +1,4 @@
 import html
-import os
 
 from aiogram import Router
 from aiogram.filters import CommandStart
@@ -17,11 +16,6 @@ router = Router()
 
 def _escape(value):
     return html.escape(str(value or ""))
-
-
-def _is_test_admin_login_enabled():
-    raw_value = str(os.environ.get("ENABLE_TEST_ADMIN_LOGIN", "1") or "").strip().casefold()
-    return raw_value in {"1", "true", "yes", "on"}
 
 
 def _linked_student_from_user(user):
@@ -72,21 +66,11 @@ async def start_handler(message, state):
 
     linked_student = _linked_student_from_user(message.from_user)
     if not linked_student:
-        test_admin_enabled = _is_test_admin_login_enabled()
-        hint_line = (
-            "\n\nFor testing without Mini App, use <code>/admin</code> or tap <b>Admin (Test)</b>."
-            if test_admin_enabled
-            else ""
-        )
         await message.answer(
             "👋 <b>Welcome!</b>\n\n"
             "Authentication is available only through the mini app.\n"
-            "Please open the mini app and sign in first."
-            f"{hint_line}",
-            reply_markup=registration_keyboard(
-                settings.mini_app_url,
-                show_test_admin=test_admin_enabled,
-            ),
+            "Please open the mini app and sign in first.",
+            reply_markup=registration_keyboard(settings.mini_app_url),
         )
         return
 

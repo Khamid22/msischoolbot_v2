@@ -140,7 +140,7 @@ def register_user_auth_routes(
         telegram_user_id = parse_telegram_user_id(login_form.telegram_user_id.data)
         if telegram_user_id is None:
             return render_login_page(
-                auth_error="Student authentication is available only through the Telegram mini app.",
+                auth_error="Unable to authenticate student.",
                 auth_login_input=login_value,
             ), 401
 
