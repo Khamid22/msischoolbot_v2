@@ -195,7 +195,7 @@
   border-radius: var(--radius-sm);
   text-align: center;
   white-space: nowrap;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
 }
 
 .resource-video-wrap {
@@ -236,7 +236,7 @@
 .resource-video-modal-head .secondary-btn {
   min-height: 32px;
   padding: 5px 12px;
-  font-size: 0.64rem;
+  font-size: 0.72rem;
 }
 
 .resource-video-modal-body {
@@ -384,7 +384,7 @@
   .resource-open-btn {
     min-height: 30px;
     padding: 4px 8px;
-    font-size: 0.64rem;
+    font-size: 0.72rem;
   }
 
   .resource-title-btn,
@@ -411,7 +411,7 @@
   .resource-category-chip {
     padding: 5px 9px;
     max-width: 100%;
-    font-size: 0.62rem;
+    font-size: 0.68rem;
   }
 
   .resource-category-chip small {

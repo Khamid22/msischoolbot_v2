@@ -24,7 +24,7 @@
 }
 
 body.tg-miniapp.dashboard-page {
-  --student-tg-content-top: 10px;
+  --student-tg-content-top: 12px;
   --student-tg-content-left: 0px;
   --student-tg-content-right: 0px;
 }
@@ -94,7 +94,7 @@ body.tg-miniapp .topbar {
 
 .topbar-left span {
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--muted);
   font-weight: 500;
 }
@@ -126,7 +126,7 @@ body.tg-miniapp .topbar {
 
 .dashboard-last-updated {
   margin-top: 2px;
-  font-size: 0.56rem;
+  font-size: 0.64rem;
   line-height: 1.2;
   letter-spacing: 0.04em;
   color: var(--muted);
@@ -389,7 +389,7 @@ body.tg-miniapp .topbar {
   }
 
   .topbar-left h1 {
-    font-size: 0.84rem;
+    font-size: 0.9rem;
     line-height: 1.15;
   }
 
@@ -398,12 +398,12 @@ body.tg-miniapp .topbar {
   }
 
   .dashboard-last-updated {
-    font-size: 0.46rem;
+    font-size: 0.6rem;
     letter-spacing: 0.03em;
   }
 
   .topbar-left span {
-    font-size: 0.58rem;
+    font-size: 0.66rem;
     line-height: 1.1;
   }
 

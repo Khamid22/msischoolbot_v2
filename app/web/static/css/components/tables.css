@@ -185,9 +185,9 @@
 }
 
 .teachers-action-btn {
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 0.6rem;
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 0.68rem;
   letter-spacing: 0.02em;
 }
 
@@ -976,9 +976,9 @@
   }
 
   .home-page-admin .admin-resources-table .teachers-action-btn {
-    min-height: 22px;
-    padding: 2px 4px;
-    font-size: 0.48rem;
+    min-height: 24px;
+    padding: 3px 6px;
+    font-size: 0.62rem;
   }
 
   .admin-resource-types-table {
@@ -992,9 +992,9 @@
   }
 
   .admin-resource-type-rename-form input {
-    min-height: 28px;
+    min-height: 30px;
     padding: 4px 8px;
-    font-size: 0.62rem;
+    font-size: 0.7rem;
   }
 
   .admin-resource-type-action-buttons {

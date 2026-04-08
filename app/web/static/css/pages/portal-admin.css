@@ -9,6 +9,10 @@
   padding: calc(6px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left));
 }
 
+body.home-page-admin.tg-miniapp {
+  padding-top: calc(12px + var(--safe-top));
+}
+
 .home-page-admin .home-wrap {
   margin-inline: auto;
   max-width: min(1320px, 100%);
@@ -88,10 +92,10 @@ body.home-page-admin.tg-miniapp .admin-sticky-header {
 }
 
 .admin-tab-btn {
-  min-height: 34px;
-  padding: 6px 14px;
+  min-height: 36px;
+  padding: 6px 12px;
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   transition: all var(--transition-fast);
 }
 
@@ -156,7 +160,7 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-sm);
   padding: 5px 10px;
-  min-height: 34px;
+  min-height: 36px;
   background: var(--surface);
 }
 
@@ -173,7 +177,7 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
 
 .admin-nav-brand-text {
   font-family: var(--font-display);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -212,6 +216,10 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
     padding: calc(1px + var(--safe-top)) calc(6px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(6px + var(--safe-left));
   }
 
+  body.home-page-admin.tg-miniapp {
+    padding-top: calc(10px + var(--safe-top));
+  }
+
   .home-page-admin .home-wrap {
     max-width: 100%;
   }
@@ -233,7 +241,7 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
   }
 
   .admin-nav-brand {
-    min-height: 30px;
+    min-height: 32px;
     padding: 4px 8px;
     gap: 4px;
   }
@@ -244,16 +252,16 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
   }
 
   .admin-nav-brand-text {
-    font-size: 0.64rem;
+    font-size: 0.7rem;
   }
 
   .admin-main-nav .admin-tab-btn,
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
     flex: 0 0 auto;
     min-width: max-content;
-    min-height: 30px;
+    min-height: 32px;
     padding: 4px 10px;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
   }
 
   .admin-logout-icon-btn {

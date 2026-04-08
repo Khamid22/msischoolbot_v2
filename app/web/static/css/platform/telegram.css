@@ -91,6 +91,18 @@ body.tg-miniapp .admin-chart-table-wrap {
   overscroll-behavior: contain;
 }
 
+body.tg-miniapp .primary-btn {
+  min-height: 38px;
+  font-size: 0.8rem;
+  padding-inline: 14px;
+}
+
+body.tg-miniapp .secondary-btn:not(.admin-exit-btn):not(.admin-logout-icon-btn):not(.teachers-icon-btn) {
+  min-height: 34px;
+  font-size: 0.72rem;
+  padding: 5px 10px;
+}
+
 @media (max-width: 640px) {
   body.tg-miniapp {
     --tg-rating-rank-column: clamp(48px, 13vw, 52px);
@@ -329,7 +341,7 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     padding-inline: 8px;
   }
 
@@ -354,7 +366,7 @@ body.tg-miniapp .admin-chart-table-wrap {
   body.home-page-admin.tg-miniapp .admin-school-filter-form .field span,
   body.home-page-admin.tg-miniapp .admin-resource-type-form .field span,
   body.home-page-admin.tg-miniapp .admin-resource-form .field span {
-    font-size: 0.5rem;
+    font-size: 0.66rem;
     letter-spacing: 0.04em;
   }
 
@@ -364,9 +376,9 @@ body.tg-miniapp .admin-chart-table-wrap {
   }
 
   body.home-page-admin.tg-miniapp .teacher-mode-btn {
-    min-height: 28px;
-    padding: 4px 7px;
-    font-size: 0.56rem;
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 0.72rem;
   }
 
   body.home-page-admin.tg-miniapp .admin-panel-students .admin-table-wrap,

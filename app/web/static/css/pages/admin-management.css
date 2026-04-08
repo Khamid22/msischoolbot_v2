@@ -141,7 +141,7 @@
   min-height: 34px;
   margin-top: 0;
   padding: 6px 12px;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
 }
 
 .admin-resource-card-form .admin-resource-submit-btn {
@@ -161,20 +161,20 @@
 }
 
 .admin-resources-grid-compact .teachers-action-btn {
-  min-height: 24px;
-  padding: 3px 6px;
-  font-size: 0.56rem;
+  min-height: 26px;
+  padding: 4px 7px;
+  font-size: 0.66rem;
 }
 
 .admin-resources-grid-compact .admin-resource-types-table th,
 .admin-resources-grid-compact .admin-resource-types-table td {
   padding: 6px 4px;
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   line-height: 1.2;
 }
 
 .admin-resources-grid-compact .admin-resource-types-table th {
-  font-size: 0.58rem;
+  font-size: 0.62rem;
 }
 
 .admin-resources-grid-compact .admin-resource-types-table th:nth-child(1),
@@ -393,10 +393,10 @@
 
   .admin-resource-card-types .admin-resource-submit-btn,
   .admin-resource-card-form .admin-resource-submit-btn {
-    min-height: 30px;
+    min-height: 32px;
     width: 100%;
-    padding: 4px 8px;
-    font-size: 0.66rem;
+    padding: 5px 10px;
+    font-size: 0.72rem;
   }
 
   .admin-resources-grid-compact .admin-resource-types-wrap {
@@ -406,17 +406,17 @@
   .admin-resources-grid-compact .admin-resource-types-table th,
   .admin-resources-grid-compact .admin-resource-types-table td {
     padding: 4px 3px;
-    font-size: 0.54rem;
+    font-size: 0.62rem;
   }
 
   .admin-resources-grid-compact .admin-resource-types-table th {
-    font-size: 0.44rem;
+    font-size: 0.56rem;
   }
 
   .admin-resources-grid-compact .teachers-action-btn {
-    min-height: 20px;
-    padding: 2px 4px;
-    font-size: 0.46rem;
+    min-height: 24px;
+    padding: 3px 6px;
+    font-size: 0.62rem;
   }
 
   .admin-resources-grid-compact .teachers-actions-cell,

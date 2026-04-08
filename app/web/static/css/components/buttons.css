@@ -24,15 +24,16 @@
 
 .primary-btn {
   margin-top: 4px;
-  min-height: 50px;
+  min-height: 46px;
   border: 0;
   border-radius: var(--radius-md);
   background: var(--text);
   color: var(--surface);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+  line-height: 1.15;
   font-weight: 700;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
-  padding-inline: 20px;
+  padding-inline: 18px;
   box-shadow: var(--card-shadow);
 }
 
@@ -48,14 +49,15 @@
 }
 
 .secondary-btn {
-  min-height: 38px;
+  min-height: 36px;
   border: 1.5px solid rgba(10, 10, 10, 0.2);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
+  line-height: 1.1;
   font-weight: 600;
-  padding: 8px 14px;
+  padding: 6px 12px;
   white-space: nowrap;
   flex-shrink: 0;
   transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
@@ -68,6 +70,20 @@
 
 .secondary-btn:active {
   transform: scale(0.98);
+}
+
+@media (max-width: 640px) {
+  .primary-btn {
+    min-height: 42px;
+    font-size: 0.8rem;
+    padding-inline: 14px;
+  }
+
+  .secondary-btn {
+    min-height: 34px;
+    font-size: 0.72rem;
+    padding: 5px 10px;
+  }
 }
 
 .admin-logout-icon-btn svg,
