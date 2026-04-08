@@ -5,7 +5,7 @@
 }
 
 .admin-resource-types-wrap {
-  margin-top: 10px;
+  margin-top: 8px;
   width: 100%;
   min-width: 0;
   max-height: min(46vh, 400px);
@@ -76,7 +76,7 @@
 }
 
 .admin-resources-table-wrap {
-  margin-top: 10px;
+  margin-top: 8px;
   width: 100%;
   min-width: 0;
   max-height: min(60vh, 580px);
@@ -911,6 +911,7 @@
     max-height: none;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    margin-top: 6px;
   }
 
   .home-page-admin .admin-resources-table {
@@ -982,6 +983,7 @@
 
   .admin-resource-types-wrap {
     max-height: none;
+    margin-top: 6px;
   }
 
   .admin-resource-type-rename-form input {

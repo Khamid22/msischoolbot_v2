@@ -258,11 +258,15 @@
 
   .admin-resources-grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
+  }
+
+  .admin-resources-grid .admin-resource-card-wide {
+    order: -1;
   }
 
   .admin-resource-card {
-    padding: 10px;
+    padding: 8px;
   }
 
   .admin-resource-card .admin-card-title,
@@ -285,12 +289,12 @@
   .admin-resource-form .field input,
   .admin-resource-form .field select,
   .admin-resource-form .field textarea {
-    min-height: 36px;
+    min-height: 34px;
     font-size: 0.75rem;
   }
 
   .admin-resource-form .field textarea {
-    min-height: 68px;
+    min-height: 56px;
   }
 
   .admin-resource-submit-btn {
