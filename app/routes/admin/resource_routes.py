@@ -1,4 +1,4 @@
-from flask import request, session
+from flask import jsonify, request, session, url_for
 
 from app.routes.admin.services.r2_storage_service import upload_resource_file
 from app.routes.admin.services.resources_service import (
@@ -22,6 +22,30 @@ def register_admin_resource_routes(
     *,
     render_admin_page,
 ):
+    def is_xhr_request():
+        requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+        return requested_with == "XMLHttpRequest"
+
+    def xhr_success(message):
+        return jsonify(
+            {
+                "ok": True,
+                "message": message,
+                "redirect_url": url_for("student.home", panel="resources", school="all"),
+            }
+        )
+
+    def xhr_error(message, status_code=400):
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "message": message,
+                }
+            ),
+            status_code,
+        )
+
     @router.post("/admin/resources/types/add")
     def add_resource_type():
         resource_type_name = request.form.get("resource_type_name", "").strip()
@@ -126,6 +150,8 @@ def register_admin_resource_routes(
                     percent=4.0,
                     stage="upload_error",
                 )
+                if is_xhr_request():
+                    return xhr_error(upload_error)
                 return (
                     render_admin_page(
                         auth_error=upload_error,
@@ -162,6 +188,8 @@ def register_admin_resource_routes(
                 percent=98.0,
                 stage="save_error",
             )
+            if is_xhr_request():
+                return xhr_error(create_error or "Unable to save resource.")
             return (
                 render_admin_page(
                     auth_error=create_error or "Unable to save resource.",
@@ -171,6 +199,8 @@ def register_admin_resource_routes(
             )
 
         complete_upload(upload_id, message="Resource saved.")
+        if is_xhr_request():
+            return xhr_success("Resource saved.")
         return render_admin_page(
             admin_notice="Resource saved.",
             admin_panel="resources",

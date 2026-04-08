@@ -1,38 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0a0a0a" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <title>Student Not Found</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
-    <link rel="manifest" href="{{ url_for('system.manifest') }}" />
-    <link rel="preconnect" href="https://telegram.org" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/bundles/portal.css', v=asset_version) }}" />
-  </head>
-  <body class="not-found-page">
-    <main class="not-found-wrap">
-      <section class="not-found-card animate-in">
-        <div class="logo-block" aria-hidden="true" style="margin: 0 auto 18px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 8v4M12 16h.01"></path>
-          </svg>
-        </div>
-        <h1>Student Not Found</h1>
-        <p>{{ message or 'We could not retrieve data for this student. Please search again.' }}</p>
-        <a href="{{ url_for('student.home') }}" class="primary-btn">Return to Search</a>
-      </section>
-    </main>
-    <script defer src="{{ url_for('static', filename='js/bundles/telegram-base.js', v=asset_version) }}"></script>
-  </body>
-</html>
+{% set react_page_name = "student-not-found" %}
+{% set react_page_title = "Student Not Found" %}
+{% set react_description = message|default("We could not retrieve data for this student. Please search again.", true) %}
+{% set react_body_class = "msi-react-page msi-react-student-not-found" %}
+{% set react_props = {
+  "message": message|default("We could not retrieve data for this student. Please search again.", true),
+  "returnUrl": url_for("student.home"),
+} %}
+{% include "layouts/react_app.html" %}

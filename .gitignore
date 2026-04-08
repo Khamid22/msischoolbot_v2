@@ -1,5 +1,6 @@
 .DS_Store
 .venv/
+frontend/node_modules/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -20,5 +21,5 @@ app/app_data.sqlite3
 utils/app_data.sqlite3
 web/static/uploads/
 app/web/static/uploads/
-app/web/static/css/bundles/
 app/web/static/js/bundles/
+frontend/dist/

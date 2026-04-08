@@ -1,4 +1,4 @@
-const CACHE_VERSION = "msi-mobile-v28";
+const CACHE_VERSION = "msi-mobile-v29";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -64,6 +64,13 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  if (
+    url.pathname.startsWith("/static/react/") ||
+    url.pathname.startsWith("/static/js/bundles/")
+  ) {
     return;
   }
 

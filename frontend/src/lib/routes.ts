@@ -1,0 +1,24 @@
+export const routes = {
+  home: "/",
+  login: "/login",
+  logout: "/logout",
+  search: "/search",
+  changePassword: "/profile/password",
+  dashboard: (studentId: number | string) => `/dashboard/${studentId}`,
+  resources: (studentId: number | string) => `/dashboard/${studentId}/resources`,
+  rating: (studentId: number | string) => `/dashboard/${studentId}/rating-board`,
+  aap: (studentId: number | string) => `/dashboard/${studentId}/aap-lessons`,
+  adminTeacherAdd: "/admin/teachers/add",
+  adminTeacherDelete: (teacherId: number | string) => `/admin/teachers/${teacherId}/delete`,
+  adminTeacherEdit: (teacherId: number | string, school = "all") =>
+    `/?panel=teachers&school=${encodeURIComponent(String(school || "all"))}&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
+  adminResourceTypeAdd: "/admin/resources/types/add",
+  adminResourceTypeDelete: (typeId: number | string) => `/admin/resources/types/${typeId}/delete`,
+  adminResourceTypeRename: (typeId: number | string) => `/admin/resources/types/${typeId}/rename`,
+  adminResourceAdd: "/admin/resources/add",
+  adminResourceDelete: (resourceId: number | string) => `/admin/resources/${resourceId}/delete`,
+  adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
+  adminStudentDashboard: (studentRowId: number | string, school = "all") =>
+    `/admin/students/${studentRowId}/dashboard?school=${encodeURIComponent(String(school || "all"))}`,
+  adminStudentSave: (studentRowId: number | string) => `/admin/students/${studentRowId}/profile`,
+};

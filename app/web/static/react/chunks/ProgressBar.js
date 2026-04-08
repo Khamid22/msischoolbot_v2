@@ -1,0 +1,1 @@
+import{j as r}from"../app.js";function o({value:t,max:s=100,className:a=""}){const e=Math.min(100,Math.max(0,t/s*100));return r.jsx("div",{className:`h-2 w-full rounded-full bg-muted overflow-hidden ${a}`,children:r.jsx("div",{className:"h-full rounded-full bg-primary transition-all duration-500 ease-out",style:{width:`${e}%`}})})}export{o as P};

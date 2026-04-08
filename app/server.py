@@ -12,7 +12,6 @@ from flask_wtf.csrf import CSRFError
 
 from app.auth.policies import is_authenticated_session as is_authenticated_policy_session
 from app.auth.session import configure_login_manager
-from app.css_bundles import ensure_css_bundles
 from app.js_bundles import ensure_js_bundles
 from app.config.schools import get_configured_school_spreadsheets
 from app.config.settings import get_web_settings
@@ -29,7 +28,7 @@ _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
 _TEMPLATE_DIR = os.path.join(_FRONTEND_DIR, "templates")
 _STATIC_DIR = os.path.join(_FRONTEND_DIR, "static")
-_CSS_DIR = os.path.join(_STATIC_DIR, "css")
+_REACT_DIR = os.path.join(_STATIC_DIR, "react")
 app = Flask(
     __name__,
     template_folder=_TEMPLATE_DIR,
@@ -47,39 +46,38 @@ app.config["WTF_CSRF_TIME_LIMIT"] = None
 
 init_extensions(app)
 configure_login_manager(login_manager)
-ensure_css_bundles(_STATIC_DIR)
 ensure_js_bundles(_STATIC_DIR)
 
 
 def _build_default_asset_version():
     # Build a simple asset version from the latest static/template file mtime.
     candidate_paths = [
-        os.path.join(_BACKEND_DIR, "css_bundles.py"),
         os.path.join(_BACKEND_DIR, "js_bundles.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
+        os.path.join(_TEMPLATE_DIR, "layouts", "react_app.html"),
         os.path.join(_TEMPLATE_DIR, "student", "dashboard.html"),
         os.path.join(_TEMPLATE_DIR, "home.html"),
         os.path.join(_TEMPLATE_DIR, "auth", "login.html"),
         os.path.join(_TEMPLATE_DIR, "student", "home.html"),
         os.path.join(_TEMPLATE_DIR, "admin", "home.html"),
-        os.path.join(_TEMPLATE_DIR, "layouts", "portal.html"),
+        os.path.join(_REACT_DIR, "app.css"),
+        os.path.join(_REACT_DIR, "app.js"),
     ]
-
-    css_root = os.path.join(_STATIC_DIR, "css")
-    for root_dir, _dir_names, file_names in os.walk(css_root):
-        for file_name in file_names:
-            if not file_name.endswith(".css"):
-                continue
-            candidate_paths.append(os.path.join(root_dir, file_name))
 
     js_roots = [
         os.path.join(_STATIC_DIR, "js"),
-        os.path.join(_STATIC_DIR, "vendor"),
     ]
     for js_root in js_roots:
         for root_dir, _dir_names, file_names in os.walk(js_root):
             for file_name in file_names:
                 if not file_name.endswith(".js"):
+                    continue
+                candidate_paths.append(os.path.join(root_dir, file_name))
+
+    if os.path.isdir(_REACT_DIR):
+        for root_dir, _dir_names, file_names in os.walk(_REACT_DIR):
+            for file_name in file_names:
+                if not (file_name.endswith(".js") or file_name.endswith(".css")):
                     continue
                 candidate_paths.append(os.path.join(root_dir, file_name))
 
@@ -719,6 +717,9 @@ def add_common_headers(response):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
 
     if request.path == "/" or request.path.startswith("/dashboard/"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+
+    if request.path.startswith("/static/react/") or request.path.startswith("/static/js/bundles/"):
         response.headers["Cache-Control"] = "no-store, max-age=0"
 
     if request.path.startswith("/static/") and "Cache-Control" not in response.headers:

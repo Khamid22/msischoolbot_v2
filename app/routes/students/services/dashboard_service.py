@@ -49,6 +49,17 @@ def extract_aap_remark(score):
     return "Excellent", "remark-excellent"
 
 
+def extract_attendance_remark(status):
+    normalized = str(status or "").strip().casefold()
+    if normalized == "present":
+        return "Present", "remark-excellent"
+    if normalized == "absent":
+        return "Absent", "remark-fail"
+    if normalized == "justified":
+        return "Justified", "remark-satisfactory"
+    return "N/A", "remark-muted"
+
+
 def _parse_lesson_number(raw_value):
     text = str(raw_value or "").strip()
     if not text:
@@ -91,6 +102,48 @@ def extract_last_completed_lesson(payload):
         return max_lesson_number
 
     return len(homework_grades)
+
+
+def _build_lesson_catalog_rows(
+    *,
+    lesson_catalog,
+    lesson_data_by_lesson,
+    topic_key,
+    date_key,
+):
+    if not lesson_catalog:
+        lesson_catalog = []
+
+    seen = set()
+    max_lesson_order = 0
+    for lesson in lesson_catalog:
+        if not isinstance(lesson, dict):
+            continue
+        lesson_number = str(lesson.get("lesson_number", "")).strip()
+        if not lesson_number:
+            continue
+        seen.add(lesson_number.casefold())
+        try:
+            max_lesson_order = max(max_lesson_order, int(lesson.get("lesson_order", 0)))
+        except (TypeError, ValueError):
+            continue
+
+    for lesson_number, lesson_item in lesson_data_by_lesson.items():
+        dedupe_key = lesson_number.casefold()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        max_lesson_order += 1
+        lesson_catalog.append(
+            {
+                "lesson_number": lesson_number,
+                "lesson_topic": str(lesson_item.get(topic_key, "")).strip(),
+                "lesson_date": str(lesson_item.get(date_key, "")).strip(),
+                "lesson_order": max_lesson_order,
+            }
+        )
+
+    return lesson_catalog
 
 
 def build_subject_switch_options(
@@ -285,6 +338,13 @@ def build_dashboard_page_context(
         group=requested_group or current_group_name,
         school=current_school_code,
     )
+    ar_lessons_url = url_for(
+        "student.ar_lessons",
+        student_id=student_id,
+        subject=requested_subject or current_subject_name,
+        group=requested_group or current_group_name,
+        school=current_school_code,
+    )
 
     dashboard_back_url = url_for("student.home")
     if current_auth_role() == "admin":
@@ -310,6 +370,7 @@ def build_dashboard_page_context(
         "rating_board_url": rating_board_url,
         "resources_url": resources_url,
         "aap_lessons_url": aap_lessons_url,
+        "ar_lessons_url": ar_lessons_url,
         "current_subject_name": current_subject_name,
         "current_subject_short_name": current_subject_short_name,
         "subject_switch_options": subject_switch_options,
@@ -389,37 +450,18 @@ def build_aap_lessons_page_context(
         if lesson_date:
             date_by_lesson[lesson_number] = lesson_date
 
-    if not lesson_catalog:
-        lesson_catalog = []
-
-    seen = set()
-    max_lesson_order = 0
-    for lesson in lesson_catalog:
-        if not isinstance(lesson, dict):
-            continue
-        lesson_number = str(lesson.get("lesson_number", "")).strip()
-        if not lesson_number:
-            continue
-        seen.add(lesson_number.casefold())
-        try:
-            max_lesson_order = max(max_lesson_order, int(lesson.get("lesson_order", 0)))
-        except (TypeError, ValueError):
-            continue
-
-    for lesson_number in grade_by_lesson.keys():
-        dedupe_key = lesson_number.casefold()
-        if dedupe_key in seen:
-            continue
-        seen.add(dedupe_key)
-        max_lesson_order += 1
-        lesson_catalog.append(
-            {
-                "lesson_number": lesson_number,
-                "lesson_topic": topic_by_lesson.get(lesson_number, ""),
-                "lesson_date": date_by_lesson.get(lesson_number, ""),
-                "lesson_order": max_lesson_order,
+    lesson_catalog = _build_lesson_catalog_rows(
+        lesson_catalog=lesson_catalog,
+        lesson_data_by_lesson={
+            lesson_number: {
+                "topic": topic_by_lesson.get(lesson_number, ""),
+                "date": date_by_lesson.get(lesson_number, ""),
             }
-        )
+            for lesson_number in grade_by_lesson.keys()
+        },
+        topic_key="topic",
+        date_key="date",
+    )
 
     lesson_rows = []
     for lesson in lesson_catalog:
@@ -476,10 +518,133 @@ def build_aap_lessons_page_context(
     )
 
 
+def build_ar_lessons_page_context(
+    *,
+    student_id,
+    payload,
+    requested_subject,
+    requested_group,
+    requested_school,
+    load_dataset,
+    force_refresh=False,
+):
+    payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
+    subject_name = str(payload_student.get("subject", "")).strip() or "Unknown"
+    group_name = str(payload_student.get("group", "")).strip()
+    full_name = str(payload_student.get("fullName", "")).strip()
+    current_school_code = (
+        str(payload_student.get("schoolCode", "")).strip() or requested_school
+    )
+
+    def load_current_school_dataset(school_code=None, force_refresh_dataset=False):
+        normalized_school = str(school_code or current_school_code).strip()
+        if normalized_school:
+            return load_dataset(
+                school_code=normalized_school,
+                force_refresh=force_refresh_dataset,
+            )
+        return load_dataset(force_refresh=force_refresh_dataset)
+
+    lesson_catalog, lesson_error = get_lessons_for_subject(
+        subject_name,
+        group_name,
+        load_current_school_dataset,
+    )
+    if lesson_error:
+        return None, lesson_error, 503
+
+    attendance_lessons = payload.get("attendanceLessons", [])
+    if not isinstance(attendance_lessons, list):
+        attendance_lessons = []
+
+    attendance_by_lesson = {}
+    topic_by_lesson = {}
+    date_by_lesson = {}
+    for item in attendance_lessons:
+        if not isinstance(item, dict):
+            continue
+
+        lesson_number = str(item.get("lesson", "")).strip()
+        if not lesson_number:
+            continue
+
+        status = str(item.get("status", "")).strip().casefold()
+        if status not in {"present", "absent", "justified"}:
+            continue
+
+        attendance_by_lesson[lesson_number] = status
+
+        lesson_topic = str(item.get("topic", "")).strip()
+        if lesson_topic:
+            topic_by_lesson[lesson_number] = lesson_topic
+
+        lesson_date = str(item.get("date", "")).strip()
+        if lesson_date:
+            date_by_lesson[lesson_number] = lesson_date
+
+    lesson_catalog = _build_lesson_catalog_rows(
+        lesson_catalog=lesson_catalog,
+        lesson_data_by_lesson={
+            lesson_number: {
+                "topic": topic_by_lesson.get(lesson_number, ""),
+                "date": date_by_lesson.get(lesson_number, ""),
+            }
+            for lesson_number in attendance_by_lesson.keys()
+        },
+        topic_key="topic",
+        date_key="date",
+    )
+
+    lesson_rows = []
+    for lesson in lesson_catalog:
+        lesson_number = str(lesson.get("lesson_number", "")).strip()
+        lesson_topic = str(lesson.get("lesson_topic", "")).strip()
+        lesson_date = str(lesson.get("lesson_date", "")).strip()
+        if not lesson_number:
+            continue
+        if not lesson_date:
+            lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
+
+        lesson_status = attendance_by_lesson.get(lesson_number, "")
+        remark, remark_class = extract_attendance_remark(lesson_status)
+        lesson_rows.append(
+            {
+                "lesson_number": lesson_number,
+                "lesson_topic": lesson_topic or "Topic unavailable",
+                "lesson_date_display": lesson_date or "Not conducted",
+                "attendance_status": lesson_status,
+                "attendance_display": remark,
+                "remark_class": remark_class,
+            }
+        )
+
+    back_url = url_for(
+        "student.dashboard",
+        student_id=student_id,
+        subject=requested_subject or subject_name,
+        group=requested_group or group_name,
+        school=current_school_code,
+    )
+
+    return (
+        {
+            "student_id": student_id,
+            "student_full_name": full_name,
+            "subject_name": subject_name,
+            "lesson_rows": lesson_rows,
+            "back_url": back_url,
+        },
+        "",
+        200,
+    )
+
+
 __all__ = [
     "build_dashboard_page_context",
     "build_aap_lessons_page_context",
+    "build_ar_lessons_page_context",
     "build_subject_switch_options",
     "extract_aap_remark",
+    "extract_attendance_remark",
     "subject_short_name",
 ]

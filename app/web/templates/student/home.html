@@ -1,26 +1,16 @@
-{% extends "layouts/portal.html" %}
-{% set body_class = "home-page home-page-student" %}
-
-{% block header %}
-<header class="login-header">
-  <div class="logo-block" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
-      <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
-    </svg>
-  </div>
-  <h1>MSI School Portal</h1>
-  <p>Select stream, group, and student</p>
-</header>
-{% endblock %}
-
-{% block content %}
-{% include "student/_panel_content.html" %}
-{% endblock %}
-
-{% block scripts %}
-<script id="groupsBySubjectJson" type="application/json">{{ groups_by_subject|default({}, true)|tojson|safe }}</script>
-<script id="studentsBySubjectGroupJson" type="application/json">{{ students_by_subject_group|default({}, true)|tojson|safe }}</script>
-<script id="initialFormDataJson" type="application/json">{{ form_data|default({}, true)|tojson|safe }}</script>
-<script defer src="{{ url_for('static', filename='js/bundles/student-home.js', v=asset_version) }}"></script>
-{% endblock %}
+{% set react_page_name = "student-home" %}
+{% set react_page_title = "MSI School Portal" %}
+{% set react_description = "Select stream, group, and student." %}
+{% set react_body_class = "msi-react-page msi-react-student-home" %}
+{% set react_props = {
+  "subjects": subjects|default([], true),
+  "groupsBySubject": groups_by_subject|default({}, true),
+  "studentsBySubjectGroup": students_by_subject_group|default({}, true),
+  "formData": form_data|default({}, true),
+  "error": error|default("", true),
+  "authLogin": auth_login|default("", true),
+  "csrfToken": csrf_token(),
+  "logoutUrl": url_for("student.logout"),
+  "searchUrl": url_for("student.search_student_form"),
+} %}
+{% include "layouts/react_app.html" %}

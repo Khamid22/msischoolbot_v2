@@ -1,4 +1,23 @@
 (function () {
+  function unregisterServiceWorkers() {
+    if (!("serviceWorker" in navigator)) {
+      return;
+    }
+
+    navigator.serviceWorker
+      .getRegistrations()
+      .then(function (registrations) {
+        return Promise.all(
+          registrations.map(function (registration) {
+            return registration.unregister();
+          })
+        );
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
   function isTelegramMiniApp(webApp) {
     if (!webApp) {
       return false;
@@ -10,6 +29,7 @@
 
   const webApp = typeof Telegram !== "undefined" ? Telegram.WebApp : null;
   if (isTelegramMiniApp(webApp)) {
+    unregisterServiceWorkers();
     return;
   }
 

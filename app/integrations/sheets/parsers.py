@@ -471,6 +471,7 @@ def parse_student_row(
         )
 
     homework_grades = []
+    attendance_lessons = []
     present_count = 0
     absent_count = 0
     justified_absent_count = 0
@@ -500,6 +501,25 @@ def parse_student_row(
             p += p2
             a += a2
             ai += ai2
+
+        if ai > 0:
+            attendance_status = "justified"
+        elif a > 0:
+            attendance_status = "absent"
+        elif p > 0:
+            attendance_status = "present"
+        else:
+            attendance_status = ""
+
+        if attendance_status:
+            attendance_lessons.append(
+                {
+                    "lesson": lesson_meta.label,
+                    "topic": lesson_meta.topic,
+                    "date": lesson_meta.date,
+                    "status": attendance_status,
+                }
+            )
 
         present_count += p
         absent_count += a
@@ -558,6 +578,7 @@ def parse_student_row(
         "academicRecords": academic_records,
         "examResults": exam_results,
         "homeworkGrades": homework_grades,
+        "attendanceLessons": attendance_lessons,
         "attendanceRecord": {
             "presentCount": present_count,
             "absentCount": absent_count,

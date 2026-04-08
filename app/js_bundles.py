@@ -9,23 +9,6 @@ JS_BUNDLES: Dict[str, tuple[str, ...]] = {
         "js/telegram-init.js",
         "js/pwa.js",
     ),
-    "student-home.js": (
-        "js/telegram-init.js",
-        "js/home.js",
-        "js/pwa.js",
-    ),
-    "admin-home.js": (
-        "vendor/chart.umd.min.js",
-        "js/telegram-init.js",
-        "js/home.js",
-        "js/pwa.js",
-    ),
-    "student-dashboard.js": (
-        "vendor/chart.umd.min.js",
-        "js/telegram-init.js",
-        "js/dashboard.js",
-        "js/pwa.js",
-    ),
 }
 
 

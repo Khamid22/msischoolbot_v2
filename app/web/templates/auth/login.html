@@ -1,23 +1,11 @@
-{% extends "layouts/portal.html" %}
-{% set body_class = "home-page home-page-login" %}
-
-{% block header %}
-<header class="login-header">
-  <div class="logo-block" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="m22 10-10-5-10 5 10 5 10-5Z"></path>
-      <path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"></path>
-    </svg>
-  </div>
-  <h1>MSI School Portal</h1>
-  <p>Login to continue</p>
-</header>
-{% endblock %}
-
-{% block content %}
-{% include "auth/_login_content.html" %}
-{% endblock %}
-
-{% block scripts %}
-<script defer src="{{ url_for('static', filename='js/bundles/telegram-base.js', v=asset_version) }}"></script>
-{% endblock %}
+{% set react_page_name = "login" %}
+{% set react_page_title = "MSI School Portal" %}
+{% set react_description = "Login to continue." %}
+{% set react_body_class = "msi-react-page msi-react-login" %}
+{% set react_props = {
+  "authError": auth_error|default("", true),
+  "authLoginInput": auth_login_input|default("", true),
+  "submitUrl": url_for("student.login"),
+  "csrfToken": csrf_token(),
+} %}
+{% include "layouts/react_app.html" %}

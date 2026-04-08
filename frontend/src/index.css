@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: 'Outfit', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
+
+    --background: 0 0% 96%;
+    --foreground: 0 0% 4%;
+    --surface: 0 0% 100%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+
+    --primary: 0 0% 4%;
+    --primary-foreground: 0 0% 96%;
+
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 4%;
+
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 4%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 4%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --trophy: 45 93% 47%;
+    --rank-gold: 45 93% 47%;
+    --rank-silver: 0 0% 70%;
+    --rank-bronze: 30 60% 50%;
+
+    --border: 0 0% 4%;
+    --hairline: 0 0% 4% / 0.08;
+    --input: 0 0% 90%;
+    --ring: 0 0% 4%;
+
+    --radius: 12px;
+
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+    --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.06);
+    --card-shadow-neo: 3px 3px 0 0 rgba(0,0,0,1);
+
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --tg-header-height: 56px;
+    --tg-top-offset: 14px;
+    --tg-safe-offset: 0px;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-body);
+    @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  a, button, input, select, textarea {
+    touch-action: manipulation;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  .shadow-card {
+    box-shadow: var(--card-shadow);
+  }
+  .shadow-card-hover {
+    box-shadow: var(--card-shadow-hover);
+  }
+  .shadow-neo {
+    box-shadow: var(--card-shadow-neo);
+  }
+  .animate-in {
+    animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  .tg-safe-top {
+    padding-top: var(--tg-safe-offset);
+  }
+}
+
+html.tg-miniapp .tg-safe-top,
+body.tg-miniapp .tg-safe-top {
+  --tg-safe-offset: calc(var(--safe-top) + var(--tg-top-offset));
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

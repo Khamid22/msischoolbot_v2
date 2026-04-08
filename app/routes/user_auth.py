@@ -126,7 +126,9 @@ def register_user_auth_routes(
                     ), 500
 
             set_admin_session(admin)
-            return redirect(url_for("student.home"))
+            session["admin_last_panel"] = "overview"
+            session["admin_last_school"] = "all"
+            return redirect(url_for("student.home", panel="overview", school="all"))
 
         student = verify_student_credentials(login_value, password_value)
         if not student:
