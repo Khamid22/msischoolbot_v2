@@ -60,7 +60,7 @@
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --tg-header-height: 56px;
-    --tg-top-offset: 14px;
+    --tg-top-offset: 0px;
     --tg-safe-offset: 0px;
     --tg-nav-inline-offset: 0px;
 
@@ -138,8 +138,8 @@ body.tg-miniapp .tg-safe-top {
 @media (max-width: 640px) {
   html.tg-miniapp .tg-miniapp-nav-offset,
   body.tg-miniapp .tg-miniapp-nav-offset {
-    padding-left: calc(0.75rem + 18px);
-    padding-right: calc(0.75rem + 18px);
+    padding-left: calc(0.75rem + 34px);
+    padding-right: calc(0.75rem + 34px);
   }
 }
 
