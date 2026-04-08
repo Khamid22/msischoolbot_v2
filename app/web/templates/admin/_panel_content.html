@@ -381,8 +381,8 @@
             </table>
           </div>
           {% elif admin_panel == "resources" %}
-          <section class="admin-resources-grid">
-            <article class="admin-card admin-resource-card">
+          <section class="admin-resources-grid admin-resources-grid-compact">
+            <article class="admin-card admin-resource-card admin-resource-card-types">
               <h2 class="admin-card-title">Resource Types</h2>
               <form action="{{ url_for('admin.add_resource_type') }}" method="post" class="login-form admin-resource-type-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -463,11 +463,8 @@
               </div>
             </article>
 
-            <article class="admin-card admin-resource-card">
+            <article class="admin-card admin-resource-card admin-resource-card-form">
               <h2 class="admin-card-title">Add Resource</h2>
-              {% if admin_notice and ("saved" in admin_notice|lower) %}
-              <div class="form-notice admin-resource-local-notice">{{ admin_notice }}</div>
-              {% endif %}
               <form action="{{ url_for('admin.add_resource') }}" method="post" enctype="multipart/form-data" class="login-form admin-resource-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                 <label class="field">

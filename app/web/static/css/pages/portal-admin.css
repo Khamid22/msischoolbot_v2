@@ -81,14 +81,6 @@ body.home-page-admin.tg-miniapp .admin-sticky-header {
   z-index: var(--z-sticky-header-elevated);
 }
 
-.admin-sticky-header-full .admin-login-header {
-  margin-bottom: 10px;
-}
-
-.admin-sticky-header-full .admin-login-header h1 {
-  font-size: clamp(1.2rem, 2.8vw, 1.55rem);
-}
-
 .admin-switch-row {
   display: flex;
   flex-wrap: wrap;
@@ -124,6 +116,8 @@ body.home-page-admin.tg-miniapp .admin-sticky-header {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   background: var(--surface);
+  width: 100%;
+  gap: 6px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -152,6 +146,38 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
   white-space: nowrap;
 }
 
+.admin-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  min-height: 34px;
+  background: var(--surface);
+}
+
+.admin-nav-brand-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+}
+
+.admin-nav-brand-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.admin-nav-brand-text {
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .admin-main-nav .tab-label-short {
   display: none;
   letter-spacing: -0.02em;
@@ -162,7 +188,7 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
 }
 
 .admin-logout-form {
-  margin: 0;
+  margin: 0 0 0 auto;
   flex: 0 0 auto;
 }
 
@@ -200,34 +226,25 @@ body.home-page-admin.tg-miniapp .admin-main-nav {
     padding: calc(1px + var(--safe-top)) 0 4px;
   }
 
-  .admin-sticky-header-full .admin-login-header {
-    margin-bottom: 4px;
-  }
-
-  .admin-login-header .logo-block {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 4px;
-  }
-
-  .admin-login-header .logo-block svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .admin-login-header h1 {
-    font-size: clamp(1.02rem, 5vw, 1.2rem);
-  }
-
-  .admin-login-header p {
-    margin-top: 4px;
-    font-size: 0.75rem;
-  }
-
   .admin-main-nav {
     gap: 4px;
     top: calc(1px + var(--safe-top));
     padding: 1px;
+  }
+
+  .admin-nav-brand {
+    min-height: 30px;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .admin-nav-brand-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .admin-nav-brand-text {
+    font-size: 0.64rem;
   }
 
   .admin-main-nav .admin-tab-btn,

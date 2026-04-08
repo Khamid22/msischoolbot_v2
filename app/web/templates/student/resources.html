@@ -168,26 +168,31 @@
         var player = document.getElementById("resourceVideoPlayer");
         var title = document.getElementById("resourceVideoModalTitle");
         var closeBtn = document.getElementById("resourceVideoCloseBtn");
+        var currentVideoSrc = "";
         if (!modal || !player) return;
 
         function closeModal() {
           player.pause();
-          player.removeAttribute("src");
-          player.load();
+          if (!player.ended && Number.isFinite(player.currentTime)) {
+            player.currentTime = 0;
+          }
           modal.hidden = true;
           document.body.classList.remove("has-open-modal");
         }
 
         function openModal(videoSrc, videoTitle) {
-          if (!videoSrc) return;
-          player.setAttribute("src", videoSrc);
+          var normalizedSrc = String(videoSrc || "").trim();
+          if (!normalizedSrc) return;
           title.textContent = videoTitle || "Video";
           modal.hidden = false;
           document.body.classList.add("has-open-modal");
-          player.load();
-          var playPromise = player.play();
-          if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(function () {});
+
+          if (currentVideoSrc !== normalizedSrc || player.getAttribute("src") !== normalizedSrc) {
+            currentVideoSrc = normalizedSrc;
+            player.setAttribute("src", normalizedSrc);
+            player.load();
+          } else if (Number.isFinite(player.currentTime)) {
+            player.currentTime = 0;
           }
         }
 

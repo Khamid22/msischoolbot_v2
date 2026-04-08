@@ -285,18 +285,52 @@ body.tg-miniapp .admin-chart-table-wrap {
     letter-spacing: 0.02em;
   }
 
-  body.tg-miniapp .admin-resource-file-cell,
+  body.tg-miniapp .admin-resources-table th:nth-child(1),
+  body.tg-miniapp .admin-resources-table td:nth-child(1) {
+    width: 6%;
+  }
+
+  body.tg-miniapp .admin-resources-table th:nth-child(2),
+  body.tg-miniapp .admin-resources-table td:nth-child(2) {
+    width: 14%;
+  }
+
+  body.tg-miniapp .admin-resources-table th:nth-child(3),
+  body.tg-miniapp .admin-resources-table td:nth-child(3) {
+    width: 12%;
+  }
+
+  body.tg-miniapp .admin-resources-table th:nth-child(4),
+  body.tg-miniapp .admin-resources-table td:nth-child(4) {
+    width: 40%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  body.tg-miniapp .admin-resources-table th:nth-child(5),
+  body.tg-miniapp .admin-resources-table td:nth-child(5),
+  body.tg-miniapp .admin-resources-table th:nth-child(6),
+  body.tg-miniapp .admin-resources-table td:nth-child(6) {
+    width: 14%;
+  }
+
+  body.tg-miniapp .admin-resource-file-cell {
+    text-align: left;
+  }
+
   body.tg-miniapp .admin-resource-file-cell a,
   body.tg-miniapp .admin-resource-file-title {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 0.48rem;
   }
 
   body.home-page-admin.tg-miniapp .admin-main-nav .admin-tab-btn {
-    font-size: 0.50rem;
-    padding-inline: 4px;
+    font-size: 0.62rem;
+    padding-inline: 8px;
   }
 
   body.home-page-admin.tg-miniapp .admin-exit-btn {

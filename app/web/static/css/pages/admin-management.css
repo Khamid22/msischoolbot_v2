@@ -47,6 +47,11 @@
   align-items: start;
 }
 
+.admin-resources-grid.admin-resources-grid-compact {
+  grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.22fr);
+  gap: 10px;
+}
+
 .admin-resources-grid > * {
   min-width: 0;
 }
@@ -56,6 +61,14 @@
   min-width: 0;
   overflow: hidden;
   padding: 16px 18px;
+}
+
+.admin-resource-card-types {
+  padding-inline: 14px;
+}
+
+.admin-resource-card-form {
+  padding-inline: 16px;
 }
 
 .admin-resource-card .admin-card-title,
@@ -71,6 +84,17 @@
 .teacher-form-card .login-form {
   min-width: 0;
   gap: 12px;
+}
+
+.admin-resource-card-types .admin-resource-type-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.admin-resource-card-types .admin-resource-type-form .field {
+  margin: 0;
 }
 
 .admin-resource-type-form .field,
@@ -111,6 +135,56 @@
   padding: 8px 18px;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
+}
+
+.admin-resource-card-types .admin-resource-submit-btn {
+  min-height: 34px;
+  margin-top: 0;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+}
+
+.admin-resource-card-form .admin-resource-submit-btn {
+  min-height: 36px;
+  padding: 7px 14px;
+}
+
+.admin-resource-card-types .admin-resource-types-wrap {
+  margin-top: 8px;
+}
+
+.admin-resources-grid-compact .teachers-actions-cell,
+.admin-resources-grid-compact .admin-resource-type-action-buttons {
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.admin-resources-grid-compact .teachers-action-btn {
+  min-height: 24px;
+  padding: 3px 6px;
+  font-size: 0.56rem;
+}
+
+.admin-resources-grid-compact .admin-resource-types-table th,
+.admin-resources-grid-compact .admin-resource-types-table td {
+  padding: 6px 4px;
+  font-size: 0.66rem;
+  line-height: 1.2;
+}
+
+.admin-resources-grid-compact .admin-resource-types-table th {
+  font-size: 0.58rem;
+}
+
+.admin-resources-grid-compact .admin-resource-types-table th:nth-child(1),
+.admin-resources-grid-compact .admin-resource-types-table td:nth-child(1) {
+  width: 42%;
+}
+
+.admin-resources-grid-compact .admin-resource-types-table th:nth-child(2),
+.admin-resources-grid-compact .admin-resource-types-table td:nth-child(2) {
+  width: 58%;
 }
 
 .admin-resource-loading-state {
@@ -256,17 +330,26 @@
     font-size: 0.75rem;
   }
 
-  .admin-resources-grid {
-    grid-template-columns: 1fr;
-    gap: 6px;
+  .admin-resources-grid.admin-resources-grid-compact {
+    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+    gap: 4px;
   }
 
-  .admin-resources-grid .admin-resource-card-wide {
-    order: -1;
+  .admin-resources-grid.admin-resources-grid-compact .admin-resource-card-wide {
+    grid-column: 1 / -1;
+    order: 0;
   }
 
-  .admin-resource-card {
+  .admin-card.admin-resource-card {
     padding: 8px;
+  }
+
+  .admin-card.admin-resource-card-types {
+    padding: 7px 6px;
+  }
+
+  .admin-card.admin-resource-card-form {
+    padding: 7px 8px;
   }
 
   .admin-resource-card .admin-card-title,
@@ -285,6 +368,11 @@
     letter-spacing: 0.04em;
   }
 
+  .admin-resource-card-types .admin-resource-type-form {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
   .admin-resource-type-form .field input,
   .admin-resource-form .field input,
   .admin-resource-form .field select,
@@ -301,6 +389,39 @@
     min-height: 36px;
     padding: 6px 14px;
     font-size: 0.75rem;
+  }
+
+  .admin-resource-card-types .admin-resource-submit-btn,
+  .admin-resource-card-form .admin-resource-submit-btn {
+    min-height: 30px;
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 0.66rem;
+  }
+
+  .admin-resources-grid-compact .admin-resource-types-wrap {
+    max-height: min(28vh, 220px);
+  }
+
+  .admin-resources-grid-compact .admin-resource-types-table th,
+  .admin-resources-grid-compact .admin-resource-types-table td {
+    padding: 4px 3px;
+    font-size: 0.54rem;
+  }
+
+  .admin-resources-grid-compact .admin-resource-types-table th {
+    font-size: 0.44rem;
+  }
+
+  .admin-resources-grid-compact .teachers-action-btn {
+    min-height: 20px;
+    padding: 2px 4px;
+    font-size: 0.46rem;
+  }
+
+  .admin-resources-grid-compact .teachers-actions-cell,
+  .admin-resources-grid-compact .admin-resource-type-action-buttons {
+    gap: 2px;
   }
 
   .teacher-form-card .field input,

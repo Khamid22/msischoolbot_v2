@@ -126,54 +126,7 @@
   };
 
   const configureNativeBackButton = function () {
-    const backButton = webApp.BackButton;
-    const backMode = String(document.body.dataset.tgBackMode || "").trim().toLowerCase();
-    const fallbackUrl = String(document.body.dataset.tgBackUrl || "").trim();
-
-    if (!backButton || (!backMode && !fallbackUrl)) {
-      hideNativeBackButton();
-      return;
-    }
-
     hideNativeBackButton();
-
-    nativeBackHandler = function () {
-      if ((backMode === "history" || backMode === "auto") && window.history.length > 1) {
-        const currentHref = window.location.href;
-        clearBackFallbackTimer();
-        if (fallbackUrl) {
-          backFallbackTimer = window.setTimeout(function () {
-            backFallbackTimer = 0;
-            if (window.location.href === currentHref) {
-              window.location.assign(fallbackUrl);
-            }
-          }, 220);
-        }
-        window.history.back();
-        return;
-      }
-
-      if (fallbackUrl) {
-        window.location.assign(fallbackUrl);
-      }
-    };
-
-    if (typeof backButton.onClick === "function") {
-      try {
-        backButton.onClick(nativeBackHandler);
-      } catch (_error) {
-        nativeBackHandler = null;
-      }
-    }
-
-    if (typeof backButton.show === "function") {
-      try {
-        backButton.show();
-        document.body.classList.add("tg-native-back");
-      } catch (_error) {
-        // Ignore Telegram back button visibility errors.
-      }
-    }
   };
 
   const scheduleHeightSync = function () {

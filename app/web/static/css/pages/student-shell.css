@@ -24,9 +24,9 @@
 }
 
 body.tg-miniapp.dashboard-page {
-  --student-tg-content-top: var(--tg-content-safe-area-inset-top, 0px);
-  --student-tg-content-left: var(--tg-content-safe-area-inset-left, 0px);
-  --student-tg-content-right: var(--tg-content-safe-area-inset-right, 0px);
+  --student-tg-content-top: 10px;
+  --student-tg-content-left: 0px;
+  --student-tg-content-right: 0px;
 }
 
 .topbar {
@@ -154,14 +154,6 @@ body.tg-miniapp .topbar {
 
 .back-link:active {
   transform: scale(0.94);
-}
-
-body.tg-miniapp.tg-native-back .topbar .back-link {
-  display: none;
-}
-
-body.tg-miniapp.tg-native-back .topbar-left {
-  gap: 0;
 }
 
 .avatar {
