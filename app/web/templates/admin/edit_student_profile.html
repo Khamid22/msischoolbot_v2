@@ -2,6 +2,7 @@
 {% set react_page_title = "Edit Student Profile" %}
 {% set react_description = "Edit student profile details." %}
 {% set react_body_class = "msi-react-page msi-react-admin-edit-student" %}
+{% set react_enable_telegram = false %}
 {% set react_tg_back_mode = "history" %}
 {% set react_tg_back_url = url_for("student.home", panel="students") %}
 {% set student_record = student|default({}, true) %}

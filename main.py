@@ -202,8 +202,7 @@ async def run_bot():
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
     from aiogram.types import (
-        MenuButtonWebApp,
-        WebAppInfo,
+        MenuButtonCommands,
     )
 
     from bot.handlers.account_link import router as account_link_router
@@ -224,10 +223,7 @@ async def run_bot():
 
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_chat_menu_button(
-        menu_button=MenuButtonWebApp(
-            text="Mini App",
-            web_app=WebAppInfo(url=bot_settings.mini_app_url),
-        )
+        menu_button=MenuButtonCommands(),
     )
     await dp.start_polling(bot)
 

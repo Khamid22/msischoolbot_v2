@@ -5,9 +5,7 @@ from app.routes.students.services.auth_service import (
     detect_login_role,
     get_student_by_telegram_user_id,
     get_teacher_by_id,
-    link_admin_telegram_user,
     link_student_telegram_user,
-    unlink_student_telegram_user,
     verify_admin_credentials,
     verify_student_credentials,
 )
@@ -29,6 +27,14 @@ def register_user_auth_routes(
     render_login_page,
     render_admin_page,
 ):
+    @students.get("/admin")
+    def admin_entry():
+        if current_auth_role() == "admin":
+            return redirect(url_for("student.home", panel="overview", school="all"))
+        if current_auth_role() == "student":
+            return redirect(url_for("student.home"))
+        return render_login_page()
+
     @students.get("/")
     def home():
         role = current_auth_role()
@@ -113,18 +119,6 @@ def register_user_auth_routes(
                     auth_login_input=login_value,
                 ), 401
 
-            telegram_user_id = parse_telegram_user_id(login_form.telegram_user_id.data)
-            if telegram_user_id is not None:
-                linked = link_admin_telegram_user(
-                    int(admin["id"]),
-                    telegram_user_id,
-                )
-                if not linked:
-                    return render_login_page(
-                        auth_error="Unable to link Telegram account for this admin login.",
-                        auth_login_input=login_value,
-                    ), 500
-
             set_admin_session(admin)
             session["admin_last_panel"] = "overview"
             session["admin_last_school"] = "all"
@@ -138,21 +132,16 @@ def register_user_auth_routes(
             ), 401
 
         telegram_user_id = parse_telegram_user_id(login_form.telegram_user_id.data)
-        if telegram_user_id is None:
-            return render_login_page(
-                auth_error="Unable to authenticate student.",
-                auth_login_input=login_value,
-            ), 401
-
-        linked = link_student_telegram_user(
-            int(student["id"]),
-            telegram_user_id,
-        )
-        if not linked:
-            return render_login_page(
-                auth_error="Unable to link Telegram account. Please try again from the mini app.",
-                auth_login_input=login_value,
-            ), 500
+        if telegram_user_id is not None:
+            linked = link_student_telegram_user(
+                int(student["id"]),
+                telegram_user_id,
+            )
+            if not linked:
+                return render_login_page(
+                    auth_error="Unable to link Telegram account. Please try again from Telegram.",
+                    auth_login_input=login_value,
+                ), 500
 
         if not set_student_session(student, telegram_user_id):
             return render_login_page(
@@ -168,5 +157,5 @@ def register_user_auth_routes(
 
     @students.post("/logout")
     def logout():
-        logout_portal_session(unlink_student_telegram_user)
+        logout_portal_session()
         return redirect(url_for("student.home", logged_out=1))

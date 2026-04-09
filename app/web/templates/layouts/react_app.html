@@ -18,10 +18,12 @@
     <title>{{ react_page_title|default('MSI School Portal', true) }}</title>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}" />
     <link rel="manifest" href="{{ url_for('system.manifest') }}" />
+    {% if react_enable_telegram|default(true, true) %}
     <link rel="preconnect" href="https://telegram.org" />
+    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+    {% endif %}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
@@ -38,6 +40,8 @@
       {{ {"page": react_page_name, "props": react_props}|tojson|safe }}
     </script>
     <script type="module" src="{{ url_for('static', filename='react/app.js') }}"></script>
+    {% if react_enable_telegram|default(true, true) %}
     <script defer src="{{ url_for('static', filename='js/bundles/telegram-base.js', v=asset_version) }}"></script>
+    {% endif %}
   </body>
 </html>

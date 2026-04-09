@@ -114,7 +114,7 @@ def set_admin_session(admin):
     return True
 
 
-def set_student_session(student, telegram_user_id):
+def set_student_session(student, telegram_user_id=None):
     portal_user = build_student_user(student)
     if portal_user is None:
         return False
@@ -139,7 +139,11 @@ def set_student_session(student, telegram_user_id):
     student_school_code = normalize_school_code(student.get("school_code", ""))
     if student_school_code:
         session["student_school_code"] = student_school_code
-    session["telegram_user_id"] = telegram_user_id
+    parsed_telegram_user_id = parse_telegram_user_id(telegram_user_id)
+    if parsed_telegram_user_id is not None:
+        session["telegram_user_id"] = parsed_telegram_user_id
+    else:
+        session.pop("telegram_user_id", None)
     session.permanent = True
     return True
 
@@ -176,12 +180,7 @@ def build_dashboard_url(student_sheet_id, subject="", group="", **extra_params):
     return url_for("student.dashboard", **route_params)
 
 
-def logout_portal_session(unlink_student_telegram_user = None):
-    if callable(unlink_student_telegram_user) and current_auth_role() == "student":
-        student_db_id = current_student_db_id()
-        if student_db_id is not None:
-            unlink_student_telegram_user(student_db_id)
-
+def logout_portal_session():
     logout_user()
     session.clear()
 
