@@ -1,64 +1,11 @@
-import html
-from urllib.parse import urlsplit, urlunsplit
-
 from aiogram import Router
 from aiogram.filters import CommandStart
 
-from bot.keyboards.inline_keyboard import (
-    registration_keyboard,
-    student_menu_keyboard,
-    url_keyboard,
-)
+from bot.keyboards.inline_keyboard import registration_keyboard
 from bot.settings import settings
-from app.routes.students.services.auth_service import (
-    get_admin_by_telegram_user_id,
-    get_student_by_telegram_user_id,
-    record_bot_user,
-)
+from app.routes.students.services.auth_service import record_bot_user
 
 router = Router()
-
-
-def _escape(value):
-    return html.escape(str(value or ""))
-
-
-def _admin_portal_url(base_url):
-    parsed_url = urlsplit(str(base_url or "").strip())
-    if not parsed_url.scheme or not parsed_url.netloc:
-        return str(base_url or "").rstrip("/") + "/admin"
-
-    base_path = parsed_url.path.rstrip("/")
-    admin_path = f"{base_path}/admin" if base_path else "/admin"
-    return urlunsplit(
-        (
-            parsed_url.scheme,
-            parsed_url.netloc,
-            admin_path,
-            "",
-            "",
-        )
-    )
-
-
-def _linked_student_from_user(user):
-    telegram_user_id = getattr(user, "id", None)
-    if not isinstance(telegram_user_id, int):
-        return None
-    try:
-        return get_student_by_telegram_user_id(telegram_user_id)
-    except Exception:
-        return None
-
-
-def _linked_admin_from_user(user):
-    telegram_user_id = getattr(user, "id", None)
-    if not isinstance(telegram_user_id, int):
-        return None
-    try:
-        return get_admin_by_telegram_user_id(telegram_user_id)
-    except Exception:
-        return None
 
 
 @router.message(CommandStart())
@@ -73,44 +20,10 @@ async def start_handler(message, state):
         # Do not fail /start if SQLite write has an issue.
         pass
 
-    linked_admin = _linked_admin_from_user(message.from_user)
-    admin_portal_url = _admin_portal_url(settings.mini_app_url)
-    if linked_admin:
-        admin_login = str(linked_admin.get("login", "")).strip()
-        admin_role = str(linked_admin.get("role", "admin")).strip() or "admin"
-        admin_line = f"Login: <b>{_escape(admin_login)}</b>\n" if admin_login else ""
-        await message.answer(
-            "🛡️ <b>Admin Telegram access is disabled</b>\n\n"
-            f"{admin_line}"
-            f"Role: <b>{_escape(admin_role)}</b>\n\n"
-            "Open the admin panel on the website instead.",
-            reply_markup=url_keyboard(
-                "Open Admin Website",
-                admin_portal_url,
-            ),
-        )
-        return
-
-    linked_student = _linked_student_from_user(message.from_user)
-    if not linked_student:
-        await message.answer(
-            "👋 <b>Welcome!</b>\n\n"
-            "Students should open the mini app and sign in first.\n"
-            "Admins should use the website.",
-            reply_markup=registration_keyboard(
-                settings.mini_app_url,
-                admin_portal_url,
-            ),
-        )
-        return
-
-    full_name = str(linked_student.get("full_name", "")).strip()
-    if full_name:
-        greeting = f"👋 <b>Welcome back, {_escape(full_name)}!</b>\n\nChoose an option:"
-    else:
-        greeting = "👋 <b>Welcome back!</b>\n\nChoose an option:"
-
     await message.answer(
-        greeting,
-        reply_markup=student_menu_keyboard(),
+        "👋 <b>Welcome!</b>\n\n"
+        "Tap the button below to open the mini app.\n\n"
+        "Student credentials continue in the mini app.\n"
+        "Admin credentials redirect to the website.",
+        reply_markup=registration_keyboard(settings.mini_app_url),
     )

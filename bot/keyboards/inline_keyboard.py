@@ -11,10 +11,11 @@ def student_menu_keyboard():
 
 
 def registration_keyboard(mini_app_url, admin_url=""):
+    button_text = "Open Student Mini App" if admin_url else "Open Mini App"
     inline_keyboard = [
         [
             InlineKeyboardButton(
-                text="Open Student Mini App",
+                text=button_text,
                 web_app=WebAppInfo(url=mini_app_url),
             )
         ]
