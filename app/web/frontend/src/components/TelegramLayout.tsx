@@ -12,7 +12,7 @@ interface TopbarProps {
 
 export function Topbar({ backUrl, title, subtitle, subtitleContent, titleIcon, rightContent }: TopbarProps) {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 shadow-card backdrop-blur pt-[var(--tg-safe-area-inset-top)]">
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 shadow-card backdrop-blur pt-[var(--tg-safe-area-top)]">
       <div className="mx-auto flex min-h-[4.75rem] w-full max-w-4xl items-center justify-between gap-2.5 px-3 py-3 sm:min-h-[5rem] sm:px-4 md:px-6 lg:max-w-5xl">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {backUrl && (
@@ -49,12 +49,13 @@ interface TelegramLayoutProps {
 
 export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
   return (
-    <div className="flex flex-col min-h-[var(--tg-viewport-height)] min-h-screen overflow-hidden bg-background">
+    <div className="flex flex-col min-h-[var(--tg-app-height)] min-h-screen overflow-hidden bg-background">
       {topbar}
+      {/* 🔑 Use --tg-safe-area-top (matches your script) + MainButton padding */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 lg:px-8 
-        pt-[calc(var(--tg-safe-area-inset-top)+4.75rem)] 
-        sm:pt-[calc(var(--tg-safe-area-inset-top)+5rem)] 
-        pb-[var(--tg-safe-area-inset-bottom)]">
+        pt-[calc(var(--tg-safe-area-top)+4.75rem)] 
+        sm:pt-[calc(var(--tg-safe-area-top)+5rem)] 
+        pb-[calc(var(--tg-safe-area-bottom)+var(--tg-main-btn-height,56px))]">
         <div className="mx-auto w-full max-w-4xl">
           {children}
         </div>
