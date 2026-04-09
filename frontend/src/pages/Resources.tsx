@@ -184,8 +184,8 @@ export default function ResourcesPage(props: ResourcesPageProps) {
       </div>
 
       {videoModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-0 sm:p-4">
-          <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-surface shadow-card-hover sm:h-auto sm:max-w-3xl sm:rounded-2xl">
+        <div className="tg-fixed-fullscreen fixed inset-0 z-50 flex items-center justify-center bg-foreground/60">
+          <div className="flex h-full w-full max-h-full flex-col overflow-hidden bg-surface shadow-card-hover sm:h-auto sm:max-w-3xl sm:rounded-2xl">
             <div className="flex items-center justify-between gap-3 border-b border-foreground/5 p-4">
               <h3 className="truncate font-display text-sm font-bold">{videoModal.title}</h3>
               <button
@@ -196,7 +196,10 @@ export default function ResourcesPage(props: ResourcesPageProps) {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex-1 bg-black sm:aspect-video sm:flex-none">
+            <div
+              className="flex-1 sm:aspect-video sm:flex-none"
+              style={{ backgroundColor: "var(--tg-theme-secondary-bg-color, hsl(var(--muted)))" }}
+            >
               <video className="h-full w-full object-contain" controls playsInline preload="metadata" src={videoModal.src} />
             </div>
           </div>

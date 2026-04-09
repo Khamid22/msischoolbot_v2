@@ -74,7 +74,7 @@ export default function RatingPage(props: RatingPageProps) {
                     {["#", "Student", "Group", "AVG", "EP", "AAP", "AR"].map((heading) => (
                       <th
                         key={heading}
-                        className="sticky top-[calc(var(--student-topbar-offset-mobile)+var(--tg-safe-offset))] z-10 bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:top-[calc(var(--student-topbar-offset-desktop)+var(--tg-safe-offset))]"
+                        className="sticky top-[calc(var(--student-topbar-offset-mobile)+var(--safe-top))] z-10 bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:top-[calc(var(--student-topbar-offset-desktop)+var(--safe-top))]"
                       >
                         {heading}
                       </th>

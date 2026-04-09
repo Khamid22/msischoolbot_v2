@@ -80,7 +80,17 @@ interface DashboardPageProps {
   changePasswordUrl?: string;
 }
 
-const attendanceColors = ["hsl(var(--primary))", "#d1d5db", "#fde68a"];
+const attendanceColors = [
+  "var(--tg-theme-button-color, hsl(var(--primary)))",
+  "var(--tg-theme-link-color, hsl(var(--info)))",
+  "var(--tg-theme-hint-color, hsl(var(--muted-foreground)))",
+];
+
+const examSeriesColors = [
+  "var(--tg-theme-button-color, hsl(var(--primary)))",
+  "var(--tg-theme-link-color, hsl(var(--info)))",
+  "var(--tg-theme-hint-color, hsl(var(--muted-foreground)))",
+];
 
 export default function DashboardPage(props: DashboardPageProps) {
   const payload = props.payload || {};
@@ -310,7 +320,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                       <Bar
                         key={attempt}
                         dataKey={attempt}
-                        fill={index === 0 ? "#6b7280" : index === 1 ? "#111827" : "#374151"}
+                        fill={examSeriesColors[index % examSeriesColors.length]}
                         radius={[4, 4, 0, 0]}
                       />
                     ))}
@@ -332,7 +342,14 @@ export default function DashboardPage(props: DashboardPageProps) {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis domain={[1, 9]} tick={{ fontSize: 11 }} width={30} tickMargin={4} />
                   <Tooltip />
-                  <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.15)" strokeWidth={3} />
+                  <Area
+                    type="monotone"
+                    dataKey="score"
+                    stroke="var(--tg-theme-button-color, hsl(var(--primary)))"
+                    fill="var(--tg-theme-button-color, hsl(var(--primary)))"
+                    fillOpacity={0.15}
+                    strokeWidth={3}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -343,8 +360,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       </div>
 
       {profileModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="tg-fixed-modal fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
+          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Profile</h3>
             <div className="mt-4 space-y-3">
               <div className="flex justify-center">
@@ -401,8 +418,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {logoutOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="tg-fixed-modal fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
+          <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Confirm Logout</h3>
             <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to logout?</p>
             <div className="mt-5 flex justify-end gap-2">
@@ -425,8 +442,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {passwordOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="tg-fixed-modal fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
+          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Change Password</h3>
             <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-4">
               <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
