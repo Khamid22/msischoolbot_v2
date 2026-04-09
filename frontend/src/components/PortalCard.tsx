@@ -9,7 +9,7 @@ interface CenteredPageProps {
 
 export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-6">
+    <div className="tg-centered-page flex items-center justify-center bg-background">
       <div className="w-full max-w-md">
         <div className="rounded-3xl bg-surface p-6 shadow-card sm:p-8">
           <div className="mb-6 text-center">

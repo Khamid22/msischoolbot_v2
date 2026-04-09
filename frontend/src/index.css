@@ -58,10 +58,27 @@
     --card-shadow-neo: 3px 3px 0 0 rgba(0,0,0,1);
 
     --safe-top: env(safe-area-inset-top, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --tg-app-height: 100dvh;
     --tg-header-height: 56px;
     --tg-top-offset: 0px;
     --tg-safe-offset: 0px;
+    --tg-safe-bottom-offset: 0px;
+    --tg-safe-left-offset: 0px;
+    --tg-safe-right-offset: 0px;
+    --tg-safe-area-top: 0px;
+    --tg-safe-area-right: 0px;
+    --tg-safe-area-bottom: 0px;
+    --tg-safe-area-left: 0px;
+    --tg-content-safe-area-top: 0px;
+    --tg-content-safe-area-right: 0px;
+    --tg-content-safe-area-bottom: 0px;
+    --tg-content-safe-area-left: 0px;
+    --tg-visual-viewport-height: 100dvh;
+    --tg-visual-viewport-offset-top: 0px;
+    --tg-visual-viewport-bottom-offset: 0px;
     --tg-nav-inline-offset: 0px;
     --student-topbar-offset-mobile: 6rem;
     --student-topbar-offset-desktop: 6.25rem;
@@ -129,21 +146,50 @@
   .animate-in {
     animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
-  .tg-safe-top {
-    padding-top: var(--tg-safe-offset);
+  .tg-app-shell {
+    min-height: var(--tg-app-height);
+    min-height: min(var(--tg-app-height), 100dvh);
+    padding-bottom: var(--tg-safe-bottom-offset);
   }
+  .tg-app-main {
+    padding-bottom: calc(1rem + var(--tg-safe-bottom-offset));
+  }
+  .tg-centered-page {
+    min-height: var(--tg-app-height);
+    min-height: min(var(--tg-app-height), 100dvh);
+    padding-top: calc(1.5rem + var(--tg-safe-offset));
+    padding-right: calc(1rem + var(--tg-safe-right-offset));
+    padding-bottom: calc(1.5rem + var(--tg-safe-bottom-offset));
+    padding-left: calc(1rem + var(--tg-safe-left-offset));
+  }
+  .tg-safe-top {
+    padding-top: calc(var(--tg-safe-offset) + var(--tg-top-offset));
+  }
+}
+
+html.tg-miniapp,
+body.tg-miniapp {
+  --tg-safe-offset: max(var(--safe-top), var(--tg-safe-area-top), var(--tg-content-safe-area-top));
+  --tg-safe-bottom-offset: max(
+    var(--safe-bottom),
+    var(--tg-safe-area-bottom),
+    var(--tg-content-safe-area-bottom),
+    var(--tg-visual-viewport-bottom-offset)
+  );
+  --tg-safe-left-offset: max(var(--safe-left), var(--tg-safe-area-left), var(--tg-content-safe-area-left));
+  --tg-safe-right-offset: max(var(--safe-right), var(--tg-safe-area-right), var(--tg-content-safe-area-right));
 }
 
 html.tg-miniapp .tg-safe-top,
 body.tg-miniapp .tg-safe-top {
-  --tg-safe-offset: calc(var(--safe-top) + var(--tg-top-offset));
+  padding-top: calc(var(--tg-safe-offset) + var(--tg-top-offset));
 }
 
 @media (max-width: 640px) {
   html.tg-miniapp .tg-miniapp-nav-offset,
   body.tg-miniapp .tg-miniapp-nav-offset {
-    padding-left: calc(0.75rem + 34px);
-    padding-right: calc(0.75rem + 34px);
+    padding-left: calc(0.75rem + 34px + var(--tg-safe-left-offset));
+    padding-right: calc(0.75rem + 34px + var(--tg-safe-right-offset));
   }
 }
 

@@ -20,27 +20,121 @@
   window.__msiIsTelegramMiniApp = true;
 
   let scheduledFrame = 0;
-  let lastHeightValue = "";
   let viewportPrepared = false;
   let fullscreenRequested = false;
   let nativeBackHandler = null;
   let backFallbackTimer = 0;
+  const cssPixelValues = Object.create(null);
+
+  const setCssPixelVar = function (name, rawValue) {
+    const numericValue = Number(rawValue);
+    const safeValue =
+      Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+    const nextValue = `${Math.round(safeValue)}px`;
+    if (cssPixelValues[name] === nextValue) {
+      return;
+    }
+    cssPixelValues[name] = nextValue;
+    document.documentElement.style.setProperty(name, nextValue);
+  };
+
+  const resolveInsetValue = function (rawValue) {
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+      return 0;
+    }
+    return numericValue;
+  };
+
+  const syncSafeAreaInsets = function () {
+    const safeAreaInset =
+      webApp && webApp.safeAreaInset && typeof webApp.safeAreaInset === "object"
+        ? webApp.safeAreaInset
+        : {};
+    const contentSafeAreaInset =
+      webApp &&
+      webApp.contentSafeAreaInset &&
+      typeof webApp.contentSafeAreaInset === "object"
+        ? webApp.contentSafeAreaInset
+        : {};
+
+    setCssPixelVar("--tg-safe-area-top", resolveInsetValue(safeAreaInset.top));
+    setCssPixelVar("--tg-safe-area-right", resolveInsetValue(safeAreaInset.right));
+    setCssPixelVar("--tg-safe-area-bottom", resolveInsetValue(safeAreaInset.bottom));
+    setCssPixelVar("--tg-safe-area-left", resolveInsetValue(safeAreaInset.left));
+    setCssPixelVar(
+      "--tg-content-safe-area-top",
+      resolveInsetValue(contentSafeAreaInset.top)
+    );
+    setCssPixelVar(
+      "--tg-content-safe-area-right",
+      resolveInsetValue(contentSafeAreaInset.right)
+    );
+    setCssPixelVar(
+      "--tg-content-safe-area-bottom",
+      resolveInsetValue(contentSafeAreaInset.bottom)
+    );
+    setCssPixelVar(
+      "--tg-content-safe-area-left",
+      resolveInsetValue(contentSafeAreaInset.left)
+    );
+  };
+
+  const syncVisualViewport = function () {
+    const visualViewport = window.visualViewport;
+    const fallbackHeight = Number(
+      window.innerHeight || document.documentElement.clientHeight || 0
+    );
+
+    if (!visualViewport) {
+      setCssPixelVar("--tg-visual-viewport-height", fallbackHeight);
+      setCssPixelVar("--tg-visual-viewport-offset-top", 0);
+      setCssPixelVar("--tg-visual-viewport-bottom-offset", 0);
+      return;
+    }
+
+    const visualHeight = Number(visualViewport.height || 0);
+    const visualOffsetTop = Number(visualViewport.offsetTop || 0);
+    const layoutViewportHeight =
+      (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
+      visualHeight ||
+      0;
+    const bottomOffset = Math.max(
+      0,
+      layoutViewportHeight - (visualHeight + visualOffsetTop)
+    );
+
+    setCssPixelVar(
+      "--tg-visual-viewport-height",
+      (Number.isFinite(visualHeight) && visualHeight > 0 && visualHeight) ||
+        layoutViewportHeight
+    );
+    setCssPixelVar("--tg-visual-viewport-offset-top", visualOffsetTop);
+    setCssPixelVar("--tg-visual-viewport-bottom-offset", bottomOffset);
+  };
 
   const setAppHeight = function () {
+    syncSafeAreaInsets();
+    syncVisualViewport();
+
     const stableHeight = Number(webApp.viewportStableHeight || 0);
     const viewportHeight = Number(webApp.viewportHeight || 0);
-    const fallbackHeight = Number(window.innerHeight || 0);
+    const visualViewportHeight = Number(
+      (window.visualViewport && window.visualViewport.height) || 0
+    );
+    const fallbackHeight = Number(
+      window.innerHeight || document.documentElement.clientHeight || 0
+    );
     const resolvedHeight =
-      (Number.isFinite(stableHeight) && stableHeight > 0 && stableHeight) ||
+      (Number.isFinite(visualViewportHeight) &&
+        visualViewportHeight > 0 &&
+        visualViewportHeight) ||
       (Number.isFinite(viewportHeight) && viewportHeight > 0 && viewportHeight) ||
+      (Number.isFinite(stableHeight) && stableHeight > 0 && stableHeight) ||
       (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
       0;
     if (resolvedHeight > 0) {
-      const nextHeightValue = `${Math.round(resolvedHeight)}px`;
-      if (nextHeightValue !== lastHeightValue) {
-        lastHeightValue = nextHeightValue;
-        document.documentElement.style.setProperty("--tg-app-height", nextHeightValue);
-      }
+      setCssPixelVar("--tg-app-height", resolvedHeight);
     }
   };
 
@@ -174,6 +268,14 @@
     webApp.onEvent("contentSafeAreaChanged", scheduleHeightSync);
   }
   window.addEventListener("resize", scheduleHeightSync, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", scheduleHeightSync, {
+      passive: true,
+    });
+    window.visualViewport.addEventListener("scroll", scheduleHeightSync, {
+      passive: true,
+    });
+  }
   window.addEventListener("pagehide", clearBackFallbackTimer, { passive: true });
   window.setTimeout(setAppHeight, 180);
 

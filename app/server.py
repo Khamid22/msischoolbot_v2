@@ -741,6 +741,8 @@ def require_authentication_for_protected_routes():
     public_endpoints = {
         "static",
         "home",
+        "admin_entry",
+        "admin_continue",
         "login",
         "logout",
         "manifest",

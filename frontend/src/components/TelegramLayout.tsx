@@ -49,9 +49,9 @@ interface TelegramLayoutProps {
 
 export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-background">
+    <div className="tg-app-shell flex flex-col bg-background">
       {topbar}
-      <main className="flex-1 overflow-x-hidden px-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-[calc(var(--student-topbar-offset-mobile)+var(--tg-safe-offset))] sm:px-4 sm:pt-[calc(var(--student-topbar-offset-desktop)+var(--tg-safe-offset))] md:px-6 lg:px-8">
+      <main className="tg-app-main flex-1 overflow-x-hidden px-3 pt-[calc(var(--student-topbar-offset-mobile)+var(--tg-safe-offset))] sm:px-4 sm:pt-[calc(var(--student-topbar-offset-desktop)+var(--tg-safe-offset))] md:px-6 lg:px-8">
         <div className="mx-auto w-full max-w-4xl">
           {children}
         </div>

@@ -1,4 +1,5 @@
-from flask import redirect, request, session, url_for
+from flask import current_app, redirect, render_template, request, session, url_for
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.auth.forms import LoginForm
 from app.routes.students.services.auth_service import (
@@ -20,6 +21,87 @@ from app.routes.students.services.session_state_service import (
     try_auto_login_student_by_telegram,
 )
 
+_ADMIN_HANDOFF_SALT = "admin-website-handoff"
+_ADMIN_HANDOFF_MAX_AGE_SECONDS = 180
+
+
+def _admin_handoff_serializer():
+    return URLSafeTimedSerializer(
+        str(current_app.config.get("SECRET_KEY", "") or ""),
+        salt=_ADMIN_HANDOFF_SALT,
+    )
+
+
+def _normalize_admin_handoff_payload(admin):
+    if not isinstance(admin, dict):
+        return None
+
+    try:
+        admin_id = int(admin["id"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if admin_id <= 0:
+        return None
+
+    return {
+        "id": admin_id,
+        "login": str(admin.get("login", "")).strip(),
+        "role": str(admin.get("role", "admin")).strip() or "admin",
+        "is_owner": bool(admin.get("is_owner")),
+    }
+
+
+def _current_admin_session_payload():
+    try:
+        admin_id = int(session.get("admin_id"))
+    except (TypeError, ValueError):
+        return None
+    if admin_id <= 0:
+        return None
+
+    return {
+        "id": admin_id,
+        "login": str(session.get("auth_login", "")).strip(),
+        "role": "admin",
+        "is_owner": bool(session.get("admin_is_owner")),
+    }
+
+
+def _build_admin_handoff_url(admin):
+    normalized_admin = _normalize_admin_handoff_payload(admin)
+    if not normalized_admin:
+        return ""
+
+    handoff_token = _admin_handoff_serializer().dumps(normalized_admin)
+    return url_for("student.admin_continue", handoff=handoff_token, _external=True)
+
+
+def _load_admin_handoff_payload(raw_token):
+    token = str(raw_token or "").strip()
+    if not token:
+        return None, "Admin website handoff is missing. Please sign in again."
+
+    try:
+        payload = _admin_handoff_serializer().loads(
+            token,
+            max_age=_ADMIN_HANDOFF_MAX_AGE_SECONDS,
+        )
+    except SignatureExpired:
+        return None, "Admin website handoff expired. Please sign in again."
+    except BadSignature:
+        return None, "Invalid admin website handoff. Please sign in again."
+
+    normalized_payload = _normalize_admin_handoff_payload(payload)
+    if not normalized_payload:
+        return None, "Admin website handoff is invalid. Please sign in again."
+    return normalized_payload, ""
+
+
+def _is_telegram_mini_app_request():
+    if parse_telegram_user_id(request.args.get("tg_user_id")) is not None:
+        return True
+    return bool(str(request.args.get("tgWebAppData", "")).strip())
+
 
 def register_user_auth_routes(
     students,
@@ -27,19 +109,49 @@ def register_user_auth_routes(
     render_login_page,
     render_admin_page,
 ):
+    def render_admin_redirect_page(redirect_url):
+        return render_template(
+            "auth/admin_redirect.html",
+            redirect_url=redirect_url,
+        )
+
     @students.get("/admin")
     def admin_entry():
         if current_auth_role() == "admin":
+            if _is_telegram_mini_app_request():
+                handoff_url = _build_admin_handoff_url(_current_admin_session_payload())
+                if handoff_url:
+                    return render_admin_redirect_page(handoff_url)
             return redirect(url_for("student.home", panel="overview", school="all"))
         if current_auth_role() == "student":
             return redirect(url_for("student.home"))
         return render_login_page()
+
+    @students.get("/admin/continue")
+    def admin_continue():
+        admin_payload, handoff_error = _load_admin_handoff_payload(
+            request.args.get("handoff")
+        )
+        if not admin_payload:
+            return render_login_page(auth_error=handoff_error), 401
+
+        if not set_admin_session(admin_payload):
+            return render_login_page(
+                auth_error="Unable to initialize admin session. Please sign in again.",
+            ), 500
+
+        return redirect(url_for("student.home", panel="overview", school="all"))
 
     @students.get("/")
     def home():
         role = current_auth_role()
 
         if role == "admin":
+            if _is_telegram_mini_app_request():
+                handoff_url = _build_admin_handoff_url(_current_admin_session_payload())
+                if handoff_url:
+                    return render_admin_redirect_page(handoff_url)
+
             panel_arg = str(request.args.get("panel", "")).strip().lower()
             school_arg = str(request.args.get("school", "")).strip().lower()
             saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
@@ -118,6 +230,16 @@ def register_user_auth_routes(
                     auth_error="Invalid admin credentials.",
                     auth_login_input=login_value,
                 ), 401
+
+            telegram_user_id = parse_telegram_user_id(login_form.telegram_user_id.data)
+            if telegram_user_id is not None:
+                handoff_url = _build_admin_handoff_url(admin)
+                if not handoff_url:
+                    return render_login_page(
+                        auth_error="Unable to open the admin website. Please try again.",
+                        auth_login_input=login_value,
+                    ), 500
+                return render_admin_redirect_page(handoff_url)
 
             set_admin_session(admin)
             session["admin_last_panel"] = "overview"
