@@ -101,11 +101,11 @@
     @apply border-border;
   }
 
-  html, body, #root {
-    height: 100dvh;
+  html, body {
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    min-height: 100dvh;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -147,46 +147,49 @@
     animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
   .tg-app-shell {
-    height: 100dvh;
-    max-height: var(--tg-app-height);
-    padding-left: var(--safe-left);
-    padding-right: var(--safe-right);
+    min-height: var(--tg-app-height);
+    min-height: min(var(--tg-app-height), 100dvh);
+    padding-bottom: var(--tg-safe-bottom-offset);
   }
   .tg-app-main {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    padding-bottom: var(--safe-bottom);
+    padding-bottom: calc(1rem + var(--tg-safe-bottom-offset));
   }
   .tg-centered-page {
-    height: 100dvh;
-    max-height: var(--tg-app-height);
-    overflow-y: auto;
-    padding-top: var(--safe-top);
-    padding-right: calc(1rem + var(--safe-right));
-    padding-bottom: var(--safe-bottom);
-    padding-left: calc(1rem + var(--safe-left));
+    min-height: var(--tg-app-height);
+    min-height: min(var(--tg-app-height), 100dvh);
+    padding-top: calc(1.5rem + var(--tg-safe-offset));
+    padding-right: calc(1rem + var(--tg-safe-right-offset));
+    padding-bottom: calc(1.5rem + var(--tg-safe-bottom-offset));
+    padding-left: calc(1rem + var(--tg-safe-left-offset));
   }
-  .tg-fixed-topbar {
-    padding-top: var(--safe-top);
-    padding-right: var(--safe-right);
-    padding-left: var(--safe-left);
+  .tg-safe-top {
+    padding-top: calc(var(--tg-safe-offset) + var(--tg-top-offset));
   }
-  .tg-fixed-modal {
-    padding-top: var(--safe-top);
-    padding-right: max(1rem, var(--safe-right));
-    padding-bottom: var(--safe-bottom);
-    padding-left: max(1rem, var(--safe-left));
-  }
-  .tg-fixed-fullscreen {
-    padding-top: var(--safe-top);
-    padding-right: var(--safe-right);
-    padding-bottom: var(--safe-bottom);
-    padding-left: var(--safe-left);
-  }
-  .tg-edge-padding {
-    padding-left: var(--safe-left);
-    padding-right: var(--safe-right);
+}
+
+html.tg-miniapp,
+body.tg-miniapp {
+  --tg-safe-offset: max(var(--safe-top), var(--tg-safe-area-top), var(--tg-content-safe-area-top));
+  --tg-safe-bottom-offset: max(
+    var(--safe-bottom),
+    var(--tg-safe-area-bottom),
+    var(--tg-content-safe-area-bottom),
+    var(--tg-visual-viewport-bottom-offset)
+  );
+  --tg-safe-left-offset: max(var(--safe-left), var(--tg-safe-area-left), var(--tg-content-safe-area-left));
+  --tg-safe-right-offset: max(var(--safe-right), var(--tg-safe-area-right), var(--tg-content-safe-area-right));
+}
+
+html.tg-miniapp .tg-safe-top,
+body.tg-miniapp .tg-safe-top {
+  padding-top: calc(var(--tg-safe-offset) + var(--tg-top-offset));
+}
+
+@media (max-width: 640px) {
+  html.tg-miniapp .tg-miniapp-nav-offset,
+  body.tg-miniapp .tg-miniapp-nav-offset {
+    padding-left: calc(0.75rem + 34px + var(--tg-safe-left-offset));
+    padding-right: calc(0.75rem + 34px + var(--tg-safe-right-offset));
   }
 }
 

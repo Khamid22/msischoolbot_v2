@@ -57,22 +57,6 @@
       typeof webApp.contentSafeAreaInset === "object"
         ? webApp.contentSafeAreaInset
         : {};
-    const mergedTop = Math.max(
-      resolveInsetValue(safeAreaInset.top),
-      resolveInsetValue(contentSafeAreaInset.top)
-    );
-    const mergedRight = Math.max(
-      resolveInsetValue(safeAreaInset.right),
-      resolveInsetValue(contentSafeAreaInset.right)
-    );
-    const mergedBottom = Math.max(
-      resolveInsetValue(safeAreaInset.bottom),
-      resolveInsetValue(contentSafeAreaInset.bottom)
-    );
-    const mergedLeft = Math.max(
-      resolveInsetValue(safeAreaInset.left),
-      resolveInsetValue(contentSafeAreaInset.left)
-    );
 
     setCssPixelVar("--tg-safe-area-top", resolveInsetValue(safeAreaInset.top));
     setCssPixelVar("--tg-safe-area-right", resolveInsetValue(safeAreaInset.right));
@@ -94,10 +78,6 @@
       "--tg-content-safe-area-left",
       resolveInsetValue(contentSafeAreaInset.left)
     );
-    setCssPixelVar("--safe-top", mergedTop);
-    setCssPixelVar("--safe-right", mergedRight);
-    setCssPixelVar("--safe-bottom", mergedBottom);
-    setCssPixelVar("--safe-left", mergedLeft);
   };
 
   const syncVisualViewport = function () {
