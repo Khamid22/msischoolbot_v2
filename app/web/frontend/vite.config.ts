@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
   build: {
-    outDir: "../app/web/static/react",
+    // Outputs to app/web/static/react/ — served by Flask
+    outDir: "../static/react",
     emptyOutDir: true,
     cssCodeSplit: false,
     rollupOptions: {

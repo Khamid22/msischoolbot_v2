@@ -20,7 +20,7 @@ def _remove_unused_vite_shell():
 
 def main():
     ensure_js_bundles("app/web/static")
-    frontend_dir = os.path.join(_ROOT_DIR, "frontend")
+    frontend_dir = os.path.join(_ROOT_DIR, "app", "web", "frontend")
     if os.path.isdir(frontend_dir):
         subprocess.run(["npm", "run", "build"], cwd=frontend_dir, check=True)
         _remove_unused_vite_shell()

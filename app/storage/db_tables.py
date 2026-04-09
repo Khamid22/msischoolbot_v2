@@ -110,6 +110,7 @@ def create_tables(conn):
             description TEXT NOT NULL DEFAULT '',
             resource_url TEXT NOT NULL DEFAULT '',
             resource_file_path TEXT NOT NULL DEFAULT '',
+            thumbnail_file_path TEXT NOT NULL DEFAULT '',
             is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
             created_by_admin_id INTEGER,
             created_at TEXT NOT NULL,
@@ -699,6 +700,10 @@ def ensure_resources_schema(conn):
             )
         if "created_by_admin_id" not in resource_columns:
             conn.execute("ALTER TABLE resources ADD COLUMN created_by_admin_id INTEGER")
+        if "thumbnail_file_path" not in resource_columns:
+            conn.execute(
+                "ALTER TABLE resources ADD COLUMN thumbnail_file_path TEXT NOT NULL DEFAULT ''"
+            )
         if "created_at" not in resource_columns:
             conn.execute(
                 "ALTER TABLE resources ADD COLUMN created_at TEXT NOT NULL DEFAULT ''"

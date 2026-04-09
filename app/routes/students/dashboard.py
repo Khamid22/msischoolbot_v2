@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 
-from flask import jsonify, render_template, request, url_for
+from flask import jsonify, request, url_for
+from flask_wtf.csrf import generate_csrf
+
+from app.web.render import render_react_page
 
 from app.integrations.sheets_data import get_school_dataset_last_updated
 
@@ -85,9 +88,10 @@ def register_dashboard_routes(
 
         if error_message:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=error_message,
+                render_react_page(
+                    "student-not-found",
+                    {"message": error_message, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 status_code,
             )
@@ -135,7 +139,36 @@ def register_dashboard_routes(
         context["refresh_url"] = url_for("student.dashboard", **refresh_params)
         context["last_updated_label"] = _format_last_updated_label(last_updated_at)
 
-        return render_template("student/dashboard.html", **context)
+        return render_react_page(
+            "student-dashboard",
+            {
+                "payload": context["payload"],
+                "attendanceRate": context["attendance_rate"],
+                "examPerformance": context["exam_performance"],
+                "programCompletedLessons": context["program_completed_lessons"],
+                "programCompletedRate": context["program_completed_rate"],
+                "ratingBoardUrl": context["rating_board_url"],
+                "resourcesUrl": context["resources_url"],
+                "aapLessonsUrl": context["aap_lessons_url"],
+                "arLessonsUrl": context["ar_lessons_url"],
+                "currentSubjectName": context["current_subject_name"],
+                "currentSubjectShortName": context["current_subject_short_name"],
+                "subjectSwitchOptions": context["subject_switch_options"],
+                "studentProfile": context["student_profile"],
+                "profileNotice": context["profile_notice"],
+                "profileError": context["profile_error"],
+                "dashboardBackUrl": context["dashboard_back_url"],
+                "refreshUrl": context.get("refresh_url", ""),
+                "lastUpdatedLabel": context.get("last_updated_label", ""),
+                "csrfToken": generate_csrf(),
+                "logoutUrl": url_for("student.logout"),
+                "changePasswordUrl": url_for("student.profile_change_password"),
+            },
+            title="Academic Dashboard",
+            description="Mobile-optimized MSI School dashboard with attendance and performance charts.",
+            back_mode="history",
+            back_url=context.get("dashboard_back_url"),
+        )
 
     @students.get("/dashboard/<int:student_id>/aap-lessons")
     def aap_lessons(student_id):
@@ -159,9 +192,10 @@ def register_dashboard_routes(
         )
         if error_message:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=error_message,
+                render_react_page(
+                    "student-not-found",
+                    {"message": error_message, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 status_code,
             )
@@ -178,14 +212,27 @@ def register_dashboard_routes(
         )
         if build_error:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=build_error,
+                render_react_page(
+                    "student-not-found",
+                    {"message": build_error, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 build_status_code,
             )
 
-        return render_template("student/aap_lessons.html", **context)
+        return render_react_page(
+            "student-aap",
+            {
+                "backUrl": context["back_url"],
+                "studentFullName": context["student_full_name"],
+                "subjectName": context["subject_name"],
+                "lessonRows": context["lesson_rows"],
+            },
+            title="AAP Lesson Mastery",
+            description="Average Academic Performance by lesson.",
+            back_mode="history",
+            back_url=context.get("back_url"),
+        )
 
     @students.get("/dashboard/<int:student_id>/ar-lessons")
     def ar_lessons(student_id):
@@ -209,9 +256,10 @@ def register_dashboard_routes(
         )
         if error_message:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=error_message,
+                render_react_page(
+                    "student-not-found",
+                    {"message": error_message, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 status_code,
             )
@@ -227,14 +275,27 @@ def register_dashboard_routes(
         )
         if build_error:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=build_error,
+                render_react_page(
+                    "student-not-found",
+                    {"message": build_error, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 build_status_code,
             )
 
-        return render_template("student/ar_lessons.html", **context)
+        return render_react_page(
+            "student-ar",
+            {
+                "backUrl": context["back_url"],
+                "studentFullName": context["student_full_name"],
+                "subjectName": context["subject_name"],
+                "lessonRows": context["lesson_rows"],
+            },
+            title="Attendance By Lesson",
+            description="Attendance record by lesson.",
+            back_mode="history",
+            back_url=context.get("back_url"),
+        )
 
     @students.get("/api/students/<int:student_id>/dashboard")
     def api_student_dashboard(student_id):

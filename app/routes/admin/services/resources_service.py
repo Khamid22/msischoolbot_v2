@@ -9,6 +9,7 @@ from .r2_storage_service import (
     delete_resource_file,
     infer_resource_mime_type,
     is_r2_configured,
+    upload_thumbnail_file,
 )
 
 _DB_LOCK = threading.Lock()
@@ -142,6 +143,8 @@ def _to_resource(row):
         "resource_file_mime": resource_file_mime,
         "resource_file_kind": resource_file_kind,
         "resource_file_url": build_resource_file_url(resource_file_path),
+        "thumbnail_file_path": str(_row_field(row, "thumbnail_file_path", "") or "").strip(),
+        "thumbnail_url": build_resource_file_url(str(_row_field(row, "thumbnail_file_path", "") or "").strip()),
         "is_active": bool(_row_field(row, "is_active", 0)),
         "created_by_admin_id": (
             int(_row_field(row, "created_by_admin_id"))
@@ -359,6 +362,7 @@ def create_resource(
     description="",
     resource_url="",
     resource_file_path="",
+    thumbnail_file_path="",
     created_by_admin_id=None,
 ):
     subject_key, subject_label = _canonical_subject(subject_name)
@@ -381,6 +385,7 @@ def create_resource(
 
     normalized_url = str(resource_url or "").strip()
     normalized_file_path = str(resource_file_path or "").strip()
+    normalized_thumbnail_path = str(thumbnail_file_path or "").strip()
     if not normalized_url and not normalized_file_path:
         return False, "Provide either a resource link or an uploaded file."
 
@@ -422,6 +427,7 @@ def create_resource(
                 description=normalized_description,
                 resource_url=normalized_url,
                 resource_file_path=normalized_file_path,
+                thumbnail_file_path=normalized_thumbnail_path,
                 created_by_admin_id=admin_id,
                 created_at=now,
                 updated_at=now,
@@ -465,6 +471,7 @@ def delete_resource(resource_id):
         return False, "Invalid resource."
 
     resource_file_path = ""
+    thumbnail_path = ""
     with _DB_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
@@ -473,11 +480,14 @@ def delete_resource(resource_id):
                 return False, "Resource was not found."
 
             resource_file_path = str(existing["resource_file_path"] or "").strip()
+            thumbnail_path = str(existing["thumbnail_file_path"] or "").strip()
             queries.delete_resource_row_by_id(conn, parsed_resource_id)
             conn.commit()
 
     if resource_file_path:
         delete_resource_file(resource_file_path)
+    if thumbnail_path:
+        delete_resource_file(thumbnail_path)
     return True, ""
 
 

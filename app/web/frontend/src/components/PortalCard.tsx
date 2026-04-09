@@ -11,9 +11,9 @@ export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
   return (
     <div className="tg-centered-page flex items-center justify-center bg-background">
       <div className="w-full max-w-md">
-        <div className="rounded-3xl bg-surface p-6 shadow-card sm:p-8">
+        <div className="rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8">
           <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-card">
               <GraduationCap className="h-7 w-7" />
             </div>
             <h1 className="font-display text-xl font-bold sm:text-2xl">{title}</h1>

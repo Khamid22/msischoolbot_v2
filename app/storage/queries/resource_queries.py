@@ -261,6 +261,7 @@ def insert_resource_row(
     description,
     resource_url,
     resource_file_path,
+    thumbnail_file_path,
     created_by_admin_id,
     created_at,
     updated_at,
@@ -276,12 +277,13 @@ def insert_resource_row(
             description,
             resource_url,
             resource_file_path,
+            thumbnail_file_path,
             is_active,
             created_by_admin_id,
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
         """,
         (
             subject_name,
@@ -292,6 +294,7 @@ def insert_resource_row(
             description,
             resource_url,
             resource_file_path,
+            thumbnail_file_path,
             created_by_admin_id,
             created_at,
             updated_at,
@@ -355,6 +358,7 @@ def get_resource_row_by_id(conn, resource_id):
             r.description,
             r.resource_url,
             r.resource_file_path,
+            r.thumbnail_file_path,
             r.is_active,
             r.created_by_admin_id,
             r.created_at,
@@ -399,6 +403,7 @@ def list_resource_rows(conn, include_inactive=False, subject_key=""):
             r.description,
             r.resource_url,
             r.resource_file_path,
+            r.thumbnail_file_path,
             r.is_active,
             r.created_by_admin_id,
             r.created_at,

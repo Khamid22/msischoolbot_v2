@@ -1,6 +1,9 @@
 import os
 
-from flask import Blueprint, redirect, render_template, session, url_for
+from flask import Blueprint, redirect, session, url_for
+from flask_wtf.csrf import generate_csrf
+
+from app.web.render import render_react_page
 
 from app.routes.admin.admins import register_admin_routes
 from app.routes.admin.services.page_service import (
@@ -68,30 +71,35 @@ def register_admin_page_routes(
             session["admin_last_panel"] = panel
             session["admin_last_school"] = school_filter
 
-        return render_template(
-            "admin/home.html",
-            error="",
-            auth_login=current_auth_login(),
-            auth_error=auth_error or (page_context["sync_errors"][0] if page_context["sync_errors"] else ""),
-            admin_students=page_context["admin_students"],
-            admin_panel=panel,
-            admin_teachers=page_context["admin_teachers"],
-            admin_teacher_options=page_context["admin_teacher_options"],
-            admin_group_options=page_context["admin_group_options"],
-            admin_teacher_edit=page_context["admin_teacher_edit"],
-            admin_teacher_edit_school=page_context["admin_teacher_edit_school"],
-            admin_school=school_filter,
-            admin_school_options=page_context["admin_school_options"],
-            admin_notice=admin_notice or page_context["load_error"] or "",
-            admin_quick_stats=page_context["admin_quick_stats"],
-            admin_school_info=page_context["admin_school_info"],
-            admin_subject_info=page_context["admin_subject_info"],
-            admin_group_zones=page_context["admin_group_zones"],
-            admin_resource_types=page_context["admin_resource_types"],
-            admin_resource_active_types=page_context["admin_resource_active_types"],
-            admin_resources=page_context["admin_resources"],
-            admin_resource_subject_options=page_context["admin_resource_subject_options"],
-            admin_resource_upload_enabled=page_context["admin_resource_upload_enabled"],
+        return render_react_page(
+            "admin-home",
+            {
+                "authLogin": current_auth_login(),
+                "authError": auth_error or (page_context["sync_errors"][0] if page_context["sync_errors"] else ""),
+                "adminNotice": admin_notice or page_context["load_error"] or "",
+                "adminPanel": panel,
+                "adminSchool": school_filter,
+                "adminStudents": page_context["admin_students"],
+                "adminTeachers": page_context["admin_teachers"],
+                "adminTeacherOptions": page_context["admin_teacher_options"],
+                "adminGroupOptions": page_context["admin_group_options"],
+                "adminTeacherEdit": page_context["admin_teacher_edit"],
+                "adminTeacherEditSchool": page_context["admin_teacher_edit_school"],
+                "adminSchoolOptions": page_context["admin_school_options"],
+                "adminQuickStats": page_context["admin_quick_stats"],
+                "adminSchoolInfo": page_context["admin_school_info"],
+                "adminSubjectInfo": page_context["admin_subject_info"],
+                "adminGroupZones": page_context["admin_group_zones"],
+                "adminResourceTypes": page_context["admin_resource_types"],
+                "adminResourceActiveTypes": page_context["admin_resource_active_types"],
+                "adminResources": page_context["admin_resources"],
+                "adminResourceSubjectOptions": page_context["admin_resource_subject_options"],
+                "adminResourceUploadEnabled": page_context["admin_resource_upload_enabled"],
+                "csrfToken": generate_csrf(),
+            },
+            title="MSI Admin Panel",
+            description="Admin panel for school performance, teachers, students, and resources.",
+            telegram=False,
         )
 
     def render_edit_student_page(student_row_id, auth_error="", admin_notice=""):
@@ -99,13 +107,25 @@ def register_admin_page_routes(
         if not context:
             return None
 
-        return render_template(
-            "admin/edit_student_profile.html",
-            auth_login=current_auth_login(),
-            auth_error=auth_error,
-            admin_notice=admin_notice,
-            student=context["student"],
-            teacher_name_options=context["teacher_name_options"],
+        back_url = url_for("student.home", panel="students")
+        return render_react_page(
+            "admin-edit-student",
+            {
+                "authLogin": current_auth_login(),
+                "authError": auth_error,
+                "adminNotice": admin_notice,
+                "student": context["student"],
+                "teacherNameOptions": context["teacher_name_options"],
+                "csrfToken": generate_csrf(),
+                "saveUrl": url_for("admin.save_admin_student_profile", student_row_id=student_row_id),
+                "viewDashboardUrl": url_for("admin.admin_student_dashboard", student_row_id=student_row_id),
+                "backUrl": back_url,
+            },
+            title="Edit Student Profile",
+            description="Edit student profile details.",
+            telegram=False,
+            back_mode="history",
+            back_url=back_url,
         )
 
     admin_blueprint = Blueprint("admin", __name__)

@@ -1,0 +1,223 @@
+"""
+app/web/render.py
+-----------------
+Generates HTML pages directly from Python — no Jinja2 templates needed.
+
+How it works
+------------
+  1. A Flask route builds a props dict (camelCase keys matching React component props).
+  2. The route calls render_react_page("page-name", props, title="...").
+  3. render_react_page() returns an HTML string with the props embedded as JSON.
+  4. The browser loads React, which reads the JSON and renders the right page.
+
+The page name must match a key in frontend/src/App.tsx's pageMap.
+"""
+
+import json
+
+from flask import current_app, url_for
+from markupsafe import escape
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _asset_version() -> str:
+    """Cache-busting version string, set once at startup in app.config."""
+    return str(current_app.config.get("ASSET_VERSION", "1"))
+
+
+def _safe_json(page_name: str, props: dict) -> str:
+    """Serialize page + props to HTML-safe JSON.
+
+    Escapes <, >, and & so the JSON can safely sit inside a
+    <script type="application/json"> tag without breaking the HTML parser.
+    """
+    raw = json.dumps(
+        {"page": page_name, "props": props},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return raw.replace("<", r"\u003c").replace(">", r"\u003e").replace("&", r"\u0026")
+
+
+# ---------------------------------------------------------------------------
+# Public render functions
+# ---------------------------------------------------------------------------
+
+def render_react_page(
+    page_name: str,
+    props: dict,
+    *,
+    title: str = "MSI School Portal",
+    description: str = "MSI School Portal",
+    telegram: bool = True,
+    back_mode: str | None = None,
+    back_url: str | None = None,
+) -> str:
+    """Return an HTML string that boots the React app for the given page.
+
+    Args:
+        page_name:   React page key (e.g. "student-dashboard"). Must match a
+                     key in frontend/src/App.tsx's pageMap.
+        props:       camelCase props passed straight to the React page component.
+        title:       Browser tab title.
+        description: <meta name="description"> content.
+        telegram:    Whether to load the Telegram WebApp JS bridge.
+        back_mode:   Telegram back button mode ("history" or None).
+        back_url:    URL the Telegram back button navigates to.
+    """
+    v = _asset_version()
+    props_json = _safe_json(page_name, props)
+    title_safe = str(escape(title))
+    desc_safe = str(escape(description))
+
+    favicon_url = url_for("static", filename="images/favicon.png")
+    manifest_url = url_for("system.manifest")
+    css_url = url_for("static", filename="react/app.css", v=v)
+    js_url = url_for("static", filename="react/app.js")
+    tg_bundle_url = url_for("static", filename="js/bundles/telegram-base.js", v=v)
+
+    tg_head = (
+        '\n    <link rel="preconnect" href="https://telegram.org" />'
+        '\n    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>'
+    ) if telegram else ""
+
+    tg_script = f'\n    <script defer src="{tg_bundle_url}"></script>' if telegram else ""
+
+    body_attrs = ""
+    if back_mode:
+        body_attrs += f' data-tg-back-mode="{str(escape(back_mode))}"'
+    if back_url:
+        body_attrs += f' data-tg-back-url="{str(escape(back_url))}"'
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="description" content="{desc_safe}" />{tg_head}
+    <title>{title_safe}</title>
+    <link rel="icon" type="image/png" href="{favicon_url}" />
+    <link rel="manifest" href="{manifest_url}" />
+    <link rel="stylesheet" href="{css_url}" />
+  </head>
+  <body{body_attrs}>
+    <div id="root"></div>
+    <script id="msi-react-bootstrap" type="application/json">{props_json}</script>
+    <script type="module" src="{js_url}"></script>{tg_script}
+  </body>
+</html>"""
+
+
+def render_admin_redirect(redirect_url: str) -> str:
+    """Return the standalone HTML page shown to admins inside the Telegram mini app.
+
+    This page has no React — it simply tells the admin to open the website,
+    and auto-calls Telegram.WebApp.openLink() to do it.
+    """
+    url_json = json.dumps(str(redirect_url))
+    favicon_url = url_for("static", filename="images/favicon.png")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <title>Open Admin Website</title>
+    <link rel="icon" type="image/png" href="{favicon_url}" />
+    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+      :root {{
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f5f5f5;
+        color: #0a0a0a;
+      }}
+      * {{ box-sizing: border-box; }}
+      body {{
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding:
+          max(24px, env(safe-area-inset-top, 0px))
+          max(16px, env(safe-area-inset-right, 0px))
+          max(24px, env(safe-area-inset-bottom, 0px))
+          max(16px, env(safe-area-inset-left, 0px));
+        background: radial-gradient(circle at top, rgba(0,0,0,.05), transparent 45%), #f5f5f5;
+      }}
+      .card {{
+        width: min(100%, 420px);
+        border-radius: 28px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04);
+        padding: 28px 24px;
+      }}
+      h1 {{ margin: 0 0 10px; font-size: 1.4rem; line-height: 1.2; }}
+      p {{ margin: 0; color: rgba(10,10,10,.66); line-height: 1.6; }}
+      .actions {{ display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }}
+      .button {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        border-radius: 16px;
+        border: 0;
+        background: #0a0a0a;
+        color: #f5f5f5;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }}
+      .secondary {{ background: rgba(0,0,0,.06); color: #0a0a0a; }}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Admin access continues on the website</h1>
+      <p>Your credentials were accepted. Open the website to continue in the admin panel outside the Telegram Mini App.</p>
+      <div class="actions">
+        <a id="openAdminWebsite" class="button" href="{str(escape(redirect_url))}" target="_blank" rel="noopener noreferrer">
+          Open Admin Website
+        </a>
+        <button id="retryOpenAdminWebsite" type="button" class="button secondary">Try Again</button>
+      </div>
+    </div>
+    <script>
+      (function () {{
+        var targetUrl = {url_json};
+        function openAdminWebsite() {{
+          var webApp = window.Telegram && window.Telegram.WebApp;
+          if (webApp && typeof webApp.ready === "function") {{
+            try {{ webApp.ready(); }} catch (_) {{}}
+          }}
+          if (webApp && typeof webApp.openLink === "function") {{
+            try {{
+              webApp.openLink(targetUrl);
+              if (typeof webApp.close === "function") {{
+                window.setTimeout(function () {{ try {{ webApp.close(); }} catch (_) {{}} }}, 160);
+              }}
+              return;
+            }} catch (_) {{}}
+          }}
+          window.open(targetUrl, "_blank", "noopener,noreferrer");
+        }}
+        var primary = document.getElementById("openAdminWebsite");
+        var retry = document.getElementById("retryOpenAdminWebsite");
+        if (primary) primary.addEventListener("click", function (e) {{ e.preventDefault(); openAdminWebsite(); }});
+        if (retry) retry.addEventListener("click", openAdminWebsite);
+        window.setTimeout(openAdminWebsite, 80);
+      }})();
+    </script>
+  </body>
+</html>"""

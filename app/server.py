@@ -26,12 +26,11 @@ from app.storage.db_config import get_auth_db_path
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
-_TEMPLATE_DIR = os.path.join(_FRONTEND_DIR, "templates")
 _STATIC_DIR = os.path.join(_FRONTEND_DIR, "static")
 _REACT_DIR = os.path.join(_STATIC_DIR, "react")
 app = Flask(
     __name__,
-    template_folder=_TEMPLATE_DIR,
+    template_folder=None,
     static_folder=_STATIC_DIR,
     static_url_path="/static",
 )
@@ -50,16 +49,11 @@ ensure_js_bundles(_STATIC_DIR)
 
 
 def _build_default_asset_version():
-    # Build a simple asset version from the latest static/template file mtime.
+    # Build a simple asset version from the latest static file mtime.
     candidate_paths = [
         os.path.join(_BACKEND_DIR, "js_bundles.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
-        os.path.join(_TEMPLATE_DIR, "layouts", "react_app.html"),
-        os.path.join(_TEMPLATE_DIR, "student", "dashboard.html"),
-        os.path.join(_TEMPLATE_DIR, "home.html"),
-        os.path.join(_TEMPLATE_DIR, "auth", "login.html"),
-        os.path.join(_TEMPLATE_DIR, "student", "home.html"),
-        os.path.join(_TEMPLATE_DIR, "admin", "home.html"),
+        os.path.join(_BACKEND_DIR, "web", "render.py"),
         os.path.join(_REACT_DIR, "app.css"),
         os.path.join(_REACT_DIR, "app.js"),
     ]
@@ -99,6 +93,8 @@ _ASSET_VERSION = (
     if _asset_version_override and _asset_version_override != "1"
     else _build_default_asset_version()
 )
+# Expose in app config so render.py can read it via current_app.config["ASSET_VERSION"].
+app.config["ASSET_VERSION"] = _ASSET_VERSION
 
 # Reuse shared root config so web uses the same source as main.py.
 settings = get_web_settings()
@@ -703,11 +699,6 @@ def _load_dashboard_payload(
         )
 
     return payload, dataset, None
-
-
-@app.context_processor
-def inject_asset_version():
-    return {"asset_version": _ASSET_VERSION}
 
 
 @app.after_request

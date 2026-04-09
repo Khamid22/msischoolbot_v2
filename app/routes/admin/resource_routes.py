@@ -1,6 +1,6 @@
 from flask import jsonify, request, session, url_for
 
-from app.routes.admin.services.r2_storage_service import upload_resource_file
+from app.routes.admin.services.r2_storage_service import upload_resource_file, upload_thumbnail_file
 from app.routes.admin.services.resources_service import (
     create_resource,
     create_resource_type,
@@ -166,6 +166,31 @@ def register_admin_resource_routes(
                 message="Saving resource...",
             )
 
+        uploaded_thumbnail = request.files.get("thumbnail_file")
+        uploaded_thumbnail_path = ""
+        if uploaded_thumbnail and str(uploaded_thumbnail.filename or "").strip():
+            uploaded_thumbnail_path, thumb_error = upload_thumbnail_file(
+                uploaded_thumbnail,
+                subject_name=subject_name,
+                folder_path=folder_path,
+            )
+            if thumb_error:
+                fail_upload(
+                    upload_id,
+                    message=thumb_error,
+                    percent=90.0,
+                    stage="upload_error",
+                )
+                if is_xhr_request():
+                    return xhr_error(thumb_error)
+                return (
+                    render_admin_page(
+                        auth_error=thumb_error,
+                        admin_panel="resources",
+                    ),
+                    400,
+                )
+
         publish_progress(
             percent=98.0,
             stage="saving",
@@ -179,6 +204,7 @@ def register_admin_resource_routes(
             description=description,
             resource_url=resource_url,
             resource_file_path=uploaded_file_path,
+            thumbnail_file_path=uploaded_thumbnail_path,
             created_by_admin_id=session.get("admin_id"),
         )
         if not created:

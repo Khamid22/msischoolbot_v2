@@ -1,4 +1,6 @@
-from flask import render_template, request, url_for
+from flask import request, url_for
+
+from app.web.render import render_react_page
 
 from app.routes.students.services import payload_service, resources_service
 
@@ -33,9 +35,10 @@ def register_resources_routes(
         )
         if error_message:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=error_message,
+                render_react_page(
+                    "student-not-found",
+                    {"message": error_message, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 status_code,
             )
@@ -43,9 +46,10 @@ def register_resources_routes(
         student = payload.get("student", {})
         if not isinstance(student, dict):
             return (
-                render_template(
-                    "student/not_found.html",
-                    message="Student profile is unavailable.",
+                render_react_page(
+                    "student-not-found",
+                    {"message": "Student profile is unavailable.", "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 404,
             )
@@ -63,12 +67,16 @@ def register_resources_routes(
             school=school_code,
         )
 
-        return render_template(
-            "student/resources.html",
-            current_student=student,
-            student=student,
-            student_id=student_id,
-            subject_name=subject_name,
-            grouped_resources=grouped_resources,
+        return render_react_page(
+            "student-resources",
+            {
+                "backUrl": back_url,
+                "subjectName": subject_name,
+                "currentStudent": student,
+                "groupedResources": grouped_resources,
+            },
+            title="Subject Resources",
+            description="Shared learning resources for the selected subject.",
+            back_mode="history",
             back_url=back_url,
         )

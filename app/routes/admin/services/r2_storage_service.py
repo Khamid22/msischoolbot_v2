@@ -769,9 +769,53 @@ def delete_resource_file(resource_file_path):
         return
 
 
+_ALLOWED_THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def upload_thumbnail_file(uploaded_file, subject_name="", folder_path=""):
+    if uploaded_file is None or not str(uploaded_file.filename or "").strip():
+        return "", "No thumbnail was uploaded."
+    if not is_r2_configured():
+        return "", "R2 storage is not configured."
+
+    original_name = str(uploaded_file.filename or "").strip()
+    safe_name = _safe_file_name(original_name)
+    extension = _file_extension(safe_name)
+    if extension not in _ALLOWED_THUMBNAIL_EXTENSIONS:
+        return "", "Thumbnail must be a JPG, PNG, or WebP image."
+
+    payload, payload_size = _read_limited_bytes(uploaded_file, _THUMBNAIL_MAX_BYTES)
+    if payload is None:
+        return "", "Thumbnail image is too large (max 5 MB)."
+    if payload_size <= 0:
+        return "", "Thumbnail image is empty."
+
+    content_type = infer_resource_mime_type(safe_name) or "image/jpeg"
+    object_key = _build_object_key(subject_name, f"thumb-{safe_name}", folder_path=folder_path)
+    client = _get_r2_client()
+    if client is None:
+        return "", "Unable to initialize R2 client."
+
+    try:
+        client.put_object(
+            Bucket=_resource_bucket_name(),
+            Key=object_key,
+            Body=payload,
+            ContentType=content_type,
+            ContentDisposition=f'inline; filename="{safe_name}"',
+            CacheControl=_cache_control_header(),
+        )
+    except (BotoCoreError, ClientError):
+        return "", "Failed to upload thumbnail to R2."
+
+    return object_key, ""
+
+
 __all__ = [
     "is_r2_configured",
     "upload_resource_file",
+    "upload_thumbnail_file",
     "build_resource_file_url",
     "delete_resource_file",
     "infer_resource_mime_type",

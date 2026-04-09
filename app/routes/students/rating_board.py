@@ -1,4 +1,6 @@
-from flask import render_template, request, url_for
+from flask import request, url_for
+
+from app.web.render import render_react_page
 
 from app.config.schools import get_configured_school_spreadsheets
 from app.routes.students.services import payload_service
@@ -164,9 +166,10 @@ def register_rating_board_routes(
         )
         if error_message:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=error_message,
+                render_react_page(
+                    "student-not-found",
+                    {"message": error_message, "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 status_code,
             )
@@ -174,9 +177,10 @@ def register_rating_board_routes(
         student = payload.get("student", {})
         if not isinstance(student, dict):
             return (
-                render_template(
-                    "student/not_found.html",
-                    message="Student profile is unavailable.",
+                render_react_page(
+                    "student-not-found",
+                    {"message": "Student profile is unavailable.", "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 404,
             )
@@ -213,18 +217,15 @@ def register_rating_board_routes(
 
         if load_error and not dashboards:
             return (
-                render_template(
-                    "student/not_found.html",
-                    message=load_error or "Unable to load subject rating board.",
+                render_react_page(
+                    "student-not-found",
+                    {"message": load_error or "Unable to load subject rating board.", "returnUrl": url_for("student.home")},
+                    title="Student Not Found",
                 ),
                 503,
             )
 
         leaderboard = build_subject_leaderboard(dashboards)
-        current_rating = next(
-            (row for row in leaderboard if row.get("studentId") == student_id),
-            None,
-        )
         back_url = url_for(
             "student.dashboard",
             student_id=student_id,
@@ -255,15 +256,18 @@ def register_rating_board_routes(
             else "All schools"
         )
 
-        return render_template(
-            "student/rating_board.html",
-            current_student=student,
-            current_student_id=student_id,
-            current_rating=current_rating,
-            leaderboard=leaderboard,
-            subject_name=subject_name,
+        return render_react_page(
+            "student-rating",
+            {
+                "backUrl": back_url,
+                "subjectName": subject_name,
+                "currentStudentId": student_id,
+                "leaderboard": leaderboard,
+                "scopeOptions": scope_options,
+                "ratingScopeLabel": rating_scope_label,
+            },
+            title="Student Rating Board",
+            description="Subject student rating board.",
+            back_mode="history",
             back_url=back_url,
-            rating_scope=rating_scope,
-            rating_scope_label=rating_scope_label,
-            scope_options=scope_options,
         )

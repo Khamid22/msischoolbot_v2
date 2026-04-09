@@ -1,8 +1,0 @@
-{# Compatibility template. New rendering uses auth/login.html, admin/home.html, or student/home.html directly. #}
-{% if auth_role == "admin" %}
-{% include "admin/home.html" %}
-{% elif auth_role == "student" %}
-{% include "student/home.html" %}
-{% else %}
-{% include "auth/login.html" %}
-{% endif %}

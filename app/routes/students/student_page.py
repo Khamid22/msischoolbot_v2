@@ -1,4 +1,7 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, url_for
+from flask_wtf.csrf import generate_csrf
+
+from app.web.render import render_react_page
 
 from app.routes.user_auth import register_user_auth_routes
 from app.routes.students.dashboard import register_dashboard_routes
@@ -35,12 +38,16 @@ def register_student_page_routes(
         return False
 
     def render_login_page(auth_error="", auth_login_input=""):
-        return render_template(
-            "auth/login.html",
-            error="",
-            auth_error=auth_error,
-            auth_login_input=auth_login_input,
-            admin_notice="",
+        return render_react_page(
+            "login",
+            {
+                "authError": auth_error,
+                "authLoginInput": auth_login_input,
+                "submitUrl": url_for("student.login"),
+                "csrfToken": generate_csrf(),
+            },
+            title="MSI School Portal",
+            description="Login to continue.",
         )
 
     def render_student_panel(form_data, panel_error=""):
@@ -53,17 +60,21 @@ def register_student_page_routes(
             force_refresh=should_force_refresh(),
         )
 
-        return render_template(
-            "student/home.html",
-            groups=context["groups"],
-            groups_by_subject=context["groups_by_subject"],
-            subjects=context["subjects"],
-            students_by_subject_group=context["students_by_subject_group"],
-            error=panel_error or context["load_error"] or "",
-            form_data=context["form_data"],
-            auth_login=current_auth_login(),
-            auth_error="",
-            admin_notice="",
+        return render_react_page(
+            "student-home",
+            {
+                "subjects": context["subjects"],
+                "groupsBySubject": context["groups_by_subject"],
+                "studentsBySubjectGroup": context["students_by_subject_group"],
+                "formData": context["form_data"],
+                "error": panel_error or context["load_error"] or "",
+                "authLogin": current_auth_login(),
+                "csrfToken": generate_csrf(),
+                "logoutUrl": url_for("student.logout"),
+                "searchUrl": url_for("student.search_student_form"),
+            },
+            title="MSI School Portal",
+            description="Select stream, group, and student.",
         )
 
     students = Blueprint("student", __name__)

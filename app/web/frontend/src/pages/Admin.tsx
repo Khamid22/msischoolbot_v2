@@ -1267,6 +1267,18 @@ export default function AdminPage(props: AdminPageProps) {
                       className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none disabled:opacity-50"
                     />
                   </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Thumbnail Image <span className="font-normal normal-case text-muted-foreground/60">(optional, for videos)</span>
+                    </span>
+                    <input
+                      type="file"
+                      name="thumbnail_file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={!props.adminResourceUploadEnabled}
+                      className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none disabled:opacity-50"
+                    />
+                  </label>
                   <label className="block md:col-span-2">
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
                     <textarea name="resource_description" rows={4} className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none" />

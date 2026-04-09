@@ -1,4 +1,6 @@
-from flask import current_app, redirect, render_template, request, session, url_for
+from flask import current_app, redirect, request, session, url_for
+
+from app.web.render import render_admin_redirect
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.auth.forms import LoginForm
@@ -110,10 +112,7 @@ def register_user_auth_routes(
     render_admin_page,
 ):
     def render_admin_redirect_page(redirect_url):
-        return render_template(
-            "auth/admin_redirect.html",
-            redirect_url=redirect_url,
-        )
+        return render_admin_redirect(redirect_url)
 
     @students.get("/admin")
     def admin_entry():

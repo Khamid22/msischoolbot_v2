@@ -80,7 +80,9 @@ interface DashboardPageProps {
   changePasswordUrl?: string;
 }
 
-const attendanceColors = ["hsl(var(--primary))", "#d1d5db", "#fde68a"];
+const attendanceColors = ["#111111", "#888888", "#cccccc"];
+
+const examSeriesColors = ["#111111", "#444444", "#777777", "#aaaaaa", "#dddddd"];
 
 export default function DashboardPage(props: DashboardPageProps) {
   const payload = props.payload || {};
@@ -310,7 +312,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                       <Bar
                         key={attempt}
                         dataKey={attempt}
-                        fill={index === 0 ? "#6b7280" : index === 1 ? "#111827" : "#374151"}
+                        fill={examSeriesColors[index % examSeriesColors.length]}
                         radius={[4, 4, 0, 0]}
                       />
                     ))}
@@ -332,7 +334,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis domain={[1, 9]} tick={{ fontSize: 11 }} width={30} tickMargin={4} />
                   <Tooltip />
-                  <Area type="monotone" dataKey="score" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.15)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="score" stroke="#111111" fill="#aaaaaa" fillOpacity={0.35} strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

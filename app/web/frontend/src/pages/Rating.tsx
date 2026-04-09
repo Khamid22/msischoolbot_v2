@@ -67,40 +67,40 @@ export default function RatingPage(props: RatingPageProps) {
           }
         >
           {leaderboard.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left">
-                <thead>
-                  <tr className="border-b border-foreground/5">
-                    {["#", "Student", "Group", "AVG", "EP", "AAP", "AR"].map((heading) => (
-                      <th
-                        key={heading}
-                        className="sticky top-[calc(var(--student-topbar-offset-mobile)+var(--tg-safe-offset))] z-10 bg-surface px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:top-[calc(var(--student-topbar-offset-desktop)+var(--tg-safe-offset))]"
-                      >
-                        {heading}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((row, index) => (
-                    <tr
-                      key={`${row.rank}-${row.studentId}-${row.group}-${row.displayName}`}
-                      className={`border-b border-foreground/5 ${row.studentId === props.currentStudentId ? "bg-info/5" : "hover:bg-muted/40"}`}
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-foreground/5">
+                  {["#", "Student", "Grp", "AVG", "EP", "AAP", "AR%"].map((heading) => (
+                    <th
+                      key={heading}
+                      className="sticky top-0 z-10 bg-surface px-1.5 py-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:px-3 sm:text-[10px]"
                     >
-                      <td className="px-3 py-2.5 text-xs font-bold">{index + 1}</td>
-                      <td className="max-w-[200px] px-3 py-2.5 text-xs font-medium leading-snug sm:text-sm">
-                        <span className="inline-block whitespace-normal break-words">{row.displayName}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{row.group}</td>
-                      <td className="px-3 py-2.5 text-xs font-bold">{row.averageCompositeDisplay}</td>
-                      <td className="px-3 py-2.5 text-xs">{row.examPerformance}/9</td>
-                      <td className="px-3 py-2.5 text-xs">{row.aap}/9</td>
-                      <td className="px-3 py-2.5 text-xs">{row.attendanceRate}%</td>
-                    </tr>
+                      {heading}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((row, index) => (
+                  <tr
+                    key={`${row.rank}-${row.studentId}-${row.group}-${row.displayName}`}
+                    className={`border-b border-foreground/5 ${row.studentId === props.currentStudentId ? "bg-info/5" : "hover:bg-muted/40"}`}
+                  >
+                    <td className="w-6 px-1.5 py-2 text-[10px] font-bold sm:px-3 sm:text-xs">{index + 1}</td>
+                    <td className="max-w-[90px] px-1.5 py-2 sm:max-w-[200px] sm:px-3">
+                      <span className="block truncate text-[10px] font-medium sm:text-xs">{row.displayName}</span>
+                    </td>
+                    <td className="max-w-[52px] px-1.5 py-2 sm:px-3">
+                      <span className="block truncate text-[10px] text-muted-foreground sm:text-xs">{row.group}</span>
+                    </td>
+                    <td className="px-1.5 py-2 text-[10px] font-bold sm:px-3 sm:text-xs">{row.averageCompositeDisplay}</td>
+                    <td className="px-1.5 py-2 text-[10px] sm:px-3 sm:text-xs">{row.examPerformance}/9</td>
+                    <td className="px-1.5 py-2 text-[10px] sm:px-3 sm:text-xs">{row.aap}/9</td>
+                    <td className="px-1.5 py-2 text-[10px] sm:px-3 sm:text-xs">{row.attendanceRate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <p className="text-sm text-muted-foreground">No rating data available.</p>
           )}

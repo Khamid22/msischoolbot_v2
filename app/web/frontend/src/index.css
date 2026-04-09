@@ -4,58 +4,61 @@
 
 @layer base {
   :root {
-    --font-display: 'Outfit', sans-serif;
-    --font-body: 'Plus Jakarta Sans', sans-serif;
+    --font-display: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-    --background: 0 0% 96%;
-    --foreground: 0 0% 4%;
+    --background: 0 0% 97%;
+    --foreground: 0 0% 8%;
     --surface: 0 0% 100%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
+    --card-foreground: 0 0% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
+    --popover-foreground: 0 0% 8%;
 
-    --primary: 0 0% 4%;
-    --primary-foreground: 0 0% 96%;
+    --primary: 0 0% 8%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 92%;
-    --secondary-foreground: 0 0% 4%;
+    --secondary-foreground: 0 0% 8%;
 
     --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 0 0% 92%;
-    --accent-foreground: 0 0% 4%;
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 8%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 98%;
 
-    --success: 142 76% 36%;
+    --success: 0 0% 25%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 0 0% 50%;
     --warning-foreground: 0 0% 4%;
 
-    --info: 217 91% 60%;
+    --info: 0 0% 35%;
     --info-foreground: 0 0% 100%;
 
-    --trophy: 45 93% 47%;
-    --rank-gold: 45 93% 47%;
-    --rank-silver: 0 0% 70%;
-    --rank-bronze: 30 60% 50%;
+    --trophy: 0 0% 50%;
+    --rank-gold: 0 0% 50%;
+    --rank-silver: 0 0% 65%;
+    --rank-bronze: 0 0% 40%;
 
-    --border: 0 0% 4%;
-    --hairline: 0 0% 4% / 0.08;
-    --input: 0 0% 90%;
-    --ring: 0 0% 4%;
+    --border: 0 0% 82%;
+    --hairline: 0 0% 0% / 0.08;
+    --input: 0 0% 88%;
+    --ring: 0 0% 8%;
 
     --radius: 12px;
 
-    --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
-    --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.06);
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08);
+    --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.08);
     --card-shadow-neo: 3px 3px 0 0 rgba(0,0,0,1);
+    --page-glow-top: none;
+    --page-glow-bottom: none;
+    --bg-progress-accent: linear-gradient(90deg, #111111 0%, #555555 100%);
 
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
@@ -86,13 +89,13 @@
     --admin-topbar-offset-desktop: 5.75rem;
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 26%;
+    --sidebar-primary: 0 0% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-ring: 0 0% 8%;
   }
 }
 
@@ -142,6 +145,9 @@
   }
   .shadow-neo {
     box-shadow: var(--card-shadow-neo);
+  }
+  .bg-progress-accent {
+    background: var(--bg-progress-accent);
   }
   .animate-in {
     animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
