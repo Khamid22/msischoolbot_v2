@@ -1207,8 +1207,8 @@ export default function AdminPage(props: AdminPageProps) {
         ) : null}
 
         {activeTab === "resources" ? (
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="order-2 space-y-4 xl:order-1">
+          <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="space-y-4">
               <ChartCard title="Resource Types" icon={<Plus className="h-4 w-4 text-info" />}>
                 <form action={routes.adminResourceTypeAdd} method="post" className="space-y-3">
                   <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
@@ -1277,7 +1277,7 @@ export default function AdminPage(props: AdminPageProps) {
               </ChartCard>
             </div>
 
-            <div className="order-1 space-y-4 xl:order-2">
+            <div className="space-y-4">
               <ChartCard title="Add Resource" icon={<Upload className="h-4 w-4 text-info" />}>
                 <form
                   action={routes.adminResourceAdd}
@@ -1371,56 +1371,57 @@ export default function AdminPage(props: AdminPageProps) {
               </ChartCard>
 
               <ChartCard title="Resources" subtitle={`${resources.length} total`} icon={<BookOpen className="h-4 w-4 text-info" />}>
-                {resources.length ? (
-                  <div className="divide-y divide-foreground/5">
-                    {resources.map((resource) => (
-                      <div key={asNumber(resource.id)} className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0">
-                        {/* Icon */}
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                          <BookOpen className="h-4 w-4" />
-                        </span>
-
-                        {/* Info */}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-bold leading-tight">
-                            {asString(resource.title) || "—"}
-                          </p>
-                          <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
-                            <span className="text-[10px] text-muted-foreground">{asString(resource.subject_name)}</span>
-                            <span className="text-[10px] text-muted-foreground/40">·</span>
-                            <span className="text-[10px] text-muted-foreground">{asString(resource.resource_type_name)}</span>
-                          </div>
-                          {asString(resource.resource_file_url) ? (
-                            <a
-                              href={asString(resource.resource_file_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-info hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Open file ↗
-                            </a>
-                          ) : null}
-                        </div>
-
-                        {/* Delete */}
-                        <form
-                          action={routes.adminResourceDelete(asNumber(resource.id))}
-                          method="post"
-                          onSubmit={(event) => submitConfirm(event, "Delete this resource?")}
-                          className="shrink-0"
-                        >
-                          <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
-                          <button className="rounded-lg bg-destructive/10 px-2.5 py-1.5 text-[10px] font-bold text-destructive hover:bg-destructive/20">
-                            Delete
-                          </button>
-                        </form>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No resources yet.</p>
-                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left">
+                    <thead>
+                      <tr className="border-b border-foreground/5">
+                        {["ID", "Subject", "Type", "File", "Action"].map((heading) => (
+                          <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resources.length ? (
+                        resources.map((resource) => (
+                          <tr key={asNumber(resource.id)} className="border-b border-foreground/5">
+                            <td className="px-3 py-2.5 text-xs">{asNumber(resource.id)}</td>
+                            <td className="px-3 py-2.5 text-xs">{asString(resource.subject_name)}</td>
+                            <td className="px-3 py-2.5 text-xs">{asString(resource.resource_type_name)}</td>
+                            <td className="px-3 py-2.5 text-xs">
+                              {asString(resource.resource_file_url) ? (
+                                <a href={asString(resource.resource_file_url)} target="_blank" rel="noopener noreferrer" className="block max-w-[280px] truncate hover:underline">
+                                  {asString(resource.title) || "Open file"}
+                                </a>
+                              ) : asString(resource.title) ? (
+                                <span className="block max-w-[280px] truncate">{asString(resource.title)}</span>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <form
+                                action={routes.adminResourceDelete(asNumber(resource.id))}
+                                method="post"
+                                onSubmit={(event) => submitConfirm(event, "Delete this resource?")}
+                              >
+                                <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
+                                <button className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive">Delete</button>
+                              </form>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-4 text-sm text-muted-foreground">
+                            No resources yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </ChartCard>
             </div>
           </div>
