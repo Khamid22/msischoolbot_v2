@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, ExternalLink, FileText, Loader2, MessageSquare, Play, Send, X } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Link, Loader2, MessageSquare, Play, Send, X } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/components/TelegramLayout";
 
 interface ResourceRow {
@@ -28,6 +28,7 @@ interface ResourceModalState {
   title: string;
   videoSrc?: string;
   fileUrl?: string;
+  linkUrl?: string;
   description?: string;
   resourceId: number;
 }
@@ -39,7 +40,24 @@ interface Comment {
   createdAt: string;
 }
 
-// ─── Comments section ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function isVideo(item: ResourceRow) {
+  return Boolean(item.resource_file_url && item.resource_file_kind === "video");
+}
+
+function buildModal(item: ResourceRow): ResourceModalState {
+  return {
+    title: item.title,
+    videoSrc: isVideo(item) ? item.resource_file_url : undefined,
+    fileUrl: item.resource_file_url || undefined,
+    linkUrl: item.resource_url || undefined,
+    description: item.description,
+    resourceId: item.id,
+  };
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
 
 function CommentsSection({ resourceId }: { resourceId: number }) {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -54,9 +72,7 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
     setLoading(true);
     fetch(`/api/resources/${resourceId}/comments`)
       .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) setComments(Array.isArray(data.comments) ? data.comments : []);
-      })
+      .then((data) => { if (!cancelled) setComments(Array.isArray(data.comments) ? data.comments : []); })
       .catch(() => { if (!cancelled) setComments([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -151,99 +167,51 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
   );
 }
 
-function buildResourceModalState(item: ResourceRow): ResourceModalState {
-  return {
-    title: item.title,
-    videoSrc:
-      item.resource_file_url && item.resource_file_kind === "video"
-        ? item.resource_file_url
-        : undefined,
-    fileUrl: item.resource_file_url || undefined,
-    description: item.description,
-    resourceId: item.id,
-  };
-}
+// ─── Resource card (used for ALL types — video, file, link) ──────────────────
 
-// ─── Video card ───────────────────────────────────────────────────────────────
-
-function VideoCard({
+function ResourceCard({
   item,
-  onPlay,
+  onOpen,
 }: {
   item: ResourceRow;
-  onPlay: (modal: ResourceModalState) => void;
+  onOpen: (modal: ResourceModalState) => void;
 }) {
+  const video = isVideo(item);
+  const hasThumb = !!item.thumbnail_url;
+
+  const icon = video
+    ? <Play className="h-4 w-4 translate-x-px" />
+    : item.resource_file_url
+    ? <FileText className="h-4 w-4" />
+    : <Link className="h-4 w-4" />;
+
+  const badge = video ? "Video" : item.resource_file_url ? "File" : "Link";
+
   return (
     <button
       type="button"
-      onClick={() => onPlay(buildResourceModalState(item))}
+      onClick={() => onOpen(buildModal(item))}
       className="group flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background text-left transition-[box-shadow,transform] duration-200 active:scale-[0.97] sm:w-56"
     >
-      {/* Thumbnail */}
+      {/* Thumbnail / icon area */}
       <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden bg-foreground/6">
-        {item.thumbnail_url ? (
+        {hasThumb ? (
           <img src={item.thumbnail_url} alt={item.title} className="absolute inset-0 h-full w-full object-cover" />
         ) : null}
         <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-foreground/80 text-background transition-transform duration-200 group-hover:scale-110">
-          <Play className="h-4 w-4 translate-x-px" />
+          {icon}
         </span>
       </div>
+
       {/* Info */}
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         <p className="line-clamp-2 text-xs font-bold leading-snug">{item.title}</p>
         {item.description ? (
           <p className="line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{item.description}</p>
         ) : null}
+        <p className="mt-auto text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">{badge}</p>
       </div>
     </button>
-  );
-}
-
-// ─── File / link row ──────────────────────────────────────────────────────────
-
-function FileRow({
-  item,
-  onOpenResource,
-}: {
-  item: ResourceRow;
-  onOpenResource: (modal: ResourceModalState) => void;
-}) {
-  const hasFile = !!item.resource_file_url;
-  const openDetails = () => onOpenResource(buildResourceModalState(item));
-
-  return (
-    <div className="flex w-full min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
-      <button
-        type="button"
-        onClick={openDetails}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          {hasFile ? <FileText className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold leading-tight">{item.title}</p>
-          {item.description ? (
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.description}</p>
-          ) : null}
-        </div>
-      </button>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={openDetails}
-          className="inline-flex h-8 items-center rounded-lg border border-foreground/15 px-2.5 text-[10px] font-bold"
-        >
-          Details
-        </button>
-        {hasFile ? (
-          <a href={item.resource_file_url} target="_blank" rel="noopener noreferrer"
-            className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[10px] font-bold text-background">
-            <FileText className="h-3 w-3" /> Open
-          </a>
-        ) : null}
-      </div>
-    </div>
   );
 }
 
@@ -251,14 +219,11 @@ function FileRow({
 
 function ResourceGroupCard({
   group,
-  onOpenResource,
+  onOpen,
 }: {
   group: ResourceGroup;
-  onOpenResource: (modal: ResourceModalState) => void;
+  onOpen: (modal: ResourceModalState) => void;
 }) {
-  const videos = group.resources.filter((r) => r.resource_file_url && r.resource_file_kind === "video");
-  const others = group.resources.filter((r) => !(r.resource_file_url && r.resource_file_kind === "video"));
-
   return (
     <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
       {/* Header */}
@@ -270,22 +235,13 @@ function ResourceGroupCard({
         </span>
       </div>
 
-      {/* Video scroll row */}
-      {videos.length > 0 ? (
+      {/* Horizontal scroll row for ALL resource types */}
+      {group.resources.length > 0 ? (
         <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-3 pt-1 sm:px-5">
-          {videos.map((item) => (
-            <VideoCard key={item.id} item={item} onPlay={onOpenResource} />
+          {group.resources.map((item) => (
+            <ResourceCard key={item.id} item={item} onOpen={onOpen} />
           ))}
           <div className="w-1 shrink-0" aria-hidden="true" />
-        </div>
-      ) : null}
-
-      {/* File / link list */}
-      {others.length > 0 ? (
-        <div className={`divide-y divide-foreground/5 pb-1 ${videos.length > 0 ? "border-t border-foreground/5" : ""}`}>
-          {others.map((item) => (
-            <FileRow key={item.id} item={item} onOpenResource={onOpenResource} />
-          ))}
         </div>
       ) : null}
     </div>
@@ -294,9 +250,16 @@ function ResourceGroupCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const fullscreenInsetStyle = {
+  paddingTop: "calc(var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px))) + var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px)))",
+  paddingRight: "calc(var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px))) + var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px)))",
+  paddingBottom: "calc(var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px))) + var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px)))",
+  paddingLeft: "calc(var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px))) + var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px)))",
+} as const;
+
 export default function ResourcesPage(props: ResourcesPageProps) {
   const [activeFilter, setActiveFilter] = useState("all");
-  const [resourceModal, setResourceModal] = useState<ResourceModalState | null>(null);
+  const [modal, setModal] = useState<ResourceModalState | null>(null);
 
   const groupedResources = Array.isArray(props.groupedResources) ? props.groupedResources : [];
   const totalCount = groupedResources.reduce((sum, g) => sum + g.resources.length, 0);
@@ -304,17 +267,6 @@ export default function ResourcesPage(props: ResourcesPageProps) {
     activeFilter === "all"
       ? groupedResources
       : groupedResources.filter((_g, i) => activeFilter === `group-${i + 1}`);
-
-  const fullscreenInsetStyle = {
-    paddingTop:
-      "calc(var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px))) + var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px)))",
-    paddingRight:
-      "calc(var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px))) + var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px)))",
-    paddingBottom:
-      "calc(var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px))) + var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px)))",
-    paddingLeft:
-      "calc(var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px))) + var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px)))",
-  } as const;
 
   return (
     <TelegramLayout
@@ -334,7 +286,8 @@ export default function ResourcesPage(props: ResourcesPageProps) {
         />
       }
     >
-      <div className="space-y-3 animate-in pb-6 sm:space-y-4">
+      <div className="animate-in space-y-3 pb-6 sm:space-y-4">
+
         {/* Type filter */}
         {groupedResources.length > 1 ? (
           <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
@@ -378,7 +331,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
             <ResourceGroupCard
               key={activeFilter === "all" ? `g-${i}` : activeFilter}
               group={group}
-              onOpenResource={setResourceModal}
+              onOpen={setModal}
             />
           ))
         ) : (
@@ -388,63 +341,70 @@ export default function ResourcesPage(props: ResourcesPageProps) {
         )}
       </div>
 
-      {/* Resource details modal */}
-      {resourceModal ? (
+      {/* Resource modal */}
+      {modal ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/60"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-2 sm:p-4"
           style={fullscreenInsetStyle}
-          onClick={() => setResourceModal(null)}
+          onClick={() => setModal(null)}
         >
           <div
-            className="flex h-full w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover sm:h-auto sm:max-h-[96dvh] sm:max-w-3xl sm:rounded-2xl"
+            className="flex w-full max-w-2xl max-h-[82dvh] flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover sm:max-h-[88dvh]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal header */}
+            {/* Header */}
             <div className="flex min-w-0 shrink-0 items-center justify-between gap-3 border-b border-foreground/5 px-4 py-3">
-              <h3 className="min-w-0 truncate text-sm font-bold">{resourceModal.title}</h3>
-              <button type="button" onClick={() => setResourceModal(null)}
+              <h3 className="min-w-0 truncate text-sm font-bold">{modal.title}</h3>
+              <button type="button" onClick={() => setModal(null)}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {resourceModal.videoSrc ? (
-              <div className="w-full shrink-0 bg-black sm:aspect-video">
+            {/* Video player */}
+            {modal.videoSrc ? (
+              <div className="w-full shrink-0 bg-black">
                 <video
                   className="h-full w-full object-contain"
                   controls autoPlay playsInline preload="metadata"
-                  src={resourceModal.videoSrc}
+                  src={modal.videoSrc}
                   style={{ maxHeight: "40dvh" }}
                 />
               </div>
             ) : null}
 
+            {/* Scrollable body */}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {resourceModal.fileUrl ? (
+              {/* Open buttons */}
+              {(modal.fileUrl || modal.linkUrl) ? (
                 <div className="border-b border-foreground/5 px-4 py-3 sm:px-5">
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Open Resource</p>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Open</p>
                   <div className="flex flex-wrap gap-2">
-                    {resourceModal.fileUrl ? (
-                      <a
-                        href={resourceModal.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[10px] font-bold text-background"
-                      >
+                    {modal.fileUrl && !modal.videoSrc ? (
+                      <a href={modal.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-[10px] font-bold text-background">
                         <FileText className="h-3 w-3" /> Open File
+                      </a>
+                    ) : null}
+                    {modal.linkUrl ? (
+                      <a href={modal.linkUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/15 px-3 text-[10px] font-bold">
+                        <ExternalLink className="h-3 w-3" /> Open Link
                       </a>
                     ) : null}
                   </div>
                 </div>
               ) : null}
 
-              {resourceModal.description ? (
+              {/* Description */}
+              {modal.description ? (
                 <div className="border-b border-foreground/5 px-4 py-3 sm:px-5">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Description</p>
-                  <p className="text-xs leading-relaxed">{resourceModal.description}</p>
+                  <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</p>
+                  <p className="text-xs leading-relaxed">{modal.description}</p>
                 </div>
               ) : null}
-              <CommentsSection resourceId={resourceModal.resourceId} />
+
+              <CommentsSection resourceId={modal.resourceId} />
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 SCOPES = ("https://www.googleapis.com/auth/spreadsheets.readonly",)
-CACHE_TTL_SECONDS = int(os.environ.get("SHEETS_CACHE_TTL_SECONDS", "600"))
+CACHE_TTL_SECONDS = int(os.environ.get("SHEETS_CACHE_TTL_SECONDS", "1800"))
 WEBHOOK_MAX_STALE_SECONDS = int(
     os.environ.get("SHEETS_WEBHOOK_MAX_STALE_SECONDS", "21600")
 )

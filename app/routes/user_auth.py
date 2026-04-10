@@ -237,7 +237,7 @@ def register_user_auth_routes(
         role_hint = detect_login_role(login_value)
         if not role_hint:
             return render_login_page(
-                auth_error="Login must start with Staff#####, MSI#####, or MSIS#####.",
+                auth_error="Login must be admin, Staff#####, MSI#####, or MSIS#####.",
                 auth_login_input=login_value,
             ), 400
 

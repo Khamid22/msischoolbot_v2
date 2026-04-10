@@ -6,8 +6,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.storage import queries
 
-_OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "staff280902") or "staff280902").strip()
-_OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "Khamid007") or "Khamid007").strip()
+_OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "admin") or "admin").strip()
+_OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "Msischool2026") or "Msischool2026").strip()
 _DEFAULT_SCHOOL_NAME = "School 5"
 _DEFAULT_SCHOOL_CODE = "school5"
 _SCHOOL_DISPLAY_NAMES = {
@@ -62,21 +62,72 @@ def _ensure_students_schema(conn):
 
 
 def _ensure_owner_admin(conn):
-    owner = queries.get_admin_id_by_login(conn, _OWNER_LOGIN)
-    if owner:
+    desired_login = _OWNER_LOGIN
+    desired_password_hash = generate_password_hash(_OWNER_PASSWORD)
+
+    # If the desired login already exists, enforce it as the single owner account.
+    existing_desired_login = queries.get_admin_id_by_login(conn, desired_login)
+    if existing_desired_login:
+        target_id = int(existing_desired_login["id"])
+        conn.execute(
+            """
+            UPDATE admins
+            SET password_hash = ?, role = 'owner', is_owner = 1
+            WHERE id = ?
+            """,
+            (desired_password_hash, target_id),
+        )
+        conn.execute(
+            """
+            UPDATE admins
+            SET role = 'admin', is_owner = 0
+            WHERE is_owner = 1 AND id != ?
+            """,
+            (target_id,),
+        )
+        return
+
+    # Otherwise migrate an existing owner account (if any) to the desired login.
+    owner_row = conn.execute(
+        """
+        SELECT id
+        FROM admins
+        WHERE is_owner = 1
+        ORDER BY id ASC
+        LIMIT 1
+        """
+    ).fetchone()
+    if owner_row:
+        owner_id = int(owner_row["id"])
+        conn.execute(
+            """
+            UPDATE admins
+            SET login = ?, password_hash = ?, role = 'owner', is_owner = 1
+            WHERE id = ?
+            """,
+            (desired_login, desired_password_hash, owner_id),
+        )
+        conn.execute(
+            """
+            UPDATE admins
+            SET role = 'admin', is_owner = 0
+            WHERE is_owner = 1 AND id != ?
+            """,
+            (owner_id,),
+        )
         return
 
     queries.insert_owner_admin(
         conn,
-        _OWNER_LOGIN,
-        generate_password_hash(_OWNER_PASSWORD),
+        desired_login,
+        desired_password_hash,
         _utc_now_iso(),
     )
 
 
 def detect_login_role(login):
     normalized = (login or "").strip().casefold()
-    if normalized.startswith("staff"):
+    if normalized == "admin" or normalized.startswith("staff"):
         return "admin"
     if normalized.startswith("msi"):
         return "student"

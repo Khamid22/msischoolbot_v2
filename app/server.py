@@ -23,6 +23,7 @@ from app.routes.students.student_page import register_student_page_routes
 from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
 from app.routes.webhooks import register_webhook_routes
 from app.storage.db_config import get_auth_db_path
+from app.integrations.sheets.background_refresh import start_background_refresh
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "web")
@@ -787,3 +788,4 @@ register_webhook_routes(
 )
 register_system_routes(app)
 register_admin_upload_progress_ws()
+start_background_refresh()
