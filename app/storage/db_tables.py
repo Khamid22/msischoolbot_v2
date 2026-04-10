@@ -765,6 +765,27 @@ def ensure_resources_schema(conn):
     )
 
 
+def ensure_resource_comments_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS resource_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resource_id INTEGER NOT NULL,
+            author_name TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(resource_id) REFERENCES resources(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_comments_resource_id
+        ON resource_comments(resource_id, created_at)
+        """
+    )
+
+
 __all__ = [
     "create_tables",
     "ensure_admins_schema",
@@ -773,4 +794,5 @@ __all__ = [
     "ensure_lesson_catalog_schema",
     "ensure_subject_summaries_schema",
     "ensure_resources_schema",
+    "ensure_resource_comments_schema",
 ]

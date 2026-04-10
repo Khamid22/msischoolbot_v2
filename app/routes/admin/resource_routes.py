@@ -127,7 +127,7 @@ def register_admin_resource_routes(
         folder_path = request.form.get("resource_folder_path", "").strip()
         title = request.form.get("resource_title", "").strip()
         description = request.form.get("resource_description", "").strip()
-        resource_url = request.form.get("resource_url", "").strip()
+        resource_url = ""
 
         uploaded_resource = request.files.get("resource_file")
         uploaded_file_path = ""
@@ -160,10 +160,20 @@ def register_admin_resource_routes(
                     400,
                 )
         else:
-            publish_progress(
-                percent=60.0,
-                stage="saving",
-                message="Saving resource...",
+            fail_upload(
+                upload_id,
+                message="Please upload a resource file.",
+                percent=4.0,
+                stage="upload_error",
+            )
+            if is_xhr_request():
+                return xhr_error("Please upload a resource file.")
+            return (
+                render_admin_page(
+                    auth_error="Please upload a resource file.",
+                    admin_panel="resources",
+                ),
+                400,
             )
 
         uploaded_thumbnail = request.files.get("thumbnail_file")

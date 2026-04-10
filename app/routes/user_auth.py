@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from flask import current_app, redirect, request, session, url_for
 
 from app.web.render import render_admin_redirect
@@ -100,9 +102,26 @@ def _load_admin_handoff_payload(raw_token):
 
 
 def _is_telegram_mini_app_request():
-    if parse_telegram_user_id(request.args.get("tg_user_id")) is not None:
+    if parse_telegram_user_id(request.values.get("tg_user_id")) is not None:
         return True
-    return bool(str(request.args.get("tgWebAppData", "")).strip())
+    if bool(str(request.values.get("tgWebAppData", "")).strip()):
+        return True
+
+    referrer = str(request.referrer or "").strip()
+    if not referrer:
+        return False
+
+    try:
+        referrer_params = parse_qs(urlparse(referrer).query or "")
+    except Exception:
+        return False
+
+    if bool((referrer_params.get("tgWebAppData") or [""])[0].strip()):
+        return True
+    return (
+        parse_telegram_user_id((referrer_params.get("tg_user_id") or [""])[0])
+        is not None
+    )
 
 
 def register_user_auth_routes(
@@ -223,6 +242,12 @@ def register_user_auth_routes(
             ), 400
 
         if role_hint == "admin":
+            if _is_telegram_mini_app_request():
+                return render_login_page(
+                    auth_error="Admin access is available on the website only.",
+                    auth_login_input="",
+                ), 403
+
             admin = verify_admin_credentials(login_value, password_value)
             if not admin:
                 return render_login_page(

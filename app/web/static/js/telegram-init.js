@@ -34,6 +34,7 @@
   let viewportPrepared = false;
   let fullscreenRequested = false;
   let swipeLockApplied = false;
+  let collapseFallbackBound = false;
   let nativeBackHandler = null;
   let backFallbackTimer = 0;
   const cssPixelValues = Object.create(null);
@@ -200,6 +201,47 @@
     }
   };
 
+  // Fallback for older Telegram clients (pre-7.7) where disableVerticalSwipes()
+  // is unavailable and swipe-down may collapse the mini app.
+  const ensureDocumentIsScrollable = function () {
+    const viewportHeight = Number(
+      window.innerHeight || document.documentElement.clientHeight || 0
+    );
+    const documentHeight = Number(document.documentElement.scrollHeight || 0);
+    if (viewportHeight > 0 && documentHeight <= viewportHeight) {
+      document.documentElement.style.setProperty(
+        "min-height",
+        "calc(100dvh + 1px)"
+      );
+      document.body.style.setProperty("min-height", "calc(100dvh + 1px)");
+    }
+  };
+
+  const preventCollapseOnTopSwipe = function () {
+    if (window.scrollY <= 0) {
+      window.scrollTo(0, 1);
+    }
+  };
+
+  const bindCollapseFallback = function () {
+    if (collapseFallbackBound) {
+      return;
+    }
+    if (typeof webApp.disableVerticalSwipes === "function") {
+      return;
+    }
+
+    collapseFallbackBound = true;
+    ensureDocumentIsScrollable();
+    window.setTimeout(ensureDocumentIsScrollable, 100);
+    document.addEventListener("touchstart", preventCollapseOnTopSwipe, {
+      passive: true,
+    });
+    window.addEventListener("resize", ensureDocumentIsScrollable, {
+      passive: true,
+    });
+  };
+
   const prepareViewport = function () {
     setAppHeight();
     if (viewportPrepared) {
@@ -295,6 +337,7 @@
   document.documentElement.classList.add("tg-miniapp");
   document.body.classList.add("tg-miniapp");
   prepareViewport();
+  bindCollapseFallback();
   configureNativeBackButton();
 
   const loginTelegramUserIdInput = document.getElementById("loginTelegramUserId");

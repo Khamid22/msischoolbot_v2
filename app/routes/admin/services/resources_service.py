@@ -386,8 +386,9 @@ def create_resource(
     normalized_url = str(resource_url or "").strip()
     normalized_file_path = str(resource_file_path or "").strip()
     normalized_thumbnail_path = str(thumbnail_file_path or "").strip()
-    if not normalized_url and not normalized_file_path:
-        return False, "Provide either a resource link or an uploaded file."
+    if not normalized_file_path:
+        return False, "Please upload a resource file."
+    normalized_url = ""
 
     try:
         type_id = int(resource_type_id)

@@ -48,6 +48,7 @@ def init_storage():
             queries.ensure_lesson_catalog_schema(conn)
             queries.ensure_subject_summaries_schema(conn)
             queries.ensure_resources_schema(conn)
+            queries.ensure_resource_comments_schema(conn)
             queries.ensure_default_resource_types(conn, _utc_now_iso())
             _ensure_owner_admin(conn)
             conn.commit()

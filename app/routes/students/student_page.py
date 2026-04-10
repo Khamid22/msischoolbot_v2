@@ -6,6 +6,7 @@ from app.web.render import render_react_page
 from app.routes.user_auth import register_user_auth_routes
 from app.routes.students.dashboard import register_dashboard_routes
 from app.routes.students.rating_board import register_rating_board_routes
+from app.routes.students.comment_routes import register_comment_routes
 from app.routes.students.resources import register_resources_routes
 from app.routes.students.services.page_service import build_student_panel_context
 from app.routes.students.services.session_state_service import (
@@ -114,4 +115,5 @@ def register_student_page_routes(
         students,
         load_dashboard_payload=load_dashboard_payload,
     )
+    register_comment_routes(students)
     app.register_blueprint(students)

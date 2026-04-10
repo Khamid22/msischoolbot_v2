@@ -65,11 +65,9 @@
   }
 
   html, body, #root {
-    height: 100dvh;
+    min-height: 100dvh;
     margin: 0;
     padding: 0;
-    overflow: hidden;
-    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -77,6 +75,20 @@
     -webkit-text-size-adjust: 100%;
     font-family: var(--font-body);
     @apply bg-background text-foreground;
+  }
+
+  html,
+  body {
+    overflow-y: auto;
+  }
+
+  /* Apply strict viewport/scroll lock only inside Telegram Mini App. */
+  html.tg-miniapp,
+  html.tg-miniapp body,
+  html.tg-miniapp #root {
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior-y: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
