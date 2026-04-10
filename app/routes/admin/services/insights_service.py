@@ -518,9 +518,12 @@ def build_admin_subject_info(metrics, dataset = None, school_option_catalog = No
                 for month_key in group_scores.keys()
             }
         )
-        # Keep only months that actually have lesson data so summer gaps are not
-        # injected into the timeline.
-        month_range_values = list(month_keys)
+        # Fill the full range from the first lesson month to the current month
+        # so the chart always shows a continuous timeline (no skipped months).
+        if month_keys:
+            month_range_values = month_range(month_keys[0], current_month_key)
+        else:
+            month_range_values = []
         monthly_series = []
         for group_name, month_scores in monthly_subject_bucket.items():
             label = format_group_label(school_name, group_name)

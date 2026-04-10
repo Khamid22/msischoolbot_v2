@@ -64,14 +64,13 @@
     @apply border-border;
   }
 
-  /* 🔒 CRITICAL FIXES FOR TELEGRAM MINI APPS */
   html, body {
     margin: 0;
     padding: 0;
-    height: 100%; /* Lock to exact viewport */
-    width: 100%;
-    overflow: hidden; /* 🔒 Stops body-level scrolling */
-    overscroll-behavior: none; /* 🔒 Disables pull-to-close & pull-to-refresh */
+    /* Let the shell div (h-[100dvh] overflow-hidden) own the clipping.
+       body must NOT be overflow:hidden — that breaks regular browsers
+       and prevents child scroll containers from receiving touch events. */
+    overscroll-behavior: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;

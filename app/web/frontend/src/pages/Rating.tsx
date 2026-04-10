@@ -87,8 +87,8 @@ export default function RatingPage(props: RatingPageProps) {
                     className={`border-b border-foreground/5 ${row.studentId === props.currentStudentId ? "bg-info/5" : "hover:bg-muted/40"}`}
                   >
                     <td className="w-6 px-1.5 py-2 text-[10px] font-bold sm:px-3 sm:text-xs">{index + 1}</td>
-                    <td className="max-w-[90px] px-1.5 py-2 sm:max-w-[200px] sm:px-3">
-                      <span className="block truncate text-[10px] font-medium sm:text-xs">{row.displayName}</span>
+                    <td className="w-[90px] px-1.5 py-2 sm:w-auto sm:max-w-[200px] sm:px-3">
+                      <span className="block break-words text-[10px] font-medium leading-snug sm:text-xs">{row.displayName}</span>
                     </td>
                     <td className="max-w-[52px] px-1.5 py-2 sm:px-3">
                       <span className="block truncate text-[10px] text-muted-foreground sm:text-xs">{row.group}</span>

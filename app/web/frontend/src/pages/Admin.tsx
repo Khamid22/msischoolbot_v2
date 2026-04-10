@@ -564,8 +564,8 @@ export default function AdminPage(props: AdminPageProps) {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <header className="tg-safe-top fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 backdrop-blur">
-        <div className="tg-miniapp-nav-offset mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 backdrop-blur" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
           <a href={`/?panel=overview&school=${encodeURIComponent(currentSchool)}`} className="flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold">
             <GraduationCap className="h-5 w-5" />
             MSI
@@ -604,7 +604,7 @@ export default function AdminPage(props: AdminPageProps) {
           </form>
         </div>
         {mobileNavOpen ? (
-          <div id="admin-mobile-nav" className="tg-miniapp-nav-offset border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
+          <div id="admin-mobile-nav" className="border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
             <nav className="grid grid-cols-2 gap-2" aria-label="Admin mobile navigation">
               {tabs.map((tab) => (
                 <button
@@ -623,7 +623,7 @@ export default function AdminPage(props: AdminPageProps) {
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 pb-4 pt-[calc(var(--admin-topbar-offset-mobile)+var(--tg-safe-offset))] sm:px-4 sm:pt-[calc(var(--admin-topbar-offset-desktop)+var(--tg-safe-offset))] md:px-6">
+      <main className="mx-auto w-full max-w-6xl px-3 pb-4 pt-16 sm:px-4 md:px-6">
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
         {resourceUploadState.active && activeTab !== "resources" ? (
@@ -898,6 +898,7 @@ export default function AdminPage(props: AdminPageProps) {
 
         {activeTab === "students" ? (
           <div className="space-y-4">
+            <div className="sticky top-16 z-30 -mx-3 bg-background px-3 pb-3 pt-1 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6">
             <div className="flex flex-col gap-3 sm:flex-row">
               <label className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -924,6 +925,7 @@ export default function AdminPage(props: AdminPageProps) {
                   ))}
                 </select>
               </form>
+            </div>
             </div>
 
             <ChartCard title="Students" subtitle={`${filteredStudents.length} results`} icon={<Users className="h-4 w-4 text-info" />}>

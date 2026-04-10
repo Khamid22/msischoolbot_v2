@@ -20,14 +20,11 @@ interface ResourceGroup {
 interface ResourcesPageProps {
   backUrl?: string;
   subjectName?: string;
-  currentStudent?: {
-    fullName?: string;
-    group?: string;
-  };
+  currentStudent?: { fullName?: string; group?: string };
   groupedResources?: ResourceGroup[];
 }
 
-// ─── Video card (used in horizontal scroll row) ───────────────────────────────
+// ─── Video card ───────────────────────────────────────────────────────────────
 
 function VideoCard({
   item,
@@ -40,27 +37,22 @@ function VideoCard({
     <button
       type="button"
       onClick={() => onPlay(item.title, item.resource_file_url || "")}
-      className="group flex w-36 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background text-left transition-[box-shadow,transform] duration-200 active:scale-[0.97] sm:w-44"
+      className="group flex w-44 shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background text-left transition-[box-shadow,transform] duration-200 active:scale-[0.97] sm:w-56"
     >
       {/* Thumbnail */}
       <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden bg-foreground/6">
         {item.thumbnail_url ? (
-          <img
-            src={item.thumbnail_url}
-            alt={item.title}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          <img src={item.thumbnail_url} alt={item.title} className="absolute inset-0 h-full w-full object-cover" />
         ) : null}
-        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-foreground/80 text-background transition-transform duration-200 group-hover:scale-110">
-          <Play className="h-3.5 w-3.5 translate-x-px" />
+        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-foreground/80 text-background transition-transform duration-200 group-hover:scale-110">
+          <Play className="h-4 w-4 translate-x-px" />
         </span>
       </div>
-
       {/* Info */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5 p-2">
-        <p className="line-clamp-2 text-[11px] font-bold leading-snug">{item.title}</p>
+      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
+        <p className="line-clamp-2 text-xs font-bold leading-snug">{item.title}</p>
         {item.description ? (
-          <p className="line-clamp-1 text-[10px] text-muted-foreground">{item.description}</p>
+          <p className="line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{item.description}</p>
         ) : null}
       </div>
     </button>
@@ -74,49 +66,33 @@ function FileRow({ item }: { item: ResourceRow }) {
   const hasLink = !!item.resource_url;
 
   return (
-    <div className="flex w-full min-w-0 items-center gap-2 px-3 py-2.5 sm:px-4">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+    <div className="flex w-full min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
         {hasFile ? <FileText className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
       </span>
-
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-bold leading-tight">{item.title}</p>
+        <p className="text-xs font-bold leading-tight">{item.title}</p>
         {item.description ? (
-          <p className="truncate text-[10px] text-muted-foreground">{item.description}</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.description}</p>
         ) : null}
       </div>
-
       <div className="flex shrink-0 items-center gap-1.5">
         {hasFile ? (
-          <a
-            href={item.resource_file_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[10px] font-bold text-background"
-          >
-            <FileText className="h-3 w-3" />
-            Open
+          <a href={item.resource_file_url} target="_blank" rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[10px] font-bold text-background">
+            <FileText className="h-3 w-3" /> Open
           </a>
         ) : null}
         {!hasFile && hasLink ? (
-          <a
-            href={item.resource_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/15 px-2.5 text-[10px] font-bold"
-          >
-            <ExternalLink className="h-3 w-3" />
-            Open
+          <a href={item.resource_url} target="_blank" rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/15 px-2.5 text-[10px] font-bold">
+            <ExternalLink className="h-3 w-3" /> Open
           </a>
         ) : null}
         {hasFile && hasLink ? (
-          <a
-            href={item.resource_url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <a href={item.resource_url} target="_blank" rel="noopener noreferrer"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/15"
-            aria-label="Reference link"
-          >
+            aria-label="Reference link">
             <ExternalLink className="h-3 w-3" />
           </a>
         ) : null}
@@ -125,7 +101,7 @@ function FileRow({ item }: { item: ResourceRow }) {
   );
 }
 
-// ─── Group card (no negative margins — scroll sits inside padded card edges) ──
+// ─── Group card ───────────────────────────────────────────────────────────────
 
 function ResourceGroupCard({
   group,
@@ -134,38 +110,33 @@ function ResourceGroupCard({
   group: ResourceGroup;
   onPlayVideo: (title: string, src: string) => void;
 }) {
-  const videos = group.resources.filter(
-    (r) => r.resource_file_url && r.resource_file_kind === "video",
-  );
-  const others = group.resources.filter(
-    (r) => !(r.resource_file_url && r.resource_file_kind === "video"),
-  );
+  const videos = group.resources.filter((r) => r.resource_file_url && r.resource_file_kind === "video");
+  const others = group.resources.filter((r) => !(r.resource_file_url && r.resource_file_kind === "video"));
 
   return (
     <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
       {/* Header */}
       <div className="flex min-w-0 items-center gap-2 px-4 pb-2 pt-3 sm:px-5 sm:pt-4">
         <BookOpen className="h-4 w-4 shrink-0 text-info" />
-        <h3 className="min-w-0 flex-1 truncate text-sm font-bold">{group.resource_type_name}</h3>
+        <h3 className="min-w-0 flex-1 text-sm font-bold">{group.resource_type_name}</h3>
         <span className="shrink-0 text-xs text-muted-foreground">
           {group.resources.length} item{group.resources.length === 1 ? "" : "s"}
         </span>
       </div>
 
-      {/* Video horizontal scroll — padding matches card edges, no negative margins */}
+      {/* Video scroll row */}
       {videos.length > 0 ? (
-        <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-3 pt-1 sm:px-5">
+        <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-3 pt-1 sm:px-5">
           {videos.map((item) => (
             <VideoCard key={item.id} item={item} onPlay={onPlayVideo} />
           ))}
-          {/* trailing space so last card isn't flush with right edge */}
           <div className="w-1 shrink-0" aria-hidden="true" />
         </div>
       ) : null}
 
       {/* File / link list */}
       {others.length > 0 ? (
-        <div className={`divide-y divide-foreground/5 ${videos.length > 0 ? "border-t border-foreground/5" : ""} pb-1`}>
+        <div className={`divide-y divide-foreground/5 pb-1 ${videos.length > 0 ? "border-t border-foreground/5" : ""}`}>
           {others.map((item) => (
             <FileRow key={item.id} item={item} />
           ))}
@@ -207,23 +178,17 @@ export default function ResourcesPage(props: ResourcesPageProps) {
       }
     >
       <div className="space-y-3 animate-in pb-6 sm:space-y-4">
-
-        {/* Type filter — only shown when there are multiple groups */}
+        {/* Type filter */}
         {groupedResources.length > 1 ? (
           <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
             <div className="px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Filter by type
-              </p>
-              {/* Scroll container: overflow-x-auto, no negative margins */}
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Filter by type</p>
               <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5">
                 <button
                   type="button"
                   onClick={() => setActiveFilter("all")}
                   className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    activeFilter === "all"
-                      ? "bg-foreground text-background"
-                      : "bg-muted text-foreground"
+                    activeFilter === "all" ? "bg-foreground text-background" : "bg-muted text-foreground"
                   }`}
                 >
                   All <span className="opacity-60">{totalCount}</span>
@@ -236,9 +201,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
                       type="button"
                       onClick={() => setActiveFilter(key)}
                       className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        activeFilter === key
-                          ? "bg-foreground text-background"
-                          : "bg-muted text-foreground"
+                        activeFilter === key ? "bg-foreground text-background" : "bg-muted text-foreground"
                       }`}
                     >
                       {group.resource_type_name}
@@ -263,9 +226,7 @@ export default function ResourcesPage(props: ResourcesPageProps) {
           ))
         ) : (
           <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-card">
-            <p className="text-sm text-muted-foreground">
-              No resources are available for this subject yet.
-            </p>
+            <p className="text-sm text-muted-foreground">No resources are available for this subject yet.</p>
           </div>
         )}
       </div>
@@ -282,21 +243,15 @@ export default function ResourcesPage(props: ResourcesPageProps) {
           >
             <div className="flex min-w-0 items-center justify-between gap-3 border-b border-foreground/5 px-4 py-3">
               <h3 className="min-w-0 truncate text-sm font-bold">{videoModal.title}</h3>
-              <button
-                type="button"
-                onClick={() => setVideoModal(null)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
-              >
+              <button type="button" onClick={() => setVideoModal(null)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="w-full bg-black sm:aspect-video">
               <video
                 className="h-full w-full object-contain"
-                controls
-                autoPlay
-                playsInline
-                preload="metadata"
+                controls autoPlay playsInline preload="metadata"
                 src={videoModal.src}
                 style={{ maxHeight: "70dvh" }}
               />

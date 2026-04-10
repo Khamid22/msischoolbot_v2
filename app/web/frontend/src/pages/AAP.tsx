@@ -84,7 +84,7 @@ export default function AAPPage(props: AapPageProps) {
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
                             <strong className="text-xs">{row.aap_display}</strong>
-                            <ProgressBar value={row.progress_width} className="h-1.5 w-20" />
+                            <ProgressBar value={row.progress_width} className="h-2 min-w-[5rem] flex-1" />
                           </div>
                           <p className="mt-0.5 text-[10px] font-semibold">{row.remark}</p>
                         </td>
