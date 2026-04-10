@@ -27,7 +27,9 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         entryFileNames: "app.js",
-        chunkFileNames: "chunks/[name].js",
+        // Add content hash so browsers can cache chunks indefinitely.
+        // The hash changes only when the chunk content changes.
+        chunkFileNames: "chunks/[name]-[hash].js",
         assetFileNames: (assetInfo) => {
           if (assetInfo.name && assetInfo.name.endsWith(".css")) {
             return "app.css";

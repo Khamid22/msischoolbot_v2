@@ -2,6 +2,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import threading
 import time
 from datetime import timedelta
@@ -702,6 +703,11 @@ def _load_dashboard_payload(
     return payload, dataset, None
 
 
+# Vite content-hashed chunks: name-HASH.js, where HASH is 6+ base62 chars.
+# These are immutable — the hash changes on code change, so they can be cached forever.
+_HASHED_CHUNK_RE = re.compile(r"/chunks/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css)$")
+
+
 @app.after_request
 def add_common_headers(response):
     # Apply shared security/cache headers for every response.
@@ -712,7 +718,11 @@ def add_common_headers(response):
         response.headers["Cache-Control"] = "no-store, max-age=0"
 
     if request.path.startswith("/static/react/") or request.path.startswith("/static/js/bundles/"):
-        response.headers["Cache-Control"] = "no-store, max-age=0"
+        # Hashed chunks are immutable; app.js / app.css have no hash so must not be cached.
+        if _HASHED_CHUNK_RE.search(request.path):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-store, max-age=0"
 
     if request.path.startswith("/static/") and "Cache-Control" not in response.headers:
         response.headers["Cache-Control"] = "public, max-age=2592000, immutable"

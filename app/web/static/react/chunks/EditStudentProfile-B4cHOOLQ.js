@@ -1,4 +1,4 @@
-import{r as f,j as e}from"../app.js";import{T as g,a as j}from"./TelegramLayout.js";import{C as s}from"./ChartCard.js";import{U as b}from"./Avatar.js";import{F as u}from"./PortalCard.js";import{U as n}from"./user.js";import{c as v}from"./createLucideIcon.js";import{T as N}from"./trash-2.js";import"./graduation-cap.js";/**
+import{r as f,j as e}from"../app.js";import{T as g,a as j}from"./TelegramLayout-CdGFISkH.js";import{C as s}from"./ChartCard-B4hKlw9t.js";import{U as b}from"./Avatar-F2xpFTa4.js";import{F as u}from"./PortalCard-BVJnuZoF.js";import{U as n}from"./user-BicUO34-.js";import{c as v}from"./createLucideIcon-CoJhLPZd.js";import{T as N}from"./trash-2-cxMI7r3C.js";import"./graduation-cap-Crkq1O8G.js";/**
  * @license lucide-react v0.462.0 - ISC
  *
  * This source code is licensed under the ISC license.

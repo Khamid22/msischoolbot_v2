@@ -1,4 +1,4 @@
-import{r as c,j as e}from"../app.js";import{T as w,a as S}from"./TelegramLayout.js";import{X as _}from"./x.js";import{c as g}from"./createLucideIcon.js";import{M as C}from"./message-square.js";import{L as N,S as L}from"./send.js";import{B as M}from"./book-open.js";/**
+import{r as c,j as e}from"../app.js";import{T as w,a as S}from"./TelegramLayout-CdGFISkH.js";import{X as _}from"./x-DXvfoO2m.js";import{c as g}from"./createLucideIcon-CoJhLPZd.js";import{M as C}from"./message-square-CXNMr9xE.js";import{L as N,S as L}from"./send-WMzmUusc.js";import{B as M}from"./book-open-CnxRhZQN.js";/**
  * @license lucide-react v0.462.0 - ISC
  *
  * This source code is licensed under the ISC license.
