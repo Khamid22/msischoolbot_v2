@@ -158,6 +158,16 @@ export default function ResourcesPage(props: ResourcesPageProps) {
     activeFilter === "all"
       ? groupedResources
       : groupedResources.filter((_g, i) => activeFilter === `group-${i + 1}`);
+  const fullscreenInsetStyle = {
+    paddingTop:
+      "calc(var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px))) + var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px)))",
+    paddingRight:
+      "calc(var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px))) + var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px)))",
+    paddingBottom:
+      "calc(var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px))) + var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px)))",
+    paddingLeft:
+      "calc(var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px))) + var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px)))",
+  } as const;
 
   return (
     <TelegramLayout
@@ -234,11 +244,12 @@ export default function ResourcesPage(props: ResourcesPageProps) {
       {/* Video modal */}
       {videoModal ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/60 sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/60"
+          style={fullscreenInsetStyle}
           onClick={() => setVideoModal(null)}
         >
           <div
-            className="flex max-h-[96dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover sm:max-w-3xl sm:rounded-2xl"
+            className="flex h-full w-full max-h-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover sm:h-auto sm:max-h-[96dvh] sm:max-w-3xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex min-w-0 items-center justify-between gap-3 border-b border-foreground/5 px-4 py-3">

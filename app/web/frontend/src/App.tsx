@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import { readBootstrap } from "./lib/bootstrap";
+import { useTelegramSafeArea } from "./hooks/useTelegramSafeArea";
 
 const bootstrap = readBootstrap();
 
@@ -18,18 +19,22 @@ const pageMap = {
 
 const ResolvedPage = pageMap[bootstrap.page] || pageMap["student-not-found"];
 
-const App = () => (
-  <Suspense
-    fallback={
-      <div className="flex min-h-[var(--tg-viewport-height)] items-center justify-center bg-background px-4">
-        <div className="rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-muted-foreground shadow-card">
-          Loading...
+const App = () => {
+  useTelegramSafeArea();
+
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[var(--tg-viewport-height)] items-center justify-center bg-background px-4">
+          <div className="rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-muted-foreground shadow-card">
+            Loading...
+          </div>
         </div>
-      </div>
-    }
-  >
-    <ResolvedPage {...bootstrap.props} />
-  </Suspense>
-);
+      }
+    >
+      <ResolvedPage {...bootstrap.props} />
+    </Suspense>
+  );
+};
 
 export default App;

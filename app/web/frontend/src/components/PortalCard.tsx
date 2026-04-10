@@ -9,17 +9,33 @@ interface CenteredPageProps {
 
 export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
   return (
-    <div className="tg-centered-page flex items-center justify-center bg-background">
-      <div className="w-full max-w-md">
-        <div className="rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-card">
-              <GraduationCap className="h-7 w-7" />
+    <div
+      className="flex h-[100dvh] flex-col overflow-y-auto bg-background"
+      style={{
+        paddingTop:
+          "calc(var(--safe-top, var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))) + 1rem)",
+        paddingRight:
+          "max(0.75rem, calc(var(--safe-right, var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px))) + 0.5rem))",
+        paddingBottom:
+          "calc(var(--safe-bottom, var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + 1rem)",
+        paddingLeft:
+          "max(0.75rem, calc(var(--safe-left, var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px))) + 0.5rem))",
+        overscrollBehaviorY: "contain",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <div className="flex min-h-full flex-1 items-center justify-center">
+        <div className="w-full max-w-md">
+          <div className="rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8">
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-card">
+                <GraduationCap className="h-7 w-7" />
+              </div>
+              <h1 className="font-display text-xl font-bold sm:text-2xl">{title}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
             </div>
-            <h1 className="font-display text-xl font-bold sm:text-2xl">{title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+            {children}
           </div>
-          {children}
         </div>
       </div>
     </div>

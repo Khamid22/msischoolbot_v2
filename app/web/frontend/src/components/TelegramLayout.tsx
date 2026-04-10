@@ -12,23 +12,36 @@ import { ChevronLeft } from "lucide-react";
 // (e.g. when opening the page in a regular browser for testing).
 
 const safeTop =
-  "var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))";
+  "var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px)))";
+const safeLeft =
+  "var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px)))";
+const safeRight =
+  "var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px)))";
 const contentSafeTop =
-  "var(--tg-content-safe-area-inset-top, 0px)";
+  "var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px))";
 const safeBottom =
-  "var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))";
+  "var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px)))";
 const contentSafeBottom =
-  "var(--tg-content-safe-area-inset-bottom, 0px)";
+  "var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px))";
+const contentSafeLeft =
+  "var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px))";
+const contentSafeRight =
+  "var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px))";
 
-// Total top padding for the sticky header (only device safe area, not topbar).
-const headerPadTop = safeTop;
+const headerPadLeft = `calc(${safeLeft} + ${contentSafeLeft})`;
+const headerPadRight = `calc(${safeRight} + ${contentSafeRight})`;
+
+// Total top padding for the sticky header (device + Telegram UI inset).
+const headerPadTop = `calc(${safeTop} + ${contentSafeTop})`;
 
 // Total top padding for <main>: device notch + Telegram UI + topbar height.
 // Using 5.5rem gives a ~0.5rem buffer above both mobile (4.75rem) and desktop (5rem) topbar heights.
-const mainPadTop = `calc(${safeTop} + ${contentSafeTop} + 5.5rem)`;
+const mainPadTop = `calc(${headerPadTop} + 5.5rem)`;
 
 // Total bottom padding for <main>: device home indicator + Telegram main button.
-const mainPadBottom = `calc(${safeBottom} + ${contentSafeBottom} + 1.5rem)`;
+const mainPadBottom = `calc(${safeBottom} + ${contentSafeBottom} + 1rem)`;
+const mainPadLeft = `calc(${safeLeft} + ${contentSafeLeft})`;
+const mainPadRight = `calc(${safeRight} + ${contentSafeRight})`;
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
@@ -52,7 +65,7 @@ export function Topbar({
   return (
     <header
       className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 shadow-card backdrop-blur"
-      style={{ paddingTop: headerPadTop }}
+      style={{ paddingTop: headerPadTop, paddingLeft: headerPadLeft, paddingRight: headerPadRight }}
     >
       <div className="mx-auto flex min-h-[4.75rem] w-full max-w-4xl items-center justify-between gap-2.5 px-3 py-3 sm:min-h-[5rem] sm:px-4 md:px-6 lg:max-w-5xl">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -112,6 +125,10 @@ export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
         style={{
           paddingTop: mainPadTop,
           paddingBottom: mainPadBottom,
+          paddingLeft: `calc(${mainPadLeft} + 0.75rem)`,
+          paddingRight: `calc(${mainPadRight} + 0.75rem)`,
+          overscrollBehaviorY: "contain",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         <div className="mx-auto w-full max-w-4xl">

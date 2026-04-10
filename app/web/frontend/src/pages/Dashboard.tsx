@@ -84,6 +84,17 @@ const attendanceColors = ["#111111", "#888888", "#cccccc"];
 
 const examSeriesColors = ["#111111", "#444444", "#777777", "#aaaaaa", "#dddddd"];
 
+const modalInsetStyle = {
+  paddingTop:
+    "calc(var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px))) + var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px)))",
+  paddingRight:
+    "max(1rem, calc(var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px))) + var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px))))",
+  paddingBottom:
+    "calc(var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px))) + var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px)))",
+  paddingLeft:
+    "max(1rem, calc(var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px))) + var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px))))",
+} as const;
+
 export default function DashboardPage(props: DashboardPageProps) {
   const payload = props.payload || {};
   const student =
@@ -345,8 +356,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       </div>
 
       {profileModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
+          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Profile</h3>
             <div className="mt-4 space-y-3">
               <div className="flex justify-center">
@@ -403,8 +414,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {logoutOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
+          <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Confirm Logout</h3>
             <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to logout?</p>
             <div className="mt-5 flex justify-end gap-2">
@@ -427,8 +438,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {passwordOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-card-hover">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
+          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
             <h3 className="font-display text-base font-bold">Change Password</h3>
             <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-4">
               <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />

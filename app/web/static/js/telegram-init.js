@@ -1,4 +1,4 @@
-(function () {
+(function initTelegramMiniApp(retriesLeft) {
   if (window.__msiTelegramMiniAppInitDone) {
     return;
   }
@@ -6,13 +6,24 @@
   const telegram = window.Telegram;
   const webApp = telegram && telegram.WebApp;
   if (!webApp) {
+    if (Number(retriesLeft) > 0) {
+      window.setTimeout(function () {
+        initTelegramMiniApp(Number(retriesLeft) - 1);
+      }, 80);
+    }
     return;
   }
 
   const initData = typeof webApp.initData === "string" ? webApp.initData.trim() : "";
   const hasQueryInitData = /(?:^|[?&])tgWebAppData=/.test(window.location.search);
-  const isMiniApp = Boolean(initData) || hasQueryInitData;
+  const platform = typeof webApp.platform === "string" ? webApp.platform.trim() : "";
+  const isMiniApp = Boolean(initData) || hasQueryInitData || Boolean(platform);
   if (!isMiniApp) {
+    if (Number(retriesLeft) > 0) {
+      window.setTimeout(function () {
+        initTelegramMiniApp(Number(retriesLeft) - 1);
+      }, 80);
+    }
     return;
   }
 
@@ -22,6 +33,7 @@
   let scheduledFrame = 0;
   let viewportPrepared = false;
   let fullscreenRequested = false;
+  let swipeLockApplied = false;
   let nativeBackHandler = null;
   let backFallbackTimer = 0;
   const cssPixelValues = Object.create(null);
@@ -57,27 +69,64 @@
       typeof webApp.contentSafeAreaInset === "object"
         ? webApp.contentSafeAreaInset
         : {};
+    const mergedTop = Math.max(
+      resolveInsetValue(safeAreaInset.top),
+      resolveInsetValue(contentSafeAreaInset.top)
+    );
+    const mergedRight = Math.max(
+      resolveInsetValue(safeAreaInset.right),
+      resolveInsetValue(contentSafeAreaInset.right)
+    );
+    const mergedBottom = Math.max(
+      resolveInsetValue(safeAreaInset.bottom),
+      resolveInsetValue(contentSafeAreaInset.bottom)
+    );
+    const mergedLeft = Math.max(
+      resolveInsetValue(safeAreaInset.left),
+      resolveInsetValue(contentSafeAreaInset.left)
+    );
 
-    setCssPixelVar("--tg-safe-area-top", resolveInsetValue(safeAreaInset.top));
-    setCssPixelVar("--tg-safe-area-right", resolveInsetValue(safeAreaInset.right));
-    setCssPixelVar("--tg-safe-area-bottom", resolveInsetValue(safeAreaInset.bottom));
-    setCssPixelVar("--tg-safe-area-left", resolveInsetValue(safeAreaInset.left));
+    const safeTop = resolveInsetValue(safeAreaInset.top);
+    const safeRight = resolveInsetValue(safeAreaInset.right);
+    const safeBottom = resolveInsetValue(safeAreaInset.bottom);
+    const safeLeft = resolveInsetValue(safeAreaInset.left);
+    const contentSafeTop = resolveInsetValue(contentSafeAreaInset.top);
+    const contentSafeRight = resolveInsetValue(contentSafeAreaInset.right);
+    const contentSafeBottom = resolveInsetValue(contentSafeAreaInset.bottom);
+    const contentSafeLeft = resolveInsetValue(contentSafeAreaInset.left);
+
+    setCssPixelVar("--tg-safe-area-top", safeTop);
+    setCssPixelVar("--tg-safe-area-right", safeRight);
+    setCssPixelVar("--tg-safe-area-bottom", safeBottom);
+    setCssPixelVar("--tg-safe-area-left", safeLeft);
+    setCssPixelVar("--tg-safe-area-inset-top", safeTop);
+    setCssPixelVar("--tg-safe-area-inset-right", safeRight);
+    setCssPixelVar("--tg-safe-area-inset-bottom", safeBottom);
+    setCssPixelVar("--tg-safe-area-inset-left", safeLeft);
     setCssPixelVar(
       "--tg-content-safe-area-top",
-      resolveInsetValue(contentSafeAreaInset.top)
+      contentSafeTop
     );
     setCssPixelVar(
       "--tg-content-safe-area-right",
-      resolveInsetValue(contentSafeAreaInset.right)
+      contentSafeRight
     );
     setCssPixelVar(
       "--tg-content-safe-area-bottom",
-      resolveInsetValue(contentSafeAreaInset.bottom)
+      contentSafeBottom
     );
     setCssPixelVar(
       "--tg-content-safe-area-left",
-      resolveInsetValue(contentSafeAreaInset.left)
+      contentSafeLeft
     );
+    setCssPixelVar("--tg-content-safe-area-inset-top", contentSafeTop);
+    setCssPixelVar("--tg-content-safe-area-inset-right", contentSafeRight);
+    setCssPixelVar("--tg-content-safe-area-inset-bottom", contentSafeBottom);
+    setCssPixelVar("--tg-content-safe-area-inset-left", contentSafeLeft);
+    setCssPixelVar("--safe-top", mergedTop);
+    setCssPixelVar("--safe-right", mergedRight);
+    setCssPixelVar("--safe-bottom", mergedBottom);
+    setCssPixelVar("--safe-left", mergedLeft);
   };
 
   const syncVisualViewport = function () {
@@ -135,6 +184,19 @@
       0;
     if (resolvedHeight > 0) {
       setCssPixelVar("--tg-app-height", resolvedHeight);
+      setCssPixelVar("--tg-viewport-height", resolvedHeight);
+    }
+  };
+
+  const enforceSwipeLock = function () {
+    if (typeof webApp.disableVerticalSwipes !== "function") {
+      return;
+    }
+    try {
+      webApp.disableVerticalSwipes();
+      swipeLockApplied = true;
+    } catch (_error) {
+      // Ignore Telegram swipe setup errors.
     }
   };
 
@@ -151,13 +213,7 @@
     } catch (_error) {
       // Ignore Telegram viewport errors.
     }
-    if (typeof webApp.disableVerticalSwipes === "function") {
-      try {
-        webApp.disableVerticalSwipes();
-      } catch (_error) {
-        // Ignore Telegram swipe setup errors.
-      }
-    }
+    enforceSwipeLock();
   };
 
   const requestFullscreenIfAvailable = function () {
@@ -230,6 +286,9 @@
     scheduledFrame = window.requestAnimationFrame(function () {
       scheduledFrame = 0;
       setAppHeight();
+      if (!swipeLockApplied || webApp.isFullscreen === true) {
+        enforceSwipeLock();
+      }
     });
   };
 
@@ -287,6 +346,12 @@
 
   window.setTimeout(function () {
     requestFullscreenIfAvailable();
+    enforceSwipeLock();
     scheduleHeightSync();
   }, 40);
-})();
+
+  window.setTimeout(function () {
+    enforceSwipeLock();
+    scheduleHeightSync();
+  }, 260);
+})(24);
