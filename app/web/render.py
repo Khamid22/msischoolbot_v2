@@ -76,7 +76,7 @@ def render_react_page(
     favicon_url = url_for("static", filename="images/favicon.png")
     manifest_url = url_for("system.manifest")
     css_url = url_for("static", filename="react/app.css", v=v)
-    js_url = url_for("static", filename="react/app.js")
+    js_url = url_for("static", filename="react/app.js", v=v)
     tg_bundle_url = url_for("static", filename="js/bundles/telegram-base.js", v=v)
 
     tg_head = (

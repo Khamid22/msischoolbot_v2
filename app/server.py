@@ -711,7 +711,9 @@ def add_common_headers(response):
         response.headers["Cache-Control"] = "no-store, max-age=0"
 
     if request.path.startswith("/static/react/") or request.path.startswith("/static/js/bundles/"):
-        response.headers["Cache-Control"] = "no-store, max-age=0"
+        # Keep assets cacheable to avoid full redownloads between page navigations.
+        # Filenames are mostly stable, so use a short TTL to balance freshness/speed.
+        response.headers["Cache-Control"] = "public, max-age=300"
 
     if request.path.startswith("/static/") and "Cache-Control" not in response.headers:
         response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
