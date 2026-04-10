@@ -7,6 +7,7 @@ import {
   ChevronDown,
   GraduationCap,
   LogOut,
+  MessageSquare,
   RefreshCw,
   Target,
   Trophy,
@@ -64,6 +65,7 @@ interface DashboardPageProps {
   programCompletedRate?: number;
   ratingBoardUrl?: string;
   resourcesUrl?: string;
+  chatUrl?: string;
   aapLessonsUrl?: string;
   arLessonsUrl?: string;
   currentSubjectName?: string;
@@ -188,6 +190,10 @@ export default function DashboardPage(props: DashboardPageProps) {
                     <a href={props.resourcesUrl} className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium hover:bg-muted">
                       <BookOpen className="h-3.5 w-3.5" />
                       Resources
+                    </a>
+                    <a href={props.chatUrl} className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium hover:bg-muted">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Chat
                     </a>
                     <button
                       type="button"

@@ -139,6 +139,16 @@ def register_dashboard_routes(
         context["refresh_url"] = url_for("student.dashboard", **refresh_params)
         context["last_updated_label"] = _format_last_updated_label(last_updated_at)
 
+        current_subject = context["current_subject_name"]
+        current_group = str(payload_student.get("group", "")).strip()
+        chat_url = url_for(
+            "student.chat_room",
+            student_id=student_id,
+            subject=requested_subject or current_subject,
+            group=requested_group or current_group,
+            school=school_code,
+        )
+
         return render_react_page(
             "student-dashboard",
             {
@@ -149,6 +159,7 @@ def register_dashboard_routes(
                 "programCompletedRate": context["program_completed_rate"],
                 "ratingBoardUrl": context["rating_board_url"],
                 "resourcesUrl": context["resources_url"],
+                "chatUrl": chat_url,
                 "aapLessonsUrl": context["aap_lessons_url"],
                 "arLessonsUrl": context["ar_lessons_url"],
                 "currentSubjectName": context["current_subject_name"],

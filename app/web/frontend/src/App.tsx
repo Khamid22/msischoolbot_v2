@@ -14,6 +14,7 @@ const pageMap = {
   "student-ar": lazy(() => import("./pages/AR")),
   "admin-home": lazy(() => import("./pages/Admin")),
   "admin-edit-student": lazy(() => import("./pages/EditStudentProfile")),
+  "student-chat": lazy(() => import("./pages/Chat")),
   "student-not-found": lazy(() => import("./pages/StudentNotFound")),
 } as const;
 

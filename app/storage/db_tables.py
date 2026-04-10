@@ -765,6 +765,40 @@ def ensure_resources_schema(conn):
     )
 
 
+def ensure_chat_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room TEXT NOT NULL,
+            author_name TEXT NOT NULL,
+            author_student_id TEXT NOT NULL,
+            body TEXT NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0 CHECK (is_deleted IN (0, 1)),
+            edited_at TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_room_created
+        ON chat_messages(room, created_at)
+        WHERE is_deleted = 0
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_blocked_users (
+            student_id TEXT PRIMARY KEY COLLATE NOCASE,
+            blocked_by_admin TEXT NOT NULL DEFAULT '',
+            blocked_at TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
 def ensure_resource_comments_schema(conn):
     conn.execute(
         """
@@ -795,4 +829,5 @@ __all__ = [
     "ensure_subject_summaries_schema",
     "ensure_resources_schema",
     "ensure_resource_comments_schema",
+    "ensure_chat_schema",
 ]

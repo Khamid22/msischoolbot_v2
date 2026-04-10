@@ -6,6 +6,7 @@ from flask_wtf.csrf import generate_csrf
 from app.web.render import render_react_page
 
 from app.routes.admin.admins import register_admin_routes
+from app.routes.admin.chat_admin_routes import register_admin_chat_routes
 from app.routes.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
@@ -143,5 +144,6 @@ def register_admin_page_routes(
         delete_uploaded_student_photo=delete_uploaded_student_photo,
         load_dataset=load_dataset,
     )
+    register_admin_chat_routes(admin_blueprint)
     app.register_blueprint(admin_blueprint)
     return render_admin_page
