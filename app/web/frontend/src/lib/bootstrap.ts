@@ -2,6 +2,7 @@ export type ReactPageName =
   | "login"
   | "student-home"
   | "student-dashboard"
+  | "student-chat"
   | "student-resources"
   | "student-rating"
   | "student-aap"
@@ -19,6 +20,7 @@ const REACT_PAGES = new Set<ReactPageName>([
   "login",
   "student-home",
   "student-dashboard",
+  "student-chat",
   "student-resources",
   "student-rating",
   "student-aap",
@@ -29,6 +31,9 @@ const REACT_PAGES = new Set<ReactPageName>([
 ]);
 
 function inferPageFromPath(pathname: string): ReactPageName | null {
+  if (/^\/dashboard\/\d+\/chat\/?$/.test(pathname)) {
+    return "student-chat";
+  }
   if (/^\/dashboard\/\d+\/ar-lessons\/?$/.test(pathname)) {
     return "student-ar";
   }
@@ -57,6 +62,8 @@ function normalizePageName(page: unknown): ReactPageName | null {
   }
 
   const aliases: Record<string, ReactPageName> = {
+    "chat": "student-chat",
+    "student-chat-room": "student-chat",
     "student-ar-lessons": "student-ar",
     "student-aap-lessons": "student-aap",
     "ar-lessons": "student-ar",
