@@ -130,6 +130,7 @@ _GROUP_CACHE = {}
 _SEEDED_DATASET_TOKENS = {}
 _SEEDING_IN_PROGRESS = set()
 _STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
+_APP_BOOTSTRAPPED = False
 
 
 def _clear_group_cache():
@@ -798,33 +799,53 @@ def handle_csrf_error(_error):
         return jsonify({"message": "Invalid or missing CSRF token."}), 400
     return redirect(url_for("student.home"))
 
+def _is_background_refresh_enabled():
+    raw_value = str(os.getenv("DISABLE_BACKGROUND_REFRESH", "0") or "").strip()
+    return raw_value.casefold() not in {"1", "true", "yes", "on"}
 
-render_admin_page = register_admin_page_routes(
-    app,
-    load_dataset=_load_dataset,
-)
-register_student_page_routes(
-    app,
-    render_admin_page=render_admin_page,
-    load_dataset=_load_dataset,
-    seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
-    build_students_by_subject_group=_build_students_by_subject_group,
-    is_full_form=_is_full_form,
-    get_group_cache_entry=_get_group_cache_entry,
-    search_student=_search_student,
-    load_dashboard_payload=_load_dashboard_payload,
-    collect_subject_dashboards_from_dataset=_collect_subject_dashboards_from_dataset,
-    collect_subject_dashboards_from_cache=_collect_subject_dashboards_from_cache,
-    extract_attendance_rate=_extract_attendance_rate,
-    extract_exam_average_score=_extract_exam_average_score,
-    round_grade_half_up=_round_grade_half_up,
-    compute_subject_rating=_compute_subject_rating,
-    build_subject_leaderboard=_build_subject_leaderboard,
-)
-register_webhook_routes(
-    app,
-    clear_group_cache=_clear_group_cache,
-)
-register_system_routes(app)
-register_admin_upload_progress_ws()
-start_background_refresh()
+
+def _bootstrap_app(flask_app):
+    global _APP_BOOTSTRAPPED
+    if _APP_BOOTSTRAPPED:
+        return flask_app
+
+    render_admin_page = register_admin_page_routes(
+        flask_app,
+        load_dataset=_load_dataset,
+    )
+    register_student_page_routes(
+        flask_app,
+        render_admin_page=render_admin_page,
+        load_dataset=_load_dataset,
+        seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
+        build_students_by_subject_group=_build_students_by_subject_group,
+        is_full_form=_is_full_form,
+        get_group_cache_entry=_get_group_cache_entry,
+        search_student=_search_student,
+        load_dashboard_payload=_load_dashboard_payload,
+        collect_subject_dashboards_from_dataset=_collect_subject_dashboards_from_dataset,
+        collect_subject_dashboards_from_cache=_collect_subject_dashboards_from_cache,
+        extract_attendance_rate=_extract_attendance_rate,
+        extract_exam_average_score=_extract_exam_average_score,
+        round_grade_half_up=_round_grade_half_up,
+        compute_subject_rating=_compute_subject_rating,
+        build_subject_leaderboard=_build_subject_leaderboard,
+    )
+    register_webhook_routes(
+        flask_app,
+        clear_group_cache=_clear_group_cache,
+    )
+    register_system_routes(flask_app)
+    register_admin_upload_progress_ws()
+    if _is_background_refresh_enabled():
+        start_background_refresh()
+
+    _APP_BOOTSTRAPPED = True
+    return flask_app
+
+
+def create_app():
+    return _bootstrap_app(app)
+
+
+app = create_app()

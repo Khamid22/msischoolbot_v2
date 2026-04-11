@@ -35,6 +35,7 @@ Create `.env` in the project root:
 - `WAITRESS_CONNECTION_LIMIT` (default: `1024`)
 - `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
 - `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
+- `DISABLE_BACKGROUND_REFRESH` (optional; `1` disables startup Sheets background refresh)
 - `GOOGLE_SHEETS_WEBHOOK_TOKEN` (required for webhook auth)
 - `SHEETS_WEBHOOK_CACHE_ENABLED` (optional; defaults to enabled when token is set)
 - `SHEETS_WEBHOOK_MAX_STALE_SECONDS` (default: `21600`)
