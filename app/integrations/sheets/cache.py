@@ -87,6 +87,44 @@ class SheetCache:
 
 SHEET_CACHE = SheetCache()
 
+# Tracks which schools are currently being revalidated in the background so we
+# don't spawn duplicate refresh threads for the same school.
+_REVALIDATING: set[str] = set()
+_REVALIDATING_LOCK = threading.Lock()
+
+
+def _revalidate_school(school_code: str) -> None:
+    try:
+        loaded_dataset = load_from_google_sheets(school_code)
+    except Exception:
+        return  # Keep existing stale data on failure
+    with SHEET_CACHE.lock:
+        SHEET_CACHE.set(school_code, loaded_dataset, now=time.time())
+
+
+def _trigger_background_revalidation(school_code: str) -> None:
+    """Kick off a one-shot background thread to refresh *school_code*.
+
+    No-ops if a refresh is already in progress for that school.
+    """
+    with _REVALIDATING_LOCK:
+        if school_code in _REVALIDATING:
+            return
+        _REVALIDATING.add(school_code)
+
+    def _run() -> None:
+        try:
+            _revalidate_school(school_code)
+        finally:
+            with _REVALIDATING_LOCK:
+                _REVALIDATING.discard(school_code)
+
+    threading.Thread(
+        target=_run,
+        daemon=True,
+        name=f"sheets-revalidate-{school_code}",
+    ).start()
+
 
 def mark_school_dataset_dirty(school_codes = None, clear_cached_data = False):
     configured_codes = list(get_configured_school_spreadsheets().keys())
@@ -128,7 +166,13 @@ def get_school_dataset(force_refresh = False, school_code = None):
         if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
             return cached_dataset
 
-    # Never hold the global cache lock during remote I/O.
+    # Stale-while-revalidate: if we have any existing data (even stale), return
+    # it immediately and refresh in the background so the next request is fresh.
+    if not force_refresh and cached_dataset is not None:
+        _trigger_background_revalidation(normalized_school_code)
+        return cached_dataset
+
+    # No data at all (cold start or force_refresh): block until loaded.
     try:
         loaded_dataset = load_from_google_sheets(normalized_school_code)
     except SheetsDataError:
