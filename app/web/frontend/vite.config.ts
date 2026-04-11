@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   base: "/static/react/",
   server: {
     host: "::",
@@ -36,9 +36,26 @@ export default defineConfig(({ mode }) => ({
           }
           return "assets/[name][extname]";
         },
-        // Split heavy third-party libraries into their own cached chunks.
-        manualChunks: {
-          recharts: ["recharts"],
+        // Reduce request fan-out on high-latency/mobile networks by grouping
+        // many tiny node_modules chunks into a few stable vendor chunks.
+        manualChunks: (id) => {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (id.includes("/recharts/")) {
+            return "recharts";
+          }
+          if (id.includes("/lucide-react/")) {
+            return "icons";
+          }
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "react-vendor";
+          }
+          return "vendor";
         },
       },
     },

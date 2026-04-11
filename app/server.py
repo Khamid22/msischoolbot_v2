@@ -51,8 +51,13 @@ _compress = Compress(app)
 
 @app.after_request
 def _compress_static(response):
-    # Flask serves static files with direct_passthrough=True (streaming), which
-    # bypasses Flask-Compress. Disable passthrough so gzip can be applied.
+    # Do not dynamically compress static files on each request. Runtime
+    # compression can become a CPU bottleneck on low-resource servers.
+    if request.path.startswith("/static/"):
+        return response
+
+    # Flask streams some responses with direct_passthrough=True; disable
+    # passthrough for non-static responses so Flask-Compress can run.
     if response.direct_passthrough:
         response.direct_passthrough = False
     return _compress.after_request(response)
@@ -718,6 +723,8 @@ def _load_dashboard_payload(
 # Vite content-hashed chunks: name-HASH.js, where HASH is 6+ base62 chars.
 # These are immutable — the hash changes on code change, so they can be cached forever.
 _HASHED_CHUNK_RE = re.compile(r"/chunks/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css)$")
+_VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
+_VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
 
 
 @app.after_request
@@ -730,8 +737,18 @@ def add_common_headers(response):
         response.headers["Cache-Control"] = "no-store, max-age=0"
 
     if request.path.startswith("/static/react/") or request.path.startswith("/static/js/bundles/"):
-        # Hashed chunks are immutable; app.js / app.css have no hash so must not be cached.
+        # Hashed chunks are immutable and can be cached long-term.
         if _HASHED_CHUNK_RE.search(request.path):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        # app.js/app.css and js bundle assets are versioned via ?v=<ASSET_VERSION>.
+        # Allow long caching when the version query exists.
+        elif (
+            request.args.get("v")
+            and (
+                _VERSIONED_REACT_ENTRY_RE.match(request.path)
+                or _VERSIONED_BUNDLE_RE.match(request.path)
+            )
+        ):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
             response.headers["Cache-Control"] = "no-store, max-age=0"

@@ -60,12 +60,19 @@ def _env_positive_int(name, default):
     return max(parsed, 1)
 
 
+def _default_gevent_workers():
+    # gevent workers are lightweight greenlets, so a higher default helps
+    # absorb many concurrent static chunk requests.
+    cpu_count = os.cpu_count() or 1
+    return max(16, cpu_count * 8)
+
+
 def _waitress_threads():
-    return _env_positive_int("WAITRESS_THREADS", 8)
+    return _env_positive_int("WAITRESS_THREADS", _default_gevent_workers())
 
 
 def _waitress_connection_limit():
-    return _env_positive_int("WAITRESS_CONNECTION_LIMIT", 256)
+    return _env_positive_int("WAITRESS_CONNECTION_LIMIT", 1024)
 
 
 def _waitress_channel_timeout():
