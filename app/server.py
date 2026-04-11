@@ -8,6 +8,7 @@ import time
 from datetime import timedelta
 
 from flask import Flask, jsonify, redirect, request, session, url_for
+from flask_compress import Compress
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError
 
@@ -37,6 +38,7 @@ app = Flask(
     static_url_path="/static",
 )
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
+app.config["COMPRESS_REGISTER"] = False  # We register manually after static-file hook
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
     days=int(os.environ.get("SESSION_LIFETIME_DAYS", "365"))
@@ -44,6 +46,16 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.abspath(get_auth_db_path())
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["WTF_CSRF_TIME_LIMIT"] = None
+
+_compress = Compress(app)
+
+@app.after_request
+def _compress_static(response):
+    # Flask serves static files with direct_passthrough=True (streaming), which
+    # bypasses Flask-Compress. Disable passthrough so gzip can be applied.
+    if response.direct_passthrough:
+        response.direct_passthrough = False
+    return _compress.after_request(response)
 
 init_extensions(app)
 configure_login_manager(login_manager)

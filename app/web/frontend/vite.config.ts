@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => ({
           }
           return "assets/[name][extname]";
         },
+        // Split heavy third-party libraries into their own cached chunks.
+        manualChunks: {
+          recharts: ["recharts"],
+        },
       },
     },
   },

@@ -1,4 +1,4 @@
-import{r as a}from"../app.js";/**
+import{r as a}from"./recharts-BwRHXgM6.js";/**
  * @license lucide-react v0.462.0 - ISC
  *
  * This source code is licensed under the ISC license.
