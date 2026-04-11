@@ -28,7 +28,7 @@ def _prewarm_cache() -> None:
         with SHEET_CACHE.lock:
             entry = SHEET_CACHE._entries.get(school_code)
         if entry is not None and entry.dataset:
-            continue  # Already warm — nothing to do.
+            continue 
 
         logger.info("Startup pre-warm: loading '%s' from Google Sheets", school_code)
         try:
@@ -91,17 +91,14 @@ def start_background_refresh() -> None:
             return
         _started = True
 
-    threading.Thread(
-        target=_prewarm_cache,
-        name="sheets-cache-prewarm",
-        daemon=True,
-    ).start()
+    try:
+        import gevent
+        gevent.spawn(_prewarm_cache)
+        gevent.spawn(_refresh_loop)
+    except ImportError:
+        threading.Thread(target=_prewarm_cache, name="sheets-cache-prewarm", daemon=True).start()
+        threading.Thread(target=_refresh_loop, name="sheets-cache-refresh", daemon=True).start()
 
-    threading.Thread(
-        target=_refresh_loop,
-        name="sheets-cache-refresh",
-        daemon=True,
-    ).start()
     logger.info(
         "Background Sheets cache refresh started "
         "(check every %ds, refresh %ds ahead of expiry)",

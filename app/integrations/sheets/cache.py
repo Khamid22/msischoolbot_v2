@@ -119,11 +119,11 @@ def _trigger_background_revalidation(school_code: str) -> None:
             with _REVALIDATING_LOCK:
                 _REVALIDATING.discard(school_code)
 
-    threading.Thread(
-        target=_run,
-        daemon=True,
-        name=f"sheets-revalidate-{school_code}",
-    ).start()
+    try:
+        import gevent
+        gevent.spawn(_run)
+    except ImportError:
+        threading.Thread(target=_run, daemon=True, name=f"sheets-revalidate-{school_code}").start()
 
 
 def mark_school_dataset_dirty(school_codes = None, clear_cached_data = False):
