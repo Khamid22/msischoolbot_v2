@@ -14,6 +14,22 @@ from .loader import load_from_google_sheets
 from .utils import normalize_school_code
 
 
+def _load_sheets_in_threadpool(school_code: str) -> dict:
+    """Run load_from_google_sheets in gevent's thread pool.
+
+    google-api-python-client uses httplib2 which does not cooperate with
+    gevent's monkey-patched event loop even with patch_all().  Running the
+    call inside a real OS thread (via gevent's threadpool) lets the event
+    loop continue serving all other requests while waiting for Google Sheets.
+    The calling greenlet suspends cooperatively until the thread finishes.
+    """
+    try:
+        from gevent.hub import get_hub
+        return get_hub().threadpool.spawn(load_from_google_sheets, school_code).get()
+    except ImportError:
+        return load_from_google_sheets(school_code)
+
+
 @dataclass
 class CacheEntry:
     dataset: dict[str, Any] | None = None
@@ -95,7 +111,7 @@ _REVALIDATING_LOCK = threading.Lock()
 
 def _revalidate_school(school_code: str) -> None:
     try:
-        loaded_dataset = load_from_google_sheets(school_code)
+        loaded_dataset = _load_sheets_in_threadpool(school_code)
     except Exception:
         return  # Keep existing stale data on failure
     with SHEET_CACHE.lock:
@@ -174,7 +190,7 @@ def get_school_dataset(force_refresh = False, school_code = None):
 
     # No data at all (cold start or force_refresh): block until loaded.
     try:
-        loaded_dataset = load_from_google_sheets(normalized_school_code)
+        loaded_dataset = _load_sheets_in_threadpool(normalized_school_code)
     except SheetsDataError:
         with SHEET_CACHE.lock:
             fallback_dataset = SHEET_CACHE.get(normalized_school_code)
