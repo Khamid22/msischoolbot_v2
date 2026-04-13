@@ -206,9 +206,6 @@ function ResourceCard({
       {/* Info */}
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
         <p className="line-clamp-2 text-xs font-bold leading-snug">{item.title}</p>
-        {item.description ? (
-          <p className="line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">{item.description}</p>
-        ) : null}
         <p className="mt-auto text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">{badge}</p>
       </div>
     </button>
