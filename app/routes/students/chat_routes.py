@@ -7,7 +7,8 @@ Rooms:
   "group:<name>"     – e.g. "group:Group A"
 
 Endpoints:
-  GET  /api/chat/messages?room=...&before_id=...   list messages (newest-first, 40 per page)
+  GET  /api/chat/messages?room=...&before_id=...&after_id=...
+                                                  list messages (newest-first, 40 per page)
   POST /api/chat/messages                          send message
   PUT  /api/chat/messages/<id>                     edit own message
   DELETE /api/chat/messages/<id>                  soft-delete own message
@@ -23,9 +24,6 @@ from app.storage import queries
 from app.routes.students.services.session_state_service import (
     current_auth_role,
     current_student_full_name,
-)
-from app.routes.admin.services.session_state_service import (
-    current_auth_login as current_admin_login,
 )
 
 _DB_LOCK = threading.Lock()
@@ -91,8 +89,27 @@ def register_chat_routes(students):
             before_id = int(request.args.get("before_id", 0))
         except (TypeError, ValueError):
             before_id = 0
+        try:
+            after_id = int(request.args.get("after_id", 0))
+        except (TypeError, ValueError):
+            after_id = 0
 
         with _connect() as conn:
+            if after_id > 0:
+                rows = conn.execute(
+                    """
+                    SELECT id, room, author_name, author_student_id, body,
+                           edited_at, created_at
+                    FROM chat_messages
+                    WHERE room = ? AND is_deleted = 0 AND id > ?
+                    ORDER BY id ASC
+                    LIMIT ?
+                    """,
+                    (room, after_id, _PAGE_SIZE),
+                ).fetchall()
+                messages = [_serialize(r) for r in rows]
+                return jsonify({"messages": messages, "room": room})
+
             if before_id > 0:
                 rows = conn.execute(
                     """
@@ -154,7 +171,7 @@ def register_chat_routes(students):
                 if _is_blocked(conn, student_login):
                     return jsonify({"error": "You have been blocked from the chat."}), 403
 
-                conn.execute(
+                inserted = conn.execute(
                     """
                     INSERT INTO chat_messages
                         (room, author_name, author_student_id, body, created_at)
@@ -162,7 +179,7 @@ def register_chat_routes(students):
                     """,
                     (room, author_name, student_login, body, now),
                 )
-                msg_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                msg_id = int(getattr(inserted, "lastrowid", 0) or 0)
                 conn.commit()
 
         return jsonify({

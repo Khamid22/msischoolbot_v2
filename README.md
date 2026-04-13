@@ -44,8 +44,14 @@ Create `.env` in the project root:
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
 - `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
+- `DATABASE_URL` (optional PostgreSQL URL; when set, app uses Postgres instead of SQLite)
 - `OWNER_ADMIN_LOGIN` (default: `staff280902`)
 - `OWNER_ADMIN_PASSWORD` (default: `Khamid007`)
+
+Database backend behavior:
+- Local development: keep `DATABASE_URL` empty and app will use SQLite file at `AUTH_DB_PATH`.
+- Railway production: set `DATABASE_URL` to the PostgreSQL connection string provided by Railway.
+- `POSTGRES_DB` is only the database name, not a full connection URL.
 
 ## Auth Flow
 
@@ -53,7 +59,7 @@ Create `.env` in the project root:
 2. Login by prefix:
 - `staff#####` -> admin path
 - `MSI#####` -> student path
-3. Credentials are checked against SQLite.
+3. Credentials are checked against the configured auth database (SQLite locally, PostgreSQL when `DATABASE_URL` is set).
 4. Authenticated users get a Flask session.
 5. Student login redirects directly to their own dashboard.
 6. All protected pages and APIs require an authenticated session.

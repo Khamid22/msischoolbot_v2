@@ -162,19 +162,23 @@ export default function ChatPage(props: ChatPageProps) {
   // ── Poll for new messages ─────────────────────────────────────────────────
   async function pollNew(room: string) {
     if (!latestIdRef.current) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      return;
+    }
     try {
-      const res = await fetch(`/api/chat/messages?room=${encodeURIComponent(room)}`);
+      const res = await fetch(
+        `/api/chat/messages?room=${encodeURIComponent(room)}&after_id=${latestIdRef.current}`
+      );
       const data = await res.json();
       const incoming: ChatMessage[] = Array.isArray(data.messages) ? data.messages : [];
-      const newOnes = incoming.filter((m) => m.id > latestIdRef.current);
-      if (newOnes.length) {
+      if (incoming.length) {
         setMessages((prev) => {
           // merge, avoid duplicates
           const known = new Set(prev.map((m) => m.id));
-          const toAdd = newOnes.filter((m) => !known.has(m.id));
+          const toAdd = incoming.filter((m) => !known.has(m.id));
           return toAdd.length ? [...prev, ...toAdd] : prev;
         });
-        latestIdRef.current = Math.max(...newOnes.map((m) => m.id));
+        latestIdRef.current = Math.max(...incoming.map((m) => m.id));
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       }
     } catch {
@@ -206,7 +210,7 @@ export default function ChatPage(props: ChatPageProps) {
   useEffect(() => {
     fetchMessages(activeRoom);
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => pollNew(activeRoom), 5000);
+    pollRef.current = setInterval(() => pollNew(activeRoom), 7000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
