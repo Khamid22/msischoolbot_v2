@@ -86,14 +86,14 @@ def register_comment_routes(students):
                 if not exists:
                     return jsonify({"error": "Resource not found."}), 404
 
-                conn.execute(
+                inserted = conn.execute(
                     """
                     INSERT INTO resource_comments (resource_id, author_name, body, created_at)
                     VALUES (?, ?, ?, ?)
                     """,
                     (resource_id, author_name, body, now),
                 )
-                comment_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+                comment_id = int(getattr(inserted, "lastrowid", 0) or 0)
                 conn.commit()
 
         return jsonify({

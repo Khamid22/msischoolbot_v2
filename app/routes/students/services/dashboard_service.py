@@ -1,5 +1,7 @@
 import math
 import re
+import threading
+import time
 
 from flask import session, url_for
 
@@ -24,6 +26,10 @@ SUBJECT_SHORT_NAMES = {
 }
 
 PROGRAM_TOTAL_LESSONS = 180
+
+_SUBJECT_SWITCH_CACHE_LOCK = threading.Lock()
+_SUBJECT_SWITCH_CACHE = {}
+_SUBJECT_SWITCH_CACHE_TTL_SECONDS = 60
 
 
 def subject_short_name(subject_name):
@@ -161,9 +167,21 @@ def build_subject_switch_options(
 
     current_name_norm = normalize_text(current_full_name)
     options = []
-    seen = set()
 
-    if current_name_norm:
+    cache_key = (int(id(dataset)), current_name_norm)
+    if isinstance(dataset, dict) and current_name_norm:
+        now = time.time()
+        with _SUBJECT_SWITCH_CACHE_LOCK:
+            cached_entry = _SUBJECT_SWITCH_CACHE.get(cache_key)
+            if (
+                cached_entry
+                and cached_entry.get("dataset_obj") is dataset
+                and now < float(cached_entry.get("expires_at", 0))
+            ):
+                options = [dict(item) for item in cached_entry.get("options", [])]
+
+    if not options and current_name_norm:
+        seen = set()
         for student in students:
             if not isinstance(student, dict):
                 continue
@@ -190,13 +208,36 @@ def build_subject_switch_options(
                 }
             )
 
-    options.sort(
-        key=lambda item: (
-            normalize_text(item.get("subject", "")),
-            normalize_text(item.get("group", "")),
-            int(item.get("student_id", 0)),
+        options.sort(
+            key=lambda item: (
+                normalize_text(item.get("subject", "")),
+                normalize_text(item.get("group", "")),
+                int(item.get("student_id", 0)),
+            )
         )
-    )
+
+        if isinstance(dataset, dict):
+            now = time.time()
+            with _SUBJECT_SWITCH_CACHE_LOCK:
+                _SUBJECT_SWITCH_CACHE[cache_key] = {
+                    "dataset_obj": dataset,
+                    "options": [dict(item) for item in options],
+                    "expires_at": now + _SUBJECT_SWITCH_CACHE_TTL_SECONDS,
+                }
+                expired_keys = [
+                    key
+                    for key, entry in _SUBJECT_SWITCH_CACHE.items()
+                    if float(entry.get("expires_at", 0)) <= now
+                ]
+                for key in expired_keys:
+                    _SUBJECT_SWITCH_CACHE.pop(key, None)
+                if len(_SUBJECT_SWITCH_CACHE) > 256:
+                    ordered_entries = sorted(
+                        _SUBJECT_SWITCH_CACHE.items(),
+                        key=lambda item: float(item[1].get("expires_at", 0)),
+                    )
+                    for key, _entry in ordered_entries[: len(_SUBJECT_SWITCH_CACHE) - 256]:
+                        _SUBJECT_SWITCH_CACHE.pop(key, None)
 
     if not options:
         options = [

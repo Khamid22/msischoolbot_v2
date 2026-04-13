@@ -1,5 +1,3 @@
-import hashlib
-import json
 import math
 import os
 import re
@@ -24,7 +22,7 @@ from app.routes.system_routes import register_system_routes
 from app.routes.students.student_page import register_student_page_routes
 from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
 from app.routes.webhooks import register_webhook_routes
-from app.storage.db_config import get_auth_db_path
+from app.storage.db_config import get_sqlalchemy_database_uri
 from app.integrations.sheets.background_refresh import start_background_refresh
 
 _BACKEND_DIR = os.path.dirname(__file__)
@@ -39,11 +37,21 @@ app = Flask(
 )
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
 app.config["COMPRESS_REGISTER"] = False  # We register manually after static-file hook
+app.config["COMPRESS_LEVEL"] = int(os.environ.get("COMPRESS_LEVEL", "6"))
+app.config["COMPRESS_MIN_SIZE"] = int(os.environ.get("COMPRESS_MIN_SIZE", "512"))
+app.config["COMPRESS_MIMETYPES"] = [
+    "text/html",
+    "text/css",
+    "application/javascript",
+    "text/javascript",
+    "application/json",
+    "image/svg+xml",
+]
 app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
     days=int(os.environ.get("SESSION_LIFETIME_DAYS", "365"))
 )
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.abspath(get_auth_db_path())
+app.config["SQLALCHEMY_DATABASE_URI"] = get_sqlalchemy_database_uri()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["WTF_CSRF_TIME_LIMIT"] = None
 
@@ -51,13 +59,8 @@ _compress = Compress(app)
 
 @app.after_request
 def _compress_static(response):
-    # Do not dynamically compress static files on each request. Runtime
-    # compression can become a CPU bottleneck on low-resource servers.
-    if request.path.startswith("/static/"):
-        return response
-
-    # Flask streams some responses with direct_passthrough=True; disable
-    # passthrough for non-static responses so Flask-Compress can run.
+    # Flask serves static files with direct_passthrough=True; disable it so
+    # Flask-Compress can apply gzip/brotli when the client supports it.
     if response.direct_passthrough:
         response.direct_passthrough = False
     return _compress.after_request(response)
@@ -587,11 +590,14 @@ def _build_students_by_subject_group(
         return {}
 
     now = time.time()
-    serialized_students = json.dumps(students, sort_keys=True).encode()
-    cache_key = hashlib.md5(serialized_students).hexdigest()
+    cache_key = int(id(students))
     with _GROUP_CACHE_LOCK:
         cached_entry = _STUDENTS_BY_SUBJECT_GROUP_CACHE.get(cache_key)
-        if cached_entry and now < float(cached_entry.get("expires_at", 0)):
+        if (
+            cached_entry
+            and cached_entry.get("students_obj") is students
+            and now < float(cached_entry.get("expires_at", 0))
+        ):
             return cached_entry.get("value", {})
 
     students_by_subject_group = {}
@@ -622,10 +628,10 @@ def _build_students_by_subject_group(
     expires_at = now + GROUP_CACHE_TTL_SECONDS
     with _GROUP_CACHE_LOCK:
         _STUDENTS_BY_SUBJECT_GROUP_CACHE[cache_key] = {
+            "students_obj": students,
             "value": students_by_subject_group,
             "expires_at": expires_at,
         }
-        # Keep cache small and drop expired entries.
         expired_keys = [
             key
             for key, entry in _STUDENTS_BY_SUBJECT_GROUP_CACHE.items()
