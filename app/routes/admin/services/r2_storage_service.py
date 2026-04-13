@@ -213,7 +213,9 @@ def _ffmpeg_binary():
     if not _FFMPEG_MISSING_LOGGED:
         _FFMPEG_MISSING_LOGGED = True
         print(
-            "[resources] ffmpeg is not installed; uploading video without processing."
+            "[resources] ffmpeg is not installed; uploading video without processing. "
+            "On Railway Railpack add apt package 'ffmpeg' (or set "
+            "RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg)."
         )
     return ""
 

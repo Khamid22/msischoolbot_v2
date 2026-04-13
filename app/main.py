@@ -1,3 +1,5 @@
-from app.server import app, settings
+from app.server import create_app, settings
 
-__all__ = ["app", "settings"]
+app = create_app()
+
+__all__ = ["app", "settings", "create_app"]

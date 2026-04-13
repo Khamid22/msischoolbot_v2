@@ -35,6 +35,7 @@ Create `.env` in the project root:
 - `WAITRESS_CONNECTION_LIMIT` (default: `1024`)
 - `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
 - `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
+- `DISABLE_BACKGROUND_REFRESH` (optional; `1` disables startup Sheets background refresh)
 - `GOOGLE_SHEETS_WEBHOOK_TOKEN` (required for webhook auth)
 - `SHEETS_WEBHOOK_CACHE_ENABLED` (optional; defaults to enabled when token is set)
 - `SHEETS_WEBHOOK_MAX_STALE_SECONDS` (default: `21600`)
@@ -52,6 +53,7 @@ Database backend behavior:
 - Local development: keep `DATABASE_URL` empty and app will use SQLite file at `AUTH_DB_PATH`.
 - Railway production: set `DATABASE_URL` to the PostgreSQL connection string provided by Railway.
 - `POSTGRES_DB` is only the database name, not a full connection URL.
+- Railway video processing: this repo includes `railpack.json` to install `ffmpeg`. If your service overrides build config, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg`.
 
 ## Auth Flow
 
