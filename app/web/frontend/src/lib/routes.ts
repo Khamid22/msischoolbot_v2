@@ -17,6 +17,8 @@ export const routes = {
   adminResourceTypeRename: (typeId: number | string) => `/admin/resources/types/${typeId}/rename`,
   adminResourceAdd: "/admin/resources/add",
   adminResourceDelete: (resourceId: number | string) => `/admin/resources/${resourceId}/delete`,
+  adminResourceEdit: (resourceId: number | string) => `/admin/resources/${resourceId}/edit`,
+  adminResourcesApi: "/admin/api/resources",
   adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
   adminStudentDashboard: (studentRowId: number | string, school = "all") =>
     `/admin/students/${studentRowId}/dashboard?school=${encodeURIComponent(String(school || "all"))}`,

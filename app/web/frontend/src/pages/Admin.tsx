@@ -245,7 +245,7 @@ export default function AdminPage(props: AdminPageProps) {
   const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
   const resourceTypes = Array.isArray(props.adminResourceTypes) ? props.adminResourceTypes : [];
   const activeResourceTypes = Array.isArray(props.adminResourceActiveTypes) ? props.adminResourceActiveTypes : [];
-  const resources = Array.isArray(props.adminResources) ? props.adminResources : [];
+  const [resourcesList, setResourcesList] = useState<Array<Record<string, unknown>>>(Array.isArray(props.adminResources) ? props.adminResources : []);
   const quickStats = props.adminQuickStats || {};
   const schoolInfo = Array.isArray(props.adminSchoolInfo) ? props.adminSchoolInfo : [];
   const subjectInfo = Array.isArray(props.adminSubjectInfo) ? props.adminSubjectInfo : [];
@@ -276,6 +276,19 @@ export default function AdminPage(props: AdminPageProps) {
     error: false,
   });
   const [isSubmittingResource, setIsSubmittingResource] = useState(false);
+  const [resourceSubjectFilter, setResourceSubjectFilter] = useState("all");
+  const [editingResource, setEditingResource] = useState<{
+    id: number;
+    title: string;
+    description: string;
+    resourceFileKind: string;
+    thumbnailUrl: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [uploadFormKey, setUploadFormKey] = useState(0);
+  const editResourceFileRef = useRef<HTMLInputElement>(null);
+  const editThumbnailFileRef = useRef<HTMLInputElement>(null);
   const resourceUploadSocketRef = useRef<WebSocket | null>(null);
   const resourceUploadXhrRef = useRef<XMLHttpRequest | null>(null);
 
@@ -449,6 +462,53 @@ export default function AdminPage(props: AdminPageProps) {
     }
   }
 
+  async function refreshResources() {
+    try {
+      const res = await fetch(routes.adminResourcesApi);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.resources)) {
+          setResourcesList(data.resources);
+        }
+      }
+    } catch (_error) {
+      // ignore network errors silently
+    }
+  }
+
+  async function saveEditResource() {
+    if (!editingResource || editSaving) return;
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const formData = new FormData();
+      formData.set("resource_title", editingResource.title.trim());
+      formData.set("resource_description", editingResource.description.trim());
+      formData.set("csrf_token", props.csrfToken || "");
+      const resourceFile = editResourceFileRef.current?.files?.[0];
+      if (resourceFile) formData.set("resource_file", resourceFile);
+      const thumbnailFile = editThumbnailFileRef.current?.files?.[0];
+      if (thumbnailFile) formData.set("thumbnail_file", thumbnailFile);
+      const res = await fetch(routes.adminResourceEdit(editingResource.id), {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(asString(data.message) || "Unable to update resource.");
+        return;
+      }
+      setEditingResource(null);
+      setEditError("");
+      await refreshResources();
+    } catch (_error) {
+      setEditError("Network error. Please try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   async function submitResourceForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmittingResource) {
@@ -541,16 +601,15 @@ export default function AdminPage(props: AdminPageProps) {
           }
 
           if (ok) {
+            setIsSubmittingResource(false);
+            setUploadFormKey((k) => k + 1);
             setResourceUploadState({
               active: true,
               percent: 100,
               message: asString(payload.message) || "Resource saved.",
               error: false,
             });
-            const redirectUrl = asString(payload.redirect_url) || "/?panel=resources&school=all";
-            window.setTimeout(() => {
-              window.location.assign(redirectUrl);
-            }, 180);
+            refreshResources();
             return;
           }
 
@@ -565,15 +624,15 @@ export default function AdminPage(props: AdminPageProps) {
         }
 
         if (ok) {
+          setIsSubmittingResource(false);
+          setUploadFormKey((k) => k + 1);
           setResourceUploadState({
             active: true,
             percent: 100,
             message: "Resource saved.",
             error: false,
           });
-          window.setTimeout(() => {
-            window.location.assign("/?panel=resources&school=all");
-          }, 180);
+          refreshResources();
           return;
         }
 
@@ -1280,6 +1339,7 @@ export default function AdminPage(props: AdminPageProps) {
             <div className="space-y-4">
               <ChartCard title="Add Resource" icon={<Upload className="h-4 w-4 text-info" />}>
                 <form
+                  key={uploadFormKey}
                   action={routes.adminResourceAdd}
                   method="post"
                   encType="multipart/form-data"
@@ -1370,59 +1430,118 @@ export default function AdminPage(props: AdminPageProps) {
                 </form>
               </ChartCard>
 
-              <ChartCard title="Resources" subtitle={`${resources.length} total`} icon={<BookOpen className="h-4 w-4 text-info" />}>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px] text-left">
-                    <thead>
-                      <tr className="border-b border-foreground/5">
-                        {["ID", "Subject", "Type", "File", "Action"].map((heading) => (
-                          <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                            {heading}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {resources.length ? (
-                        resources.map((resource) => (
-                          <tr key={asNumber(resource.id)} className="border-b border-foreground/5">
-                            <td className="px-3 py-2.5 text-xs">{asNumber(resource.id)}</td>
-                            <td className="px-3 py-2.5 text-xs">{asString(resource.subject_name)}</td>
-                            <td className="px-3 py-2.5 text-xs">{asString(resource.resource_type_name)}</td>
-                            <td className="px-3 py-2.5 text-xs">
-                              {asString(resource.resource_file_url) ? (
-                                <a href={asString(resource.resource_file_url)} target="_blank" rel="noopener noreferrer" className="block max-w-[280px] truncate hover:underline">
-                                  {asString(resource.title) || "Open file"}
-                                </a>
-                              ) : asString(resource.title) ? (
-                                <span className="block max-w-[280px] truncate">{asString(resource.title)}</span>
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <form
-                                action={routes.adminResourceDelete(asNumber(resource.id))}
-                                method="post"
-                                onSubmit={(event) => submitConfirm(event, "Delete this resource?")}
-                              >
-                                <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
-                                <button className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive">Delete</button>
-                              </form>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-3 py-4 text-sm text-muted-foreground">
-                            No resources yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </ChartCard>
+              {(() => {
+                const resourceSubjects = Array.from(new Set(resourcesList.map((r) => asString(r.subject_name)).filter(Boolean)));
+                const filteredResources = resourceSubjectFilter === "all"
+                  ? resourcesList
+                  : resourcesList.filter((r) => asString(r.subject_name) === resourceSubjectFilter);
+                return (
+                  <ChartCard title="Resources" subtitle={`${resourcesList.length} total`} icon={<BookOpen className="h-4 w-4 text-info" />}>
+                    {/* Subject filter tabs */}
+                    {resourceSubjects.length > 1 ? (
+                      <div className="mb-3 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setResourceSubjectFilter("all")}
+                          className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            resourceSubjectFilter === "all" ? "bg-foreground text-background" : "bg-muted text-foreground hover:bg-foreground/10"
+                          }`}
+                        >
+                          All <span className="opacity-60">{resourcesList.length}</span>
+                        </button>
+                        {resourceSubjects.map((subject) => {
+                          const count = resourcesList.filter((r) => asString(r.subject_name) === subject).length;
+                          return (
+                            <button
+                              key={subject}
+                              type="button"
+                              onClick={() => setResourceSubjectFilter(subject)}
+                              className={`inline-flex shrink-0 snap-start items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                resourceSubjectFilter === subject ? "bg-foreground text-background" : "bg-muted text-foreground hover:bg-foreground/10"
+                              }`}
+                            >
+                              {subject} <span className="opacity-60">{count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {/* Table with vertical scroll when > 5 rows */}
+                    <div className="overflow-x-auto">
+                      <div className={filteredResources.length > 5 ? "max-h-80 overflow-y-auto rounded-lg" : ""}>
+                        <table className="w-full min-w-[800px] text-left">
+                          <thead className="sticky top-0 bg-surface">
+                            <tr className="border-b border-foreground/5">
+                              {["ID", "Subject", "Type", "Title", "Action"].map((heading) => (
+                                <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                  {heading}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredResources.length ? (
+                              filteredResources.map((resource) => (
+                                <tr key={asNumber(resource.id)} className="border-b border-foreground/5">
+                                  <td className="px-3 py-2.5 text-xs">{asNumber(resource.id)}</td>
+                                  <td className="px-3 py-2.5 text-xs">{asString(resource.subject_name)}</td>
+                                  <td className="px-3 py-2.5 text-xs">{asString(resource.resource_type_name)}</td>
+                                  <td className="px-3 py-2.5 text-xs">
+                                    {asString(resource.resource_file_url) ? (
+                                      <a href={asString(resource.resource_file_url)} target="_blank" rel="noopener noreferrer" className="block max-w-[260px] truncate hover:underline">
+                                        {asString(resource.title) || "Open file"}
+                                      </a>
+                                    ) : asString(resource.title) ? (
+                                      <span className="block max-w-[260px] truncate">{asString(resource.title)}</span>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingResource({
+                                            id: asNumber(resource.id),
+                                            title: asString(resource.title),
+                                            description: asString(resource.description),
+                                            resourceFileKind: asString(resource.resource_file_kind),
+                                            thumbnailUrl: asString(resource.thumbnail_url),
+                                          });
+                                          setEditError("");
+                                        }}
+                                        className="flex items-center gap-1 rounded-lg bg-muted px-3 py-2 text-xs font-bold text-foreground hover:bg-foreground/10"
+                                      >
+                                        <Pencil className="h-3 w-3" /> Edit
+                                      </button>
+                                      <form
+                                        action={routes.adminResourceDelete(asNumber(resource.id))}
+                                        method="post"
+                                        onSubmit={(event) => submitConfirm(event, "Delete this resource?")}
+                                      >
+                                        <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
+                                        <button className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-bold text-destructive">Delete</button>
+                                      </form>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-4 text-sm text-muted-foreground">
+                                  No resources yet.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </ChartCard>
+                );
+              })()}
             </div>
           </div>
         ) : null}
@@ -1535,6 +1654,120 @@ export default function AdminPage(props: AdminPageProps) {
           </div>
         ) : null}
       </main>
+
+      {/* Edit resource modal */}
+      {editingResource ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4"
+          onClick={() => { setEditingResource(null); setEditError(""); }}
+        >
+          <div
+            className="flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-foreground/5 px-5 py-3">
+              <h3 className="text-sm font-bold">Edit Resource</h3>
+              <button
+                type="button"
+                onClick={() => { setEditingResource(null); setEditError(""); }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="space-y-3 px-5 py-4">
+                {editError ? <p className="text-xs font-semibold text-destructive">{editError}</p> : null}
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Title</span>
+                  <input
+                    type="text"
+                    value={editingResource.title}
+                    onChange={(e) => setEditingResource((prev) => prev ? { ...prev, title: e.target.value } : null)}
+                    maxLength={180}
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none focus:border-foreground/30"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
+                  <textarea
+                    value={editingResource.description}
+                    onChange={(e) => setEditingResource((prev) => prev ? { ...prev, description: e.target.value } : null)}
+                    rows={3}
+                    maxLength={2000}
+                    className="w-full resize-none rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none focus:border-foreground/30"
+                  />
+                </label>
+
+                {/* Swap video / file */}
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {editingResource.resourceFileKind === "video" ? "Swap Video" : "Replace File"}
+                    <span className="ml-1 font-normal normal-case text-muted-foreground/60">(optional — leave empty to keep current)</span>
+                  </span>
+                  <input
+                    ref={editResourceFileRef}
+                    type="file"
+                    name="resource_file"
+                    accept={editingResource.resourceFileKind === "video" ? "video/mp4,video/quicktime,video/x-m4v" : undefined}
+                    disabled={editSaving}
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none disabled:opacity-50"
+                  />
+                </label>
+
+                {/* Swap thumbnail — only for videos */}
+                {editingResource.resourceFileKind === "video" ? (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {editingResource.thumbnailUrl ? "Swap Thumbnail" : "Add Thumbnail"}
+                      <span className="ml-1 font-normal normal-case text-muted-foreground/60">(optional)</span>
+                    </span>
+                    {editingResource.thumbnailUrl ? (
+                      <img
+                        src={editingResource.thumbnailUrl}
+                        alt="Current thumbnail"
+                        className="mb-2 h-20 w-auto rounded-lg object-cover"
+                      />
+                    ) : null}
+                    <input
+                      ref={editThumbnailFileRef}
+                      type="file"
+                      name="thumbnail_file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={editSaving}
+                      className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none disabled:opacity-50"
+                    />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex shrink-0 gap-2 border-t border-foreground/5 px-5 py-3">
+              <button
+                type="button"
+                disabled={editSaving}
+                onClick={saveEditResource}
+                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {editSaving ? "Saving..." : "Save"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditingResource(null); setEditError(""); }}
+                className="rounded-xl bg-muted px-5 py-2.5 text-sm font-bold text-muted-foreground hover:bg-foreground/10"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, ExternalLink, FileText, Link, Loader2, MessageSquare, Play, Send, X } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Link, Loader2, MessageSquare, Play, Send, X, ChevronRight } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/components/TelegramLayout";
 
 interface ResourceRow {
@@ -212,7 +212,7 @@ function ResourceCard({
   );
 }
 
-// ─── Group card ───────────────────────────────────────────────────────────────
+// ─── Group card (horizontal cards, used for "all" view) ──────────────────────
 
 function ResourceGroupCard({
   group,
@@ -232,13 +232,88 @@ function ResourceGroupCard({
         </span>
       </div>
 
-      {/* Horizontal scroll row for ALL resource types */}
+      {/* Horizontal scroll row */}
       {group.resources.length > 0 ? (
         <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-3 pt-1 sm:px-5">
           {group.resources.map((item) => (
             <ResourceCard key={item.id} item={item} onOpen={onOpen} />
           ))}
           <div className="w-1 shrink-0" aria-hidden="true" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── Table view (used when a single type filter is active) ────────────────────
+
+function ResourceTableGroup({
+  group,
+  onOpen,
+}: {
+  group: ResourceGroup;
+  onOpen: (modal: ResourceModalState) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-surface shadow-card">
+      {/* Header */}
+      <div className="flex min-w-0 items-center gap-2 px-4 pb-2 pt-3 sm:px-5 sm:pt-4">
+        <BookOpen className="h-4 w-4 shrink-0 text-info" />
+        <h3 className="min-w-0 flex-1 text-sm font-bold">{group.resource_type_name}</h3>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {group.resources.length} item{group.resources.length === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {/* Table */}
+      {group.resources.length > 0 ? (
+        <div className="overflow-x-auto px-0 pb-3">
+          <table className="w-full min-w-[380px] text-left">
+            <thead>
+              <tr className="border-b border-foreground/5">
+                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Title</th>
+                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Type</th>
+                <th className="px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:px-5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.resources.map((item) => {
+                const video = isVideo(item);
+                const badge = video ? "Video" : item.resource_file_url ? "File" : "Link";
+                const icon = video
+                  ? <Play className="h-3.5 w-3.5 translate-x-px" />
+                  : item.resource_file_url
+                  ? <FileText className="h-3.5 w-3.5" />
+                  : <Link className="h-3.5 w-3.5" />;
+                return (
+                  <tr
+                    key={item.id}
+                    className="group cursor-pointer border-b border-foreground/5 transition-colors last:border-0 hover:bg-foreground/4"
+                    onClick={() => onOpen(buildModal(item))}
+                  >
+                    <td className="px-4 py-2.5 sm:px-5">
+                      <div className="flex items-center gap-2.5">
+                        {item.thumbnail_url ? (
+                          <img src={item.thumbnail_url} alt={item.title} className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground/8 text-foreground/60">
+                            {icon}
+                          </span>
+                        )}
+                        <span className="min-w-0 text-xs font-semibold leading-snug line-clamp-2">{item.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 sm:px-5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{badge}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right sm:px-5">
+                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : null}
     </div>
@@ -325,11 +400,19 @@ export default function ResourcesPage(props: ResourcesPageProps) {
         {/* Resource groups */}
         {visibleGroups.length ? (
           visibleGroups.map((group, i) => (
-            <ResourceGroupCard
-              key={activeFilter === "all" ? `g-${i}` : activeFilter}
-              group={group}
-              onOpen={setModal}
-            />
+            activeFilter === "all" ? (
+              <ResourceGroupCard
+                key={`g-${i}`}
+                group={group}
+                onOpen={setModal}
+              />
+            ) : (
+              <ResourceTableGroup
+                key={activeFilter}
+                group={group}
+                onOpen={setModal}
+              />
+            )
           ))
         ) : (
           <div className="rounded-2xl border border-foreground/10 bg-surface p-4 shadow-card">

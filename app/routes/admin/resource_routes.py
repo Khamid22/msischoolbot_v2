@@ -6,7 +6,9 @@ from app.routes.admin.services.resources_service import (
     create_resource_type,
     delete_resource,
     delete_resource_type,
+    list_resources,
     rename_resource_type,
+    update_resource,
 )
 from app.routes.admin.services.upload_progress_service import (
     begin_upload,
@@ -258,3 +260,38 @@ def register_admin_resource_routes(
             admin_notice="Resource deleted.",
             admin_panel="resources",
         )
+
+    @router.post("/admin/resources/<int:resource_id>/edit")
+    def edit_resource_route(resource_id):
+        title = request.form.get("resource_title", "").strip()
+        description = request.form.get("resource_description", "").strip()
+        new_resource_file = request.files.get("resource_file") or None
+        new_thumbnail_file = request.files.get("thumbnail_file") or None
+        updated, update_error = update_resource(
+            resource_id,
+            title=title,
+            description=description,
+            new_resource_file=new_resource_file,
+            new_thumbnail_file=new_thumbnail_file,
+        )
+        if not updated:
+            if is_xhr_request():
+                return xhr_error(update_error or "Unable to update resource.")
+            return (
+                render_admin_page(
+                    auth_error=update_error or "Unable to update resource.",
+                    admin_panel="resources",
+                ),
+                400,
+            )
+        if is_xhr_request():
+            return jsonify({"ok": True, "message": "Resource updated."})
+        return render_admin_page(
+            admin_notice="Resource updated.",
+            admin_panel="resources",
+        )
+
+    @router.get("/admin/api/resources")
+    def list_resources_api():
+        resources = list_resources(include_inactive=False)
+        return jsonify({"resources": resources})

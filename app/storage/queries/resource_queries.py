@@ -350,6 +350,23 @@ def update_resource_row(conn, resource_id, title, description, updated_at):
     return int(updated.rowcount or 0)
 
 
+def update_resource_full_row(conn, resource_id, title, description, resource_file_path, thumbnail_file_path, updated_at):
+    updated = conn.execute(
+        """
+        UPDATE resources
+        SET
+            title = ?,
+            description = ?,
+            resource_file_path = ?,
+            thumbnail_file_path = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (title, description, resource_file_path, thumbnail_file_path, updated_at, int(resource_id)),
+    )
+    return int(updated.rowcount or 0)
+
+
 def delete_resource_row_by_id(conn, resource_id):
     deleted = conn.execute(
         """
@@ -458,6 +475,7 @@ __all__ = [
     "insert_resource_row",
     "update_resource_active",
     "update_resource_row",
+    "update_resource_full_row",
     "count_resources_by_type",
     "delete_resource_row_by_id",
     "get_resource_row_by_id",

@@ -9,6 +9,7 @@ from .r2_storage_service import (
     delete_resource_file,
     infer_resource_mime_type,
     is_r2_configured,
+    upload_resource_file,
     upload_thumbnail_file,
 )
 
@@ -437,6 +438,84 @@ def create_resource(
     return True, ""
 
 
+def update_resource(resource_id, *, title, description="", new_resource_file=None, new_thumbnail_file=None):
+    try:
+        parsed_resource_id = int(resource_id)
+    except (TypeError, ValueError):
+        return False, "Invalid resource."
+    if parsed_resource_id <= 0:
+        return False, "Invalid resource."
+
+    normalized_title = str(title or "").strip()
+    if not normalized_title:
+        return False, "Resource title is required."
+    if len(normalized_title) > 180:
+        return False, "Resource title is too long."
+
+    normalized_description = str(description or "").strip()
+    if len(normalized_description) > 2000:
+        return False, "Description is too long."
+
+    # Read existing record to get current file paths and subject
+    with _connect() as conn:
+        _ensure_storage(conn)
+        existing = queries.get_resource_row_by_id(conn, parsed_resource_id)
+    if not existing:
+        return False, "Resource was not found."
+
+    existing_subject_name = str(existing["subject_name"] or "").strip()
+    existing_resource_file_path = str(existing["resource_file_path"] or "").strip()
+    existing_thumbnail_file_path = str(existing["thumbnail_file_path"] or "").strip()
+
+    # Upload replacement resource file if provided
+    new_resource_file_path = ""
+    if new_resource_file and str(new_resource_file.filename or "").strip():
+        new_resource_file_path, upload_error = upload_resource_file(
+            new_resource_file,
+            subject_name=existing_subject_name,
+        )
+        if upload_error:
+            return False, upload_error
+
+    # Upload replacement thumbnail if provided
+    new_thumbnail_file_path = ""
+    if new_thumbnail_file and str(new_thumbnail_file.filename or "").strip():
+        new_thumbnail_file_path, thumb_error = upload_thumbnail_file(
+            new_thumbnail_file,
+            subject_name=existing_subject_name,
+        )
+        if thumb_error:
+            if new_resource_file_path:
+                delete_resource_file(new_resource_file_path)
+            return False, thumb_error
+
+    final_resource_file_path = new_resource_file_path or existing_resource_file_path
+    final_thumbnail_file_path = new_thumbnail_file_path or existing_thumbnail_file_path
+
+    now = _utc_now_iso()
+    with _DB_LOCK:
+        with _connect() as conn:
+            _ensure_storage(conn)
+            queries.update_resource_full_row(
+                conn,
+                parsed_resource_id,
+                normalized_title,
+                normalized_description,
+                final_resource_file_path,
+                final_thumbnail_file_path,
+                now,
+            )
+            conn.commit()
+
+    # Delete old R2 files that were replaced
+    if new_resource_file_path and existing_resource_file_path and new_resource_file_path != existing_resource_file_path:
+        delete_resource_file(existing_resource_file_path)
+    if new_thumbnail_file_path and existing_thumbnail_file_path and new_thumbnail_file_path != existing_thumbnail_file_path:
+        delete_resource_file(existing_thumbnail_file_path)
+
+    return True, ""
+
+
 def set_resource_active(resource_id, is_active):
     try:
         parsed_resource_id = int(resource_id)
@@ -614,6 +693,7 @@ __all__ = [
     "delete_resource_type",
     "list_resource_subject_names",
     "create_resource",
+    "update_resource",
     "set_resource_active",
     "delete_resource",
     "list_resources",
