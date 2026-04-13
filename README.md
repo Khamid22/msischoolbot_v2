@@ -157,6 +157,22 @@ Run only bot:
 python main.py bot
 ```
 
+## SQLite -> PostgreSQL Migration
+
+If you have old data in local SQLite and want to move it to Railway PostgreSQL:
+
+```bash
+DATABASE_URL="postgresql://<user>:<pass>@<host>:<port>/<db>?sslmode=require" \
+python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path utils/app_data.sqlite3 \
+  --truncate-target
+```
+
+Notes:
+- Run this once before switching production traffic.
+- `--truncate-target` is recommended for first migration into a new/empty Postgres DB.
+- If you run migration from your local machine, use Railway public DB URL (`DATABASE_PUBLIC_URL`), not `*.railway.internal`.
+
 Recommended in production (separate processes):
 
 ```bash
