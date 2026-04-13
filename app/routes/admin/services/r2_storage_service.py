@@ -139,8 +139,8 @@ def _max_upload_bytes():
 
 
 def _video_optimize_enabled():
-    # Default is disabled for faster admin uploads; enable explicitly when needed.
-    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE", "0").strip().lower()
+    # Default is enabled so uploaded videos are web-optimized out of the box.
+    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE", "1").strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
 
 
@@ -172,7 +172,8 @@ def _video_max_width():
 
 
 def _video_crf():
-    raw_value = _env("RESOURCE_VIDEO_CRF", "26")
+    # Higher CRF -> smaller file size, lower visual quality.
+    raw_value = _env("RESOURCE_VIDEO_CRF", "28")
     try:
         parsed = int(raw_value)
     except ValueError:
@@ -181,7 +182,8 @@ def _video_crf():
 
 
 def _video_preset():
-    preset = _env("RESOURCE_VIDEO_PRESET", "ultrafast").strip().lower()
+    # veryfast is a practical balance between upload-time CPU and output size.
+    preset = _env("RESOURCE_VIDEO_PRESET", "veryfast").strip().lower()
     allowed = {
         "ultrafast",
         "superfast",
@@ -486,7 +488,7 @@ def _optimize_video_payload(payload, source_extension, ffmpeg_path=""):
         ):
             try:
                 remux_command = [
-                    ffmpeg_path,
+                    resolved_ffmpeg,
                     "-y",
                     "-hide_banner",
                     "-loglevel",
