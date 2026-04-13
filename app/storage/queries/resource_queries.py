@@ -242,9 +242,10 @@ def ensure_default_resource_types(conn, created_at):
 def list_resource_subject_names(conn):
     rows = conn.execute(
         """
-        SELECT DISTINCT subject_name
+        SELECT subject_name
         FROM resources
         WHERE trim(coalesce(subject_name, '')) <> ''
+        GROUP BY subject_name
         ORDER BY lower(subject_name) ASC
         """
     ).fetchall()
@@ -332,6 +333,21 @@ def count_resources_by_type(conn, resource_type_id):
         return int(row["row_count"] or 0)
     except (TypeError, ValueError, KeyError):
         return 0
+
+
+def update_resource_row(conn, resource_id, title, description, updated_at):
+    updated = conn.execute(
+        """
+        UPDATE resources
+        SET
+            title = ?,
+            description = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (title, description, updated_at, int(resource_id)),
+    )
+    return int(updated.rowcount or 0)
 
 
 def delete_resource_row_by_id(conn, resource_id):
@@ -441,6 +457,7 @@ __all__ = [
     "list_resource_subject_names",
     "insert_resource_row",
     "update_resource_active",
+    "update_resource_row",
     "count_resources_by_type",
     "delete_resource_row_by_id",
     "get_resource_row_by_id",
