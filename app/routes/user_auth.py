@@ -136,10 +136,6 @@ def register_user_auth_routes(
     @students.get("/admin")
     def admin_entry():
         if current_auth_role() == "admin":
-            if _is_telegram_mini_app_request():
-                handoff_url = _build_admin_handoff_url(_current_admin_session_payload())
-                if handoff_url:
-                    return render_admin_redirect_page(handoff_url)
             return redirect(url_for("student.home", panel="overview", school="all"))
         if current_auth_role() == "student":
             return redirect(url_for("student.home"))
@@ -165,11 +161,6 @@ def register_user_auth_routes(
         role = current_auth_role()
 
         if role == "admin":
-            if _is_telegram_mini_app_request():
-                handoff_url = _build_admin_handoff_url(_current_admin_session_payload())
-                if handoff_url:
-                    return render_admin_redirect_page(handoff_url)
-
             panel_arg = str(request.args.get("panel", "")).strip().lower()
             school_arg = str(request.args.get("school", "")).strip().lower()
             saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
@@ -242,28 +233,12 @@ def register_user_auth_routes(
             ), 400
 
         if role_hint == "admin":
-            if _is_telegram_mini_app_request():
-                return render_login_page(
-                    auth_error="Admin access is available on the website only.",
-                    auth_login_input="",
-                ), 403
-
             admin = verify_admin_credentials(login_value, password_value)
             if not admin:
                 return render_login_page(
                     auth_error="Invalid admin credentials.",
                     auth_login_input=login_value,
                 ), 401
-
-            telegram_user_id = parse_telegram_user_id(login_form.telegram_user_id.data)
-            if telegram_user_id is not None:
-                handoff_url = _build_admin_handoff_url(admin)
-                if not handoff_url:
-                    return render_login_page(
-                        auth_error="Unable to open the admin website. Please try again.",
-                        auth_login_input=login_value,
-                    ), 500
-                return render_admin_redirect_page(handoff_url)
 
             set_admin_session(admin)
             session["admin_last_panel"] = "overview"

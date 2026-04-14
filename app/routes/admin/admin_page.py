@@ -100,7 +100,7 @@ def register_admin_page_routes(
             },
             title="MSI Admin Panel",
             description="Admin panel for school performance, teachers, students, and resources.",
-            telegram=False,
+            telegram=True,
         )
 
     def render_edit_student_page(student_row_id, auth_error="", admin_notice=""):
@@ -124,7 +124,7 @@ def register_admin_page_routes(
             },
             title="Edit Student Profile",
             description="Edit student profile details.",
-            telegram=False,
+            telegram=True,
             back_mode="history",
             back_url=back_url,
         )
