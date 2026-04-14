@@ -1,12 +1,13 @@
 import os
 import time
 
-from flask import current_app, redirect, request, session, url_for
+from flask import current_app, jsonify, redirect, request, session, url_for
 from werkzeug.utils import secure_filename
 
 from app.routes.admin.services.auth_service import (
     assign_teacher_to_group,
     get_admin_student_profile,
+    list_students_for_admin,
     list_teachers,
     update_student_admin_profile,
 )
@@ -21,6 +22,14 @@ def register_admin_student_routes(
     delete_uploaded_student_photo,
     load_dataset,
 ):
+    @router.get("/admin/api/students")
+    def admin_students_api():
+        school_filter = str(request.args.get("school", "all")).strip().casefold()
+        if school_filter not in {"all", "school5", "sehriyo"}:
+            school_filter = "all"
+        students = list_students_for_admin(school_filter=school_filter)
+        return jsonify({"students": students})
+
     @router.get("/admin/students/<int:student_row_id>")
     def admin_student_profile(student_row_id):
         admin_notice = request.args.get("notice", "").strip()

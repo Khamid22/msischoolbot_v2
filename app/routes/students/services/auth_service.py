@@ -29,7 +29,7 @@ _STUDENT_ACTIVITY_IN_FLIGHT = set()
 _STUDENT_ACTIVITY_LAST_FLUSHED = {}
 _STUDENT_ACTIVITY_MAX_TRACKED_IDS = 4096
 _STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS = max(
-    int(str(os.environ.get("STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS", "30") or "30")),
+    int(str(os.environ.get("STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS", "10") or "10")),
     5,
 )
 _STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS = max(
@@ -271,6 +271,21 @@ def _normalize_name(value):
     return " ".join(str(value or "").strip().casefold().split())
 
 
+def _subject_sort_key(subject_name):
+    normalized = str(subject_name or "").strip().casefold()
+    if normalized in {"igcse mathematics a", "igcse math a", "mathematics", "math"}:
+        return (0, normalized)
+    if normalized in {"general english", "english"}:
+        return (1, normalized)
+    if normalized == "chemistry":
+        return (2, normalized)
+    if normalized == "biology":
+        return (3, normalized)
+    if normalized == "physics":
+        return (4, normalized)
+    return (999, normalized)
+
+
 def _split_subjects(subjects_value):
     normalized = str(subjects_value or "").replace(";", ",")
     parts = [part.strip() for part in normalized.split(",")]
@@ -488,7 +503,7 @@ def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
         ),
     )
     for index, item in enumerate(grouped_items, start=1):
-        subjects_sorted = sorted(item["subjects_set"], key=lambda value: value.casefold())
+        subjects_sorted = sorted(item["subjects_set"], key=_subject_sort_key)
         results.append(
             {
                 "display_id": index,

@@ -19,6 +19,7 @@ class AppFactoryPhase1Tests(unittest.TestCase):
         self.assertIn("/", rules)
         self.assertIn("/login", rules)
         self.assertIn("/dashboard/<int:student_id>", rules)
+        self.assertIn("/api/activity/ping", rules)
         self.assertIn("/webhooks/google-sheets", rules)
 
 

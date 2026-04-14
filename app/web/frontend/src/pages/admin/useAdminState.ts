@@ -13,13 +13,43 @@ import {
   availableGradesForRow,
   buildAdminTabUrl,
   buildUploadWebSocketUrl,
+  compareSubjectsMathFirst,
   createUploadId,
+  findPreferredMathSubject,
   filterGroupsByGrade,
   filterMonthlySeriesByGrade,
   formatMonthKeyLabel,
   normalizeAdminTab,
+  sortSubjectsMathFirst,
   trimEmptyMonthlyMonths,
 } from "./shared";
+
+function preferredSchoolCode(schoolCodes: string[]) {
+  if (schoolCodes.includes("sehriyo")) {
+    return "sehriyo";
+  }
+  return schoolCodes[0] || "";
+}
+
+function normalizeStudentSubjects(value: unknown) {
+  const subjects = asString(value)
+    .replace(/;/g, ",")
+    .split(",")
+    .map((item: string) => asString(item))
+    .filter(Boolean);
+  return sortSubjectsMathFirst(subjects).join(", ");
+}
+
+function normalizeStudentRows(rows: Array<Record<string, unknown>>) {
+  return rows.map((row) => ({
+    ...row,
+    subjects: normalizeStudentSubjects(row.subjects),
+  }));
+}
+
+function preferredSubjectName(rows: Array<Record<string, unknown>>) {
+  return findPreferredMathSubject(rows.map((row) => asString(row.subject_name)));
+}
 
 export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
@@ -34,7 +64,9 @@ export function useAdminState(props: AdminPageProps) {
         option && typeof option.code === "string" && typeof option.label === "string"
       )
   );
-  const students = Array.isArray(props.adminStudents) ? props.adminStudents : [];
+  const [students, setStudents] = useState<Array<Record<string, unknown>>>(() =>
+    normalizeStudentRows(Array.isArray(props.adminStudents) ? props.adminStudents : [])
+  );
   const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
   const resourceTypes = Array.isArray(props.adminResourceTypes) ? props.adminResourceTypes : [];
   const activeResourceTypes = Array.isArray(props.adminResourceActiveTypes)
@@ -61,8 +93,10 @@ export function useAdminState(props: AdminPageProps) {
   const teacherEdit = props.adminTeacherEdit || null;
 
   const availableSubjectSchools = schoolOptions.filter((option) => option.code !== "all");
-  const initialSchool =
-    props.adminTeacherEditSchool || availableSubjectSchools[0]?.code || "all";
+  const preferredSchool = preferredSchoolCode(
+    availableSubjectSchools.map((option) => option.code)
+  );
+  const initialSchool = props.adminTeacherEditSchool || preferredSchool || "all";
   const [teacherMode, setTeacherMode] = useState(teacherEdit ? "add" : "select");
   const [teacherSchool, setTeacherSchool] = useState(initialSchool);
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,15 +105,17 @@ export function useAdminState(props: AdminPageProps) {
     currentSchool !== "all" &&
     availableSubjectSchools.some((option) => option.code === currentSchool)
       ? currentSchool
-      : availableSubjectSchools[0]?.code || "";
+      : preferredSchool;
   const [selectedOverviewSchool, setSelectedOverviewSchool] = useState(
     initialOverviewSchool
   );
-  const schoolSubjectRows = subjectInfo.filter(
-    (row) => asString(row.school_key).toLowerCase() === selectedOverviewSchool
-  );
+  const schoolSubjectRows = subjectInfo
+    .filter((row) => asString(row.school_key).toLowerCase() === selectedOverviewSchool)
+    .sort((left, right) =>
+      compareSubjectsMathFirst(asString(left.subject_name), asString(right.subject_name))
+    );
   const [selectedSubjectName, setSelectedSubjectName] = useState(
-    asString(schoolSubjectRows[0]?.subject_name)
+    preferredSubjectName(schoolSubjectRows)
   );
   const [selectedSehriyoGrade, setSelectedSehriyoGrade] = useState<OverviewGrade | "">(
     ""
@@ -203,6 +239,24 @@ export function useAdminState(props: AdminPageProps) {
       .catch(() => {});
   }
 
+  async function refreshStudents() {
+    try {
+      const url = `${routes.adminStudentsApi}?school=${encodeURIComponent(
+        String(currentSchool || "all")
+      )}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        return;
+      }
+      const data = await res.json();
+      if (Array.isArray(data.students)) {
+        setStudents(normalizeStudentRows(data.students));
+      }
+    } catch (_error) {
+      // ignore transient network failures for background polling
+    }
+  }
+
   useEffect(() => {
     setActiveTab(normalizeAdminTab(props.adminPanel));
   }, [props.adminPanel]);
@@ -212,6 +266,12 @@ export function useAdminState(props: AdminPageProps) {
       setResourcesList(props.adminResources);
     }
   }, [props.adminResources]);
+
+  useEffect(() => {
+    if (Array.isArray(props.adminStudents)) {
+      setStudents(normalizeStudentRows(props.adminStudents));
+    }
+  }, [props.adminStudents]);
 
   useEffect(() => {
     if (activeTab === "chat") {
@@ -238,7 +298,7 @@ export function useAdminState(props: AdminPageProps) {
       currentSchool !== "all" &&
       availableSubjectSchools.some((option) => option.code === currentSchool)
         ? currentSchool
-        : availableSubjectSchools[0]?.code || "";
+        : preferredSchoolCode(availableSubjectSchools.map((option) => option.code));
     setSelectedOverviewSchool(preferredSchool);
   }, [availableSubjectSchools, currentSchool, selectedOverviewSchool]);
 
@@ -253,9 +313,28 @@ export function useAdminState(props: AdminPageProps) {
       (row) => asString(row.subject_name) === selectedSubjectName
     );
     if (!selectedSubjectStillExists) {
-      setSelectedSubjectName(asString(schoolSubjectRows[0]?.subject_name));
+      setSelectedSubjectName(preferredSubjectName(schoolSubjectRows));
     }
   }, [schoolSubjectRows, selectedSubjectName]);
+
+  useEffect(() => {
+    if (activeTab !== "students") {
+      return;
+    }
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled || document.visibilityState === "hidden") {
+        return;
+      }
+      await refreshStudents();
+    };
+    run();
+    const intervalId = window.setInterval(run, 12000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeTab, currentSchool]);
 
   const filteredTeacherOptions = teacherOptions.filter((option) => {
     if (!teacherSchool) {

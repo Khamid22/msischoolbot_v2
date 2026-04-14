@@ -118,6 +118,12 @@ def register_dashboard_routes(
         payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
         school_code = str(payload_student.get("schoolCode", "")).strip() or requested_school
         last_updated_at = get_school_dataset_last_updated(school_code=school_code)
+        try:
+            last_updated_at_value = float(last_updated_at)
+        except (TypeError, ValueError):
+            last_updated_at_value = None
+        if isinstance(last_updated_at_value, float) and last_updated_at_value <= 0:
+            last_updated_at_value = None
 
         refresh_subject = requested_subject or str(payload_student.get("subject", "")).strip()
         refresh_group = requested_group or str(payload_student.get("group", "")).strip()
@@ -171,6 +177,7 @@ def register_dashboard_routes(
                 "dashboardBackUrl": context["dashboard_back_url"],
                 "refreshUrl": context.get("refresh_url", ""),
                 "lastUpdatedLabel": context.get("last_updated_label", ""),
+                "lastUpdatedAt": last_updated_at_value,
                 "csrfToken": generate_csrf(),
                 "logoutUrl": url_for("student.logout"),
                 "changePasswordUrl": url_for("student.profile_change_password"),

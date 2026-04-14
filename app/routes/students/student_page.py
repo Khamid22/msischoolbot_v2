@@ -1,4 +1,4 @@
-from flask import Blueprint, url_for
+from flask import Blueprint, jsonify, url_for
 from flask_wtf.csrf import generate_csrf
 
 from app.web.render import render_react_page
@@ -89,6 +89,10 @@ def register_student_page_routes(
         student_db_id = current_student_db_id()
         if student_db_id is not None:
             record_student_activity(student_db_id)
+
+    @students.get("/api/activity/ping")
+    def activity_ping():
+        return jsonify({"ok": True})
 
     register_user_auth_routes(
         students,

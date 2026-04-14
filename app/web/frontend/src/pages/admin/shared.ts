@@ -75,6 +75,60 @@ export function asString(value: unknown) {
   return String(value || "").trim();
 }
 
+export function normalizeSubjectKey(value: unknown) {
+  return asString(value)
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+export function isMathSubject(value: unknown) {
+  const normalized = normalizeSubjectKey(value);
+  return (
+    normalized === "igcse mathematics a" ||
+    normalized === "igcse math a" ||
+    normalized === "mathematics" ||
+    normalized === "math"
+  );
+}
+
+function subjectPriorityTuple(value: unknown): [number, string] {
+  const normalized = normalizeSubjectKey(value);
+  if (isMathSubject(normalized)) {
+    return [0, normalized];
+  }
+  if (normalized === "general english" || normalized === "english") {
+    return [1, normalized];
+  }
+  if (normalized === "chemistry") {
+    return [2, normalized];
+  }
+  if (normalized === "biology") {
+    return [3, normalized];
+  }
+  if (normalized === "physics") {
+    return [4, normalized];
+  }
+  return [999, normalized];
+}
+
+export function compareSubjectsMathFirst(left: unknown, right: unknown) {
+  const leftKey = subjectPriorityTuple(left);
+  const rightKey = subjectPriorityTuple(right);
+  if (leftKey[0] !== rightKey[0]) {
+    return leftKey[0] - rightKey[0];
+  }
+  return leftKey[1].localeCompare(rightKey[1]);
+}
+
+export function sortSubjectsMathFirst(subjects: string[]) {
+  return [...subjects].sort(compareSubjectsMathFirst);
+}
+
+export function findPreferredMathSubject(subjects: string[]) {
+  const prioritized = sortSubjectsMathFirst(subjects.filter(Boolean));
+  return prioritized[0] || "";
+}
+
 export function asNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;

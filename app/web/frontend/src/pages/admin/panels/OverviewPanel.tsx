@@ -22,7 +22,7 @@ import {
 } from "recharts";
 import { ChartCard } from "@/components/ChartCard";
 import { StatCard } from "@/components/StatCard";
-import { OverviewGrade, asNumber, asString } from "../shared";
+import { OverviewGrade, asNumber, asString, findPreferredMathSubject } from "../shared";
 
 export default function OverviewPanel({ state }: { state: any }) {
   const {
@@ -105,7 +105,11 @@ export default function OverviewPanel({ state }: { state: any }) {
                 const nextRows = subjectInfo.filter(
                   (row: Record<string, unknown>) => asString(row.school_key).toLowerCase() === nextSchool
                 );
-                setSelectedSubjectName(asString(nextRows[0]?.subject_name));
+                setSelectedSubjectName(
+                  findPreferredMathSubject(
+                    nextRows.map((row: Record<string, unknown>) => asString(row.subject_name))
+                  )
+                );
               }}
               className="rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none"
             >

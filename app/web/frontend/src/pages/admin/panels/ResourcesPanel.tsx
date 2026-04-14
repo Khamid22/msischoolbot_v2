@@ -1,7 +1,7 @@
 import { BookOpen, Pencil, Plus, Upload } from "lucide-react";
 import { ChartCard } from "@/components/ChartCard";
 import { routes } from "@/lib/routes";
-import { asNumber, asString, submitConfirm } from "../shared";
+import { asNumber, asString, sortSubjectsMathFirst, submitConfirm } from "../shared";
 
 export default function ResourcesPanel({ state }: { state: any }) {
   const {
@@ -20,6 +20,12 @@ export default function ResourcesPanel({ state }: { state: any }) {
     setEditingResource,
     setEditError,
   } = state;
+  const uploadSubjectOptions = sortSubjectsMathFirst(
+    Array.isArray(props.adminResourceSubjectOptions)
+      ? props.adminResourceSubjectOptions
+      : []
+  );
+  const defaultUploadSubject = uploadSubjectOptions[0] || "";
 
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -106,11 +112,18 @@ export default function ResourcesPanel({ state }: { state: any }) {
             <input type="hidden" name="upload_id" value="" />
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subject</span>
-              <select name="resource_subject_name" required className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none">
-                <option value="" disabled>
-                  Select subject
-                </option>
-                {(props.adminResourceSubjectOptions || []).map((subjectName: string) => (
+              <select
+                name="resource_subject_name"
+                required
+                defaultValue={defaultUploadSubject}
+                className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none"
+              >
+                {!defaultUploadSubject ? (
+                  <option value="" disabled>
+                    Select subject
+                  </option>
+                ) : null}
+                {uploadSubjectOptions.map((subjectName: string) => (
                   <option key={subjectName} value={subjectName}>
                     {subjectName}
                   </option>
@@ -192,11 +205,13 @@ export default function ResourcesPanel({ state }: { state: any }) {
         </ChartCard>
 
         {(() => {
-          const resourceSubjects: string[] = Array.from(
-            new Set(
-              resourcesList
-                .map((r: Record<string, unknown>) => asString(r.subject_name))
-                .filter(Boolean)
+          const resourceSubjects: string[] = sortSubjectsMathFirst(
+            Array.from(
+              new Set(
+                resourcesList
+                  .map((r: Record<string, unknown>) => asString(r.subject_name))
+                  .filter(Boolean)
+              )
             )
           );
           const filteredResources =

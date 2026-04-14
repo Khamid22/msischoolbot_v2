@@ -3,9 +3,30 @@ import re
 from datetime import datetime
 from typing import Any
 
+_MATH_SUBJECT_ALIASES = {
+    "igcse mathematics a",
+    "igcse math a",
+    "mathematics",
+    "math",
+}
+_SUBJECT_PRIORITY = {
+    "general english": 1,
+    "english": 1,
+    "chemistry": 2,
+    "biology": 3,
+    "physics": 4,
+}
+
 
 def normalize_text(value):
     return " ".join(str(value or "").strip().casefold().split())
+
+
+def subject_priority_key(subject_name):
+    normalized = normalize_text(subject_name)
+    if normalized in _MATH_SUBJECT_ALIASES:
+        return (0, normalized)
+    return (_SUBJECT_PRIORITY.get(normalized, 999), normalized)
 
 
 def safe_float(value):
@@ -593,7 +614,7 @@ def build_admin_subject_info(metrics, dataset = None, school_option_catalog = No
     rows.sort(
         key=lambda row: (
             normalize_text(row.get("school_name", "")),
-            normalize_text(row.get("subject_name", "")),
+            subject_priority_key(row.get("subject_name", "")),
         )
     )
     return rows

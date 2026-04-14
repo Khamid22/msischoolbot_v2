@@ -33,6 +33,26 @@ from .resources_service import (
 
 _ADMIN_PAGE_CONTEXT_CACHE_LOCK = threading.Lock()
 _ADMIN_PAGE_CONTEXT_CACHE = {}
+_MATH_SUBJECT_ALIASES = {
+    "igcse mathematics a",
+    "igcse math a",
+    "mathematics",
+    "math",
+}
+_SUBJECT_PRIORITY = {
+    "general english": 1,
+    "english": 1,
+    "chemistry": 2,
+    "biology": 3,
+    "physics": 4,
+}
+
+
+def _subject_priority_key(subject_name):
+    normalized = normalize_text(subject_name)
+    if normalized in _MATH_SUBJECT_ALIASES:
+        return (0, normalized)
+    return (_SUBJECT_PRIORITY.get(normalized, 999), normalized)
 
 
 def invalidate_admin_page_context_cache():
@@ -115,7 +135,7 @@ def build_school_configuration():
     }
     ordered_school_codes = [
         code
-        for code in ("school5", "sehriyo")
+        for code in ("sehriyo", "school5")
         if code in configured_school_codes
     ]
     if not ordered_school_codes:
@@ -252,14 +272,6 @@ def _load_admin_dataset_for_filter(
 
 
 def build_admin_resource_subject_options(summary_rows, resource_rows):
-    subject_priority = {
-        "math": 0,
-        "english": 1,
-        "chemistry": 2,
-        "biology": 3,
-        "physics": 4,
-    }
-
     subject_map = {}
     if isinstance(summary_rows, list):
         for row in summary_rows:
@@ -287,10 +299,7 @@ def build_admin_resource_subject_options(summary_rows, resource_rows):
 
     return sorted(
         subject_map.values(),
-        key=lambda value: (
-            subject_priority.get(normalize_text(value), 999),
-            normalize_text(value),
-        ),
+        key=_subject_priority_key,
     )
 
 
