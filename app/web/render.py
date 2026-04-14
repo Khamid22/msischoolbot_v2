@@ -48,15 +48,27 @@ def _load_react_manifest() -> dict[str, Any]:
 
 def _resolve_react_assets() -> tuple[str, str]:
     manifest = _load_react_manifest()
+
     entry = manifest.get("index.html") if isinstance(manifest, dict) else None
+    js_file = ""
+    css_file = ""
+
     if isinstance(entry, dict):
         js_file = str(entry.get("file") or "").strip()
         css_files = entry.get("css")
-        css_file = ""
         if isinstance(css_files, list) and css_files:
             css_file = str(css_files[0] or "").strip()
-        if js_file and css_file:
-            return js_file, css_file
+
+    # Newer Vite manifests may emit CSS as a standalone "style.css" entry
+    # instead of listing it under index.html->css.
+    if not css_file and isinstance(manifest, dict):
+        style_entry = manifest.get("style.css")
+        if isinstance(style_entry, dict):
+            css_file = str(style_entry.get("file") or "").strip()
+
+    if js_file:
+        return js_file, css_file
+
     return "app.js", "app.css"
 
 
@@ -118,7 +130,7 @@ def render_react_page(
     favicon_url = url_for("static", filename="images/favicon.png")
     manifest_url = url_for("system.manifest")
     js_file, css_file = _resolve_react_assets()
-    css_url = _react_asset_url(css_file, v)
+    css_url = _react_asset_url(css_file, v) if css_file else ""
     js_url = _react_asset_url(js_file, v)
     tg_bundle_url = url_for("static", filename="js/bundles/telegram-base.js", v=v)
 
@@ -150,7 +162,7 @@ def render_react_page(
     <title>{title_safe}</title>
     <link rel="icon" type="image/png" href="{favicon_url}" />
     <link rel="manifest" href="{manifest_url}" />
-    <link rel="stylesheet" href="{css_url}" />
+    {"<link rel=\"stylesheet\" href=\"" + css_url + "\" />" if css_url else ""}
   </head>
   <body{body_attrs}>
     <div id="root"></div>

@@ -67,6 +67,34 @@ class RenderAssetsTests(unittest.TestCase):
             self.assertIn('/static/react/app.css?v=77"', html)
             self.assertIn('/static/react/app.js?v=77"', html)
 
+    def test_render_uses_style_entry_when_manifest_has_no_entry_css(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            static_root = os.path.join(tmp_dir, "static")
+            react_root = os.path.join(static_root, "react")
+            os.makedirs(react_root, exist_ok=True)
+            manifest_path = os.path.join(react_root, "manifest.json")
+            with open(manifest_path, "w", encoding="utf-8") as manifest_file:
+                json.dump(
+                    {
+                        "index.html": {
+                            "file": "assets/index-abc123def456.js",
+                        },
+                        "style.css": {
+                            "file": "assets/style-fedcba654321.css",
+                            "src": "style.css",
+                        },
+                    },
+                    manifest_file,
+                )
+
+            app = self._create_app(static_root, version="11")
+            with app.app_context():
+                with app.test_request_context("/"):
+                    html = render_react_page("login", {}, telegram=False)
+
+            self.assertIn('/static/react/assets/index-abc123def456.js"', html)
+            self.assertIn('/static/react/assets/style-fedcba654321.css"', html)
+
     def test_render_speed(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             static_root = os.path.join(tmp_dir, "static")
