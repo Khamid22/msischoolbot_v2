@@ -1,0 +1,722 @@
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { routes } from "@/lib/routes";
+import {
+  AdminPageProps,
+  AdminTab,
+  BlockedUser,
+  ChatMsg,
+  OverviewGrade,
+  ResourceUploadState,
+  asNumber,
+  asString,
+  asStringArray,
+  availableGradesForRow,
+  buildAdminTabUrl,
+  buildUploadWebSocketUrl,
+  createUploadId,
+  filterGroupsByGrade,
+  filterMonthlySeriesByGrade,
+  formatMonthKeyLabel,
+  normalizeAdminTab,
+  trimEmptyMonthlyMonths,
+} from "./shared";
+
+export function useAdminState(props: AdminPageProps) {
+  const initialTab = normalizeAdminTab(props.adminPanel);
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const currentSchool = props.adminSchool || "all";
+  const schoolOptions = (
+    Array.isArray(props.adminSchoolOptions) ? props.adminSchoolOptions : []
+  ).filter(
+    (option): option is { code: string; label: string } =>
+      Boolean(
+        option && typeof option.code === "string" && typeof option.label === "string"
+      )
+  );
+  const students = Array.isArray(props.adminStudents) ? props.adminStudents : [];
+  const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
+  const resourceTypes = Array.isArray(props.adminResourceTypes) ? props.adminResourceTypes : [];
+  const activeResourceTypes = Array.isArray(props.adminResourceActiveTypes)
+    ? props.adminResourceActiveTypes
+    : [];
+  const [resourcesList, setResourcesList] = useState<Array<Record<string, unknown>>>(
+    Array.isArray(props.adminResources) ? props.adminResources : []
+  );
+  const quickStats = props.adminQuickStats || {};
+  const schoolInfo = Array.isArray(props.adminSchoolInfo) ? props.adminSchoolInfo : [];
+  const subjectInfo = Array.isArray(props.adminSubjectInfo) ? props.adminSubjectInfo : [];
+  const teacherOptions = (
+    Array.isArray(props.adminTeacherOptions) ? props.adminTeacherOptions : []
+  ).map((option) => ({
+    name: asString(option?.name),
+    school_codes: asStringArray(option?.school_codes),
+  }));
+  const groupOptions = (
+    Array.isArray(props.adminGroupOptions) ? props.adminGroupOptions : []
+  ).map((option) => ({
+    name: asString(option?.name),
+    school_codes: asStringArray(option?.school_codes),
+  }));
+  const teacherEdit = props.adminTeacherEdit || null;
+
+  const availableSubjectSchools = schoolOptions.filter((option) => option.code !== "all");
+  const initialSchool =
+    props.adminTeacherEditSchool || availableSubjectSchools[0]?.code || "all";
+  const [teacherMode, setTeacherMode] = useState(teacherEdit ? "add" : "select");
+  const [teacherSchool, setTeacherSchool] = useState(initialSchool);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
+  const initialOverviewSchool =
+    currentSchool !== "all" &&
+    availableSubjectSchools.some((option) => option.code === currentSchool)
+      ? currentSchool
+      : availableSubjectSchools[0]?.code || "";
+  const [selectedOverviewSchool, setSelectedOverviewSchool] = useState(
+    initialOverviewSchool
+  );
+  const schoolSubjectRows = subjectInfo.filter(
+    (row) => asString(row.school_key).toLowerCase() === selectedOverviewSchool
+  );
+  const [selectedSubjectName, setSelectedSubjectName] = useState(
+    asString(schoolSubjectRows[0]?.subject_name)
+  );
+  const [selectedSehriyoGrade, setSelectedSehriyoGrade] = useState<OverviewGrade | "">(
+    ""
+  );
+  const [resourceUploadState, setResourceUploadState] = useState<ResourceUploadState>({
+    active: false,
+    percent: 0,
+    message: "",
+    error: false,
+  });
+  const [isSubmittingResource, setIsSubmittingResource] = useState(false);
+  const [resourceSubjectFilter, setResourceSubjectFilter] = useState("all");
+  const [editingResource, setEditingResource] = useState<{
+    id: number;
+    title: string;
+    description: string;
+    resourceFileKind: string;
+    thumbnailUrl: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [uploadFormKey, setUploadFormKey] = useState(0);
+  const editResourceFileRef = useRef<HTMLInputElement>(null);
+  const editThumbnailFileRef = useRef<HTMLInputElement>(null);
+  const resourceUploadSocketRef = useRef<WebSocket | null>(null);
+  const resourceUploadXhrRef = useRef<XMLHttpRequest | null>(null);
+  const resourceUploadResetTimerRef = useRef<number | null>(null);
+
+  const [chatRoom, setChatRoom] = useState("global");
+  const [chatRooms, setChatRooms] = useState<{ room: string; active: number }[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+  const [blockReason, setBlockReason] = useState("");
+
+  function clearResourceUploadResetTimer() {
+    if (resourceUploadResetTimerRef.current !== null) {
+      window.clearTimeout(resourceUploadResetTimerRef.current);
+      resourceUploadResetTimerRef.current = null;
+    }
+  }
+
+  function scheduleResourceUploadReset(delayMs = 2200) {
+    clearResourceUploadResetTimer();
+    resourceUploadResetTimerRef.current = window.setTimeout(() => {
+      setResourceUploadState({
+        active: false,
+        percent: 0,
+        message: "",
+        error: false,
+      });
+      resourceUploadResetTimerRef.current = null;
+    }, delayMs);
+  }
+
+  function loadChatRooms() {
+    fetch("/admin/api/chat/rooms")
+      .then((r) => r.json())
+      .then((d) => {
+        const base = [{ room: "global", active: 0 }];
+        const merged = [...base];
+        for (const r of d.rooms ?? []) {
+          if (!merged.find((x) => x.room === r.room)) merged.push(r);
+        }
+        setChatRooms(merged);
+      })
+      .catch(() => {});
+  }
+
+  function loadChatMessages(room: string) {
+    setChatLoading(true);
+    fetch(`/admin/api/chat/messages?room=${encodeURIComponent(room)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setChatMessages(Array.isArray(d.messages) ? d.messages : []);
+      })
+      .catch(() => {})
+      .finally(() => setChatLoading(false));
+  }
+
+  function loadBlocked() {
+    fetch("/admin/api/chat/blocked")
+      .then((r) => r.json())
+      .then((d) => {
+        setBlockedUsers(Array.isArray(d.blocked) ? d.blocked : []);
+      })
+      .catch(() => {});
+  }
+
+  function adminDeleteMsg(id: number) {
+    fetch(`/admin/api/chat/messages/${id}`, { method: "DELETE" })
+      .then((r) => {
+        if (r.ok)
+          setChatMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, isDeleted: true } : m))
+          );
+      })
+      .catch(() => {});
+  }
+
+  function adminBlockUser(studentId: string) {
+    fetch("/admin/api/chat/block", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentId, reason: blockReason }),
+    })
+      .then((r) => {
+        if (r.ok) {
+          setBlockReason("");
+          loadBlocked();
+        }
+      })
+      .catch(() => {});
+  }
+
+  function adminUnblock(studentId: string) {
+    fetch(`/admin/api/chat/block/${encodeURIComponent(studentId)}`, { method: "DELETE" })
+      .then((r) => {
+        if (r.ok) loadBlocked();
+      })
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    setActiveTab(normalizeAdminTab(props.adminPanel));
+  }, [props.adminPanel]);
+
+  useEffect(() => {
+    if (Array.isArray(props.adminResources)) {
+      setResourcesList(props.adminResources);
+    }
+  }, [props.adminResources]);
+
+  useEffect(() => {
+    if (activeTab === "chat") {
+      loadChatRooms();
+      loadChatMessages(chatRoom);
+      loadBlocked();
+    }
+  }, [activeTab, chatRoom]);
+
+  useEffect(() => {
+    if (!availableSubjectSchools.length) {
+      if (selectedOverviewSchool) {
+        setSelectedOverviewSchool("");
+      }
+      return;
+    }
+    const selectedSchoolIsValid = availableSubjectSchools.some(
+      (option) => option.code === selectedOverviewSchool
+    );
+    if (selectedSchoolIsValid) {
+      return;
+    }
+    const preferredSchool =
+      currentSchool !== "all" &&
+      availableSubjectSchools.some((option) => option.code === currentSchool)
+        ? currentSchool
+        : availableSubjectSchools[0]?.code || "";
+    setSelectedOverviewSchool(preferredSchool);
+  }, [availableSubjectSchools, currentSchool, selectedOverviewSchool]);
+
+  useEffect(() => {
+    if (!schoolSubjectRows.length) {
+      if (selectedSubjectName) {
+        setSelectedSubjectName("");
+      }
+      return;
+    }
+    const selectedSubjectStillExists = schoolSubjectRows.some(
+      (row) => asString(row.subject_name) === selectedSubjectName
+    );
+    if (!selectedSubjectStillExists) {
+      setSelectedSubjectName(asString(schoolSubjectRows[0]?.subject_name));
+    }
+  }, [schoolSubjectRows, selectedSubjectName]);
+
+  const filteredTeacherOptions = teacherOptions.filter((option) => {
+    if (!teacherSchool) {
+      return true;
+    }
+    return !option.school_codes.length || option.school_codes.includes(teacherSchool);
+  });
+  const filteredGroupOptions = groupOptions.filter((option) => {
+    if (!teacherSchool) {
+      return true;
+    }
+    return !option.school_codes.length || option.school_codes.includes(teacherSchool);
+  });
+
+  const filteredStudents = students.filter((student) => {
+    const haystack = [
+      asString(student.full_name),
+      asString(student.student_id),
+      asString(student.subjects),
+      asString(student.school_name),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return !searchQuery || haystack.includes(searchQuery.toLowerCase());
+  });
+
+  const selectedSubjectRow =
+    schoolSubjectRows.find((row) => asString(row.subject_name) === selectedSubjectName) ||
+    schoolSubjectRows[0];
+  const baseGroupRows = Array.isArray(selectedSubjectRow?.groups)
+    ? (selectedSubjectRow.groups as Array<Record<string, unknown>>)
+    : [];
+  const baseMonthlyMonths = Array.isArray(selectedSubjectRow?.monthly_months)
+    ? (selectedSubjectRow.monthly_months as string[])
+    : [];
+  const baseMonthlySeries = Array.isArray(selectedSubjectRow?.monthly_series)
+    ? (selectedSubjectRow.monthly_series as Array<Record<string, unknown>>)
+    : [];
+  const isSehriyoOverview = asString(selectedSubjectRow?.school_key).toLowerCase() === "sehriyo";
+  const availableOverviewGrades = isSehriyoOverview
+    ? availableGradesForRow(selectedSubjectRow)
+    : [];
+  let activeOverviewGrade: OverviewGrade | "" = "";
+  if (isSehriyoOverview && availableOverviewGrades.length) {
+    if (selectedSehriyoGrade && availableOverviewGrades.includes(selectedSehriyoGrade)) {
+      activeOverviewGrade = selectedSehriyoGrade;
+    } else if (availableOverviewGrades.includes("7")) {
+      activeOverviewGrade = "7";
+    } else if (availableOverviewGrades.includes("8")) {
+      activeOverviewGrade = "8";
+    } else {
+      activeOverviewGrade = availableOverviewGrades[0];
+    }
+  }
+  const selectedGroupRows = isSehriyoOverview
+    ? filterGroupsByGrade(baseGroupRows, activeOverviewGrade)
+    : baseGroupRows;
+  const filteredMonthlySeries = isSehriyoOverview
+    ? filterMonthlySeriesByGrade(baseMonthlySeries, activeOverviewGrade)
+    : baseMonthlySeries;
+  const monthlyTimeline = trimEmptyMonthlyMonths(baseMonthlyMonths, filteredMonthlySeries);
+  const monthlyMonths = monthlyTimeline.months;
+  const monthlySeries = monthlyTimeline.series;
+  const monthlyChartData = monthlyMonths.map((monthKey, index) => {
+    const row: Record<string, string | number | null> = {
+      month: monthKey,
+      monthLabel: formatMonthKeyLabel(monthKey),
+    };
+    for (const seriesRow of monthlySeries) {
+      const sr = seriesRow as Record<string, unknown>;
+      row[asString(sr.label)] = Array.isArray(sr.values) ? (sr.values[index] as number | null) : null;
+    }
+    return row;
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setActiveTab(normalizeAdminTab(params.get("panel")));
+      setMobileNavOpen(false);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSubmittingResource) {
+      return;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isSubmittingResource]);
+
+  useEffect(() => {
+    return () => {
+      clearResourceUploadResetTimer();
+      if (
+        resourceUploadSocketRef.current &&
+        resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
+      ) {
+        resourceUploadSocketRef.current.close();
+      }
+      resourceUploadSocketRef.current = null;
+      if (resourceUploadXhrRef.current) {
+        resourceUploadXhrRef.current.abort();
+      }
+      resourceUploadXhrRef.current = null;
+    };
+  }, []);
+
+  function switchAdminTab(nextTab: AdminTab) {
+    setMobileNavOpen(false);
+    const nextUrl = buildAdminTabUrl(nextTab, currentSchool);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextUrl !== currentUrl) {
+      window.location.href = nextUrl;
+    }
+  }
+
+  async function refreshResources() {
+    try {
+      const res = await fetch(routes.adminResourcesApi);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.resources)) {
+          setResourcesList(data.resources);
+        }
+      }
+    } catch (_error) {
+      // ignore network errors silently
+    }
+  }
+
+  async function saveEditResource() {
+    if (!editingResource || editSaving) return;
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const formData = new FormData();
+      formData.set("resource_title", editingResource.title.trim());
+      formData.set("resource_description", editingResource.description.trim());
+      formData.set("csrf_token", props.csrfToken || "");
+      const resourceFile = editResourceFileRef.current?.files?.[0];
+      if (resourceFile) formData.set("resource_file", resourceFile);
+      const thumbnailFile = editThumbnailFileRef.current?.files?.[0];
+      if (thumbnailFile) formData.set("thumbnail_file", thumbnailFile);
+      const res = await fetch(routes.adminResourceEdit(editingResource.id), {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditError(asString(data.message) || "Unable to update resource.");
+        return;
+      }
+      setEditingResource(null);
+      setEditError("");
+      await refreshResources();
+    } catch (_error) {
+      setEditError("Network error. Please try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function submitResourceForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!props.adminResourceUploadEnabled) {
+      setResourceUploadState({
+        active: true,
+        percent: 100,
+        message: "Resource upload is disabled in this environment.",
+        error: true,
+      });
+      return;
+    }
+    if (isSubmittingResource) {
+      return;
+    }
+
+    const form = event.currentTarget;
+    const uploadId = createUploadId();
+    const formData = new FormData(form);
+    formData.set("upload_id", uploadId);
+
+    if (
+      resourceUploadSocketRef.current &&
+      resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
+    ) {
+      resourceUploadSocketRef.current.close();
+    }
+    resourceUploadSocketRef.current = null;
+    clearResourceUploadResetTimer();
+
+    setIsSubmittingResource(true);
+    setResourceUploadState({
+      active: true,
+      percent: 1,
+      message: "Preparing upload...",
+      error: false,
+    });
+
+    if (typeof window.WebSocket !== "undefined") {
+      try {
+        const socket = new WebSocket(buildUploadWebSocketUrl(uploadId));
+        resourceUploadSocketRef.current = socket;
+        socket.onmessage = (messageEvent) => {
+          try {
+            const payload = JSON.parse(String(messageEvent.data || ""));
+            if (payload?.type === "heartbeat") {
+              return;
+            }
+            setResourceUploadState((current) => ({
+              active: true,
+              percent: Math.max(
+                current.percent,
+                Math.max(0, Math.min(100, Number(payload?.percent || 0)))
+              ),
+              message:
+                asString(payload?.message) || current.message || "Uploading resource...",
+              error: Boolean(payload?.error),
+            }));
+          } catch (_error) {
+            return;
+          }
+        };
+      } catch (_error) {
+        resourceUploadSocketRef.current = null;
+      }
+    }
+
+    try {
+      const xhr = new XMLHttpRequest();
+      resourceUploadXhrRef.current = xhr;
+
+      xhr.open(String(form.method || "post").toUpperCase(), form.action, true);
+      xhr.withCredentials = true;
+      xhr.responseType = "text";
+      xhr.setRequestHeader("Accept", "text/html");
+      xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
+      xhr.upload.onprogress = (progressEvent) => {
+        if (!progressEvent.lengthComputable) {
+          return;
+        }
+        const ratio = progressEvent.total > 0 ? progressEvent.loaded / progressEvent.total : 0;
+        const nextPercent = Math.max(4, Math.min(72, 4 + ratio * 68));
+        setResourceUploadState((current) => ({
+          active: true,
+          percent: Math.max(current.percent, nextPercent),
+          message: "Uploading file...",
+          error: false,
+        }));
+      };
+
+      xhr.onload = () => {
+        const ok = xhr.status >= 200 && xhr.status < 300;
+        const contentType = String(xhr.getResponseHeader("Content-Type") || "");
+
+        if (
+          resourceUploadSocketRef.current &&
+          resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
+        ) {
+          resourceUploadSocketRef.current.close();
+        }
+        resourceUploadSocketRef.current = null;
+        resourceUploadXhrRef.current = null;
+
+        if (contentType.includes("application/json")) {
+          let payload: Record<string, unknown> = {};
+          try {
+            payload = JSON.parse(String(xhr.responseText || ""));
+          } catch (_error) {
+            payload = {};
+          }
+
+          if (ok) {
+            setIsSubmittingResource(false);
+            setUploadFormKey((k) => k + 1);
+            setResourceUploadState({
+              active: true,
+              percent: 100,
+              message: asString(payload.message) || "Resource saved.",
+              error: false,
+            });
+            scheduleResourceUploadReset();
+            refreshResources();
+            return;
+          }
+
+          setIsSubmittingResource(false);
+          setResourceUploadState((current) => ({
+            active: true,
+            percent: Math.max(current.percent, 98),
+            message: asString(payload.message) || "Unable to save resource.",
+            error: true,
+          }));
+          return;
+        }
+
+        if (ok) {
+          setIsSubmittingResource(false);
+          setUploadFormKey((k) => k + 1);
+          setResourceUploadState({
+            active: true,
+            percent: 100,
+            message: "Resource saved.",
+            error: false,
+          });
+          scheduleResourceUploadReset();
+          refreshResources();
+          return;
+        }
+
+        setIsSubmittingResource(false);
+        setResourceUploadState((current) => ({
+          active: true,
+          percent: Math.max(current.percent, 98),
+          message: current.message || "Unable to save resource.",
+          error: true,
+        }));
+      };
+
+      xhr.onerror = () => {
+        if (
+          resourceUploadSocketRef.current &&
+          resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
+        ) {
+          resourceUploadSocketRef.current.close();
+        }
+        resourceUploadSocketRef.current = null;
+        resourceUploadXhrRef.current = null;
+        setIsSubmittingResource(false);
+        setResourceUploadState({
+          active: true,
+          percent: 0,
+          message: "Upload failed. Check your connection and try again.",
+          error: true,
+        });
+      };
+
+      xhr.onabort = () => {
+        resourceUploadSocketRef.current = null;
+        resourceUploadXhrRef.current = null;
+        setIsSubmittingResource(false);
+      };
+
+      xhr.send(formData);
+    } catch (_error) {
+      if (
+        resourceUploadSocketRef.current &&
+        resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
+      ) {
+        resourceUploadSocketRef.current.close();
+      }
+      resourceUploadSocketRef.current = null;
+      resourceUploadXhrRef.current = null;
+      setIsSubmittingResource(false);
+      setResourceUploadState({
+        active: true,
+        percent: 0,
+        message: "Upload failed. Check your connection and try again.",
+        error: true,
+      });
+    }
+  }
+
+  return {
+    props,
+    activeTab,
+    setActiveTab,
+    mobileNavOpen,
+    setMobileNavOpen,
+    currentSchool,
+    schoolOptions,
+    students,
+    teachers,
+    resourceTypes,
+    activeResourceTypes,
+    resourcesList,
+    setResourcesList,
+    quickStats,
+    schoolInfo,
+    subjectInfo,
+    teacherOptions,
+    groupOptions,
+    teacherEdit,
+    availableSubjectSchools,
+    teacherMode,
+    setTeacherMode,
+    teacherSchool,
+    setTeacherSchool,
+    searchQuery,
+    setSearchQuery,
+    editingTypeId,
+    setEditingTypeId,
+    selectedOverviewSchool,
+    setSelectedOverviewSchool,
+    schoolSubjectRows,
+    selectedSubjectName,
+    setSelectedSubjectName,
+    selectedSehriyoGrade,
+    setSelectedSehriyoGrade,
+    resourceUploadState,
+    setResourceUploadState,
+    isSubmittingResource,
+    setIsSubmittingResource,
+    resourceSubjectFilter,
+    setResourceSubjectFilter,
+    editingResource,
+    setEditingResource,
+    editSaving,
+    setEditSaving,
+    editError,
+    setEditError,
+    uploadFormKey,
+    setUploadFormKey,
+    editResourceFileRef,
+    editThumbnailFileRef,
+    resourceUploadSocketRef,
+    resourceUploadXhrRef,
+    chatRoom,
+    setChatRoom,
+    chatRooms,
+    setChatRooms,
+    chatMessages,
+    setChatMessages,
+    chatLoading,
+    setChatLoading,
+    blockedUsers,
+    setBlockedUsers,
+    blockReason,
+    setBlockReason,
+    loadChatRooms,
+    loadChatMessages,
+    loadBlocked,
+    adminDeleteMsg,
+    adminBlockUser,
+    adminUnblock,
+    filteredTeacherOptions,
+    filteredGroupOptions,
+    filteredStudents,
+    selectedSubjectRow,
+    isSehriyoOverview,
+    availableOverviewGrades,
+    activeOverviewGrade,
+    selectedGroupRows,
+    monthlySeries,
+    monthlyChartData,
+    switchAdminTab,
+    refreshResources,
+    saveEditResource,
+    submitResourceForm,
+  };
+}

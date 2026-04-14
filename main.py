@@ -29,7 +29,9 @@ def _bootstrap_gevent_monkey_patch():
         return
 
     run_mode = _resolve_bootstrap_run_mode()
-    if run_mode not in {"web", "both"}:
+    # Avoid monkey-patching when bot polling runs in the same process.
+    # gevent-patched sockets can interfere with asyncio/aiohttp behaviour.
+    if run_mode != "web":
         return
 
     import gevent.monkey
@@ -209,6 +211,7 @@ async def run_bot():
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
     from aiogram.types import (
+        BotCommand,
         MenuButtonCommands,
     )
 
@@ -227,10 +230,26 @@ async def run_bot():
     dp.include_router(account_link_router)
     dp.include_router(quick_summary_router)
     dp.include_router(contact_us_router)
+    logging.info(
+        "Bot handlers loaded: start=%d account=%d quick=%d contact=%d",
+        len(start_router.message.handlers),
+        len(account_link_router.message.handlers),
+        len(quick_summary_router.callback_query.handlers),
+        len(contact_us_router.callback_query.handlers)
+        + len(contact_us_router.message.handlers),
+    )
 
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_chat_menu_button(
         menu_button=MenuButtonCommands(),
+    )
+    await bot.set_my_commands(
+        commands=[
+            BotCommand(command="start", description="Open mini app"),
+            BotCommand(command="menu", description="Show quick actions"),
+            BotCommand(command="whoami", description="Show linked account"),
+            BotCommand(command="unlink_me", description="Unlink Telegram account"),
+        ]
     )
     await dp.start_polling(bot)
 

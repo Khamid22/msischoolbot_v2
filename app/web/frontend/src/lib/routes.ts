@@ -8,7 +8,8 @@ export const routes = {
   resources: (studentId: number | string) => `/dashboard/${studentId}/resources`,
   rating: (studentId: number | string) => `/dashboard/${studentId}/rating-board`,
   aap: (studentId: number | string) => `/dashboard/${studentId}/aap-lessons`,
-  adminTeacherAdd: "/admin/teachers/add",
+  adminTeacherCreate: "/admin/teachers",
+  adminTeacherUpdate: (teacherId: number | string) => `/admin/teachers/${teacherId}`,
   adminTeacherDelete: (teacherId: number | string) => `/admin/teachers/${teacherId}/delete`,
   adminTeacherEdit: (teacherId: number | string, school = "all") =>
     `/?panel=teachers&school=${encodeURIComponent(String(school || "all"))}&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,

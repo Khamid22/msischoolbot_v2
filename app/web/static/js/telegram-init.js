@@ -1,400 +1,98 @@
-(function initTelegramMiniApp(retriesLeft) {
+(function telegramOrchestrator() {
   if (window.__msiTelegramMiniAppInitDone) {
     return;
   }
 
-  const telegram = window.Telegram;
-  const webApp = telegram && telegram.WebApp;
-  if (!webApp) {
-    if (Number(retriesLeft) > 0) {
-      window.setTimeout(function () {
-        initTelegramMiniApp(Number(retriesLeft) - 1);
-      }, 80);
-    }
-    return;
-  }
-
-  const initData = typeof webApp.initData === "string" ? webApp.initData.trim() : "";
-  const hasQueryInitData = /(?:^|[?&])tgWebAppData=/.test(window.location.search);
-  const platform = typeof webApp.platform === "string" ? webApp.platform.trim() : "";
-  const isMiniApp = Boolean(initData) || hasQueryInitData || Boolean(platform);
-  if (!isMiniApp) {
-    if (Number(retriesLeft) > 0) {
-      window.setTimeout(function () {
-        initTelegramMiniApp(Number(retriesLeft) - 1);
-      }, 80);
-    }
-    return;
-  }
-
-  window.__msiTelegramMiniAppInitDone = true;
-  window.__msiIsTelegramMiniApp = true;
-
-  let scheduledFrame = 0;
-  let viewportPrepared = false;
-  let fullscreenRequested = false;
-  let swipeLockApplied = false;
-  let collapseFallbackBound = false;
-  let nativeBackHandler = null;
-  let backFallbackTimer = 0;
-  const cssPixelValues = Object.create(null);
-
-  const setCssPixelVar = function (name, rawValue) {
-    const numericValue = Number(rawValue);
-    const safeValue =
-      Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
-    const nextValue = `${Math.round(safeValue)}px`;
-    if (cssPixelValues[name] === nextValue) {
-      return;
-    }
-    cssPixelValues[name] = nextValue;
-    document.documentElement.style.setProperty(name, nextValue);
-  };
-
-  const resolveInsetValue = function (rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue) || numericValue <= 0) {
-      return 0;
-    }
-    return numericValue;
-  };
-
-  const syncSafeAreaInsets = function () {
-    const safeAreaInset =
-      webApp && webApp.safeAreaInset && typeof webApp.safeAreaInset === "object"
-        ? webApp.safeAreaInset
-        : {};
-    const contentSafeAreaInset =
-      webApp &&
-      webApp.contentSafeAreaInset &&
-      typeof webApp.contentSafeAreaInset === "object"
-        ? webApp.contentSafeAreaInset
-        : {};
-    const mergedTop = Math.max(
-      resolveInsetValue(safeAreaInset.top),
-      resolveInsetValue(contentSafeAreaInset.top)
-    );
-    const mergedRight = Math.max(
-      resolveInsetValue(safeAreaInset.right),
-      resolveInsetValue(contentSafeAreaInset.right)
-    );
-    const mergedBottom = Math.max(
-      resolveInsetValue(safeAreaInset.bottom),
-      resolveInsetValue(contentSafeAreaInset.bottom)
-    );
-    const mergedLeft = Math.max(
-      resolveInsetValue(safeAreaInset.left),
-      resolveInsetValue(contentSafeAreaInset.left)
-    );
-
-    const safeTop = resolveInsetValue(safeAreaInset.top);
-    const safeRight = resolveInsetValue(safeAreaInset.right);
-    const safeBottom = resolveInsetValue(safeAreaInset.bottom);
-    const safeLeft = resolveInsetValue(safeAreaInset.left);
-    const contentSafeTop = resolveInsetValue(contentSafeAreaInset.top);
-    const contentSafeRight = resolveInsetValue(contentSafeAreaInset.right);
-    const contentSafeBottom = resolveInsetValue(contentSafeAreaInset.bottom);
-    const contentSafeLeft = resolveInsetValue(contentSafeAreaInset.left);
-
-    setCssPixelVar("--tg-safe-area-top", safeTop);
-    setCssPixelVar("--tg-safe-area-right", safeRight);
-    setCssPixelVar("--tg-safe-area-bottom", safeBottom);
-    setCssPixelVar("--tg-safe-area-left", safeLeft);
-    setCssPixelVar("--tg-safe-area-inset-top", safeTop);
-    setCssPixelVar("--tg-safe-area-inset-right", safeRight);
-    setCssPixelVar("--tg-safe-area-inset-bottom", safeBottom);
-    setCssPixelVar("--tg-safe-area-inset-left", safeLeft);
-    setCssPixelVar(
-      "--tg-content-safe-area-top",
-      contentSafeTop
-    );
-    setCssPixelVar(
-      "--tg-content-safe-area-right",
-      contentSafeRight
-    );
-    setCssPixelVar(
-      "--tg-content-safe-area-bottom",
-      contentSafeBottom
-    );
-    setCssPixelVar(
-      "--tg-content-safe-area-left",
-      contentSafeLeft
-    );
-    setCssPixelVar("--tg-content-safe-area-inset-top", contentSafeTop);
-    setCssPixelVar("--tg-content-safe-area-inset-right", contentSafeRight);
-    setCssPixelVar("--tg-content-safe-area-inset-bottom", contentSafeBottom);
-    setCssPixelVar("--tg-content-safe-area-inset-left", contentSafeLeft);
-    setCssPixelVar("--safe-top", mergedTop);
-    setCssPixelVar("--safe-right", mergedRight);
-    setCssPixelVar("--safe-bottom", mergedBottom);
-    setCssPixelVar("--safe-left", mergedLeft);
-  };
-
-  const syncVisualViewport = function () {
-    const visualViewport = window.visualViewport;
-    const fallbackHeight = Number(
-      window.innerHeight || document.documentElement.clientHeight || 0
-    );
-
-    if (!visualViewport) {
-      setCssPixelVar("--tg-visual-viewport-height", fallbackHeight);
-      setCssPixelVar("--tg-visual-viewport-offset-top", 0);
-      setCssPixelVar("--tg-visual-viewport-bottom-offset", 0);
-      return;
-    }
-
-    const visualHeight = Number(visualViewport.height || 0);
-    const visualOffsetTop = Number(visualViewport.offsetTop || 0);
-    const layoutViewportHeight =
-      (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
-      visualHeight ||
-      0;
-    const bottomOffset = Math.max(
-      0,
-      layoutViewportHeight - (visualHeight + visualOffsetTop)
-    );
-
-    setCssPixelVar(
-      "--tg-visual-viewport-height",
-      (Number.isFinite(visualHeight) && visualHeight > 0 && visualHeight) ||
-        layoutViewportHeight
-    );
-    setCssPixelVar("--tg-visual-viewport-offset-top", visualOffsetTop);
-    setCssPixelVar("--tg-visual-viewport-bottom-offset", bottomOffset);
-  };
-
-  const setAppHeight = function () {
-    syncSafeAreaInsets();
-    syncVisualViewport();
-
-    const stableHeight = Number(webApp.viewportStableHeight || 0);
-    const viewportHeight = Number(webApp.viewportHeight || 0);
-    const visualViewportHeight = Number(
-      (window.visualViewport && window.visualViewport.height) || 0
-    );
-    const fallbackHeight = Number(
-      window.innerHeight || document.documentElement.clientHeight || 0
-    );
-    const resolvedHeight =
-      (Number.isFinite(visualViewportHeight) &&
-        visualViewportHeight > 0 &&
-        visualViewportHeight) ||
-      (Number.isFinite(viewportHeight) && viewportHeight > 0 && viewportHeight) ||
-      (Number.isFinite(stableHeight) && stableHeight > 0 && stableHeight) ||
-      (Number.isFinite(fallbackHeight) && fallbackHeight > 0 && fallbackHeight) ||
-      0;
-    if (resolvedHeight > 0) {
-      setCssPixelVar("--tg-app-height", resolvedHeight);
-      setCssPixelVar("--tg-viewport-height", resolvedHeight);
-    }
-  };
-
-  const enforceSwipeLock = function () {
-    if (typeof webApp.disableVerticalSwipes !== "function") {
-      return;
-    }
-    try {
-      webApp.disableVerticalSwipes();
-      swipeLockApplied = true;
-    } catch (_error) {
-      // Ignore Telegram swipe setup errors.
-    }
-  };
-
-  // Fallback for older Telegram clients (pre-7.7) where disableVerticalSwipes()
-  // is unavailable and swipe-down may collapse the mini app.
-  const ensureDocumentIsScrollable = function () {
-    const viewportHeight = Number(
-      window.innerHeight || document.documentElement.clientHeight || 0
-    );
-    const documentHeight = Number(document.documentElement.scrollHeight || 0);
-    if (viewportHeight > 0 && documentHeight <= viewportHeight) {
-      document.documentElement.style.setProperty(
-        "min-height",
-        "calc(100dvh + 1px)"
-      );
-      document.body.style.setProperty("min-height", "calc(100dvh + 1px)");
-    }
-  };
-
-  const preventCollapseOnTopSwipe = function () {
-    if (window.scrollY <= 0) {
-      window.scrollTo(0, 1);
-    }
-  };
-
-  const bindCollapseFallback = function () {
-    if (collapseFallbackBound) {
-      return;
-    }
-    if (typeof webApp.disableVerticalSwipes === "function") {
-      return;
-    }
-
-    collapseFallbackBound = true;
-    ensureDocumentIsScrollable();
-    window.setTimeout(ensureDocumentIsScrollable, 100);
-    document.addEventListener("touchstart", preventCollapseOnTopSwipe, {
-      passive: true,
-    });
-    window.addEventListener("resize", ensureDocumentIsScrollable, {
-      passive: true,
-    });
-  };
-
-  const prepareViewport = function () {
-    setAppHeight();
-    if (viewportPrepared) {
-      return;
-    }
-
-    viewportPrepared = true;
-    setAppHeight();
-    try {
-      webApp.expand();
-    } catch (_error) {
-      // Ignore Telegram viewport errors.
-    }
-    enforceSwipeLock();
-  };
-
-  const requestFullscreenIfAvailable = function () {
-    if (fullscreenRequested) {
-      return;
-    }
-
-    if (webApp.isFullscreen === true) {
-      fullscreenRequested = true;
-      return;
-    }
-
-    if (typeof webApp.requestFullscreen !== "function") {
-      return;
-    }
-
-    fullscreenRequested = true;
-    try {
-      webApp.requestFullscreen();
-    } catch (_error) {
-      // Ignore Telegram fullscreen errors on clients that reject the request.
-    }
-  };
-
-  const clearBackFallbackTimer = function () {
-    if (!backFallbackTimer) {
-      return;
-    }
-
-    window.clearTimeout(backFallbackTimer);
-    backFallbackTimer = 0;
-  };
-
-  const hideNativeBackButton = function () {
-    const backButton = webApp.BackButton;
-    clearBackFallbackTimer();
-    document.body.classList.remove("tg-native-back");
-    if (!backButton) {
-      nativeBackHandler = null;
-      return;
-    }
-
-    if (nativeBackHandler && typeof backButton.offClick === "function") {
-      try {
-        backButton.offClick(nativeBackHandler);
-      } catch (_error) {
-        // Ignore Telegram back button cleanup errors.
-      }
-    }
-
-    if (typeof backButton.hide === "function") {
-      try {
-        backButton.hide();
-      } catch (_error) {
-        // Ignore Telegram back button visibility errors.
-      }
-    }
-
-    nativeBackHandler = null;
-  };
-
-  const configureNativeBackButton = function () {
-    hideNativeBackButton();
-  };
-
-  const scheduleHeightSync = function () {
-    if (scheduledFrame) {
-      return;
-    }
-    scheduledFrame = window.requestAnimationFrame(function () {
-      scheduledFrame = 0;
-      setAppHeight();
-      if (!swipeLockApplied || webApp.isFullscreen === true) {
-        enforceSwipeLock();
-      }
-    });
-  };
-
-  document.documentElement.classList.add("tg-miniapp");
-  document.body.classList.add("tg-miniapp");
-  prepareViewport();
-  bindCollapseFallback();
-  configureNativeBackButton();
-
-  const loginTelegramUserIdInput = document.getElementById("loginTelegramUserId");
-  const telegramUserId =
-    webApp &&
-    webApp.initDataUnsafe &&
-    webApp.initDataUnsafe.user &&
-    Number(webApp.initDataUnsafe.user.id);
+  const ns = window.__msiTelegramInit || {};
   if (
-    loginTelegramUserIdInput &&
-    Number.isInteger(telegramUserId) &&
-    telegramUserId > 0
+    typeof ns.runWithWebApp !== "function" ||
+    typeof ns.createSafeAreaController !== "function" ||
+    typeof ns.createFullscreenController !== "function" ||
+    typeof ns.createSwipeController !== "function" ||
+    typeof ns.createBackButtonController !== "function"
   ) {
-    loginTelegramUserIdInput.value = String(telegramUserId);
+    return;
+  }
 
+  function hydrateLoginTelegramUserId(webApp) {
+    const input = document.getElementById("loginTelegramUserId");
+    const telegramUserId =
+      webApp &&
+      webApp.initDataUnsafe &&
+      webApp.initDataUnsafe.user &&
+      Number(webApp.initDataUnsafe.user.id);
+
+    if (!input || !Number.isInteger(telegramUserId) || telegramUserId <= 0) {
+      return;
+    }
+
+    input.value = String(telegramUserId);
     const currentUrl = new URL(window.location.href);
     const loggedOut = currentUrl.searchParams.get("logged_out") === "1";
     const currentTelegramUserId = Number(currentUrl.searchParams.get("tg_user_id"));
     if (!loggedOut && currentTelegramUserId !== telegramUserId) {
       currentUrl.searchParams.set("tg_user_id", String(telegramUserId));
       window.location.replace(currentUrl.toString());
-      return;
     }
   }
 
-  if (typeof webApp.onEvent === "function") {
-    webApp.onEvent("viewportChanged", scheduleHeightSync);
-    webApp.onEvent("fullscreenChanged", scheduleHeightSync);
-    webApp.onEvent("safeAreaChanged", scheduleHeightSync);
-    webApp.onEvent("contentSafeAreaChanged", scheduleHeightSync);
-  }
-  window.addEventListener("resize", scheduleHeightSync, { passive: true });
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", scheduleHeightSync, {
-      passive: true,
-    });
-    window.visualViewport.addEventListener("scroll", scheduleHeightSync, {
-      passive: true,
-    });
-  }
-  window.addEventListener("pagehide", clearBackFallbackTimer, { passive: true });
-  window.setTimeout(setAppHeight, 180);
+  ns.runWithWebApp(
+    function onReady(webApp) {
+      if (window.__msiTelegramMiniAppInitDone) {
+        return;
+      }
+      window.__msiTelegramMiniAppInitDone = true;
+      window.__msiIsTelegramMiniApp = true;
 
-  try {
-    webApp.ready();
-  } catch (_error) {
-    // Ignore Telegram ready errors.
-  }
+      document.documentElement.classList.add("tg-miniapp");
+      document.body.classList.add("tg-miniapp");
 
-  window.setTimeout(function () {
-    requestFullscreenIfAvailable();
-    enforceSwipeLock();
-    scheduleHeightSync();
-  }, 40);
+      const safeArea = ns.createSafeAreaController(webApp);
+      const fullscreen = ns.createFullscreenController(webApp);
+      const swipe = ns.createSwipeController(webApp);
+      const backButton = ns.createBackButtonController(webApp);
 
-  window.setTimeout(function () {
-    enforceSwipeLock();
-    scheduleHeightSync();
-  }, 260);
-})(24);
+      safeArea.syncAppHeight();
+      try {
+        webApp.expand();
+      } catch (_error) {
+        // Ignore viewport expansion failures.
+      }
+      fullscreen.requestFullscreenIfAvailable();
+      swipe.enforceSwipeLock();
+      swipe.bindCollapseFallback();
+      backButton.configureFromDocument();
+      hydrateLoginTelegramUserId(webApp);
+
+      const scheduleSync = function scheduleSync() {
+        safeArea.scheduleSync(swipe.afterSync);
+      };
+
+      if (typeof webApp.onEvent === "function") {
+        webApp.onEvent("viewportChanged", scheduleSync);
+        webApp.onEvent("fullscreenChanged", scheduleSync);
+        webApp.onEvent("safeAreaChanged", scheduleSync);
+        webApp.onEvent("contentSafeAreaChanged", scheduleSync);
+      }
+      window.addEventListener("resize", scheduleSync, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scheduleSync, {
+          passive: true,
+        });
+        window.visualViewport.addEventListener("scroll", scheduleSync, {
+          passive: true,
+        });
+      }
+
+      try {
+        webApp.ready();
+      } catch (_error) {
+        // Ignore ready() failures on unsupported clients.
+      }
+
+      window.setTimeout(scheduleSync, 120);
+      window.setTimeout(scheduleSync, 420);
+    },
+    24
+  );
+})();

@@ -15,7 +15,7 @@ def register_system_routes(app):
     def service_worker():
         response = make_response(app.send_static_file("js/sw.js"))
         response.headers["Content-Type"] = "application/javascript"
-        response.headers["Cache-Control"] = "no-cache"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         return response
 
     app.register_blueprint(system_blueprint)

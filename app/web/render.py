@@ -14,6 +14,9 @@ The page name must match a key in frontend/src/App.tsx's pageMap.
 """
 
 import json
+import os
+import re
+from typing import Any
 
 from flask import current_app, url_for
 from markupsafe import escape
@@ -26,6 +29,45 @@ from markupsafe import escape
 def _asset_version() -> str:
     """Cache-busting version string, set once at startup in app.config."""
     return str(current_app.config.get("ASSET_VERSION", "1"))
+
+
+def _react_manifest_path() -> str:
+    static_root = current_app.static_folder or ""
+    return os.path.join(static_root, "react", "manifest.json")
+
+
+def _load_react_manifest() -> dict[str, Any]:
+    path = _react_manifest_path()
+    try:
+        with open(path, "r", encoding="utf-8") as manifest_file:
+            data = json.load(manifest_file)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _resolve_react_assets() -> tuple[str, str]:
+    manifest = _load_react_manifest()
+    entry = manifest.get("index.html") if isinstance(manifest, dict) else None
+    if isinstance(entry, dict):
+        js_file = str(entry.get("file") or "").strip()
+        css_files = entry.get("css")
+        css_file = ""
+        if isinstance(css_files, list) and css_files:
+            css_file = str(css_files[0] or "").strip()
+        if js_file and css_file:
+            return js_file, css_file
+    return "app.js", "app.css"
+
+
+def _is_hashed_asset(file_name: str) -> bool:
+    return bool(re.search(r"-[A-Za-z0-9_-]{8,}\.", str(file_name)))
+
+
+def _react_asset_url(file_name: str, version: str) -> str:
+    if _is_hashed_asset(file_name):
+        return url_for("static", filename=f"react/{file_name}")
+    return url_for("static", filename=f"react/{file_name}", v=version)
 
 
 def _safe_json(page_name: str, props: dict) -> str:
@@ -75,12 +117,14 @@ def render_react_page(
 
     favicon_url = url_for("static", filename="images/favicon.png")
     manifest_url = url_for("system.manifest")
-    css_url = url_for("static", filename="react/app.css", v=v)
-    js_url = url_for("static", filename="react/app.js", v=v)
+    js_file, css_file = _resolve_react_assets()
+    css_url = _react_asset_url(css_file, v)
+    js_url = _react_asset_url(js_file, v)
     tg_bundle_url = url_for("static", filename="js/bundles/telegram-base.js", v=v)
 
     tg_head = (
-        '\n    <link rel="preconnect" href="https://telegram.org" />'
+        '\n    <link rel="dns-prefetch" href="//telegram.org" />'
+        '\n    <link rel="preconnect" href="https://telegram.org" crossorigin />'
         '\n    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>'
     ) if telegram else ""
 
@@ -110,8 +154,8 @@ def render_react_page(
   </head>
   <body{body_attrs}>
     <div id="root"></div>
-    <script id="msi-react-bootstrap" type="application/json">{props_json}</script>
-    <script type="module" src="{js_url}"></script>{tg_script}
+    <script id="msi-react-bootstrap" type="application/json">{props_json}</script>{tg_script}
+    <script type="module" src="{js_url}"></script>
   </body>
 </html>"""
 

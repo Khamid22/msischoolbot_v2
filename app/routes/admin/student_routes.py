@@ -173,6 +173,9 @@ def register_admin_student_routes(
             teacher_name="",
         )
         if not saved:
+            # Clean up the newly uploaded photo so it doesn't become an orphan.
+            if photo_url and photo_url != previous_photo_url:
+                delete_uploaded_student_photo(photo_url)
             rendered = render_edit_student_page(
                 student_row_id,
                 auth_error="Unable to save student profile details.",

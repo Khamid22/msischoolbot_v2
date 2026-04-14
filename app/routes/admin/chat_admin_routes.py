@@ -2,43 +2,23 @@
 Admin chat moderation API.
 
   GET    /admin/api/chat/messages?room=...&before_id=...   list messages (incl. deleted)
-  DELETE /admin/api/chat/messages/<id>                     hard-delete any message
+  DELETE /admin/api/chat/messages/<id>                     soft-delete any message
   POST   /admin/api/chat/block                             block a student
   DELETE /admin/api/chat/block/<student_id>               unblock a student
   GET    /admin/api/chat/blocked                           list blocked students
   GET    /admin/api/chat/rooms                             list distinct active rooms
 """
 
-import threading
-from datetime import datetime, timezone
-
 from flask import jsonify, request
 
 from app.extensions import csrf
-from app.storage import queries
+from app.routes.chat_shared import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from app.routes.admin.services.session_state_service import (
-    current_auth_role,
     current_auth_login,
+    current_auth_role,
 )
 
-_DB_LOCK = threading.Lock()
 _PAGE_SIZE = 60
-
-
-def _connect():
-    return queries.connect_auth_db()
-
-
-def _now_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _fmt(iso_str):
-    try:
-        dt = datetime.strptime(iso_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-        return dt.strftime("%-d %b %Y, %H:%M")
-    except Exception:
-        return iso_str
 
 
 def _require_admin():
@@ -55,8 +35,8 @@ def _serialize(row) -> dict:
         "authorStudentId": str(row["author_student_id"]),
         "body": str(row["body"]),
         "isDeleted": bool(row["is_deleted"]),
-        "editedAt": _fmt(str(row["edited_at"])) if row["edited_at"] else None,
-        "createdAt": _fmt(str(row["created_at"])),
+        "editedAt": fmt_display(str(row["edited_at"])) if row["edited_at"] else None,
+        "createdAt": fmt_display(str(row["created_at"])),
     }
 
 
@@ -76,7 +56,7 @@ def register_admin_chat_routes(router):
         except (TypeError, ValueError):
             before_id = 0
 
-        with _connect() as conn:
+        with connect_chat_db() as conn:
             if before_id > 0:
                 rows = conn.execute(
                     """
@@ -103,7 +83,7 @@ def register_admin_chat_routes(router):
         messages = [_serialize(r) for r in reversed(rows)]
         return jsonify({"messages": messages, "room": room})
 
-    # ── Hard-delete any message ────────────────────────────────────────────────
+    # ── Soft-delete any message ────────────────────────────────────────────────
     @router.delete("/admin/api/chat/messages/<int:msg_id>")
     @csrf.exempt
     def admin_api_chat_delete(msg_id):
@@ -112,7 +92,7 @@ def register_admin_chat_routes(router):
             return err
 
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 row = conn.execute(
                     "SELECT id FROM chat_messages WHERE id = ?", (msg_id,)
                 ).fetchone()
@@ -140,10 +120,10 @@ def register_admin_chat_routes(router):
         if not student_id:
             return jsonify({"error": "studentId required."}), 400
 
-        now = _now_iso()
+        now = utc_now_iso()
         admin_login = current_auth_login()
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 conn.execute(
                     """
                     INSERT INTO chat_blocked_users (student_id, blocked_by_admin, blocked_at, reason)
@@ -168,7 +148,7 @@ def register_admin_chat_routes(router):
             return err
 
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 conn.execute(
                     "DELETE FROM chat_blocked_users WHERE student_id = ?",
                     (student_id.strip().lower(),),
@@ -185,7 +165,7 @@ def register_admin_chat_routes(router):
         if err:
             return err
 
-        with _connect() as conn:
+        with connect_chat_db() as conn:
             rows = conn.execute(
                 """
                 SELECT student_id, blocked_by_admin, blocked_at, reason
@@ -198,7 +178,7 @@ def register_admin_chat_routes(router):
             {
                 "studentId": str(r["student_id"]),
                 "blockedBy": str(r["blocked_by_admin"]),
-                "blockedAt": _fmt(str(r["blocked_at"])),
+                "blockedAt": fmt_display(str(r["blocked_at"])),
                 "reason": str(r["reason"]),
             }
             for r in rows
@@ -213,7 +193,7 @@ def register_admin_chat_routes(router):
         if err:
             return err
 
-        with _connect() as conn:
+        with connect_chat_db() as conn:
             rows = conn.execute(
                 """
                 SELECT room, COUNT(*) as total,

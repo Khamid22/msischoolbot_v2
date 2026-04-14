@@ -117,11 +117,6 @@ def load_from_google_sheets(school_code):
             group.subject_name, {}
         )
         group_lessons = subject_group_lessons.setdefault(group.group_display_name, [])
-        group_seen_numbers = {
-            str(lesson.get("lesson_number", "")).strip().casefold()
-            for lesson in group_lessons
-            if isinstance(lesson, dict)
-        }
         group_existing_by_number = {
             str(lesson.get("lesson_number", "")).strip().casefold(): lesson
             for lesson in group_lessons
@@ -129,11 +124,6 @@ def load_from_google_sheets(school_code):
         }
 
         subject_lessons = lesson_catalog_by_subject.setdefault(group.subject_name, [])
-        seen_numbers = {
-            str(lesson.get("lesson_number", "")).strip().casefold()
-            for lesson in subject_lessons
-            if isinstance(lesson, dict)
-        }
         existing_by_number = {
             str(lesson.get("lesson_number", "")).strip().casefold(): lesson
             for lesson in subject_lessons
@@ -149,16 +139,14 @@ def load_from_google_sheets(school_code):
                 continue
             dedupe_key = lesson_number.casefold()
 
-            if dedupe_key in group_seen_numbers:
-                existing_group_lesson = group_existing_by_number.get(dedupe_key)
+            if dedupe_key in group_existing_by_number:
+                existing_group_lesson = group_existing_by_number[dedupe_key]
                 if (
-                    existing_group_lesson is not None
-                    and lesson_date
+                    lesson_date
                     and not str(existing_group_lesson.get("lesson_date", "")).strip()
                 ):
                     existing_group_lesson["lesson_date"] = lesson_date
             else:
-                group_seen_numbers.add(dedupe_key)
                 grouped_lesson = {
                     "lesson_number": lesson_number,
                     "lesson_topic": lesson_topic,
@@ -168,16 +156,14 @@ def load_from_google_sheets(school_code):
                 group_lessons.append(grouped_lesson)
                 group_existing_by_number[dedupe_key] = grouped_lesson
 
-            if dedupe_key in seen_numbers:
-                existing_lesson = existing_by_number.get(dedupe_key)
+            if dedupe_key in existing_by_number:
+                existing_lesson = existing_by_number[dedupe_key]
                 if (
-                    existing_lesson is not None
-                    and lesson_date
+                    lesson_date
                     and not str(existing_lesson.get("lesson_date", "")).strip()
                 ):
                     existing_lesson["lesson_date"] = lesson_date
                 continue
-            seen_numbers.add(dedupe_key)
             merged_lesson = {
                 "lesson_number": lesson_number,
                 "lesson_topic": lesson_topic,
@@ -241,11 +227,15 @@ def load_from_google_sheets(school_code):
 
 def merge_total_coins_across_subjects(students, dashboards_by_id):
     total_coins_by_name: dict[str, int] = {}
+    # Cache name keys in a parallel list to avoid calling normalize_name_key twice per student.
+    name_key_cache: list[str] = []
 
     for student in students:
         if not isinstance(student, dict):
+            name_key_cache.append("")
             continue
         student_name_key = normalize_name_key(student.get("fullName", ""))
+        name_key_cache.append(student_name_key)
         if not student_name_key:
             continue
 
@@ -259,29 +249,15 @@ def merge_total_coins_across_subjects(students, dashboards_by_id):
             total_coins_by_name.get(student_name_key, 0) + numeric_coins
         )
 
-    for student in students:
-        if not isinstance(student, dict):
+    # Second pass: write merged totals back to each student and update the top-level
+    # dashboard["coins"] field.  dashboard["student"] is the *same object* as the
+    # student dict, so updating student["coins"] here covers both automatically.
+    for student, name_key in zip(students, name_key_cache):
+        if not isinstance(student, dict) or not name_key:
             continue
-        student_name_key = normalize_name_key(student.get("fullName", ""))
-        if not student_name_key:
-            continue
-        student["coins"] = int(total_coins_by_name.get(student_name_key, 0))
-
-    if not isinstance(dashboards_by_id, dict):
-        return
-
-    for dashboard_payload in dashboards_by_id.values():
-        if not isinstance(dashboard_payload, dict):
-            continue
-
-        payload_student = dashboard_payload.get("student", {})
-        if not isinstance(payload_student, dict):
-            continue
-
-        student_name_key = normalize_name_key(payload_student.get("fullName", ""))
-        if not student_name_key:
-            continue
-
-        merged_coins = int(total_coins_by_name.get(student_name_key, 0))
-        payload_student["coins"] = merged_coins
-        dashboard_payload["coins"] = merged_coins
+        merged_coins = int(total_coins_by_name.get(name_key, 0))
+        student["coins"] = merged_coins
+        if isinstance(dashboards_by_id, dict):
+            dashboard = dashboards_by_id.get(student.get("id"))
+            if isinstance(dashboard, dict):
+                dashboard["coins"] = merged_coins

@@ -22,9 +22,6 @@ def register_admin_page_routes(
     *,
     load_dataset,
 ):
-    def should_force_refresh():
-        return False
-
     def delete_uploaded_student_photo(photo_url):
         raw_url = str(photo_url or "").strip()
         if not raw_url:
@@ -48,12 +45,10 @@ def register_admin_page_routes(
         auth_error="",
         admin_notice="",
         admin_panel="overview",
-        admin_selected_student=None,
         admin_teacher_edit=None,
         admin_school="all",
     ):
-        _ = admin_selected_student  # Kept for backward compatibility.
-        force_refresh = should_force_refresh() or bool(
+        force_refresh = bool(
             str(auth_error or "").strip()
             or str(admin_notice or "").strip()
             or isinstance(admin_teacher_edit, dict)

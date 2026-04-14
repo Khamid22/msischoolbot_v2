@@ -35,6 +35,11 @@ _ADMIN_PAGE_CONTEXT_CACHE_LOCK = threading.Lock()
 _ADMIN_PAGE_CONTEXT_CACHE = {}
 
 
+def invalidate_admin_page_context_cache():
+    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
+        _ADMIN_PAGE_CONTEXT_CACHE.clear()
+
+
 def _admin_page_context_cache_ttl_seconds():
     raw_value = str(os.environ.get("ADMIN_PAGE_CONTEXT_CACHE_SECONDS", "15") or "").strip()
     try:
@@ -303,7 +308,7 @@ def build_admin_page_context(
     available_school_codes = school_config["available_school_codes"]
 
     panel = str(admin_panel or "overview").strip().lower()
-    if panel not in {"overview", "students", "teachers", "resources"}:
+    if panel not in {"overview", "students", "teachers", "resources", "chat"}:
         panel = "overview"
 
     school_filter = normalize_admin_school_filter(admin_school, admin_school_options)
@@ -510,7 +515,8 @@ def build_admin_page_context(
         "admin_resource_subject_options": admin_resource_subject_options,
         "admin_resource_upload_enabled": admin_resource_upload_enabled,
     }
-    if not force_refresh:
+    should_cache_context = not force_refresh and not load_error and not sync_errors
+    if should_cache_context:
         _set_cached_admin_page_context(cache_key, context)
     return context
 
@@ -540,5 +546,6 @@ __all__ = [
     "build_admin_page_context",
     "build_edit_student_page_context",
     "build_school_configuration",
+    "invalidate_admin_page_context_cache",
     "normalize_admin_school_filter",
 ]

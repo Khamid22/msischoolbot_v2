@@ -14,11 +14,6 @@ from .loader import load_from_google_sheets
 from .utils import normalize_school_code
 
 
-# Per-school-code cooperative lock that serializes all Google Sheets API calls.
-# Using gevent.lock.Semaphore (falls back to threading.Lock) so the holder can
-# yield during threadpool.spawn().get() without blocking the event loop, while
-# still preventing concurrent httplib2 socket access which causes:
-#   "This socket is already used by another greenlet"
 _LOAD_LOCKS: dict[str, Any] = {}
 _LOAD_LOCKS_META = threading.Lock()
 
@@ -37,14 +32,6 @@ def _get_load_lock(school_code: str) -> Any:
 
 
 def _load_sheets_in_threadpool(school_code: str) -> dict:
-    """Run load_from_google_sheets in gevent's thread pool.
-
-    google-api-python-client uses httplib2 which does not cooperate with
-    gevent's monkey-patched event loop even with patch_all().  Running the
-    call inside a real OS thread (via gevent's threadpool) lets the event
-    loop continue serving all other requests while waiting for Google Sheets.
-    The calling greenlet suspends cooperatively until the thread finishes.
-    """
     try:
         from gevent.hub import get_hub
         return get_hub().threadpool.spawn(load_from_google_sheets, school_code).get()
@@ -63,11 +50,15 @@ class CacheEntry:
 class SheetCache:
     def __init__(self):
         self._entries: dict[str, CacheEntry] = {}
-        self._lock = threading.Lock()
+        self._school_locks: dict[str, threading.Lock] = {}
+        self._meta_lock = threading.Lock()
 
-    @property
-    def lock(self):
-        return self._lock
+    def school_lock(self, school_code: str) -> threading.Lock:
+        """Return the per-school lock, creating it on first access."""
+        with self._meta_lock:
+            if school_code not in self._school_locks:
+                self._school_locks[school_code] = threading.Lock()
+            return self._school_locks[school_code]
 
     def get(self, school_code):
         entry = self._entries.get(school_code)
@@ -125,8 +116,6 @@ class SheetCache:
 
 SHEET_CACHE = SheetCache()
 
-# Tracks which schools are currently being revalidated in the background so we
-# don't spawn duplicate refresh threads for the same school.
 _REVALIDATING: set[str] = set()
 _REVALIDATING_LOCK = threading.Lock()
 
@@ -136,7 +125,7 @@ def _revalidate_school(school_code: str) -> None:
     lock.acquire()
     try:
         loaded_dataset = _load_sheets_in_threadpool(school_code)
-        with SHEET_CACHE.lock:
+        with SHEET_CACHE.school_lock(school_code):
             SHEET_CACHE.set(school_code, loaded_dataset, now=time.time())
     except Exception:
         return  # Keep existing stale data on failure
@@ -145,10 +134,6 @@ def _revalidate_school(school_code: str) -> None:
 
 
 def _trigger_background_revalidation(school_code: str) -> None:
-    """Kick off a one-shot background thread to refresh *school_code*.
-
-    No-ops if a refresh is already in progress for that school.
-    """
     with _REVALIDATING_LOCK:
         if school_code in _REVALIDATING:
             return
@@ -189,8 +174,8 @@ def mark_school_dataset_dirty(school_codes = None, clear_cached_data = False):
     if not target_codes:
         target_codes = set(SHEET_CACHE.keys())
 
-    with SHEET_CACHE.lock:
-        for school_code in target_codes:
+    for school_code in target_codes:
+        with SHEET_CACHE.school_lock(school_code):
             SHEET_CACHE.mark_dirty(school_code, clear_cached_data=clear_cached_data)
 
     return sorted(target_codes)
@@ -202,7 +187,7 @@ def get_school_dataset(force_refresh = False, school_code = None):
         or os.environ.get("ACTIVE_SCHOOL_CODE", DEFAULT_SCHOOL_CODE)
         or DEFAULT_SCHOOL_CODE
     )
-    with SHEET_CACHE.lock:
+    with SHEET_CACHE.school_lock(normalized_school_code):
         now = time.time()
         cached_dataset = SHEET_CACHE.get(normalized_school_code)
         if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
@@ -223,7 +208,7 @@ def get_school_dataset(force_refresh = False, school_code = None):
     try:
         # Re-check cache — another greenlet may have loaded while we waited.
         if not force_refresh:
-            with SHEET_CACHE.lock:
+            with SHEET_CACHE.school_lock(normalized_school_code):
                 now = time.time()
                 cached_dataset = SHEET_CACHE.get(normalized_school_code)
                 if cached_dataset is not None:
@@ -232,13 +217,13 @@ def get_school_dataset(force_refresh = False, school_code = None):
         try:
             loaded_dataset = _load_sheets_in_threadpool(normalized_school_code)
         except SheetsDataError:
-            with SHEET_CACHE.lock:
+            with SHEET_CACHE.school_lock(normalized_school_code):
                 fallback_dataset = SHEET_CACHE.get(normalized_school_code)
                 if fallback_dataset:
                     return fallback_dataset
             raise
 
-        with SHEET_CACHE.lock:
+        with SHEET_CACHE.school_lock(normalized_school_code):
             now = time.time()
             cached_dataset = SHEET_CACHE.get(normalized_school_code)
             if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
@@ -255,5 +240,5 @@ def get_school_dataset_last_updated(school_code = None):
         or os.environ.get("ACTIVE_SCHOOL_CODE", DEFAULT_SCHOOL_CODE)
         or DEFAULT_SCHOOL_CODE
     )
-    with SHEET_CACHE.lock:
+    with SHEET_CACHE.school_lock(normalized_school_code):
         return SHEET_CACHE.get_last_updated(normalized_school_code)

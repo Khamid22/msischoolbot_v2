@@ -10,26 +10,17 @@ def student_menu_keyboard():
     )
 
 
-def registration_keyboard(mini_app_url, admin_url=""):
-    button_text = "Open Student Mini App" if admin_url else "Open Mini App"
-    inline_keyboard = [
-        [
-            InlineKeyboardButton(
-                text=button_text,
-                web_app=WebAppInfo(url=mini_app_url),
-            )
-        ]
-    ]
-    if admin_url:
-        inline_keyboard.append(
+def registration_keyboard(mini_app_url):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Open Admin Website",
-                    url=admin_url,
+                    text="Open Mini App",
+                    web_app=WebAppInfo(url=mini_app_url),
                 )
             ]
-        )
-    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+        ]
+    )
 
 
 def url_keyboard(button_text, target_url):

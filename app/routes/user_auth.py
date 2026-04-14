@@ -1,5 +1,3 @@
-from urllib.parse import parse_qs, urlparse
-
 from flask import current_app, redirect, request, session, url_for
 
 from app.web.render import render_admin_redirect
@@ -99,29 +97,6 @@ def _load_admin_handoff_payload(raw_token):
     if not normalized_payload:
         return None, "Admin website handoff is invalid. Please sign in again."
     return normalized_payload, ""
-
-
-def _is_telegram_mini_app_request():
-    if parse_telegram_user_id(request.values.get("tg_user_id")) is not None:
-        return True
-    if bool(str(request.values.get("tgWebAppData", "")).strip()):
-        return True
-
-    referrer = str(request.referrer or "").strip()
-    if not referrer:
-        return False
-
-    try:
-        referrer_params = parse_qs(urlparse(referrer).query or "")
-    except Exception:
-        return False
-
-    if bool((referrer_params.get("tgWebAppData") or [""])[0].strip()):
-        return True
-    return (
-        parse_telegram_user_id((referrer_params.get("tg_user_id") or [""])[0])
-        is not None
-    )
 
 
 def register_user_auth_routes(

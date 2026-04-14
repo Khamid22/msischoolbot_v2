@@ -7,51 +7,31 @@ Rooms:
   "group:<name>"     – e.g. "group:Group A"
 
 Endpoints:
-  GET  /api/chat/messages?room=...&before_id=...&after_id=...
+  GET    /api/chat/messages?room=...&before_id=...&after_id=...
                                                   list messages (newest-first, 40 per page)
-  POST /api/chat/messages                          send message
-  PUT  /api/chat/messages/<id>                     edit own message
+  POST   /api/chat/messages                        send message
+  PUT    /api/chat/messages/<id>                   edit own message
   DELETE /api/chat/messages/<id>                  soft-delete own message
 """
-
-import threading
-from datetime import datetime, timezone
 
 from flask import jsonify, request
 
 from app.extensions import csrf
-from app.storage import queries
+from app.routes.chat_shared import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from app.routes.students.services.session_state_service import (
+    current_auth_login,
     current_auth_role,
     current_student_full_name,
 )
 
-_DB_LOCK = threading.Lock()
 _PAGE_SIZE = 40
 _MAX_BODY = 800
-_VALID_ROOM_PREFIXES = ("global", "subject:", "group:")
-
-
-def _connect():
-    return queries.connect_auth_db()
-
-
-def _now_iso():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _fmt(iso_str):
-    try:
-        dt = datetime.strptime(iso_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-        return dt.strftime("%-d %b %Y, %H:%M")
-    except Exception:
-        return iso_str
 
 
 def _validate_room(room: str) -> bool:
     if not room:
         return False
-    return any(room == "global" or room.startswith(p) for p in _VALID_ROOM_PREFIXES)
+    return room == "global" or room.startswith("subject:") or room.startswith("group:")
 
 
 def _is_blocked(conn, student_login: str) -> bool:
@@ -69,8 +49,8 @@ def _serialize(row) -> dict:
         "authorName": str(row["author_name"]),
         "authorStudentId": str(row["author_student_id"]),
         "body": str(row["body"]),
-        "editedAt": _fmt(str(row["edited_at"])) if row["edited_at"] else None,
-        "createdAt": _fmt(str(row["created_at"])),
+        "editedAt": fmt_display(str(row["edited_at"])) if row["edited_at"] else None,
+        "createdAt": fmt_display(str(row["created_at"])),
         "createdAtRaw": str(row["created_at"]),
     }
 
@@ -94,7 +74,7 @@ def register_chat_routes(students):
         except (TypeError, ValueError):
             after_id = 0
 
-        with _connect() as conn:
+        with connect_chat_db() as conn:
             if after_id > 0:
                 rows = conn.execute(
                     """
@@ -161,13 +141,10 @@ def register_chat_routes(students):
         if len(body) > _MAX_BODY:
             return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}), 400
 
-        # Use full_name as the stable login for blocking
-        from app.routes.students.services.session_state_service import current_auth_login as _student_login
-        student_login = _student_login() or author_name
-
-        now = _now_iso()
+        student_login = current_auth_login() or author_name
+        now = utc_now_iso()
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 if _is_blocked(conn, student_login):
                     return jsonify({"error": "You have been blocked from the chat."}), 403
 
@@ -184,13 +161,13 @@ def register_chat_routes(students):
 
         return jsonify({
             "message": {
-                "id": int(msg_id),
+                "id": msg_id,
                 "room": room,
                 "authorName": author_name,
                 "authorStudentId": student_login,
                 "body": body,
                 "editedAt": None,
-                "createdAt": _fmt(now),
+                "createdAt": fmt_display(now),
                 "createdAtRaw": now,
             }
         }), 201
@@ -202,8 +179,7 @@ def register_chat_routes(students):
         if current_auth_role() != "student":
             return jsonify({"error": "Login required."}), 401
 
-        from app.routes.students.services.session_state_service import current_auth_login as _student_login
-        student_login = _student_login() or current_student_full_name()
+        student_login = current_auth_login() or current_student_full_name()
 
         data = request.get_json(silent=True) or {}
         body = str(data.get("body", "")).strip()
@@ -212,9 +188,9 @@ def register_chat_routes(students):
         if len(body) > _MAX_BODY:
             return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}), 400
 
-        now = _now_iso()
+        now = utc_now_iso()
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 row = conn.execute(
                     "SELECT author_student_id FROM chat_messages WHERE id = ? AND is_deleted = 0",
                     (msg_id,),
@@ -230,20 +206,19 @@ def register_chat_routes(students):
                 )
                 conn.commit()
 
-        return jsonify({"id": msg_id, "body": body, "editedAt": _fmt(now)})
+        return jsonify({"id": msg_id, "body": body, "editedAt": fmt_display(now)})
 
-    # ── Delete own message ─────────────────────────────────────────────────────
+    # ── Soft-delete own message ────────────────────────────────────────────────
     @students.delete("/api/chat/messages/<int:msg_id>")
     @csrf.exempt
     def api_chat_delete(msg_id):
         if current_auth_role() != "student":
             return jsonify({"error": "Login required."}), 401
 
-        from app.routes.students.services.session_state_service import current_auth_login as _student_login
-        student_login = _student_login() or current_student_full_name()
+        student_login = current_auth_login() or current_student_full_name()
 
         with _DB_LOCK:
-            with _connect() as conn:
+            with connect_chat_db() as conn:
                 row = conn.execute(
                     "SELECT author_student_id FROM chat_messages WHERE id = ? AND is_deleted = 0",
                     (msg_id,),

@@ -25,10 +25,10 @@ def _prewarm_cache() -> None:
         return
 
     for school_code in configured_codes:
-        with SHEET_CACHE.lock:
-            entry = SHEET_CACHE._entries.get(school_code)
-        if entry is not None and entry.dataset:
-            continue 
+        with SHEET_CACHE.school_lock(school_code):
+            cached = SHEET_CACHE.get(school_code)
+        if cached is not None:
+            continue
 
         logger.info("Startup pre-warm: loading '%s' from Google Sheets", school_code)
         try:
@@ -58,7 +58,7 @@ def _refresh_stale_schools() -> None:
 
     now = time.time()
     for school_code in configured_codes:
-        with SHEET_CACHE.lock:
+        with SHEET_CACHE.school_lock(school_code):
             entry = SHEET_CACHE._entries.get(school_code)
 
         if entry is None or not entry.dataset:
@@ -100,8 +100,6 @@ def start_background_refresh() -> None:
         threading.Thread(target=_refresh_loop, name="sheets-cache-refresh", daemon=True).start()
 
     logger.info(
-        "Background Sheets cache refresh started "
-        "(check every %ds, refresh %ds ahead of expiry)",
         CHECK_INTERVAL_SECONDS,
         REFRESH_AHEAD_SECONDS,
     )

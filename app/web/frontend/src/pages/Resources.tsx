@@ -323,10 +323,10 @@ function ResourceTableGroup({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const fullscreenInsetStyle = {
-  paddingTop: "calc(var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px))) + var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px)))",
-  paddingRight: "calc(var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px))) + var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px)))",
-  paddingBottom: "calc(var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px))) + var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px)))",
-  paddingLeft: "calc(var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px))) + var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px)))",
+  paddingTop: "var(--app-top-inset)",
+  paddingRight: "var(--app-right-inset)",
+  paddingBottom: "var(--app-bottom-inset)",
+  paddingLeft: "var(--app-left-inset)",
 } as const;
 
 export default function ResourcesPage(props: ResourcesPageProps) {

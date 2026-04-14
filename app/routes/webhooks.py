@@ -25,77 +25,72 @@ def register_webhook_routes(
         return [part.strip() for part in text.split(",") if part.strip()]
 
     def _extract_school_codes(payload):
+        """Resolve target school codes from the webhook request.
+
+        Priority: JSON body → query string → form data.
+        Accepts both school codes ("school5", "sehriyo") and spreadsheet IDs.
+        Falls back to all configured schools when none are specified.
+        """
         configured_map = get_configured_school_spreadsheets()
         spreadsheet_to_school = {
-            str(spreadsheet_id).strip(): school_code
-            for school_code, spreadsheet_id in configured_map.items()
-            if str(spreadsheet_id).strip()
+            str(sid).strip(): code
+            for code, sid in configured_map.items()
+            if str(sid).strip()
         }
 
-        resolved_codes = []
+        resolved: list[str] = []
 
-        def _add_school_code(raw_value):
+        def _add(raw_value):
             code = normalization_service.normalize_school_code(raw_value)
-            if code and code in configured_map and code not in resolved_codes:
-                resolved_codes.append(code)
+            if code and code in configured_map and code not in resolved:
+                resolved.append(code)
 
-        school_candidates = []
-        school_candidates.extend(_split_csv(request.args.get("school", "")))
-        school_candidates.extend(_split_csv(request.args.get("schools", "")))
-        school_candidates.extend(_split_csv(request.form.get("school", "")))
-        school_candidates.extend(_split_csv(request.form.get("schools", "")))
+        def _add_spreadsheet_id(raw_id):
+            school = spreadsheet_to_school.get(str(raw_id).strip())
+            if school and school not in resolved:
+                resolved.append(school)
 
+        # 1. JSON body (most explicit — checked first)
         if isinstance(payload, dict):
-            school_candidates.extend(_split_csv(payload.get("school")))
-            school_candidates.extend(_split_csv(payload.get("school_code")))
-            school_candidates.extend(_split_csv(payload.get("schoolKey")))
-            school_candidates.extend(_split_csv(payload.get("schools")))
+            for raw in _split_csv(payload.get("school")) + _split_csv(payload.get("schools")):
+                _add(raw)
+            for raw in _split_csv(payload.get("spreadsheet_id")) + _split_csv(payload.get("spreadsheet_ids")):
+                _add_spreadsheet_id(raw)
+            if isinstance(payload.get("schools"), list):
+                for raw in payload["schools"]:
+                    _add(raw)
 
-            raw_schools = payload.get("schools")
-            if isinstance(raw_schools, list):
-                school_candidates.extend(raw_schools)
+        # 2. Query string
+        for raw in _split_csv(request.args.get("school", "")):
+            _add(raw)
 
-            spreadsheet_id_candidates = []
-            spreadsheet_id_candidates.extend(_split_csv(payload.get("spreadsheet_id")))
-            spreadsheet_id_candidates.extend(_split_csv(payload.get("spreadsheetId")))
-            spreadsheet_id_candidates.extend(_split_csv(payload.get("spreadsheet_ids")))
-            raw_spreadsheet_ids = payload.get("spreadsheet_ids")
-            if isinstance(raw_spreadsheet_ids, list):
-                spreadsheet_id_candidates.extend(raw_spreadsheet_ids)
+        # 3. Form data
+        for raw in _split_csv(request.form.get("school", "")):
+            _add(raw)
 
-            for spreadsheet_id in spreadsheet_id_candidates:
-                resolved_school = spreadsheet_to_school.get(str(spreadsheet_id).strip())
-                if resolved_school and resolved_school not in resolved_codes:
-                    resolved_codes.append(resolved_school)
-
-        for candidate in school_candidates:
-            _add_school_code(candidate)
-
-        if not resolved_codes:
-            resolved_codes = list(configured_map.keys())
-
-        return resolved_codes
+        return resolved or list(configured_map.keys())
 
     def _validate_webhook_token(payload):
-        expected_token = str(
-            os.environ.get("GOOGLE_SHEETS_WEBHOOK_TOKEN", "")
-        ).strip()
+        """Validate the bearer token in the request.
+
+        Returns (ok: bool, error_message: str, status_code: int).
+        """
+        expected_token = str(os.environ.get("GOOGLE_SHEETS_WEBHOOK_TOKEN", "")).strip()
         if not expected_token:
-            return False, "GOOGLE_SHEETS_WEBHOOK_TOKEN is not configured."
+            return False, "GOOGLE_SHEETS_WEBHOOK_TOKEN is not configured.", 503
 
-        provided_token = str(request.headers.get("X-Webhook-Token", "")).strip()
-        if not provided_token:
-            provided_token = str(request.args.get("token", "")).strip()
-        if not provided_token:
-            provided_token = str(request.form.get("token", "")).strip()
-        if not provided_token and isinstance(payload, dict):
-            provided_token = str(payload.get("token", "")).strip()
+        provided_token = (
+            str(request.headers.get("X-Webhook-Token", "")).strip()
+            or str(request.args.get("token", "")).strip()
+            or str(request.form.get("token", "")).strip()
+            or (str(payload.get("token", "")).strip() if isinstance(payload, dict) else "")
+        )
 
         if not provided_token:
-            return False, "Webhook token is missing."
+            return False, "Webhook token is missing.", 401
         if not hmac.compare_digest(provided_token, expected_token):
-            return False, "Webhook token is invalid."
-        return True, ""
+            return False, "Webhook token is invalid.", 401
+        return True, "", 200
 
     @webhook_blueprint.post("/webhooks/google-sheets")
     @csrf.exempt
@@ -104,32 +99,23 @@ def register_webhook_routes(
         if not isinstance(payload, dict):
             payload = {}
 
-        token_ok, token_error = _validate_webhook_token(payload)
+        token_ok, token_error, token_status = _validate_webhook_token(payload)
         if not token_ok:
             logging.warning(
                 "Google Sheets webhook rejected: %s (remote_addr=%s)",
                 token_error,
                 request.remote_addr,
             )
-            status_code = 503 if "not configured" in token_error else 401
-            return jsonify({"ok": False, "message": token_error}), status_code
+            return jsonify({"ok": False, "message": token_error}), token_status
 
         target_school_codes = _extract_school_codes(payload)
         if not target_school_codes:
             return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "message": "Unable to resolve target schools for this webhook event.",
-                    }
-                ),
+                jsonify({"ok": False, "message": "Unable to resolve target schools for this webhook event."}),
                 400,
             )
 
-        logging.info(
-            "Google Sheets webhook accepted for schools=%s",
-            target_school_codes,
-        )
+        logging.info("Google Sheets webhook accepted for schools=%s", target_school_codes)
         clear_group_cache()
         mark_school_dataset_dirty(target_school_codes, clear_cached_data=False)
 

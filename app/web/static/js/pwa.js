@@ -24,7 +24,8 @@
     }
     const initData = typeof webApp.initData === "string" ? webApp.initData.trim() : "";
     const hasQueryInitData = /(?:^|[?&])tgWebAppData=/.test(window.location.search);
-    return Boolean(initData) || hasQueryInitData;
+    const platform = typeof webApp.platform === "string" ? webApp.platform.trim() : "";
+    return Boolean(initData) || hasQueryInitData || Boolean(platform);
   }
 
   const webApp = typeof Telegram !== "undefined" ? Telegram.WebApp : null;
@@ -39,7 +40,7 @@
 
   window.addEventListener("load", function () {
     navigator.serviceWorker
-      .register("/static/js/sw.js")
+      .register("/sw.js", { updateViaCache: "none" })
       .catch(function (error) {
         console.error("Service worker registration failed:", error);
       });

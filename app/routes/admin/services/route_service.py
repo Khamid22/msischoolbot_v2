@@ -21,10 +21,7 @@ def group_belongs_to_school(group_name, school_code, load_dataset):
     if not normalized_group or not normalized_school or normalized_school == "all":
         return True
 
-    try:
-        dataset, _load_error = load_dataset(school_code=normalized_school)
-    except TypeError:
-        dataset, _load_error = load_dataset()
+    dataset, _load_error = load_dataset(school_code=normalized_school)
 
     if not isinstance(dataset, dict):
         return True
@@ -47,13 +44,7 @@ def resolve_sheet_student_for_admin(student_row_id, get_admin_student_profile, l
         return None, "Selected student was not found.", 404
 
     school_code = school_code_from_name(student_profile.get("school_name", ""))
-    if school_code:
-        try:
-            dataset, load_error = load_dataset(school_code=school_code)
-        except TypeError:
-            dataset, load_error = load_dataset()
-    else:
-        dataset, load_error = load_dataset()
+    dataset, load_error = load_dataset(school_code=school_code or None)
 
     if load_error or not dataset:
         return None, load_error or "Unable to load Google Sheets data.", 503

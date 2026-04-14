@@ -8,40 +8,24 @@ import { ChevronLeft } from "lucide-react";
 //   --tg-content-safe-area-inset-top  → Telegram's own UI (close btn, header)
 //   --tg-content-safe-area-inset-bottom → main button / bottom bar height
 //
-// We fall back to the browser env() safe area when the Telegram SDK is absent
-// (e.g. when opening the page in a regular browser for testing).
+// Base CSS provides env() fallbacks for non-Telegram browser mode.
+const appTopInset = "var(--app-top-inset)";
+const appLeftInset = "var(--app-left-inset)";
+const appRightInset = "var(--app-right-inset)";
+const appBottomInset = "var(--app-bottom-inset)";
 
-const safeTop =
-  "var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px)))";
-const safeLeft =
-  "var(--tg-safe-area-inset-left, var(--tg-safe-area-left, env(safe-area-inset-left, 0px)))";
-const safeRight =
-  "var(--tg-safe-area-inset-right, var(--tg-safe-area-right, env(safe-area-inset-right, 0px)))";
-const contentSafeTop =
-  "var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px))";
-const safeBottom =
-  "var(--tg-safe-area-inset-bottom, var(--tg-safe-area-bottom, env(safe-area-inset-bottom, 0px)))";
-const contentSafeBottom =
-  "var(--tg-content-safe-area-inset-bottom, var(--tg-content-safe-area-bottom, 0px))";
-const contentSafeLeft =
-  "var(--tg-content-safe-area-inset-left, var(--tg-content-safe-area-left, 0px))";
-const contentSafeRight =
-  "var(--tg-content-safe-area-inset-right, var(--tg-content-safe-area-right, 0px))";
-
-const headerPadLeft = `calc(${safeLeft} + ${contentSafeLeft})`;
-const headerPadRight = `calc(${safeRight} + ${contentSafeRight})`;
-
-// Total top padding for the sticky header (device + Telegram UI inset).
-const headerPadTop = `calc(${safeTop} + ${contentSafeTop})`;
+const headerPadLeft = appLeftInset;
+const headerPadRight = appRightInset;
+const headerPadTop = appTopInset;
 
 // Total top padding for <main>: device notch + Telegram UI + topbar height.
 // Using 5.5rem gives a ~0.5rem buffer above both mobile (4.75rem) and desktop (5rem) topbar heights.
 const mainPadTop = `calc(${headerPadTop} + 5.5rem)`;
 
 // Total bottom padding for <main>: device home indicator + Telegram main button.
-const mainPadBottom = `calc(${safeBottom} + ${contentSafeBottom} + 1rem)`;
-const mainPadLeft = `calc(${safeLeft} + ${contentSafeLeft})`;
-const mainPadRight = `calc(${safeRight} + ${contentSafeRight})`;
+const mainPadBottom = `calc(${appBottomInset} + 1rem)`;
+const mainPadLeft = appLeftInset;
+const mainPadRight = appRightInset;
 
 // ─── Components ───────────────────────────────────────────────────────────────
 

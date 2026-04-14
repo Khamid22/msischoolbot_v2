@@ -23,19 +23,14 @@ export default defineConfig(() => ({
     // Outputs to app/web/static/react/ — served by Flask
     outDir: "../static/react",
     emptyOutDir: true,
+    manifest: "manifest.json",
     cssCodeSplit: false,
     rollupOptions: {
       output: {
-        entryFileNames: "app.js",
         // Add content hash so browsers can cache chunks indefinitely.
         // The hash changes only when the chunk content changes.
         chunkFileNames: "chunks/[name]-[hash].js",
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith(".css")) {
-            return "app.css";
-          }
-          return "assets/[name][extname]";
-        },
+        assetFileNames: "assets/[name]-[hash][extname]",
         // Reduce request fan-out on high-latency/mobile networks by grouping
         // many tiny node_modules chunks into a few stable vendor chunks.
         manualChunks: (id) => {

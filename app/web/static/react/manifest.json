@@ -1,0 +1,309 @@
+{
+  "_Admin-MEUrHj_Q.js": {
+    "file": "chunks/Admin-MEUrHj_Q.js",
+    "name": "Admin",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_react-vendor-BBSa9SYs.js",
+      "_PortalCard-Dxgeq0kI.js",
+      "_icons-KwKt1V7c.js"
+    ],
+    "dynamicImports": [
+      "src/pages/admin/panels/OverviewPanel.tsx",
+      "src/pages/admin/panels/StudentsPanel.tsx",
+      "src/pages/admin/panels/TeachersPanel.tsx",
+      "src/pages/admin/panels/ResourcesPanel.tsx",
+      "src/pages/admin/panels/ChatPanel.tsx"
+    ]
+  },
+  "_Avatar-DntxQ76S.js": {
+    "file": "chunks/Avatar-DntxQ76S.js",
+    "name": "Avatar",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_ChartCard-bWHinZyU.js": {
+    "file": "chunks/ChartCard-bWHinZyU.js",
+    "name": "ChartCard",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_PortalCard-Dxgeq0kI.js": {
+    "file": "chunks/PortalCard-Dxgeq0kI.js",
+    "name": "PortalCard",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "_ProgressBar-D5eTqNaz.js": {
+    "file": "chunks/ProgressBar-D5eTqNaz.js",
+    "name": "ProgressBar",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_StatCard-DxV87oL7.js": {
+    "file": "chunks/StatCard-DxV87oL7.js",
+    "name": "StatCard",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_TelegramLayout-DO25TAsP.js": {
+    "file": "chunks/TelegramLayout-DO25TAsP.js",
+    "name": "TelegramLayout",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "_icons-KwKt1V7c.js": {
+    "file": "chunks/icons-KwKt1V7c.js",
+    "name": "icons",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_react-vendor-BBSa9SYs.js": {
+    "file": "chunks/react-vendor-BBSa9SYs.js",
+    "name": "react-vendor"
+  },
+  "_recharts-BIGzVQz5.js": {
+    "file": "chunks/recharts-BIGzVQz5.js",
+    "name": "recharts",
+    "imports": [
+      "_vendor-BbMHAT_T.js",
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "_vendor-BbMHAT_T.js": {
+    "file": "chunks/vendor-BbMHAT_T.js",
+    "name": "vendor",
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ]
+  },
+  "index.html": {
+    "file": "assets/index-Bugojrk5.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js"
+    ],
+    "dynamicImports": [
+      "src/pages/Login.tsx",
+      "src/pages/Home.tsx",
+      "src/pages/Dashboard.tsx",
+      "src/pages/Resources.tsx",
+      "src/pages/Rating.tsx",
+      "src/pages/AAP.tsx",
+      "src/pages/AR.tsx",
+      "_Admin-MEUrHj_Q.js",
+      "src/pages/EditStudentProfile.tsx",
+      "src/pages/Chat.tsx",
+      "src/pages/StudentNotFound.tsx"
+    ]
+  },
+  "src/pages/AAP.tsx": {
+    "file": "chunks/AAP-DEVfhxkE.js",
+    "name": "AAP",
+    "src": "src/pages/AAP.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_ProgressBar-D5eTqNaz.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/AR.tsx": {
+    "file": "chunks/AR-BbDk6GnS.js",
+    "name": "AR",
+    "src": "src/pages/AR.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Chat.tsx": {
+    "file": "chunks/Chat-DD72sRhV.js",
+    "name": "Chat",
+    "src": "src/pages/Chat.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Dashboard.tsx": {
+    "file": "chunks/Dashboard-D-3TCpNF.js",
+    "name": "Dashboard",
+    "src": "src/pages/Dashboard.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_ProgressBar-D5eTqNaz.js",
+      "_StatCard-DxV87oL7.js",
+      "_Avatar-DntxQ76S.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js",
+      "_recharts-BIGzVQz5.js",
+      "_vendor-BbMHAT_T.js"
+    ]
+  },
+  "src/pages/EditStudentProfile.tsx": {
+    "file": "chunks/EditStudentProfile-Dpr83MmQ.js",
+    "name": "EditStudentProfile",
+    "src": "src/pages/EditStudentProfile.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_ChartCard-bWHinZyU.js",
+      "_Avatar-DntxQ76S.js",
+      "_PortalCard-Dxgeq0kI.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Home.tsx": {
+    "file": "chunks/Home-BHqJ-4LQ.js",
+    "name": "Home",
+    "src": "src/pages/Home.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_PortalCard-Dxgeq0kI.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Login.tsx": {
+    "file": "chunks/Login-dfgMMLtg.js",
+    "name": "Login",
+    "src": "src/pages/Login.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_PortalCard-Dxgeq0kI.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Rating.tsx": {
+    "file": "chunks/Rating-Bg4lhFTj.js",
+    "name": "Rating",
+    "src": "src/pages/Rating.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/Resources.tsx": {
+    "file": "chunks/Resources-CKzERF5l.js",
+    "name": "Resources",
+    "src": "src/pages/Resources.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_TelegramLayout-DO25TAsP.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/StudentNotFound.tsx": {
+    "file": "chunks/StudentNotFound-DeCJ9V2d.js",
+    "name": "StudentNotFound",
+    "src": "src/pages/StudentNotFound.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_PortalCard-Dxgeq0kI.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/admin/panels/ChatPanel.tsx": {
+    "file": "chunks/ChatPanel-DiklUroK.js",
+    "name": "ChatPanel",
+    "src": "src/pages/admin/panels/ChatPanel.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_icons-KwKt1V7c.js"
+    ]
+  },
+  "src/pages/admin/panels/OverviewPanel.tsx": {
+    "file": "chunks/OverviewPanel-Da5GUoCj.js",
+    "name": "OverviewPanel",
+    "src": "src/pages/admin/panels/OverviewPanel.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_StatCard-DxV87oL7.js",
+      "_Admin-MEUrHj_Q.js",
+      "_icons-KwKt1V7c.js",
+      "_recharts-BIGzVQz5.js",
+      "index.html",
+      "_PortalCard-Dxgeq0kI.js",
+      "_vendor-BbMHAT_T.js"
+    ]
+  },
+  "src/pages/admin/panels/ResourcesPanel.tsx": {
+    "file": "chunks/ResourcesPanel-CXwsgsUM.js",
+    "name": "ResourcesPanel",
+    "src": "src/pages/admin/panels/ResourcesPanel.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_Admin-MEUrHj_Q.js",
+      "_icons-KwKt1V7c.js",
+      "index.html",
+      "_PortalCard-Dxgeq0kI.js"
+    ]
+  },
+  "src/pages/admin/panels/StudentsPanel.tsx": {
+    "file": "chunks/StudentsPanel-Way8tuWK.js",
+    "name": "StudentsPanel",
+    "src": "src/pages/admin/panels/StudentsPanel.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_Admin-MEUrHj_Q.js",
+      "_icons-KwKt1V7c.js",
+      "index.html",
+      "_PortalCard-Dxgeq0kI.js"
+    ]
+  },
+  "src/pages/admin/panels/TeachersPanel.tsx": {
+    "file": "chunks/TeachersPanel-XGio8797.js",
+    "name": "TeachersPanel",
+    "src": "src/pages/admin/panels/TeachersPanel.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_ChartCard-bWHinZyU.js",
+      "_Admin-MEUrHj_Q.js",
+      "_icons-KwKt1V7c.js",
+      "index.html",
+      "_PortalCard-Dxgeq0kI.js"
+    ]
+  },
+  "style.css": {
+    "file": "assets/style-CNkp7SJQ.css",
+    "src": "style.css"
+  }
+}

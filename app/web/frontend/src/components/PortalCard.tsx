@@ -12,14 +12,10 @@ export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
     <div
       className="flex h-[100dvh] flex-col overflow-y-auto bg-background"
       style={{
-        paddingTop:
-          "calc(var(--safe-top, var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))) + 1rem)",
-        paddingRight:
-          "max(0.75rem, calc(var(--safe-right, var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px))) + 0.5rem))",
-        paddingBottom:
-          "calc(var(--safe-bottom, var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))) + 1rem)",
-        paddingLeft:
-          "max(0.75rem, calc(var(--safe-left, var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px))) + 0.5rem))",
+        paddingTop: "calc(var(--app-top-inset) + 1rem)",
+        paddingRight: "max(0.75rem, calc(var(--app-right-inset) + 0.5rem))",
+        paddingBottom: "calc(var(--app-bottom-inset) + 1rem)",
+        paddingLeft: "max(0.75rem, calc(var(--app-left-inset) + 0.5rem))",
         overscrollBehaviorY: "contain",
         WebkitOverflowScrolling: "touch",
       }}

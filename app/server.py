@@ -12,7 +12,7 @@ from flask_wtf.csrf import CSRFError
 
 from app.auth.policies import is_authenticated_session as is_authenticated_policy_session
 from app.auth.session import configure_login_manager
-from app.js_bundles import ensure_js_bundles
+from app.web.js_bundles import ensure_js_bundles
 from app.config.schools import get_configured_school_spreadsheets
 from app.config.settings import get_web_settings
 from app.extensions import init_extensions, login_manager
@@ -57,6 +57,43 @@ app.config["WTF_CSRF_TIME_LIMIT"] = None
 
 _compress = Compress(app)
 
+
+_CACHE_NO_STORE = "no-store, max-age=0"
+_CACHE_NO_CACHE_REVALIDATE = "no-cache, no-store, must-revalidate"
+_CACHE_LONG_IMMUTABLE = "public, max-age=31536000, immutable"
+_CACHE_STATIC_DEFAULT = "public, max-age=2592000, immutable"
+
+# Hashed Vite assets (for example index-abc123def456.js) can be cached forever.
+_HASHED_REACT_ASSET_FILE_RE = re.compile(r"-[A-Za-z0-9_-]{8,}\.(js|css)$")
+_VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
+_VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
+
+
+def _resolve_cache_control_header(request_path, query_version = ""):
+    if request_path == "/" or request_path.startswith("/dashboard/"):
+        return _CACHE_NO_STORE
+
+    if request_path.startswith("/static/react/"):
+        file_name = os.path.basename(request_path)
+        if file_name in {"manifest.json", "index.html"}:
+            return _CACHE_NO_CACHE_REVALIDATE
+        if _HASHED_REACT_ASSET_FILE_RE.search(file_name):
+            return _CACHE_LONG_IMMUTABLE
+        if query_version and _VERSIONED_REACT_ENTRY_RE.match(request_path):
+            return _CACHE_LONG_IMMUTABLE
+        return _CACHE_NO_STORE
+
+    if request_path.startswith("/static/js/bundles/"):
+        if query_version and _VERSIONED_BUNDLE_RE.match(request_path):
+            return _CACHE_LONG_IMMUTABLE
+        return _CACHE_NO_STORE
+
+    if request_path.startswith("/static/"):
+        return _CACHE_STATIC_DEFAULT
+
+    return None
+
+
 @app.after_request
 def _compress_static(response):
     # Flask serves static files with direct_passthrough=True; disable it so
@@ -73,9 +110,10 @@ ensure_js_bundles(_STATIC_DIR)
 def _build_default_asset_version():
     # Build a simple asset version from the latest static file mtime.
     candidate_paths = [
-        os.path.join(_BACKEND_DIR, "js_bundles.py"),
+        os.path.join(_BACKEND_DIR, "web", "js_bundles.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
         os.path.join(_BACKEND_DIR, "web", "render.py"),
+        os.path.join(_REACT_DIR, "manifest.json"),
         os.path.join(_REACT_DIR, "app.css"),
         os.path.join(_REACT_DIR, "app.js"),
     ]
@@ -134,6 +172,17 @@ _SEEDED_DATASET_TOKENS = {}
 _SEEDING_IN_PROGRESS = set()
 _STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
 _APP_BOOTSTRAPPED = False
+_PUBLIC_ENDPOINTS = {
+    "static",
+    "home",
+    "admin_entry",
+    "admin_continue",
+    "login",
+    "logout",
+    "manifest",
+    "service_worker",
+    "google_sheets_webhook",
+}
 
 
 def _clear_group_cache():
@@ -726,42 +775,19 @@ def _load_dashboard_payload(
 
     return payload, dataset, None
 
-
-# Vite content-hashed chunks: name-HASH.js, where HASH is 6+ base62 chars.
-# These are immutable — the hash changes on code change, so they can be cached forever.
-_HASHED_CHUNK_RE = re.compile(r"/chunks/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css)$")
-_VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
-_VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
-
-
 @app.after_request
 def add_common_headers(response):
     # Apply shared security/cache headers for every response.
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
 
-    if request.path == "/" or request.path.startswith("/dashboard/"):
-        response.headers["Cache-Control"] = "no-store, max-age=0"
-
-    if request.path.startswith("/static/react/") or request.path.startswith("/static/js/bundles/"):
-        # Hashed chunks are immutable and can be cached long-term.
-        if _HASHED_CHUNK_RE.search(request.path):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        # app.js/app.css and js bundle assets are versioned via ?v=<ASSET_VERSION>.
-        # Allow long caching when the version query exists.
-        elif (
-            request.args.get("v")
-            and (
-                _VERSIONED_REACT_ENTRY_RE.match(request.path)
-                or _VERSIONED_BUNDLE_RE.match(request.path)
-            )
-        ):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        else:
-            response.headers["Cache-Control"] = "no-store, max-age=0"
-
-    if request.path.startswith("/static/") and "Cache-Control" not in response.headers:
-        response.headers["Cache-Control"] = "public, max-age=2592000, immutable"
+    request_path = str(request.path or "")
+    cache_control = _resolve_cache_control_header(
+        request_path=request_path,
+        query_version=str(request.args.get("v", "")).strip(),
+    )
+    if cache_control:
+        response.headers["Cache-Control"] = cache_control
 
     return response
 
@@ -778,18 +804,7 @@ def _is_authenticated_session():
 def require_authentication_for_protected_routes():
     endpoint = request.endpoint or ""
     endpoint_name = endpoint.split(".")[-1] if endpoint else ""
-    public_endpoints = {
-        "static",
-        "home",
-        "admin_entry",
-        "admin_continue",
-        "login",
-        "logout",
-        "manifest",
-        "service_worker",
-        "google_sheets_webhook",
-    }
-    if endpoint in public_endpoints or endpoint_name in public_endpoints:
+    if endpoint in _PUBLIC_ENDPOINTS or endpoint_name in _PUBLIC_ENDPOINTS:
         return None
 
     if _is_authenticated_session():

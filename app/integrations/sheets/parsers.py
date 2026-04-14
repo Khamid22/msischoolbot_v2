@@ -166,6 +166,59 @@ def parse_sehriyo_group_info(sheet_title):
     )
 
 
+def _scan_rows(rows, group):
+    """Single pass over all data rows.
+
+    Returns:
+        max_columns   – width of the widest row (needed for homework column ranges)
+        coins_by_name – normalised-name → coin total
+        student_row_data – list of (row_number, row, full_name) for student rows
+    """
+    normalized_school_code = normalize_school_code(
+        getattr(group, "school_code", DEFAULT_SCHOOL_CODE)
+    )
+    is_sehriyo = normalized_school_code == "sehriyo"
+    skip_coins = is_sehriyo and getattr(group, "subject_code", "") == "CHM"
+    coins_start_row = 31 if is_sehriyo else 19
+
+    max_columns = 0
+    coins_by_name: dict[str, int] = {}
+    student_row_data: list = []
+
+    for row_number, row in enumerate(rows, start=1):
+        row_len = len(row)
+        if row_len > max_columns:
+            max_columns = row_len
+
+        # ── Coins ──────────────────────────────────────────────────────────
+        if not skip_coins and row_number >= coins_start_row:
+            name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_INDEX_MARKER)))
+            if not name:
+                name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_NAME)))
+            if name and "TOTAL COINS" not in name.upper():
+                coins_value = parse_numeric_score(cell_value(row, Columns.COINS))
+                if coins_value is not None:
+                    coins_by_name[normalize_name_key(name)] = int(round(coins_value))
+
+        # ── Student rows ────────────────────────────────────────────────────
+        full_name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_NAME)))
+        if not full_name:
+            continue
+        if full_name.casefold() in {"student name", "lesson aap", "submission rate"}:
+            continue
+
+        if is_sehriyo:
+            if row_number < 4 or row_number > 19:
+                continue
+        else:
+            if not is_student_data_row(row):
+                continue
+
+        student_row_data.append((row_number, row, full_name))
+
+    return max_columns, coins_by_name, student_row_data
+
+
 def parse_group_rows(
     group,
     rows,
@@ -188,18 +241,21 @@ def parse_group_rows(
         exam_columns = list(range(Columns.EXAM_START, Columns.EXAM_END_EXCLUSIVE))  # C..T
 
     exam_column_meta = build_exam_column_meta(header_rows.lesson_name_row, exam_columns)
+
+    # Single combined pass: max column width, coins, and student rows.
+    max_columns, coins_by_name, student_row_data = _scan_rows(rows, group)
+
     homework_columns_meta = build_homework_column_meta(
         group,
-        rows,
         header_rows.lesson_number_row,
         header_rows.lesson_name_row,
         header_rows.lesson_date_row,
+        max_columns,
     )
-    coins_by_name = extract_coins(rows, group)
     lesson_catalog = build_lesson_catalog(homework_columns_meta)
 
     parsed_rows = []
-    for row_number, row, full_name in get_student_rows(group, rows):
+    for row_number, row, full_name in student_row_data:
         parsed_row = parse_student_row(
             group=group,
             row_number=row_number,
@@ -253,20 +309,19 @@ def build_exam_column_meta(
 
 def build_homework_column_meta(
     group,
-    rows,
     lesson_number_row,
     lesson_topic_row,
     lesson_date_row,
+    max_columns,
 ):
-    # Use full row width so trailing score columns are not dropped when
-    # header rows are shorter than student rows.
-    max_columns = max((len(row) for row in rows), default=0)
+    # max_columns is pre-computed by _scan_rows so trailing score columns are not
+    # dropped when header rows are shorter than student rows.
     if is_sehriyo_chemistry_group(group):
         return build_sehriyo_chemistry_homework_column_meta(
-            rows,
             lesson_number_row,
             lesson_topic_row,
             lesson_date_row,
+            max_columns,
         )
 
     metadata: list[LessonMeta] = []
@@ -318,13 +373,11 @@ def build_homework_column_meta(
 
 
 def build_sehriyo_chemistry_homework_column_meta(
-    rows,
     lesson_number_row,
     lesson_topic_row,
     lesson_date_row,
+    max_columns,
 ):
-    max_columns = max((len(row) for row in rows), default=0)
-
     metadata: list[LessonMeta] = []
     for lesson_column_index in range(Columns.SEHRIYO_CHEMISTRY_LESSON_START, max_columns):
         raw_label = to_text(cell_value(lesson_number_row, lesson_column_index))
@@ -370,39 +423,6 @@ def build_sehriyo_chemistry_homework_column_meta(
     return metadata
 
 
-def extract_coins(rows, group):
-    coins_by_name: dict[str, int] = {}
-    normalized_school_code = normalize_school_code(
-        getattr(group, "school_code", DEFAULT_SCHOOL_CODE)
-    )
-    if normalized_school_code == "sehriyo" and getattr(group, "subject_code", "") == "CHM":
-        return coins_by_name
-
-    coins_start_row = 31 if normalized_school_code == "sehriyo" else 19
-
-    for row_number, row in enumerate(rows, start=1):
-        if row_number < coins_start_row:
-            continue
-
-        name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_INDEX_MARKER)))
-        if not name:
-            name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_NAME)))
-        if not name:
-            continue
-
-        upper_name = name.upper()
-        if "TOTAL COINS" in upper_name:
-            continue
-
-        coins_value = parse_numeric_score(cell_value(row, Columns.COINS))
-        if coins_value is None:
-            continue
-
-        coins_by_name[normalize_name_key(name)] = int(round(coins_value))
-
-    return coins_by_name
-
-
 def build_lesson_catalog(homework_columns_meta):
     lesson_catalog = []
     for lesson_order, lesson_meta in enumerate(homework_columns_meta, start=1):
@@ -415,30 +435,6 @@ def build_lesson_catalog(homework_columns_meta):
             }
         )
     return lesson_catalog
-
-
-def get_student_rows(group, rows):
-    for row_number, row in enumerate(rows, start=1):
-        full_name = normalize_whitespace(to_text(cell_value(row, Columns.STUDENT_NAME)))
-
-        if group.school_code == "sehriyo":
-            # Sehriyo student roster lives in B4:B19.
-            if row_number < 4 or row_number > 19:
-                continue
-            if not full_name:
-                continue
-        else:
-            if not is_student_data_row(row):
-                continue
-
-        if not full_name:
-            continue
-
-        normalized_name = full_name.casefold()
-        if normalized_name in {"student name", "lesson aap", "submission rate"}:
-            continue
-
-        yield row_number, row, full_name
 
 
 def parse_student_row(
