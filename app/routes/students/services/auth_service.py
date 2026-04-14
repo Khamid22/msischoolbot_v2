@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 from datetime import datetime
 
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -23,6 +24,18 @@ _ADMIN_SCHOOL_FILTER_ALL = "all"
 _DB_LOCK = threading.Lock()
 _SYNC_LOCK = threading.Lock()
 _STORAGE_READY = False
+_STUDENT_ACTIVITY_STATE_LOCK = threading.Lock()
+_STUDENT_ACTIVITY_IN_FLIGHT = set()
+_STUDENT_ACTIVITY_LAST_FLUSHED = {}
+_STUDENT_ACTIVITY_MAX_TRACKED_IDS = 4096
+_STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS = max(
+    int(str(os.environ.get("STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS", "30") or "30")),
+    5,
+)
+_STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS = max(
+    int(str(os.environ.get("STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS", "700") or "700")),
+    100,
+)
 
 
 def _utc_now_iso():
@@ -31,6 +44,34 @@ def _utc_now_iso():
 
 def _connect():
     return queries.connect_auth_db()
+
+
+def _begin_student_activity_write(student_row_id, now_monotonic):
+    with _STUDENT_ACTIVITY_STATE_LOCK:
+        if student_row_id in _STUDENT_ACTIVITY_IN_FLIGHT:
+            return False
+        last_flushed = float(_STUDENT_ACTIVITY_LAST_FLUSHED.get(student_row_id, 0.0))
+        if now_monotonic - last_flushed < _STUDENT_ACTIVITY_WRITE_INTERVAL_SECONDS:
+            return False
+        _STUDENT_ACTIVITY_IN_FLIGHT.add(student_row_id)
+    return True
+
+
+def _finish_student_activity_write(student_row_id, now_monotonic, succeeded):
+    with _STUDENT_ACTIVITY_STATE_LOCK:
+        _STUDENT_ACTIVITY_IN_FLIGHT.discard(student_row_id)
+        if not succeeded:
+            return
+        _STUDENT_ACTIVITY_LAST_FLUSHED[student_row_id] = now_monotonic
+        if len(_STUDENT_ACTIVITY_LAST_FLUSHED) <= _STUDENT_ACTIVITY_MAX_TRACKED_IDS:
+            return
+        sorted_entries = sorted(
+            _STUDENT_ACTIVITY_LAST_FLUSHED.items(),
+            key=lambda item: float(item[1]),
+        )
+        to_prune = len(_STUDENT_ACTIVITY_LAST_FLUSHED) - _STUDENT_ACTIVITY_MAX_TRACKED_IDS
+        for stale_student_row_id, _ in sorted_entries[:to_prune]:
+            _STUDENT_ACTIVITY_LAST_FLUSHED.pop(stale_student_row_id, None)
 
 
 def init_storage():
@@ -369,13 +410,31 @@ def sync_students_if_needed(load_dataset, school_code = None, force_refresh = Fa
 def record_student_activity(student_row_id):
     if not isinstance(student_row_id, int) or student_row_id <= 0:
         return
+    now_monotonic = time.monotonic()
+    if not _begin_student_activity_write(student_row_id, now_monotonic):
+        return
+    updated = False
     now = _utc_now_iso()
     try:
         with _connect() as conn:
+            try:
+                # Avoid long request stalls when another writer holds SQLite lock.
+                conn.execute(
+                    f"PRAGMA busy_timeout = {int(_STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS)}"
+                )
+            except Exception:
+                pass
             queries.update_student_last_seen(conn, student_row_id, now)
             conn.commit()
+            updated = True
     except Exception:
         pass
+    finally:
+        _finish_student_activity_write(
+            student_row_id,
+            now_monotonic,
+            updated,
+        )
 
 
 def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
