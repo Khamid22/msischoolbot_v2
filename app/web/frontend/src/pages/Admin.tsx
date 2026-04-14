@@ -85,6 +85,21 @@ function asString(value: unknown) {
   return String(value || "").trim();
 }
 
+function formatLastSeen(value: unknown): { label: string; online: boolean } {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return { label: "Never", online: false };
+
+  const ts = Date.parse(raw);
+  if (!Number.isFinite(ts)) return { label: "Never", online: false };
+
+  const diffSec = Math.floor((Date.now() - ts) / 1000);
+  if (diffSec < 0) return { label: "Just now", online: true };
+  if (diffSec < 300) return { label: "Online", online: true };
+  if (diffSec < 3600) return { label: `${Math.floor(diffSec / 60)}m ago`, online: false };
+  if (diffSec < 86400) return { label: `${Math.floor(diffSec / 3600)}h ago`, online: false };
+  return { label: `${Math.floor(diffSec / 86400)}d ago`, online: false };
+}
+
 function asNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -1063,7 +1078,7 @@ export default function AdminPage(props: AdminPageProps) {
                 <table className="w-full min-w-[720px] text-left">
                   <thead>
                     <tr className="sticky top-0 z-10 border-b border-foreground/5 bg-surface">
-                      {["ID", "Full Name", "Subjects", "School"].map((heading) => (
+                      {["ID", "Full Name", "Subjects", "School", "Last Seen"].map((heading) => (
                         <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                           {heading}
                         </th>
@@ -1072,25 +1087,33 @@ export default function AdminPage(props: AdminPageProps) {
                   </thead>
                   <tbody>
                     {filteredStudents.length ? (
-                      filteredStudents.map((student) => (
-                        <tr key={asNumber(student.id)} className="border-b border-foreground/5 hover:bg-muted/40">
-                          <td className="px-3 py-2.5 text-xs font-bold">
-                            <a href={routes.adminStudentDashboard(asNumber(student.id), currentSchool)} className="text-info hover:underline">
-                              {asString(student.student_id)}
-                            </a>
-                          </td>
-                          <td className="px-3 py-2.5 text-sm font-medium">
-                            <a href={routes.adminStudentProfile(asNumber(student.id))} className="hover:underline">
-                              {asString(student.full_name)}
-                            </a>
-                          </td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(student.subjects)}</td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
-                        </tr>
-                      ))
+                      filteredStudents.map((student) => {
+                        const seen = formatLastSeen(student.last_seen_at);
+                        return (
+                          <tr key={asNumber(student.id)} className="border-b border-foreground/5 hover:bg-muted/40">
+                            <td className="px-3 py-2.5 text-xs font-bold">
+                              <a href={routes.adminStudentDashboard(asNumber(student.id), currentSchool)} className="text-info hover:underline">
+                                {asString(student.student_id)}
+                              </a>
+                            </td>
+                            <td className="px-3 py-2.5 text-sm font-medium">
+                              <a href={routes.adminStudentProfile(asNumber(student.id))} className="hover:underline">
+                                {asString(student.full_name)}
+                              </a>
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(student.subjects)}</td>
+                            <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
+                            <td className="px-3 py-2.5 text-xs">
+                              <span className={seen.online ? "font-semibold text-green-500" : "text-muted-foreground"}>
+                                {seen.label}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
-                        <td colSpan={4} className="px-3 py-4 text-sm text-muted-foreground">
+                        <td colSpan={5} className="px-3 py-4 text-sm text-muted-foreground">
                           No students match your search.
                         </td>
                       </tr>

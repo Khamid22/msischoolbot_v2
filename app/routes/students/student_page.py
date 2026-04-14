@@ -10,9 +10,11 @@ from app.routes.students.chat_page import register_chat_page_routes
 from app.routes.students.chat_routes import register_chat_routes
 from app.routes.students.comment_routes import register_comment_routes
 from app.routes.students.resources import register_resources_routes
+from app.routes.students.services.auth_service import record_student_activity
 from app.routes.students.services.page_service import build_student_panel_context
 from app.routes.students.services.session_state_service import (
     current_auth_login,
+    current_student_db_id,
     current_student_school_code,
 )
 from app.routes.students.students import register_student_routes
@@ -81,6 +83,13 @@ def register_student_page_routes(
         )
 
     students = Blueprint("student", __name__)
+
+    @students.before_request
+    def track_student_activity():
+        student_db_id = current_student_db_id()
+        if student_db_id is not None:
+            record_student_activity(student_db_id)
+
     register_user_auth_routes(
         students,
         render_login_page=render_login_page,

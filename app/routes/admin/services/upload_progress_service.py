@@ -161,19 +161,29 @@ def wait_for_upload_event(upload_id, *, after_seq=0, timeout_seconds=20.0):
 
     safe_after_seq = int(after_seq or 0)
     safe_timeout = max(float(timeout_seconds or 0.0), 0.0)
+    deadline = time.time() + safe_timeout
 
-    def _next_event():
+    def _next_event_locked():
         for event in state["events"]:
             if int(event.get("seq", 0)) > safe_after_seq:
                 return dict(event)
         return None
 
-    with state["condition"]:
-        found = _next_event()
+    # NOTE:
+    # Do not use threading.Condition.wait() here. In our gevent web runtime,
+    # thread monkey-patching is disabled, so blocking condition waits can stall
+    # the entire worker. Polling with short sleeps stays cooperative.
+    while True:
+        with state["condition"]:
+            found = _next_event_locked()
         if found is not None:
             return found
-        state["condition"].wait(timeout=safe_timeout)
-        return _next_event()
+
+        now = time.time()
+        if now >= deadline:
+            return None
+
+        time.sleep(min(0.2, deadline - now))
 
 
 __all__ = [

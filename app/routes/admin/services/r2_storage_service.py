@@ -5,18 +5,15 @@ import subprocess
 import tempfile
 import threading
 import time
-from io import BytesIO
 from datetime import datetime
 from urllib.parse import quote
 
 try:
     import boto3
-    from boto3.s3.transfer import TransferConfig
     from botocore.config import Config as BotocoreConfig
     from botocore.exceptions import BotoCoreError, ClientError
 except Exception:  # pragma: no cover - optional dependency guard
     boto3 = None
-    TransferConfig = None
     BotocoreConfig = None
     BotoCoreError = Exception
     ClientError = Exception
@@ -477,55 +474,22 @@ def _upload_payload_to_r2(
     safe_name,
     progress_callback=None,
 ):
-    payload_size = len(payload)
     extra_args = {
         "ContentType": content_type,
         "ContentDisposition": f'inline; filename="{safe_name}"',
         "CacheControl": _cache_control_header(),
     }
-    payload_stream = BytesIO(payload)
-
-    if TransferConfig is None:
-        client.put_object(
-            Bucket=bucket,
-            Key=object_key,
-            Body=payload,
-            **extra_args,
-        )
-        return
-
-    chunk_bytes = _r2_multipart_chunk_bytes()
-    transferred_bytes = 0
-    transferred_lock = threading.Lock()
-
-    def _transfer_callback(bytes_amount):
-        nonlocal transferred_bytes
-        with transferred_lock:
-            transferred_bytes += int(bytes_amount or 0)
-            done_bytes = min(transferred_bytes, payload_size)
-        if payload_size > 0:
-            ratio = min(done_bytes / payload_size, 1.0)
-            percent = 90.0 + ((97.0 - 90.0) * ratio)
-            _report_progress(
-                progress_callback,
-                percent=percent,
-                stage="cloud_upload",
-                message="Uploading file to storage...",
-            )
-
-    transfer_config = TransferConfig(
-        multipart_threshold=chunk_bytes,
-        multipart_chunksize=chunk_bytes,
-        max_concurrency=4,
-        use_threads=True,
+    _report_progress(
+        progress_callback,
+        percent=92.0,
+        stage="cloud_upload",
+        message="Uploading file to storage...",
     )
-    client.upload_fileobj(
-        payload_stream,
-        bucket,
-        object_key,
-        ExtraArgs=extra_args,
-        Callback=_transfer_callback,
-        Config=transfer_config,
+    client.put_object(
+        Bucket=bucket,
+        Key=object_key,
+        Body=payload,
+        **extra_args,
     )
 
 

@@ -47,7 +47,8 @@ def _create_tables_postgres(conn):
             class_name TEXT NOT NULL DEFAULT '',
             school_name TEXT NOT NULL DEFAULT '',
             school_key TEXT NOT NULL DEFAULT '',
-            teacher_name TEXT NOT NULL DEFAULT ''
+            teacher_name TEXT NOT NULL DEFAULT '',
+            last_seen_at TEXT
         )
         """
     )
@@ -357,7 +358,8 @@ def create_tables(conn):
             class_name TEXT NOT NULL DEFAULT '',
             school_name TEXT NOT NULL DEFAULT '',
             school_key TEXT NOT NULL DEFAULT '',
-            teacher_name TEXT NOT NULL DEFAULT ''
+            teacher_name TEXT NOT NULL DEFAULT '',
+            last_seen_at TEXT
         )
         """
     )
@@ -556,6 +558,9 @@ def ensure_students_schema(conn):
             WHERE trim(coalesce(school_key, '')) = ''
             """
         )
+        conn.execute(
+            "ALTER TABLE students ADD COLUMN IF NOT EXISTS last_seen_at TEXT"
+        )
         return
 
     columns = {
@@ -578,6 +583,8 @@ def ensure_students_schema(conn):
         conn.execute("ALTER TABLE students ADD COLUMN school_key TEXT NOT NULL DEFAULT ''")
     if "teacher_name" not in columns:
         conn.execute("ALTER TABLE students ADD COLUMN teacher_name TEXT NOT NULL DEFAULT ''")
+    if "last_seen_at" not in columns:
+        conn.execute("ALTER TABLE students ADD COLUMN last_seen_at TEXT")
 
     # Backfill school_key from school_name for already existing rows.
     conn.execute(

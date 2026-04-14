@@ -366,6 +366,18 @@ def sync_students_if_needed(load_dataset, school_code = None, force_refresh = Fa
         }
 
 
+def record_student_activity(student_row_id):
+    if not isinstance(student_row_id, int) or student_row_id <= 0:
+        return
+    now = _utc_now_iso()
+    try:
+        with _connect() as conn:
+            queries.update_student_last_seen(conn, student_row_id, now)
+            conn.commit()
+    except Exception:
+        pass
+
+
 def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
     init_storage()
     normalized_filter = _normalize_admin_school_filter(school_filter)
@@ -401,6 +413,7 @@ def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
                     if row["telegram_user_id"] is not None
                     else None
                 ),
+                "last_seen_at": row["last_seen_at"] if row["last_seen_at"] is not None else None,
             }
             continue
 
@@ -427,6 +440,7 @@ def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
                 "subjects": ", ".join(subjects_sorted),
                 "school_name": str(item.get("school_name", "")).strip() or _DEFAULT_SCHOOL_NAME,
                 "telegram_user_id": item["telegram_user_id"],
+                "last_seen_at": item.get("last_seen_at"),
             }
         )
     return results

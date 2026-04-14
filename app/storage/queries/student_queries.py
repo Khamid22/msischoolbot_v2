@@ -198,6 +198,17 @@ def delete_students_by_ids(conn, student_row_ids):
     return int(deleted.rowcount or 0)
 
 
+def update_student_last_seen(conn, student_row_id, now):
+    conn.execute(
+        """
+        UPDATE students
+        SET last_seen_at = ?
+        WHERE id = ?
+        """,
+        (now, student_row_id),
+    )
+
+
 def list_students_for_admin_rows(conn, school_name=""):
     normalized_school_name = str(school_name or "").strip()
     if normalized_school_name:
@@ -213,7 +224,8 @@ def list_students_for_admin_rows(conn, school_name=""):
                 photo_url,
                 profile_description,
                 class_name,
-                school_name
+                school_name,
+                last_seen_at
             FROM students
             WHERE lower(school_name) = lower(?)
             ORDER BY id ASC
@@ -233,7 +245,8 @@ def list_students_for_admin_rows(conn, school_name=""):
             photo_url,
             profile_description,
             class_name,
-            school_name
+            school_name,
+            last_seen_at
         FROM students
         ORDER BY id ASC
         """
@@ -391,6 +404,7 @@ __all__ = [
     "insert_students_sheet_map",
     "list_students_sheet_map_rows_by_school",
     "delete_students_by_ids",
+    "update_student_last_seen",
     "list_students_for_admin_rows",
     "get_student_admin_row",
     "get_student_auth_row_by_id",
