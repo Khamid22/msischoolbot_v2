@@ -9,26 +9,39 @@ from .normalization_service import normalize_school_code
 
 
 def current_auth_role():
+    role = str(session.get("auth_role", "")).strip().lower()
+    if role in {"admin", "student"}:
+        return role
+
     if bool(getattr(current_user, "is_authenticated", False)):
         role = str(getattr(current_user, "role", "")).strip().lower()
         if role in {"admin", "student"}:
             return role
 
-    role = str(session.get("auth_role", "")).strip().lower()
-    if role in {"admin", "student"}:
-        return role
     return ""
 
 
 def current_auth_login():
+    auth_login = str(session.get("auth_login", "")).strip()
+    if auth_login:
+        return auth_login
+
     if bool(getattr(current_user, "is_authenticated", False)):
         auth_login = str(getattr(current_user, "auth_login", "")).strip()
         if auth_login:
             return auth_login
-    return str(session.get("auth_login", "")).strip()
+    return ""
 
 
 def current_student_sheet_id():
+    raw_value = session.get("student_sheet_id")
+    try:
+        parsed_value = int(raw_value)
+    except (TypeError, ValueError):
+        parsed_value = None
+    if parsed_value and parsed_value > 0:
+        return parsed_value
+
     if bool(getattr(current_user, "is_authenticated", False)) and str(
         getattr(current_user, "role", "")
     ).strip().lower() == "student":
@@ -40,14 +53,18 @@ def current_student_sheet_id():
         if parsed_user_value and parsed_user_value > 0:
             return parsed_user_value
 
-    raw_value = session.get("student_sheet_id")
-    try:
-        return int(raw_value)
-    except (TypeError, ValueError):
-        return None
+    return None
 
 
 def current_student_db_id():
+    raw_value = session.get("student_db_id")
+    try:
+        parsed_value = int(raw_value)
+    except (TypeError, ValueError):
+        parsed_value = None
+    if parsed_value and parsed_value > 0:
+        return parsed_value
+
     if bool(getattr(current_user, "is_authenticated", False)) and str(
         getattr(current_user, "role", "")
     ).strip().lower() == "student":
@@ -59,24 +76,28 @@ def current_student_db_id():
         if parsed_user_value and parsed_user_value > 0:
             return parsed_user_value
 
-    raw_value = session.get("student_db_id")
-    try:
-        return int(raw_value)
-    except (TypeError, ValueError):
-        return None
+    return None
 
 
 def current_student_full_name():
+    current_name = str(session.get("student_full_name", "")).strip()
+    if current_name:
+        return current_name
+
     if bool(getattr(current_user, "is_authenticated", False)) and str(
         getattr(current_user, "role", "")
     ).strip().lower() == "student":
         current_name = str(getattr(current_user, "student_full_name", "")).strip()
         if current_name:
             return current_name
-    return str(session.get("student_full_name", "")).strip()
+    return ""
 
 
 def current_student_school_code():
+    session_school_code = normalize_school_code(session.get("student_school_code", ""))
+    if session_school_code:
+        return session_school_code
+
     if bool(getattr(current_user, "is_authenticated", False)) and str(
         getattr(current_user, "role", "")
     ).strip().lower() == "student":
@@ -84,7 +105,7 @@ def current_student_school_code():
         if school_code:
             return school_code
 
-    return normalize_school_code(session.get("student_school_code", ""))
+    return ""
 
 
 def parse_telegram_user_id(raw_value):

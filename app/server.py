@@ -767,9 +767,11 @@ def add_common_headers(response):
 
 
 def _is_authenticated_session():
-    if bool(getattr(current_user, "is_authenticated", False)):
+    # Prefer signed Flask session fields first; this avoids triggering
+    # Flask-Login user loading (and DB access) on every request.
+    if bool(is_authenticated_policy_session(session)):
         return True
-    return bool(is_authenticated_policy_session(session))
+    return bool(getattr(current_user, "is_authenticated", False))
 
 
 @app.before_request
