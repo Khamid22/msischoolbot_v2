@@ -46,6 +46,7 @@ Create `.env` in the project root:
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
 - `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
 - `DATABASE_URL` (optional PostgreSQL URL; when set, app uses Postgres instead of SQLite)
+- `R2_ENABLED` (optional; `1`/`0`, default: `1`; set `0` for local/dev to disable R2 uploads)
 - `OWNER_ADMIN_LOGIN` (default: `staff280902`)
 - `OWNER_ADMIN_PASSWORD` (default: `Khamid007`)
 
@@ -54,6 +55,7 @@ Database backend behavior:
 - Railway production: set `DATABASE_URL` to the PostgreSQL connection string provided by Railway.
 - `POSTGRES_DB` is only the database name, not a full connection URL.
 - Railway video processing: this repo includes `railpack.json` to install `ffmpeg`. If your service overrides build config, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg`.
+- Local development storage: set `R2_ENABLED=0` and keep `R2_*` credentials unset to avoid writing to production bucket.
 
 ## Auth Flow
 

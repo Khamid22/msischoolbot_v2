@@ -5,14 +5,19 @@ import subprocess
 import tempfile
 import threading
 import time
+from io import BytesIO
 from datetime import datetime
 from urllib.parse import quote
 
 try:
     import boto3
+    from boto3.s3.transfer import TransferConfig
+    from botocore.config import Config as BotocoreConfig
     from botocore.exceptions import BotoCoreError, ClientError
 except Exception:  # pragma: no cover - optional dependency guard
     boto3 = None
+    TransferConfig = None
+    BotocoreConfig = None
     BotoCoreError = Exception
     ClientError = Exception
 
@@ -72,6 +77,16 @@ _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 
 def _env(name, default=""):
     return str(os.environ.get(name, default) or "").strip()
+
+
+def _is_false_like(value):
+    normalized = str(value or "").strip().lower()
+    return normalized in {"0", "false", "no", "off"}
+
+
+def _r2_enabled():
+    # Keep R2 on by default for production; local/dev can opt out with R2_ENABLED=0.
+    return not _is_false_like(_env("R2_ENABLED", "1"))
 
 
 def _required_r2_env():
@@ -255,7 +270,60 @@ def _endpoint_url():
     return f"https://{account_id}.r2.cloudflarestorage.com"
 
 
+def _r2_connect_timeout_seconds():
+    raw_value = _env("R2_CONNECT_TIMEOUT_SECONDS", "10")
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        parsed = 10
+    return max(3, min(parsed, 60))
+
+
+def _r2_read_timeout_seconds():
+    raw_value = _env("R2_READ_TIMEOUT_SECONDS", "120")
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        parsed = 120
+    return max(20, min(parsed, 900))
+
+
+def _r2_max_attempts():
+    raw_value = _env("R2_MAX_ATTEMPTS", "3")
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        parsed = 3
+    return max(1, min(parsed, 10))
+
+
+def _r2_multipart_chunk_bytes():
+    raw_value = _env("R2_MULTIPART_CHUNK_MB", "8")
+    try:
+        parsed_mb = int(raw_value)
+    except ValueError:
+        parsed_mb = 8
+    # S3 multipart requires minimum 5MB.
+    parsed_mb = max(5, min(parsed_mb, 128))
+    return parsed_mb * 1024 * 1024
+
+
+def _r2_client_config():
+    if BotocoreConfig is None:
+        return None
+    return BotocoreConfig(
+        connect_timeout=_r2_connect_timeout_seconds(),
+        read_timeout=_r2_read_timeout_seconds(),
+        retries={
+            "max_attempts": _r2_max_attempts(),
+            "mode": "standard",
+        },
+    )
+
+
 def is_r2_configured():
+    if not _r2_enabled():
+        return False
     if boto3 is None:
         return False
     values = _required_r2_env()
@@ -268,13 +336,16 @@ def _build_r2_client():
 
     region_name = _env("R2_REGION", "auto")
     endpoint_url = _endpoint_url()
-    return boto3.client(
-        "s3",
-        endpoint_url=endpoint_url,
-        aws_access_key_id=_env("R2_ACCESS_KEY_ID"),
-        aws_secret_access_key=_env("R2_SECRET_ACCESS_KEY"),
-        region_name=region_name,
-    )
+    client_kwargs = {
+        "endpoint_url": endpoint_url,
+        "aws_access_key_id": _env("R2_ACCESS_KEY_ID"),
+        "aws_secret_access_key": _env("R2_SECRET_ACCESS_KEY"),
+        "region_name": region_name,
+    }
+    client_config = _r2_client_config()
+    if client_config is not None:
+        client_kwargs["config"] = client_config
+    return boto3.client("s3", **client_kwargs)
 
 
 def _get_r2_client():
@@ -394,6 +465,68 @@ def _read_limited_bytes(
         message="Uploaded file received.",
     )
     return b"".join(chunks), total
+
+
+def _upload_payload_to_r2(
+    client,
+    *,
+    bucket,
+    object_key,
+    payload,
+    content_type,
+    safe_name,
+    progress_callback=None,
+):
+    payload_size = len(payload)
+    extra_args = {
+        "ContentType": content_type,
+        "ContentDisposition": f'inline; filename="{safe_name}"',
+        "CacheControl": _cache_control_header(),
+    }
+    payload_stream = BytesIO(payload)
+
+    if TransferConfig is None:
+        client.put_object(
+            Bucket=bucket,
+            Key=object_key,
+            Body=payload,
+            **extra_args,
+        )
+        return
+
+    chunk_bytes = _r2_multipart_chunk_bytes()
+    transferred_bytes = 0
+    transferred_lock = threading.Lock()
+
+    def _transfer_callback(bytes_amount):
+        nonlocal transferred_bytes
+        with transferred_lock:
+            transferred_bytes += int(bytes_amount or 0)
+            done_bytes = min(transferred_bytes, payload_size)
+        if payload_size > 0:
+            ratio = min(done_bytes / payload_size, 1.0)
+            percent = 90.0 + ((97.0 - 90.0) * ratio)
+            _report_progress(
+                progress_callback,
+                percent=percent,
+                stage="cloud_upload",
+                message="Uploading file to storage...",
+            )
+
+    transfer_config = TransferConfig(
+        multipart_threshold=chunk_bytes,
+        multipart_chunksize=chunk_bytes,
+        max_concurrency=4,
+        use_threads=True,
+    )
+    client.upload_fileobj(
+        payload_stream,
+        bucket,
+        object_key,
+        ExtraArgs=extra_args,
+        Callback=_transfer_callback,
+        Config=transfer_config,
+    )
 
 
 def _faststart_remux_video_payload(payload, source_extension, ffmpeg_path=""):
@@ -585,6 +718,7 @@ def upload_resource_file(
     folder_path="",
     progress_callback=None,
 ):
+    upload_started_at = time.time()
     _report_progress(
         progress_callback,
         percent=5.0,
@@ -614,6 +748,7 @@ def upload_resource_file(
         max_upload_size,
         progress_callback=progress_callback,
     )
+    payload_ready_at = time.time()
     if payload is None:
         return "", (
             "Uploaded file is too large. "
@@ -679,16 +814,35 @@ def upload_resource_file(
         return "", "Unable to initialize R2 client."
 
     try:
-        client.put_object(
-            Bucket=_resource_bucket_name(),
-            Key=object_key,
-            Body=payload,
-            ContentType=content_type,
-            ContentDisposition=f'inline; filename="{safe_name}"',
-            CacheControl=_cache_control_header(),
+        _upload_payload_to_r2(
+            client,
+            bucket=_resource_bucket_name(),
+            object_key=object_key,
+            payload=payload,
+            content_type=content_type,
+            safe_name=safe_name,
+            progress_callback=progress_callback,
         )
-    except (BotoCoreError, ClientError):
+    except Exception:
+        print(
+            "[resources] R2 upload failed",
+            {
+                "file_name": safe_name,
+                "bytes": int(payload_size or 0),
+                "read_seconds": round(payload_ready_at - upload_started_at, 3),
+                "total_seconds": round(time.time() - upload_started_at, 3),
+            },
+        )
         return "", "Failed to upload resource file to R2."
+    print(
+        "[resources] R2 upload complete",
+        {
+            "file_name": safe_name,
+            "bytes": int(payload_size or 0),
+            "read_seconds": round(payload_ready_at - upload_started_at, 3),
+            "total_seconds": round(time.time() - upload_started_at, 3),
+        },
+    )
 
     _report_progress(
         progress_callback,
@@ -701,13 +855,16 @@ def upload_resource_file(
 
 def build_resource_file_url(resource_file_path):
     object_key = str(resource_file_path or "").strip()
-    if not object_key or not is_r2_configured():
+    if not object_key:
         return ""
 
     public_base = _public_base_url()
     if public_base:
         escaped_key = quote(object_key, safe="/-_.~")
         return f"{public_base}/{escaped_key}"
+
+    if not is_r2_configured():
+        return ""
 
     client = _get_r2_client()
     if client is None:
@@ -802,15 +959,15 @@ def upload_thumbnail_file(uploaded_file, subject_name="", folder_path=""):
         return "", "Unable to initialize R2 client."
 
     try:
-        client.put_object(
-            Bucket=_resource_bucket_name(),
-            Key=object_key,
-            Body=payload,
-            ContentType=content_type,
-            ContentDisposition=f'inline; filename="{safe_name}"',
-            CacheControl=_cache_control_header(),
+        _upload_payload_to_r2(
+            client,
+            bucket=_resource_bucket_name(),
+            object_key=object_key,
+            payload=payload,
+            content_type=content_type,
+            safe_name=safe_name,
         )
-    except (BotoCoreError, ClientError):
+    except Exception:
         return "", "Failed to upload thumbnail to R2."
 
     return object_key, ""

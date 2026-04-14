@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, redirect, session, url_for
+from flask import Blueprint, jsonify, redirect, request, session, url_for
 from flask_wtf.csrf import generate_csrf
 
 from app.web.render import render_react_page
@@ -135,6 +135,9 @@ def register_admin_page_routes(
     def ensure_admin_role():
         if current_auth_role() == "admin":
             return None
+        requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+        if requested_with == "XMLHttpRequest":
+            return jsonify({"ok": False, "message": "Admin authentication required."}), 401
         return redirect(url_for("student.home"))
 
     register_admin_routes(

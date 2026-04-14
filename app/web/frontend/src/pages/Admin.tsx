@@ -511,6 +511,15 @@ export default function AdminPage(props: AdminPageProps) {
 
   async function submitResourceForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!props.adminResourceUploadEnabled) {
+      setResourceUploadState({
+        active: true,
+        percent: 100,
+        message: "Resource upload is disabled in this environment.",
+        error: true,
+      });
+      return;
+    }
     if (isSubmittingResource) {
       return;
     }
@@ -1402,6 +1411,11 @@ export default function AdminPage(props: AdminPageProps) {
                       />
                     </label>
                   </div>
+                  {!props.adminResourceUploadEnabled ? (
+                    <p className="md:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Resource upload is disabled in this environment.
+                    </p>
+                  ) : null}
                   <label className="block md:col-span-2">
                     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</span>
                     <textarea name="resource_description" rows={4} className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none" />
@@ -1421,10 +1435,10 @@ export default function AdminPage(props: AdminPageProps) {
                   ) : null}
                   <div className="md:col-span-2">
                     <button
-                      disabled={isSubmittingResource}
+                      disabled={isSubmittingResource || !props.adminResourceUploadEnabled}
                       className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-neo disabled:opacity-50"
                     >
-                      {isSubmittingResource ? "Uploading..." : "Save Resource"}
+                      {isSubmittingResource ? "Uploading..." : props.adminResourceUploadEnabled ? "Save Resource" : "Upload Disabled"}
                     </button>
                   </div>
                 </form>

@@ -794,14 +794,18 @@ def require_authentication_for_protected_routes():
         session.permanent = True
         return None
 
-    if request.path.startswith("/api/"):
+    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request.path.startswith("/api/") or is_xhr:
         return jsonify({"message": "Authentication required."}), 401
     return redirect(url_for("student.home"))
 
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(_error):
-    if request.path.startswith("/api/"):
+    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request.path.startswith("/api/") or is_xhr:
         return jsonify({"message": "Invalid or missing CSRF token."}), 400
     return redirect(url_for("student.home"))
 
