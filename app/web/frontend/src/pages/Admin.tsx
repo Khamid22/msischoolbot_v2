@@ -100,6 +100,16 @@ function formatLastSeen(value: unknown): { label: string; online: boolean } {
   return { label: `${Math.floor(diffSec / 86400)}d ago`, online: false };
 }
 
+// Telegram-aware safe area helpers (mirrors TelegramLayout.tsx approach).
+const _safeTop =
+  "var(--tg-safe-area-inset-top, var(--tg-safe-area-top, env(safe-area-inset-top, 0px)))";
+const _contentSafeTop =
+  "var(--tg-content-safe-area-inset-top, var(--tg-content-safe-area-top, 0px))";
+// Header inner content is ~2.5rem (py-2.5 × 2 + icon line-height).
+// 3.5rem gives a small buffer so main never slides under the header.
+const adminHeaderPadTop = `calc(${_safeTop} + ${_contentSafeTop})`;
+const adminMainPadTop = `calc(${_safeTop} + ${_contentSafeTop} + 3.5rem)`;
+
 function asNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -709,7 +719,7 @@ export default function AdminPage(props: AdminPageProps) {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-foreground/5 bg-surface/95 backdrop-blur" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-foreground/5 bg-surface/95 backdrop-blur" style={{ paddingTop: adminHeaderPadTop }}>
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
           <a href={`/?panel=overview&school=${encodeURIComponent(currentSchool)}`} className="flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold">
             <GraduationCap className="h-5 w-5" />
@@ -768,7 +778,7 @@ export default function AdminPage(props: AdminPageProps) {
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 pb-4 pt-16 sm:px-4 md:px-6">
+      <main className="mx-auto w-full max-w-6xl px-3 pb-4 sm:px-4 md:px-6" style={{ paddingTop: adminMainPadTop }}>
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
         {resourceUploadState.active && activeTab !== "resources" ? (
