@@ -14,6 +14,28 @@ from .loader import load_from_google_sheets
 from .utils import normalize_school_code
 
 
+# Per-school-code cooperative lock that serializes all Google Sheets API calls.
+# Using gevent.lock.Semaphore (falls back to threading.Lock) so the holder can
+# yield during threadpool.spawn().get() without blocking the event loop, while
+# still preventing concurrent httplib2 socket access which causes:
+#   "This socket is already used by another greenlet"
+_LOAD_LOCKS: dict[str, Any] = {}
+_LOAD_LOCKS_META = threading.Lock()
+
+
+def _get_load_lock(school_code: str) -> Any:
+    with _LOAD_LOCKS_META:
+        lock = _LOAD_LOCKS.get(school_code)
+        if lock is None:
+            try:
+                from gevent.lock import Semaphore
+                lock = Semaphore(1)
+            except ImportError:
+                lock = threading.Lock()
+            _LOAD_LOCKS[school_code] = lock
+        return lock
+
+
 def _load_sheets_in_threadpool(school_code: str) -> dict:
     """Run load_from_google_sheets in gevent's thread pool.
 
@@ -110,12 +132,16 @@ _REVALIDATING_LOCK = threading.Lock()
 
 
 def _revalidate_school(school_code: str) -> None:
+    lock = _get_load_lock(school_code)
+    lock.acquire()
     try:
         loaded_dataset = _load_sheets_in_threadpool(school_code)
+        with SHEET_CACHE.lock:
+            SHEET_CACHE.set(school_code, loaded_dataset, now=time.time())
     except Exception:
         return  # Keep existing stale data on failure
-    with SHEET_CACHE.lock:
-        SHEET_CACHE.set(school_code, loaded_dataset, now=time.time())
+    finally:
+        lock.release()
 
 
 def _trigger_background_revalidation(school_code: str) -> None:
@@ -188,24 +214,39 @@ def get_school_dataset(force_refresh = False, school_code = None):
         _trigger_background_revalidation(normalized_school_code)
         return cached_dataset
 
-    # No data at all (cold start or force_refresh): block until loaded.
+    # No data at all (cold start or force_refresh): serialize via per-school lock.
+    # Multiple concurrent greenlets may reach this point simultaneously.  Only
+    # the first one actually calls the Sheets API; the rest wait cooperatively
+    # and then return from cache once the leader finishes.
+    load_lock = _get_load_lock(normalized_school_code)
+    load_lock.acquire()
     try:
-        loaded_dataset = _load_sheets_in_threadpool(normalized_school_code)
-    except SheetsDataError:
+        # Re-check cache — another greenlet may have loaded while we waited.
+        if not force_refresh:
+            with SHEET_CACHE.lock:
+                now = time.time()
+                cached_dataset = SHEET_CACHE.get(normalized_school_code)
+                if cached_dataset is not None:
+                    return cached_dataset
+
+        try:
+            loaded_dataset = _load_sheets_in_threadpool(normalized_school_code)
+        except SheetsDataError:
+            with SHEET_CACHE.lock:
+                fallback_dataset = SHEET_CACHE.get(normalized_school_code)
+                if fallback_dataset:
+                    return fallback_dataset
+            raise
+
         with SHEET_CACHE.lock:
-            fallback_dataset = SHEET_CACHE.get(normalized_school_code)
-            if fallback_dataset:
-                return fallback_dataset
-        raise
-
-    with SHEET_CACHE.lock:
-        now = time.time()
-        cached_dataset = SHEET_CACHE.get(normalized_school_code)
-        if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
-            return cached_dataset
-
-        SHEET_CACHE.set(normalized_school_code, loaded_dataset, now=now)
-        return loaded_dataset
+            now = time.time()
+            cached_dataset = SHEET_CACHE.get(normalized_school_code)
+            if not force_refresh and SHEET_CACHE.is_fresh(normalized_school_code, now):
+                return cached_dataset
+            SHEET_CACHE.set(normalized_school_code, loaded_dataset, now=now)
+            return loaded_dataset
+    finally:
+        load_lock.release()
 
 
 def get_school_dataset_last_updated(school_code = None):

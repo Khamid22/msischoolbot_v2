@@ -423,7 +423,8 @@ export default function AdminPage(props: AdminPageProps) {
       monthLabel: formatMonthKeyLabel(monthKey),
     };
     for (const seriesRow of monthlySeries) {
-      row[asString(seriesRow.label)] = Array.isArray(seriesRow.values) ? (seriesRow.values[index] as number | null) : null;
+      const sr = seriesRow as Record<string, unknown>;
+      row[asString(sr.label)] = Array.isArray(sr.values) ? (sr.values[index] as number | null) : null;
     }
     return row;
   });
@@ -468,12 +469,11 @@ export default function AdminPage(props: AdminPageProps) {
   }, []);
 
   function switchAdminTab(nextTab: AdminTab) {
-    setActiveTab(nextTab);
     setMobileNavOpen(false);
     const nextUrl = buildAdminTabUrl(nextTab, currentSchool);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
-      window.history.pushState({}, "", nextUrl);
+      window.location.href = nextUrl;
     }
   }
 
@@ -993,51 +993,52 @@ export default function AdminPage(props: AdminPageProps) {
               )}
             </ChartCard>
 
-            {[
-              { label: "Green Zone", key: "green", icon: <Trophy className="h-4 w-4 text-success" /> },
-              { label: "Yellow Zone", key: "yellow", icon: <AlertTriangle className="h-4 w-4 text-warning" /> },
-              { label: "Red Zone", key: "red", icon: <AlertCircle className="h-4 w-4 text-destructive" /> },
-            ].map((zone) => {
-              const rows = Array.isArray(props.adminGroupZones?.[zone.key as keyof typeof props.adminGroupZones])
-                ? (props.adminGroupZones?.[zone.key as keyof typeof props.adminGroupZones] as Array<Record<string, unknown>>)
-                : [];
-              return (
-                <ChartCard key={zone.key} title={zone.label} icon={zone.icon}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[520px] text-left">
-                      <thead>
-                        <tr className="border-b border-foreground/5">
-                          {["Group", "Subject", "AAP", "AR", "School"].map((heading) => (
-                            <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              {heading}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.length ? (
-                          rows.map((row, index) => (
-                            <tr key={`${zone.key}-${index}`} className="border-b border-foreground/5">
-                              <td className="px-3 py-2.5 text-xs font-medium">{asString(row.group_name)}</td>
-                              <td className="px-3 py-2.5 text-xs">{asString(row.subject_name)}</td>
-                              <td className="px-3 py-2.5 text-xs">{row.aap == null ? "-" : asNumber(row.aap).toFixed(1)}</td>
-                              <td className="px-3 py-2.5 text-xs">{row.ar == null ? "-" : asNumber(row.ar).toFixed(1)}</td>
-                              <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(row.school_name)}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={5} className="px-3 py-4 text-sm text-muted-foreground">
-                              No groups in this zone.
-                            </td>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {[
+                { label: "Green Zone", key: "green", icon: <Trophy className="h-4 w-4 text-success" /> },
+                { label: "Yellow Zone", key: "yellow", icon: <AlertTriangle className="h-4 w-4 text-warning" /> },
+                { label: "Red Zone", key: "red", icon: <AlertCircle className="h-4 w-4 text-destructive" /> },
+              ].map((zone) => {
+                const rows = Array.isArray(props.adminGroupZones?.[zone.key as keyof typeof props.adminGroupZones])
+                  ? (props.adminGroupZones?.[zone.key as keyof typeof props.adminGroupZones] as Array<Record<string, unknown>>)
+                  : [];
+                return (
+                  <ChartCard key={zone.key} title={zone.label} icon={zone.icon}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[240px] text-left">
+                        <thead>
+                          <tr className="border-b border-foreground/5">
+                            {["Group", "Subject", "AAP", "AR"].map((heading) => (
+                              <th key={heading} className="px-2 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                {heading}
+                              </th>
+                            ))}
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </ChartCard>
-              );
-            })}
+                        </thead>
+                        <tbody>
+                          {rows.length ? (
+                            rows.map((row, index) => (
+                              <tr key={`${zone.key}-${index}`} className="border-b border-foreground/5">
+                                <td className="px-2 py-2 text-xs font-medium">{asString(row.group_name)}</td>
+                                <td className="px-2 py-2 text-xs">{asString(row.subject_name)}</td>
+                                <td className="px-2 py-2 text-xs">{row.aap == null ? "-" : asNumber(row.aap).toFixed(1)}</td>
+                                <td className="px-2 py-2 text-xs">{row.ar == null ? "-" : asNumber(row.ar).toFixed(1)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={4} className="px-2 py-4 text-sm text-muted-foreground">
+                                No groups in this zone.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </ChartCard>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 

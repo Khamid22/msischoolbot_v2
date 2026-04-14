@@ -2,7 +2,6 @@ import os
 import unittest
 
 
-# Prevent background cache workers from starting during factory tests.
 os.environ.setdefault("DISABLE_BACKGROUND_REFRESH", "1")
 
 from app.server import create_app
