@@ -87,6 +87,16 @@ def _resource_sort_key(row):
     )
 
 
+def _resource_old_to_new_sort_key(row):
+    created_at = str(row.get("created_at", "") or "").strip()
+    # Keep rows without timestamp at the end; stable fallback by id.
+    normalized_created_at = created_at or "9999-12-31T23:59:59Z"
+    return (
+        normalized_created_at,
+        int(row.get("id", 0)),
+    )
+
+
 def _ensure_storage(conn):
     queries.create_tables(conn)
     queries.ensure_resources_schema(conn)
@@ -619,6 +629,41 @@ def list_resources_grouped_by_type(subject_name):
     return grouped
 
 
+def list_resources_grouped_by_type_old_to_new(subject_name):
+    resources = list_resources(
+        include_inactive=False,
+        subject_name=subject_name,
+    )
+    grouped = []
+    by_type = {}
+    for row in resources:
+        type_key = int(row["resource_type_id"])
+        bucket = by_type.get(type_key)
+        if bucket is None:
+            bucket = {
+                "resource_type_id": type_key,
+                "resource_type_name": row["resource_type_name"],
+                "resource_type_slug": row["resource_type_slug"],
+                "resource_type_display_order": int(
+                    row.get("resource_type_display_order", 0)
+                ),
+                "resources": [],
+            }
+            by_type[type_key] = bucket
+            grouped.append(bucket)
+        bucket["resources"].append(row)
+
+    grouped.sort(
+        key=lambda row: (
+            int(row.get("resource_type_display_order", 0)),
+            str(row.get("resource_type_name", "")).casefold(),
+        )
+    )
+    for bucket in grouped:
+        bucket["resources"].sort(key=_resource_old_to_new_sort_key)
+    return grouped
+
+
 def list_resources_grouped_for_library(subject_name):
     resources = list_resources(
         include_inactive=False,
@@ -698,5 +743,6 @@ __all__ = [
     "delete_resource",
     "list_resources",
     "list_resources_grouped_by_type",
+    "list_resources_grouped_by_type_old_to_new",
     "list_resources_grouped_for_library",
 ]

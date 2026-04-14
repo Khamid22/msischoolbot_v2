@@ -58,7 +58,9 @@ def register_resources_routes(
         group_name = str(student.get("group", "")).strip()
         school_code = str(student.get("schoolCode", "")).strip() or requested_school
 
-        grouped_resources = resources_service.list_resources_grouped_by_type(subject_name)
+        grouped_resources = resources_service.list_resources_grouped_by_type_old_to_new(
+            subject_name
+        )
         back_url = url_for(
             "student.dashboard",
             student_id=student_id,
