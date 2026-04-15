@@ -114,6 +114,7 @@ def register_admin_page_routes(
                 "teacherNameOptions": context["teacher_name_options"],
                 "csrfToken": generate_csrf(),
                 "saveUrl": url_for("admin.save_admin_student_profile", student_row_id=student_row_id),
+                "changePasswordUrl": url_for("admin.admin_change_student_password_route", student_row_id=student_row_id),
                 "viewDashboardUrl": url_for("admin.admin_student_dashboard", student_row_id=student_row_id),
                 "backUrl": back_url,
             },

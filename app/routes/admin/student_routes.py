@@ -5,6 +5,7 @@ from flask import current_app, jsonify, redirect, request, session, url_for
 from werkzeug.utils import secure_filename
 
 from app.routes.admin.services.auth_service import (
+    admin_change_student_password,
     assign_teacher_to_group,
     get_admin_student_profile,
     list_students_for_admin,
@@ -204,5 +205,49 @@ def register_admin_student_routes(
                 "admin.admin_student_profile",
                 student_row_id=student_row_id,
                 notice="Student profile updated.",
+            )
+        )
+
+    @router.post("/admin/students/<int:student_row_id>/password")
+    def admin_change_student_password_route(student_row_id):
+        new_password = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if new_password != confirm_password:
+            rendered = render_edit_student_page(
+                student_row_id,
+                auth_error="Passwords do not match.",
+            )
+            if rendered is not None:
+                return rendered, 400
+            return (
+                render_admin_page(
+                    auth_error="Passwords do not match.",
+                    admin_panel="students",
+                ),
+                400,
+            )
+
+        changed, change_error = admin_change_student_password(student_row_id, new_password)
+        if not changed:
+            rendered = render_edit_student_page(
+                student_row_id,
+                auth_error=change_error or "Unable to change password.",
+            )
+            if rendered is not None:
+                return rendered, 400
+            return (
+                render_admin_page(
+                    auth_error=change_error or "Unable to change password.",
+                    admin_panel="students",
+                ),
+                400,
+            )
+
+        return redirect(
+            url_for(
+                "admin.admin_student_profile",
+                student_row_id=student_row_id,
+                notice="Password changed successfully.",
             )
         )
