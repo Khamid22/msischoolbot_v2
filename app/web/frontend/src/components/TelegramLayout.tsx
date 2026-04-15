@@ -48,7 +48,7 @@ export function Topbar({
 }: TopbarProps) {
   return (
     <header
-      className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface/95 shadow-card backdrop-blur"
+      className="fixed inset-x-0 top-0 z-40 border-b border-foreground/5 bg-surface shadow-card"
       style={{ paddingTop: headerPadTop, paddingLeft: headerPadLeft, paddingRight: headerPadRight }}
     >
       <div className="mx-auto flex min-h-[4.75rem] w-full max-w-4xl items-center justify-between gap-2.5 px-3 py-3 sm:min-h-[5rem] sm:px-4 md:px-6 lg:max-w-5xl">

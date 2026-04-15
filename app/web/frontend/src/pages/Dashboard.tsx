@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -13,32 +13,20 @@ import {
   Trophy,
   User,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ChartCard } from "@/components/ChartCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { StatCard } from "@/components/StatCard";
 import { UserAvatar } from "@/components/Avatar";
 import { TelegramLayout, Topbar } from "@/components/TelegramLayout";
+import { useLazyVisible } from "@/hooks/useLazyVisible";
 import {
   buildAttendanceDonutData,
   buildExamChartData,
   buildHomeworkChartData,
   buildStudentDisplayName,
 } from "@/lib/dashboard-data";
+
+const DashboardChartsSection = lazy(() => import("./dashboard/DashboardChartsSection"));
 
 interface SubjectOption {
   subject: string;
@@ -82,10 +70,6 @@ interface DashboardPageProps {
   logoutUrl?: string;
   changePasswordUrl?: string;
 }
-
-const attendanceColors = ["#111111", "#888888", "#cccccc"];
-
-const examSeriesColors = ["#111111", "#444444", "#777777", "#aaaaaa", "#dddddd"];
 
 const modalInsetStyle = {
   paddingTop: "var(--app-top-inset)",
@@ -148,6 +132,7 @@ export default function DashboardPage(props: DashboardPageProps) {
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState(
     formatLastUpdatedLabel(props.lastUpdatedAt, props.lastUpdatedLabel || "")
   );
+  const { ref: chartsRef, visible: chartsVisible } = useLazyVisible({ rootMargin: "180px" });
 
   const studentName = buildStudentDisplayName(student);
   const studentInitials = String(student.initials || "").trim() || "ST";
@@ -343,93 +328,25 @@ export default function DashboardPage(props: DashboardPageProps) {
           <StatCard title="Coins" value={String(coins)} icon={<Activity className="h-3.5 w-3.5" />} />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ChartCard title="Attendance Rate" subtitle={`Total Sessions: ${attendanceTotal}`} icon={<Calendar className="h-4 w-4 text-success" />}>
-            {attendanceData.length ? (
-              <>
-                <div className="relative h-52 sm:h-60">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={attendanceData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={92} paddingAngle={2}>
-                        {attendanceData.map((entry, index) => (
-                          <Cell key={entry.name} fill={attendanceColors[index]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="rounded-full bg-surface/90 px-4 py-2 text-center shadow-sm">
-                      <strong className="block font-display text-2xl leading-none">{props.attendanceRate || 0}%</strong>
-                      <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg border border-foreground/5 px-3 py-2">
-                    <strong className="block font-display text-lg">{presentCount}</strong>
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Present</span>
-                  </div>
-                  <div className="rounded-lg border border-foreground/5 px-3 py-2">
-                    <strong className="block font-display text-lg">{absentCount}</strong>
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Absent</span>
-                  </div>
-                  <div className="rounded-lg border border-foreground/5 bg-warning/20 px-3 py-2">
-                    <strong className="block font-display text-lg">{justifiedCount}</strong>
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Justified</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No attendance records yet.</p>
-            )}
-          </ChartCard>
-
-          <ChartCard title="Exam Performance" subtitle="Scores by test attempts" icon={<BarChart3 className="h-4 w-4 text-info" />}>
-            {examChartData.length ? (
-              <div className="h-56 sm:h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={examChartData} margin={{ top: 8, right: 6, left: -6, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--foreground) / 0.06)" />
-                    <XAxis dataKey="examName" tick={{ fontSize: 11 }} />
-                    <YAxis domain={[0, 9]} tick={{ fontSize: 11 }} width={30} tickMargin={4} />
-                    <Tooltip />
-                    <Legend />
-                    {examAttempts.map((attempt, index) => (
-                      <Bar
-                        key={attempt}
-                        dataKey={attempt}
-                        fill={examSeriesColors[index % examSeriesColors.length]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No exam results yet.</p>
-            )}
-          </ChartCard>
-        </div>
-
-        <ChartCard title="Homework Grades" icon={<Activity className="h-4 w-4 text-success" />}>
-          {homeworkChartData.length ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={homeworkChartData} margin={{ top: 8, right: 6, left: -6, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--foreground) / 0.06)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis domain={[1, 9]} tick={{ fontSize: 11 }} width={30} tickMargin={4} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="score" stroke="#111111" fill="#aaaaaa" fillOpacity={0.35} strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+        <div ref={chartsRef} className="space-y-4">
+          {chartsVisible ? (
+            <Suspense fallback={<ChartsFallback />}>
+              <DashboardChartsSection
+                attendanceTotal={attendanceTotal}
+                attendanceRate={props.attendanceRate || 0}
+                presentCount={presentCount}
+                absentCount={absentCount}
+                justifiedCount={justifiedCount}
+                attendanceData={attendanceData}
+                examChartData={examChartData}
+                examAttempts={examAttempts}
+                homeworkChartData={homeworkChartData}
+              />
+            </Suspense>
           ) : (
-            <p className="text-sm text-muted-foreground">No homework grades yet.</p>
+            <ChartsFallback />
           )}
-        </ChartCard>
+        </div>
       </div>
 
       {profileModalOpen ? (
@@ -572,5 +489,23 @@ export default function DashboardPage(props: DashboardPageProps) {
         </div>
       ) : null}
     </TelegramLayout>
+  );
+}
+
+function ChartsFallback() {
+  return (
+    <>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Attendance Rate" subtitle="Loading chart data..." icon={<Calendar className="h-4 w-4 text-success" />}>
+          <div className="h-52 animate-pulse rounded-lg bg-muted/70 sm:h-60" />
+        </ChartCard>
+        <ChartCard title="Exam Performance" subtitle="Loading chart data..." icon={<BarChart3 className="h-4 w-4 text-info" />}>
+          <div className="h-56 animate-pulse rounded-lg bg-muted/70 sm:h-64" />
+        </ChartCard>
+      </div>
+      <ChartCard title="Homework Grades" subtitle="Loading chart data..." icon={<Activity className="h-4 w-4 text-success" />}>
+        <div className="h-64 animate-pulse rounded-lg bg-muted/70" />
+      </ChartCard>
+    </>
   );
 }

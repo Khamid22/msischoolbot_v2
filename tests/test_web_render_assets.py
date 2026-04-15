@@ -3,13 +3,20 @@ import os
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from flask import Flask
 
-from app.web.render import render_react_page
+from app.web.render import clear_react_manifest_cache, render_react_page
 
 
 class RenderAssetsTests(unittest.TestCase):
+    def setUp(self):
+        clear_react_manifest_cache()
+
+    def tearDown(self):
+        clear_react_manifest_cache()
+
     def _create_app(self, static_root: str, version: str = "42") -> Flask:
         app = Flask(__name__, static_folder=static_root, static_url_path="/static")
         app.config["ASSET_VERSION"] = version
@@ -111,6 +118,41 @@ class RenderAssetsTests(unittest.TestCase):
                     avg_ms = (elapsed / runs) * 1000
 
             self.assertLess(avg_ms, 5.0, f"render_react_page too slow: {avg_ms:.2f}ms avg")
+
+    def test_manifest_file_is_cached_between_renders(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            static_root = os.path.join(tmp_dir, "static")
+            react_root = os.path.join(static_root, "react")
+            os.makedirs(react_root, exist_ok=True)
+            manifest_path = os.path.join(react_root, "manifest.json")
+            with open(manifest_path, "w", encoding="utf-8") as manifest_file:
+                json.dump(
+                    {
+                        "index.html": {
+                            "file": "assets/index-cached12345678.js",
+                            "css": ["assets/index-cached12345678.css"],
+                        }
+                    },
+                    manifest_file,
+                )
+
+            app = self._create_app(static_root, version="123")
+            with app.app_context():
+                with app.test_request_context("/"):
+                    with patch("builtins.open", wraps=open) as mocked_open:
+                        render_react_page("login", {}, telegram=False)
+                        render_react_page("login", {}, telegram=False)
+
+            manifest_open_calls = [
+                call
+                for call in mocked_open.call_args_list
+                if call.args and call.args[0] == manifest_path
+            ]
+            self.assertEqual(
+                len(manifest_open_calls),
+                1,
+                "manifest.json should be read once while unchanged",
+            )
 
 
 if __name__ == "__main__":

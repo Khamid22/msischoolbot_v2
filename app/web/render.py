@@ -16,6 +16,7 @@ The page name must match a key in frontend/src/App.tsx's pageMap.
 import json
 import os
 import re
+import threading
 from typing import Any
 
 from flask import current_app, url_for
@@ -25,6 +26,55 @@ from markupsafe import escape
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+_MANIFEST_CACHE_LOCK = threading.Lock()
+_MANIFEST_CACHE_PATH = ""
+_MANIFEST_CACHE_MTIME_NS = -1
+_MANIFEST_CACHE_DATA: dict[str, Any] | None = None
+
+_TG_SAFE_AREA_PRIME_SCRIPT = """
+    <script>
+      (function () {
+        var docEl = document.documentElement;
+        if (!docEl || typeof window.getComputedStyle !== "function") {
+          return;
+        }
+        var style = docEl.style;
+        var computed = getComputedStyle(docEl);
+        var vars = [
+          "--tg-safe-area-inset-top",
+          "--tg-safe-area-inset-bottom",
+          "--tg-content-safe-area-inset-top",
+          "--tg-content-safe-area-inset-bottom",
+          "--tg-safe-area-inset-left",
+          "--tg-safe-area-inset-right"
+        ];
+        for (var i = 0; i < vars.length; i += 1) {
+          var name = vars[i];
+          var value = String(computed.getPropertyValue(name) || "").trim();
+          if (value && value !== "0px") {
+            style.setProperty(name, value);
+          }
+        }
+      })();
+    </script>
+""".rstrip()
+
+_MINIMAL_CRITICAL_CSS = """
+    <style>
+      :root { --msi-critical-bg: hsl(0 0% 97%); }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body, #root {
+        margin: 0;
+        min-height: 100dvh;
+        background: var(--msi-critical-bg);
+      }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+    </style>
+""".rstrip()
 
 def _asset_version() -> str:
     """Cache-busting version string, set once at startup in app.config."""
@@ -36,14 +86,42 @@ def _react_manifest_path() -> str:
     return os.path.join(static_root, "react", "manifest.json")
 
 
+def clear_react_manifest_cache() -> None:
+    global _MANIFEST_CACHE_PATH, _MANIFEST_CACHE_MTIME_NS, _MANIFEST_CACHE_DATA
+    with _MANIFEST_CACHE_LOCK:
+        _MANIFEST_CACHE_PATH = ""
+        _MANIFEST_CACHE_MTIME_NS = -1
+        _MANIFEST_CACHE_DATA = None
+
+
 def _load_react_manifest() -> dict[str, Any]:
     path = _react_manifest_path()
+    global _MANIFEST_CACHE_PATH, _MANIFEST_CACHE_MTIME_NS, _MANIFEST_CACHE_DATA
     try:
-        with open(path, "r", encoding="utf-8") as manifest_file:
-            data = json.load(manifest_file)
-    except (OSError, json.JSONDecodeError):
+        stat_result = os.stat(path)
+        mtime_ns = int(getattr(stat_result, "st_mtime_ns", int(stat_result.st_mtime * 1_000_000_000)))
+    except OSError:
         return {}
-    return data if isinstance(data, dict) else {}
+
+    with _MANIFEST_CACHE_LOCK:
+        if (
+            _MANIFEST_CACHE_DATA is not None
+            and _MANIFEST_CACHE_PATH == path
+            and _MANIFEST_CACHE_MTIME_NS == mtime_ns
+        ):
+            return _MANIFEST_CACHE_DATA
+
+        try:
+            with open(path, "r", encoding="utf-8") as manifest_file:
+                data = json.load(manifest_file)
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+        manifest = data if isinstance(data, dict) else {}
+        _MANIFEST_CACHE_PATH = path
+        _MANIFEST_CACHE_MTIME_NS = mtime_ns
+        _MANIFEST_CACHE_DATA = manifest
+        return manifest
 
 
 def _resolve_react_assets() -> tuple[str, str]:
@@ -138,6 +216,7 @@ def render_react_page(
         '\n    <link rel="dns-prefetch" href="//telegram.org" />'
         '\n    <link rel="preconnect" href="https://telegram.org" crossorigin />'
         '\n    <script defer src="https://telegram.org/js/telegram-web-app.js"></script>'
+        f"\n{_TG_SAFE_AREA_PRIME_SCRIPT}"
     ) if telegram else ""
 
     tg_script = f'\n    <script defer src="{tg_bundle_url}"></script>' if telegram else ""
@@ -160,6 +239,7 @@ def render_react_page(
     <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="{desc_safe}" />{tg_head}
     <title>{title_safe}</title>
+{_MINIMAL_CRITICAL_CSS}
     <link rel="icon" type="image/png" href="{favicon_url}" />
     <link rel="manifest" href="{manifest_url}" />
     {"<link rel=\"stylesheet\" href=\"" + css_url + "\" />" if css_url else ""}
