@@ -311,8 +311,8 @@ export function normalizeAdminTab(value: unknown): AdminTab {
 }
 
 export function buildAdminTabUrl(tab: AdminTab, school: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("panel", tab);
-  url.searchParams.set("school", school || "all");
-  return `${url.pathname}${url.search}${url.hash}`;
+  const params = new URLSearchParams();
+  params.set("panel", tab);
+  params.set("school", school || "all");
+  return `/?${params.toString()}`;
 }

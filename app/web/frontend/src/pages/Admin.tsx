@@ -6,6 +6,8 @@ import {
   AdminPageProps,
   adminHeaderPadTop,
   adminMainPadTop,
+  asNumber,
+  asString,
   tabs,
 } from "./admin/shared";
 import { useAdminState } from "./admin/useAdminState";
@@ -224,6 +226,26 @@ export default function AdminPage(props: AdminPageProps) {
                     maxLength={2000}
                     className="w-full resize-none rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none focus:border-foreground/30"
                   />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resource Type</span>
+                  <select
+                    value={String(state.editingResource.resourceTypeId)}
+                    onChange={(e) =>
+                      state.setEditingResource((prev: any) =>
+                        prev ? { ...prev, resourceTypeId: Number(e.target.value) } : null
+                      )
+                    }
+                    disabled={state.editSaving}
+                    className="w-full rounded-xl border-2 border-foreground/10 bg-background px-4 py-2.5 text-sm outline-none focus:border-foreground/30 disabled:opacity-50"
+                  >
+                    {state.activeResourceTypes.map((typeRow: Record<string, unknown>) => (
+                      <option key={asNumber(typeRow.id)} value={asNumber(typeRow.id)}>
+                        {asString(typeRow.name)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label className="block">

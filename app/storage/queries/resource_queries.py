@@ -350,20 +350,36 @@ def update_resource_row(conn, resource_id, title, description, updated_at):
     return int(updated.rowcount or 0)
 
 
-def update_resource_full_row(conn, resource_id, title, description, resource_file_path, thumbnail_file_path, updated_at):
-    updated = conn.execute(
-        """
-        UPDATE resources
-        SET
-            title = ?,
-            description = ?,
-            resource_file_path = ?,
-            thumbnail_file_path = ?,
-            updated_at = ?
-        WHERE id = ?
-        """,
-        (title, description, resource_file_path, thumbnail_file_path, updated_at, int(resource_id)),
-    )
+def update_resource_full_row(conn, resource_id, title, description, resource_file_path, thumbnail_file_path, updated_at, resource_type_id=None):
+    if resource_type_id is not None:
+        updated = conn.execute(
+            """
+            UPDATE resources
+            SET
+                title = ?,
+                description = ?,
+                resource_file_path = ?,
+                thumbnail_file_path = ?,
+                resource_type_id = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (title, description, resource_file_path, thumbnail_file_path, int(resource_type_id), updated_at, int(resource_id)),
+        )
+    else:
+        updated = conn.execute(
+            """
+            UPDATE resources
+            SET
+                title = ?,
+                description = ?,
+                resource_file_path = ?,
+                thumbnail_file_path = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (title, description, resource_file_path, thumbnail_file_path, updated_at, int(resource_id)),
+        )
     return int(updated.rowcount or 0)
 
 

@@ -448,7 +448,7 @@ def create_resource(
     return True, ""
 
 
-def update_resource(resource_id, *, title, description="", new_resource_file=None, new_thumbnail_file=None):
+def update_resource(resource_id, *, title, description="", resource_type_id=None, new_resource_file=None, new_thumbnail_file=None):
     try:
         parsed_resource_id = int(resource_id)
     except (TypeError, ValueError):
@@ -465,6 +465,17 @@ def update_resource(resource_id, *, title, description="", new_resource_file=Non
     normalized_description = str(description or "").strip()
     if len(normalized_description) > 2000:
         return False, "Description is too long."
+
+    # Validate resource_type_id if provided
+    final_resource_type_id = None
+    if resource_type_id is not None:
+        try:
+            parsed_type_id = int(resource_type_id)
+        except (TypeError, ValueError):
+            return False, "Invalid resource type."
+        if parsed_type_id <= 0:
+            return False, "Invalid resource type."
+        final_resource_type_id = parsed_type_id
 
     # Read existing record to get current file paths and subject
     with _connect() as conn:
@@ -506,6 +517,20 @@ def update_resource(resource_id, *, title, description="", new_resource_file=Non
     with _DB_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
+            if final_resource_type_id is not None:
+                resource_type = queries.get_resource_type_by_id_row(conn, final_resource_type_id)
+                if not resource_type:
+                    if new_resource_file_path:
+                        delete_resource_file(new_resource_file_path)
+                    if new_thumbnail_file_path:
+                        delete_resource_file(new_thumbnail_file_path)
+                    return False, "Resource type was not found."
+                if not bool(resource_type["is_active"]):
+                    if new_resource_file_path:
+                        delete_resource_file(new_resource_file_path)
+                    if new_thumbnail_file_path:
+                        delete_resource_file(new_thumbnail_file_path)
+                    return False, "Selected resource type is inactive."
             queries.update_resource_full_row(
                 conn,
                 parsed_resource_id,
@@ -514,6 +539,7 @@ def update_resource(resource_id, *, title, description="", new_resource_file=Non
                 final_resource_file_path,
                 final_thumbnail_file_path,
                 now,
+                resource_type_id=final_resource_type_id,
             )
             conn.commit()
 

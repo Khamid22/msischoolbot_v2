@@ -134,10 +134,12 @@ export function useAdminState(props: AdminPageProps) {
     description: string;
     resourceFileKind: string;
     thumbnailUrl: string;
+    resourceTypeId: number;
   } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [uploadFormKey, setUploadFormKey] = useState(0);
+  const [lastResourceTypeId, setLastResourceTypeId] = useState("");
   const editResourceFileRef = useRef<HTMLInputElement>(null);
   const editThumbnailFileRef = useRef<HTMLInputElement>(null);
   const resourceUploadSocketRef = useRef<WebSocket | null>(null);
@@ -484,6 +486,7 @@ export function useAdminState(props: AdminPageProps) {
       const formData = new FormData();
       formData.set("resource_title", editingResource.title.trim());
       formData.set("resource_description", editingResource.description.trim());
+      formData.set("resource_type_id", String(editingResource.resourceTypeId));
       formData.set("csrf_token", props.csrfToken || "");
       const resourceFile = editResourceFileRef.current?.files?.[0];
       if (resourceFile) formData.set("resource_file", resourceFile);
@@ -761,6 +764,8 @@ export function useAdminState(props: AdminPageProps) {
     setEditError,
     uploadFormKey,
     setUploadFormKey,
+    lastResourceTypeId,
+    setLastResourceTypeId,
     editResourceFileRef,
     editThumbnailFileRef,
     resourceUploadSocketRef,

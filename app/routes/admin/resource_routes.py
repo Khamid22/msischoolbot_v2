@@ -224,12 +224,14 @@ def register_admin_resource_routes(
     def edit_resource(resource_id):
         title = request.form.get("resource_title", "").strip()
         description = request.form.get("resource_description", "").strip()
+        resource_type_id = request.form.get("resource_type_id", "").strip() or None
         new_resource_file = request.files.get("resource_file")
         new_thumbnail_file = request.files.get("thumbnail_file")
         updated, update_error = svc_update_resource(
             resource_id,
             title=title,
             description=description,
+            resource_type_id=resource_type_id,
             new_resource_file=new_resource_file,
             new_thumbnail_file=new_thumbnail_file,
         )

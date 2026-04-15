@@ -1,6 +1,6 @@
 {
-  "_Admin-BXJ2NP8O.js": {
-    "file": "chunks/Admin-BXJ2NP8O.js",
+  "_Admin-BxRqcYXk.js": {
+    "file": "chunks/Admin-BxRqcYXk.js",
     "name": "Admin",
     "isDynamicEntry": true,
     "imports": [
@@ -88,7 +88,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-CWxCmEA3.js",
+    "file": "assets/index-S3vpXzr9.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -103,7 +103,7 @@
       "src/pages/Rating.tsx",
       "src/pages/AAP.tsx",
       "src/pages/AR.tsx",
-      "_Admin-BXJ2NP8O.js",
+      "_Admin-BxRqcYXk.js",
       "src/pages/EditStudentProfile.tsx",
       "src/pages/Chat.tsx",
       "src/pages/StudentNotFound.tsx"
@@ -244,7 +244,7 @@
     ]
   },
   "src/pages/admin/panels/OverviewPanel.tsx": {
-    "file": "chunks/OverviewPanel-BIwAFdBH.js",
+    "file": "chunks/OverviewPanel-ueozCM-6.js",
     "name": "OverviewPanel",
     "src": "src/pages/admin/panels/OverviewPanel.tsx",
     "isDynamicEntry": true,
@@ -252,7 +252,7 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
       "_StatCard-DxV87oL7.js",
-      "_Admin-BXJ2NP8O.js",
+      "_Admin-BxRqcYXk.js",
       "_icons-KwKt1V7c.js",
       "_recharts-BIGzVQz5.js",
       "index.html",
@@ -261,42 +261,42 @@
     ]
   },
   "src/pages/admin/panels/ResourcesPanel.tsx": {
-    "file": "chunks/ResourcesPanel-MbScgNS9.js",
+    "file": "chunks/ResourcesPanel-Cwu5hYrL.js",
     "name": "ResourcesPanel",
     "src": "src/pages/admin/panels/ResourcesPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-BXJ2NP8O.js",
+      "_Admin-BxRqcYXk.js",
       "_icons-KwKt1V7c.js",
       "index.html",
       "_PortalCard-Dxgeq0kI.js"
     ]
   },
   "src/pages/admin/panels/StudentsPanel.tsx": {
-    "file": "chunks/StudentsPanel-BDs42RvS.js",
+    "file": "chunks/StudentsPanel-DWVLqHd3.js",
     "name": "StudentsPanel",
     "src": "src/pages/admin/panels/StudentsPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-BXJ2NP8O.js",
+      "_Admin-BxRqcYXk.js",
       "_icons-KwKt1V7c.js",
       "index.html",
       "_PortalCard-Dxgeq0kI.js"
     ]
   },
   "src/pages/admin/panels/TeachersPanel.tsx": {
-    "file": "chunks/TeachersPanel-EjyNAN5a.js",
+    "file": "chunks/TeachersPanel-BbP-BkqK.js",
     "name": "TeachersPanel",
     "src": "src/pages/admin/panels/TeachersPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-BXJ2NP8O.js",
+      "_Admin-BxRqcYXk.js",
       "_icons-KwKt1V7c.js",
       "index.html",
       "_PortalCard-Dxgeq0kI.js"

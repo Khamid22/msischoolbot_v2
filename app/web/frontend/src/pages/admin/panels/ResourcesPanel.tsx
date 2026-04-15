@@ -19,6 +19,8 @@ export default function ResourcesPanel({ state }: { state: any }) {
     setResourceSubjectFilter,
     setEditingResource,
     setEditError,
+    lastResourceTypeId,
+    setLastResourceTypeId,
   } = state;
   const uploadSubjectOptions = sortSubjectsMathFirst(
     Array.isArray(props.adminResourceSubjectOptions)
@@ -132,7 +134,13 @@ export default function ResourcesPanel({ state }: { state: any }) {
             </label>
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resource Type</span>
-              <select name="resource_type_id" required className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none">
+              <select
+                name="resource_type_id"
+                required
+                defaultValue={lastResourceTypeId}
+                onChange={(e) => setLastResourceTypeId(e.target.value)}
+                className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none"
+              >
                 <option value="" disabled>
                   Select type
                 </option>
@@ -290,6 +298,7 @@ export default function ResourcesPanel({ state }: { state: any }) {
                                       description: asString(resource.description),
                                       resourceFileKind: asString(resource.resource_file_kind),
                                       thumbnailUrl: asString(resource.thumbnail_url),
+                                      resourceTypeId: asNumber(resource.resource_type_id),
                                     });
                                     setEditError("");
                                   }}
