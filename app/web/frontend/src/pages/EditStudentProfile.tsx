@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from "react";
-import { Camera, Trash2, User } from "lucide-react";
+import { Camera, KeyRound, Trash2, User } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/components/TelegramLayout";
 import { ChartCard } from "@/components/ChartCard";
 import { UserAvatar } from "@/components/Avatar";
@@ -27,13 +27,22 @@ interface EditStudentProfileProps {
   teacherNameOptions?: string[];
   csrfToken?: string;
   saveUrl?: string;
+  changePasswordUrl?: string;
   viewDashboardUrl?: string;
   backUrl?: string;
 }
 
+const modalInsetStyle = {
+  paddingTop: "var(--app-top-inset)",
+  paddingRight: "max(1rem, var(--app-right-inset))",
+  paddingBottom: "var(--app-bottom-inset)",
+  paddingLeft: "max(1rem, var(--app-left-inset))",
+} as const;
+
 export default function EditStudentProfile(props: EditStudentProfileProps) {
   const student = props.student || { id: 0 };
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(student.photo_url || "");
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const initials = `${String(student.surname || "").slice(0, 1)}${String(student.name || "").slice(0, 1)}`.trim() || "ST";
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -117,7 +126,6 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
                 {[
                   { label: "Surname and Name", value: `${student.surname || ""} ${student.name || ""}`.trim() || "-" },
                   { label: "Username", value: student.student_id || "-" },
-                  { label: "Password", value: student.password || "-" },
                   { label: "Group", value: student.group || "-" },
                 ].map((item) => (
                   <div key={item.label}>
@@ -125,6 +133,24 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
                     <p className="mt-0.5 text-sm font-medium">{item.value}</p>
                   </div>
                 ))}
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-foreground/10 bg-surface px-4 py-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Password</span>
+                      <p className="mt-0.5 text-sm font-medium">{student.password || "-"}</p>
+                    </div>
+                    {props.changePasswordUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setPasswordModalOpen(true)}
+                        className="inline-flex items-center gap-1 rounded-lg border-2 border-foreground/10 px-3 py-1.5 text-[11px] font-bold hover:bg-muted"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Change password
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block">
                     <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Teacher</span>
@@ -175,6 +201,61 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
           </button>
         </form>
       </div>
+
+      {passwordModalOpen && props.changePasswordUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50"
+          style={modalInsetStyle}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setPasswordModalOpen(false);
+            }
+          }}
+        >
+          <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
+            <h3 className="font-display text-base font-bold">Change Password</h3>
+            <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-3">
+              <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">New Password</span>
+                <input
+                  type="password"
+                  name="new_password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  placeholder="Enter new password"
+                  className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none focus:border-foreground/30"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Confirm Password</span>
+                <input
+                  type="password"
+                  name="confirm_password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  placeholder="Confirm new password"
+                  className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-2.5 text-sm outline-none focus:border-foreground/30"
+                />
+              </label>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPasswordModalOpen(false)}
+                  className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="rounded-lg bg-warning px-4 py-2 text-sm font-bold text-warning-foreground">
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </TelegramLayout>
   );
 }
