@@ -10,10 +10,12 @@ from urllib.parse import quote
 
 try:
     import boto3
+    from boto3.s3.transfer import TransferConfig as _S3TransferConfig
     from botocore.config import Config as BotocoreConfig
     from botocore.exceptions import BotoCoreError, ClientError
 except Exception:  # pragma: no cover - optional dependency guard
     boto3 = None
+    _S3TransferConfig = None
     BotocoreConfig = None
     BotoCoreError = Exception
     ClientError = Exception
@@ -25,26 +27,9 @@ _SIGNED_URL_CACHE = {}
 _FFMPEG_MISSING_LOGGED = False
 
 _ALLOWED_RESOURCE_EXTENSIONS = {
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".ppt",
-    ".pptx",
-    ".xls",
-    ".xlsx",
-    ".txt",
-    ".csv",
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp",
-    ".gif",
-    ".mp4",
-    ".mov",
-    ".m4v",
-    ".mp3",
-    ".wav",
-    ".zip",
+    ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx",
+    ".txt", ".csv", ".jpg", ".jpeg", ".png", ".webp", ".gif",
+    ".mp4", ".mov", ".m4v", ".mp3", ".wav", ".zip",
 }
 
 _RESOURCE_EXTENSION_MIME_MAP = {
@@ -72,17 +57,19 @@ _RESOURCE_EXTENSION_MIME_MAP = {
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 
 
+# ---------------------------------------------------------------------------
+# Environment helpers
+# ---------------------------------------------------------------------------
+
 def _env(name, default=""):
     return str(os.environ.get(name, default) or "").strip()
 
 
 def _is_false_like(value):
-    normalized = str(value or "").strip().lower()
-    return normalized in {"0", "false", "no", "off"}
+    return str(value or "").strip().lower() in {"0", "false", "no", "off"}
 
 
 def _r2_enabled():
-    # Keep R2 on by default for production; local/dev can opt out with R2_ENABLED=0.
     return not _is_false_like(_env("R2_ENABLED", "1"))
 
 
@@ -94,6 +81,10 @@ def _required_r2_env():
         "R2_BUCKET_NAME": _env("R2_BUCKET_NAME"),
     }
 
+
+# ---------------------------------------------------------------------------
+# Slug / name helpers
+# ---------------------------------------------------------------------------
 
 def _normalize(value):
     return " ".join(str(value or "").strip().casefold().split())
@@ -110,7 +101,6 @@ def _folder_slug_segments(folder_path):
     raw_value = str(folder_path or "").strip()
     if not raw_value:
         return []
-
     segments = []
     for part in re.split(r"[\\/]+", raw_value):
         segment_slug = _slugify(part)
@@ -139,82 +129,71 @@ def infer_resource_mime_type(file_name_or_key):
     return _RESOURCE_EXTENSION_MIME_MAP.get(extension, "")
 
 
+# ---------------------------------------------------------------------------
+# Upload / video configuration (all env-overridable)
+# ---------------------------------------------------------------------------
+
 def _max_upload_bytes():
-    raw_value = _env("RESOURCE_UPLOAD_MAX_MB", "200")
+    """Max resource file size. Default 1 GB; hard cap 4 GB."""
+    raw = _env("RESOURCE_UPLOAD_MAX_MB", "1024")
     try:
-        parsed = int(raw_value)
+        mb = int(raw)
     except ValueError:
-        parsed = 200
-    parsed = max(parsed, 1)
-    parsed = min(parsed, 1024)
-    return parsed * 1024 * 1024
+        mb = 1024
+    return max(1, min(mb, 4096)) * 1024 * 1024
 
 
 def _video_optimize_enabled():
-    # Default is enabled so uploaded videos are web-optimized out of the box.
-    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE", "1").strip().lower()
-    return raw_value not in {"0", "false", "no", "off"}
+    return not _is_false_like(_env("RESOURCE_VIDEO_OPTIMIZE", "1"))
 
 
 def _video_optimize_timeout_seconds():
-    raw_value = _env("RESOURCE_VIDEO_OPTIMIZE_TIMEOUT_SECONDS", "240")
+    raw = _env("RESOURCE_VIDEO_OPTIMIZE_TIMEOUT_SECONDS", "600")
     try:
-        parsed = int(raw_value)
+        s = int(raw)
     except ValueError:
-        parsed = 240
-    return max(20, min(parsed, 1800))
+        s = 600
+    return max(60, min(s, 3600))
 
 
 def _video_faststart_timeout_seconds():
-    raw_value = _env("RESOURCE_VIDEO_FASTSTART_TIMEOUT_SECONDS", "90")
+    raw = _env("RESOURCE_VIDEO_FASTSTART_TIMEOUT_SECONDS", "120")
     try:
-        parsed = int(raw_value)
+        s = int(raw)
     except ValueError:
-        parsed = 90
-    return max(10, min(parsed, 600))
+        s = 120
+    return max(10, min(s, 600))
 
 
 def _video_max_width():
-    raw_value = _env("RESOURCE_VIDEO_MAX_WIDTH", "960")
+    raw = _env("RESOURCE_VIDEO_MAX_WIDTH", "960")
     try:
-        parsed = int(raw_value)
+        w = int(raw)
     except ValueError:
-        parsed = 960
-    return max(320, min(parsed, 3840))
+        w = 960
+    return max(320, min(w, 3840))
 
 
 def _video_crf():
-    # Higher CRF -> smaller file size, lower visual quality.
-    raw_value = _env("RESOURCE_VIDEO_CRF", "28")
+    raw = _env("RESOURCE_VIDEO_CRF", "28")
     try:
-        parsed = int(raw_value)
+        crf = int(raw)
     except ValueError:
-        parsed = 26
-    return max(18, min(parsed, 32))
+        crf = 28
+    return max(18, min(crf, 32))
 
 
 def _video_preset():
-    # veryfast is a practical balance between upload-time CPU and output size.
-    preset = _env("RESOURCE_VIDEO_PRESET", "veryfast").strip().lower()
+    preset = _env("RESOURCE_VIDEO_PRESET", "veryfast").lower()
     allowed = {
-        "ultrafast",
-        "superfast",
-        "veryfast",
-        "faster",
-        "fast",
-        "medium",
-        "slow",
-        "slower",
-        "veryslow",
+        "ultrafast", "superfast", "veryfast", "faster", "fast",
+        "medium", "slow", "slower", "veryslow",
     }
-    if preset not in allowed:
-        return "ultrafast"
-    return preset
+    return preset if preset in allowed else "ultrafast"
 
 
 def _video_faststart_remux_enabled():
-    raw_value = _env("RESOURCE_VIDEO_FASTSTART_REMUX", "1").strip().lower()
-    return raw_value not in {"0", "false", "no", "off"}
+    return not _is_false_like(_env("RESOURCE_VIDEO_FASTSTART_REMUX", "1"))
 
 
 def _ffmpeg_binary():
@@ -225,34 +204,31 @@ def _ffmpeg_binary():
     if not _FFMPEG_MISSING_LOGGED:
         _FFMPEG_MISSING_LOGGED = True
         print(
-            "[resources] ffmpeg is not installed; uploading video without processing. "
-            "On Railway Railpack add apt package 'ffmpeg' (or set "
-            "RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg)."
+            "[resources] ffmpeg not found — videos will be uploaded without processing. "
+            "Add it via RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg or apt install ffmpeg."
         )
     return ""
 
 
 def _signed_url_ttl():
-    raw_value = _env("R2_SIGNED_URL_TTL_SECONDS", "21600")
+    raw = _env("R2_SIGNED_URL_TTL_SECONDS", "21600")
     try:
-        parsed = int(raw_value)
+        s = int(raw)
     except ValueError:
-        parsed = 21600
-    return max(60, min(parsed, 604800))
+        s = 21600
+    return max(60, min(s, 604800))
 
 
 def _public_base_url():
-    raw_value = (
+    raw = (
         _env("R2_PUBLIC_BASE_URL")
         or _env("RESOURCE_PUBLIC_BASE_URL")
         or _env("R2_DEV_PUBLIC_URL")
     )
-    if not raw_value:
+    if not raw:
         return ""
-    normalized = str(raw_value).strip().rstrip("/")
-    if not normalized:
-        return ""
-    if normalized.startswith("http://") or normalized.startswith("https://"):
+    normalized = raw.rstrip("/")
+    if normalized.startswith(("http://", "https://")):
         return normalized
     return f"https://{normalized}"
 
@@ -262,48 +238,50 @@ def _endpoint_url():
     if explicit:
         return explicit
     account_id = _env("R2_ACCOUNT_ID")
-    if not account_id:
-        return ""
-    return f"https://{account_id}.r2.cloudflarestorage.com"
+    return f"https://{account_id}.r2.cloudflarestorage.com" if account_id else ""
 
 
 def _r2_connect_timeout_seconds():
-    raw_value = _env("R2_CONNECT_TIMEOUT_SECONDS", "10")
+    raw = _env("R2_CONNECT_TIMEOUT_SECONDS", "10")
     try:
-        parsed = int(raw_value)
+        s = int(raw)
     except ValueError:
-        parsed = 10
-    return max(3, min(parsed, 60))
+        s = 10
+    return max(3, min(s, 60))
 
 
 def _r2_read_timeout_seconds():
-    raw_value = _env("R2_READ_TIMEOUT_SECONDS", "120")
+    # Needs to be long enough for a multipart upload of 1 GB+ on slow links.
+    raw = _env("R2_READ_TIMEOUT_SECONDS", "300")
     try:
-        parsed = int(raw_value)
+        s = int(raw)
     except ValueError:
-        parsed = 120
-    return max(20, min(parsed, 900))
+        s = 300
+    return max(60, min(s, 1800))
 
 
 def _r2_max_attempts():
-    raw_value = _env("R2_MAX_ATTEMPTS", "3")
+    raw = _env("R2_MAX_ATTEMPTS", "3")
     try:
-        parsed = int(raw_value)
+        n = int(raw)
     except ValueError:
-        parsed = 3
-    return max(1, min(parsed, 10))
+        n = 3
+    return max(1, min(n, 10))
 
 
 def _r2_multipart_chunk_bytes():
-    raw_value = _env("R2_MULTIPART_CHUNK_MB", "8")
+    """Size of each multipart part. S3 minimum is 5 MB."""
+    raw = _env("R2_MULTIPART_CHUNK_MB", "16")
     try:
-        parsed_mb = int(raw_value)
+        mb = int(raw)
     except ValueError:
-        parsed_mb = 8
-    # S3 multipart requires minimum 5MB.
-    parsed_mb = max(5, min(parsed_mb, 128))
-    return parsed_mb * 1024 * 1024
+        mb = 16
+    return max(5, min(mb, 128)) * 1024 * 1024
 
+
+# ---------------------------------------------------------------------------
+# R2 client
+# ---------------------------------------------------------------------------
 
 def _r2_client_config():
     if BotocoreConfig is None:
@@ -311,37 +289,28 @@ def _r2_client_config():
     return BotocoreConfig(
         connect_timeout=_r2_connect_timeout_seconds(),
         read_timeout=_r2_read_timeout_seconds(),
-        retries={
-            "max_attempts": _r2_max_attempts(),
-            "mode": "standard",
-        },
+        retries={"max_attempts": _r2_max_attempts(), "mode": "standard"},
     )
 
 
 def is_r2_configured():
-    if not _r2_enabled():
+    if not _r2_enabled() or boto3 is None:
         return False
-    if boto3 is None:
-        return False
-    values = _required_r2_env()
-    return all(values.values()) and bool(_endpoint_url())
+    return all(_required_r2_env().values()) and bool(_endpoint_url())
 
 
 def _build_r2_client():
     if not is_r2_configured():
         return None
-
-    region_name = _env("R2_REGION", "auto")
-    endpoint_url = _endpoint_url()
     client_kwargs = {
-        "endpoint_url": endpoint_url,
+        "endpoint_url": _endpoint_url(),
         "aws_access_key_id": _env("R2_ACCESS_KEY_ID"),
         "aws_secret_access_key": _env("R2_SECRET_ACCESS_KEY"),
-        "region_name": region_name,
+        "region_name": _env("R2_REGION", "auto"),
     }
-    client_config = _r2_client_config()
-    if client_config is not None:
-        client_kwargs["config"] = client_config
+    cfg = _r2_client_config()
+    if cfg is not None:
+        client_kwargs["config"] = cfg
     return boto3.client("s3", **client_kwargs)
 
 
@@ -359,23 +328,16 @@ def _resource_bucket_name():
 
 def _cache_control_header():
     configured = _env("R2_CACHE_CONTROL") or _env("RESOURCE_CACHE_CONTROL")
-    normalized = str(configured or "").strip()
-    if normalized:
-        return normalized
-    return "public, max-age=31536000, immutable"
+    return configured or "public, max-age=31536000, immutable"
 
 
-def _report_progress(
-    progress_callback,
-    *,
-    percent,
-    stage,
-    message,
-    eta_seconds=None,
-):
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _report_progress(progress_callback, *, percent, stage, message, eta_seconds=None):
     if not callable(progress_callback):
         return
-
     try:
         progress_callback(
             percent=float(percent),
@@ -406,275 +368,155 @@ def _build_object_key(subject_name, original_name, folder_path=""):
     )
 
 
-def _read_limited_bytes(
-    uploaded_file,
-    limit_bytes,
-    *,
-    progress_callback=None,
-    stage_start_percent=12.0,
-    stage_end_percent=52.0,
-):
-    stream = uploaded_file.stream
-    try:
-        stream.seek(0)
-    except Exception:
-        pass
+def _build_transfer_config():
+    """
+    Build a TransferConfig that enables parallel multipart upload.
 
-    expected_total = 0
-    try:
-        expected_total = int(uploaded_file.content_length or 0)
-    except Exception:
-        expected_total = 0
-    if expected_total <= 0:
+    boto3 splits the file into chunks of _r2_multipart_chunk_bytes() and
+    uploads up to 4 parts concurrently — so a 1 GB file with 16 MB chunks
+    (64 parts) uses ~64 MB of peak RAM and uploads 4× faster than a single
+    sequential PUT.
+    """
+    if _S3TransferConfig is None:
+        return None
+    chunk = _r2_multipart_chunk_bytes()
+    return _S3TransferConfig(
+        multipart_threshold=chunk,
+        multipart_chunksize=chunk,
+        max_concurrency=4,
+        use_threads=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Video processing  (file-path based — no bytes in Python memory)
+# ---------------------------------------------------------------------------
+
+def _process_video_file(input_path, output_path, source_extension):
+    """
+    Prepare a video for web delivery using ffmpeg, working entirely with files.
+
+    Phase 1 — fast stream-copy remux (MP4/M4V only):
+      Moves the moov atom to the front (faststart) without re-encoding.
+      Runs in seconds even for a 1 GB file. No quality loss.
+
+    Phase 2 — full H.264 re-encode (all other formats, or when Phase 1 fails):
+      Transcodes to H.264 + AAC, scales to max width, adds faststart.
+      Slower but universally compatible.
+
+    Returns True when output_path was written successfully.
+    Falls back gracefully (returns False) if ffmpeg is missing or times out
+    — the caller then uploads the original file unchanged.
+    """
+    ffmpeg = _ffmpeg_binary()
+    if not ffmpeg:
+        return False
+
+    # Phase 1: fast remux for MP4/M4V — copy codecs, add faststart moov atom
+    if source_extension in {".mp4", ".m4v"} and _video_faststart_remux_enabled():
         try:
-            expected_total = int(getattr(stream, "content_length", 0) or 0)
+            subprocess.run(
+                [
+                    ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", input_path,
+                    "-map", "0:v:0", "-map", "0:a?",
+                    "-c", "copy",
+                    "-movflags", "+faststart",
+                    output_path,
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=_video_faststart_timeout_seconds(),
+            )
+            if os.path.isfile(output_path) and os.path.getsize(output_path) > 0:
+                return True
         except Exception:
-            expected_total = 0
-    if expected_total > limit_bytes:
-        expected_total = limit_bytes
+            pass  # fall through to full re-encode
 
-    total = 0
-    chunks = []
-    while True:
-        chunk = stream.read(1024 * 1024)
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > limit_bytes:
-            return None, total
-        chunks.append(chunk)
-        if expected_total > 0:
-            ratio = min(total / expected_total, 1.0)
-            percent = stage_start_percent + (
-                (stage_end_percent - stage_start_percent) * ratio
-            )
-            _report_progress(
-                progress_callback,
-                percent=percent,
-                stage="receiving",
-                message="Receiving uploaded file...",
-            )
-
-    _report_progress(
-        progress_callback,
-        percent=stage_end_percent,
-        stage="received",
-        message="Uploaded file received.",
-    )
-    return b"".join(chunks), total
-
-
-def _upload_payload_to_r2(
-    client,
-    *,
-    bucket,
-    object_key,
-    payload,
-    content_type,
-    safe_name,
-    progress_callback=None,
-):
-    extra_args = {
-        "ContentType": content_type,
-        "ContentDisposition": f'inline; filename="{safe_name}"',
-        "CacheControl": _cache_control_header(),
-    }
-    _report_progress(
-        progress_callback,
-        percent=92.0,
-        stage="cloud_upload",
-        message="Uploading file to storage...",
-    )
-    client.put_object(
-        Bucket=bucket,
-        Key=object_key,
-        Body=payload,
-        **extra_args,
-    )
-
-
-def _faststart_remux_video_payload(payload, source_extension, ffmpeg_path=""):
-    if not payload:
-        return payload, source_extension
-    if not _video_faststart_remux_enabled():
-        return payload, source_extension
-    if source_extension not in _VIDEO_EXTENSIONS:
-        return payload, source_extension
-
-    resolved_ffmpeg = str(ffmpeg_path or "").strip() or _ffmpeg_binary()
-    if not resolved_ffmpeg:
-        return payload, source_extension
-
-    input_temp = None
-    output_temp = None
-
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=source_extension) as input_file:
-            input_temp = input_file.name
-            input_file.write(payload)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as output_file:
-            output_temp = output_file.name
-
-        remux_command = [
-            resolved_ffmpeg,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            input_temp,
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a?",
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            output_temp,
-        ]
-        subprocess.run(
-            remux_command,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=_video_faststart_timeout_seconds(),
-        )
-        with open(output_temp, "rb") as optimized_file:
-            optimized_payload = optimized_file.read()
-        if optimized_payload:
-            return optimized_payload, ".mp4"
-    except Exception:
-        return payload, source_extension
-    finally:
-        for temp_path in (input_temp, output_temp):
-            if not temp_path:
-                continue
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
-
-    return payload, source_extension
-
-
-def _optimize_video_payload(payload, source_extension, ffmpeg_path=""):
-    if not payload:
-        return payload, source_extension
+    # Phase 2: full H.264 re-encode (all formats, or Phase 1 fallback)
     if not _video_optimize_enabled():
-        return payload, source_extension
-
-    resolved_ffmpeg = str(ffmpeg_path or "").strip() or _ffmpeg_binary()
-    if not resolved_ffmpeg:
-        return payload, source_extension
-
-    input_extension = source_extension if source_extension in _VIDEO_EXTENSIONS else ".mp4"
-    input_temp = None
-    output_temp = None
+        return False
 
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=input_extension) as input_file:
-            input_temp = input_file.name
-            input_file.write(payload)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as output_file:
-            output_temp = output_file.name
-
-        if (
-            _video_faststart_remux_enabled()
-            and source_extension in {".mp4", ".m4v"}
-        ):
-            try:
-                remux_command = [
-                    resolved_ffmpeg,
-                    "-y",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-i",
-                    input_temp,
-                    "-map",
-                    "0:v:0",
-                    "-map",
-                    "0:a?",
-                    "-c",
-                    "copy",
-                    "-movflags",
-                    "+faststart",
-                    output_temp,
-                ]
-                subprocess.run(
-                    remux_command,
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    timeout=_video_faststart_timeout_seconds(),
-                )
-                with open(output_temp, "rb") as optimized_file:
-                    optimized_payload = optimized_file.read()
-                if optimized_payload:
-                    return optimized_payload, ".mp4"
-            except Exception:
-                pass
-
-        scale_filter = f"scale='min({_video_max_width()},iw)':-2"
-        command = [
-            resolved_ffmpeg,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            input_temp,
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a?",
-            "-c:v",
-            "libx264",
-            "-preset",
-            _video_preset(),
-            "-crf",
-            str(_video_crf()),
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            "-vf",
-            scale_filter,
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            output_temp,
-        ]
         subprocess.run(
-            command,
+            [
+                ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", input_path,
+                "-map", "0:v:0", "-map", "0:a?",
+                "-c:v", "libx264",
+                "-preset", _video_preset(),
+                "-crf", str(_video_crf()),
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                "-vf", f"scale='min({_video_max_width()},iw)':-2",
+                "-c:a", "aac", "-b:a", "128k",
+                output_path,
+            ],
             check=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=_video_optimize_timeout_seconds(),
         )
-
-        with open(output_temp, "rb") as optimized_file:
-            optimized_payload = optimized_file.read()
-
-        if optimized_payload:
-            return optimized_payload, ".mp4"
+        return os.path.isfile(output_path) and os.path.getsize(output_path) > 0
     except Exception:
-        return payload, source_extension
-    finally:
-        for temp_path in (input_temp, output_temp):
-            if not temp_path:
-                continue
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
+        return False
 
-    return payload, source_extension
 
+# ---------------------------------------------------------------------------
+# R2 streaming upload
+# ---------------------------------------------------------------------------
+
+def _upload_file_to_r2(
+    client,
+    *,
+    bucket,
+    object_key,
+    file_path,
+    content_type,
+    safe_name,
+    progress_callback=None,
+    start_pct=75.0,
+    end_pct=97.0,
+):
+    """
+    Stream a file from disk to R2 using multipart upload.
+
+    boto3's upload_fileobj reads one chunk at a time from the open file handle
+    and uploads parts in parallel.  Peak RAM = one chunk (~16 MB) regardless of
+    file size — a 1 GB upload uses the same memory as a 1 MB one.
+    """
+    file_size = os.path.getsize(file_path)
+    extra_args = {
+        "ContentType": content_type,
+        "ContentDisposition": f'inline; filename="{safe_name}"',
+        "CacheControl": _cache_control_header(),
+    }
+
+    bytes_sent = [0]
+
+    def _on_chunk(chunk_bytes):
+        bytes_sent[0] += chunk_bytes
+        ratio = min(bytes_sent[0] / file_size, 1.0) if file_size > 0 else 0.5
+        _report_progress(
+            progress_callback,
+            percent=start_pct + ratio * (end_pct - start_pct),
+            stage="cloud_upload",
+            message="Uploading to storage...",
+        )
+
+    config = _build_transfer_config()
+    upload_kwargs = {"ExtraArgs": extra_args, "Callback": _on_chunk}
+    if config is not None:
+        upload_kwargs["Config"] = config
+
+    with open(file_path, "rb") as fh:
+        client.upload_fileobj(fh, bucket, object_key, **upload_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Public upload functions
+# ---------------------------------------------------------------------------
 
 def upload_resource_file(
     uploaded_file,
@@ -682,14 +524,23 @@ def upload_resource_file(
     folder_path="",
     progress_callback=None,
 ):
+    """
+    Receive, optionally process, and stream-upload a resource file to R2.
+
+    Memory model
+    ------------
+    1. werkzeug stream → disk temp file via uploaded_file.save()
+       (sequential write, ~16 KB buffer — safe for 1 GB)
+    2. Optional ffmpeg processing: reads from disk, writes to another temp file
+       (no Python bytes object for the video content)
+    3. R2 upload via upload_fileobj + TransferConfig: 4 parallel parts,
+       ~16 MB chunk buffer — peak RAM is one chunk regardless of file size.
+
+    All temp files are cleaned up in a finally block.
+    """
     upload_started_at = time.time()
-    _report_progress(
-        progress_callback,
-        percent=5.0,
-        stage="validating",
-        message="Checking uploaded file...",
-    )
-    if uploaded_file is None or not str(uploaded_file.filename or "").strip():
+
+    if not uploaded_file or not str(uploaded_file.filename or "").strip():
         return "", "No file was uploaded."
     if not is_r2_configured():
         return "", "R2 storage is not configured."
@@ -700,122 +551,197 @@ def upload_resource_file(
     if extension not in _ALLOWED_RESOURCE_EXTENSIONS:
         return "", "File type is not supported for resources."
 
-    max_upload_size = _max_upload_bytes()
-    _report_progress(
-        progress_callback,
-        percent=10.0,
-        stage="receiving",
-        message="Receiving uploaded file...",
-    )
-    payload, payload_size = _read_limited_bytes(
-        uploaded_file,
-        max_upload_size,
-        progress_callback=progress_callback,
-    )
-    payload_ready_at = time.time()
-    if payload is None:
-        return "", (
-            "Uploaded file is too large. "
-            f"Max upload size is {max_upload_size // (1024 * 1024)} MB."
-        )
-    if payload_size <= 0:
-        return "", "Uploaded file is empty."
-    if payload_size > max_upload_size:
-        return "", (
-            "Uploaded file is too large or empty. "
-            f"Max upload size is {max_upload_size // (1024 * 1024)} MB."
-        )
+    max_bytes = _max_upload_bytes()
+    _report_progress(progress_callback, percent=5.0, stage="receiving", message="Receiving uploaded file...")
 
-    dot_index = safe_name.rfind(".")
-    stem = safe_name[:dot_index] if dot_index > 0 else safe_name
+    input_temp = None
+    output_temp = None
 
-    if extension in _VIDEO_EXTENSIONS:
+    try:
+        # --- Step 1: write werkzeug stream to a temp file on disk ---
+        # uploaded_file.save() uses shutil.copyfileobj with a 16 KB buffer,
+        # so the full file never enters Python memory.
+        fd, input_temp = tempfile.mkstemp(suffix=extension)
+        os.close(fd)
+        uploaded_file.save(input_temp)
+
+        file_size = os.path.getsize(input_temp)
+        if file_size == 0:
+            return "", "Uploaded file is empty."
+        if file_size > max_bytes:
+            mb = max_bytes // (1024 * 1024)
+            return "", f"File too large. Max upload size is {mb} MB."
+
         _report_progress(
             progress_callback,
-            percent=60.0,
-            stage="video",
-            message="Preparing video for web playback...",
+            percent=28.0,
+            stage="received",
+            message=f"File received ({file_size / (1024 * 1024):.1f} MB).",
         )
-        ffmpeg_path = _ffmpeg_binary()
-        payload, extension = _faststart_remux_video_payload(
-            payload,
-            extension,
-            ffmpeg_path=ffmpeg_path,
+
+        # --- Step 2: optional video processing (file → file, no RAM spike) ---
+        upload_path = input_temp
+        if extension in _VIDEO_EXTENSIONS:
+            _report_progress(
+                progress_callback,
+                percent=32.0,
+                stage="video",
+                message="Preparing video for web playback...",
+            )
+            fd2, output_temp = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd2)
+
+            if _process_video_file(input_temp, output_temp, extension):
+                upload_path = output_temp
+                extension = ".mp4"
+                dot_index = safe_name.rfind(".")
+                stem = safe_name[:dot_index] if dot_index > 0 else safe_name
+                safe_name = f"{stem}.mp4"
+                _report_progress(
+                    progress_callback,
+                    percent=72.0,
+                    stage="video",
+                    message="Video optimized.",
+                )
+            else:
+                _report_progress(
+                    progress_callback,
+                    percent=72.0,
+                    stage="video",
+                    message="Uploading original video.",
+                )
+
+        # --- Step 3: stream-upload to R2 via parallel multipart ---
+        content_type = (
+            infer_resource_mime_type(safe_name)
+            or str(uploaded_file.mimetype or "").strip()
+            or "application/octet-stream"
         )
+        object_key = _build_object_key(subject_name, safe_name, folder_path=folder_path)
+        client = _get_r2_client()
+        if client is None:
+            return "", "Unable to connect to R2 storage."
+
         _report_progress(
             progress_callback,
             percent=75.0,
-            stage="video",
-            message="Optimizing video...",
+            stage="cloud_upload",
+            message="Starting upload to storage...",
         )
-        payload, extension = _optimize_video_payload(
-            payload,
-            extension,
-            ffmpeg_path=ffmpeg_path,
-        )
-        _report_progress(
-            progress_callback,
-            percent=84.0,
-            stage="video",
-            message="Video optimization finished.",
-        )
-        safe_name = f"{stem}{extension}"
 
-    content_type = (
-        infer_resource_mime_type(safe_name)
-        or str(uploaded_file.mimetype or "").strip()
-        or "application/octet-stream"
-    )
-    _report_progress(
-        progress_callback,
-        percent=90.0,
-        stage="cloud_upload",
-        message="Uploading file to storage...",
-    )
-    object_key = _build_object_key(subject_name, safe_name, folder_path=folder_path)
+        try:
+            _upload_file_to_r2(
+                client,
+                bucket=_resource_bucket_name(),
+                object_key=object_key,
+                file_path=upload_path,
+                content_type=content_type,
+                safe_name=safe_name,
+                progress_callback=progress_callback,
+                start_pct=75.0,
+                end_pct=97.0,
+            )
+        except Exception:
+            elapsed = round(time.time() - upload_started_at, 1)
+            print(
+                "[resources] R2 upload failed",
+                {"file": safe_name, "bytes": file_size, "elapsed_s": elapsed},
+            )
+            return "", "Failed to upload resource file to R2."
+
+        upload_size = os.path.getsize(upload_path)
+        elapsed = round(time.time() - upload_started_at, 1)
+        print(
+            "[resources] R2 upload complete",
+            {"file": safe_name, "bytes": upload_size, "elapsed_s": elapsed},
+        )
+        _report_progress(progress_callback, percent=97.0, stage="done", message="Upload complete.")
+        return object_key, ""
+
+    finally:
+        for tmp_path in (input_temp, output_temp):
+            if tmp_path and os.path.isfile(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+
+# ---------------------------------------------------------------------------
+# Thumbnail upload (small files — in-memory read is acceptable at ≤5 MB)
+# ---------------------------------------------------------------------------
+
+_ALLOWED_THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+def _read_limited_bytes(uploaded_file, limit_bytes):
+    """Read a small file entirely into memory. Use only for thumbnails."""
+    stream = uploaded_file.stream
+    try:
+        stream.seek(0)
+    except Exception:
+        pass
+
+    total = 0
+    chunks = []
+    while True:
+        chunk = stream.read(256 * 1024)  # 256 KB
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit_bytes:
+            return None, total
+        chunks.append(chunk)
+
+    return b"".join(chunks), total
+
+
+def upload_thumbnail_file(uploaded_file, subject_name="", folder_path=""):
+    if not uploaded_file or not str(uploaded_file.filename or "").strip():
+        return "", "No thumbnail was uploaded."
+    if not is_r2_configured():
+        return "", "R2 storage is not configured."
+
+    original_name = str(uploaded_file.filename or "").strip()
+    safe_name = _safe_file_name(original_name)
+    extension = _file_extension(safe_name)
+    if extension not in _ALLOWED_THUMBNAIL_EXTENSIONS:
+        return "", "Thumbnail must be a JPG, PNG, or WebP image."
+
+    payload, payload_size = _read_limited_bytes(uploaded_file, _THUMBNAIL_MAX_BYTES)
+    if payload is None:
+        return "", "Thumbnail image is too large (max 5 MB)."
+    if payload_size <= 0:
+        return "", "Thumbnail image is empty."
+
+    content_type = infer_resource_mime_type(safe_name) or "image/jpeg"
+    object_key = _build_object_key(subject_name, f"thumb-{safe_name}", folder_path=folder_path)
     client = _get_r2_client()
     if client is None:
-        return "", "Unable to initialize R2 client."
+        return "", "Unable to connect to R2 storage."
 
     try:
-        _upload_payload_to_r2(
-            client,
-            bucket=_resource_bucket_name(),
-            object_key=object_key,
-            payload=payload,
-            content_type=content_type,
-            safe_name=safe_name,
-            progress_callback=progress_callback,
+        extra_args = {
+            "ContentType": content_type,
+            "ContentDisposition": f'inline; filename="{safe_name}"',
+            "CacheControl": _cache_control_header(),
+        }
+        client.put_object(
+            Bucket=_resource_bucket_name(),
+            Key=object_key,
+            Body=payload,
+            **extra_args,
         )
     except Exception:
-        print(
-            "[resources] R2 upload failed",
-            {
-                "file_name": safe_name,
-                "bytes": int(payload_size or 0),
-                "read_seconds": round(payload_ready_at - upload_started_at, 3),
-                "total_seconds": round(time.time() - upload_started_at, 3),
-            },
-        )
-        return "", "Failed to upload resource file to R2."
-    print(
-        "[resources] R2 upload complete",
-        {
-            "file_name": safe_name,
-            "bytes": int(payload_size or 0),
-            "read_seconds": round(payload_ready_at - upload_started_at, 3),
-            "total_seconds": round(time.time() - upload_started_at, 3),
-        },
-    )
+        return "", "Failed to upload thumbnail to R2."
 
-    _report_progress(
-        progress_callback,
-        percent=97.0,
-        stage="cloud_upload",
-        message="File uploaded. Finalizing...",
-    )
     return object_key, ""
 
+
+# ---------------------------------------------------------------------------
+# Signed URL / public URL
+# ---------------------------------------------------------------------------
 
 def build_resource_file_url(resource_file_path):
     object_key = str(resource_file_path or "").strip()
@@ -843,10 +769,9 @@ def build_resource_file_url(resource_file_path):
                 return cached_url
 
     response_content_type = infer_resource_mime_type(object_key)
-    file_name = _safe_file_name(object_key.split("/")[-1] if "/" in object_key else object_key)
-    if not file_name:
-        file_name = "resource"
-
+    file_name = _safe_file_name(
+        object_key.split("/")[-1] if "/" in object_key else object_key
+    ) or "resource"
     ttl_seconds = _signed_url_ttl()
     params = {
         "Bucket": _resource_bucket_name(),
@@ -886,55 +811,9 @@ def delete_resource_file(resource_file_path):
         return
 
     try:
-        client.delete_object(
-            Bucket=_resource_bucket_name(),
-            Key=object_key,
-        )
+        client.delete_object(Bucket=_resource_bucket_name(), Key=object_key)
     except (BotoCoreError, ClientError):
         return
-
-
-_ALLOWED_THUMBNAIL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
-
-
-def upload_thumbnail_file(uploaded_file, subject_name="", folder_path=""):
-    if uploaded_file is None or not str(uploaded_file.filename or "").strip():
-        return "", "No thumbnail was uploaded."
-    if not is_r2_configured():
-        return "", "R2 storage is not configured."
-
-    original_name = str(uploaded_file.filename or "").strip()
-    safe_name = _safe_file_name(original_name)
-    extension = _file_extension(safe_name)
-    if extension not in _ALLOWED_THUMBNAIL_EXTENSIONS:
-        return "", "Thumbnail must be a JPG, PNG, or WebP image."
-
-    payload, payload_size = _read_limited_bytes(uploaded_file, _THUMBNAIL_MAX_BYTES)
-    if payload is None:
-        return "", "Thumbnail image is too large (max 5 MB)."
-    if payload_size <= 0:
-        return "", "Thumbnail image is empty."
-
-    content_type = infer_resource_mime_type(safe_name) or "image/jpeg"
-    object_key = _build_object_key(subject_name, f"thumb-{safe_name}", folder_path=folder_path)
-    client = _get_r2_client()
-    if client is None:
-        return "", "Unable to initialize R2 client."
-
-    try:
-        _upload_payload_to_r2(
-            client,
-            bucket=_resource_bucket_name(),
-            object_key=object_key,
-            payload=payload,
-            content_type=content_type,
-            safe_name=safe_name,
-        )
-    except Exception:
-        return "", "Failed to upload thumbnail to R2."
-
-    return object_key, ""
 
 
 __all__ = [

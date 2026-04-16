@@ -54,6 +54,9 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
 app.config["SQLALCHEMY_DATABASE_URI"] = get_sqlalchemy_database_uri()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["WTF_CSRF_TIME_LIMIT"] = None
+# Werkzeug rejects requests larger than this before the route handler runs.
+# Matches RESOURCE_UPLOAD_MAX_MB (default 1 GB). Override with MAX_UPLOAD_MB env var.
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "1024")) * 1024 * 1024
 
 _compress = Compress(app)
 
@@ -233,7 +236,7 @@ def _group_cache_key(subject, group):
     return (_normalize(subject), _normalize(group))
 
 
-def _seed_group_cache_from_dataset(dataset):
+def _seed_group_cache_from_dataset(dataset, force=False):
     students = dataset.get("students", [])
     dashboards_by_id = dataset.get("dashboards_by_id", {})
     if not isinstance(students, list) or not isinstance(dashboards_by_id, dict):
@@ -245,9 +248,10 @@ def _seed_group_cache_from_dataset(dataset):
     with _GROUP_CACHE_LOCK:
         if dataset_token in _SEEDING_IN_PROGRESS:
             return
-        token_expires_at = float(_SEEDED_DATASET_TOKENS.get(dataset_token, 0))
-        if now < token_expires_at:
-            return
+        if not force:
+            token_expires_at = float(_SEEDED_DATASET_TOKENS.get(dataset_token, 0))
+            if now < token_expires_at:
+                return
         _SEEDING_IN_PROGRESS.add(dataset_token)
 
     try:
@@ -339,7 +343,7 @@ def _get_group_cache_entry(subject, group, school_code = "", force_refresh = Fal
     if load_error or not dataset:
         return None, load_error or "Unable to load Google Sheets data."
 
-    _seed_group_cache_from_dataset(dataset)
+    _seed_group_cache_from_dataset(dataset, force=force_refresh)
 
     with _GROUP_CACHE_LOCK:
         cached_entry = _GROUP_CACHE.get(key)
@@ -761,7 +765,7 @@ def _load_dashboard_payload(
             continue
 
         any_dataset_loaded = True
-        _seed_group_cache_from_dataset(dataset)
+        _seed_group_cache_from_dataset(dataset, force=force_refresh)
         payload = dataset.get("dashboards_by_id", {}).get(student_id)
         if payload is not None:
             return payload, dataset, None

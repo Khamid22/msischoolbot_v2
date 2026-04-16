@@ -135,12 +135,24 @@ def register_admin_student_routes(
                 final_name = f"student_{student_row_id}_{int(time.time())}{extension}"
                 final_path = os.path.join(uploads_dir, final_name)
                 uploaded_photo.save(final_path)
-                photo_url = url_for(
-                    "static",
-                    filename=f"uploads/student_photos/{final_name}",
-                )
-                if previous_photo_url:
-                    delete_uploaded_student_photo(previous_photo_url)
+                if os.path.getsize(final_path) > 10 * 1024 * 1024:  # 10 MB cap
+                    try:
+                        os.remove(final_path)
+                    except OSError:
+                        pass
+                    rendered = render_edit_student_page(
+                        student_row_id,
+                        auth_error="Photo is too large. Maximum file size is 10 MB.",
+                    )
+                    if rendered is not None:
+                        return rendered, 413
+                else:
+                    photo_url = url_for(
+                        "static",
+                        filename=f"uploads/student_photos/{final_name}",
+                    )
+                    if previous_photo_url:
+                        delete_uploaded_student_photo(previous_photo_url)
 
         available_teacher_names = {
             str(row.get("full_name", "")).strip()

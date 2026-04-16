@@ -63,8 +63,6 @@ def _env_positive_int(name, default):
 
 
 def _default_gevent_workers():
-    # gevent workers are lightweight greenlets, so a higher default helps
-    # absorb many concurrent static chunk requests.
     cpu_count = os.cpu_count() or 1
     return max(16, cpu_count * 8)
 
