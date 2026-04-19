@@ -20,6 +20,7 @@ from .utils import (
     format_lesson_date,
     humanize_group_suffix,
     is_excluded_homework_session,
+    is_chemistry_group,
     is_sehriyo_chemistry_group,
     is_student_data_row,
     is_supported_group_suffix,
@@ -57,6 +58,9 @@ class LessonMeta:
     label: str
     topic: str
     date: str
+    include_homework: bool = True
+    include_attendance: bool = True
+    include_in_lesson_catalog: bool = True
 
 
 @dataclass(frozen=True)
@@ -178,6 +182,7 @@ def _scan_rows(rows, group):
         getattr(group, "school_code", DEFAULT_SCHOOL_CODE)
     )
     is_sehriyo = normalized_school_code == "sehriyo"
+    is_chemistry = is_chemistry_group(group)
     skip_coins = is_sehriyo and getattr(group, "subject_code", "") == "CHM"
     coins_start_row = 31 if is_sehriyo else 19
 
@@ -207,7 +212,10 @@ def _scan_rows(rows, group):
         if full_name.casefold() in {"student name", "lesson aap", "submission rate"}:
             continue
 
-        if is_sehriyo:
+        if is_chemistry:
+            if row_number < 4 or row_number > 19:
+                continue
+        elif is_sehriyo:
             if row_number < 4 or row_number > 19:
                 continue
         else:
@@ -233,12 +241,7 @@ def parse_group_rows(
         lesson_name_row=rows[2] if len(rows) > 2 else [],
     )
 
-    if is_sehriyo_chemistry_group(group):
-        exam_columns = list(
-            range(Columns.EXAM_START, Columns.SEHRIYO_CHEMISTRY_EXAM_END_EXCLUSIVE)
-        )  # C..S
-    else:
-        exam_columns = list(range(Columns.EXAM_START, Columns.EXAM_END_EXCLUSIVE))  # C..T
+    exam_columns = list(range(Columns.EXAM_START, Columns.EXAM_END_EXCLUSIVE))  # C..T
 
     exam_column_meta = build_exam_column_meta(header_rows.lesson_name_row, exam_columns)
 
@@ -316,8 +319,8 @@ def build_homework_column_meta(
 ):
     # max_columns is pre-computed by _scan_rows so trailing score columns are not
     # dropped when header rows are shorter than student rows.
-    if is_sehriyo_chemistry_group(group):
-        return build_sehriyo_chemistry_homework_column_meta(
+    if is_chemistry_group(group):
+        return build_chemistry_homework_column_meta(
             lesson_number_row,
             lesson_topic_row,
             lesson_date_row,
@@ -372,15 +375,27 @@ def build_homework_column_meta(
     return metadata
 
 
-def build_sehriyo_chemistry_homework_column_meta(
+def build_chemistry_homework_column_meta(
     lesson_number_row,
     lesson_topic_row,
     lesson_date_row,
     max_columns,
 ):
     metadata: list[LessonMeta] = []
-    for lesson_column_index in range(Columns.SEHRIYO_CHEMISTRY_LESSON_START, max_columns):
-        raw_label = to_text(cell_value(lesson_number_row, lesson_column_index))
+    # Chemistry sheets store three columns per topic from V onward:
+    # Lesson attendance, Lab attendance, then Homework score.
+    for lesson_column_index in range(Columns.HOMEWORK_START, max_columns, 3):
+        lesson_attendance_column_index = lesson_column_index
+        lab_attendance_column_index = lesson_column_index + 1
+        score_column_index = lesson_column_index + 2
+        if score_column_index >= max_columns:
+            break
+
+        raw_label = to_text(cell_value(lesson_number_row, lesson_attendance_column_index))
+        if not raw_label:
+            raw_label = to_text(cell_value(lesson_number_row, lab_attendance_column_index))
+        if not raw_label:
+            raw_label = to_text(cell_value(lesson_number_row, score_column_index))
         if not raw_label:
             continue
 
@@ -388,21 +403,19 @@ def build_sehriyo_chemistry_homework_column_meta(
         if should_skip_homework_lesson(label):
             continue
 
-        score_column_index = (
-            Columns.SEHRIYO_CHEMISTRY_SCORE_START
-            + (lesson_column_index - Columns.SEHRIYO_CHEMISTRY_LESSON_START)
-        )
-        if score_column_index >= max_columns:
-            continue
-
-        raw_topic = to_text(cell_value(lesson_topic_row, lesson_column_index))
+        raw_topic = to_text(cell_value(lesson_topic_row, lesson_attendance_column_index))
+        if not raw_topic:
+            raw_topic = to_text(cell_value(lesson_topic_row, lab_attendance_column_index))
         if not raw_topic:
             raw_topic = to_text(cell_value(lesson_topic_row, score_column_index))
 
-        raw_date = cell_value(lesson_date_row, lesson_column_index)
-        if raw_date is None or to_text(raw_date) == "":
-            raw_date = cell_value(lesson_date_row, score_column_index)
-        lesson_date = format_lesson_date(raw_date)
+        lesson_date = format_lesson_date(
+            cell_value(lesson_date_row, lesson_attendance_column_index)
+        )
+        lab_date = format_lesson_date(
+            cell_value(lesson_date_row, lab_attendance_column_index)
+        )
+        homework_date = format_lesson_date(cell_value(lesson_date_row, score_column_index))
 
         topic = normalize_whitespace(raw_topic.replace("\n", " "))
         if not topic:
@@ -410,13 +423,44 @@ def build_sehriyo_chemistry_homework_column_meta(
         if is_excluded_homework_session(label, topic):
             continue
 
+        fallback_date = lesson_date or lab_date or homework_date
+        lesson_topic = f"{topic} (Lesson)"
+        lab_topic = f"{topic} (Lab)"
+
+        metadata.append(
+            LessonMeta(
+                attendance_column_index=lesson_attendance_column_index,
+                score_column_index=lesson_attendance_column_index,
+                label=f"{label} (Lesson)",
+                topic=lesson_topic,
+                date=lesson_date or fallback_date,
+                include_homework=False,
+                include_attendance=True,
+                include_in_lesson_catalog=False,
+            )
+        )
+        metadata.append(
+            LessonMeta(
+                attendance_column_index=lab_attendance_column_index,
+                score_column_index=lab_attendance_column_index,
+                label=f"{label} (Lab)",
+                topic=lab_topic,
+                date=lab_date or fallback_date,
+                include_homework=False,
+                include_attendance=True,
+                include_in_lesson_catalog=False,
+            )
+        )
         metadata.append(
             LessonMeta(
                 attendance_column_index=score_column_index,
                 score_column_index=score_column_index,
                 label=label,
                 topic=topic,
-                date=lesson_date,
+                date=homework_date or fallback_date,
+                include_homework=True,
+                include_attendance=False,
+                include_in_lesson_catalog=True,
             )
         )
 
@@ -425,7 +469,11 @@ def build_sehriyo_chemistry_homework_column_meta(
 
 def build_lesson_catalog(homework_columns_meta):
     lesson_catalog = []
-    for lesson_order, lesson_meta in enumerate(homework_columns_meta, start=1):
+    lesson_order = 0
+    for lesson_meta in homework_columns_meta:
+        if not lesson_meta.include_in_lesson_catalog:
+            continue
+        lesson_order += 1
         lesson_catalog.append(
             {
                 "lesson_number": str(lesson_meta.label).strip(),
@@ -475,51 +523,53 @@ def parse_student_row(
         attendance_cell = cell_value(row, lesson_meta.attendance_column_index)
         score_cell = cell_value(row, lesson_meta.score_column_index)
 
-        score = parse_numeric_score(score_cell)
-        if (
-            score is None
-            and lesson_meta.score_column_index != lesson_meta.attendance_column_index
-        ):
-            score = parse_numeric_score(attendance_cell)
-        if score is not None:
-            homework_grades.append(
-                {
-                    "lesson": lesson_meta.label,
-                    "topic": lesson_meta.topic,
-                    "date": lesson_meta.date,
-                    "score": score,
-                }
-            )
+        if lesson_meta.include_homework:
+            score = parse_numeric_score(score_cell)
+            if (
+                score is None
+                and lesson_meta.score_column_index != lesson_meta.attendance_column_index
+            ):
+                score = parse_numeric_score(attendance_cell)
+            if score is not None:
+                homework_grades.append(
+                    {
+                        "lesson": lesson_meta.label,
+                        "topic": lesson_meta.topic,
+                        "date": lesson_meta.date,
+                        "score": score,
+                    }
+                )
 
-        p, a, ai = parse_attendance_markers(attendance_cell)
-        if lesson_meta.score_column_index != lesson_meta.attendance_column_index:
-            p2, a2, ai2 = parse_attendance_markers(score_cell)
-            p += p2
-            a += a2
-            ai += ai2
+        if lesson_meta.include_attendance:
+            p, a, ai = parse_attendance_markers(attendance_cell)
+            if lesson_meta.score_column_index != lesson_meta.attendance_column_index:
+                p2, a2, ai2 = parse_attendance_markers(score_cell)
+                p += p2
+                a += a2
+                ai += ai2
 
-        if ai > 0:
-            attendance_status = "justified"
-        elif a > 0:
-            attendance_status = "absent"
-        elif p > 0:
-            attendance_status = "present"
-        else:
-            attendance_status = ""
+            if ai > 0:
+                attendance_status = "justified"
+            elif a > 0:
+                attendance_status = "absent"
+            elif p > 0:
+                attendance_status = "present"
+            else:
+                attendance_status = ""
 
-        if attendance_status:
-            attendance_lessons.append(
-                {
-                    "lesson": lesson_meta.label,
-                    "topic": lesson_meta.topic,
-                    "date": lesson_meta.date,
-                    "status": attendance_status,
-                }
-            )
+            if attendance_status:
+                attendance_lessons.append(
+                    {
+                        "lesson": lesson_meta.label,
+                        "topic": lesson_meta.topic,
+                        "date": lesson_meta.date,
+                        "status": attendance_status,
+                    }
+                )
 
-        present_count += p
-        absent_count += a
-        justified_absent_count += ai
+            present_count += p
+            absent_count += a
+            justified_absent_count += ai
 
     # Keep backward-compatible structure for existing frontend integrations.
     academic_records = [
@@ -535,6 +585,10 @@ def parse_student_row(
     average_grade_cell = parse_numeric_score(
         cell_value(row, average_grade_column_index(group))
     )
+    if average_grade_cell is None and is_sehriyo_chemistry_group(group):
+        average_grade_cell = parse_numeric_score(
+            cell_value(row, Columns.SEHRIYO_CHEMISTRY_AVERAGE_GRADE)
+        )
     if average_grade_cell is not None:
         average_grade = float(average_grade_cell)
     else:

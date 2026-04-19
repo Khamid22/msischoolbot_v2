@@ -246,7 +246,10 @@ export function useAdminState(props: AdminPageProps) {
       const url = `${routes.adminStudentsApi}?school=${encodeURIComponent(
         String(currentSchool || "all")
       )}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       if (!res.ok) {
         return;
       }

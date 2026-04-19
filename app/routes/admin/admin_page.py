@@ -1,3 +1,4 @@
+import logging
 import os
 
 from flask import Blueprint, jsonify, redirect, request, session, url_for
@@ -5,22 +6,27 @@ from flask_wtf.csrf import generate_csrf
 
 from app.web.render import render_react_page
 
+from app.background import start_google_sheets_sync_background
+from app.integrations.sheets_data import mark_school_dataset_dirty
 from app.routes.admin.admins import register_admin_routes
 from app.routes.admin.chat_admin_routes import register_admin_chat_routes
 from app.routes.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
+    invalidate_admin_page_context_cache,
 )
 from app.routes.admin.services.session_state_service import (
     current_auth_login,
     current_auth_role,
 )
+from app.config.schools import get_configured_school_spreadsheets
 
 
 def register_admin_page_routes(
     app,
     *,
     load_dataset,
+    clear_group_cache,
 ):
     def delete_uploaded_student_photo(photo_url):
         raw_url = str(photo_url or "").strip()
@@ -135,6 +141,19 @@ def register_admin_page_routes(
         if requested_with == "XMLHttpRequest":
             return jsonify({"ok": False, "message": "Admin authentication required."}), 401
         return redirect(url_for("student.home"))
+
+    @admin_blueprint.post("/admin/api/refresh")
+    def admin_refresh_sheets():
+        all_school_codes = list(get_configured_school_spreadsheets().keys())
+        clear_group_cache()
+        mark_school_dataset_dirty(all_school_codes, clear_cached_data=False)
+        invalidate_admin_page_context_cache()
+        sync_state = start_google_sheets_sync_background(all_school_codes)
+        logging.info("Admin-triggered Google Sheets refresh: state=%s", sync_state)
+        started = bool(sync_state.get("started", False))
+        already_running = bool(sync_state.get("already_running", False))
+        accepted = started and not already_running
+        return jsonify({"ok": accepted, **sync_state}), (202 if accepted else 503)
 
     register_admin_routes(
         admin_blueprint,

@@ -1,5 +1,5 @@
-import { Suspense, lazy } from "react";
-import { GraduationCap, LogOut, Menu, X } from "lucide-react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { GraduationCap, LogOut, Menu, RefreshCw, X } from "lucide-react";
 import { FormAlert } from "@/components/PortalCard";
 import { routes } from "@/lib/routes";
 import {
@@ -45,6 +45,69 @@ function ActivePanel({ state }: { state: any }) {
 
 export default function AdminPage(props: AdminPageProps) {
   const state = useAdminState(props);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshStatus, setRefreshStatus] = useState<"idle" | "ok" | "warn" | "error">("idle");
+  const [refreshMessage, setRefreshMessage] = useState("");
+  const refreshResetTimerRef = useRef<number | null>(null);
+
+  function clearRefreshResetTimer() {
+    if (refreshResetTimerRef.current !== null) {
+      window.clearTimeout(refreshResetTimerRef.current);
+      refreshResetTimerRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      clearRefreshResetTimer();
+    };
+  }, []);
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    clearRefreshResetTimer();
+    setRefreshing(true);
+    setRefreshStatus("idle");
+    setRefreshMessage("Refreshing Google Sheets data...");
+    try {
+      const res = await fetch(routes.adminRefreshApi, {
+        method: "POST",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRFToken": props.csrfToken || "",
+        },
+      });
+      let payload: Record<string, unknown> = {};
+      try {
+        payload = (await res.json()) as Record<string, unknown>;
+      } catch {
+        payload = {};
+      }
+
+      const apiMessage = asString(payload.message);
+      const alreadyRunning = Boolean(payload.already_running);
+      if (res.status === 202) {
+        setRefreshStatus("ok");
+        setRefreshMessage(apiMessage || "Refresh started in background.");
+      } else if (res.status === 503 && alreadyRunning) {
+        setRefreshStatus("warn");
+        setRefreshMessage(apiMessage || "Refresh is already running; rerun queued.");
+      } else {
+        setRefreshStatus("error");
+        setRefreshMessage(apiMessage || "Unable to start refresh.");
+      }
+    } catch {
+      setRefreshStatus("error");
+      setRefreshMessage("Network error. Please try again.");
+    } finally {
+      setRefreshing(false);
+      refreshResetTimerRef.current = window.setTimeout(() => {
+        setRefreshStatus("idle");
+        setRefreshMessage("");
+        refreshResetTimerRef.current = null;
+      }, 4000);
+    }
+  }
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -53,17 +116,32 @@ export default function AdminPage(props: AdminPageProps) {
         style={{ paddingTop: adminHeaderPadTop }}
       >
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
-          <a
-            href={`/?panel=overview&school=${encodeURIComponent(state.currentSchool)}`}
-            className="flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold"
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Refresh data from Google Sheets"
+            className={`flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold transition-colors disabled:opacity-60 ${
+              refreshStatus === "ok"
+                ? "text-green-600"
+                : refreshStatus === "warn"
+                  ? "text-amber-600"
+                : refreshStatus === "error"
+                  ? "text-destructive"
+                  : "hover:bg-muted"
+            }`}
           >
-            <GraduationCap className="h-5 w-5" />
+            {refreshing ? (
+              <RefreshCw className="h-5 w-5 animate-spin" />
+            ) : (
+              <GraduationCap className="h-5 w-5" />
+            )}
             MSI
-          </a>
+          </button>
           <nav
             className="hidden min-w-0 flex-1 gap-1 overflow-x-auto sm:flex"
             aria-label="Admin navigation"
-          >
+            >
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -102,6 +180,27 @@ export default function AdminPage(props: AdminPageProps) {
             </button>
           </form>
         </div>
+        {refreshMessage ? (
+          <div className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-4 md:px-6">
+            <p
+              role="status"
+              aria-live="polite"
+              className={`text-xs font-semibold ${
+                refreshing
+                  ? "text-muted-foreground"
+                  : refreshStatus === "ok"
+                    ? "text-green-600"
+                    : refreshStatus === "warn"
+                      ? "text-amber-600"
+                      : refreshStatus === "error"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+              }`}
+            >
+              {refreshMessage}
+            </p>
+          </div>
+        ) : null}
         {state.mobileNavOpen ? (
           <div id="admin-mobile-nav" className="relative z-50 border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
             <nav className="grid grid-cols-2 gap-2" aria-label="Admin mobile navigation">

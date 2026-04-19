@@ -21,6 +21,7 @@ export const routes = {
   adminResourceEdit: (resourceId: number | string) => `/admin/resources/${resourceId}/edit`,
   adminResourcesApi: "/admin/api/resources",
   adminStudentsApi: "/admin/api/students",
+  adminRefreshApi: "/admin/api/refresh",
   adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
   adminStudentDashboard: (studentRowId: number | string, school = "all") =>
     `/admin/students/${studentRowId}/dashboard?school=${encodeURIComponent(String(school || "all"))}`,

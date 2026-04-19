@@ -191,13 +191,16 @@ def is_sehriyo_chemistry_group(group):
     normalized_school_code = normalize_school_code(
         getattr(group, "school_code", DEFAULT_SCHOOL_CODE)
     )
+    return normalized_school_code == "sehriyo" and is_chemistry_group(group)
+
+
+def is_chemistry_group(group):
     subject_code = str(getattr(group, "subject_code", "")).strip().upper()
-    return normalized_school_code == "sehriyo" and subject_code == "CHM"
+    return subject_code == "CHM"
 
 
 def average_grade_column_index(group):
-    if is_sehriyo_chemistry_group(group):
-        return Columns.SEHRIYO_CHEMISTRY_AVERAGE_GRADE
+    _ = group
     return Columns.SCHOOL_AVERAGE_GRADE
 
 

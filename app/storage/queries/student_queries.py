@@ -209,7 +209,30 @@ def update_student_last_seen(conn, student_row_id, now):
     )
 
 
-def list_students_for_admin_rows(conn, school_name=""):
+def list_students_for_admin_rows(conn, school_key="", school_name=""):
+    normalized_school_key = str(school_key or "").strip().casefold()
+    if normalized_school_key:
+        return conn.execute(
+            """
+            SELECT
+                id,
+                full_name,
+                student_id,
+                password,
+                subjects,
+                telegram_user_id,
+                photo_url,
+                profile_description,
+                class_name,
+                school_name,
+                last_seen_at
+            FROM students
+            WHERE school_key = ?
+            ORDER BY id ASC
+            """,
+            (_normalize_school_key(normalized_school_key),),
+        ).fetchall()
+
     normalized_school_name = str(school_name or "").strip()
     if normalized_school_name:
         return conn.execute(

@@ -153,6 +153,7 @@ def start_google_sheets_sync_background(target_school_codes):
         return {
             "started": False,
             "queued": False,
+            "already_running": False,
             "schools": [],
             "message": "No target schools configured.",
         }
@@ -171,6 +172,7 @@ def start_google_sheets_sync_background(target_school_codes):
             return {
                 "started": True,
                 "queued": True,
+                "already_running": True,
                 "schools": normalized_codes,
                 "message": "Matching sync is already running; rerun queued.",
             }
@@ -232,6 +234,7 @@ def start_google_sheets_sync_background(target_school_codes):
     return {
         "started": True,
         "queued": True,
+        "already_running": False,
         "schools": normalized_codes,
         "message": "Sync started in background.",
     }

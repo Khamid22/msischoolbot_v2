@@ -455,13 +455,13 @@ def record_student_activity(student_row_id):
 def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
     init_storage()
     normalized_filter = _normalize_admin_school_filter(school_filter)
-    school_name = (
-        _school_display_name(normalized_filter)
+    school_key = (
+        normalized_filter
         if normalized_filter != _ADMIN_SCHOOL_FILTER_ALL
         else ""
     )
     with _connect() as conn:
-        rows = queries.list_students_for_admin_rows(conn, school_name=school_name)
+        rows = queries.list_students_for_admin_rows(conn, school_key=school_key)
 
     grouped = {}
     for row in rows:

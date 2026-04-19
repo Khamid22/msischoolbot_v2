@@ -76,6 +76,9 @@ def _resolve_cache_control_header(request_path, query_version = ""):
     if request_path == "/" or request_path.startswith("/dashboard/"):
         return _CACHE_NO_STORE
 
+    if request_path.startswith("/api/") or request_path.startswith("/admin/api/"):
+        return _CACHE_NO_STORE
+
     if request_path.startswith("/static/react/"):
         file_name = os.path.basename(request_path)
         if file_name in {"manifest.json", "index.html"}:
@@ -843,6 +846,7 @@ def _bootstrap_app(flask_app):
     render_admin_page = register_admin_page_routes(
         flask_app,
         load_dataset=_load_dataset,
+        clear_group_cache=_clear_group_cache,
     )
     register_student_page_routes(
         flask_app,
