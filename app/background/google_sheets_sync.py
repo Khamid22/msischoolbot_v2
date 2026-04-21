@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import threading
 import time
+import uuid
 
 from app.config.schools import get_configured_school_spreadsheets
 from app.integrations.sheets_data import SheetsDataError, get_school_dataset, mark_school_dataset_dirty
@@ -16,6 +18,15 @@ from app.routes.students.services import (
 JOB_TYPE_GOOGLE_SHEETS_SYNC = "google_sheets_sync"
 _ACTIVE_SYNC_LOCK = threading.Lock()
 _SYNC_STATE_BY_KEY = {}
+
+
+def _sync_stale_timeout_seconds():
+    raw = str(os.environ.get("GOOGLE_SHEETS_SYNC_STALE_SECONDS", "600")).strip()
+    try:
+        parsed = int(raw)
+    except ValueError:
+        parsed = 600
+    return max(parsed, 60)
 
 
 def normalize_target_school_codes(target_school_codes):
@@ -159,14 +170,33 @@ def start_google_sheets_sync_background(target_school_codes):
         }
 
     job_key = ",".join(sorted(normalized_codes))
+    stale_timeout_seconds = _sync_stale_timeout_seconds()
+    worker_token = uuid.uuid4().hex
+    now = time.time()
     with _ACTIVE_SYNC_LOCK:
         state = _SYNC_STATE_BY_KEY.setdefault(
             job_key,
             {
                 "running": False,
                 "rerun_requested": False,
+                "started_at": 0.0,
+                "worker_token": "",
             },
         )
+        if bool(state.get("running", False)):
+            started_at = float(state.get("started_at", 0.0) or 0.0)
+            if started_at > 0 and (now - started_at) >= stale_timeout_seconds:
+                logging.warning(
+                    "Google Sheets sync state reset as stale for schools=%s age_s=%s timeout_s=%s",
+                    normalized_codes,
+                    int(now - started_at),
+                    stale_timeout_seconds,
+                )
+                state["running"] = False
+                state["rerun_requested"] = False
+                state["started_at"] = 0.0
+                state["worker_token"] = ""
+
         if bool(state.get("running", False)):
             state["rerun_requested"] = True
             return {
@@ -178,8 +208,10 @@ def start_google_sheets_sync_background(target_school_codes):
             }
         state["running"] = True
         state["rerun_requested"] = False
+        state["started_at"] = now
+        state["worker_token"] = worker_token
 
-    def _run():
+    def _run(current_worker_token):
         run_index = 0
         while True:
             run_index += 1
@@ -209,11 +241,16 @@ def start_google_sheets_sync_background(target_school_codes):
 
             with _ACTIVE_SYNC_LOCK:
                 state = _SYNC_STATE_BY_KEY.get(job_key, {})
+                if str(state.get("worker_token", "")) != str(current_worker_token):
+                    return
                 rerun_requested = bool(state.get("rerun_requested", False))
                 if rerun_requested:
                     state["rerun_requested"] = False
+                    state["started_at"] = time.time()
                 else:
                     state["running"] = False
+                    state["started_at"] = 0.0
+                    state["worker_token"] = ""
                     _SYNC_STATE_BY_KEY.pop(job_key, None)
 
             if not rerun_requested:
@@ -225,17 +262,26 @@ def start_google_sheets_sync_background(target_school_codes):
                 run_index + 1,
             )
 
-    worker = threading.Thread(
-        target=_run,
-        daemon=True,
-        name=f"google-sheets-sync-{job_key or 'all'}",
-    )
-    worker.start()
+    spawned_with_gevent = False
+    try:
+        import gevent
+
+        gevent.spawn(_run, worker_token)
+        spawned_with_gevent = True
+    except Exception:
+        worker = threading.Thread(
+            target=_run,
+            args=(worker_token,),
+            daemon=True,
+            name=f"google-sheets-sync-{job_key or 'all'}",
+        )
+        worker.start()
     return {
         "started": True,
         "queued": True,
         "already_running": False,
         "schools": normalized_codes,
+        "runner": "gevent" if spawned_with_gevent else "thread",
         "message": "Sync started in background.",
     }
 

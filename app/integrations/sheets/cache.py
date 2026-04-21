@@ -18,15 +18,25 @@ _LOAD_LOCKS: dict[str, Any] = {}
 _LOAD_LOCKS_META = threading.Lock()
 
 
+def _load_lock_wait_seconds() -> int:
+    raw = str(os.environ.get("SHEETS_LOAD_LOCK_WAIT_SECONDS", "45") or "").strip()
+    try:
+        parsed = int(raw or "45")
+    except ValueError:
+        parsed = 45
+    return max(parsed, 5)
+
+
+LOAD_LOCK_WAIT_SECONDS = _load_lock_wait_seconds()
+
+
 def _get_load_lock(school_code: str) -> Any:
     with _LOAD_LOCKS_META:
         lock = _LOAD_LOCKS.get(school_code)
         if lock is None:
-            try:
-                from gevent.lock import Semaphore
-                lock = Semaphore(1)
-            except ImportError:
-                lock = threading.Lock()
+            # Use standard thread locks so both native threads and greenlets can
+            # coordinate safely through the same lock object.
+            lock = threading.Lock()
             _LOAD_LOCKS[school_code] = lock
         return lock
 
@@ -34,9 +44,29 @@ def _get_load_lock(school_code: str) -> Any:
 def _load_sheets_in_threadpool(school_code: str) -> dict:
     try:
         from gevent.hub import get_hub
-        return get_hub().threadpool.spawn(load_from_google_sheets, school_code).get()
+        hub = get_hub()
+        threadpool = getattr(hub, "threadpool", None)
+        if threadpool is None:
+            return load_from_google_sheets(school_code)
+        return threadpool.spawn(load_from_google_sheets, school_code).get()
     except ImportError:
         return load_from_google_sheets(school_code)
+    except Exception as exc:
+        # In some runtime setups background sync may run outside an active gevent
+        # loop; fallback to direct loading instead of failing permanently.
+        message = str(exc or "").strip().casefold()
+        if "destroyed loop" in message or "event loop" in message or "hub" in message:
+            return load_from_google_sheets(school_code)
+        raise
+
+
+def _acquire_with_timeout(lock: Any, timeout_seconds: int) -> bool:
+    try:
+        acquired = lock.acquire(timeout=timeout_seconds)
+    except TypeError:
+        lock.acquire()
+        acquired = True
+    return bool(acquired)
 
 
 @dataclass
@@ -122,7 +152,8 @@ _REVALIDATING_LOCK = threading.Lock()
 
 def _revalidate_school(school_code: str) -> None:
     lock = _get_load_lock(school_code)
-    lock.acquire()
+    if not _acquire_with_timeout(lock, LOAD_LOCK_WAIT_SECONDS):
+        return
     try:
         loaded_dataset = _load_sheets_in_threadpool(school_code)
         with SHEET_CACHE.school_lock(school_code):
@@ -204,7 +235,14 @@ def get_school_dataset(force_refresh = False, school_code = None):
     # the first one actually calls the Sheets API; the rest wait cooperatively
     # and then return from cache once the leader finishes.
     load_lock = _get_load_lock(normalized_school_code)
-    load_lock.acquire()
+    if not _acquire_with_timeout(load_lock, LOAD_LOCK_WAIT_SECONDS):
+        with SHEET_CACHE.school_lock(normalized_school_code):
+            fallback_dataset = SHEET_CACHE.get(normalized_school_code)
+            if fallback_dataset is not None:
+                return fallback_dataset
+        raise SheetsDataError(
+            f"Timed out waiting for Google Sheets refresh lock for school '{normalized_school_code}'."
+        )
     try:
         # Re-check cache — another greenlet may have loaded while we waited.
         if not force_refresh:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 
 from google.oauth2.service_account import Credentials
@@ -15,7 +16,7 @@ class SheetsDataError(RuntimeError):
     """Raised when Google Sheets data cannot be loaded or parsed."""
 
 
-_SERVICE = None
+_SERVICE_LOCAL = threading.local()
 
 
 def is_retryable_google_error(exc):
@@ -58,9 +59,9 @@ def execute_google_request_with_retries(request_factory):
 
 
 def get_sheets_service():
-    global _SERVICE
-    if _SERVICE is not None:
-        return _SERVICE
+    service = getattr(_SERVICE_LOCAL, "service", None)
+    if service is not None:
+        return service
 
     raw_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
     credentials_source = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
@@ -104,7 +105,8 @@ def get_sheets_service():
         )
 
     try:
-        _SERVICE = build("sheets", "v4", credentials=credentials, cache_discovery=False)
+        service = build("sheets", "v4", credentials=credentials, cache_discovery=False)
     except Exception as exc:
         raise SheetsDataError("Failed to initialize Google Sheets API client.") from exc
-    return _SERVICE
+    _SERVICE_LOCAL.service = service
+    return service

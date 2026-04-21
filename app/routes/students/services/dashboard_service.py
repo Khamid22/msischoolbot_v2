@@ -450,93 +450,138 @@ def build_aap_lessons_page_context(
             )
         return load_dataset(force_refresh=force_refresh_dataset)
 
-    lesson_catalog, lesson_error = get_lessons_for_subject(
-        subject_name,
-        group_name,
-        load_current_school_dataset,
-    )
-    if lesson_error:
-        return None, lesson_error, 503
-
     homework_grades = payload.get("homeworkGrades", [])
     if not isinstance(homework_grades, list):
         homework_grades = []
 
-    grade_by_lesson = {}
-    topic_by_lesson = {}
-    date_by_lesson = {}
-    for item in homework_grades:
-        if not isinstance(item, dict):
-            continue
-
-        lesson_number = str(item.get("lesson", "")).strip()
-        if not lesson_number:
-            continue
-
-        raw_score = item.get("score")
-        try:
-            score = float(raw_score)
-        except (TypeError, ValueError):
-            continue
-        if not math.isfinite(score):
-            continue
-
-        grade_by_lesson[lesson_number] = max(0, min(9, round_grade_half_up(score)))
-
-        lesson_topic = str(item.get("topic", "")).strip()
-        if lesson_topic:
-            topic_by_lesson[lesson_number] = lesson_topic
-
-        lesson_date = str(item.get("date", "")).strip()
-        if lesson_date:
-            date_by_lesson[lesson_number] = lesson_date
-
-    lesson_catalog = _build_lesson_catalog_rows(
-        lesson_catalog=lesson_catalog,
-        lesson_data_by_lesson={
-            lesson_number: {
-                "topic": topic_by_lesson.get(lesson_number, ""),
-                "date": date_by_lesson.get(lesson_number, ""),
-            }
-            for lesson_number in grade_by_lesson.keys()
-        },
-        topic_key="topic",
-        date_key="date",
-    )
-
     lesson_rows = []
-    for lesson in lesson_catalog:
-        lesson_number = str(lesson.get("lesson_number", "")).strip()
-        lesson_topic = str(lesson.get("lesson_topic", "")).strip()
-        lesson_date = str(lesson.get("lesson_date", "")).strip()
-        if not lesson_number:
-            continue
-        if not lesson_date:
-            lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
+    is_chemistry = normalize_text(subject_name) == "chemistry"
+    if is_chemistry:
+        for item in homework_grades:
+            if not isinstance(item, dict):
+                continue
 
-        lesson_score = grade_by_lesson.get(lesson_number)
-        remark, remark_class = extract_aap_remark(lesson_score)
-        progress_width = (
-            int(round((int(lesson_score) / 9) * 100))
-            if lesson_score is not None
-            else 0
+            lesson_number = str(item.get("lesson", "")).strip()
+            lesson_topic = str(item.get("topic", "")).strip()
+            task_name = lesson_number or "Homework"
+
+            if not lesson_number and not lesson_topic:
+                continue
+
+            raw_score = item.get("score")
+            lesson_score = None
+            try:
+                score = float(raw_score)
+                if math.isfinite(score):
+                    lesson_score = max(0, min(9, round_grade_half_up(score)))
+            except (TypeError, ValueError):
+                lesson_score = None
+
+            remark, remark_class = extract_aap_remark(lesson_score)
+            progress_width = (
+                int(round((int(lesson_score) / 9) * 100))
+                if lesson_score is not None
+                else 0
+            )
+            lesson_rows.append(
+                {
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic or "Topic unavailable",
+                    "lesson_date_display": task_name,
+                    "aap_score": lesson_score,
+                    "aap_display": (
+                        f"{int(lesson_score)}/9"
+                        if lesson_score is not None
+                        else "N/A"
+                    ),
+                    "progress_width": max(0, min(progress_width, 100)),
+                    "remark": remark,
+                    "remark_class": remark_class,
+                }
+            )
+    else:
+        lesson_catalog, lesson_error = get_lessons_for_subject(
+            subject_name,
+            group_name,
+            load_current_school_dataset,
         )
-        lesson_rows.append(
-            {
-                "lesson_number": lesson_number,
-                "lesson_topic": lesson_topic or "Topic unavailable",
-                "lesson_date_display": lesson_date or "Not conducted",
-                "aap_score": lesson_score,
-                "aap_display": (
-                    f"{int(lesson_score)}/9"
-                    if lesson_score is not None
-                    else "N/A"
-                ),
-                "progress_width": max(0, min(progress_width, 100)),
-                "remark": remark,
-                "remark_class": remark_class,
-            }
+        if lesson_error:
+            return None, lesson_error, 503
+
+        grade_by_lesson = {}
+        topic_by_lesson = {}
+        date_by_lesson = {}
+        for item in homework_grades:
+            if not isinstance(item, dict):
+                continue
+
+            lesson_number = str(item.get("lesson", "")).strip()
+            if not lesson_number:
+                continue
+
+            raw_score = item.get("score")
+            try:
+                score = float(raw_score)
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(score):
+                continue
+
+            grade_by_lesson[lesson_number] = max(0, min(9, round_grade_half_up(score)))
+
+            lesson_topic = str(item.get("topic", "")).strip()
+            if lesson_topic:
+                topic_by_lesson[lesson_number] = lesson_topic
+
+            lesson_date = str(item.get("date", "")).strip()
+            if lesson_date:
+                date_by_lesson[lesson_number] = lesson_date
+
+        lesson_catalog = _build_lesson_catalog_rows(
+            lesson_catalog=lesson_catalog,
+            lesson_data_by_lesson={
+                lesson_number: {
+                    "topic": topic_by_lesson.get(lesson_number, ""),
+                    "date": date_by_lesson.get(lesson_number, ""),
+                }
+                for lesson_number in grade_by_lesson.keys()
+            },
+            topic_key="topic",
+            date_key="date",
         )
+
+        for lesson in lesson_catalog:
+            lesson_number = str(lesson.get("lesson_number", "")).strip()
+            lesson_topic = str(lesson.get("lesson_topic", "")).strip()
+            lesson_date = str(lesson.get("lesson_date", "")).strip()
+            if not lesson_number:
+                continue
+            if not lesson_date:
+                lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
+
+            lesson_score = grade_by_lesson.get(lesson_number)
+            remark, remark_class = extract_aap_remark(lesson_score)
+            progress_width = (
+                int(round((int(lesson_score) / 9) * 100))
+                if lesson_score is not None
+                else 0
+            )
+            lesson_rows.append(
+                {
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic or "Topic unavailable",
+                    "lesson_date_display": lesson_date or "Not conducted",
+                    "aap_score": lesson_score,
+                    "aap_display": (
+                        f"{int(lesson_score)}/9"
+                        if lesson_score is not None
+                        else "N/A"
+                    ),
+                    "progress_width": max(0, min(progress_width, 100)),
+                    "remark": remark,
+                    "remark_class": remark_class,
+                }
+            )
 
     back_url = url_for(
         "student.dashboard",
@@ -586,78 +631,136 @@ def build_ar_lessons_page_context(
             )
         return load_dataset(force_refresh=force_refresh_dataset)
 
-    lesson_catalog, lesson_error = get_lessons_for_subject(
-        subject_name,
-        group_name,
-        load_current_school_dataset,
-    )
-    if lesson_error:
-        return None, lesson_error, 503
-
     attendance_lessons = payload.get("attendanceLessons", [])
     if not isinstance(attendance_lessons, list):
         attendance_lessons = []
 
-    attendance_by_lesson = {}
-    topic_by_lesson = {}
-    date_by_lesson = {}
-    for item in attendance_lessons:
-        if not isinstance(item, dict):
-            continue
-
-        lesson_number = str(item.get("lesson", "")).strip()
-        if not lesson_number:
-            continue
-
-        status = str(item.get("status", "")).strip().casefold()
-        if status not in {"present", "absent", "justified"}:
-            continue
-
-        attendance_by_lesson[lesson_number] = status
-
-        lesson_topic = str(item.get("topic", "")).strip()
-        if lesson_topic:
-            topic_by_lesson[lesson_number] = lesson_topic
-
-        lesson_date = str(item.get("date", "")).strip()
-        if lesson_date:
-            date_by_lesson[lesson_number] = lesson_date
-
-    lesson_catalog = _build_lesson_catalog_rows(
-        lesson_catalog=lesson_catalog,
-        lesson_data_by_lesson={
-            lesson_number: {
-                "topic": topic_by_lesson.get(lesson_number, ""),
-                "date": date_by_lesson.get(lesson_number, ""),
-            }
-            for lesson_number in attendance_by_lesson.keys()
-        },
-        topic_key="topic",
-        date_key="date",
-    )
-
     lesson_rows = []
-    for lesson in lesson_catalog:
-        lesson_number = str(lesson.get("lesson_number", "")).strip()
-        lesson_topic = str(lesson.get("lesson_topic", "")).strip()
-        lesson_date = str(lesson.get("lesson_date", "")).strip()
-        if not lesson_number:
-            continue
-        if not lesson_date:
-            lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
+    is_chemistry = normalize_text(subject_name) == "chemistry"
+    if is_chemistry:
+        for item in attendance_lessons:
+            if not isinstance(item, dict):
+                continue
 
-        lesson_status = attendance_by_lesson.get(lesson_number, "")
-        remark, remark_class = extract_attendance_remark(lesson_status)
-        lesson_rows.append(
-            {
-                "lesson_number": lesson_number,
-                "lesson_topic": lesson_topic or "Topic unavailable",
-                "lesson_date_display": lesson_date or "Not conducted",
-                "attendance_status": lesson_status,
-                "attendance_display": remark,
-                "remark_class": remark_class,
-            }
+            lesson_number = str(item.get("lesson", "")).strip()
+            lesson_topic = str(item.get("topic", "")).strip()
+            lesson_date = str(item.get("date", "")).strip()
+
+            if not lesson_number and not lesson_topic:
+                continue
+
+            status = str(item.get("status", "")).strip().casefold()
+            if status not in {"present", "absent", "justified"}:
+                continue
+
+            raw_type = str(
+                item.get("attendanceType")
+                or item.get("type")
+                or ""
+            ).strip().casefold()
+            if raw_type in {"lesson", "lecture"}:
+                attendance_type = "Lecture"
+            elif raw_type == "lab":
+                attendance_type = "Lab"
+            else:
+                attendance_type = ""
+
+            # Backward-compatible inference for old payloads that encoded type
+            # in the topic text instead of a dedicated field.
+            if not attendance_type:
+                normalized_topic = lesson_topic.casefold()
+                if normalized_topic.endswith("(lesson)"):
+                    attendance_type = "Lecture"
+                elif normalized_topic.endswith("(lab)"):
+                    attendance_type = "Lab"
+            lesson_topic = re.sub(
+                r"\s*\((?:lesson|lab)\)\s*$",
+                "",
+                lesson_topic,
+                flags=re.IGNORECASE,
+            ).strip()
+
+            remark, remark_class = extract_attendance_remark(status)
+            lesson_rows.append(
+                {
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic or "Topic unavailable",
+                    "lesson_date_display": lesson_date or "Not conducted",
+                    "attendance_type": attendance_type,
+                    "attendance_status": status,
+                    "attendance_display": remark,
+                    "remark_class": remark_class,
+                }
+            )
+    else:
+        lesson_catalog, lesson_error = get_lessons_for_subject(
+            subject_name,
+            group_name,
+            load_current_school_dataset,
         )
+        if lesson_error:
+            return None, lesson_error, 503
+
+        attendance_by_lesson = {}
+        topic_by_lesson = {}
+        date_by_lesson = {}
+        for item in attendance_lessons:
+            if not isinstance(item, dict):
+                continue
+
+            lesson_number = str(item.get("lesson", "")).strip()
+            if not lesson_number:
+                continue
+
+            status = str(item.get("status", "")).strip().casefold()
+            if status not in {"present", "absent", "justified"}:
+                continue
+
+            attendance_by_lesson[lesson_number] = status
+
+            lesson_topic = str(item.get("topic", "")).strip()
+            if lesson_topic:
+                topic_by_lesson[lesson_number] = lesson_topic
+
+            lesson_date = str(item.get("date", "")).strip()
+            if lesson_date:
+                date_by_lesson[lesson_number] = lesson_date
+
+        lesson_catalog = _build_lesson_catalog_rows(
+            lesson_catalog=lesson_catalog,
+            lesson_data_by_lesson={
+                lesson_number: {
+                    "topic": topic_by_lesson.get(lesson_number, ""),
+                    "date": date_by_lesson.get(lesson_number, ""),
+                }
+                for lesson_number in attendance_by_lesson.keys()
+            },
+            topic_key="topic",
+            date_key="date",
+        )
+
+        for lesson in lesson_catalog:
+            lesson_number = str(lesson.get("lesson_number", "")).strip()
+            lesson_topic = str(lesson.get("lesson_topic", "")).strip()
+            lesson_date = str(lesson.get("lesson_date", "")).strip()
+            if not lesson_number:
+                continue
+            if not lesson_date:
+                lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
+
+            lesson_status = attendance_by_lesson.get(lesson_number, "")
+            remark, remark_class = extract_attendance_remark(lesson_status)
+            lesson_rows.append(
+                {
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic or "Topic unavailable",
+                    "lesson_date_display": lesson_date or "Not conducted",
+                    "attendance_type": "",
+                    "attendance_status": lesson_status,
+                    "attendance_display": remark,
+                    "remark_class": remark_class,
+                }
+            )
 
     back_url = url_for(
         "student.dashboard",

@@ -193,7 +193,9 @@ export default function DashboardPage(props: DashboardPageProps) {
                 href={props.refreshUrl}
                 onClick={(event) => {
                   event.preventDefault();
-                  window.location.assign(props.refreshUrl!);
+                  const nextUrl = new URL(props.refreshUrl!, window.location.origin);
+                  nextUrl.searchParams.set("_rt", String(Date.now()));
+                  window.location.assign(nextUrl.toString());
                 }}
                 aria-label="Refresh dashboard"
                 className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-foreground/10 bg-background/80 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

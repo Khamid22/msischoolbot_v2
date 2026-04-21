@@ -74,14 +74,17 @@ export default function StudentsPanel({ state }: { state: any }) {
                     <tr key={asNumber(student.id)} className="border-b border-foreground/5 hover:bg-muted/40">
                       <td className="px-3 py-2.5 text-xs font-bold">
                         <a
-                          href={routes.adminStudentDashboard(asNumber(student.id), currentSchool)}
+                          href={routes.adminStudentProfile(asNumber(student.id))}
                           className="text-info hover:underline"
                         >
                           {asString(student.student_id)}
                         </a>
                       </td>
                       <td className="px-3 py-2.5 text-sm font-medium">
-                        <a href={routes.adminStudentProfile(asNumber(student.id))} className="hover:underline">
+                        <a
+                          href={routes.adminStudentDashboard(asNumber(student.id), currentSchool)}
+                          className="hover:underline"
+                        >
                           {asString(student.full_name)}
                         </a>
                       </td>

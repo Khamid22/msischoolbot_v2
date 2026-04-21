@@ -2,6 +2,7 @@ import { GraduationCap } from "lucide-react";
 import { ChartCard } from "@/components/ChartCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { TelegramLayout, Topbar } from "@/components/TelegramLayout";
+import { formatLessonDateDisplay } from "@/lib/lesson-date";
 
 interface LessonRow {
   lesson_number: string;
@@ -20,17 +21,10 @@ interface AapPageProps {
   lessonRows?: LessonRow[];
 }
 
-function formatLessonNumber(value: string) {
-  const normalized = String(value || "")
-    .trim()
-    .replace(/^lesson\s*/i, "")
-    .replace(/^l\s*/i, "")
-    .trim();
-  return normalized || "—";
-}
-
 export default function AAPPage(props: AapPageProps) {
   const lessonRows = Array.isArray(props.lessonRows) ? props.lessonRows : [];
+  const isChemistrySubject = String(props.subjectName || "").trim().toLowerCase() === "chemistry";
+  const firstColumnLabel = isChemistrySubject ? "Task" : "Date";
 
   return (
     <TelegramLayout
@@ -47,14 +41,11 @@ export default function AAPPage(props: AapPageProps) {
           {lessonRows.length ? (
             <>
               <div className="space-y-3 sm:hidden">
-                {lessonRows.map((row) => (
-                  <div key={`${row.lesson_number}-${row.lesson_topic}`} className="rounded-lg border border-foreground/5 p-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-medium text-muted-foreground">{row.lesson_date_display}</span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold">
-                        Lesson {formatLessonNumber(row.lesson_number)}
-                      </span>
-                    </div>
+                {lessonRows.map((row, index) => (
+                  <div key={`${row.lesson_number}-${row.lesson_topic}-${row.lesson_date_display}-${index}`} className="rounded-lg border border-foreground/5 p-3">
+                    <p className="mb-2 text-[10px] font-medium text-muted-foreground">
+                      {formatLessonDateDisplay(row.lesson_date_display)}
+                    </p>
                     <p className="mb-2 text-xs font-bold leading-snug">{row.lesson_topic}</p>
                     <div className="flex items-center gap-2">
                       <strong className="text-xs">{row.aap_display}</strong>
@@ -69,17 +60,17 @@ export default function AAPPage(props: AapPageProps) {
                 <table className="w-full min-w-[560px] text-left">
                   <thead>
                     <tr className="border-b border-foreground/5">
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lesson</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Topic</th>
-                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Grade</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{firstColumnLabel}</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lesson Topic</th>
+                      <th className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Homework</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {lessonRows.map((row) => (
-                      <tr key={`${row.lesson_number}-${row.lesson_topic}`} className="border-b border-foreground/5">
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground">{row.lesson_date_display}</td>
-                        <td className="px-3 py-2.5 text-xs font-medium">{formatLessonNumber(row.lesson_number)}</td>
+                    {lessonRows.map((row, index) => (
+                      <tr key={`${row.lesson_number}-${row.lesson_topic}-${row.lesson_date_display}-${index}`} className="border-b border-foreground/5">
+                        <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                          {formatLessonDateDisplay(row.lesson_date_display)}
+                        </td>
                         <td className="px-3 py-2.5 text-xs font-medium">{row.lesson_topic}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">

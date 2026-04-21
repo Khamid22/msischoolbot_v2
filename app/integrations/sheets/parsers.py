@@ -58,6 +58,7 @@ class LessonMeta:
     label: str
     topic: str
     date: str
+    session_type: str = ""
     include_homework: bool = True
     include_attendance: bool = True
     include_in_lesson_catalog: bool = True
@@ -381,88 +382,181 @@ def build_chemistry_homework_column_meta(
     lesson_date_row,
     max_columns,
 ):
+    def _is_cancelled_marker(value):
+        normalized = str(value or "").strip().casefold()
+        return "cancelled" in normalized or "canceled" in normalized
+
+    def _is_homework_marker(value):
+        normalized = re.sub(r"\s+", "", str(value or "").strip().casefold())
+        if not normalized:
+            return False
+        if "homework" in normalized:
+            return True
+        return normalized in {"hw", "h/w", "h.w"}
+
+    def _is_date_like(value):
+        text = str(value or "").strip()
+        if not text or _is_homework_marker(text):
+            return False
+        return bool(re.search(r"\d", text) and any(sep in text for sep in ("/", "-", ".")))
+
+    def _normalized_cell_text(row, column_index):
+        return normalize_whitespace(to_text(cell_value(row, column_index)).replace("\n", " "))
+
+    def _strip_topic_suffix(value):
+        return re.sub(
+            r"\s*\((?:lesson|lab)\)\s*$",
+            "",
+            str(value or ""),
+            flags=re.IGNORECASE,
+        ).strip()
+
+    def _topic_session_type(topic_value):
+        topic_text = str(topic_value or "").strip()
+        if re.search(r"\(\s*lab\s*\)\s*$", topic_text, flags=re.IGNORECASE):
+            return "Lab"
+        if re.search(r"\(\s*(?:lesson|lecture)\s*\)\s*$", topic_text, flags=re.IGNORECASE):
+            return "Lecture"
+        return ""
+
+    def _extract_lesson_label(label_value):
+        raw_text = normalize_whitespace(str(label_value or "").strip())
+        if not raw_text:
+            return ""
+        match = re.search(r"\b(?:lesson|l)\s*(\d{1,3})\b", raw_text, flags=re.IGNORECASE)
+        if not match:
+            return ""
+        lesson_number = str(int(match.group(1)))
+        if re.fullmatch(r"l\s*\d{1,3}", raw_text, flags=re.IGNORECASE):
+            return f"L{lesson_number}"
+        return f"Lesson {lesson_number}"
+
+    def _is_lesson_label(label_value):
+        return bool(_extract_lesson_label(label_value))
+
+    def _has_neighbor_session_context(column_index):
+        for neighbor_index in (column_index - 2, column_index - 1, column_index + 1):
+            if neighbor_index < Columns.HOMEWORK_START or neighbor_index >= max_columns:
+                continue
+
+            neighbor_label = _normalized_cell_text(lesson_number_row, neighbor_index)
+            if _is_lesson_label(neighbor_label):
+                return True
+
+            neighbor_topic_raw = _normalized_cell_text(lesson_topic_row, neighbor_index)
+            if _topic_session_type(neighbor_topic_raw):
+                return True
+
+        return False
+
     metadata: list[LessonMeta] = []
-    # Chemistry sheets store three columns per topic from V onward:
-    # Lesson attendance, Lab attendance, then Homework score.
-    for lesson_column_index in range(Columns.HOMEWORK_START, max_columns, 3):
-        lesson_attendance_column_index = lesson_column_index
-        lab_attendance_column_index = lesson_column_index + 1
-        score_column_index = lesson_column_index + 2
-        if score_column_index >= max_columns:
-            break
+    # Chemistry can include cancellation/month separator columns that break fixed
+    # V/W/X triplet alignment. Scan each column by content instead.
+    active_lesson_label = ""
+    latest_lesson_label = ""
+    latest_topic = ""
+    topic_by_lesson: dict[str, str] = {}
+    for column_index in range(Columns.HOMEWORK_START, max_columns):
+        label = _normalized_cell_text(lesson_number_row, column_index)
+        topic_raw = _normalized_cell_text(lesson_topic_row, column_index)
+        topic = _strip_topic_suffix(topic_raw)
+        lesson_date = format_lesson_date(cell_value(lesson_date_row, column_index))
 
-        raw_label = to_text(cell_value(lesson_number_row, lesson_attendance_column_index))
-        if not raw_label:
-            raw_label = to_text(cell_value(lesson_number_row, lab_attendance_column_index))
-        if not raw_label:
-            raw_label = to_text(cell_value(lesson_number_row, score_column_index))
-        if not raw_label:
+        is_cancelled = _is_cancelled_marker(label) or _is_cancelled_marker(topic_raw)
+        is_homework = _is_homework_marker(label) or _is_homework_marker(lesson_date)
+
+        inferred_label = _extract_lesson_label(label)
+        if inferred_label:
+            active_lesson_label = inferred_label
+            latest_lesson_label = inferred_label
+
+        session_type = ""
+        topic_type = _topic_session_type(topic_raw)
+        if topic_type:
+            session_type = topic_type
+        elif is_homework:
+            session_type = "Homework"
+        elif _is_lesson_label(label):
+            session_type = "Lecture"
+        elif (
+            not topic
+            and not inferred_label
+            and (column_index - Columns.HOMEWORK_START) % 3 == 2
+            and _is_date_like(lesson_date)
+            and _has_neighbor_session_context(column_index)
+        ):
+            # Backward compatibility for legacy chemistry sheets where H/W
+            # columns were plain date cells in fixed triplets.
+            session_type = "Homework"
+
+        if topic:
+            if topic_type or (is_cancelled and _topic_session_type(topic_raw)):
+                latest_topic = topic
+                if active_lesson_label:
+                    topic_by_lesson[active_lesson_label] = topic
+
+        if session_type in {"Lecture", "Lab"}:
+            if is_cancelled:
+                continue
+
+            resolved_label = inferred_label or active_lesson_label or latest_lesson_label or label
+            resolved_topic = (
+                topic
+                or topic_by_lesson.get(resolved_label, "")
+                or latest_topic
+                or "Topic"
+            )
+            if resolved_label and resolved_topic:
+                topic_by_lesson[resolved_label] = resolved_topic
+                latest_lesson_label = resolved_label
+
+            metadata.append(
+                LessonMeta(
+                    attendance_column_index=column_index,
+                    score_column_index=column_index,
+                    label=resolved_label,
+                    topic=resolved_topic,
+                    date=lesson_date,
+                    session_type=session_type,
+                    include_homework=False,
+                    include_attendance=True,
+                    include_in_lesson_catalog=False,
+                )
+            )
             continue
 
-        label = normalize_whitespace(raw_label.replace("\n", " "))
-        if should_skip_homework_lesson(label):
-            continue
+        if session_type == "Homework":
+            if is_cancelled:
+                continue
 
-        raw_topic = to_text(cell_value(lesson_topic_row, lesson_attendance_column_index))
-        if not raw_topic:
-            raw_topic = to_text(cell_value(lesson_topic_row, lab_attendance_column_index))
-        if not raw_topic:
-            raw_topic = to_text(cell_value(lesson_topic_row, score_column_index))
+            resolved_label = inferred_label or active_lesson_label or latest_lesson_label
+            if not resolved_label:
+                resolved_label = label or "H/W"
 
-        lesson_date = format_lesson_date(
-            cell_value(lesson_date_row, lesson_attendance_column_index)
-        )
-        lab_date = format_lesson_date(
-            cell_value(lesson_date_row, lab_attendance_column_index)
-        )
-        homework_date = format_lesson_date(cell_value(lesson_date_row, score_column_index))
-
-        topic = normalize_whitespace(raw_topic.replace("\n", " "))
-        if not topic:
-            topic = "Topic"
-        if is_excluded_homework_session(label, topic):
-            continue
-
-        fallback_date = lesson_date or lab_date or homework_date
-        lesson_topic = f"{topic} (Lesson)"
-        lab_topic = f"{topic} (Lab)"
-
-        metadata.append(
-            LessonMeta(
-                attendance_column_index=lesson_attendance_column_index,
-                score_column_index=lesson_attendance_column_index,
-                label=f"{label} (Lesson)",
-                topic=lesson_topic,
-                date=lesson_date or fallback_date,
-                include_homework=False,
-                include_attendance=True,
-                include_in_lesson_catalog=False,
+            resolved_topic = (
+                topic
+                or topic_by_lesson.get(resolved_label, "")
+                or latest_topic
+                or "Topic"
             )
-        )
-        metadata.append(
-            LessonMeta(
-                attendance_column_index=lab_attendance_column_index,
-                score_column_index=lab_attendance_column_index,
-                label=f"{label} (Lab)",
-                topic=lab_topic,
-                date=lab_date or fallback_date,
-                include_homework=False,
-                include_attendance=True,
-                include_in_lesson_catalog=False,
+            if resolved_label and resolved_topic:
+                topic_by_lesson[resolved_label] = resolved_topic
+                latest_lesson_label = resolved_label
+
+            metadata.append(
+                LessonMeta(
+                    attendance_column_index=column_index,
+                    score_column_index=column_index,
+                    label=resolved_label,
+                    topic=resolved_topic,
+                    # Chemistry homework uses a static marker instead of date.
+                    date="HOMEWORK",
+                    session_type="Homework",
+                    include_homework=True,
+                    include_attendance=False,
+                    include_in_lesson_catalog=True,
+                )
             )
-        )
-        metadata.append(
-            LessonMeta(
-                attendance_column_index=score_column_index,
-                score_column_index=score_column_index,
-                label=label,
-                topic=topic,
-                date=homework_date or fallback_date,
-                include_homework=True,
-                include_attendance=False,
-                include_in_lesson_catalog=True,
-            )
-        )
 
     return metadata
 
@@ -536,6 +630,7 @@ def parse_student_row(
                         "lesson": lesson_meta.label,
                         "topic": lesson_meta.topic,
                         "date": lesson_meta.date,
+                        "type": lesson_meta.session_type or "Homework",
                         "score": score,
                     }
                 )
@@ -563,6 +658,7 @@ def parse_student_row(
                         "lesson": lesson_meta.label,
                         "topic": lesson_meta.topic,
                         "date": lesson_meta.date,
+                        "attendanceType": lesson_meta.session_type,
                         "status": attendance_status,
                     }
                 )
