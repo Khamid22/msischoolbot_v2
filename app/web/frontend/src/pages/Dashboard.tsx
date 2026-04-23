@@ -8,7 +8,6 @@ import {
   GraduationCap,
   LogOut,
   MessageSquare,
-  RefreshCw,
   Target,
   Trophy,
   User,
@@ -63,9 +62,6 @@ interface DashboardPageProps {
   profileNotice?: string;
   profileError?: string;
   dashboardBackUrl?: string;
-  refreshUrl?: string;
-  lastUpdatedLabel?: string;
-  lastUpdatedAt?: number | null;
   csrfToken?: string;
   logoutUrl?: string;
   changePasswordUrl?: string;
@@ -77,36 +73,6 @@ const modalInsetStyle = {
   paddingBottom: "var(--app-bottom-inset)",
   paddingLeft: "max(1rem, var(--app-left-inset))",
 } as const;
-
-function formatLastUpdatedLabel(timestampSeconds: number | null | undefined, fallbackLabel: string) {
-  if (!Number.isFinite(Number(timestampSeconds)) || Number(timestampSeconds) <= 0) {
-    return fallbackLabel || "Last Update: --.";
-  }
-
-  const nowMs = Date.now();
-  const diffSeconds = Math.max(0, Math.floor((nowMs - Number(timestampSeconds) * 1000) / 1000));
-  if (diffSeconds < 60) {
-    return "Last Update: moments ago.";
-  }
-
-  const units: Array<{ seconds: number; label: string }> = [
-    { seconds: 31536000, label: "year" },
-    { seconds: 2592000, label: "month" },
-    { seconds: 604800, label: "week" },
-    { seconds: 86400, label: "day" },
-    { seconds: 3600, label: "hour" },
-    { seconds: 60, label: "minute" },
-  ];
-  for (const unit of units) {
-    if (diffSeconds >= unit.seconds) {
-      const amount = Math.floor(diffSeconds / unit.seconds);
-      const suffix = amount === 1 ? "" : "s";
-      return `Last Update: ${amount} ${unit.label}${suffix} ago.`;
-    }
-  }
-
-  return fallbackLabel || "Last Update: --.";
-}
 
 export default function DashboardPage(props: DashboardPageProps) {
   const payload = props.payload || {};
@@ -129,9 +95,6 @@ export default function DashboardPage(props: DashboardPageProps) {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [lastUpdatedLabel, setLastUpdatedLabel] = useState(
-    formatLastUpdatedLabel(props.lastUpdatedAt, props.lastUpdatedLabel || "")
-  );
   const { ref: chartsRef, visible: chartsVisible } = useLazyVisible({ rootMargin: "180px" });
 
   const studentName = buildStudentDisplayName(student);
@@ -143,20 +106,6 @@ export default function DashboardPage(props: DashboardPageProps) {
   const justifiedCount = Number(attendanceRecord.justifiedAbsentCount || 0);
   const coins = Number(payload.coins || 0);
   const averageGrade = Math.round(Number(payload.averageGrade || 0));
-
-  useEffect(() => {
-    setLastUpdatedLabel(formatLastUpdatedLabel(props.lastUpdatedAt, props.lastUpdatedLabel || ""));
-  }, [props.lastUpdatedAt, props.lastUpdatedLabel]);
-
-  useEffect(() => {
-    if (!Number.isFinite(Number(props.lastUpdatedAt)) || Number(props.lastUpdatedAt) <= 0) {
-      return;
-    }
-    const intervalId = window.setInterval(() => {
-      setLastUpdatedLabel(formatLastUpdatedLabel(props.lastUpdatedAt, props.lastUpdatedLabel || ""));
-    }, 60000);
-    return () => window.clearInterval(intervalId);
-  }, [props.lastUpdatedAt, props.lastUpdatedLabel]);
 
   useEffect(() => {
     const pingActivity = () => {
@@ -187,26 +136,6 @@ export default function DashboardPage(props: DashboardPageProps) {
         <Topbar
           backUrl={props.dashboardBackUrl}
           title="Academic Dashboard"
-          subtitleContent={
-            props.refreshUrl ? (
-              <a
-                href={props.refreshUrl}
-                onClick={(event) => {
-                  event.preventDefault();
-                  const nextUrl = new URL(props.refreshUrl!, window.location.origin);
-                  nextUrl.searchParams.set("_rt", String(Date.now()));
-                  window.location.assign(nextUrl.toString());
-                }}
-                aria-label="Refresh dashboard"
-                className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-foreground/10 bg-background/80 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <RefreshCw className="h-3 w-3 shrink-0" />
-                <span className="truncate">{lastUpdatedLabel}</span>
-              </a>
-            ) : (
-              <p className="truncate text-xs text-muted-foreground">{lastUpdatedLabel}</p>
-            )
-          }
           rightContent={
             <div className="flex items-center gap-2">
               <div className="hidden text-right sm:block">

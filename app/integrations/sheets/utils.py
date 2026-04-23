@@ -91,6 +91,10 @@ def split_subject_and_suffix(normalized_code):
 
 
 def humanize_group_suffix(suffix):
+    normalized_suffix = str(suffix or "").strip().upper()
+    if normalized_suffix in {"ONLINE", "ONL"}:
+        return "Online"
+
     morning_match = re.fullmatch(r"MG(\d+)", suffix)
     if morning_match:
         return f"MG{morning_match.group(1)}"
@@ -109,7 +113,10 @@ def humanize_group_suffix(suffix):
 
 
 def is_supported_group_suffix(suffix):
-    return bool(re.fullmatch(r"[A-Z]*G\d+", suffix))
+    normalized_suffix = str(suffix or "").strip().upper()
+    if normalized_suffix in {"ONLINE", "ONL"}:
+        return True
+    return bool(re.fullmatch(r"[A-Z]*G\d+", normalized_suffix))
 
 
 def extract_title_from_a1_range(a1_range):

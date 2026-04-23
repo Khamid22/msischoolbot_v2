@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 
@@ -17,6 +18,11 @@ REFRESH_AHEAD_SECONDS = max(120, CACHE_TTL_SECONDS // 5)
 
 _started = False
 _start_lock = threading.Lock()
+
+
+def _is_startup_prewarm_enabled() -> bool:
+    raw = str(os.environ.get("SHEETS_STARTUP_PREWARM", "1") or "").strip()
+    return raw.casefold() not in {"0", "false", "no", "off"}
 
 
 def _prewarm_cache() -> None:
@@ -91,15 +97,24 @@ def start_background_refresh() -> None:
             return
         _started = True
 
-    try:
-        import gevent
-        gevent.spawn(_prewarm_cache)
-        gevent.spawn(_refresh_loop)
-    except ImportError:
-        threading.Thread(target=_prewarm_cache, name="sheets-cache-prewarm", daemon=True).start()
-        threading.Thread(target=_refresh_loop, name="sheets-cache-refresh", daemon=True).start()
+    # Always run in native daemon threads. Running Sheets I/O in gevent greenlets
+    # can block the hub in environments where DNS/network calls are not fully
+    # cooperative, which stalls the web server.
+    if _is_startup_prewarm_enabled():
+        threading.Thread(
+            target=_prewarm_cache,
+            name="sheets-cache-prewarm",
+            daemon=True,
+        ).start()
+    threading.Thread(
+        target=_refresh_loop,
+        name="sheets-cache-refresh",
+        daemon=True,
+    ).start()
 
     logger.info(
+        "Background Sheets refresh started (check_interval=%ss, refresh_ahead=%ss, prewarm=%s)",
         CHECK_INTERVAL_SECONDS,
         REFRESH_AHEAD_SECONDS,
+        _is_startup_prewarm_enabled(),
     )

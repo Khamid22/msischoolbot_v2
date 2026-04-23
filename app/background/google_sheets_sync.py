@@ -158,7 +158,7 @@ def run_google_sheets_sync(target_school_codes):
     }
 
 
-def start_google_sheets_sync_background(target_school_codes):
+def start_google_sheets_sync_background(target_school_codes, queue_if_running = True):
     normalized_codes = normalize_target_school_codes(target_school_codes)
     if not normalized_codes:
         return {
@@ -198,13 +198,21 @@ def start_google_sheets_sync_background(target_school_codes):
                 state["worker_token"] = ""
 
         if bool(state.get("running", False)):
-            state["rerun_requested"] = True
+            if queue_if_running:
+                state["rerun_requested"] = True
+                return {
+                    "started": True,
+                    "queued": True,
+                    "already_running": True,
+                    "schools": normalized_codes,
+                    "message": "Matching sync is already running; rerun queued.",
+                }
             return {
                 "started": True,
-                "queued": True,
+                "queued": False,
                 "already_running": True,
                 "schools": normalized_codes,
-                "message": "Matching sync is already running; rerun queued.",
+                "message": "Matching sync is already running.",
             }
         state["running"] = True
         state["rerun_requested"] = False
@@ -262,26 +270,22 @@ def start_google_sheets_sync_background(target_school_codes):
                 run_index + 1,
             )
 
-    spawned_with_gevent = False
-    try:
-        import gevent
-
-        gevent.spawn(_run, worker_token)
-        spawned_with_gevent = True
-    except Exception:
-        worker = threading.Thread(
-            target=_run,
-            args=(worker_token,),
-            daemon=True,
-            name=f"google-sheets-sync-{job_key or 'all'}",
-        )
-        worker.start()
+    # Always run in a native daemon thread. Sync work includes Python-heavy
+    # parsing and DB writes; running it in gevent greenlets can introduce
+    # latency spikes for normal HTTP requests.
+    worker = threading.Thread(
+        target=_run,
+        args=(worker_token,),
+        daemon=True,
+        name=f"google-sheets-sync-{job_key or 'all'}",
+    )
+    worker.start()
     return {
         "started": True,
         "queued": True,
         "already_running": False,
         "schools": normalized_codes,
-        "runner": "gevent" if spawned_with_gevent else "thread",
+        "runner": "thread",
         "message": "Sync started in background.",
     }
 

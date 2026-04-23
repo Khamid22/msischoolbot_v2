@@ -148,7 +148,10 @@ def register_admin_page_routes(
         clear_group_cache()
         mark_school_dataset_dirty(all_school_codes, clear_cached_data=False)
         invalidate_admin_page_context_cache()
-        sync_state = start_google_sheets_sync_background(all_school_codes)
+        sync_state = start_google_sheets_sync_background(
+            all_school_codes,
+            queue_if_running=False,
+        )
         logging.info("Admin-triggered Google Sheets refresh: state=%s", sync_state)
         started = bool(sync_state.get("started", False))
         already_running = bool(sync_state.get("already_running", False))
