@@ -178,11 +178,24 @@ def parse_attendance_markers(value):
     if not raw:
         return 0, 0, 0
 
-    normalized = re.sub(r"\s+", "", raw).upper().replace("Aİ", "AI")
-    tokens = re.findall(r"A\(\s*I\s*\)|AI|P|L|A", normalized)
+    normalized = str(raw).upper().replace("Aİ", "AI")
+
+    # Canceled/cancelled sessions should not be interpreted as attendance marks.
+    if re.search(r"\bCANCEL(?:ED|LED)\b", normalized):
+        return 0, 0, 0
+
+    # Normalize justified-absence notations like "A(I)", "A/I", "A I" -> "AI".
+    normalized = re.sub(r"A\s*[\(\[/\\-]?\s*I\s*[\)\]]?", "AI", normalized)
+
+    # Split by common separators and only accept explicit attendance tokens.
+    tokens = [
+        token
+        for token in re.split(r"[\s,;|/]+", normalized)
+        if token in {"P", "L", "A", "AI"}
+    ]
 
     present = sum(1 for token in tokens if token in {"P", "L"})
-    justified_absent = sum(1 for token in tokens if token in {"AI", "A(I)"})
+    justified_absent = sum(1 for token in tokens if token == "AI")
     absent = sum(1 for token in tokens if token == "A")
 
     return present, absent, justified_absent
