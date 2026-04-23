@@ -145,11 +145,11 @@ def build_school_configuration():
         {"code": code, "label": school_option_catalog.get(code, code.title())}
         for code in ordered_school_codes
     ]
-    available_school_codes = [
-        option["code"]
-        for option in admin_school_options
-        if option["code"] != "all"
-    ]
+    # "Online Sessions" is a virtual filter for student list only, not a real school.
+    if "school5" in configured_school_codes:
+        admin_school_options.append({"code": "online", "label": "Online Sessions"})
+
+    available_school_codes = list(ordered_school_codes)
     return {
         "school_option_catalog": school_option_catalog,
         "admin_school_options": admin_school_options,

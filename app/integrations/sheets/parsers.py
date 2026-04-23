@@ -62,6 +62,7 @@ class LessonMeta:
     include_homework: bool = True
     include_attendance: bool = True
     include_in_lesson_catalog: bool = True
+    is_cancelled_session: bool = False
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,17 @@ class HeaderRows:
     lesson_date_row: list[Any]
     lesson_number_row: list[Any]
     lesson_name_row: list[Any]
+
+
+def _contains_cancelled_marker(value):
+    normalized = str(value or "").strip().casefold()
+    return "cancelled" in normalized or "canceled" in normalized
+
+
+def _is_amir_online_student(full_name, group):
+    normalized_name = normalize_name_key(full_name)
+    group_name = str(getattr(group, "group_display_name", "") or "").strip().casefold()
+    return normalized_name in {"амир", "amir"} and "online" in group_name
 
 
 def parse_group_info(sheet_title, school_code):
@@ -331,7 +343,27 @@ def build_homework_column_meta(
     metadata: list[LessonMeta] = []
     for column_index in range(Columns.HOMEWORK_START, max_columns):
         raw_label = to_text(cell_value(lesson_number_row, column_index))
+        raw_topic = to_text(cell_value(lesson_topic_row, column_index))
+        raw_date = cell_value(lesson_date_row, column_index)
+
         if not raw_label:
+            topic_text = normalize_whitespace(raw_topic.replace("\n", " "))
+            date_text = format_lesson_date(raw_date)
+            normalized_cancellation_marker = f"{topic_text} {date_text}".casefold()
+            if "cancelled" in normalized_cancellation_marker or "canceled" in normalized_cancellation_marker:
+                metadata.append(
+                    LessonMeta(
+                        attendance_column_index=column_index,
+                        score_column_index=column_index,
+                        label=f"Cancelled Session {column_index - Columns.HOMEWORK_START + 1}",
+                        topic=topic_text or "Cancelled",
+                        date=date_text,
+                        include_homework=False,
+                        include_attendance=True,
+                        include_in_lesson_catalog=False,
+                        is_cancelled_session=True,
+                    )
+                )
             continue
 
         label = normalize_whitespace(raw_label.replace("\n", " "))
@@ -360,7 +392,27 @@ def build_homework_column_meta(
         topic = normalize_whitespace(raw_topic.replace("\n", " "))
         if not topic:
             topic = "Topic"
+        normalized_session = f"{label} {topic}".casefold()
+        is_cancelled_session = (
+            "cancelled" in normalized_session or "canceled" in normalized_session
+        )
         if is_excluded_homework_session(label, topic):
+            # Keep cancelled lessons in AR pipeline so special handling can
+            # include them for selected students without affecting AAP.
+            if is_cancelled_session:
+                metadata.append(
+                    LessonMeta(
+                        attendance_column_index=attendance_column_index,
+                        score_column_index=attendance_column_index,
+                        label=label,
+                        topic=topic,
+                        date=lesson_date,
+                        include_homework=False,
+                        include_attendance=True,
+                        include_in_lesson_catalog=False,
+                        is_cancelled_session=True,
+                    )
+                )
             continue
 
         metadata.append(
@@ -592,6 +644,7 @@ def parse_student_row(
     del row_number
 
     split_name = split_student_name(full_name)
+    amir_online_student = _is_amir_online_student(full_name, group)
 
     exam_results = []
     for exam_meta in exam_column_meta:
@@ -642,6 +695,23 @@ def parse_student_row(
                 p += p2
                 a += a2
                 ai += ai2
+
+            # Targeted business rule: for Amir's Online sessions, treat
+            # cancelled lesson markers as AR absences so cancellations are
+            # visible in AR while AAP logic remains unchanged.
+            if (
+                amir_online_student
+                and p == 0
+                and a == 0
+                and ai == 0
+                and (
+                    lesson_meta.is_cancelled_session
+                    or
+                    _contains_cancelled_marker(attendance_cell)
+                    or _contains_cancelled_marker(score_cell)
+                )
+            ):
+                a = 1
 
             if ai > 0:
                 attendance_status = "justified"

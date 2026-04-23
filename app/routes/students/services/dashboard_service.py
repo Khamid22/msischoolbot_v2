@@ -637,7 +637,11 @@ def build_ar_lessons_page_context(
 
     lesson_rows = []
     is_chemistry = normalize_text(subject_name) == "chemistry"
-    if is_chemistry:
+    is_amir_online = (
+        normalize_text(full_name) in {"amir", "амир"}
+        and "online" in normalize_text(group_name)
+    )
+    if is_chemistry or is_amir_online:
         for item in attendance_lessons:
             if not isinstance(item, dict):
                 continue
@@ -701,60 +705,110 @@ def build_ar_lessons_page_context(
         if lesson_error:
             return None, lesson_error, 503
 
-        attendance_by_lesson = {}
-        topic_by_lesson = {}
-        date_by_lesson = {}
+        parsed_attendance_rows = []
+        deduped_lesson_data = {}
         for item in attendance_lessons:
             if not isinstance(item, dict):
                 continue
 
             lesson_number = str(item.get("lesson", "")).strip()
-            if not lesson_number:
-                continue
-
             status = str(item.get("status", "")).strip().casefold()
             if status not in {"present", "absent", "justified"}:
                 continue
 
-            attendance_by_lesson[lesson_number] = status
-
             lesson_topic = str(item.get("topic", "")).strip()
-            if lesson_topic:
-                topic_by_lesson[lesson_number] = lesson_topic
-
             lesson_date = str(item.get("date", "")).strip()
-            if lesson_date:
-                date_by_lesson[lesson_number] = lesson_date
+            if not lesson_number and not lesson_topic:
+                continue
+
+            parsed_attendance_rows.append(
+                {
+                    "lesson_number": lesson_number,
+                    "status": status,
+                    "topic": lesson_topic,
+                    "date": lesson_date,
+                }
+            )
+
+            # Keep catalog enrichment backward-compatible while preserving all
+            # raw attendance rows (including repeated "Cancelled" sessions).
+            if lesson_number and lesson_number not in deduped_lesson_data:
+                deduped_lesson_data[lesson_number] = {
+                    "topic": lesson_topic,
+                    "date": lesson_date,
+                }
 
         lesson_catalog = _build_lesson_catalog_rows(
             lesson_catalog=lesson_catalog,
-            lesson_data_by_lesson={
-                lesson_number: {
-                    "topic": topic_by_lesson.get(lesson_number, ""),
-                    "date": date_by_lesson.get(lesson_number, ""),
-                }
-                for lesson_number in attendance_by_lesson.keys()
-            },
+            lesson_data_by_lesson=deduped_lesson_data,
             topic_key="topic",
             date_key="date",
         )
 
+        used_attendance_indexes = set()
         for lesson in lesson_catalog:
             lesson_number = str(lesson.get("lesson_number", "")).strip()
             lesson_topic = str(lesson.get("lesson_topic", "")).strip()
             lesson_date = str(lesson.get("lesson_date", "")).strip()
             if not lesson_number:
                 continue
-            if not lesson_date:
-                lesson_date = str(date_by_lesson.get(lesson_number, "")).strip()
 
-            lesson_status = attendance_by_lesson.get(lesson_number, "")
+            lesson_status = ""
+            matched_topic = ""
+            matched_date = ""
+            for idx, attendance_row in enumerate(parsed_attendance_rows):
+                if idx in used_attendance_indexes:
+                    continue
+                if str(attendance_row.get("lesson_number", "")).strip() != lesson_number:
+                    continue
+                used_attendance_indexes.add(idx)
+                lesson_status = str(attendance_row.get("status", "")).strip().casefold()
+                matched_topic = str(attendance_row.get("topic", "")).strip()
+                matched_date = str(attendance_row.get("date", "")).strip()
+                break
+
+            if matched_topic:
+                lesson_topic = matched_topic
+            if not lesson_date:
+                lesson_date = matched_date
+
             remark, remark_class = extract_attendance_remark(lesson_status)
             lesson_rows.append(
                 {
                     "lesson_number": lesson_number,
                     "lesson_topic": lesson_topic or "Topic unavailable",
                     "lesson_date_display": lesson_date or "Not conducted",
+                    "attendance_type": "",
+                    "attendance_status": lesson_status,
+                    "attendance_display": remark,
+                    "remark_class": remark_class,
+                }
+            )
+
+        # Include attendance rows that are not represented in lesson catalog,
+        # such as repeated "Cancelled" sessions with different dates/reasons.
+        for idx, attendance_row in enumerate(parsed_attendance_rows):
+            if idx in used_attendance_indexes:
+                continue
+
+            lesson_status = str(attendance_row.get("status", "")).strip().casefold()
+            if lesson_status not in {"present", "absent", "justified"}:
+                continue
+
+            remark, remark_class = extract_attendance_remark(lesson_status)
+            lesson_rows.append(
+                {
+                    "lesson_number": str(
+                        attendance_row.get("lesson_number", "")
+                    ).strip(),
+                    "lesson_topic": (
+                        str(attendance_row.get("topic", "")).strip()
+                        or "Topic unavailable"
+                    ),
+                    "lesson_date_display": (
+                        str(attendance_row.get("date", "")).strip()
+                        or "Not conducted"
+                    ),
                     "attendance_type": "",
                     "attendance_status": lesson_status,
                     "attendance_display": remark,

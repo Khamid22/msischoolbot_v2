@@ -4,6 +4,7 @@ import time
 from flask import current_app, jsonify, redirect, request, session, url_for
 from werkzeug.utils import secure_filename
 
+from app.config.schools import get_configured_school_spreadsheets
 from app.routes.admin.services.auth_service import (
     admin_change_student_password,
     assign_teacher_to_group,
@@ -13,6 +14,7 @@ from app.routes.admin.services.auth_service import (
     update_student_admin_profile,
 )
 from app.routes.admin.services.route_service import resolve_sheet_student_for_admin
+from app.storage import queries
 
 
 def register_admin_student_routes(
@@ -23,12 +25,74 @@ def register_admin_student_routes(
     delete_uploaded_student_photo,
     load_dataset,
 ):
+    def _resolve_online_student_row_ids():
+        configured_school_codes = list(get_configured_school_spreadsheets().keys())
+        online_sheet_ids_by_school = {}
+
+        for school_code in configured_school_codes:
+            try:
+                dataset, load_error = load_dataset(
+                    school_code=school_code,
+                    force_refresh=False,
+                )
+            except TypeError:
+                dataset, load_error = load_dataset()
+
+            if load_error or not isinstance(dataset, dict):
+                continue
+
+            dataset_students = dataset.get("students", [])
+            if not isinstance(dataset_students, list):
+                continue
+
+            for student in dataset_students:
+                if not isinstance(student, dict):
+                    continue
+
+                group_name = str(student.get("group", "")).strip().casefold()
+                if "online" not in group_name:
+                    continue
+
+                sheet_student_id = student.get("id")
+                if not isinstance(sheet_student_id, int) or sheet_student_id <= 0:
+                    continue
+
+                online_sheet_ids_by_school.setdefault(school_code, set()).add(
+                    sheet_student_id
+                )
+
+        if not online_sheet_ids_by_school:
+            return set()
+
+        online_row_ids = set()
+        with queries.connect_auth_db() as conn:
+            for school_code, sheet_student_ids in online_sheet_ids_by_school.items():
+                mapping_rows = queries.list_students_sheet_map_rows_by_school(
+                    conn,
+                    school_key=school_code,
+                )
+                for mapping_row in mapping_rows:
+                    mapped_sheet_student_id = mapping_row["sheet_student_id"]
+                    if mapped_sheet_student_id in sheet_student_ids:
+                        online_row_ids.add(int(mapping_row["student_row_id"]))
+        return online_row_ids
+
     @router.get("/admin/api/students")
     def admin_students_api():
         school_filter = str(request.args.get("school", "all")).strip().casefold()
-        if school_filter not in {"all", "school5", "sehriyo"}:
+        if school_filter not in {"all", "school5", "sehriyo", "online"}:
             school_filter = "all"
-        students = list_students_for_admin(school_filter=school_filter)
+
+        if school_filter == "online":
+            online_row_ids = _resolve_online_student_row_ids()
+            all_students = list_students_for_admin(school_filter="all")
+            students = [
+                student
+                for student in all_students
+                if int(student.get("id", 0)) in online_row_ids
+            ]
+        else:
+            students = list_students_for_admin(school_filter=school_filter)
         return jsonify({"students": students})
 
     @router.get("/admin/students/<int:student_row_id>")
