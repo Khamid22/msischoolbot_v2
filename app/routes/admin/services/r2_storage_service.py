@@ -546,10 +546,16 @@ def upload_resource_file(
         return "", "R2 storage is not configured."
 
     original_name = str(uploaded_file.filename or "").strip()
-    safe_name = _safe_file_name(original_name)
-    extension = _file_extension(safe_name)
+    # Extract extension from the original name before _safe_file_name can strip it.
+    # Non-ASCII stems (e.g. Cyrillic/Uzbek filenames) become all dashes then get
+    # stripped along with the leading dot, losing the extension entirely.
+    extension = _file_extension(original_name.lower())
     if extension not in _ALLOWED_RESOURCE_EXTENSIONS:
         return "", "File type is not supported for resources."
+    safe_name = _safe_file_name(original_name)
+    # Restore the extension if _safe_file_name dropped it (non-ASCII stem case).
+    if not safe_name.endswith(extension):
+        safe_name = (safe_name or "resource") + extension
 
     max_bytes = _max_upload_bytes()
     _report_progress(progress_callback, percent=5.0, stage="receiving", message="Receiving uploaded file...")
