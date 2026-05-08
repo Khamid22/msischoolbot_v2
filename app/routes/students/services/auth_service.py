@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 import time
@@ -429,12 +430,28 @@ def sync_students_if_needed(load_dataset, school_code = None, force_refresh = Fa
 
 def record_student_activity(student_row_id):
     if not isinstance(student_row_id, int) or student_row_id <= 0:
-        return
+        return {
+            "updated": False,
+            "skipped": False,
+            "reason": "invalid_student_id",
+            "last_seen_at": "",
+        }
     now_monotonic = time.monotonic()
     if not _begin_student_activity_write(student_row_id, now_monotonic):
-        return
+        return {
+            "updated": False,
+            "skipped": True,
+            "reason": "throttled",
+            "last_seen_at": "",
+        }
     updated = False
     now = _utc_now_iso()
+    result = {
+        "updated": False,
+        "skipped": False,
+        "reason": "",
+        "last_seen_at": now,
+    }
     try:
         with _connect() as conn:
             if _is_sqlite_connection(conn):
@@ -442,11 +459,22 @@ def record_student_activity(student_row_id):
                 conn.execute(
                     f"PRAGMA busy_timeout = {int(_STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS)}"
                 )
-            queries.update_student_last_seen(conn, student_row_id, now)
+            rowcount = queries.update_student_last_seen(conn, student_row_id, now)
+            if rowcount <= 0:
+                conn.rollback()
+                result["reason"] = "student_not_found"
+                return result
             conn.commit()
             updated = True
+            result["updated"] = True
+            return result
     except Exception:
-        pass
+        logging.exception(
+            "Failed to record student activity for student_row_id=%s",
+            student_row_id,
+        )
+        result["reason"] = "activity_write_failed"
+        return result
     finally:
         _finish_student_activity_write(
             student_row_id,
@@ -477,6 +505,7 @@ def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
         item = grouped.get(key)
 
         row_subjects = _split_subjects(row["subjects"])
+        row_last_seen_at = row["last_seen_at"] if row["last_seen_at"] is not None else None
         if item is None:
             grouped[key] = {
                 "id": int(row["id"]),
@@ -490,11 +519,16 @@ def list_students_for_admin(school_filter = _ADMIN_SCHOOL_FILTER_ALL):
                     if row["telegram_user_id"] is not None
                     else None
                 ),
-                "last_seen_at": row["last_seen_at"] if row["last_seen_at"] is not None else None,
+                "last_seen_at": row_last_seen_at,
             }
             continue
 
         item["subjects_set"].update(row_subjects)
+        if row_last_seen_at and (
+            not item.get("last_seen_at")
+            or str(row_last_seen_at) > str(item.get("last_seen_at"))
+        ):
+            item["last_seen_at"] = row_last_seen_at
 
     results = []
     grouped_items = sorted(

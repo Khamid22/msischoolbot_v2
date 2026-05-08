@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { readBootstrap } from "./lib/bootstrap";
 
 const bootstrap = readBootstrap();
@@ -19,7 +19,39 @@ const pageMap = {
 
 const ResolvedPage = pageMap[bootstrap.page] || pageMap["student-not-found"];
 
+function useStudentActivityHeartbeat(page: string) {
+  useEffect(() => {
+    if (!page.startsWith("student-") || page === "student-not-found") {
+      return;
+    }
+
+    const pingActivity = () => {
+      void fetch("/api/activity/ping", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    pingActivity();
+    const intervalId = window.setInterval(pingActivity, 45000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        pingActivity();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [page]);
+}
+
 const App = () => {
+  useStudentActivityHeartbeat(bootstrap.page);
+
   return (
     <Suspense
       fallback={

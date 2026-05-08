@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -106,29 +106,6 @@ export default function DashboardPage(props: DashboardPageProps) {
   const justifiedCount = Number(attendanceRecord.justifiedAbsentCount || 0);
   const coins = Number(payload.coins || 0);
   const averageGrade = Math.round(Number(payload.averageGrade || 0));
-
-  useEffect(() => {
-    const pingActivity = () => {
-      void fetch("/api/activity/ping", {
-        method: "GET",
-        credentials: "same-origin",
-        cache: "no-store",
-      }).catch(() => {});
-    };
-
-    pingActivity();
-    const intervalId = window.setInterval(pingActivity, 45000);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        pingActivity();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
 
   return (
     <TelegramLayout

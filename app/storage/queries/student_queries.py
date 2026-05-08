@@ -199,7 +199,7 @@ def delete_students_by_ids(conn, student_row_ids):
 
 
 def update_student_last_seen(conn, student_row_id, now):
-    conn.execute(
+    updated = conn.execute(
         """
         UPDATE students
         SET last_seen_at = ?
@@ -207,6 +207,7 @@ def update_student_last_seen(conn, student_row_id, now):
         """,
         (now, student_row_id),
     )
+    return int(updated.rowcount or 0)
 
 
 def list_students_for_admin_rows(conn, school_key="", school_name=""):

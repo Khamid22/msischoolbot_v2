@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, url_for
+from flask import Blueprint, jsonify, request, session, url_for
 from flask_wtf.csrf import generate_csrf
 
 from app.web.render import render_react_page
@@ -10,12 +10,16 @@ from app.routes.students.chat_page import register_chat_page_routes
 from app.routes.students.chat_routes import register_chat_routes
 from app.routes.students.comment_routes import register_comment_routes
 from app.routes.students.resources import register_resources_routes
-from app.routes.students.services.auth_service import record_student_activity
+from app.routes.students.services.auth_service import (
+    get_student_db_id_by_sheet_student_id,
+    record_student_activity,
+)
 from app.routes.students.services.page_service import build_student_panel_context
 from app.routes.students.services.session_state_service import (
     current_auth_login,
     current_student_db_id,
     current_student_school_code,
+    current_student_sheet_id,
 )
 from app.routes.students.students import register_student_routes
 
@@ -86,13 +90,36 @@ def register_student_page_routes(
 
     @students.before_request
     def track_student_activity():
+        if request.endpoint == "student.activity_ping":
+            return None
         student_db_id = current_student_db_id()
         if student_db_id is not None:
             record_student_activity(student_db_id)
+        return None
 
     @students.get("/api/activity/ping")
     def activity_ping():
-        return jsonify({"ok": True})
+        student_db_id = current_student_db_id()
+        if student_db_id is None:
+            return jsonify({"ok": False, "message": "Student session is missing."}), 401
+
+        result = record_student_activity(student_db_id)
+        if result.get("reason") == "student_not_found":
+            sheet_student_id = current_student_sheet_id()
+            school_code = current_student_school_code()
+            resolved_student_db_id = get_student_db_id_by_sheet_student_id(
+                sheet_student_id,
+                school_code=school_code,
+            )
+            if resolved_student_db_id and resolved_student_db_id != student_db_id:
+                session["student_db_id"] = resolved_student_db_id
+                result = record_student_activity(resolved_student_db_id)
+
+        if result.get("updated") or result.get("skipped"):
+            return jsonify({"ok": True, **result})
+
+        status_code = 404 if result.get("reason") == "student_not_found" else 500
+        return jsonify({"ok": False, **result}), status_code
 
     register_user_auth_routes(
         students,
