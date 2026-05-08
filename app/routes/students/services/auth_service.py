@@ -6,6 +6,7 @@ from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.storage import queries
+from utils.databaseStorage import get_db_backend_for_connection
 
 _OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "admin") or "admin").strip()
 _OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "Msischool2026") or "Msischool2026").strip()
@@ -44,6 +45,10 @@ def _utc_now_iso():
 
 def _connect():
     return queries.connect_auth_db()
+
+
+def _is_sqlite_connection(conn):
+    return str(get_db_backend_for_connection(conn)).strip().casefold() == "sqlite"
 
 
 def _begin_student_activity_write(student_row_id, now_monotonic):
@@ -432,13 +437,11 @@ def record_student_activity(student_row_id):
     now = _utc_now_iso()
     try:
         with _connect() as conn:
-            try:
+            if _is_sqlite_connection(conn):
                 # Avoid long request stalls when another writer holds SQLite lock.
                 conn.execute(
                     f"PRAGMA busy_timeout = {int(_STUDENT_ACTIVITY_SQLITE_BUSY_TIMEOUT_MS)}"
                 )
-            except Exception:
-                pass
             queries.update_student_last_seen(conn, student_row_id, now)
             conn.commit()
             updated = True
