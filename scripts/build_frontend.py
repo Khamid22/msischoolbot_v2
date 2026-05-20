@@ -8,7 +8,7 @@ if _ROOT_DIR not in sys.path:
     sys.path.insert(0, _ROOT_DIR)
 
 
-from app.js_bundles import ensure_js_bundles
+from app.web.js_bundles import ensure_js_bundles
 
 
 def _remove_unused_vite_shell():

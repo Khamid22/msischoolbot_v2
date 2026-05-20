@@ -150,12 +150,12 @@ def register_admin_page_routes(
         invalidate_admin_page_context_cache()
         sync_state = start_google_sheets_sync_background(
             all_school_codes,
-            queue_if_running=False,
+            queue_if_running=True,
         )
         logging.info("Admin-triggered Google Sheets refresh: state=%s", sync_state)
         started = bool(sync_state.get("started", False))
         already_running = bool(sync_state.get("already_running", False))
-        accepted = started and not already_running
+        accepted = started
         return jsonify({"ok": accepted, **sync_state}), (202 if accepted else 503)
 
     register_admin_routes(

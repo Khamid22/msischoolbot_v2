@@ -17,6 +17,7 @@ from app.routes.students.services.auth_service import (
 from app.routes.students.services.page_service import build_student_panel_context
 from app.routes.students.services.session_state_service import (
     current_auth_login,
+    current_auth_role,
     current_student_db_id,
     current_student_school_code,
     current_student_sheet_id,
@@ -92,6 +93,8 @@ def register_student_page_routes(
     def track_student_activity():
         if request.endpoint == "student.activity_ping":
             return None
+        if current_auth_role() != "student":
+            return None
         student_db_id = current_student_db_id()
         if student_db_id is not None:
             record_student_activity(student_db_id)
@@ -99,6 +102,9 @@ def register_student_page_routes(
 
     @students.get("/api/activity/ping")
     def activity_ping():
+        if current_auth_role() != "student":
+            return jsonify({"ok": False, "message": "Student session is missing."}), 401
+
         student_db_id = current_student_db_id()
         if student_db_id is None:
             return jsonify({"ok": False, "message": "Student session is missing."}), 401

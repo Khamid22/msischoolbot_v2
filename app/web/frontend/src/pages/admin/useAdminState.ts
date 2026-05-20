@@ -12,7 +12,7 @@ import {
   asStringArray,
   availableGradesForRow,
   buildAdminTabUrl,
-  buildUploadWebSocketUrl,
+  buildUploadProgressUrl,
   compareSubjectsMathFirst,
   createUploadId,
   findPreferredMathSubject,
@@ -142,7 +142,9 @@ export function useAdminState(props: AdminPageProps) {
   const [lastResourceTypeId, setLastResourceTypeId] = useState("");
   const editResourceFileRef = useRef<HTMLInputElement>(null);
   const editThumbnailFileRef = useRef<HTMLInputElement>(null);
-  const resourceUploadSocketRef = useRef<WebSocket | null>(null);
+  const resourceUploadPollTimerRef = useRef<number | null>(null);
+  const resourceUploadPollUploadIdRef = useRef("");
+  const resourceUploadLastSeqRef = useRef(0);
   const resourceUploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const resourceUploadResetTimerRef = useRef<number | null>(null);
 
@@ -171,6 +173,94 @@ export function useAdminState(props: AdminPageProps) {
       });
       resourceUploadResetTimerRef.current = null;
     }, delayMs);
+  }
+
+  function clearResourceUploadPollTimer() {
+    if (resourceUploadPollTimerRef.current !== null) {
+      window.clearTimeout(resourceUploadPollTimerRef.current);
+      resourceUploadPollTimerRef.current = null;
+    }
+  }
+
+  function stopResourceUploadProgressPolling() {
+    clearResourceUploadPollTimer();
+    resourceUploadPollUploadIdRef.current = "";
+  }
+
+  function applyResourceUploadProgressEvent(payload: Record<string, unknown>) {
+    const seq = Math.floor(Number(payload.seq || 0));
+    if (seq > resourceUploadLastSeqRef.current) {
+      resourceUploadLastSeqRef.current = seq;
+    }
+    setResourceUploadState((current) => ({
+      active: true,
+      percent: Math.max(
+        current.percent,
+        Math.max(0, Math.min(100, Number(payload.percent || 0)))
+      ),
+      message: asString(payload.message) || current.message || "Uploading resource...",
+      error: Boolean(payload.error),
+    }));
+  }
+
+  function scheduleResourceUploadProgressPoll(uploadId: string, delayMs = 700) {
+    if (resourceUploadPollUploadIdRef.current !== uploadId) {
+      return;
+    }
+    clearResourceUploadPollTimer();
+    resourceUploadPollTimerRef.current = window.setTimeout(() => {
+      void pollResourceUploadProgress(uploadId);
+    }, delayMs);
+  }
+
+  async function pollResourceUploadProgress(uploadId: string) {
+    if (resourceUploadPollUploadIdRef.current !== uploadId) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        buildUploadProgressUrl(uploadId, resourceUploadLastSeqRef.current),
+        {
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          cache: "no-store",
+        }
+      );
+      if (!res.ok || resourceUploadPollUploadIdRef.current !== uploadId) {
+        scheduleResourceUploadProgressPoll(uploadId, 1400);
+        return;
+      }
+
+      const payload = (await res.json()) as { events?: unknown[]; done?: unknown };
+      const events: unknown[] = Array.isArray(payload.events) ? payload.events : [];
+      let sawTerminalEvent = Boolean(payload.done);
+      events.forEach((event) => {
+        if (!event || typeof event !== "object") {
+          return;
+        }
+        const progressEvent = event as Record<string, unknown>;
+        applyResourceUploadProgressEvent(progressEvent);
+        if (Boolean(progressEvent.done) || Boolean(progressEvent.error)) {
+          sawTerminalEvent = true;
+        }
+      });
+
+      if (sawTerminalEvent) {
+        stopResourceUploadProgressPolling();
+        return;
+      }
+    } catch (_error) {
+      // Keep the upload running; XHR completion/error remains authoritative.
+    }
+
+    scheduleResourceUploadProgressPoll(uploadId);
+  }
+
+  function startResourceUploadProgressPolling(uploadId: string) {
+    stopResourceUploadProgressPolling();
+    resourceUploadLastSeqRef.current = 0;
+    resourceUploadPollUploadIdRef.current = uploadId;
+    scheduleResourceUploadProgressPoll(uploadId, 250);
   }
 
   function loadChatRooms() {
@@ -444,13 +534,7 @@ export function useAdminState(props: AdminPageProps) {
   useEffect(() => {
     return () => {
       clearResourceUploadResetTimer();
-      if (
-        resourceUploadSocketRef.current &&
-        resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
-      ) {
-        resourceUploadSocketRef.current.close();
-      }
-      resourceUploadSocketRef.current = null;
+      stopResourceUploadProgressPolling();
       if (resourceUploadXhrRef.current) {
         resourceUploadXhrRef.current.abort();
       }
@@ -535,13 +619,7 @@ export function useAdminState(props: AdminPageProps) {
     const formData = new FormData(form);
     formData.set("upload_id", uploadId);
 
-    if (
-      resourceUploadSocketRef.current &&
-      resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
-    ) {
-      resourceUploadSocketRef.current.close();
-    }
-    resourceUploadSocketRef.current = null;
+    stopResourceUploadProgressPolling();
     clearResourceUploadResetTimer();
 
     setIsSubmittingResource(true);
@@ -551,35 +629,7 @@ export function useAdminState(props: AdminPageProps) {
       message: "Preparing upload...",
       error: false,
     });
-
-    if (typeof window.WebSocket !== "undefined") {
-      try {
-        const socket = new WebSocket(buildUploadWebSocketUrl(uploadId));
-        resourceUploadSocketRef.current = socket;
-        socket.onmessage = (messageEvent) => {
-          try {
-            const payload = JSON.parse(String(messageEvent.data || ""));
-            if (payload?.type === "heartbeat") {
-              return;
-            }
-            setResourceUploadState((current) => ({
-              active: true,
-              percent: Math.max(
-                current.percent,
-                Math.max(0, Math.min(100, Number(payload?.percent || 0)))
-              ),
-              message:
-                asString(payload?.message) || current.message || "Uploading resource...",
-              error: Boolean(payload?.error),
-            }));
-          } catch (_error) {
-            return;
-          }
-        };
-      } catch (_error) {
-        resourceUploadSocketRef.current = null;
-      }
-    }
+    startResourceUploadProgressPolling(uploadId);
 
     try {
       const xhr = new XMLHttpRequest();
@@ -609,13 +659,7 @@ export function useAdminState(props: AdminPageProps) {
         const ok = xhr.status >= 200 && xhr.status < 300;
         const contentType = String(xhr.getResponseHeader("Content-Type") || "");
 
-        if (
-          resourceUploadSocketRef.current &&
-          resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
-        ) {
-          resourceUploadSocketRef.current.close();
-        }
-        resourceUploadSocketRef.current = null;
+        stopResourceUploadProgressPolling();
         resourceUploadXhrRef.current = null;
 
         if (contentType.includes("application/json")) {
@@ -674,13 +718,7 @@ export function useAdminState(props: AdminPageProps) {
       };
 
       xhr.onerror = () => {
-        if (
-          resourceUploadSocketRef.current &&
-          resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
-        ) {
-          resourceUploadSocketRef.current.close();
-        }
-        resourceUploadSocketRef.current = null;
+        stopResourceUploadProgressPolling();
         resourceUploadXhrRef.current = null;
         setIsSubmittingResource(false);
         setResourceUploadState({
@@ -692,20 +730,14 @@ export function useAdminState(props: AdminPageProps) {
       };
 
       xhr.onabort = () => {
-        resourceUploadSocketRef.current = null;
+        stopResourceUploadProgressPolling();
         resourceUploadXhrRef.current = null;
         setIsSubmittingResource(false);
       };
 
       xhr.send(formData);
     } catch (_error) {
-      if (
-        resourceUploadSocketRef.current &&
-        resourceUploadSocketRef.current.readyState < WebSocket.CLOSING
-      ) {
-        resourceUploadSocketRef.current.close();
-      }
-      resourceUploadSocketRef.current = null;
+      stopResourceUploadProgressPolling();
       resourceUploadXhrRef.current = null;
       setIsSubmittingResource(false);
       setResourceUploadState({
@@ -771,7 +803,6 @@ export function useAdminState(props: AdminPageProps) {
     setLastResourceTypeId,
     editResourceFileRef,
     editThumbnailFileRef,
-    resourceUploadSocketRef,
     resourceUploadXhrRef,
     chatRoom,
     setChatRoom,

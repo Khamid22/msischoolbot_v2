@@ -14,10 +14,10 @@ from app.auth.policies import is_authenticated_session as is_authenticated_polic
 from app.auth.session import configure_login_manager
 from app.web.js_bundles import ensure_js_bundles
 from app.config.schools import get_configured_school_spreadsheets
+from app.core.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
 from app.config.settings import get_web_settings
 from app.extensions import init_extensions, login_manager
 from app.routes.admin.admin_page import register_admin_page_routes
-from app.routes.admin.upload_progress_ws import register_admin_upload_progress_ws
 from app.routes.system_routes import register_system_routes
 from app.routes.students.student_page import register_student_page_routes
 from app.routes.students.services.dataset_service import SheetsDataError, get_school_dataset
@@ -174,8 +174,6 @@ GROUP_CACHE_TTL_SECONDS = int(
 _GROUP_CACHE_LOCK = threading.Lock()
 # In-memory cache keyed by (subject, group) to avoid repeated sheet calls.
 _GROUP_CACHE = {}
-_SEEDED_DATASET_TOKENS = {}
-_SEEDING_IN_PROGRESS = set()
 _STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
 _APP_BOOTSTRAPPED = False
 _PUBLIC_ENDPOINTS = {
@@ -194,28 +192,7 @@ _PUBLIC_ENDPOINTS = {
 def _clear_group_cache():
     with _GROUP_CACHE_LOCK:
         _GROUP_CACHE.clear()
-        _SEEDED_DATASET_TOKENS.clear()
-        _SEEDING_IN_PROGRESS.clear()
         _STUDENTS_BY_SUBJECT_GROUP_CACHE.clear()
-
-
-def _normalize(value):
-    return " ".join(value.strip().casefold().split())
-
-
-_SCHOOL_CODE_ALIASES = {
-    "school_5": "school5",
-    "school-5": "school5",
-    "school 5": "school5",
-    "school5": "school5",
-    "sehriyo": "sehriyo",
-    "sehriyo school": "sehriyo",
-}
-
-
-def _normalize_school_code(value):
-    normalized = str(value or "").strip().casefold()
-    return _SCHOOL_CODE_ALIASES.get(normalized, normalized)
 
 
 def _iter_dashboard_school_codes(preferred_school_code = ""):
@@ -246,86 +223,57 @@ def _seed_group_cache_from_dataset(dataset, force=False):
         return
 
     now = time.time()
-    dataset_token = int(id(dataset))
+
+    # Collect which (subject, group) keys are stale or missing.
+    candidate_keys: set = set()
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        subject = str(student.get("subject", "")).strip()
+        group = str(student.get("group", "")).strip()
+        candidate_keys.add(_group_cache_key(subject, group))
+
+    if not force:
+        with _GROUP_CACHE_LOCK:
+            needed_keys = {
+                key for key in candidate_keys
+                if not _GROUP_CACHE.get(key) or now >= float(_GROUP_CACHE[key].get("expires_at", 0))
+            }
+        if not needed_keys:
+            return
+    else:
+        needed_keys = candidate_keys
+
+    grouped_entries: dict = {}
+    for student in students:
+        if not isinstance(student, dict):
+            continue
+        student_id = student.get("id")
+        if not isinstance(student_id, int):
+            continue
+
+        subject = str(student.get("subject", "")).strip()
+        group = str(student.get("group", "")).strip()
+        key = _group_cache_key(subject, group)
+        if key not in needed_keys:
+            continue
+
+        entry = grouped_entries.setdefault(key, {"students": [], "dashboards_by_id": {}})
+        entry["students"].append({"id": student_id, "fullName": str(student.get("fullName", "")).strip()})
+        dashboard_payload = dashboards_by_id.get(student_id)
+        if dashboard_payload:
+            entry["dashboards_by_id"][student_id] = dashboard_payload
+
+    if not grouped_entries:
+        return
+
+    expires_at = now + GROUP_CACHE_TTL_SECONDS
+    for entry in grouped_entries.values():
+        entry["students"].sort(key=lambda item: _normalize(str(item.get("fullName", ""))))
+        entry["expires_at"] = expires_at
 
     with _GROUP_CACHE_LOCK:
-        if dataset_token in _SEEDING_IN_PROGRESS:
-            return
-        if not force:
-            token_expires_at = float(_SEEDED_DATASET_TOKENS.get(dataset_token, 0))
-            if now < token_expires_at:
-                return
-        _SEEDING_IN_PROGRESS.add(dataset_token)
-
-    try:
-        grouped_entries = {}
-        for student in students:
-            if not isinstance(student, dict):
-                continue
-            student_id = student.get("id")
-            if not isinstance(student_id, int):
-                continue
-
-            subject = str(student.get("subject", "")).strip()
-            group = str(student.get("group", "")).strip()
-            key = _group_cache_key(subject, group)
-
-            entry = grouped_entries.setdefault(
-                key,
-                {
-                    "students": [],
-                    "dashboards_by_id": {},
-                },
-            )
-            entry["students"].append(
-                {
-                    "id": student_id,
-                    "fullName": str(student.get("fullName", "")).strip(),
-                }
-            )
-
-            dashboard_payload = dashboards_by_id.get(student_id)
-            if dashboard_payload:
-                entry["dashboards_by_id"][student_id] = dashboard_payload
-
-        expires_at = now + GROUP_CACHE_TTL_SECONDS
-        for entry in grouped_entries.values():
-            entry["students"].sort(key=lambda item: _normalize(str(item.get("fullName", ""))))
-            entry["expires_at"] = expires_at
-
-        with _GROUP_CACHE_LOCK:
-            _GROUP_CACHE.update(grouped_entries)
-            _SEEDED_DATASET_TOKENS[dataset_token] = expires_at
-            seeded_dataset_tokens = dict(_SEEDED_DATASET_TOKENS)
-
-        # Prune expired/old dataset tokens to keep memory bounded.
-        expired_tokens = [
-            token
-            for token, token_expiry in seeded_dataset_tokens.items()
-            if float(token_expiry) <= now
-        ]
-        tokens_to_prune = []
-        if len(seeded_dataset_tokens) > 512:
-            ordered_tokens = sorted(
-                seeded_dataset_tokens.items(),
-                key=lambda item: float(item[1]),
-            )
-            tokens_to_prune = [
-                token
-                for token, _expiry in ordered_tokens[: len(seeded_dataset_tokens) - 512]
-            ]
-
-        with _GROUP_CACHE_LOCK:
-            for token in expired_tokens:
-                if float(_SEEDED_DATASET_TOKENS.get(token, 0)) <= now:
-                    _SEEDED_DATASET_TOKENS.pop(token, None)
-            for token in tokens_to_prune:
-                if len(_SEEDED_DATASET_TOKENS) <= 512:
-                    break
-                _SEEDED_DATASET_TOKENS.pop(token, None)
-    finally:
-        with _GROUP_CACHE_LOCK:
-            _SEEDING_IN_PROGRESS.discard(dataset_token)
+        _GROUP_CACHE.update(grouped_entries)
 
 
 def _get_group_cache_entry(subject, group, school_code = "", force_refresh = False):
@@ -871,7 +819,6 @@ def _bootstrap_app(flask_app):
         clear_group_cache=_clear_group_cache,
     )
     register_system_routes(flask_app)
-    register_admin_upload_progress_ws()
     if _is_background_refresh_enabled():
         start_background_refresh()
 

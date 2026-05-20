@@ -15,6 +15,7 @@ from app.routes.admin.services.upload_progress_service import (
     begin_upload,
     complete_upload,
     fail_upload,
+    get_upload_events,
     normalize_upload_id,
     publish_upload_event,
 )
@@ -38,6 +39,34 @@ def register_admin_resource_routes(
 
     def xhr_error(message, status_code=400):
         return jsonify({"ok": False, "message": message}), status_code
+
+    @router.get("/admin/api/resource-upload-progress/<upload_id>")
+    def resource_upload_progress(upload_id):
+        normalized_upload_id = normalize_upload_id(upload_id)
+        if not normalized_upload_id:
+            return jsonify({"ok": False, "message": "Invalid upload id."}), 400
+
+        try:
+            after_seq = int(request.args.get("after_seq", "0") or 0)
+        except ValueError:
+            after_seq = 0
+
+        events = get_upload_events(normalized_upload_id, after_seq=after_seq)
+        latest_seq = after_seq
+        done = False
+        for event in events:
+            latest_seq = max(latest_seq, int(event.get("seq", latest_seq) or latest_seq))
+            if bool(event.get("done")) or bool(event.get("error")):
+                done = True
+
+        return jsonify(
+            {
+                "ok": True,
+                "events": events,
+                "latest_seq": latest_seq,
+                "done": done,
+            }
+        )
 
     @router.post("/admin/resources/types/add")
     def add_resource_type():

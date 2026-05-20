@@ -45,10 +45,7 @@ import asyncio
 import logging
 import threading
 
-from gevent.pywsgi import WSGIServer
-from geventwebsocket.handler import WebSocketHandler
-
-from app.main import app, settings as web_settings
+from app.config.settings import get_web_settings
 from app.routes.students.services.auth_service import init_storage
 
 
@@ -64,7 +61,7 @@ def _env_positive_int(name, default):
 
 def _default_gevent_workers():
     cpu_count = os.cpu_count() or 1
-    return max(16, cpu_count * 8)
+    return min(max(8, cpu_count * 4), 32)
 
 
 def _waitress_threads():
@@ -104,7 +101,8 @@ def _normalize_listen_target(raw_target, default_port):
 
 
 def _waitress_listen_targets():
-    web_port = int(web_settings.flask_port)
+    _settings = get_web_settings()
+    web_port = int(_settings.flask_port)
     raw_listen = str(os.getenv("WAITRESS_LISTEN", "")).strip()
     if raw_listen:
         targets = []
@@ -115,7 +113,7 @@ def _waitress_listen_targets():
         if targets:
             return targets
 
-    primary_host = str(web_settings.flask_host or "0.0.0.0").strip() or "0.0.0.0"
+    primary_host = str(_settings.flask_host or "0.0.0.0").strip() or "0.0.0.0"
     targets = [f"{primary_host}:{web_port}"]
 
     extra_192_host = str(os.getenv("FLASK_HOST_192", "")).strip()
@@ -159,6 +157,10 @@ def _split_listen_target(raw_target, default_port):
 
 
 def run_web_server():
+    from gevent.pywsgi import WSGIServer
+    from geventwebsocket.handler import WebSocketHandler
+    from app.main import app
+
     threads = _waitress_threads()
     connection_limit = _waitress_connection_limit()
     channel_timeout = _waitress_channel_timeout()
@@ -170,7 +172,7 @@ def run_web_server():
         connection_limit,
         channel_timeout,
     )
-    default_port = int(web_settings.flask_port)
+    default_port = int(get_web_settings().flask_port)
     servers = []
     for listen_target in listen_targets:
         host, port = _split_listen_target(listen_target, default_port)

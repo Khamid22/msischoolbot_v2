@@ -1,13 +1,13 @@
 {
-  "_Admin-Cey-WC3H.js": {
-    "file": "chunks/Admin-Cey-WC3H.js",
+  "_Admin-BTnSYlpD.js": {
+    "file": "chunks/Admin-BTnSYlpD.js",
     "name": "Admin",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-wYm1MIl5.js",
-      "_icons-DnTsVtbE.js"
+      "_PortalCard-CnWyMpxK.js",
+      "_icons-BiAspqyY.js"
     ],
     "dynamicImports": [
       "src/pages/admin/panels/OverviewPanel.tsx",
@@ -31,12 +31,12 @@
       "_react-vendor-BBSa9SYs.js"
     ]
   },
-  "_PortalCard-wYm1MIl5.js": {
-    "file": "chunks/PortalCard-wYm1MIl5.js",
+  "_PortalCard-CnWyMpxK.js": {
+    "file": "chunks/PortalCard-CnWyMpxK.js",
     "name": "PortalCard",
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_icons-DnTsVtbE.js"
+      "_icons-BiAspqyY.js"
     ]
   },
   "_ProgressBar-D5eTqNaz.js": {
@@ -53,16 +53,16 @@
       "_react-vendor-BBSa9SYs.js"
     ]
   },
-  "_TelegramLayout--UnG8mp1.js": {
-    "file": "chunks/TelegramLayout--UnG8mp1.js",
+  "_TelegramLayout-BrnYzwFT.js": {
+    "file": "chunks/TelegramLayout-BrnYzwFT.js",
     "name": "TelegramLayout",
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_icons-DnTsVtbE.js"
+      "_icons-BiAspqyY.js"
     ]
   },
-  "_icons-DnTsVtbE.js": {
-    "file": "chunks/icons-DnTsVtbE.js",
+  "_icons-BiAspqyY.js": {
+    "file": "chunks/icons-BiAspqyY.js",
     "name": "icons",
     "imports": [
       "_react-vendor-BBSa9SYs.js"
@@ -92,7 +92,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-13yMa3cX.js",
+    "file": "assets/index-HJHpCn4x.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -107,14 +107,14 @@
       "src/pages/Rating.tsx",
       "src/pages/AAP.tsx",
       "src/pages/AR.tsx",
-      "_Admin-Cey-WC3H.js",
+      "_Admin-BTnSYlpD.js",
       "src/pages/EditStudentProfile.tsx",
       "src/pages/Chat.tsx",
       "src/pages/StudentNotFound.tsx"
     ]
   },
   "src/pages/AAP.tsx": {
-    "file": "chunks/AAP-rpiGHOm2.js",
+    "file": "chunks/AAP-sEnq9nJb.js",
     "name": "AAP",
     "src": "src/pages/AAP.tsx",
     "isDynamicEntry": true,
@@ -122,37 +122,37 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
       "_ProgressBar-D5eTqNaz.js",
-      "_TelegramLayout--UnG8mp1.js",
+      "_TelegramLayout-BrnYzwFT.js",
       "_lesson-date-CBdzB-Y1.js",
-      "_icons-DnTsVtbE.js"
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/AR.tsx": {
-    "file": "chunks/AR-EvR1QKDW.js",
+    "file": "chunks/AR-DuwOxOo_.js",
     "name": "AR",
     "src": "src/pages/AR.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_TelegramLayout--UnG8mp1.js",
+      "_TelegramLayout-BrnYzwFT.js",
       "_lesson-date-CBdzB-Y1.js",
-      "_icons-DnTsVtbE.js"
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Chat.tsx": {
-    "file": "chunks/Chat-BRvcKE6f.js",
+    "file": "chunks/Chat-BNjASJ13.js",
     "name": "Chat",
     "src": "src/pages/Chat.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_TelegramLayout--UnG8mp1.js",
-      "_icons-DnTsVtbE.js"
+      "_TelegramLayout-BrnYzwFT.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Dashboard.tsx": {
-    "file": "chunks/Dashboard-BbYvVG2Y.js",
+    "file": "chunks/Dashboard-CIJJbumd.js",
     "name": "Dashboard",
     "src": "src/pages/Dashboard.tsx",
     "isDynamicEntry": true,
@@ -163,96 +163,96 @@
       "_ProgressBar-D5eTqNaz.js",
       "_StatCard-DxV87oL7.js",
       "_Avatar-DntxQ76S.js",
-      "_TelegramLayout--UnG8mp1.js",
-      "_icons-DnTsVtbE.js"
+      "_TelegramLayout-BrnYzwFT.js",
+      "_icons-BiAspqyY.js"
     ],
     "dynamicImports": [
       "src/pages/dashboard/DashboardChartsSection.tsx"
     ]
   },
   "src/pages/EditStudentProfile.tsx": {
-    "file": "chunks/EditStudentProfile-B6KhwlN5.js",
+    "file": "chunks/EditStudentProfile-CjNSDysA.js",
     "name": "EditStudentProfile",
     "src": "src/pages/EditStudentProfile.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_TelegramLayout--UnG8mp1.js",
+      "_TelegramLayout-BrnYzwFT.js",
       "_ChartCard-bWHinZyU.js",
       "_Avatar-DntxQ76S.js",
-      "_PortalCard-wYm1MIl5.js",
-      "_icons-DnTsVtbE.js"
+      "_PortalCard-CnWyMpxK.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Home.tsx": {
-    "file": "chunks/Home-DGUS_wcq.js",
+    "file": "chunks/Home-36EmytnG.js",
     "name": "Home",
     "src": "src/pages/Home.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-wYm1MIl5.js",
-      "_icons-DnTsVtbE.js"
+      "_PortalCard-CnWyMpxK.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Login.tsx": {
-    "file": "chunks/Login-tvaL_xTa.js",
+    "file": "chunks/Login-DHiXRayK.js",
     "name": "Login",
     "src": "src/pages/Login.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-wYm1MIl5.js",
-      "_icons-DnTsVtbE.js"
+      "_PortalCard-CnWyMpxK.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Rating.tsx": {
-    "file": "chunks/Rating-DB4cVSrn.js",
+    "file": "chunks/Rating-Ci1ZcAyE.js",
     "name": "Rating",
     "src": "src/pages/Rating.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_TelegramLayout--UnG8mp1.js",
-      "_icons-DnTsVtbE.js"
+      "_TelegramLayout-BrnYzwFT.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/Resources.tsx": {
-    "file": "chunks/Resources-DMxfrgJU.js",
+    "file": "chunks/Resources-C3A5_6CK.js",
     "name": "Resources",
     "src": "src/pages/Resources.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_TelegramLayout--UnG8mp1.js",
-      "_icons-DnTsVtbE.js"
+      "_TelegramLayout-BrnYzwFT.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/StudentNotFound.tsx": {
-    "file": "chunks/StudentNotFound-E1UDBV4X.js",
+    "file": "chunks/StudentNotFound-CNRE9q80.js",
     "name": "StudentNotFound",
     "src": "src/pages/StudentNotFound.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-wYm1MIl5.js",
-      "_icons-DnTsVtbE.js"
+      "_PortalCard-CnWyMpxK.js",
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/admin/panels/ChatPanel.tsx": {
-    "file": "chunks/ChatPanel-CUzAeUGe.js",
+    "file": "chunks/ChatPanel-GS1ttOxX.js",
     "name": "ChatPanel",
     "src": "src/pages/admin/panels/ChatPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_icons-DnTsVtbE.js"
+      "_icons-BiAspqyY.js"
     ]
   },
   "src/pages/admin/panels/OverviewPanel.tsx": {
-    "file": "chunks/OverviewPanel-DuvEdmVG.js",
+    "file": "chunks/OverviewPanel-CRduyP2P.js",
     "name": "OverviewPanel",
     "src": "src/pages/admin/panels/OverviewPanel.tsx",
     "isDynamicEntry": true,
@@ -260,71 +260,71 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
       "_StatCard-DxV87oL7.js",
-      "_Admin-Cey-WC3H.js",
-      "_icons-DnTsVtbE.js",
+      "_Admin-BTnSYlpD.js",
+      "_icons-BiAspqyY.js",
       "_recharts-BIGzVQz5.js",
       "index.html",
-      "_PortalCard-wYm1MIl5.js",
+      "_PortalCard-CnWyMpxK.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "src/pages/admin/panels/ResourcesPanel.tsx": {
-    "file": "chunks/ResourcesPanel-Ps7-mxya.js",
+    "file": "chunks/ResourcesPanel-BBP1BlTR.js",
     "name": "ResourcesPanel",
     "src": "src/pages/admin/panels/ResourcesPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-Cey-WC3H.js",
-      "_icons-DnTsVtbE.js",
+      "_Admin-BTnSYlpD.js",
+      "_icons-BiAspqyY.js",
       "index.html",
-      "_PortalCard-wYm1MIl5.js"
+      "_PortalCard-CnWyMpxK.js"
     ]
   },
   "src/pages/admin/panels/StudentsPanel.tsx": {
-    "file": "chunks/StudentsPanel-D8ec8Stz.js",
+    "file": "chunks/StudentsPanel-BNTlnQOI.js",
     "name": "StudentsPanel",
     "src": "src/pages/admin/panels/StudentsPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-Cey-WC3H.js",
-      "_icons-DnTsVtbE.js",
+      "_Admin-BTnSYlpD.js",
+      "_icons-BiAspqyY.js",
       "index.html",
-      "_PortalCard-wYm1MIl5.js"
+      "_PortalCard-CnWyMpxK.js"
     ]
   },
   "src/pages/admin/panels/TeachersPanel.tsx": {
-    "file": "chunks/TeachersPanel-BC0wsUAN.js",
+    "file": "chunks/TeachersPanel-DwccgN0O.js",
     "name": "TeachersPanel",
     "src": "src/pages/admin/panels/TeachersPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_Admin-Cey-WC3H.js",
-      "_icons-DnTsVtbE.js",
+      "_Admin-BTnSYlpD.js",
+      "_icons-BiAspqyY.js",
       "index.html",
-      "_PortalCard-wYm1MIl5.js"
+      "_PortalCard-CnWyMpxK.js"
     ]
   },
   "src/pages/dashboard/DashboardChartsSection.tsx": {
-    "file": "chunks/DashboardChartsSection-ChaEbVDF.js",
+    "file": "chunks/DashboardChartsSection-zJiPJTGY.js",
     "name": "DashboardChartsSection",
     "src": "src/pages/dashboard/DashboardChartsSection.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-bWHinZyU.js",
-      "_icons-DnTsVtbE.js",
+      "_icons-BiAspqyY.js",
       "_recharts-BIGzVQz5.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "style.css": {
-    "file": "assets/style-DggKQmi_.css",
+    "file": "assets/style-3ubWHsDr.css",
     "src": "style.css"
   }
 }

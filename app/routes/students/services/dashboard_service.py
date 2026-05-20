@@ -304,13 +304,14 @@ def build_dashboard_page_context(
             )
         return load_dataset(force_refresh=force_refresh_dataset)
 
-    resolved_student_db_id = current_student_db_id()
+    auth_role = current_auth_role()
+    resolved_student_db_id = current_student_db_id() if auth_role == "student" else None
     if not resolved_student_db_id:
         resolved_student_db_id = get_student_db_id_by_sheet_student_id(
             student_id,
             school_code=current_school_code,
         )
-        if resolved_student_db_id:
+        if resolved_student_db_id and auth_role == "student":
             session["student_db_id"] = resolved_student_db_id
 
     student_profile = get_dashboard_student_profile(
@@ -388,7 +389,7 @@ def build_dashboard_page_context(
     )
 
     dashboard_back_url = url_for("student.home")
-    if current_auth_role() == "admin":
+    if auth_role == "admin":
         return_panel = admin_return_panel or "students"
         return_school = admin_return_school or str(
             session.get("admin_last_school", "all")

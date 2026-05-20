@@ -292,9 +292,10 @@ export function createUploadId() {
   return `upload-${randomPart}`.slice(0, 64);
 }
 
-export function buildUploadWebSocketUrl(uploadId: string) {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${window.location.host}/ws/resource-upload/${encodeURIComponent(uploadId)}`;
+export function buildUploadProgressUrl(uploadId: string, afterSeq = 0) {
+  const params = new URLSearchParams();
+  params.set("after_seq", String(Math.max(0, Math.floor(Number(afterSeq) || 0))));
+  return `/admin/api/resource-upload-progress/${encodeURIComponent(uploadId)}?${params.toString()}`;
 }
 
 export function normalizeAdminTab(value: unknown): AdminTab {

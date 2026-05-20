@@ -1,11 +1,22 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { GraduationCap, LogOut, Menu, RefreshCw, X } from "lucide-react";
+import {
+  Bell,
+  BookOpen,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquare,
+  RefreshCw,
+  Search,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { FormAlert } from "@/components/PortalCard";
 import { routes } from "@/lib/routes";
 import {
   AdminPageProps,
-  adminHeaderPadTop,
-  adminMainPadTop,
   asNumber,
   asString,
   tabs,
@@ -20,7 +31,7 @@ const ChatPanel = lazy(() => import("./admin/panels/ChatPanel"));
 
 function PanelFallback() {
   return (
-    <div className="rounded-xl border border-foreground/10 bg-surface px-4 py-3 text-sm text-muted-foreground">
+    <div className="rounded-lg border border-foreground/10 bg-surface px-4 py-3 text-sm text-muted-foreground shadow-card">
       Loading panel...
     </div>
   );
@@ -41,6 +52,107 @@ function ActivePanel({ state }: { state: any }) {
     default:
       return <OverviewPanel state={state} />;
   }
+}
+
+const tabIcons: Record<string, LucideIcon> = {
+  overview: LayoutDashboard,
+  students: Users,
+  teachers: GraduationCap,
+  resources: BookOpen,
+  chat: MessageSquare,
+};
+
+const tabDescriptions: Record<string, string> = {
+  overview: "School performance, groups, and attention signals.",
+  students: "Manage student accounts, profiles, and access.",
+  teachers: "Assign teachers, rates, and group ownership.",
+  resources: "Upload and organize learning materials.",
+  chat: "Moderate student conversations and support rooms.",
+};
+
+function AdminSidebar({
+  state,
+  csrfToken,
+  compact = false,
+}: {
+  state: any;
+  csrfToken?: string;
+  compact?: boolean;
+}) {
+  return (
+    <aside
+      className={
+        compact
+          ? "flex h-full flex-col bg-sidebar text-sidebar-foreground"
+          : "fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex"
+      }
+    >
+      <div className="border-b border-sidebar-border px-4 py-4">
+        <button
+          type="button"
+          onClick={() => state.switchAdminTab("overview")}
+          className="flex w-full items-center gap-2.5 rounded-lg text-left"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground">
+            M
+          </div>
+          <div className="min-w-0 leading-tight">
+            <span className="block truncate text-sm font-semibold text-foreground">MSI School</span>
+            <span className="block truncate text-xs text-muted-foreground">Admin Console</span>
+          </div>
+        </button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+        <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          Manage
+        </p>
+        <nav className="space-y-1" aria-label="Admin navigation">
+          {tabs.map((tab) => {
+            const Icon = tabIcons[tab.key] || LayoutDashboard;
+            const isActive = state.activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => state.switchAdminTab(tab.key)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="border-t border-sidebar-border p-3">
+        <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+            KA
+          </div>
+          <div className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-sm font-medium text-foreground">Khamid A.</span>
+            <span className="block truncate text-xs text-muted-foreground">Owner admin</span>
+          </div>
+          <form action={routes.logout} method="post" className="shrink-0">
+            <input type="hidden" name="csrf_token" value={csrfToken || ""} />
+            <button
+              type="submit"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Exit"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  );
 }
 
 export default function AdminPage(props: AdminPageProps) {
@@ -109,19 +221,53 @@ export default function AdminPage(props: AdminPageProps) {
     }
   }
 
+  function handleSchoolChange(nextSchool: string) {
+    const params = new URLSearchParams();
+    params.set("panel", state.activeTab);
+    params.set("school", nextSchool || "all");
+    window.location.href = `/?${params.toString()}`;
+  }
+
+  const activeTabLabel = tabs.find((tab) => tab.key === state.activeTab)?.label || "Overview";
+  const activeTabDescription = tabDescriptions[state.activeTab] || "Manage the admin workspace.";
+
   return (
     <div className="min-h-[100dvh] bg-background">
+      <AdminSidebar state={state} csrfToken={props.csrfToken} />
+
       <header
-        className="fixed inset-x-0 top-0 z-50 border-b border-foreground/5 bg-surface/95 backdrop-blur"
-        style={{ paddingTop: adminHeaderPadTop }}
+        className="fixed inset-x-0 top-0 z-50 border-b border-foreground/5 bg-surface/95 backdrop-blur lg:left-64"
+        style={{ paddingTop: "var(--app-top-inset)" }}
       >
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-3 py-2.5 sm:px-4 md:px-6">
+        <div className="flex h-14 w-full items-center gap-3 px-3 sm:px-4 md:px-6">
+          <button
+            type="button"
+            onClick={() => state.setMobileNavOpen((current: boolean) => !current)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-muted lg:hidden"
+            aria-label={state.mobileNavOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={state.mobileNavOpen}
+            aria-controls="admin-mobile-nav"
+          >
+            {state.mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+
+          <div className="relative hidden min-w-0 max-w-md flex-1 md:block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={state.searchQuery}
+              onChange={(event) => state.setSearchQuery(event.target.value)}
+              placeholder="Search students, resources..."
+              className="h-9 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none transition-colors focus:border-foreground/30"
+            />
+          </div>
+
           <button
             type="button"
             onClick={handleRefresh}
             disabled={refreshing}
             title="Refresh data from Google Sheets"
-            className={`flex items-center gap-2 rounded-lg px-2 py-2 font-display text-sm font-bold transition-colors disabled:opacity-60 ${
+            className={`ml-auto flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold transition-colors disabled:opacity-60 ${
               refreshStatus === "ok"
                 ? "text-green-600"
                 : refreshStatus === "warn"
@@ -132,43 +278,22 @@ export default function AdminPage(props: AdminPageProps) {
             }`}
           >
             {refreshing ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
+              <RefreshCw className="h-4 w-4 animate-spin" />
             ) : (
-              <GraduationCap className="h-5 w-5" />
+              <RefreshCw className="h-4 w-4" />
             )}
-            MSI
+            <span className="hidden sm:inline">Refresh</span>
           </button>
-          <nav
-            className="hidden min-w-0 flex-1 gap-1 overflow-x-auto sm:flex"
-            aria-label="Admin navigation"
-            >
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => state.switchAdminTab(tab.key)}
-                className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
-                  state.activeTab === tab.key
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-2 sm:hidden">
-            <button
-              type="button"
-              onClick={() => state.setMobileNavOpen((current: boolean) => !current)}
-              className="relative z-50 flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-muted"
-              aria-label={state.mobileNavOpen ? "Close navigation" : "Open navigation"}
-              aria-expanded={state.mobileNavOpen}
-              aria-controls="admin-mobile-nav"
-            >
-              {state.mobileNavOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
-          </div>
+
+          <button
+            type="button"
+            className="relative hidden h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground sm:flex"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive" />
+          </button>
+
           <form action={routes.logout} method="post" className="shrink-0 sm:ml-auto">
             <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
             <button
@@ -181,7 +306,7 @@ export default function AdminPage(props: AdminPageProps) {
           </form>
         </div>
         {refreshMessage ? (
-          <div className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-4 md:px-6">
+          <div className="w-full px-3 pb-2 sm:px-4 md:px-6">
             <p
               role="status"
               aria-live="polite"
@@ -202,33 +327,55 @@ export default function AdminPage(props: AdminPageProps) {
           </div>
         ) : null}
         {state.mobileNavOpen ? (
-          <div id="admin-mobile-nav" className="relative z-50 border-t border-foreground/5 px-3 pb-3 pt-2 sm:hidden">
-            <nav className="grid grid-cols-2 gap-2" aria-label="Admin mobile navigation">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => state.switchAdminTab(tab.key)}
-                  className={`rounded-xl px-3 py-3 text-left text-sm font-bold transition-colors ${
-                    state.activeTab === tab.key
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground hover:bg-foreground/10"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+          <div id="admin-mobile-nav" className="fixed inset-x-0 bottom-0 top-14 z-50 border-t border-foreground/5 bg-foreground/35 lg:hidden">
+            <div className="h-full w-[min(20rem,86vw)] shadow-card-hover">
+              <AdminSidebar state={state} csrfToken={props.csrfToken} compact />
+            </div>
           </div>
         ) : null}
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 pb-4 sm:px-4 md:px-6" style={{ paddingTop: adminMainPadTop }}>
+      <main
+        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)]"
+      >
+        <section className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-normal text-foreground">
+              {activeTabLabel}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">{activeTabDescription}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={state.currentSchool}
+              onChange={(event) => handleSchoolChange(event.target.value)}
+              className="h-9 rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-semibold outline-none focus:border-foreground/30"
+              aria-label="School"
+            >
+              {state.schoolOptions.map((school: { code: string; label: string }) => (
+                <option key={school.code} value={school.code}>
+                  {school.label}
+                </option>
+              ))}
+            </select>
+            <div className="relative w-full sm:hidden">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                value={state.searchQuery}
+                onChange={(event) => state.setSearchQuery(event.target.value)}
+                placeholder="Search..."
+                className="h-9 w-full rounded-lg border border-foreground/10 bg-surface pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
+              />
+            </div>
+          </div>
+        </section>
+
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
 
         {state.resourceUploadState.active && state.activeTab !== "resources" ? (
-          <div className="mb-4 rounded-xl border border-foreground/10 bg-surface px-4 py-3 shadow-card">
+          <div className="mb-4 rounded-lg border border-foreground/10 bg-surface px-4 py-3 shadow-card">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className={`text-xs font-semibold uppercase tracking-wide ${state.resourceUploadState.error ? "text-destructive" : "text-muted-foreground"}`}>

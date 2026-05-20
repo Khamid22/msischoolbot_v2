@@ -106,15 +106,19 @@ def start_background_refresh() -> None:
             name="sheets-cache-prewarm",
             daemon=True,
         ).start()
-    threading.Thread(
-        target=_refresh_loop,
-        name="sheets-cache-refresh",
-        daemon=True,
-    ).start()
+
+    # In webhook mode data is pushed on change, so time-based polling is redundant.
+    if not WEBHOOK_CACHE_ENABLED:
+        threading.Thread(
+            target=_refresh_loop,
+            name="sheets-cache-refresh",
+            daemon=True,
+        ).start()
 
     logger.info(
-        "Background Sheets refresh started (check_interval=%ss, refresh_ahead=%ss, prewarm=%s)",
+        "Background Sheets refresh started (check_interval=%ss, refresh_ahead=%ss, prewarm=%s, webhook_mode=%s)",
         CHECK_INTERVAL_SECONDS,
         REFRESH_AHEAD_SECONDS,
         _is_startup_prewarm_enabled(),
+        WEBHOOK_CACHE_ENABLED,
     )

@@ -140,6 +140,13 @@ def run_google_sheets_sync(target_school_codes):
     if lesson_sync_error:
         webhook_errors.append(f"lesson_catalog: {lesson_sync_error}")
 
+    try:
+        from app.routes.admin.services.page_service import invalidate_admin_page_context_cache
+
+        invalidate_admin_page_context_cache()
+    except Exception:
+        logging.exception("Failed to invalidate admin cache after Google Sheets sync.")
+
     return {
         "ok": not webhook_errors,
         "schools": normalized_codes,
