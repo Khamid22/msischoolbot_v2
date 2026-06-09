@@ -1,6 +1,8 @@
 .DS_Store
 .venv/
-app/web/frontend/node_modules/
+node_modules/
+web/frontend/node_modules/
+.claude/worktrees/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -16,10 +18,7 @@ credentials.json
 
 # Build/runtime artifacts
 *.log
-web/app_data.sqlite3
-app/app_data.sqlite3
-utils/app_data.sqlite3
-web/static/uploads/
-app/web/static/uploads/
-app/web/static/js/bundles/
-app/web/frontend/dist/
+*.sqlite3
+web/backend/static/uploads/
+web/backend/static/js/bundles/
+web/frontend/dist/

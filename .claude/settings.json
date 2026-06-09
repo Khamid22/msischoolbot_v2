@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/apple/Desktop/Coding/msischool-portal log --oneline -10)"
+    ]
+  }
+}

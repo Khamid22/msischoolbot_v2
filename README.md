@@ -1,11 +1,12 @@
 # Telegram School Dashboard (Aiogram + Flask)
 
-This project has two parts:
-- Telegram bot (`aiogram`) in `bot/`
-- Backend dashboard app (`Flask`) in `app/`
-- Frontend assets/templates in `app/web/`
+This project has three parts:
+- Telegram bot (`aiogram`) in `telegram_bot/`
+- Backend dashboard app (`Flask`) in `web/backend/`
+- Frontend (React + Vite) in `web/frontend/`
 
-The bot opens the web app as a Telegram Mini App.
+Shared database access lives in `database_storage/`. The bot opens the web app
+as a Telegram Mini App.
 
 ## Dependencies
 
@@ -14,8 +15,6 @@ Use the root requirements file as the single source of dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-
-`app/requirements.txt` points to the root requirements file.
 
 ## Environment Variables
 
@@ -35,24 +34,18 @@ Create `.env` in the project root:
 - `WAITRESS_CONNECTION_LIMIT` (default: `1024`)
 - `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
 - `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
-- `DISABLE_BACKGROUND_REFRESH` (optional; `1` disables startup Sheets background refresh)
-- `GOOGLE_SHEETS_WEBHOOK_TOKEN` (required for webhook auth)
-- `SHEETS_WEBHOOK_CACHE_ENABLED` (optional; defaults to enabled when token is set)
-- `SHEETS_WEBHOOK_MAX_STALE_SECONDS` (default: `21600`)
 - `STUDENT_METADATA_CACHE_SECONDS` (default: `30`, cache `/api/metadata` payload)
 - `STUDENT_PANEL_CONTEXT_CACHE_SECONDS` (default: `30`, cache student home panel context)
 - `ADMIN_PAGE_CONTEXT_CACHE_SECONDS` (default: `15`, cache admin panel context)
 - `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
 - `GROUP_CACHE_TTL_SECONDS` (default: `600`)
-- `AUTH_DB_PATH` (optional path for SQLite, default: `utils/app_data.sqlite3`)
-- `DATABASE_URL` (optional PostgreSQL URL; when set, app uses Postgres instead of SQLite)
+- `DATABASE_URL` (required PostgreSQL URL)
 - `R2_ENABLED` (optional; `1`/`0`, default: `1`; set `0` for local/dev to disable R2 uploads)
 - `OWNER_ADMIN_LOGIN` (default: `staff280902`)
 - `OWNER_ADMIN_PASSWORD` (default: `Khamid007`)
 
 Database backend behavior:
-- Local development: keep `DATABASE_URL` empty and app will use SQLite file at `AUTH_DB_PATH`.
-- Railway production: set `DATABASE_URL` to the PostgreSQL connection string provided by Railway.
+- Local development and production both use PostgreSQL through `DATABASE_URL`.
 - `POSTGRES_DB` is only the database name, not a full connection URL.
 - Railway video processing: this repo includes `railpack.json` to install `ffmpeg`. If your service overrides build config, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg`.
 - Local development storage: set `R2_ENABLED=0` and keep `R2_*` credentials unset to avoid writing to production bucket.
@@ -63,7 +56,7 @@ Database backend behavior:
 2. Login by prefix:
 - `staff#####` -> admin path
 - `MSI#####` -> student path
-3. Credentials are checked against the configured auth database (SQLite locally, PostgreSQL when `DATABASE_URL` is set).
+3. Credentials are checked against PostgreSQL.
 4. Authenticated users get a Flask session.
 5. Student login redirects directly to their own dashboard.
 6. All protected pages and APIs require an authenticated session.
@@ -79,63 +72,20 @@ Database backend behavior:
 - direct open to own dashboard after login
 - student cannot open another student ID directly
 
-## Student Sync From Google Sheets
+## Students
 
-- Students are synced from Google Sheets into SQLite.
-- Sync is webhook-driven and runs in an in-process background thread.
+- Students live in PostgreSQL and are managed from the admin panel.
 - New students get generated unique IDs: `MSI#####`.
-- Default password for new student is same as student ID.
+- Default password for a new student is the same as their student ID.
 - Password verification uses hashed values.
 
-### Webhook-Based Sync (Recommended)
-
-- Endpoint: `POST /webhooks/google-sheets`
-- Auth header: `X-Webhook-Token: <your token>`
-- Required env: `GOOGLE_SHEETS_WEBHOOK_TOKEN`
-- Behavior: endpoint returns immediately (`202`) and sync runs in background.
-- Optional env:
-- `SHEETS_WEBHOOK_CACHE_ENABLED=1`
-- `SHEETS_WEBHOOK_MAX_STALE_SECONDS=21600`
-
-Webhook payload supports one or many schools:
-
-```json
-{
-  "school": "sehriyo"
-}
-```
-
-```json
-{
-  "schools": ["school5", "sehriyo"]
-}
-```
-
-```json
-{
-  "spreadsheetId": "your_google_spreadsheet_id"
-}
-```
-
-### Google Sheets Trigger Setup (Apps Script)
-
-Google Sheets does not push webhooks natively. Use Apps Script installable triggers.
-
-1. Open your spreadsheet -> Extensions -> Apps Script.
-2. Paste `scripts/google_sheets_webhook.gs` into the project.
-3. In Script Properties, set:
-- `WEBHOOK_URL=https://<your-domain>/webhooks/google-sheets`
-- `WEBHOOK_TOKEN=<same value as GOOGLE_SHEETS_WEBHOOK_TOKEN>`
-4. Run `setupInstallableTriggers()` once and grant permissions.
-5. Optionally run `testWebhook()` to verify the endpoint returns success.
-
-## SQLite Tables
+## PostgreSQL Tables
 
 Main tables used for auth and admin data:
 - `admins`
 - `students` (required columns: ID, Full Name, Student ID, Password, Subjects, Telegram User ID)
 - `student_auth` (hashed password storage)
-- `students_sheet_map` (Google Sheets student mapping)
+- `students_sheet_map` (maps public dashboard id -> student row id)
 - `bot_users`
 - `app_meta`
 - `subject_summaries` (daily snapshot for bot quick summary: subject, AAP, AR, EP, rating, total coins)
@@ -161,22 +111,6 @@ Run only bot:
 python main.py bot
 ```
 
-## SQLite -> PostgreSQL Migration
-
-If you have old data in local SQLite and want to move it to Railway PostgreSQL:
-
-```bash
-DATABASE_URL="postgresql://<user>:<pass>@<host>:<port>/<db>?sslmode=require" \
-python scripts/migrate_sqlite_to_postgres.py \
-  --sqlite-path utils/app_data.sqlite3 \
-  --truncate-target
-```
-
-Notes:
-- Run this once before switching production traffic.
-- `--truncate-target` is recommended for first migration into a new/empty Postgres DB.
-- If you run migration from your local machine, use Railway public DB URL (`DATABASE_PUBLIC_URL`), not `*.railway.internal`.
-
 Recommended in production (separate processes):
 
 ```bash
@@ -189,16 +123,16 @@ python main.py bot
 
 ## Project Structure
 
+See `docs/architecture.md` for the current backend boundaries and rules for new
+work.
+
 - `config.py` - shared config
-- `main.py` - starts Waitress (WSGI) web server thread + bot loop
-- `bot/handlers/start.py` - `/start` handler
-- `bot/keyboards/inline_keyboard.py` - inline keyboard builders
-- `app/server.py` - Flask app, helpers, auth guard, route registration
-- `app/routes/students/services/auth_service.py` - auth + student/admin/teacher business logic
-- `app/routes/students/services/subject_summary_service.py` - daily Google Sheets -> SQLite subject summary sync
-- `app/routes/students/services/lesson_catalog_service.py` - daily Google Sheets -> SQLite lesson catalog sync
-- `app/routes/home.py` - login/logout, home, search APIs
-- `app/routes/dashboard.py` - dashboard endpoints
-- `app/routes/rating_board.py` - rating board page
-- `app/routes/webhooks.py` - Google Sheets webhook endpoint for cache invalidation + DB sync
-- `app/integrations/sheets_data.py` - Google Sheets parser
+- `main.py` - starts the web server (gevent/Flask) and/or the bot polling loop
+- `telegram_bot/handlers/` - bot command and callback handlers (`start`, `account_link`, `quick_summary`, `contact_us`)
+- `telegram_bot/keyboards/inline_keyboard.py` - inline keyboard builders
+- `web/backend/server.py` - Flask app, helpers, auth guard, route registration
+- `web/backend/routes/` - HTTP route modules (students, admin, system)
+- `web/backend/services/` - business workflows (auth, resources, subjects, academic, announcements, dashboards)
+- `web/backend/queries/` - reusable SQL helpers
+- `database_storage/` - PostgreSQL connection layer, table schema, and shared queries
+- `web/frontend/` - React + Vite mini app source (built into `web/backend/static/`)

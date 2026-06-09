@@ -1,2 +1,13 @@
+providers = ["...", "node"]
+
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+nixPkgs = ["...", "ffmpeg"]
+
+[phases.install]
+cmds = ["...", "cd web/frontend && npm ci"]
+
+[phases.build]
+cmds = ["...", "cd web/frontend && npm run build"]
+
+[start]
+cmd = "python main.py web"

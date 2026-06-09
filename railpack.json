@@ -1,9 +1,33 @@
 {
   "$schema": "https://schema.railpack.com",
+  "packages": {
+    "node": "22"
+  },
   "buildAptPackages": [
     "ffmpeg"
   ],
+  "steps": {
+    "install": {
+      "commands": [
+        "...",
+        {
+          "cmd": "cd web/frontend && npm ci",
+          "customName": "Install React frontend dependencies"
+        }
+      ]
+    },
+    "build": {
+      "commands": [
+        "...",
+        {
+          "cmd": "cd web/frontend && npm run build",
+          "customName": "Build React frontend assets"
+        }
+      ]
+    }
+  },
   "deploy": {
+    "startCommand": "python main.py web",
     "aptPackages": [
       "ffmpeg"
     ]

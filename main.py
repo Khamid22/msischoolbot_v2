@@ -45,8 +45,8 @@ import asyncio
 import logging
 import threading
 
-from app.config.settings import get_web_settings
-from app.routes.students.services.auth_service import init_storage
+from config import get_web_settings
+from web.backend.routes.students.services.auth_service import init_storage
 
 
 def _env_positive_int(name, default):
@@ -157,9 +157,26 @@ def _split_listen_target(raw_target, default_port):
 
 
 def run_web_server():
+    if not _is_gevent_patch_enabled():
+        from web.backend.main import app
+
+        listen_targets = _waitress_listen_targets()
+        primary_target = listen_targets[0] if listen_targets else ""
+        host, port = _split_listen_target(primary_target, int(get_web_settings().flask_port))
+        if not host or port <= 0:
+            raise RuntimeError("No valid web server listen targets configured.")
+
+        logging.info(
+            "Starting Flask development server on %s:%s",
+            host,
+            port,
+        )
+        app.run(host=host, port=port, threaded=True, use_reloader=False)
+        return
+
     from gevent.pywsgi import WSGIServer
     from geventwebsocket.handler import WebSocketHandler
-    from app.main import app
+    from web.backend.main import app
 
     threads = _waitress_threads()
     connection_limit = _waitress_connection_limit()
@@ -215,11 +232,11 @@ async def run_bot():
         MenuButtonCommands,
     )
 
-    from bot.handlers.account_link import router as account_link_router
-    from bot.handlers.contact_us import router as contact_us_router
-    from bot.handlers.quick_summary import router as quick_summary_router
-    from bot.handlers.start import router as start_router
-    from bot.settings import settings as bot_settings
+    from telegram_bot.handlers.account_link import router as account_link_router
+    from telegram_bot.handlers.contact_us import router as contact_us_router
+    from telegram_bot.handlers.quick_summary import router as quick_summary_router
+    from telegram_bot.handlers.start import router as start_router
+    from telegram_bot.settings import settings as bot_settings
 
     bot = Bot(
         token=bot_settings.bot_token,

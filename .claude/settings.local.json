@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"http://0.0.0.0:8080/login\")",
+      "Bash(python3 -c ':*)",
+      "Bash(git rm *)",
+      "Bash(ln -s database-storage database_storage)",
+      "Bash(/Users/apple/Desktop/Coding/Aiogram/msischoolbot_v2/.venv/bin/python -c \"import os; os.environ['DISABLE_BACKGROUND_REFRESH']='1'; from database_storage import connect_auth_db; print\\('db OK'\\); from telegram_bot.handlers.start import router; print\\('bot OK'\\); from web.backend.server import create_app; app=create_app\\(\\); print\\(f'flask OK — {len\\(list\\(app.url_map.iter_rules\\(\\)\\)\\)} routes'\\)\")",
+      "Bash(.venv/bin/python -W ignore -c ' *)",
+      "Bash(sed -i '' '/^telegram_bot$/d' .gitignore)",
+      "Bash(sed -i '' '/^database_storage$/d' .gitignore)",
+      "Bash(npm run *)",
+      "Bash(python3 -c ' *)",
+      "Bash(git show *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
