@@ -1,52 +1,13 @@
+import errno
 import os
 import sys
-
-
-def _resolve_bootstrap_run_mode():
-    raw_mode = ""
-    if len(sys.argv) > 1:
-        raw_mode = str(sys.argv[1] or "").strip().lower()
-    if not raw_mode:
-        raw_mode = str(os.getenv("RUN_MODE", "both") or "").strip().lower()
-
-    aliases = {
-        "both": "both",
-        "all": "both",
-        "web": "web",
-        "server": "web",
-        "bot": "bot",
-    }
-    return aliases.get(raw_mode, "both")
-
-
-def _is_gevent_patch_enabled():
-    raw_value = str(os.getenv("GEVENT_MONKEY_PATCH", "1") or "").strip()
-    return raw_value.casefold() in {"1", "true", "yes", "on"}
-
-
-def _bootstrap_gevent_monkey_patch():
-    if not _is_gevent_patch_enabled():
-        return
-
-    run_mode = _resolve_bootstrap_run_mode()
-    # Avoid monkey-patching when bot polling runs in the same process.
-    # gevent-patched sockets can interfere with asyncio/aiohttp behaviour.
-    if run_mode != "web":
-        return
-
-    import gevent.monkey
-
-    gevent.monkey.patch_all(thread=False)
-
-
-_bootstrap_gevent_monkey_patch()
 
 import asyncio
 import logging
 import threading
 
 from config import get_web_settings
-from web.backend.routes.students.services.auth_service import init_storage
+from shared.identity.account_service import init_storage
 
 
 def _env_positive_int(name, default):
@@ -59,13 +20,13 @@ def _env_positive_int(name, default):
     return max(parsed, 1)
 
 
-def _default_gevent_workers():
+def _default_worker_threads():
     cpu_count = os.cpu_count() or 1
     return min(max(8, cpu_count * 4), 32)
 
 
 def _waitress_threads():
-    return _env_positive_int("WAITRESS_THREADS", _default_gevent_workers())
+    return _env_positive_int("WAITRESS_THREADS", _default_worker_threads())
 
 
 def _waitress_connection_limit():
@@ -74,6 +35,14 @@ def _waitress_connection_limit():
 
 def _waitress_channel_timeout():
     return _env_positive_int("WAITRESS_CHANNEL_TIMEOUT", 120)
+
+
+_ADDRESS_IN_USE_ERRNOS = {
+    getattr(errno, "EADDRINUSE", 48),
+    48,     # macOS / BSD
+    98,     # Linux
+    10048,  # Windows
+}
 
 
 def _is_wildcard_host(host):
@@ -156,71 +125,55 @@ def _split_listen_target(raw_target, default_port):
     return host, port
 
 
+def _is_address_in_use_error(exc):
+    error_number = getattr(exc, "errno", None)
+    if error_number in _ADDRESS_IN_USE_ERRNOS:
+        return True
+    return "address already in use" in str(exc).strip().lower()
+
+
 def run_web_server():
-    if not _is_gevent_patch_enabled():
-        from web.backend.main import app
+    # Production WSGI server: waitress (real threads). Each thread handles one
+    # request and one blocking DB call at a time; the bounded psycopg pool
+    # (DB_POOL_MAX) caps total DB load. Keep WAITRESS_THREADS ~ DB_POOL_MAX.
+    from waitress import serve
 
-        listen_targets = _waitress_listen_targets()
-        primary_target = listen_targets[0] if listen_targets else ""
-        host, port = _split_listen_target(primary_target, int(get_web_settings().flask_port))
-        if not host or port <= 0:
-            raise RuntimeError("No valid web server listen targets configured.")
-
-        logging.info(
-            "Starting Flask development server on %s:%s",
-            host,
-            port,
-        )
-        app.run(host=host, port=port, threaded=True, use_reloader=False)
-        return
-
-    from gevent.pywsgi import WSGIServer
-    from geventwebsocket.handler import WebSocketHandler
     from web.backend.main import app
+
+    listen_targets = _waitress_listen_targets()
+    if not listen_targets:
+        raise RuntimeError("No valid web server listen targets configured.")
 
     threads = _waitress_threads()
     connection_limit = _waitress_connection_limit()
     channel_timeout = _waitress_channel_timeout()
-    listen_targets = _waitress_listen_targets()
+    listen = " ".join(listen_targets)
+
     logging.info(
-        "Starting gevent WebSocket server on %s (workers=%s, backlog=%s, timeout=%s)",
-        ", ".join(listen_targets),
+        "Starting waitress on %s (threads=%s, connection_limit=%s, channel_timeout=%s)",
+        listen,
         threads,
         connection_limit,
         channel_timeout,
     )
-    default_port = int(get_web_settings().flask_port)
-    servers = []
-    for listen_target in listen_targets:
-        host, port = _split_listen_target(listen_target, default_port)
-        if not host or port <= 0:
-            continue
-
-        server = WSGIServer(
-            (host, port),
+    try:
+        serve(
             app,
-            handler_class=WebSocketHandler,
-            spawn=threads,
-            backlog=connection_limit,
-            log=None,
-            error_log=None,
+            listen=listen,
+            threads=threads,
+            connection_limit=connection_limit,
+            channel_timeout=channel_timeout,
+            ident=None,
         )
-        servers.append((listen_target, server))
-
-    if not servers:
-        raise RuntimeError("No valid web server listen targets configured.")
-
-    for listen_target, server in servers[1:]:
-        thread = threading.Thread(
-            target=server.serve_forever,
-            daemon=True,
-            name=f"web-server-{listen_target}",
-        )
-        thread.start()
-
-    primary_target, primary_server = servers[0]
-    logging.info("Primary web server target: %s", primary_target)
-    primary_server.serve_forever()
+    except OSError as exc:
+        if _is_address_in_use_error(exc):
+            logging.error(
+                "Cannot start waitress because the listen target is already in use: %s. "
+                "Stop the existing process or run with a different PORT/FLASK_PORT.",
+                listen,
+            )
+            raise SystemExit(1) from exc
+        raise
 
 
 async def run_bot():
@@ -232,11 +185,11 @@ async def run_bot():
         MenuButtonCommands,
     )
 
-    from telegram_bot.handlers.account_link import router as account_link_router
-    from telegram_bot.handlers.contact_us import router as contact_us_router
-    from telegram_bot.handlers.quick_summary import router as quick_summary_router
-    from telegram_bot.handlers.start import router as start_router
-    from telegram_bot.settings import settings as bot_settings
+    from tgbot.handlers.account_link import router as account_link_router
+    from tgbot.handlers.contact_us import router as contact_us_router
+    from tgbot.handlers.quick_summary import router as quick_summary_router
+    from tgbot.handlers.start import router as start_router
+    from tgbot.settings import settings as bot_settings
 
     bot = Bot(
         token=bot_settings.bot_token,

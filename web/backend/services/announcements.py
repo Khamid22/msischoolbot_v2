@@ -2,9 +2,19 @@
 
 from datetime import datetime
 
-from web.backend import queries
+from db import queries
 
-AUDIENCES = {"all", "students", "teachers", "year10", "year11"}
+AUDIENCES = {
+    "all",
+    "students",
+    "parents",
+    "teachers",
+    "year10",
+    "year11",
+    "trainees",
+    "candidates",
+    "staff",
+}
 PRIORITIES = {"info", "important", "urgent"}
 STATUSES = {"published", "draft", "scheduled"}
 
@@ -17,32 +27,9 @@ def _connect():
     return queries.connect_auth_db()
 
 
-def ensure_announcements_schema(conn):
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS announcements (
-            id BIGSERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            audience TEXT NOT NULL DEFAULT 'all',
-            priority TEXT NOT NULL DEFAULT 'info',
-            status TEXT NOT NULL DEFAULT 'draft',
-            pinned INTEGER NOT NULL DEFAULT 0,
-            author TEXT NOT NULL DEFAULT '',
-            views INTEGER NOT NULL DEFAULT 0,
-            published_at TEXT NOT NULL DEFAULT '',
-            scheduled_at TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_announcements_status_pinned
-        ON announcements(status, pinned, updated_at)
-        """
-    )
+# Schema DDL now lives in the query layer; re-exported here so existing callers
+# (and `from .announcements import ensure_announcements_schema`) keep working.
+ensure_announcements_schema = queries.ensure_announcements_schema
 
 
 def _normalize_choice(value, allowed, default):
@@ -118,7 +105,8 @@ def create_announcement(
                 title, body, audience, priority, status, pinned, author, views,
                 published_at, scheduled_at, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s)
+            RETURNING id
             """,
             (
                 normalized_title,
@@ -134,9 +122,10 @@ def create_announcement(
                 now,
             ),
         )
+        inserted = cur.fetchone()
+        announcement_id = int(inserted["id"] or 0) if inserted else 0
         conn.commit()
-        announcement_id = int(cur.lastrowid)
-        row = conn.execute("SELECT * FROM announcements WHERE id = ?", (announcement_id,)).fetchone()
+        row = conn.execute("SELECT * FROM announcements WHERE id = %s", (announcement_id,)).fetchone()
     return _row_to_dict(row)
 
 
@@ -145,7 +134,7 @@ def update_announcement(announcement_id, **values):
     with _connect() as conn:
         ensure_announcements_schema(conn)
         existing = conn.execute(
-            "SELECT * FROM announcements WHERE id = ?",
+            "SELECT * FROM announcements WHERE id = %s",
             (int(announcement_id),),
         ).fetchone()
         if not existing:
@@ -172,9 +161,9 @@ def update_announcement(announcement_id, **values):
         conn.execute(
             """
             UPDATE announcements
-            SET title = ?, body = ?, audience = ?, priority = ?, status = ?,
-                pinned = ?, published_at = ?, scheduled_at = ?, updated_at = ?
-            WHERE id = ?
+            SET title = %s, body = %s, audience = %s, priority = %s, status = %s,
+                pinned = %s, published_at = %s, scheduled_at = %s, updated_at = %s
+            WHERE id = %s
             """,
             (
                 title,
@@ -205,7 +194,7 @@ def update_announcement(announcement_id, **values):
             ),
         )
         conn.commit()
-        row = conn.execute("SELECT * FROM announcements WHERE id = ?", (int(announcement_id),)).fetchone()
+        row = conn.execute("SELECT * FROM announcements WHERE id = %s", (int(announcement_id),)).fetchone()
     return _row_to_dict(row)
 
 
@@ -213,7 +202,7 @@ def delete_announcement(announcement_id):
     with _connect() as conn:
         ensure_announcements_schema(conn)
         cur = conn.execute(
-            "DELETE FROM announcements WHERE id = ?",
+            "DELETE FROM announcements WHERE id = %s",
             (int(announcement_id),),
         )
         conn.commit()

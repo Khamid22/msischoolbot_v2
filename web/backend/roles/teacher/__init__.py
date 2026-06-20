@@ -1,0 +1,2 @@
+"""Teacher role entry points."""
+

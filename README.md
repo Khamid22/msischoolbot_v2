@@ -1,99 +1,67 @@
-# Telegram School Dashboard (Aiogram + Flask)
+# MSI School Bot And Portal
 
-This project has three parts:
-- Telegram bot (`aiogram`) in `telegram_bot/`
-- Backend dashboard app (`Flask`) in `web/backend/`
-- Frontend (React + Vite) in `web/frontend/`
+This project has four runtime areas:
 
-Shared database access lives in `database_storage/`. The bot opens the web app
-as a Telegram Mini App.
+- `tgbot/` - Telegram bot only
+- `web/backend/` - Flask backend only
+- `web/frontend/` - React frontend only
+- `shared/` - Python logic and PostgreSQL access shared by bot and backend
 
-## Dependencies
+PostgreSQL is the source of truth. Do not delete database values during cleanup.
 
-Use the root requirements file as the single source of dependencies:
+## Architecture
+
+```text
+web/frontend -> web/backend -> shared -> shared/db -> PostgreSQL
+tgbot -----------------------> shared -> shared/db -> PostgreSQL
+```
+
+The bot and web backend must not import each other.
+
+## Current Source Map
+
+```text
+shared/
+  academics/        subject, date, school, and summary rules
+  identity/         login, passwords, profiles, Telegram links
+  db/               PostgreSQL connection, tables, shared SQL queries
+
+tgbot/
+  handlers/         aiogram command/callback handlers
+  keyboards/        Telegram inline keyboard builders
+  helpers.py        bot-specific formatting helpers
+
+web/backend/
+  server.py         Flask app composition
+  auth/             web auth/session helpers
+  routes/           small system routes
+  roles/            role-specific backend workflows
+  domains/          reusable backend business domains
+  utils/            web-only helpers
+  static/react/     generated React build output
+
+web/frontend/src/
+  app/              React app bootstrap
+  shared/           reusable frontend UI and browser helpers
+  roles/            role-specific React screens
+```
+
+## Main Docs
+
+- `AGENTS.md` - rules for coding assistants
+- `docs/PROJECT_RULES.md` - human-friendly editing guide
+- `docs/GLOSSARY.md` - naming rules for confusing concepts
+- `docs/performance.md` - scaling notes
+
+## Run Locally
+
+Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Environment Variables
-
-Create `.env` in the project root:
-- `BOT_TOKEN`
-- `MINI_APP_URL`
-- `ENABLE_TEST_ADMIN_LOGIN` (optional; `1`/`0`, default: `1`; enables `/admin` + Admin(Test) button)
-- `TEST_ADMIN_LOGIN` (optional; default: `staff280902`)
-- `TEST_ADMIN_PASSWORD` (optional; default falls back to `OWNER_ADMIN_PASSWORD`)
-- `TEST_ADMIN_TELEGRAM_IDS` (optional comma-separated allowlist for test admin login)
-- `COURSE_LEADER_CHAT` (optional for Contact US; numeric Telegram ID only, e.g. `123456789` or `-1001234567890`)
-- `ADMIN_CHAT` (optional for Contact US; numeric Telegram ID only, e.g. `123456789` or `-1001234567890`)
-- `FLASK_HOST` (default: `0.0.0.0`)
-- `FLASK_PORT` (default: `8080`)
-- `PORT` (overrides `FLASK_PORT`)
-- `WAITRESS_THREADS` (default: `max(16, cpu_count * 8)`, used by production WSGI server)
-- `WAITRESS_CONNECTION_LIMIT` (default: `1024`)
-- `WAITRESS_CHANNEL_TIMEOUT` (default: `120`)
-- `RUN_MODE` (`both`, `web`, `bot`; default: `both`)
-- `STUDENT_METADATA_CACHE_SECONDS` (default: `30`, cache `/api/metadata` payload)
-- `STUDENT_PANEL_CONTEXT_CACHE_SECONDS` (default: `30`, cache student home panel context)
-- `ADMIN_PAGE_CONTEXT_CACHE_SECONDS` (default: `15`, cache admin panel context)
-- `FLASK_SECRET_KEY` (recommended for secure Flask session cookies)
-- `GROUP_CACHE_TTL_SECONDS` (default: `600`)
-- `DATABASE_URL` (required PostgreSQL URL)
-- `R2_ENABLED` (optional; `1`/`0`, default: `1`; set `0` for local/dev to disable R2 uploads)
-- `OWNER_ADMIN_LOGIN` (default: `staff280902`)
-- `OWNER_ADMIN_PASSWORD` (default: `Khamid007`)
-
-Database backend behavior:
-- Local development and production both use PostgreSQL through `DATABASE_URL`.
-- `POSTGRES_DB` is only the database name, not a full connection URL.
-- Railway video processing: this repo includes `railpack.json` to install `ffmpeg`. If your service overrides build config, add `RAILPACK_DEPLOY_APT_PACKAGES=ffmpeg`.
-- Local development storage: set `R2_ENABLED=0` and keep `R2_*` credentials unset to avoid writing to production bucket.
-
-## Auth Flow
-
-1. Open `/` (home page).
-2. Login by prefix:
-- `staff#####` -> admin path
-- `MSI#####` -> student path
-3. Credentials are checked against PostgreSQL.
-4. Authenticated users get a Flask session.
-5. Student login redirects directly to their own dashboard.
-6. All protected pages and APIs require an authenticated session.
-7. Student access to dashboard/rating URLs is restricted to their own student ID.
-
-## Panels
-
-- Admin panel shows:
-- bot users count (from `bot_users` table)
-- students table: full name, enrolled course, student ID, password
-
-- Student panel keeps existing behavior:
-- direct open to own dashboard after login
-- student cannot open another student ID directly
-
-## Students
-
-- Students live in PostgreSQL and are managed from the admin panel.
-- New students get generated unique IDs: `MSI#####`.
-- Default password for a new student is the same as their student ID.
-- Password verification uses hashed values.
-
-## PostgreSQL Tables
-
-Main tables used for auth and admin data:
-- `admins`
-- `students` (required columns: ID, Full Name, Student ID, Password, Subjects, Telegram User ID)
-- `student_auth` (hashed password storage)
-- `students_sheet_map` (maps public dashboard id -> student row id)
-- `bot_users`
-- `app_meta`
-- `subject_summaries` (daily snapshot for bot quick summary: subject, AAP, AR, EP, rating, total coins)
-- `lesson_catalog` (daily snapshot of lesson number/topic per subject for AAP lesson table)
-
-## Run Locally
-
-Run both bot + web in one process (dev only):
+Run both web and bot:
 
 ```bash
 python main.py
@@ -111,28 +79,61 @@ Run only bot:
 python main.py bot
 ```
 
-Recommended in production (separate processes):
+## Frontend
+
+React source lives in `web/frontend/src`.
+
+Check and build:
 
 ```bash
-# terminal 1
-python main.py web
-
-# terminal 2
-python main.py bot
+cd web/frontend
+npm run check-types
+npm run build
 ```
 
-## Project Structure
+The build writes generated files into `web/backend/static/react/`. Do not edit
+that generated folder manually.
 
-See `docs/architecture.md` for the current backend boundaries and rules for new
-work.
+## Verification
 
-- `config.py` - shared config
-- `main.py` - starts the web server (gevent/Flask) and/or the bot polling loop
-- `telegram_bot/handlers/` - bot command and callback handlers (`start`, `account_link`, `quick_summary`, `contact_us`)
-- `telegram_bot/keyboards/inline_keyboard.py` - inline keyboard builders
-- `web/backend/server.py` - Flask app, helpers, auth guard, route registration
-- `web/backend/routes/` - HTTP route modules (students, admin, system)
-- `web/backend/services/` - business workflows (auth, resources, subjects, academic, announcements, dashboards)
-- `web/backend/queries/` - reusable SQL helpers
-- `database_storage/` - PostgreSQL connection layer, table schema, and shared queries
-- `web/frontend/` - React + Vite mini app source (built into `web/backend/static/`)
+Backend/import check:
+
+```bash
+python3 -m compileall -q shared tgbot web/backend scripts main.py
+python3 - <<'PY'
+from web.backend.server import app
+print(app.name)
+PY
+```
+
+Frontend check:
+
+```bash
+cd web/frontend
+npm run check-types
+npm run build
+```
+
+## Environment
+
+Required:
+
+- `DATABASE_URL`
+- `BOT_TOKEN`
+- `MINI_APP_URL`
+- `FLASK_SECRET_KEY`
+
+Common optional settings:
+
+- `RUN_MODE` (`both`, `web`, or `bot`)
+- `FLASK_HOST`
+- `FLASK_PORT`
+- `PORT`
+- `WAITRESS_THREADS`
+- `DB_POOL_MIN`
+- `DB_POOL_MAX`
+- `REDIS_URL`
+- `R2_ENABLED`
+- `OWNER_ADMIN_LOGIN`
+- `OWNER_ADMIN_PASSWORD`
+

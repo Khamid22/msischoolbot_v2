@@ -2,9 +2,9 @@ import re
 import threading
 from datetime import datetime
 
-from web.backend import queries
+from db import queries
 
-from web.backend.routes.admin.services.r2_storage_service import (
+from web.backend.admin.services.r2_storage_service import (
     build_resource_file_url,
     delete_resource_file,
     infer_resource_mime_type,

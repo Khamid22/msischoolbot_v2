@@ -2,7 +2,7 @@ import math
 import threading
 from datetime import datetime
 
-from web.backend import queries
+from db import queries
 
 _DB_LOCK = threading.Lock()
 _SYNC_LOCK = threading.Lock()
@@ -152,7 +152,6 @@ def _attendance_rate_to_score(attendance_rate):
 def _ensure_storage(conn):
     queries.create_tables(conn)
     queries.ensure_students_schema(conn)
-    queries.ensure_students_sheet_map_schema(conn)
     queries.ensure_subject_summaries_schema(conn)
 
 
@@ -180,8 +179,8 @@ def _build_subject_summary_rows(dataset):
     summary_rows = []
     subject_rows = {}
 
-    for sheet_student_id, payload in dashboards_by_id.items():
-        if not isinstance(sheet_student_id, int):
+    for enrollment_id, payload in dashboards_by_id.items():
+        if not isinstance(enrollment_id, int):
             continue
         if not isinstance(payload, dict):
             continue
@@ -215,7 +214,7 @@ def _build_subject_summary_rows(dataset):
         average_composite = round((exam_performance + aap_score + attendance_score) / 3, 1)
 
         row = {
-            "sheet_student_id": int(sheet_student_id),
+            "enrollment_id": int(enrollment_id),
             "full_name": full_name,
             "full_name_norm": _normalize(full_name),
             "school_key": school_key,
@@ -233,7 +232,7 @@ def _build_subject_summary_rows(dataset):
         summary_rows.append(row)
         subject_rows.setdefault(subject_name, []).append(row)
 
-    rating_by_sheet_id = {}
+    rating_by_enrollment_id = {}
     for subject_name, rows in subject_rows.items():
         ordered_rows = sorted(
             rows,
@@ -243,12 +242,12 @@ def _build_subject_summary_rows(dataset):
                 -float(row["aap"]),
                 -int(row["ar"]),
                 str(row["full_name_norm"]),
-                int(row["sheet_student_id"]),
+                int(row["enrollment_id"]),
             ),
         )
         total = len(ordered_rows)
         for position, row in enumerate(ordered_rows, start=1):
-            rating_by_sheet_id[int(row["sheet_student_id"])] = {
+            rating_by_enrollment_id[int(row["enrollment_id"])] = {
                 "rating_rank": position,
                 "rating_total": total,
             }
@@ -256,10 +255,10 @@ def _build_subject_summary_rows(dataset):
     updated_at = _utc_now_iso()
     payload_rows = []
     for row in summary_rows:
-        rating = rating_by_sheet_id.get(int(row["sheet_student_id"]), {})
+        rating = rating_by_enrollment_id.get(int(row["enrollment_id"]), {})
         payload_rows.append(
             {
-                "sheet_student_id": int(row["sheet_student_id"]),
+                "enrollment_id": int(row["enrollment_id"]),
                 "full_name": str(row["full_name"]),
                 "full_name_norm": str(row["full_name_norm"]),
                 "school_key": str(row["school_key"]),
@@ -324,7 +323,7 @@ def list_subject_summaries_by_full_name(full_name):
             continue
         results.append(
             {
-                "sheet_student_id": int(row["sheet_student_id"]),
+                "enrollment_id": int(row["enrollment_id"]),
                 "full_name": str(row["full_name"]),
                 "school_key": str(row["school_key"] or "").strip(),
                 "school_name": str(row["school_name"] or "").strip(),
@@ -344,13 +343,13 @@ def list_subject_summaries_by_full_name(full_name):
     results.sort(
         key=lambda row: (
             _subject_sort_key(row.get("subject_name", "")),
-            int(row.get("sheet_student_id", 0)),
+            int(row.get("enrollment_id", 0)),
         )
     )
     return results
 
 
-def list_subject_summaries(school_key = ""):
+def list_subject_summaries(school_key=""):
     normalized_school_key = _normalize_school_code(school_key)
     with _connect() as conn:
         _ensure_storage(conn)
@@ -366,7 +365,7 @@ def list_subject_summaries(school_key = ""):
             continue
         results.append(
             {
-                "sheet_student_id": int(row["sheet_student_id"]),
+                "enrollment_id": int(row["enrollment_id"]),
                 "full_name": str(row["full_name"]),
                 "school_key": str(row["school_key"] or "").strip(),
                 "school_name": str(row["school_name"] or "").strip(),

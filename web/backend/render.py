@@ -150,6 +150,41 @@ def _resolve_react_assets() -> tuple[str, str]:
     return "app.js", "app.css"
 
 
+def _resolve_react_preloads() -> tuple[str, ...]:
+    """Return static-import chunk files of the entry, for <link rel=modulepreload>.
+
+    Without these hints the browser discovers vendor chunks only after the
+    entry module is downloaded and parsed, adding a network round trip.
+    """
+    manifest = _load_react_manifest()
+    if not isinstance(manifest, dict):
+        return ()
+
+    preload_files: list[str] = []
+    seen_keys = {"index.html"}
+
+    def walk(key: str) -> None:
+        node = manifest.get(key)
+        if not isinstance(node, dict):
+            return
+        imports = node.get("imports")
+        if not isinstance(imports, list):
+            return
+        for imported_key in imports:
+            if not isinstance(imported_key, str) or imported_key in seen_keys:
+                continue
+            seen_keys.add(imported_key)
+            child = manifest.get(imported_key)
+            if isinstance(child, dict):
+                child_file = str(child.get("file") or "").strip()
+                if child_file:
+                    preload_files.append(child_file)
+            walk(imported_key)
+
+    walk("index.html")
+    return tuple(preload_files)
+
+
 def _is_hashed_asset(file_name: str) -> bool:
     return bool(re.search(r"-[A-Za-z0-9_-]{8,}\.", str(file_name)))
 
@@ -210,6 +245,10 @@ def render_react_page(
     js_file, css_file = _resolve_react_assets()
     css_url = _react_asset_url(css_file, v) if css_file else ""
     js_url = _react_asset_url(js_file, v)
+    preload_links = "".join(
+        f'\n    <link rel="modulepreload" href="{_react_asset_url(preload_file, v)}" />'
+        for preload_file in _resolve_react_preloads()
+    )
     tg_bundle_url = url_for("static", filename="js/bundles/telegram-base.js", v=v)
 
     tg_head = (
@@ -242,7 +281,7 @@ def render_react_page(
 {_MINIMAL_CRITICAL_CSS}
     <link rel="icon" type="image/png" href="{favicon_url}" />
     <link rel="manifest" href="{manifest_url}" />
-    {"<link rel=\"stylesheet\" href=\"" + css_url + "\" />" if css_url else ""}
+    {"<link rel=\"stylesheet\" href=\"" + css_url + "\" />" if css_url else ""}{preload_links}
   </head>
   <body{body_attrs}>
     <div id="root"></div>

@@ -1,8 +1,10 @@
 .DS_Store
+.vscode/
 .venv/
 node_modules/
 web/frontend/node_modules/
 .claude/worktrees/
+backups/
 __pycache__/
 *.py[cod]
 *.pyo

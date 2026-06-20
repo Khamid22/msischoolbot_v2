@@ -18,7 +18,7 @@ def is_authenticated_session(session):
     if auth_role == "admin":
         return bool(session.get("admin_id"))
     if auth_role == "student":
-        return bool(session.get("student_db_id")) and bool(session.get("student_sheet_id"))
+        return bool(session.get("student_db_id"))
     return False
 
 

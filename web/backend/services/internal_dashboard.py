@@ -2,7 +2,7 @@
 
 import math
 
-from web.backend import queries
+from db import queries
 
 _SCHOOL_DISPLAY_NAMES = {
     "school5": "School 5",
@@ -46,12 +46,72 @@ def _average_homework_grade(homework_grades):
     return math.floor((sum(scores) / len(scores)) * 10 + 0.5) / 10
 
 
+_academic_tables_known_present = False
+
+
 def _academic_tables_exist(conn) -> bool:
+    # Once the tables are seen they never disappear at runtime, so cache the
+    # positive answer and skip the pg_tables scan on every later call.
+    global _academic_tables_known_present
+    if _academic_tables_known_present:
+        return True
     rows = conn.execute(
         "SELECT tablename AS name FROM pg_tables WHERE schemaname = current_schema()"
     ).fetchall()
     existing = {str(r["name"]) for r in rows}
-    return {"academic_enrollments", "academic_schools", "academic_subjects", "academic_groups"}.issubset(existing)
+    present = {"academic_enrollments", "academic_schools", "academic_subjects", "academic_groups"}.issubset(existing)
+    if present:
+        _academic_tables_known_present = True
+    return present
+
+
+def _attendance_payload(rows):
+    present_count = 0
+    absent_count = 0
+    justified_count = 0
+    attendance_lessons = []
+    for row in rows:
+        status = str(row["status"] or "").strip().casefold()
+        if status == "present":
+            present_count += 1
+        elif status == "absent":
+            absent_count += 1
+        elif status == "justified":
+            justified_count += 1
+        if status:
+            attendance_lessons.append({
+                "lesson": row["lesson_label"],
+                "topic": row["topic"] or "",
+                "date": row["lesson_date"] or "",
+                "attendanceType": row["attendance_type"] or "",
+                "status": status,
+            })
+    return attendance_lessons, present_count, absent_count, justified_count
+
+
+def _homework_payload(rows):
+    return [
+        {
+            "lesson": row["lesson_label"],
+            "topic": row["topic"] or "",
+            "date": row["lesson_date"] or "",
+            "type": row["score_type"] or "Homework",
+            "score": float(row["score"]),
+        }
+        for row in rows
+    ]
+
+
+def _exam_payload(rows):
+    return [
+        {
+            "label": row["label"],
+            "examName": row["exam_name"] or "",
+            "attempt": row["attempt"] or "",
+            "score": float(row["score"]),
+        }
+        for row in rows
+    ]
 
 
 def get_subject_dashboards_from_db(subject_name):
@@ -72,7 +132,7 @@ def get_subject_dashboards_from_db(subject_name):
             FROM academic_enrollments e
             JOIN academic_subjects sub ON sub.id = e.subject_id
             JOIN academic_groups   g   ON g.id   = e.group_id
-            WHERE lower(trim(sub.name)) = ?
+            WHERE lower(trim(sub.name)) = %s
               AND e.active = 1
             """,
             (subject_norm,),
@@ -119,7 +179,8 @@ def build_internal_dataset(school_code=""):
 
         rows = conn.execute(
             """
-            SELECT e.public_dashboard_id, e.full_name, e.average_grade, e.coins,
+            SELECT e.id AS enrollment_id, e.public_dashboard_id, e.full_name,
+                   e.average_grade, e.coins,
                    s.code AS school_code, s.name AS school_name,
                    sub.name AS subject_name, sub.code AS subject_code,
                    g.name AS group_name, g.code AS group_code
@@ -129,7 +190,7 @@ def build_internal_dataset(school_code=""):
             JOIN academic_groups g ON g.id = e.group_id
             WHERE e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             ORDER BY sub.name, g.name, e.full_name
             """,
             (normalized_school, normalized_school),
@@ -144,11 +205,70 @@ def build_internal_dataset(school_code=""):
             JOIN academic_subjects sub ON sub.id = l.subject_id
             JOIN academic_groups g ON g.id = l.group_id
             WHERE lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             ORDER BY sub.name, g.name, l.lesson_order, l.lesson_number
             """,
             (normalized_school, normalized_school),
         ).fetchall()
+
+        attendance_rows = conn.execute(
+            """
+            SELECT a.enrollment_id, a.lesson_label, a.topic, a.lesson_date,
+                   a.attendance_type, a.status
+            FROM academic_attendance_records a
+            JOIN academic_enrollments e ON e.id = a.enrollment_id
+            JOIN academic_schools s ON s.id = e.school_id
+            JOIN academic_groups g ON g.id = e.group_id
+            WHERE e.active = 1
+              AND lower(g.name) <> 'online'
+              AND (%s = '' OR s.code = %s)
+            ORDER BY a.enrollment_id, a.lesson_order, a.lesson_label
+            """,
+            (normalized_school, normalized_school),
+        ).fetchall()
+
+        homework_rows = conn.execute(
+            """
+            SELECT h.enrollment_id, h.lesson_label, h.topic, h.lesson_date,
+                   h.score_type, h.score
+            FROM academic_homework_scores h
+            JOIN academic_enrollments e ON e.id = h.enrollment_id
+            JOIN academic_schools s ON s.id = e.school_id
+            JOIN academic_groups g ON g.id = e.group_id
+            WHERE e.active = 1
+              AND lower(g.name) <> 'online'
+              AND (%s = '' OR s.code = %s)
+            ORDER BY h.enrollment_id, h.lesson_order, h.lesson_label
+            """,
+            (normalized_school, normalized_school),
+        ).fetchall()
+
+        exam_rows = conn.execute(
+            """
+            SELECT er.enrollment_id, er.label, er.exam_name, er.attempt, er.score
+            FROM academic_exam_results er
+            JOIN academic_enrollments e ON e.id = er.enrollment_id
+            JOIN academic_schools s ON s.id = e.school_id
+            JOIN academic_groups g ON g.id = e.group_id
+            WHERE e.active = 1
+              AND lower(g.name) <> 'online'
+              AND (%s = '' OR s.code = %s)
+            ORDER BY er.enrollment_id, er.label
+            """,
+            (normalized_school, normalized_school),
+        ).fetchall()
+
+    attendance_by_enrollment = {}
+    for row in attendance_rows:
+        attendance_by_enrollment.setdefault(int(row["enrollment_id"]), []).append(row)
+
+    homework_by_enrollment = {}
+    for row in homework_rows:
+        homework_by_enrollment.setdefault(int(row["enrollment_id"]), []).append(row)
+
+    exams_by_enrollment = {}
+    for row in exam_rows:
+        exams_by_enrollment.setdefault(int(row["enrollment_id"]), []).append(row)
 
     students = []
     dashboards_by_id = {}
@@ -166,6 +286,9 @@ def build_internal_dataset(school_code=""):
         groups.add(group_name)
         groups_by_subject.setdefault(subject_name, set()).add(group_name)
 
+        enrollment_id = int(row["enrollment_id"])
+        coins = int(row["coins"] or 0)
+
         student = {
             "id": int(row["public_dashboard_id"]),
             "fullName": split["fullName"],
@@ -178,31 +301,45 @@ def build_internal_dataset(school_code=""):
             "subjectCode": str(row["subject_code"] or ""),
             "schoolCode": str(row["school_code"] or ""),
             "schoolName": str(row["school_name"] or _school_display_name(row["school_code"])),
-            "coins": int(row["coins"] or 0),
+            "coins": coins,
         }
         students.append(student)
-        dashboards_by_id[int(row["public_dashboard_id"])] = (
-            get_enrollment_dashboard(
-                int(row["public_dashboard_id"]),
-                str(row["school_code"] or ""),
-            )
-            or {
-                "student": student,
-                "academicRecords": [],
-                "examResults": [],
-                "homeworkGrades": [],
-                "attendanceLessons": [],
-                "attendanceRecord": {
-                    "presentCount": 0,
-                    "absentCount": 0,
-                    "justifiedAbsentCount": 0,
-                    "totalCount": 0,
-                    "subject": subject_name,
-                },
-                "averageGrade": float(row["average_grade"] or 0),
-                "coins": int(row["coins"] or 0),
-            }
+
+        attendance_lessons, present_count, absent_count, justified_count = (
+            _attendance_payload(attendance_by_enrollment.get(enrollment_id, []))
         )
+        homework_grades = _homework_payload(homework_by_enrollment.get(enrollment_id, []))
+        exam_results = _exam_payload(exams_by_enrollment.get(enrollment_id, []))
+        academic_records = [
+            {
+                "date": result["label"],
+                "grade": result["score"],
+                "subject": subject_name,
+                "assessment": result["label"],
+            }
+            for result in exam_results
+        ]
+
+        average_grade = _average_homework_grade(homework_grades)
+        if not average_grade:
+            average_grade = float(row["average_grade"] or 0.0)
+
+        dashboards_by_id[int(row["public_dashboard_id"])] = {
+            "student": student,
+            "academicRecords": academic_records,
+            "examResults": exam_results,
+            "homeworkGrades": homework_grades,
+            "attendanceLessons": attendance_lessons,
+            "attendanceRecord": {
+                "presentCount": present_count,
+                "absentCount": absent_count,
+                "justifiedAbsentCount": justified_count,
+                "totalCount": present_count + absent_count + justified_count,
+                "subject": subject_name,
+            },
+            "averageGrade": average_grade,
+            "coins": coins,
+        }
 
     for row in lesson_rows:
         subject_name = str(row["subject_name"] or "").strip()
@@ -256,7 +393,7 @@ def build_internal_overview_dataset(school_code=""):
             JOIN academic_groups g ON g.id = e.group_id
             WHERE e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             ORDER BY sub.name, g.name, e.full_name
             """,
             (normalized_school, normalized_school),
@@ -271,7 +408,7 @@ def build_internal_overview_dataset(school_code=""):
             JOIN academic_groups g ON g.id = e.group_id
             WHERE e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             ORDER BY h.enrollment_id, h.lesson_order, h.lesson_label
             """,
             (normalized_school, normalized_school),
@@ -286,7 +423,7 @@ def build_internal_overview_dataset(school_code=""):
             JOIN academic_groups g ON g.id = e.group_id
             WHERE e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             ORDER BY er.enrollment_id, er.label
             """,
             (normalized_school, normalized_school),
@@ -301,7 +438,7 @@ def build_internal_overview_dataset(school_code=""):
             JOIN academic_groups g ON g.id = e.group_id
             WHERE e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
               AND a.lesson_date IS NOT NULL
               AND a.lesson_date <> ''
               AND a.status IS NOT NULL
@@ -386,10 +523,10 @@ def get_enrollment_dashboard(public_dashboard_id, school_code=""):
             JOIN academic_schools   s   ON s.id   = e.school_id
             JOIN academic_subjects  sub ON sub.id = e.subject_id
             JOIN academic_groups    g   ON g.id   = e.group_id
-            WHERE e.public_dashboard_id = ?
+            WHERE e.public_dashboard_id = %s
               AND e.active = 1
               AND lower(g.name) <> 'online'
-              AND (? = '' OR s.code = ?)
+              AND (%s = '' OR s.code = %s)
             LIMIT 1
             """,
             (student_id, normalized_school, normalized_school),
@@ -404,73 +541,39 @@ def get_enrollment_dashboard(public_dashboard_id, school_code=""):
             """
             SELECT lesson_label, topic, lesson_date, attendance_type, status, lesson_order
             FROM academic_attendance_records
-            WHERE enrollment_id = ?
+            WHERE enrollment_id = %s
             ORDER BY lesson_order, lesson_label
             """,
             (enrollment_id,),
         ).fetchall()
 
-        present_count = 0
-        absent_count = 0
-        justified_count = 0
-        attendance_lessons = []
-        for row in attendance_rows:
-            status = str(row["status"] or "").strip().casefold()
-            if status == "present":
-                present_count += 1
-            elif status == "absent":
-                absent_count += 1
-            elif status == "justified":
-                justified_count += 1
-            if status:
-                attendance_lessons.append({
-                    "lesson": row["lesson_label"],
-                    "topic": row["topic"] or "",
-                    "date": row["lesson_date"] or "",
-                    "attendanceType": row["attendance_type"] or "",
-                    "status": status,
-                })
+        attendance_lessons, present_count, absent_count, justified_count = (
+            _attendance_payload(attendance_rows)
+        )
 
         hw_rows = conn.execute(
             """
             SELECT lesson_label, topic, lesson_date, score_type, score, lesson_order
             FROM academic_homework_scores
-            WHERE enrollment_id = ?
+            WHERE enrollment_id = %s
             ORDER BY lesson_order, lesson_label
             """,
             (enrollment_id,),
         ).fetchall()
 
-        homework_grades = [
-            {
-                "lesson": row["lesson_label"],
-                "topic": row["topic"] or "",
-                "date": row["lesson_date"] or "",
-                "type": row["score_type"] or "Homework",
-                "score": float(row["score"]),
-            }
-            for row in hw_rows
-        ]
+        homework_grades = _homework_payload(hw_rows)
 
         exam_rows = conn.execute(
             """
             SELECT label, exam_name, attempt, score
             FROM academic_exam_results
-            WHERE enrollment_id = ?
+            WHERE enrollment_id = %s
             ORDER BY label
             """,
             (enrollment_id,),
         ).fetchall()
 
-        exam_results = [
-            {
-                "label": row["label"],
-                "examName": row["exam_name"] or "",
-                "attempt": row["attempt"] or "",
-                "score": float(row["score"]),
-            }
-            for row in exam_rows
-        ]
+        exam_results = _exam_payload(exam_rows)
 
         academic_records = [
             {

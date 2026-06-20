@@ -1,10 +1,9 @@
 """Runtime raw-SQL helpers for the internal academic admin model."""
 
-import json
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from web.backend import queries
+from db import queries
 
 
 def _utc_now_iso():
@@ -157,12 +156,12 @@ def repair_placeholder_academic_dates(conn, now=None):
             repaired_date = enrollment_label_dates.get((enrollment_id, lesson_label))
         if repaired_date:
             conn.execute(
-                "UPDATE academic_homework_scores SET lesson_date = ?, updated_at = ? WHERE id = ?",
+                "UPDATE academic_homework_scores SET lesson_date = %s, updated_at = %s WHERE id = %s",
                 (repaired_date, now, int(row["id"])),
             )
         else:
             conn.execute(
-                "UPDATE academic_homework_scores SET lesson_date = '', updated_at = ? WHERE id = ?",
+                "UPDATE academic_homework_scores SET lesson_date = '', updated_at = %s WHERE id = %s",
                 (now, int(row["id"])),
             )
 
@@ -173,7 +172,7 @@ def repair_placeholder_academic_dates(conn, now=None):
         lesson_number_norm = _normalize(row["lesson_number"])
         topic_norm = _normalize(row["topic"])
         if lesson_number_norm in {"h/w", "hw", "homework"} and topic_norm == "topic":
-            conn.execute("DELETE FROM academic_lessons WHERE id = ?", (int(row["id"]),))
+            conn.execute("DELETE FROM academic_lessons WHERE id = %s", (int(row["id"]),))
             continue
         if not _is_placeholder_date(row["lesson_date"]):
             continue
@@ -185,12 +184,12 @@ def repair_placeholder_academic_dates(conn, now=None):
             repaired_date = group_label_dates.get((group_id, lesson_number_norm))
         if repaired_date:
             conn.execute(
-                "UPDATE academic_lessons SET lesson_date = ?, updated_at = ? WHERE id = ?",
+                "UPDATE academic_lessons SET lesson_date = %s, updated_at = %s WHERE id = %s",
                 (repaired_date, now, int(row["id"])),
             )
         else:
             conn.execute(
-                "UPDATE academic_lessons SET lesson_date = '', updated_at = ? WHERE id = ?",
+                "UPDATE academic_lessons SET lesson_date = '', updated_at = %s WHERE id = %s",
                 (now, int(row["id"])),
             )
 
@@ -200,6 +199,122 @@ def _slugify(value):
 
     text = re.sub(r"[^a-z0-9]+", "-", _normalize(value)).strip("-")
     return text or "item"
+
+
+def _parse_iso_date(value, field_name):
+    text = str(value or "").strip()
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a valid YYYY-MM-DD date.") from exc
+
+
+def _time_to_minutes(value, field_name):
+    text = str(value or "").strip()
+    try:
+        hour, minute = text.split(":", 1)
+        total = int(hour) * 60 + int(minute)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must use HH:MM time.") from exc
+    if total < 0 or total >= 24 * 60 or not (0 <= int(minute) <= 59):
+        raise ValueError(f"{field_name} must use HH:MM time.")
+    return total
+
+
+def _normalize_weekdays(value):
+    raw = value
+    if isinstance(value, str):
+        raw = value.replace(";", ",").split(",")
+    if not isinstance(raw, (list, tuple, set)):
+        raw = []
+    weekdays = []
+    names = {
+        "mon": 0,
+        "monday": 0,
+        "tue": 1,
+        "tuesday": 1,
+        "wed": 2,
+        "wednesday": 2,
+        "thu": 3,
+        "thursday": 3,
+        "fri": 4,
+        "friday": 4,
+        "sat": 5,
+        "saturday": 5,
+        "sun": 6,
+        "sunday": 6,
+    }
+    for item in raw:
+        text = str(item or "").strip().casefold()
+        if not text:
+            continue
+        if text in names:
+            day = names[text]
+        else:
+            try:
+                day = int(text)
+            except ValueError:
+                continue
+        if 0 <= day <= 6 and day not in weekdays:
+            weekdays.append(day)
+    if not weekdays:
+        raise ValueError("Select at least one weekday.")
+    return sorted(weekdays)
+
+
+def _date_ranges_overlap(start_a, end_a, start_b, end_b):
+    return start_a <= end_b and start_b <= end_a
+
+
+def _time_ranges_overlap(start_a, end_a, start_b, end_b):
+    return start_a < end_b and start_b < end_a
+
+
+def _schedule_conflict_message(conn, *, group_id, teacher_id, weekdays, start_date, end_date, start_time, end_time):
+    rows = conn.execute(
+        """
+        SELECT sch.id, sch.group_id, sch.teacher_id, sch.weekdays, sch.start_date,
+               sch.end_date, sch.start_time, sch.end_time, g.name AS group_name,
+               coalesce(t.full_name, '') AS teacher_name
+        FROM academic_schedules sch
+        JOIN academic_groups g ON g.id = sch.group_id
+        LEFT JOIN teachers t ON t.id = sch.teacher_id
+        WHERE sch.status = 'active'
+          AND (sch.group_id = %s OR (%s > 0 AND sch.teacher_id = %s))
+        """,
+        (int(group_id), int(teacher_id or 0), int(teacher_id or 0)),
+    ).fetchall()
+    wanted_days = set(weekdays)
+    wanted_start = _time_to_minutes(start_time, "Start time")
+    wanted_end = _time_to_minutes(end_time, "End time")
+    for row in rows:
+        other_days = set(_normalize_weekdays(str(row["weekdays"] or "")))
+        if not wanted_days.intersection(other_days):
+            continue
+        other_start_date = _parse_iso_date(row["start_date"], "Existing start date")
+        other_end_date = _parse_iso_date(row["end_date"], "Existing end date")
+        if not _date_ranges_overlap(start_date, end_date, other_start_date, other_end_date):
+            continue
+        other_start = _time_to_minutes(row["start_time"], "Existing start time")
+        other_end = _time_to_minutes(row["end_time"], "Existing end time")
+        if not _time_ranges_overlap(wanted_start, wanted_end, other_start, other_end):
+            continue
+        if int(row["group_id"]) == int(group_id):
+            return f"Group {row['group_name']} already has a class during that time."
+        teacher_name = str(row["teacher_name"] or "Teacher").strip()
+        return f"{teacher_name} already has a class during that time."
+    return ""
+
+
+def _generated_schedule_dates(start_date, end_date, weekdays):
+    current = start_date
+    wanted = set(weekdays)
+    dates = []
+    while current <= end_date:
+        if current.weekday() in wanted:
+            dates.append(current)
+        current += timedelta(days=1)
+    return dates
 
 
 _REQUIRED_TABLES = {
@@ -212,10 +327,25 @@ _REQUIRED_TABLES = {
     "academic_homework_scores",
     "academic_exam_results",
     "academic_coin_events",
+    "academic_schedules",
+    "academic_lesson_sessions",
 }
 
 
+_ACADEMIC_SCHEMA_READY = False
+
+
 def ensure_academic_schema(conn):
+    # Schema DDL is idempotent but not free (catalog locks + round-trips). Running
+    # it on every read/write was a per-request tax; gate it to once per process.
+    global _ACADEMIC_SCHEMA_READY
+    if _ACADEMIC_SCHEMA_READY:
+        return
+    _ensure_academic_schema_ddl(conn)
+    _ACADEMIC_SCHEMA_READY = True
+
+
+def _ensure_academic_schema_ddl(conn):
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS academic_schools (
@@ -326,7 +456,7 @@ def ensure_academic_schema(conn):
         """
         CREATE TABLE IF NOT EXISTS academic_attendance_records (
             id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id),
+            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
             lesson_id BIGINT REFERENCES academic_lessons(id),
             lesson_label TEXT NOT NULL,
             topic TEXT NOT NULL DEFAULT '',
@@ -343,7 +473,7 @@ def ensure_academic_schema(conn):
         """
         CREATE TABLE IF NOT EXISTS academic_homework_scores (
             id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id),
+            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
             lesson_id BIGINT REFERENCES academic_lessons(id),
             lesson_label TEXT NOT NULL,
             topic TEXT NOT NULL DEFAULT '',
@@ -360,7 +490,7 @@ def ensure_academic_schema(conn):
         """
         CREATE TABLE IF NOT EXISTS academic_exam_results (
             id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id),
+            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
             label TEXT NOT NULL,
             exam_name TEXT NOT NULL DEFAULT '',
             attempt TEXT NOT NULL DEFAULT '',
@@ -374,12 +504,56 @@ def ensure_academic_schema(conn):
         """
         CREATE TABLE IF NOT EXISTS academic_coin_events (
             id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id),
+            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
             amount INTEGER NOT NULL DEFAULT 0,
             source TEXT NOT NULL DEFAULT 'import',
             occurred_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(enrollment_id, source)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_schedules (
+            id BIGSERIAL PRIMARY KEY,
+            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
+            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
+            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
+            teacher_id BIGINT REFERENCES teachers(id),
+            title TEXT NOT NULL DEFAULT '',
+            weekdays TEXT NOT NULL DEFAULT '',
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            room TEXT NOT NULL DEFAULT '',
+            online_url TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_lesson_sessions (
+            id BIGSERIAL PRIMARY KEY,
+            schedule_id BIGINT NOT NULL REFERENCES academic_schedules(id) ON DELETE CASCADE,
+            lesson_id BIGINT REFERENCES academic_lessons(id),
+            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
+            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
+            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
+            teacher_id BIGINT REFERENCES teachers(id),
+            session_date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            room TEXT NOT NULL DEFAULT '',
+            online_url TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'scheduled',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(schedule_id, session_date, start_time)
         )
         """
     )
@@ -393,6 +567,11 @@ def ensure_academic_schema(conn):
         ("academic_homework_scores", "enrollment_id"),
         ("academic_exam_results", "enrollment_id"),
         ("academic_coin_events", "enrollment_id"),
+        ("academic_schedules", "group_id"),
+        ("academic_schedules", "teacher_id"),
+        ("academic_lesson_sessions", "schedule_id"),
+        ("academic_lesson_sessions", "group_id"),
+        ("academic_lesson_sessions", "session_date"),
     ):
         conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_{column} ON {table}({column})")
     conn.execute(
@@ -486,7 +665,8 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT l.id, s.code AS school_code, sub.name AS subject_name,
+                SELECT l.id, l.school_id, l.subject_id, l.group_id,
+                       s.code AS school_code, sub.name AS subject_name,
                        g.name AS group_name, l.lesson_number, l.topic AS lesson_topic,
                        l.lesson_date, l.lesson_order
                 FROM academic_lessons l
@@ -498,11 +678,55 @@ def list_academic_admin_rows():
                 """
             ).fetchall()
         ]
+        schedules = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT sch.id, sch.school_id, s.code AS school_code, s.name AS school_name,
+                       sch.subject_id, sub.name AS subject_name,
+                       sch.group_id, g.name AS group_name,
+                       sch.teacher_id, coalesce(t.full_name, '') AS teacher_name,
+                       sch.title, sch.weekdays, sch.start_time, sch.end_time,
+                       sch.start_date, sch.end_date, sch.room, sch.online_url,
+                       sch.status
+                FROM academic_schedules sch
+                JOIN academic_schools s ON s.id = sch.school_id
+                JOIN academic_subjects sub ON sub.id = sch.subject_id
+                JOIN academic_groups g ON g.id = sch.group_id
+                LEFT JOIN teachers t ON t.id = sch.teacher_id
+                WHERE lower(g.name) <> 'online'
+                ORDER BY s.name, sub.name, g.name, sch.start_time
+                """
+            ).fetchall()
+        ]
+        sessions = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT sess.id, sess.schedule_id, sess.lesson_id,
+                       sess.school_id, s.code AS school_code, s.name AS school_name,
+                       sess.subject_id, sub.name AS subject_name,
+                       sess.group_id, g.name AS group_name,
+                       sess.teacher_id, coalesce(t.full_name, '') AS teacher_name,
+                       sess.session_date, sess.start_time, sess.end_time,
+                       sess.room, sess.online_url, sess.status
+                FROM academic_lesson_sessions sess
+                JOIN academic_schools s ON s.id = sess.school_id
+                JOIN academic_subjects sub ON sub.id = sess.subject_id
+                JOIN academic_groups g ON g.id = sess.group_id
+                LEFT JOIN teachers t ON t.id = sess.teacher_id
+                WHERE lower(g.name) <> 'online'
+                ORDER BY sess.session_date, sess.start_time, s.name, g.name
+                """
+            ).fetchall()
+        ]
         return {
             "schools": schools,
             "subjects": subjects,
             "groups": groups,
             "lessons": lessons,
+            "schedules": schedules,
+            "sessions": sessions,
             "enrollment_summary": enrollment_summary,
         }
 
@@ -510,18 +734,23 @@ def list_academic_admin_rows():
 def _upsert_school(conn, code, name, now):
     code = str(code or "school5").strip().casefold() or "school5"
     name = str(name or ("Sehriyo" if code == "sehriyo" else "School 5")).strip()
-    row = conn.execute("SELECT id FROM academic_schools WHERE code = ?", (code,)).fetchone()
+    row = conn.execute("SELECT id FROM academic_schools WHERE code = %s", (code,)).fetchone()
     if row:
         conn.execute(
-            "UPDATE academic_schools SET name = ?, updated_at = ? WHERE id = ?",
+            "UPDATE academic_schools SET name = %s, updated_at = %s WHERE id = %s",
             (name, now, int(row["id"])),
         )
         return int(row["id"])
     cur = conn.execute(
-        "INSERT INTO academic_schools (code, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        """
+        INSERT INTO academic_schools (code, name, created_at, updated_at)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+        """,
         (code, name, now, now),
     )
-    return int(cur.lastrowid)
+    inserted = cur.fetchone()
+    return int(inserted["id"]) if inserted else 0
 
 
 def _upsert_subject(conn, school_id, name, code, now):
@@ -529,15 +758,15 @@ def _upsert_subject(conn, school_id, name, code, now):
     key = _slugify(name)
     short_name = str(code or name[:4]).strip()
     row = conn.execute(
-        "SELECT id FROM academic_subjects WHERE school_id = ? AND key = ?",
+        "SELECT id FROM academic_subjects WHERE school_id = %s AND key = %s",
         (school_id, key),
     ).fetchone()
     if row:
         conn.execute(
             """
             UPDATE academic_subjects
-            SET name = ?, code = ?, short_name = ?, updated_at = ?
-            WHERE id = ?
+            SET name = %s, code = %s, short_name = %s, updated_at = %s
+            WHERE id = %s
             """,
             (name, str(code or ""), short_name, now, int(row["id"])),
         )
@@ -545,11 +774,13 @@ def _upsert_subject(conn, school_id, name, code, now):
     cur = conn.execute(
         """
         INSERT INTO academic_subjects (school_id, key, name, code, short_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (school_id, key, name, str(code or ""), short_name, now, now),
     )
-    return int(cur.lastrowid)
+    inserted = cur.fetchone()
+    return int(inserted["id"]) if inserted else 0
 
 
 def _upsert_group(conn, school_id, subject_id, name, code, now):
@@ -558,42 +789,44 @@ def _upsert_group(conn, school_id, subject_id, name, code, now):
     row = conn.execute(
         """
         SELECT id FROM academic_groups
-        WHERE school_id = ? AND subject_id = ? AND key = ?
+        WHERE school_id = %s AND subject_id = %s AND key = %s
         """,
         (school_id, subject_id, key),
     ).fetchone()
     if row:
         conn.execute(
-            "UPDATE academic_groups SET name = ?, code = ?, updated_at = ? WHERE id = ?",
+            "UPDATE academic_groups SET name = %s, code = %s, updated_at = %s WHERE id = %s",
             (name, str(code or ""), now, int(row["id"])),
         )
         return int(row["id"])
     cur = conn.execute(
         """
         INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
         """,
         (school_id, subject_id, key, name, str(code or ""), now, now),
     )
-    return int(cur.lastrowid)
+    inserted = cur.fetchone()
+    return int(inserted["id"]) if inserted else 0
 
 
-def _student_row_id(conn, school_key, public_dashboard_id, full_name):
+def _student_row_id(conn, school_key, enrollment_id, full_name):
     row = conn.execute(
         """
         SELECT student_row_id
         FROM students_sheet_map
-        WHERE school_key = ? AND sheet_student_id = ?
+        WHERE school_key = %s AND sheet_student_id = %s
         """,
-        (school_key, public_dashboard_id),
+        (school_key, enrollment_id),
     ).fetchone()
     if row:
         return int(row["student_row_id"])
     row = conn.execute(
         """
         SELECT id FROM students
-        WHERE lower(full_name) = lower(?)
-          AND lower(coalesce(school_key, '')) = lower(?)
+        WHERE lower(full_name) = lower(%s)
+          AND lower(coalesce(school_key, '')) = lower(%s)
         LIMIT 1
         """,
         (full_name, school_key),
@@ -607,7 +840,7 @@ def create_subject(school_code, name, code=""):
     with _connect() as conn:
         _ensure(conn)
         school = conn.execute(
-            "SELECT id FROM academic_schools WHERE code = ?",
+            "SELECT id FROM academic_schools WHERE code = %s",
             (school_code,),
         ).fetchone()
         if not school:
@@ -615,7 +848,7 @@ def create_subject(school_code, name, code=""):
         conn.execute(
             """
             INSERT INTO academic_subjects (school_id, key, name, code, short_name, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(school_id, key) DO UPDATE SET
               name = excluded.name,
               code = excluded.code,
@@ -632,11 +865,11 @@ def create_group(school_code, subject_id, name, code=""):
     key = "-".join(str(name or "").strip().casefold().split())
     with _connect() as conn:
         _ensure(conn)
-        school = conn.execute("SELECT id FROM academic_schools WHERE code = ?", (school_code,)).fetchone()
+        school = conn.execute("SELECT id FROM academic_schools WHERE code = %s", (school_code,)).fetchone()
         if not school:
             raise ValueError("School was not found.")
         subject = conn.execute(
-            "SELECT id FROM academic_subjects WHERE id = ? AND school_id = ?",
+            "SELECT id FROM academic_subjects WHERE id = %s AND school_id = %s",
             (subject_id, int(school["id"])),
         ).fetchone()
         if not subject:
@@ -644,7 +877,7 @@ def create_group(school_code, subject_id, name, code=""):
         conn.execute(
             """
             INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(school_id, subject_id, key) DO UPDATE SET
               name = excluded.name,
               code = excluded.code,
@@ -655,19 +888,208 @@ def create_group(school_code, subject_id, name, code=""):
         conn.commit()
 
 
+def create_schedule(
+    group_id,
+    *,
+    teacher_id=0,
+    weekdays=None,
+    start_time="",
+    end_time="",
+    start_date="",
+    end_date="",
+    room="",
+    online_url="",
+    title="",
+):
+    group_id = int(group_id or 0)
+    teacher_id = int(teacher_id or 0)
+    weekdays = _normalize_weekdays(weekdays)
+    start_date_obj = _parse_iso_date(start_date, "Start date")
+    end_date_obj = _parse_iso_date(end_date, "End date")
+    if end_date_obj < start_date_obj:
+        raise ValueError("End date cannot be earlier than start date.")
+    if (end_date_obj - start_date_obj).days > 366:
+        raise ValueError("Schedule range cannot be longer than one year.")
+    start_minutes = _time_to_minutes(start_time, "Start time")
+    end_minutes = _time_to_minutes(end_time, "End time")
+    if end_minutes <= start_minutes:
+        raise ValueError("End time must be after start time.")
+
+    generated_dates = _generated_schedule_dates(start_date_obj, end_date_obj, weekdays)
+    if not generated_dates:
+        raise ValueError("The selected date range does not contain the selected weekdays.")
+
+    now = _utc_now_iso()
+    weekdays_text = ",".join(str(day) for day in weekdays)
+    title = str(title or "").strip()
+    room = str(room or "").strip()
+    online_url = str(online_url or "").strip()
+
+    with _connect() as conn:
+        _ensure(conn)
+        group = conn.execute(
+            """
+            SELECT g.id, g.school_id, g.subject_id, g.name, sub.name AS subject_name
+            FROM academic_groups g
+            JOIN academic_subjects sub ON sub.id = g.subject_id
+            WHERE g.id = %s
+            """,
+            (group_id,),
+        ).fetchone()
+        if not group:
+            raise ValueError("Group was not found.")
+        if teacher_id:
+            teacher = conn.execute("SELECT id FROM teachers WHERE id = %s", (teacher_id,)).fetchone()
+            if not teacher:
+                raise ValueError("Teacher was not found.")
+        conflict = _schedule_conflict_message(
+            conn,
+            group_id=group_id,
+            teacher_id=teacher_id,
+            weekdays=weekdays,
+            start_date=start_date_obj,
+            end_date=end_date_obj,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        if conflict:
+            raise ValueError(conflict)
+
+        cur = conn.execute(
+            """
+            INSERT INTO academic_schedules (
+              school_id, subject_id, group_id, teacher_id, title, weekdays,
+              start_time, end_time, start_date, end_date, room, online_url,
+              status, created_at, updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s, %s)
+            RETURNING id
+            """,
+            (
+                int(group["school_id"]),
+                int(group["subject_id"]),
+                group_id,
+                teacher_id or None,
+                title,
+                weekdays_text,
+                str(start_time).strip(),
+                str(end_time).strip(),
+                start_date_obj.isoformat(),
+                end_date_obj.isoformat(),
+                room,
+                online_url,
+                now,
+                now,
+            ),
+        )
+        inserted_schedule = cur.fetchone()
+        schedule_id = int(inserted_schedule["id"]) if inserted_schedule else 0
+
+        row = conn.execute(
+            "SELECT coalesce(max(lesson_order), 0) AS max_order FROM academic_lessons WHERE group_id = %s",
+            (group_id,),
+        ).fetchone()
+        lesson_order = int(row["max_order"] or 0)
+        topic = title or str(group["subject_name"] or "Scheduled lesson")
+
+        session_ids = []
+        for session_date in generated_dates:
+            lesson_order += 1
+            lesson_number = f"S{schedule_id}-{session_date.strftime('%Y%m%d')}"
+            lesson_cur = conn.execute(
+                """
+                INSERT INTO academic_lessons (
+                  school_id, subject_id, group_id, lesson_number, topic,
+                  lesson_date, lesson_order, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT(school_id, subject_id, group_id, lesson_number) DO UPDATE SET
+                  topic = excluded.topic,
+                  lesson_date = excluded.lesson_date,
+                  lesson_order = excluded.lesson_order,
+                  updated_at = excluded.updated_at
+                RETURNING id
+                """,
+                (
+                    int(group["school_id"]),
+                    int(group["subject_id"]),
+                    group_id,
+                    lesson_number,
+                    topic,
+                    session_date.isoformat(),
+                    lesson_order,
+                    now,
+                    now,
+                ),
+            )
+            inserted_lesson = lesson_cur.fetchone()
+            lesson_id = int(inserted_lesson["id"]) if inserted_lesson else 0
+            if not lesson_id:
+                existing = conn.execute(
+                    """
+                    SELECT id FROM academic_lessons
+                    WHERE school_id = %s AND subject_id = %s AND group_id = %s AND lesson_number = %s
+                    """,
+                    (int(group["school_id"]), int(group["subject_id"]), group_id, lesson_number),
+                ).fetchone()
+                lesson_id = int(existing["id"]) if existing else None
+            session_cur = conn.execute(
+                """
+                INSERT INTO academic_lesson_sessions (
+                  schedule_id, lesson_id, school_id, subject_id, group_id, teacher_id,
+                  session_date, start_time, end_time, room, online_url, status,
+                  created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'scheduled', %s, %s)
+                ON CONFLICT(schedule_id, session_date, start_time) DO UPDATE SET
+                  lesson_id = excluded.lesson_id,
+                  end_time = excluded.end_time,
+                  room = excluded.room,
+                  online_url = excluded.online_url,
+                  updated_at = excluded.updated_at
+                RETURNING id
+                """,
+                (
+                    schedule_id,
+                    lesson_id,
+                    int(group["school_id"]),
+                    int(group["subject_id"]),
+                    group_id,
+                    teacher_id or None,
+                    session_date.isoformat(),
+                    str(start_time).strip(),
+                    str(end_time).strip(),
+                    room,
+                    online_url,
+                    now,
+                    now,
+                ),
+            )
+            inserted_session = session_cur.fetchone()
+            if inserted_session:
+                session_ids.append(int(inserted_session["id"] or 0))
+        conn.commit()
+
+    return {
+        "scheduleId": schedule_id,
+        "sessionCount": len(generated_dates),
+        "sessionIds": [session_id for session_id in session_ids if session_id],
+    }
+
+
 def create_lesson(group_id, lesson_number, topic, lesson_date="", lesson_order=None):
     now = _utc_now_iso()
     with _connect() as conn:
         _ensure(conn)
         group = conn.execute(
-            "SELECT school_id, subject_id FROM academic_groups WHERE id = ?",
+            "SELECT school_id, subject_id FROM academic_groups WHERE id = %s",
             (group_id,),
         ).fetchone()
         if not group:
             raise ValueError("Group was not found.")
         if not lesson_order:
             row = conn.execute(
-                "SELECT coalesce(max(lesson_order), 0) AS max_order FROM academic_lessons WHERE group_id = ?",
+                "SELECT coalesce(max(lesson_order), 0) AS max_order FROM academic_lessons WHERE group_id = %s",
                 (group_id,),
             ).fetchone()
             lesson_order = int(row["max_order"] or 0) + 1
@@ -677,7 +1099,7 @@ def create_lesson(group_id, lesson_number, topic, lesson_date="", lesson_order=N
               school_id, subject_id, group_id, lesson_number, topic, lesson_date,
               lesson_order, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT(school_id, subject_id, group_id, lesson_number) DO UPDATE SET
               topic = excluded.topic,
               lesson_date = excluded.lesson_date,
@@ -704,7 +1126,7 @@ def update_lesson(lesson_id, lesson_number=None, topic=None, lesson_date=None):
     with _connect() as conn:
         _ensure(conn)
         row = conn.execute(
-            "SELECT id FROM academic_lessons WHERE id = ?", (lesson_id,)
+            "SELECT id FROM academic_lessons WHERE id = %s", (lesson_id,)
         ).fetchone()
         if not row:
             raise ValueError("Lesson not found.")
@@ -715,9 +1137,9 @@ def update_lesson(lesson_id, lesson_number=None, topic=None, lesson_date=None):
             updates["topic"] = str(topic).strip()
         if lesson_date is not None:
             updates["lesson_date"] = str(lesson_date).strip()
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        set_clause = ", ".join(f"{k} = %s" for k in updates)
         conn.execute(
-            f"UPDATE academic_lessons SET {set_clause} WHERE id = ?",
+            f"UPDATE academic_lessons SET {set_clause} WHERE id = %s",
             list(updates.values()) + [int(lesson_id)],
         )
         conn.commit()
@@ -727,15 +1149,16 @@ def _insert_record(table, values):
     now = _utc_now_iso()
     columns = list(values.keys()) + ["updated_at"]
     params = list(values.values()) + [now]
-    placeholders = ",".join(["?"] * len(params))
+    placeholders = ",".join(["%s"] * len(params))
     with _connect() as conn:
         _ensure(conn)
         cur = conn.execute(
-            f"INSERT INTO {table} ({','.join(columns)}) VALUES ({placeholders})",
+            f"INSERT INTO {table} ({','.join(columns)}) VALUES ({placeholders}) RETURNING id",
             params,
         )
+        inserted = cur.fetchone()
         conn.commit()
-        return int(cur.lastrowid)
+        return int(inserted["id"] or 0) if inserted else 0
 
 
 def record_attendance(enrollment_id, lesson_label, status, topic="", lesson_date="", attendance_type=""):
@@ -791,12 +1214,14 @@ def record_coin_event(enrollment_id, amount, source="manual"):
         cur = conn.execute(
             """
             INSERT INTO academic_coin_events (enrollment_id, amount, source, occurred_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT(enrollment_id, source) DO UPDATE SET
               amount = excluded.amount,
               updated_at = excluded.updated_at
+            RETURNING id
             """,
             (int(enrollment_id), int(amount), source or "manual", now, now),
         )
+        inserted = cur.fetchone()
         conn.commit()
-        return int(cur.lastrowid or 0)
+        return int(inserted["id"] or 0) if inserted else 0

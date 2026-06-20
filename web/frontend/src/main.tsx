@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import App from "./app/App";
 import "./index.css";
 
 const VITE_CHUNK_RELOAD_KEY = "__msi_vite_chunk_reload_once";
@@ -21,11 +21,8 @@ window.addEventListener("pageshow", () => {
   try {
     window.sessionStorage.removeItem(VITE_CHUNK_RELOAD_KEY);
   } catch (_error) {
-    // Ignore sessionStorage availability issues.
   }
 });
-
-// Each page component owns its own TelegramLayout — no wrapper needed here.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

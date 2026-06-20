@@ -14,26 +14,46 @@
     return;
   }
 
-  function hydrateLoginTelegramUserId(webApp) {
-    const input = document.getElementById("loginTelegramUserId");
-    const telegramUserId =
-      webApp &&
-      webApp.initDataUnsafe &&
-      webApp.initDataUnsafe.user &&
-      Number(webApp.initDataUnsafe.user.id);
-
-    if (!input || !Number.isInteger(telegramUserId) || telegramUserId <= 0) {
+  // Hand the *signed* initData to the server. The backend verifies its HMAC
+  // before trusting the Telegram identity, so we never send a forgeable raw id.
+  function authenticateWithTelegram(webApp) {
+    const initData = webApp && typeof webApp.initData === "string" ? webApp.initData : "";
+    if (!initData) {
       return;
     }
 
-    input.value = String(telegramUserId);
-    const currentUrl = new URL(window.location.href);
-    const loggedOut = currentUrl.searchParams.get("logged_out") === "1";
-    const currentTelegramUserId = Number(currentUrl.searchParams.get("tg_user_id"));
-    if (!loggedOut && currentTelegramUserId !== telegramUserId) {
-      currentUrl.searchParams.set("tg_user_id", String(telegramUserId));
-      window.location.replace(currentUrl.toString());
+    // Stash the signed blob on the login form so credential login can link the
+    // Telegram account through the same server-side verification.
+    const initDataInput = document.getElementById("loginTelegramInitData");
+    if (initDataInput) {
+      initDataInput.value = initData;
     }
+
+    // Skip silent auto-login right after an explicit logout.
+    const currentUrl = new URL(window.location.href);
+    if (currentUrl.searchParams.get("logged_out") === "1") {
+      return;
+    }
+
+    const body = new URLSearchParams();
+    body.set("init_data", initData);
+    fetch("/auth/telegram", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      credentials: "same-origin",
+      body: body.toString(),
+    })
+      .then(function (response) {
+        return response.ok ? response.json() : null;
+      })
+      .then(function (data) {
+        if (data && data.ok && data.redirect) {
+          window.location.replace(data.redirect);
+        }
+      })
+      .catch(function () {
+        // Network failures fall back to the manual login form.
+      });
   }
 
   ns.runWithWebApp(
@@ -62,7 +82,7 @@
       swipe.enforceSwipeLock();
       swipe.bindCollapseFallback();
       backButton.configureFromDocument();
-      hydrateLoginTelegramUserId(webApp);
+      authenticateWithTelegram(webApp);
 
       const scheduleSync = function scheduleSync() {
         safeArea.scheduleSync(swipe.afterSync);

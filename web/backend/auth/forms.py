@@ -5,8 +5,11 @@ from wtforms.validators import DataRequired  # type: ignore
 
 class LoginForm(FlaskForm):
     login = StringField("Login", validators=[DataRequired()])
-    password = PasswordField("Password", validators=[DataRequired()])
-    telegram_user_id = HiddenField("Telegram User ID")
+    # TEMPORARY DEV: password is optional so admin can log in without one.
+    # Restore validators=[DataRequired()] before production (see
+    # shared/identity/credentials.py _ADMIN_PASSWORDLESS_LOGIN).
+    password = PasswordField("Password")
+    init_data = HiddenField("Telegram Init Data")
 
 
 class StudentPasswordChangeForm(FlaskForm):

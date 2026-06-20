@@ -1,0 +1,1 @@
+"""Parent role package (scaffold)."""

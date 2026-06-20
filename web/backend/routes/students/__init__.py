@@ -1,1 +1,0 @@
-"""Student route package."""

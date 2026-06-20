@@ -1,6 +1,7 @@
 import math
 import os
 import re
+import hashlib
 import threading
 import time
 from datetime import timedelta
@@ -13,13 +14,12 @@ from flask_wtf.csrf import CSRFError
 from web.backend.auth.policies import is_authenticated_session as is_authenticated_policy_session
 from web.backend.auth.session import configure_login_manager
 from web.backend.js_bundles import ensure_js_bundles
-from web.backend.core.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
+from web.backend.utils.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
 from config import get_web_settings
 from web.backend.extensions import init_extensions, login_manager
-from web.backend.routes.admin.admin_page import register_admin_page_routes
-from web.backend.routes.system_routes import register_system_routes
-from web.backend.routes.students.student_page import register_student_page_routes
-from database_storage.database import get_sqlalchemy_database_uri
+from web.backend.roles.admin.routes import register_admin_page_routes
+from web.backend.routes.system import register_system_routes
+from web.backend.roles.student.routes import register_student_page_routes
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
@@ -42,18 +42,50 @@ app.config["COMPRESS_MIMETYPES"] = [
     "application/json",
     "image/svg+xml",
 ]
-app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "change-me-in-production")
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
-    days=int(os.environ.get("SESSION_LIFETIME_DAYS", "365"))
+# Fail closed: a known/default signing key lets anyone forge a session cookie
+# (and therefore an admin session). Require a real key outside explicit local dev.
+_secret_key = os.environ.get("FLASK_SECRET_KEY", "").strip()
+if not _secret_key:
+    if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
+        _secret_key = "dev-only-insecure-key-do-not-use-in-prod"
+    else:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY must be set. Generate one with: "
+            'python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+app.config["SECRET_KEY"] = _secret_key
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    # Telegram Mini App runs in an embedded webview. If login breaks inside Telegram
+    # with "Lax", set SESSION_COOKIE_SAMESITE=None (requires Secure=True over HTTPS).
+    SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_COOKIE_SAMESITE", "Lax"),
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "1").strip().lower()
+    not in {"0", "false", "no", "off"},
 )
-app.config["SQLALCHEMY_DATABASE_URI"] = get_sqlalchemy_database_uri()
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# ─────────────────────────────────────────────────────────────────────────────
+# ⚠️  TEMPORARY DEV OVERRIDE — allow the session/CSRF cookie over plain http so
+# the app works on a phone at http://<lan-ip>:8080 (Secure cookies are dropped
+# over http, which makes the CSRF session token "missing" and login fail).
+# REMOVE this block before production (or set SESSION_COOKIE_SECURE=1).
+# ─────────────────────────────────────────────────────────────────────────────
+app.config["SESSION_COOKIE_SECURE"] = False
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
+    days=int(os.environ.get("SESSION_LIFETIME_DAYS", "30"))
+)
 app.config["WTF_CSRF_TIME_LIMIT"] = None
 # Werkzeug rejects requests larger than this before the route handler runs.
 # Matches RESOURCE_UPLOAD_MAX_MB (default 1 GB). Override with MAX_UPLOAD_MB env var.
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "1024")) * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "200")) * 1024 * 1024
 
 _compress = Compress(app)
+
+# Behind a TLS-terminating reverse proxy (Railway/nginx): trust one proxy hop so
+# request.remote_addr (used by the rate limiter) and request.is_secure reflect the
+# real client instead of the proxy. Disable with TRUST_PROXY=0 if running direct.
+if os.environ.get("TRUST_PROXY", "1").strip().lower() not in {"0", "false", "no", "off"}:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 
 _CACHE_NO_STORE = "no-store, max-age=0"
@@ -160,11 +192,15 @@ app.config["ASSET_VERSION"] = _ASSET_VERSION
 # Reuse shared root config so web uses the same source as main.py.
 settings = get_web_settings()
 GROUP_CACHE_TTL_SECONDS = int(os.environ.get("GROUP_CACHE_TTL_SECONDS", "600"))
+RATING_CACHE_TTL_SECONDS = int(os.environ.get("RATING_CACHE_TTL_SECONDS", "60"))
+RATING_CACHE_MAX_ENTRIES = int(os.environ.get("RATING_CACHE_MAX_ENTRIES", "128"))
 
 _GROUP_CACHE_LOCK = threading.Lock()
 # In-memory cache keyed by (subject, group) to avoid repeated dataset rebuilds.
 _GROUP_CACHE = {}
 _STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
+_RATING_CACHE_LOCK = threading.Lock()
+_RATING_LEADERBOARD_CACHE = {}
 _APP_BOOTSTRAPPED = False
 _PUBLIC_ENDPOINTS = {
     "static",
@@ -182,6 +218,8 @@ def _clear_group_cache():
     with _GROUP_CACHE_LOCK:
         _GROUP_CACHE.clear()
         _STUDENTS_BY_SUBJECT_GROUP_CACHE.clear()
+    with _RATING_CACHE_LOCK:
+        _RATING_LEADERBOARD_CACHE.clear()
 
 
 def _iter_dashboard_school_codes(preferred_school_code = ""):
@@ -292,21 +330,9 @@ def _get_group_cache_entry(subject, group, school_code = "", force_refresh = Fal
 
 
 def _extract_numeric_average_grade(dashboard_payload):
-    homework_grades = dashboard_payload.get("homeworkGrades", [])
-    if isinstance(homework_grades, list):
-        scores = []
-        for item in homework_grades:
-            if not isinstance(item, dict):
-                continue
-            try:
-                score = float(item.get("score"))
-            except (TypeError, ValueError):
-                continue
-            if not math.isfinite(score):
-                continue
-            scores.append(max(0.0, min(9.0, score)))
-        if scores:
-            return math.floor((sum(scores) / len(scores)) * 10 + 0.5) / 10
+    scores = _extract_homework_scores(dashboard_payload)
+    if scores:
+        return math.floor((sum(scores) / len(scores)) * 10 + 0.5) / 10
 
     raw_value = dashboard_payload.get("averageGrade")
     try:
@@ -319,10 +345,48 @@ def _extract_numeric_average_grade(dashboard_payload):
     return average_grade
 
 
+def _extract_homework_scores(dashboard_payload):
+    homework_grades = dashboard_payload.get("homeworkGrades", [])
+    scores = []
+    if not isinstance(homework_grades, list):
+        return scores
+    for item in homework_grades:
+        if not isinstance(item, dict):
+            continue
+        try:
+            score = float(item.get("score"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(score):
+            continue
+        scores.append(max(0.0, min(9.0, score)))
+    return scores
+
+
 def _extract_exam_average_score(dashboard_payload):
-    exam_scores = []
+    best_scores = _extract_best_exam_scores(dashboard_payload)
+    if not best_scores:
+        return None
+    return round(sum(best_scores.values()) / len(best_scores), 1)
+
+
+def _normalize_exam_rating_key(value):
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    return " ".join(normalized.casefold().split())
+
+
+def _extract_best_exam_scores(dashboard_payload):
+    best_scores = {}
     for exam_result in dashboard_payload.get("examResults", []):
         if not isinstance(exam_result, dict):
+            continue
+
+        exam_key = _normalize_exam_rating_key(
+            exam_result.get("examName") or exam_result.get("label")
+        )
+        if not exam_key:
             continue
 
         raw_score = exam_result.get("score")
@@ -333,11 +397,10 @@ def _extract_exam_average_score(dashboard_payload):
         if not math.isfinite(numeric_score):
             continue
 
-        exam_scores.append(numeric_score)
+        bounded_score = max(0.0, min(9.0, numeric_score))
+        best_scores[exam_key] = max(best_scores.get(exam_key, 0.0), bounded_score)
 
-    if not exam_scores:
-        return None
-    return round(sum(exam_scores) / len(exam_scores), 1)
+    return best_scores
 
 
 def _safe_nonnegative_int(value):
@@ -367,11 +430,24 @@ def _extract_attendance_rate(dashboard_payload):
     return round(((present + justified_absent) / total) * 100)
 
 
+def _extract_attendance_total(dashboard_payload):
+    attendance_record = dashboard_payload.get("attendanceRecord", {})
+    if not isinstance(attendance_record, dict):
+        attendance_record = {}
+
+    present = _safe_nonnegative_int(attendance_record.get("presentCount", 0))
+    absent = _safe_nonnegative_int(attendance_record.get("absentCount", 0))
+    justified_absent = _safe_nonnegative_int(
+        attendance_record.get("justifiedAbsentCount", 0)
+    )
+    return present + absent + justified_absent
+
+
 def _attendance_rate_to_score(attendance_rate):
     bounded_rate = max(0, min(int(attendance_rate), 100))
     if bounded_rate == 0:
         return 0
-    return max(1, min(9, _round_grade_half_up((bounded_rate / 100) * 9)))
+    return round((bounded_rate / 100) * 9, 1)
 
 
 def _collect_subject_dashboards_from_dataset(
@@ -443,6 +519,14 @@ def _round_grade_half_up(value):
 def _build_subject_leaderboard(
     dashboards,
 ):
+    cache_key = _subject_leaderboard_cache_key(dashboards)
+    now = time.time()
+    if cache_key and RATING_CACHE_TTL_SECONDS > 0:
+        with _RATING_CACHE_LOCK:
+            cached_entry = _RATING_LEADERBOARD_CACHE.get(cache_key)
+            if cached_entry and now < float(cached_entry.get("expires_at", 0)):
+                return cached_entry.get("value", [])
+
     # Each row stores raw values we need for sorting and final display.
     ranking_rows = []
 
@@ -465,14 +549,26 @@ def _build_subject_leaderboard(
         display_name = f"{surname} {name}".strip() if surname and name else full_name
         group_name = str(student.get("group", "")).strip()
 
-        avg_exam_score = _extract_exam_average_score(dashboard_payload) or 0.0
+        best_exam_scores = _extract_best_exam_scores(dashboard_payload)
+        exam_count = len(best_exam_scores)
+        avg_exam_score = (
+            round(sum(best_exam_scores.values()) / exam_count, 1)
+            if exam_count
+            else 0.0
+        )
         exam_performance = (
             _round_grade_half_up(avg_exam_score) if avg_exam_score > 0 else 0
         )
+        homework_count = len(_extract_homework_scores(dashboard_payload))
         aap = _round_grade_half_up(average_grade)
         attendance_rate = _extract_attendance_rate(dashboard_payload)
         attendance_score = _attendance_rate_to_score(attendance_rate)
-        average_composite = round((exam_performance + aap + attendance_score) / 3, 1)
+        attendance_total = _extract_attendance_total(dashboard_payload)
+        average_composite = round(
+            (avg_exam_score * 0.70) + (average_grade * 0.15) + (attendance_score * 0.15),
+            1,
+        )
+        is_provisional = exam_count < 2 or homework_count < 10 or attendance_total < 10
 
         ranking_rows.append(
             {
@@ -484,20 +580,29 @@ def _build_subject_leaderboard(
                 "avgExamScore": avg_exam_score,
                 "avgExamScoreDisplay": f"{avg_exam_score:.1f}",
                 "examPerformance": exam_performance,
+                "examPerformanceDisplay": f"{avg_exam_score:.1f}",
+                "examCount": exam_count,
                 "aap": aap,
+                "aapDisplay": f"{average_grade:.1f}",
+                "homeworkCount": homework_count,
                 "attendanceRate": attendance_rate,
                 "attendanceScore": attendance_score,
+                "attendanceScoreDisplay": f"{attendance_score:.1f}",
+                "attendanceTotal": attendance_total,
                 "averageComposite": average_composite,
                 "averageCompositeDisplay": f"{average_composite:.1f}",
+                "isProvisional": is_provisional,
+                "ratingStatus": "Provisional" if is_provisional else "Official",
             }
         )
 
     ranking_rows.sort(
         # Sort by the same priority users see in the rating board.
         key=lambda row: (
+            bool(row["isProvisional"]),
             -float(row["averageComposite"]),
-            -int(row["examPerformance"]),
-            -int(row["aap"]),
+            -float(row["avgExamScore"]),
+            -float(row["averageGrade"]),
             -int(row["attendanceRate"]),
             str(row["sortName"]),
             int(row["studentId"]),
@@ -505,28 +610,107 @@ def _build_subject_leaderboard(
     )
 
     leaderboard = []
+    official_position = 0
     for position, row in enumerate(ranking_rows, start=1):
         average_grade = float(row["averageGrade"])
+        if not row["isProvisional"]:
+            official_position += 1
 
         leaderboard.append(
             {
-                "rank": position,
+                "rank": official_position if not row["isProvisional"] else 0,
                 "position": position,
                 "studentId": row["studentId"],
                 "displayName": row["displayName"],
                 "group": row["group"],
                 "avgExamScoreDisplay": row["avgExamScoreDisplay"],
                 "examPerformance": row["examPerformance"],
+                "examPerformanceDisplay": row["examPerformanceDisplay"],
+                "examCount": row["examCount"],
                 "aap": row["aap"],
+                "aapDisplay": row["aapDisplay"],
+                "homeworkCount": row["homeworkCount"],
                 "attendanceRate": row["attendanceRate"],
                 "attendanceScore": row["attendanceScore"],
+                "attendanceScoreDisplay": row["attendanceScoreDisplay"],
+                "attendanceTotal": row["attendanceTotal"],
                 "averageComposite": row["averageComposite"],
                 "averageCompositeDisplay": row["averageCompositeDisplay"],
                 "averageGrade": average_grade,
+                "isProvisional": row["isProvisional"],
+                "ratingStatus": row["ratingStatus"],
             }
         )
 
+    if cache_key and RATING_CACHE_TTL_SECONDS > 0:
+        with _RATING_CACHE_LOCK:
+            _RATING_LEADERBOARD_CACHE[cache_key] = {
+                "value": leaderboard,
+                "expires_at": now + RATING_CACHE_TTL_SECONDS,
+            }
+            expired_keys = [
+                key
+                for key, entry in _RATING_LEADERBOARD_CACHE.items()
+                if float(entry.get("expires_at", 0)) <= now
+            ]
+            for key in expired_keys:
+                _RATING_LEADERBOARD_CACHE.pop(key, None)
+            if len(_RATING_LEADERBOARD_CACHE) > RATING_CACHE_MAX_ENTRIES:
+                ordered_entries = sorted(
+                    _RATING_LEADERBOARD_CACHE.items(),
+                    key=lambda item: float(item[1].get("expires_at", 0)),
+                )
+                overflow = len(_RATING_LEADERBOARD_CACHE) - RATING_CACHE_MAX_ENTRIES
+                for key, _entry in ordered_entries[:overflow]:
+                    _RATING_LEADERBOARD_CACHE.pop(key, None)
+
     return leaderboard
+
+
+def _subject_leaderboard_cache_key(dashboards):
+    if not isinstance(dashboards, list) or not dashboards:
+        return ""
+
+    parts = []
+    for dashboard_payload in dashboards:
+        if not isinstance(dashboard_payload, dict):
+            continue
+        student = dashboard_payload.get("student", {})
+        if not isinstance(student, dict):
+            continue
+        student_id = student.get("id")
+        subject = _normalize(student.get("subject", ""))
+        school = _normalize(student.get("schoolCode", "") or student.get("schoolName", ""))
+        group = _normalize(student.get("group", ""))
+        average = str(dashboard_payload.get("averageGrade", ""))
+        homework_count = len(dashboard_payload.get("homeworkGrades", []) or [])
+        exam_count = len(dashboard_payload.get("examResults", []) or [])
+        attendance = dashboard_payload.get("attendanceRecord", {})
+        if not isinstance(attendance, dict):
+            attendance = {}
+        attendance_token = ":".join(
+            str(attendance.get(key, ""))
+            for key in ("presentCount", "absentCount", "justifiedAbsentCount")
+        )
+        parts.append(
+            "|".join(
+                [
+                    str(student_id),
+                    subject,
+                    school,
+                    group,
+                    average,
+                    str(homework_count),
+                    str(exam_count),
+                    attendance_token,
+                ]
+            )
+        )
+
+    if not parts:
+        return ""
+    digest = hashlib.sha1("\n".join(sorted(parts)).encode("utf-8")).hexdigest()
+    return f"subject-leaderboard:{digest}"
 
 
 def _compute_subject_rating(
@@ -552,7 +736,7 @@ def _compute_subject_rating(
     if not dashboards:
         # When the group cache is cold, build the peer list directly from
         # internal DB enrollment records.
-        from web.backend.services.internal_dashboard import get_subject_dashboards_from_db
+        from web.backend.domains.academics.internal_dashboard_service import get_subject_dashboards_from_db
         dashboards = get_subject_dashboards_from_db(subject)
 
     if not dashboards:
@@ -664,12 +848,12 @@ def _build_students_by_subject_group(
 
 
 def _load_dataset(school_code = None, force_refresh = False):
-    _ = force_refresh
-    from web.backend.services.internal_dashboard import build_internal_dataset
+    from web.backend.domains.academics.internal_dashboard_service import build_internal_dataset
 
     dataset = build_internal_dataset(school_code or "")
     if dataset:
-        _seed_group_cache_from_dataset(dataset)
+        # force_refresh re-seeds the group cache even when entries are still fresh.
+        _seed_group_cache_from_dataset(dataset, force=bool(force_refresh))
         return dataset, None
     return None, "Internal academic data is not available."
 
@@ -683,7 +867,7 @@ def _load_dashboard_payload(
 ):
     normalized_requested_school = _normalize_school_code(requested_school)
 
-    from web.backend.services.internal_dashboard import get_enrollment_dashboard
+    from web.backend.domains.academics.internal_dashboard_service import get_enrollment_dashboard
     db_payload = get_enrollment_dashboard(student_id, normalized_requested_school)
     if db_payload is not None:
         return db_payload, None, None
@@ -727,8 +911,37 @@ def _is_authenticated_session():
     return bool(getattr(current_user, "is_authenticated", False))
 
 
+_STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _reject_cross_origin_state_change():
+    # Many JSON endpoints are @csrf.exempt; enforce same-origin here so a third-party
+    # page cannot drive state-changing requests with the victim's session cookie.
+    if request.method not in _STATE_CHANGING_METHODS:
+        return None
+    path = str(request.path or "")
+    if not (path.startswith("/api/") or path.startswith("/admin/api/")):
+        return None
+    origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
+    if not origin:
+        # Browsers attach Origin to cross-site non-GET fetches; a missing Origin on a
+        # same-origin XHR is normal. Require the XHR marker the frontend already sends.
+        if str(request.headers.get("X-Requested-With", "")).strip() == "XMLHttpRequest":
+            return None
+        return jsonify({"message": "Cross-origin request rejected."}), 403
+    from urllib.parse import urlparse
+
+    if urlparse(origin).netloc != request.host:
+        return jsonify({"message": "Cross-origin request rejected."}), 403
+    return None
+
+
 @app.before_request
 def require_authentication_for_protected_routes():
+    cross_origin_rejection = _reject_cross_origin_state_change()
+    if cross_origin_rejection is not None:
+        return cross_origin_rejection
+
     endpoint = request.endpoint or ""
     endpoint_name = endpoint.split(".")[-1] if endpoint else ""
     if endpoint in _PUBLIC_ENDPOINTS or endpoint_name in _PUBLIC_ENDPOINTS:
@@ -752,6 +965,37 @@ def handle_csrf_error(_error):
     if request.path.startswith("/api/") or is_xhr:
         return jsonify({"message": "Invalid or missing CSRF token."}), 400
     return redirect(url_for("student.home"))
+
+
+@app.errorhandler(429)
+def handle_rate_limited(_error):
+    message = "Too many attempts. Please wait a moment and try again."
+    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+        return jsonify({"message": message}), 429
+    return message, 429
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    # Let Flask handle intended HTTP errors (404/403/redirects/etc.) normally.
+    from werkzeug.exceptions import HTTPException
+
+    if isinstance(error, HTTPException):
+        return error
+
+    # Log the full traceback server-side; never leak internals to the client.
+    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
+
+    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+        return jsonify({"message": "Something went wrong. Please try again."}), 500
+    try:
+        return redirect(url_for("student.home"))
+    except Exception:
+        return "Internal Server Error", 500
 
 def _is_background_refresh_enabled():
     raw_value = str(os.getenv("DISABLE_BACKGROUND_REFRESH", "0") or "").strip()
