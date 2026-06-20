@@ -513,26 +513,26 @@ function AdminSidebar({
           : "fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex"
       }
     >
-      <div className="border-b border-sidebar-border px-4 py-4">
+      <div className="border-b border-white/10 px-4 py-4">
         <div className="flex items-start gap-2">
           <button
             type="button"
             onClick={() => state.switchAdminTab("overview")}
             className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/12 font-bold text-white ring-1 ring-white/10">
               M
             </div>
             <div className="min-w-0 leading-tight">
-              <span className="block truncate text-sm font-semibold text-foreground">MSI School</span>
-              <span className="block truncate text-xs text-muted-foreground">Admin Console</span>
+              <span className="block truncate text-sm font-semibold text-white">MSI School</span>
+              <span className="block truncate text-xs text-slate-300">Admin Console</span>
             </div>
           </button>
           {compact ? (
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
               aria-label="Close navigation"
             >
               <X className="h-4 w-4" />
@@ -540,13 +540,13 @@ function AdminSidebar({
           ) : null}
         </div>
         <label className="mt-3 block">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Workspace
           </span>
           <select
             value={state.adminMode}
             onChange={(event) => state.switchAdminMode(event.target.value)}
-            className="h-9 w-full rounded-lg border border-sidebar-border bg-surface px-2 text-xs font-bold text-foreground outline-none focus:border-foreground/30"
+            className="h-9 w-full rounded-lg border border-white/12 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-white/30"
             aria-label="Workspace mode"
           >
             {adminModes.map((mode) => (
@@ -555,14 +555,14 @@ function AdminSidebar({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">
+          <span className="mt-1 block text-[11px] leading-4 text-slate-400">
             {activeAdminProfile.description}
           </span>
         </label>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-        <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
           Manage
         </p>
         <nav className="space-y-1" aria-label="Admin navigation">
@@ -588,14 +588,14 @@ function AdminSidebar({
         </nav>
       </div>
 
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-white/10 p-3">
         <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-900">
             KA
           </div>
           <div className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-sm font-medium text-foreground">Khamid A.</span>
-            <span className="block truncate text-xs text-muted-foreground">
+            <span className="block truncate text-sm font-medium text-white">Khamid A.</span>
+            <span className="block truncate text-xs text-slate-400">
               {activeAdminProfile.label} mode
             </span>
           </div>
@@ -603,7 +603,7 @@ function AdminSidebar({
             <input type="hidden" name="csrf_token" value={csrfToken || ""} />
             <button
               type="submit"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
               aria-label="Exit"
             >
               <LogOut className="h-4 w-4" />
@@ -650,6 +650,11 @@ export default function AdminPage(props: AdminPageProps) {
     state.visibleTabs.find((tab: { key: string; label: string }) => tab.key === state.activeTab)?.label ||
     tabs.find((tab) => tab.key === state.activeTab)?.label ||
     "Overview";
+  const activeAdminMode: AdminMode =
+    state.adminMode && adminModeProfiles[state.adminMode as AdminMode]
+      ? (state.adminMode as AdminMode)
+      : "admin";
+  const activeAdminProfile = adminModeProfiles[activeAdminMode];
 
   useEffect(() => {
     if (!state.mobileNavOpen) {
@@ -743,10 +748,25 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
+        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4 xl:pr-10 2xl:pr-12"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
+
+        <section className="mb-4 hidden items-center justify-between gap-4 lg:flex">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              {activeAdminProfile.label} Workspace
+            </p>
+            <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-foreground">
+              {activeTabLabel}
+            </h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
+            <span className="h-2 w-2 rounded-full bg-success" />
+            <span className="text-xs font-semibold text-muted-foreground">FastAPI backend online</span>
+          </div>
+        </section>
 
         {isTeacherWorkspace ? (
           <TeacherPreviewSelector

@@ -488,7 +488,7 @@ function ZonesDrawer({
   const activeColor = tabs.find((t) => t.key === activeTab)?.color ?? "";
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-96 flex-col border-l border-foreground/10 bg-surface shadow-xl">
+    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[24rem] flex-col border-l border-foreground/10 bg-surface shadow-xl sm:w-96">
       <div className="flex shrink-0 items-center justify-between border-b border-foreground/8 px-5 py-3.5">
         <p className="text-sm font-bold">Performance Zones</p>
         <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-foreground/5">
@@ -1077,7 +1077,7 @@ function RoleOverviewPanel({ state }: { state: any }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="grid gap-2 md:grid-cols-4">
         <RoleMetric label="My Students" value={students.length} detail="visible student records" icon={<Users className="h-4 w-4" />} tone="bg-sky-50" />
         <RoleMetric label="Groups" value={groups.length} detail="class groups" icon={<School className="h-4 w-4" />} tone="bg-emerald-50" />
@@ -1477,7 +1477,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   findPreferredMathSubject(nextRows.map((row: Record<string, unknown>) => asString(row.subject_name))),
                 );
               }}
-              className="rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none"
+              className="min-w-0 max-w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none sm:min-w-36"
             >
               {availableSubjectSchools.map((option: { code: string; label: string }) => (
                 <option key={option.code} value={option.code}>
@@ -1494,7 +1494,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                 setSelectedAcademicYear("");
                 setSelectedTrendMonth("all");
               }}
-              className="rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none"
+              className="min-w-0 max-w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none sm:min-w-52"
             >
               {schoolSubjectRows.map((row: Record<string, unknown>) => (
                 <option key={asString(row.subject_name)} value={asString(row.subject_name)}>
@@ -1552,7 +1552,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   <p className="text-sm font-bold">Performance Graph</p>
                   <p className="text-xs text-muted-foreground">{graphTitle}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                   <select
                     value={graphMetric}
                     onChange={(event) => {
@@ -1564,7 +1564,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                         setSelectedTrendMonth("all");
                       }
                     }}
-                    className="h-8 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
+                    className="h-8 min-w-24 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
                   >
                     <option value="aap">AAP</option>
                     <option value="attendance">Attendance</option>
@@ -1579,7 +1579,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                         setSelectedAcademicYear("");
                         setSelectedTrendMonth("all");
                       }}
-                      className="h-8 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
+                      className="h-8 min-w-24 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
                       aria-label="Class"
                     >
                       {availableOverviewGrades.map((grade: "7" | "8") => (
@@ -1593,7 +1593,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                     <select
                       value={examSelectValue}
                       onChange={(event) => setSelectedExam(event.target.value)}
-                      className="h-8 rounded-md border border-violet-200 bg-white/85 px-2 text-xs font-bold text-violet-700 outline-none"
+                      className="h-8 min-w-24 rounded-md border border-violet-200 bg-white/85 px-2 text-xs font-bold text-violet-700 outline-none"
                     >
                       <option value="all">All</option>
                       {examClassOptions.map((option) => (
@@ -1611,7 +1611,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                             setSelectedAcademicYear(event.target.value);
                             setSelectedTrendMonth("all");
                           }}
-                          className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
+                          className="h-8 min-w-28 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
                           aria-label="Academic year"
                         >
                           {academicYearOptions.map((year) => (
@@ -1629,7 +1629,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                             : "all"
                         }
                         onChange={(event) => setSelectedTrendMonth(event.target.value)}
-                        className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
+                        className="h-8 min-w-32 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
                         aria-label="Month"
                       >
                         <option value="all">All {selectedAcademicYearLabel}</option>
@@ -1645,7 +1645,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               </div>
 
               {graphIsAll && graphLineLabels.length ? (
-                <div className="h-[22rem]">
+                <div className="h-[18rem] sm:h-[20rem] xl:h-[21rem]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={graphLineData} margin={{ top: 10, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -1681,7 +1681,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   </ResponsiveContainer>
                 </div>
               ) : graphBarRows.length ? (
-                <div className="h-[22rem]">
+                <div className="h-[18rem] sm:h-[20rem] xl:h-[21rem]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={graphBarRows} margin={{ top: 18, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -1699,7 +1699,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex h-[22rem] items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground">
+                <div className="flex h-[18rem] items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground sm:h-[20rem] xl:h-[21rem]">
                   No graph data for this selection yet.
                 </div>
               )}
