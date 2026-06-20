@@ -3,7 +3,8 @@ import re
 import threading
 import time
 
-from flask import session, url_for
+from web.backend.utils.context import session
+from web.backend.utils.session import url_for
 
 from shared.academics import canonical
 from shared.identity.account_service import (

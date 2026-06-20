@@ -10,33 +10,6 @@ from config import get_web_settings
 from shared.identity.account_service import init_storage
 
 
-def _env_positive_int(name, default):
-    raw_value = str(os.getenv(name, str(default)) or "").strip()
-    try:
-        parsed = int(raw_value)
-    except ValueError:
-        logging.warning("Invalid %s=%r, using %s", name, raw_value, default)
-        return int(default)
-    return max(parsed, 1)
-
-
-def _default_worker_threads():
-    cpu_count = os.cpu_count() or 1
-    return min(max(8, cpu_count * 4), 32)
-
-
-def _waitress_threads():
-    return _env_positive_int("WAITRESS_THREADS", _default_worker_threads())
-
-
-def _waitress_connection_limit():
-    return _env_positive_int("WAITRESS_CONNECTION_LIMIT", 1024)
-
-
-def _waitress_channel_timeout():
-    return _env_positive_int("WAITRESS_CHANNEL_TIMEOUT", 120)
-
-
 _ADDRESS_IN_USE_ERRNOS = {
     getattr(errno, "EADDRINUSE", 48),
     48,     # macOS / BSD
@@ -69,10 +42,10 @@ def _normalize_listen_target(raw_target, default_port):
     return f"{target}:{default_port}"
 
 
-def _waitress_listen_targets():
+def _web_listen_targets():
     _settings = get_web_settings()
-    web_port = int(_settings.flask_port)
-    raw_listen = str(os.getenv("WAITRESS_LISTEN", "")).strip()
+    web_port = int(_settings.web_port)
+    raw_listen = str(os.getenv("WEB_LISTEN", os.getenv("WAITRESS_LISTEN", ""))).strip()
     if raw_listen:
         targets = []
         for part in raw_listen.replace(",", " ").split():
@@ -82,10 +55,10 @@ def _waitress_listen_targets():
         if targets:
             return targets
 
-    primary_host = str(_settings.flask_host or "0.0.0.0").strip() or "0.0.0.0"
+    primary_host = str(_settings.web_host or "0.0.0.0").strip() or "0.0.0.0"
     targets = [f"{primary_host}:{web_port}"]
 
-    extra_192_host = str(os.getenv("FLASK_HOST_192", "")).strip()
+    extra_192_host = str(os.getenv("WEB_HOST_192", os.getenv("FLASK_HOST_192", ""))).strip()
     normalized_extra_192 = _normalize_listen_target(extra_192_host, web_port)
     if (
         normalized_extra_192
@@ -133,44 +106,38 @@ def _is_address_in_use_error(exc):
 
 
 def run_web_server():
-    # Production WSGI server: waitress (real threads). Each thread handles one
-    # request and one blocking DB call at a time; the bounded psycopg pool
-    # (DB_POOL_MAX) caps total DB load. Keep WAITRESS_THREADS ~ DB_POOL_MAX.
-    from waitress import serve
+    # Production ASGI server: uvicorn. Run with a single process since DB routes
+    # are synchronous 'def' endpoints offloaded to uvicorn's threadpool.
+    import uvicorn
+    from config import get_web_settings
 
-    from web.backend.main import app
-
-    listen_targets = _waitress_listen_targets()
+    listen_targets = _web_listen_targets()
     if not listen_targets:
         raise RuntimeError("No valid web server listen targets configured.")
 
-    threads = _waitress_threads()
-    connection_limit = _waitress_connection_limit()
-    channel_timeout = _waitress_channel_timeout()
-    listen = " ".join(listen_targets)
+    _settings = get_web_settings()
+    web_port = int(_settings.web_port)
+    host, port = _split_listen_target(listen_targets[0], web_port)
 
     logging.info(
-        "Starting waitress on %s (threads=%s, connection_limit=%s, channel_timeout=%s)",
-        listen,
-        threads,
-        connection_limit,
-        channel_timeout,
+        "Starting uvicorn on %s:%s (1 worker process)",
+        host,
+        port,
     )
     try:
-        serve(
-            app,
-            listen=listen,
-            threads=threads,
-            connection_limit=connection_limit,
-            channel_timeout=channel_timeout,
-            ident=None,
+        uvicorn.run(
+            "web.backend.server:app",
+            host=host,
+            port=port,
+            log_level="info",
         )
     except OSError as exc:
         if _is_address_in_use_error(exc):
             logging.error(
-                "Cannot start waitress because the listen target is already in use: %s. "
-                "Stop the existing process or run with a different PORT/FLASK_PORT.",
-                listen,
+                "Cannot start uvicorn because the listen target is already in use: %s:%s. "
+                "Stop the existing process or run with a different PORT/WEB_PORT.",
+                host,
+                port,
             )
             raise SystemExit(1) from exc
         raise
@@ -264,6 +231,6 @@ if __name__ == "__main__":
             "For better concurrency use separate processes: "
             "`python main.py web` and `python main.py bot`."
         )
-        flask_thread = threading.Thread(target=run_web_server, daemon=True)
-        flask_thread.start()
+        web_thread = threading.Thread(target=run_web_server, daemon=True)
+        web_thread.start()
         asyncio.run(run_bot())

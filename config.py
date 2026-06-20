@@ -10,15 +10,15 @@ load_dotenv()
 class Settings:
     bot_token: str
     mini_app_url: str
-    flask_host: str
-    flask_port: int
+    web_host: str
+    web_port: int
     webapp_init_data_ttl: int
 
 
 @dataclass(frozen=True)
 class WebSettings:
-    flask_host: str
-    flask_port: int
+    web_host: str
+    web_port: int
 
 
 def _int_env(name, default):
@@ -32,10 +32,10 @@ def _int_env(name, default):
 
 
 def get_web_settings():
-    flask_port = _int_env("PORT", _int_env("FLASK_PORT", 8080))
+    web_port = _int_env("PORT", _int_env("WEB_PORT", _int_env("FLASK_PORT", 8080)))
     return WebSettings(
-        flask_host=getenv("FLASK_HOST", "0.0.0.0"),
-        flask_port=flask_port,
+        web_host=getenv("WEB_HOST", getenv("FLASK_HOST", "0.0.0.0")),
+        web_port=web_port,
     )
 
 
@@ -53,7 +53,7 @@ def get_settings():
     return Settings(
         bot_token=bot_token,
         mini_app_url=mini_app_url,
-        flask_host=web_settings.flask_host,
-        flask_port=web_settings.flask_port,
+        web_host=web_settings.web_host,
+        web_port=web_settings.web_port,
         webapp_init_data_ttl=_int_env("WEBAPP_INIT_DATA_TTL", 3600),
     )

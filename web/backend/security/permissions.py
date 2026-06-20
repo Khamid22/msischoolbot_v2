@@ -1,0 +1,77 @@
+"""Permission definitions and role-permission mappings."""
+
+from web.backend.security import roles
+
+# Define permission constants
+PERMISSION_VIEW_DASHBOARD = "view_dashboard"
+PERMISSION_MANAGE_STUDENTS = "manage_students"
+PERMISSION_MANAGE_TEACHERS = "manage_teachers"
+PERMISSION_MANAGE_PARENTS = "manage_parents"
+PERMISSION_MANAGE_ANNOUNCEMENTS = "manage_announcements"
+PERMISSION_MANAGE_RESOURCES = "manage_resources"
+PERMISSION_MANAGE_COMPLAINTS = "manage_complaints"
+PERMISSION_MANAGE_PAYMENTS = "manage_payments"
+PERMISSION_MANAGE_ACADEMICS = "manage_academics"
+PERMISSION_SYSTEM_SETTINGS = "system_settings"
+
+ALL_PERMISSIONS = {
+    PERMISSION_VIEW_DASHBOARD,
+    PERMISSION_MANAGE_STUDENTS,
+    PERMISSION_MANAGE_TEACHERS,
+    PERMISSION_MANAGE_PARENTS,
+    PERMISSION_MANAGE_ANNOUNCEMENTS,
+    PERMISSION_MANAGE_RESOURCES,
+    PERMISSION_MANAGE_COMPLAINTS,
+    PERMISSION_MANAGE_PAYMENTS,
+    PERMISSION_MANAGE_ACADEMICS,
+    PERMISSION_SYSTEM_SETTINGS,
+}
+
+# Role-to-permissions mapping
+ROLE_PERMISSIONS = {
+    roles.ROLE_OWNER: ALL_PERMISSIONS,
+    roles.ROLE_CEO: {
+        PERMISSION_VIEW_DASHBOARD,
+        PERMISSION_MANAGE_STUDENTS,
+        PERMISSION_MANAGE_TEACHERS,
+        PERMISSION_MANAGE_PARENTS,
+        PERMISSION_MANAGE_ANNOUNCEMENTS,
+        PERMISSION_MANAGE_RESOURCES,
+        PERMISSION_MANAGE_COMPLAINTS,
+        PERMISSION_MANAGE_PAYMENTS,
+        PERMISSION_MANAGE_ACADEMICS,
+    },
+    roles.ROLE_ADMIN: {
+        PERMISSION_VIEW_DASHBOARD,
+        PERMISSION_MANAGE_STUDENTS,
+        PERMISSION_MANAGE_TEACHERS,
+        PERMISSION_MANAGE_PARENTS,
+        PERMISSION_MANAGE_ANNOUNCEMENTS,
+        PERMISSION_MANAGE_RESOURCES,
+        PERMISSION_MANAGE_COMPLAINTS,
+        PERMISSION_MANAGE_PAYMENTS,
+        PERMISSION_MANAGE_ACADEMICS,
+    },
+    roles.ROLE_TEACHER: {
+        PERMISSION_VIEW_DASHBOARD,
+        PERMISSION_MANAGE_RESOURCES,
+        PERMISSION_MANAGE_ACADEMICS,
+    },
+    roles.ROLE_CUSTOMER_SUPPORT: {
+        PERMISSION_VIEW_DASHBOARD,
+        PERMISSION_MANAGE_COMPLAINTS,
+    },
+    roles.ROLE_PARENT: {
+        PERMISSION_VIEW_DASHBOARD,
+    },
+    roles.ROLE_STUDENT: {
+        PERMISSION_VIEW_DASHBOARD,
+    },
+}
+
+
+def role_has_permission(role: str, permission: str) -> bool:
+    """Checks if a normalized role has the specified permission."""
+    norm_role = roles.normalize_role(role)
+    allowed = ROLE_PERMISSIONS.get(norm_role, set())
+    return permission in allowed

@@ -1,10 +1,6 @@
 """Centralized session/auth state helpers used by route modules."""
 
-from flask import session, url_for
-from flask_login import current_user, login_user, logout_user
-
-from web.backend.auth.session import build_admin_user, build_student_user
-
+from web.backend.utils.context import session
 from web.backend.utils.normalization import normalize_school_code
 
 
@@ -12,25 +8,11 @@ def current_auth_role():
     role = str(session.get("auth_role", "")).strip().lower()
     if role in {"admin", "student"}:
         return role
-
-    if bool(getattr(current_user, "is_authenticated", False)):
-        role = str(getattr(current_user, "role", "")).strip().lower()
-        if role in {"admin", "student"}:
-            return role
-
     return ""
 
 
 def current_auth_login():
-    auth_login = str(session.get("auth_login", "")).strip()
-    if auth_login:
-        return auth_login
-
-    if bool(getattr(current_user, "is_authenticated", False)):
-        auth_login = str(getattr(current_user, "auth_login", "")).strip()
-        if auth_login:
-            return auth_login
-    return ""
+    return str(session.get("auth_login", "")).strip()
 
 
 def current_student_enrollment_id():
@@ -60,53 +42,19 @@ def current_student_db_id():
     if parsed_value and parsed_value > 0:
         return parsed_value
 
-    if bool(getattr(current_user, "is_authenticated", False)) and str(
-        getattr(current_user, "role", "")
-    ).strip().lower() == "student":
-        raw_user_value = getattr(current_user, "user_id", None)
-        try:
-            parsed_user_value = int(raw_user_value)
-        except (TypeError, ValueError):
-            parsed_user_value = None
-        if parsed_user_value and parsed_user_value > 0:
-            return parsed_user_value
-
     return None
 
 
 def current_student_full_name():
     if current_auth_role() != "student":
         return ""
-
-    current_name = str(session.get("student_full_name", "")).strip()
-    if current_name:
-        return current_name
-
-    if bool(getattr(current_user, "is_authenticated", False)) and str(
-        getattr(current_user, "role", "")
-    ).strip().lower() == "student":
-        current_name = str(getattr(current_user, "student_full_name", "")).strip()
-        if current_name:
-            return current_name
-    return ""
+    return str(session.get("student_full_name", "")).strip()
 
 
 def current_student_school_code():
     if current_auth_role() != "student":
         return ""
-
-    session_school_code = normalize_school_code(session.get("student_school_code", ""))
-    if session_school_code:
-        return session_school_code
-
-    if bool(getattr(current_user, "is_authenticated", False)) and str(
-        getattr(current_user, "role", "")
-    ).strip().lower() == "student":
-        school_code = normalize_school_code(getattr(current_user, "student_school_code", ""))
-        if school_code:
-            return school_code
-
-    return ""
+    return normalize_school_code(session.get("student_school_code", ""))
 
 
 def parse_telegram_user_id(raw_value):
@@ -127,13 +75,11 @@ def current_admin_role():
 
 
 def set_admin_session(admin):
-    portal_user = build_admin_user(admin)
-    if portal_user is None:
+    if not isinstance(admin, dict) or not admin.get("id"):
         return False
 
     admin_role = str(admin.get("role", "admin")).strip().lower() or "admin"
     session.clear()
-    login_user(portal_user, remember=False)
     session["auth_role"] = "admin"
     session["auth_login"] = str(admin.get("login", "")).strip()
     session["admin_id"] = int(admin["id"])
@@ -146,8 +92,7 @@ def set_admin_session(admin):
 
 
 def set_student_session(student, telegram_user_id=None):
-    portal_user = build_student_user(student)
-    if portal_user is None:
+    if not isinstance(student, dict) or not student.get("id"):
         return False
 
     try:
@@ -166,7 +111,6 @@ def set_student_session(student, telegram_user_id=None):
         enrollment_id = None
 
     session.clear()
-    login_user(portal_user, remember=False)
     session["auth_role"] = "student"
     session["auth_login"] = str(student.get("student_id", "")).strip()
     session["student_db_id"] = student_db_id
@@ -197,29 +141,105 @@ def try_auto_login_student_by_telegram(telegram_user_id, fetch_student_by_telegr
 
 
 def build_dashboard_url(enrollment_id, subject="", group="", **extra_params):
-    route_params = {
-        "student_id": int(enrollment_id),
-    }
     normalized_subject = str(subject or "").strip()
     normalized_group = str(group or "").strip()
     normalized_school = normalize_school_code(extra_params.pop("school", ""))
     if not normalized_school:
         normalized_school = current_student_school_code()
 
+    query_params = []
     if normalized_subject:
-        route_params["subject"] = normalized_subject
+        query_params.append(f"subject={normalized_subject}")
     if normalized_group:
-        route_params["group"] = normalized_group
+        query_params.append(f"group={normalized_group}")
     if normalized_school:
-        route_params["school"] = normalized_school
+        query_params.append(f"school={normalized_school}")
     for key, value in extra_params.items():
         if str(value or "").strip():
-            route_params[key] = str(value).strip()
-    return url_for("student.dashboard", **route_params)
+            query_params.append(f"{key}={str(value).strip()}")
+
+    url = f"/dashboard/{int(enrollment_id)}"
+    if query_params:
+        url += "?" + "&".join(query_params)
+    return url
+
+
+def url_for(endpoint: str, **kwargs) -> str:
+    endpoint_clean = endpoint.split(".")[-1] if "." in endpoint else endpoint
+
+    if endpoint_clean == "home":
+        params = []
+        for k, v in kwargs.items():
+            if k != "_external":
+                params.append(f"{k}={v}")
+        url = "/"
+        if params:
+            url += "?" + "&".join(params)
+        return url
+
+    if endpoint_clean in {"dashboard", "chat_room", "student_resources", "rating_board", "aap_lessons", "ar_lessons"}:
+        student_id = kwargs.get("student_id")
+        subject = kwargs.get("subject", "")
+        group = kwargs.get("group", "")
+        school = kwargs.get("school", "")
+        
+        path_map = {
+            "dashboard": f"/dashboard/{student_id}",
+            "chat_room": f"/dashboard/{student_id}/chat",
+            "student_resources": f"/dashboard/{student_id}/resources",
+            "rating_board": f"/dashboard/{student_id}/rating-board",
+            "aap_lessons": f"/dashboard/{student_id}/aap-lessons",
+            "ar_lessons": f"/dashboard/{student_id}/ar-lessons",
+        }
+        url = path_map[endpoint_clean]
+        
+        query_params = []
+        if subject:
+            query_params.append(f"subject={subject}")
+        if group:
+            query_params.append(f"group={group}")
+        if school:
+            query_params.append(f"school={school}")
+        for k, v in kwargs.items():
+            if k not in {"student_id", "subject", "group", "school", "_external"}:
+                if v:
+                    query_params.append(f"{k}={v}")
+        if query_params:
+            url += "?" + "&".join(query_params)
+        return url
+
+    if endpoint_clean == "profile_change_password":
+        return "/profile/password"
+
+    if endpoint_clean == "admin_continue":
+        handoff = kwargs.get("handoff", "")
+        return f"/admin/continue?handoff={handoff}"
+
+    if endpoint_clean == "login":
+        return "/login"
+
+    if endpoint_clean == "logout":
+        return "/logout"
+
+    if endpoint_clean == "search_student_form":
+        return "/search"
+
+    if endpoint_clean == "save_admin_student_profile":
+        s_id = kwargs.get("student_row_id")
+        return f"/admin/students/{s_id}/profile"
+
+    if endpoint_clean == "admin_change_student_password_route":
+        s_id = kwargs.get("student_row_id")
+        return f"/admin/students/{s_id}/password"
+
+    if endpoint_clean == "admin_student_dashboard":
+        s_id = kwargs.get("student_row_id")
+        return f"/admin/students/{s_id}/dashboard"
+
+    raise ValueError(f"Unknown endpoint in url_for: {endpoint}")
 
 
 def logout_portal_session():
-    logout_user()
     session.clear()
 
 
@@ -236,5 +256,7 @@ __all__ = [
     "set_student_session",
     "try_auto_login_student_by_telegram",
     "build_dashboard_url",
+    "url_for",
     "logout_portal_session",
 ]
+

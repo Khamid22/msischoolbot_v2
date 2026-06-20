@@ -1,9 +1,10 @@
 import os
 
-from flask import Blueprint, jsonify, redirect, request, session, url_for
-from flask_wtf.csrf import generate_csrf
-
-from web.backend.render import render_react_page
+from web.backend.utils.router import RouteGroup
+from web.backend.utils.response_helpers import jsonify, redirect
+from web.backend.utils.context import request, session
+from web.backend.utils.session import url_for
+from web.backend.render import generate_csrf, render_react_page
 
 from web.backend.roles.admin.routes.academic_routes import register_academic_admin_routes
 from web.backend.roles.admin.routes.admins import register_admin_routes
@@ -149,9 +150,9 @@ def register_admin_page_routes(
             back_url=back_url,
         )
 
-    admin_blueprint = Blueprint("admin", __name__)
+    admin_routes = RouteGroup("admin", __name__)
 
-    @admin_blueprint.before_request
+    @admin_routes.before_request
     def ensure_admin_role():
         if current_auth_role() == "admin":
             return None
@@ -161,17 +162,17 @@ def register_admin_page_routes(
         return redirect(url_for("student.home"))
 
     register_academic_admin_routes(
-        admin_blueprint,
+        admin_routes,
         render_admin_page=render_admin_page,
     )
-    register_announcement_admin_routes(admin_blueprint)
+    register_announcement_admin_routes(admin_routes)
 
     register_admin_routes(
-        admin_blueprint,
+        admin_routes,
         render_admin_page=render_admin_page,
         render_edit_student_page=render_edit_student_page,
         delete_uploaded_student_photo=delete_uploaded_student_photo,
     )
-    register_admin_chat_routes(admin_blueprint)
-    app.register_blueprint(admin_blueprint)
+    register_admin_chat_routes(admin_routes)
+    app.include_router(admin_routes)
     return render_admin_page

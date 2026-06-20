@@ -14,7 +14,7 @@ python main.py bot
 Recommended env starting point:
 
 ```env
-WAITRESS_THREADS=16
+WEB_LISTEN=0.0.0.0:8080
 DB_POOL_MIN=2
 DB_POOL_MAX=20
 DB_POOL_TIMEOUT=10
@@ -37,7 +37,7 @@ DB_POOL_MAX * web_process_count < PostgreSQL max_connections
 - Rating boards use a short-lived in-process leaderboard cache to avoid sorting
   the same subject repeatedly during traffic bursts.
 - Admin pages should be paginated before the student count grows much further.
-- Resource files should stay on R2/CDN; Flask should serve metadata and signed
+- Resource files should stay on R2/CDN; the backend should serve metadata and signed
   URLs, not stream large videos.
 
 ## Next Scaling Steps

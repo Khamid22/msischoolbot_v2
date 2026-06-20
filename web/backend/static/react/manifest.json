@@ -79,7 +79,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-INtwH4Wg.js",
+    "file": "assets/index-DjdYlNP6.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -102,7 +102,7 @@
     ]
   },
   "src/roles/admin/pages/Admin.tsx": {
-    "file": "chunks/Admin-BOoydEEM.js",
+    "file": "chunks/Admin-BGkXUdyV.js",
     "name": "Admin",
     "src": "src/roles/admin/pages/Admin.tsx",
     "isDynamicEntry": true,
@@ -204,7 +204,7 @@
     ]
   },
   "src/roles/admin/panels/OverviewPanel.tsx": {
-    "file": "chunks/OverviewPanel-CaaKhM5l.js",
+    "file": "chunks/OverviewPanel-BGVmTbIS.js",
     "name": "OverviewPanel",
     "src": "src/roles/admin/panels/OverviewPanel.tsx",
     "isDynamicEntry": true,
@@ -291,7 +291,7 @@
     ]
   },
   "src/roles/parent/pages/ParentHome.tsx": {
-    "file": "chunks/ParentHome-CRea2JG9.js",
+    "file": "chunks/ParentHome-Bx74A9-8.js",
     "name": "ParentHome",
     "src": "src/roles/parent/pages/ParentHome.tsx",
     "isDynamicEntry": true,
@@ -359,7 +359,7 @@
     ]
   },
   "src/roles/student/pages/Dashboard.tsx": {
-    "file": "chunks/Dashboard-DOxGjYKL.js",
+    "file": "chunks/Dashboard-8SA-faQG.js",
     "name": "Dashboard",
     "src": "src/roles/student/pages/Dashboard.tsx",
     "isDynamicEntry": true,
@@ -436,7 +436,7 @@
     ]
   },
   "style.css": {
-    "file": "assets/style-BoBLShKE.css",
+    "file": "assets/style-DJ6LD1AV.css",
     "src": "style.css"
   }
 }

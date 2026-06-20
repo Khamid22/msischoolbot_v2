@@ -18,7 +18,7 @@ not guess across architectural boundaries.
 ```text
 shared/          Python logic and database access shared by bot and web
 tgbot/           Telegram bot only
-web/backend/     Flask backend only
+web/backend/     FastAPI backend only
 web/frontend/    React frontend only
 ```
 
@@ -34,7 +34,7 @@ Forbidden imports:
 - `tgbot` must not import `web.backend`.
 - `web.backend` must not import `tgbot`.
 - `web/frontend` must not import Python code.
-- `shared` must not import Flask, aiogram, or React/frontend code.
+- `shared` must not import Flask, FastAPI, aiogram, or React/frontend code.
 
 ## What To Touch
 
@@ -46,7 +46,7 @@ Use this map before editing:
 | Shared login/account logic used by bot and web | `shared/identity/` |
 | Subject/date/school canonical rules | `shared/academics/` |
 | PostgreSQL connection/schema/query helpers | `shared/db/` |
-| Flask auth/session/routes/API composition | `web/backend/` |
+| FastAPI auth/session/routes/API composition | `web/backend/` |
 | Role-specific backend workflows | `web/backend/roles/<role>/` |
 | Reusable backend school domains | `web/backend/domains/<domain>/` |
 | React app boot/page routing | `web/frontend/src/app/` |
@@ -99,7 +99,7 @@ Inside `web/backend`:
 - If logic is needed by both bot and web, move it to `shared/`.
 - If SQL is reused, put it under `shared/db/queries/` or
   `shared/db/cross_queries/`.
-- Keep Flask request/session/Blueprint logic out of `shared/`.
+- Keep FastAPI request/session/route-adapter logic out of `shared/`.
 
 ## Naming Rules
 
@@ -184,4 +184,3 @@ Debug in layers:
 5. Does the UI/message render it correctly?
 
 Do not start by editing random UI or query files. Search first with `rg`.
-

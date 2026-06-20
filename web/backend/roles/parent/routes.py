@@ -1,7 +1,7 @@
 """Parent portal page renderer."""
 
-from flask import session
-from flask_wtf.csrf import generate_csrf
+from web.backend.utils.context import session
+from web.backend.render import generate_csrf
 
 from web.backend.domains.announcements.service import list_announcements
 from web.backend.domains.resources.service import list_resources

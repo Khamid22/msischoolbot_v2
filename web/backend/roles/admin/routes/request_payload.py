@@ -1,4 +1,4 @@
-from flask import request
+from web.backend.utils.context import request
 
 
 def request_payload():

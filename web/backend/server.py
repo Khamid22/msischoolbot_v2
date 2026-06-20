@@ -6,100 +6,36 @@ import threading
 import time
 from datetime import timedelta
 
-from flask import Flask, jsonify, redirect, request, session, url_for
-from flask_compress import Compress
-from flask_login import current_user
-from flask_wtf.csrf import CSRFError
+from fastapi import FastAPI, Request
+from starlette.exceptions import HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from web.backend.utils.limiter import limiter
 
-from web.backend.auth.policies import is_authenticated_session as is_authenticated_policy_session
-from web.backend.auth.session import configure_login_manager
-from web.backend.js_bundles import ensure_js_bundles
+from web.backend.utils.context import RequestContextMiddleware, session, request
 from web.backend.utils.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
 from config import get_web_settings
-from web.backend.extensions import init_extensions, login_manager
 from web.backend.roles.admin.routes import register_admin_page_routes
-from web.backend.routes.system import register_system_routes
 from web.backend.roles.student.routes import register_student_page_routes
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
 _REACT_DIR = os.path.join(_STATIC_DIR, "react")
-app = Flask(
-    __name__,
-    template_folder=None,
-    static_folder=_STATIC_DIR,
-    static_url_path="/static",
-)
-app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
-app.config["COMPRESS_REGISTER"] = False  # We register manually after static-file hook
-app.config["COMPRESS_LEVEL"] = int(os.environ.get("COMPRESS_LEVEL", "6"))
-app.config["COMPRESS_MIN_SIZE"] = int(os.environ.get("COMPRESS_MIN_SIZE", "512"))
-app.config["COMPRESS_MIMETYPES"] = [
-    "text/html",
-    "text/css",
-    "application/javascript",
-    "text/javascript",
-    "application/json",
-    "image/svg+xml",
-]
-# Fail closed: a known/default signing key lets anyone forge a session cookie
-# (and therefore an admin session). Require a real key outside explicit local dev.
-_secret_key = os.environ.get("FLASK_SECRET_KEY", "").strip()
-if not _secret_key:
-    if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
-        _secret_key = "dev-only-insecure-key-do-not-use-in-prod"
-    else:
-        raise RuntimeError(
-            "FLASK_SECRET_KEY must be set. Generate one with: "
-            'python -c "import secrets; print(secrets.token_hex(32))"'
-        )
-app.config["SECRET_KEY"] = _secret_key
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    # Telegram Mini App runs in an embedded webview. If login breaks inside Telegram
-    # with "Lax", set SESSION_COOKIE_SAMESITE=None (requires Secure=True over HTTPS).
-    SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_COOKIE_SAMESITE", "Lax"),
-    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "1").strip().lower()
-    not in {"0", "false", "no", "off"},
-)
-# ─────────────────────────────────────────────────────────────────────────────
-# ⚠️  TEMPORARY DEV OVERRIDE — allow the session/CSRF cookie over plain http so
-# the app works on a phone at http://<lan-ip>:8080 (Secure cookies are dropped
-# over http, which makes the CSRF session token "missing" and login fail).
-# REMOVE this block before production (or set SESSION_COOKIE_SECURE=1).
-# ─────────────────────────────────────────────────────────────────────────────
-app.config["SESSION_COOKIE_SECURE"] = False
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
-    days=int(os.environ.get("SESSION_LIFETIME_DAYS", "30"))
-)
-app.config["WTF_CSRF_TIME_LIMIT"] = None
-# Werkzeug rejects requests larger than this before the route handler runs.
-# Matches RESOURCE_UPLOAD_MAX_MB (default 1 GB). Override with MAX_UPLOAD_MB env var.
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "200")) * 1024 * 1024
-
-_compress = Compress(app)
-
-# Behind a TLS-terminating reverse proxy (Railway/nginx): trust one proxy hop so
-# request.remote_addr (used by the rate limiter) and request.is_secure reflect the
-# real client instead of the proxy. Disable with TRUST_PROXY=0 if running direct.
-if os.environ.get("TRUST_PROXY", "1").strip().lower() not in {"0", "false", "no", "off"}:
-    from werkzeug.middleware.proxy_fix import ProxyFix
-
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-
 
 _CACHE_NO_STORE = "no-store, max-age=0"
 _CACHE_NO_CACHE_REVALIDATE = "no-cache, no-store, must-revalidate"
 _CACHE_LONG_IMMUTABLE = "public, max-age=31536000, immutable"
 _CACHE_STATIC_DEFAULT = "public, max-age=2592000, immutable"
 
-# Hashed Vite assets (for example index-abc123def456.js) can be cached forever.
 _HASHED_REACT_ASSET_FILE_RE = re.compile(r"-[A-Za-z0-9_-]{8,}\.(js|css)$")
 _VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
 _VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
 
-
-def _resolve_cache_control_header(request_path, query_version = ""):
+def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     if request_path == "/" or request_path.startswith("/dashboard/"):
         return _CACHE_NO_STORE
 
@@ -126,92 +62,215 @@ def _resolve_cache_control_header(request_path, query_version = ""):
 
     return None
 
+PUBLIC_PATHS = {
+    "/",
+    "/login",
+    "/auth/telegram",
+    "/admin",
+    "/admin/continue",
+    "/manifest.webmanifest",
+    "/sw.js",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/api/v1/system/status",
+}
+_STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+# Endpoints authenticated by a signed payload rather than the ambient session
+# cookie are exempt from the same-origin/CSRF check: a cross-site forgery gains
+# nothing because the request must itself carry a server-verified signature.
+# /auth/telegram only trusts HMAC-validated Telegram initData.
+_SAME_ORIGIN_EXEMPT_PATHS = {"/auth/telegram"}
 
-@app.after_request
-def _compress_static(response):
-    # Flask serves static files with direct_passthrough=True; disable it so
-    # Flask-Compress can apply gzip/brotli when the client supports it.
-    if response.direct_passthrough:
-        response.direct_passthrough = False
-    return _compress.after_request(response)
+class AuthAndSecurityMiddleware:
+    def __init__(self, app):
+        self.app = app
 
-init_extensions(app)
-configure_login_manager(login_manager)
-ensure_js_bundles(_STATIC_DIR)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
+        request_obj = Request(scope, receive=receive)
+        path = request_obj.url.path
 
-def _build_default_asset_version():
-    # Build a simple asset version from the latest static file mtime.
-    candidate_paths = [
-        os.path.join(_BACKEND_DIR, "js_bundles.py"),
-        os.path.join(_BACKEND_DIR, "server.py"),
-        os.path.join(_BACKEND_DIR, "render.py"),
-        os.path.join(_REACT_DIR, "manifest.json"),
-        os.path.join(_REACT_DIR, "app.css"),
-        os.path.join(_REACT_DIR, "app.js"),
-    ]
+        # 1. Reject cross-origin state changes (Same-Origin check). Applies to
+        # every mutating method on every path (not just /api/), so plain admin
+        # form posts like /admin/teachers are covered too.
+        if request_obj.method in _STATE_CHANGING_METHODS and path not in _SAME_ORIGIN_EXEMPT_PATHS:
+            origin = request_obj.headers.get("Origin") or request_obj.headers.get("Referer") or ""
+            is_api = path.startswith("/api/") or path.startswith("/admin/api/")
+            if origin:
+                from urllib.parse import urlparse
+                host = request_obj.headers.get("host") or ""
+                host_name = host.split(":")[0] if ":" in host else host
+                origin_netloc = urlparse(origin).netloc
+                origin_name = origin_netloc.split(":")[0] if ":" in origin_netloc else origin_netloc
+                if origin_name != host_name:
+                    response = JSONResponse({"message": "Cross-origin request rejected."}, status_code=403)
+                    await response(scope, receive, send)
+                    return
+            elif is_api:
+                # No Origin/Referer on an XHR/JSON API call: require the
+                # XMLHttpRequest marker, which a cross-site page cannot set
+                # without a CORS preflight. Same-origin HTML form posts that omit
+                # both headers are allowed here because the SameSite=Lax session
+                # cookie already prevents a cross-site POST from carrying auth.
+                if request_obj.headers.get("X-Requested-With") != "XMLHttpRequest":
+                    response = JSONResponse({"message": "Cross-origin request rejected."}, status_code=403)
+                    await response(scope, receive, send)
+                    return
 
-    js_roots = [
-        os.path.join(_STATIC_DIR, "js"),
-    ]
-    for js_root in js_roots:
-        for root_dir, _dir_names, file_names in os.walk(js_root):
-            for file_name in file_names:
-                if not file_name.endswith(".js"):
-                    continue
-                candidate_paths.append(os.path.join(root_dir, file_name))
+        # 2. Authentication check
+        is_public = (
+            path in PUBLIC_PATHS
+            or path.startswith("/static/")
+        )
 
-    if os.path.isdir(_REACT_DIR):
-        for root_dir, _dir_names, file_names in os.walk(_REACT_DIR):
-            for file_name in file_names:
-                if not (file_name.endswith(".js") or file_name.endswith(".css")):
-                    continue
-                candidate_paths.append(os.path.join(root_dir, file_name))
+        if not is_public:
+            auth_role = request_obj.session.get("auth_role")
+            if not auth_role or auth_role not in {"admin", "student"}:
+                requested_with = request_obj.headers.get("X-Requested-With") or ""
+                is_xhr = requested_with == "XMLHttpRequest"
+                if path.startswith("/api/") or is_xhr:
+                    response = JSONResponse({"message": "Authentication required."}, status_code=401)
+                    await response(scope, receive, send)
+                    return
+                response = RedirectResponse(url="/", status_code=302)
+                await response(scope, receive, send)
+                return
 
-    mtimes = []
-    for path in candidate_paths:
-        try:
-            mtimes.append(int(os.path.getmtime(path)))
-        except OSError:
-            continue
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                header_names = {h[0].lower() for h in headers}
 
-    if not mtimes:
-        return "1"
-    return str(max(mtimes))
+                if b"x-content-type-options" not in header_names:
+                    headers.append((b"x-content-type-options", b"nosniff"))
+                if b"referrer-policy" not in header_names:
+                    headers.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
 
+                cache_control = _resolve_cache_control_header(
+                    request_path=path,
+                    query_version=request_obj.query_params.get("v", ""),
+                )
+                if cache_control and b"cache-control" not in header_names:
+                    headers.append((b"cache-control", cache_control.encode("utf-8")))
 
-_asset_version_override = os.environ.get("ASSET_VERSION", "").strip()
-_ASSET_VERSION = (
-    _asset_version_override
-    if _asset_version_override and _asset_version_override != "1"
-    else _build_default_asset_version()
+                message["headers"] = headers
+
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+# Limiter imported from utils.limiter
+
+# Instantiate FastAPI application
+app = FastAPI(
+    title="MSI School API",
+    description="Backend API for MSI School Bot and Web portal management, serving multiple role-based dashboards.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_tags=[
+        {"name": "identity", "description": "Authentication and user session management."},
+        {"name": "student", "description": "Student-specific views and dashboard APIs."},
+        {"name": "admin", "description": "System administration, settings, and general management."},
+        {"name": "parent", "description": "Parent dashboard, student linked data access."},
+        {"name": "resources", "description": "Study materials, resources, and file management."},
+        {"name": "payments", "description": "Payment history, details, and billing APIs."},
+        {"name": "communication", "description": "Chats, system complaints, and messaging routes."},
+        {"name": "system", "description": "System diagnostics, health checks, and metadata utilities."},
+    ],
 )
-# Expose in app config so render.py can read it via current_app.config["ASSET_VERSION"].
-app.config["ASSET_VERSION"] = _ASSET_VERSION
+app.state.limiter = limiter
 
-# Reuse shared root config so web uses the same source as main.py.
+app.name = "web.backend.server"
+app.static_folder = _STATIC_DIR
+app.backend_root_path = _BACKEND_DIR
+
+# Fail closed: a known/default signing key lets anyone forge a session cookie
+_secret_key = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+if not _secret_key:
+    if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
+        _secret_key = "dev-only-insecure-key-do-not-use-in-prod"
+    else:
+        raise RuntimeError(
+            "APP_SECRET_KEY must be set. Generate one with: "
+            'python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+
+# Register Starlette and Custom middlewares
+app.add_middleware(AuthAndSecurityMiddleware)
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=512)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_secret_key,
+    session_cookie="session",
+    max_age=30 * 24 * 3600,  # 30 days
+    same_site=os.environ.get("SESSION_COOKIE_SAMESITE", "lax").lower(),
+    https_only=os.environ.get("SESSION_COOKIE_SECURE", "0").strip().lower() not in {"0", "false", "no", "off"},
+)
+
+# Mount static files correctly
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+
+
+
+# Expose settings
 settings = get_web_settings()
 GROUP_CACHE_TTL_SECONDS = int(os.environ.get("GROUP_CACHE_TTL_SECONDS", "600"))
 RATING_CACHE_TTL_SECONDS = int(os.environ.get("RATING_CACHE_TTL_SECONDS", "60"))
 RATING_CACHE_MAX_ENTRIES = int(os.environ.get("RATING_CACHE_MAX_ENTRIES", "128"))
 
 _GROUP_CACHE_LOCK = threading.Lock()
-# In-memory cache keyed by (subject, group) to avoid repeated dataset rebuilds.
+# In-memory cache keyed by (subject, group) to avoid repeated dataset rebuilds
 _GROUP_CACHE = {}
 _STUDENTS_BY_SUBJECT_GROUP_CACHE = {}
 _RATING_CACHE_LOCK = threading.Lock()
 _RATING_LEADERBOARD_CACHE = {}
 _APP_BOOTSTRAPPED = False
-_PUBLIC_ENDPOINTS = {
-    "static",
-    "home",
-    "admin_entry",
-    "admin_continue",
-    "login",
-    "logout",
-    "manifest",
-    "service_worker",
-}
+
+
+
+
+# Rate limiter exception handler
+@app.exception_handler(RateLimitExceeded)
+def handle_rate_limited(request_obj: Request, exc: RateLimitExceeded):
+    message = "Too many attempts. Please wait a moment and try again."
+    requested_with = request_obj.headers.get("X-Requested-With", "")
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+        return JSONResponse({"message": message}, status_code=429)
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(message, status_code=429)
+
+
+# HTTP exception handler
+@app.exception_handler(HTTPException)
+def handle_http_exception(request_obj: Request, exc: HTTPException):
+    requested_with = request_obj.headers.get("X-Requested-With", "")
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+        return JSONResponse({"message": exc.detail}, status_code=exc.status_code)
+    if exc.status_code in {401, 403}:
+        return RedirectResponse(url="/", status_code=302)
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(exc.detail, status_code=exc.status_code)
+
+
+# Global unexpected error handler
+@app.exception_handler(Exception)
+def handle_unexpected_error(request_obj: Request, exc: Exception):
+    import logging
+    logging.exception("Unhandled error on %s %s", request_obj.method, request_obj.url.path)
+    requested_with = request_obj.headers.get("X-Requested-With", "")
+    is_xhr = requested_with == "XMLHttpRequest"
+    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+        return JSONResponse({"message": "Something went wrong. Please try again."}, status_code=500)
+    return RedirectResponse(url="/", status_code=302)
 
 
 def _clear_group_cache():
@@ -224,16 +283,13 @@ def _clear_group_cache():
 
 def _iter_dashboard_school_codes(preferred_school_code = ""):
     configured_codes = ["school5", "sehriyo"]
-
     normalized_preferred_code = _normalize_school_code(preferred_school_code)
     ordered_codes = []
     if normalized_preferred_code and normalized_preferred_code in configured_codes:
         ordered_codes.append(normalized_preferred_code)
-
     for school_code in configured_codes:
         if school_code not in ordered_codes:
             ordered_codes.append(school_code)
-
     return ordered_codes
 
 
@@ -248,9 +304,7 @@ def _seed_group_cache_from_dataset(dataset, force=False):
         return
 
     now = time.time()
-
-    # Collect which (subject, group) keys are stale or missing.
-    candidate_keys: set = set()
+    candidate_keys = set()
     for student in students:
         if not isinstance(student, dict):
             continue
@@ -269,7 +323,7 @@ def _seed_group_cache_from_dataset(dataset, force=False):
     else:
         needed_keys = candidate_keys
 
-    grouped_entries: dict = {}
+    grouped_entries = {}
     for student in students:
         if not isinstance(student, dict):
             continue
@@ -302,7 +356,6 @@ def _seed_group_cache_from_dataset(dataset, force=False):
 
 
 def _get_group_cache_entry(subject, group, school_code = "", force_refresh = False):
-    # Try cached group first; if expired/missing, refresh from internal DB.
     key = _group_cache_key(subject, group)
     now = time.time()
 
@@ -527,7 +580,6 @@ def _build_subject_leaderboard(
             if cached_entry and now < float(cached_entry.get("expires_at", 0)):
                 return cached_entry.get("value", [])
 
-    # Each row stores raw values we need for sorting and final display.
     ranking_rows = []
 
     for dashboard_payload in dashboards:
@@ -597,7 +649,6 @@ def _build_subject_leaderboard(
         )
 
     ranking_rows.sort(
-        # Sort by the same priority users see in the rating board.
         key=lambda row: (
             bool(row["isProvisional"]),
             -float(row["averageComposite"]),
@@ -734,8 +785,6 @@ def _compute_subject_rating(
         dashboards = _collect_subject_dashboards_from_cache(subject)
 
     if not dashboards:
-        # When the group cache is cold, build the peer list directly from
-        # internal DB enrollment records.
         from web.backend.domains.academics.internal_dashboard_service import get_subject_dashboards_from_db
         dashboards = get_subject_dashboards_from_db(subject)
 
@@ -849,10 +898,8 @@ def _build_students_by_subject_group(
 
 def _load_dataset(school_code = None, force_refresh = False):
     from web.backend.domains.academics.internal_dashboard_service import build_internal_dataset
-
     dataset = build_internal_dataset(school_code or "")
     if dataset:
-        # force_refresh re-seeds the group cache even when entries are still fresh.
         _seed_group_cache_from_dataset(dataset, force=bool(force_refresh))
         return dataset, None
     return None, "Internal academic data is not available."
@@ -866,7 +913,6 @@ def _load_dashboard_payload(
     force_refresh = False,
 ):
     normalized_requested_school = _normalize_school_code(requested_school)
-
     from web.backend.domains.academics.internal_dashboard_service import get_enrollment_dashboard
     db_payload = get_enrollment_dashboard(student_id, normalized_requested_school)
     if db_payload is not None:
@@ -886,133 +932,79 @@ def _load_dashboard_payload(
 
     return None, None, "Student dashboard was not found in internal academic data."
 
-@app.after_request
-def add_common_headers(response):
-    # Apply shared security/cache headers for every response.
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
 
-    request_path = str(request.path or "")
-    cache_control = _resolve_cache_control_header(
-        request_path=request_path,
-        query_version=str(request.args.get("v", "")).strip(),
-    )
-    if cache_control:
-        response.headers["Cache-Control"] = cache_control
+def _build_default_asset_version():
+    candidate_paths = [
+        os.path.join(_BACKEND_DIR, "js_bundles.py"),
+        os.path.join(_BACKEND_DIR, "server.py"),
+        os.path.join(_BACKEND_DIR, "render.py"),
+        os.path.join(_REACT_DIR, "manifest.json"),
+        os.path.join(_REACT_DIR, "app.css"),
+        os.path.join(_REACT_DIR, "app.js"),
+    ]
 
-    return response
+    js_roots = [
+        os.path.join(_STATIC_DIR, "js"),
+    ]
+    for js_root in js_roots:
+        for root_dir, _dir_names, file_names in os.walk(js_root):
+            for file_name in file_names:
+                if not file_name.endswith(".js"):
+                    continue
+                candidate_paths.append(os.path.join(root_dir, file_name))
 
+    if os.path.isdir(_REACT_DIR):
+        for root_dir, _dir_names, file_names in os.walk(_REACT_DIR):
+            for file_name in file_names:
+                if not (file_name.endswith(".js") or file_name.endswith(".css")):
+                    continue
+                candidate_paths.append(os.path.join(root_dir, file_name))
 
-def _is_authenticated_session():
-    # Prefer signed Flask session fields first; this avoids triggering
-    # Flask-Login user loading (and DB access) on every request.
-    if bool(is_authenticated_policy_session(session)):
-        return True
-    return bool(getattr(current_user, "is_authenticated", False))
+    mtimes = []
+    for path in candidate_paths:
+        try:
+            mtimes.append(int(os.path.getmtime(path)))
+        except OSError:
+            continue
 
-
-_STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-
-
-def _reject_cross_origin_state_change():
-    # Many JSON endpoints are @csrf.exempt; enforce same-origin here so a third-party
-    # page cannot drive state-changing requests with the victim's session cookie.
-    if request.method not in _STATE_CHANGING_METHODS:
-        return None
-    path = str(request.path or "")
-    if not (path.startswith("/api/") or path.startswith("/admin/api/")):
-        return None
-    origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
-    if not origin:
-        # Browsers attach Origin to cross-site non-GET fetches; a missing Origin on a
-        # same-origin XHR is normal. Require the XHR marker the frontend already sends.
-        if str(request.headers.get("X-Requested-With", "")).strip() == "XMLHttpRequest":
-            return None
-        return jsonify({"message": "Cross-origin request rejected."}), 403
-    from urllib.parse import urlparse
-
-    if urlparse(origin).netloc != request.host:
-        return jsonify({"message": "Cross-origin request rejected."}), 403
-    return None
+    if not mtimes:
+        return "1"
+    return str(max(mtimes))
 
 
-@app.before_request
-def require_authentication_for_protected_routes():
-    cross_origin_rejection = _reject_cross_origin_state_change()
-    if cross_origin_rejection is not None:
-        return cross_origin_rejection
-
-    endpoint = request.endpoint or ""
-    endpoint_name = endpoint.split(".")[-1] if endpoint else ""
-    if endpoint in _PUBLIC_ENDPOINTS or endpoint_name in _PUBLIC_ENDPOINTS:
-        return None
-
-    if _is_authenticated_session():
-        session.permanent = True
-        return None
-
-    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
-    is_xhr = requested_with == "XMLHttpRequest"
-    if request.path.startswith("/api/") or is_xhr:
-        return jsonify({"message": "Authentication required."}), 401
-    return redirect(url_for("student.home"))
+_asset_version_override = os.environ.get("ASSET_VERSION", "").strip()
+_ASSET_VERSION = (
+    _asset_version_override
+    if _asset_version_override and _asset_version_override != "1"
+    else _build_default_asset_version()
+)
 
 
-@app.errorhandler(CSRFError)
-def handle_csrf_error(_error):
-    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
-    is_xhr = requested_with == "XMLHttpRequest"
-    if request.path.startswith("/api/") or is_xhr:
-        return jsonify({"message": "Invalid or missing CSRF token."}), 400
-    return redirect(url_for("student.home"))
-
-
-@app.errorhandler(429)
-def handle_rate_limited(_error):
-    message = "Too many attempts. Please wait a moment and try again."
-    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
-    is_xhr = requested_with == "XMLHttpRequest"
-    if request.path.startswith(("/api/", "/admin/api/")) or is_xhr:
-        return jsonify({"message": message}), 429
-    return message, 429
-
-
-@app.errorhandler(Exception)
-def handle_unexpected_error(error):
-    # Let Flask handle intended HTTP errors (404/403/redirects/etc.) normally.
-    from werkzeug.exceptions import HTTPException
-
-    if isinstance(error, HTTPException):
-        return error
-
-    # Log the full traceback server-side; never leak internals to the client.
-    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
-
-    requested_with = str(request.headers.get("X-Requested-With", "")).strip()
-    is_xhr = requested_with == "XMLHttpRequest"
-    if request.path.startswith(("/api/", "/admin/api/")) or is_xhr:
-        return jsonify({"message": "Something went wrong. Please try again."}), 500
-    try:
-        return redirect(url_for("student.home"))
-    except Exception:
-        return "Internal Server Error", 500
-
-def _is_background_refresh_enabled():
-    raw_value = str(os.getenv("DISABLE_BACKGROUND_REFRESH", "0") or "").strip()
-    return raw_value.casefold() not in {"1", "true", "yes", "on"}
-
-
-def _bootstrap_app(flask_app):
+def _bootstrap_app(app_instance):
     global _APP_BOOTSTRAPPED
     if _APP_BOOTSTRAPPED:
-        return flask_app
+        return app_instance
 
+    # Set static files dependencies in render.py
+    import web.backend.render as render
+    render.ASSET_VERSION = _ASSET_VERSION
+    render.STATIC_FOLDER = _STATIC_DIR
+
+    # Set static files dependencies in system.py
+    import web.backend.routes.system as system_routes
+    system_routes.STATIC_FOLDER = _STATIC_DIR
+
+    # Include system router
+    from web.backend.routes.system import router as system_router
+    app_instance.include_router(system_router)
+
+    # Register admin and student page routes
     render_admin_page = register_admin_page_routes(
-        flask_app,
+        app_instance,
         clear_group_cache=_clear_group_cache,
     )
     register_student_page_routes(
-        flask_app,
+        app_instance,
         render_admin_page=render_admin_page,
         load_dataset=_load_dataset,
         seed_group_cache_from_dataset=_seed_group_cache_from_dataset,
@@ -1029,10 +1021,9 @@ def _bootstrap_app(flask_app):
         compute_subject_rating=_compute_subject_rating,
         build_subject_leaderboard=_build_subject_leaderboard,
     )
-    register_system_routes(flask_app)
 
     _APP_BOOTSTRAPPED = True
-    return flask_app
+    return app_instance
 
 
 def create_app():

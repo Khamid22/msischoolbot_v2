@@ -1,4 +1,5 @@
-from flask import jsonify, request
+from web.backend.utils.response_helpers import jsonify
+from web.backend.utils.context import request
 
 from shared.identity.account_service import (
     delete_teacher_by_id,

@@ -53,9 +53,13 @@ class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasErr
   }
 }
 
-function useStudentActivityHeartbeat(page: string) {
+function useStudentActivityHeartbeat(page: string, props: Record<string, unknown>) {
   useEffect(() => {
     if (!page.startsWith("student-") || page === "student-not-found") {
+      return;
+    }
+
+    if (String(props.embedMode || "").trim().toLowerCase() === "admin") {
       return;
     }
 
@@ -80,11 +84,11 @@ function useStudentActivityHeartbeat(page: string) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [page]);
+  }, [page, props.embedMode]);
 }
 
 const App = () => {
-  useStudentActivityHeartbeat(bootstrap.page);
+  useStudentActivityHeartbeat(bootstrap.page, bootstrap.props);
 
   return (
     <AppErrorBoundary>

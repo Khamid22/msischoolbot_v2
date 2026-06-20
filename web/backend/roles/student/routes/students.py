@@ -2,9 +2,9 @@ import os
 import threading
 import time
 
-from flask import jsonify, redirect, request, session, url_for
-
-from web.backend.auth.forms import StudentPasswordChangeForm
+from web.backend.utils.response_helpers import jsonify, redirect
+from web.backend.utils.context import request, session
+from web.backend.utils.session import url_for
 from shared.identity.account_service import change_student_password
 from web.backend.utils.session import (
     build_dashboard_url,
@@ -86,7 +86,6 @@ def register_student_routes(
 
     @students.post("/profile/password")
     def profile_change_password():
-        password_form = StudentPasswordChangeForm()
         student_db_id = current_student_db_id()
         enrollment_id = current_student_enrollment_id()
         if student_db_id is None:
@@ -96,13 +95,15 @@ def register_student_routes(
         subject = request.form.get("subject", "").strip()
         group = request.form.get("group", "").strip()
 
-        if not password_form.validate_on_submit():
-            if password_form.csrf_token.errors:
-                profile_error = (
-                    "Form security token is missing or invalid. Please refresh and try again."
-                )
-            else:
-                profile_error = "Please fill all password fields."
+        current_password_value = str(request.form.get("current_password", ""))
+        new_password_value = str(request.form.get("new_password", ""))
+        confirm_password_value = str(request.form.get("confirm_password", ""))
+        csrf_token_value = str(request.form.get("csrf_token", ""))
+
+        # Validate CSRF manually
+        expected_csrf = session.get("csrf_token", "")
+        if not expected_csrf or csrf_token_value != expected_csrf:
+            profile_error = "Form security token is missing or invalid. Please refresh and try again."
             if enrollment_id:
                 return redirect(
                     build_dashboard_url(
@@ -114,9 +115,18 @@ def register_student_routes(
                 )
             return redirect(url_for("student.home"))
 
-        current_password_value = str(password_form.current_password.data or "")
-        new_password_value = str(password_form.new_password.data or "")
-        confirm_password_value = str(password_form.confirm_password.data or "")
+        if not current_password_value or not new_password_value or not confirm_password_value:
+            profile_error = "Please fill all password fields."
+            if enrollment_id:
+                return redirect(
+                    build_dashboard_url(
+                        enrollment_id,
+                        subject=subject,
+                        group=group,
+                        profile_error=profile_error,
+                    )
+                )
+            return redirect(url_for("student.home"))
 
         if new_password_value != confirm_password_value:
             if enrollment_id:

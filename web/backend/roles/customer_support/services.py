@@ -1,5 +1,3 @@
-"""Customer-support role service facade."""
-
 from web.backend.domains.complaints.service import (  # noqa: F401
     create_complaint,
     list_complaints,

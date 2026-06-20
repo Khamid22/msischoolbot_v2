@@ -1,5 +1,8 @@
-from flask import Blueprint, jsonify, request, session, url_for
-from flask_wtf.csrf import generate_csrf
+from web.backend.utils.router import RouteGroup
+from web.backend.utils.response_helpers import jsonify
+from web.backend.utils.context import request, session
+from web.backend.utils.session import url_for
+from web.backend.render import generate_csrf
 
 from web.backend.render import render_react_page
 
@@ -88,7 +91,7 @@ def register_student_page_routes(
             description="Select stream, group, and student.",
         )
 
-    students = Blueprint("student", __name__)
+    students = RouteGroup("student", __name__)
 
     @students.before_request
     def track_student_activity():
@@ -168,4 +171,4 @@ def register_student_page_routes(
     register_comment_routes(students)
     register_chat_page_routes(students, load_dashboard_payload=load_dashboard_payload)
     register_chat_routes(students)
-    app.register_blueprint(students)
+    app.include_router(students)

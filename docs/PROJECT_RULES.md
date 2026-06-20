@@ -41,9 +41,8 @@ tgbot/
   helpers.py        bot formatting/helper functions
 
 web/backend/
-  server.py         Flask app composition
+  server.py         FastAPI app composition
   routes/           small system-level routes
-  auth/             web auth/session helpers
   roles/            role-specific backend workflows
   domains/          reusable backend business domains
   utils/            web-only utility helpers

@@ -1,1 +1,1 @@
-"""Backend (Flask) package."""
+"""Backend (FastAPI) package."""

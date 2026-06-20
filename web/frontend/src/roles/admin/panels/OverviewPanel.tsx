@@ -181,11 +181,11 @@ function Indicator({
   tone?: "neutral" | "good" | "warn" | "bad" | "info";
 }) {
   const toneClass = {
-    neutral: "border-slate-200 bg-slate-50 text-slate-950",
-    info: "border-sky-200 bg-sky-50 text-sky-700",
-    good: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    warn: "border-amber-200 bg-amber-50 text-amber-700",
-    bad: "border-rose-200 bg-rose-50 text-rose-700",
+    neutral: "border-border bg-surface text-foreground",
+    info: "border-sky-200 bg-surface text-sky-800",
+    good: "border-emerald-200 bg-surface text-emerald-800",
+    warn: "border-amber-200 bg-surface text-amber-800",
+    bad: "border-rose-200 bg-surface text-rose-800",
   }[tone];
   return (
     <div className={`min-w-0 rounded-lg border px-3 py-2 ${toneClass}`}>
@@ -1441,12 +1441,12 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-gradient-to-r from-white via-sky-50/70 to-amber-50/60 px-3 py-2 shadow-card">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
         {[
-          { label: "Students", value: asNumber(quickStats.total_students), icon: <Users className="h-3.5 w-3.5" />, color: "bg-sky-100 text-sky-700" },
-          { label: "Schools", value: asNumber(quickStats.total_schools), icon: <School className="h-3.5 w-3.5" />, color: "bg-violet-100 text-violet-700" },
-          { label: "Teachers", value: asNumber(quickStats.total_teachers), icon: <GraduationCap className="h-3.5 w-3.5" />, color: "bg-emerald-100 text-emerald-700" },
-          { label: "Subjects", value: asNumber(quickStats.total_subjects), icon: <BookOpen className="h-3.5 w-3.5" />, color: "bg-amber-100 text-amber-700" },
+          { label: "Students", value: asNumber(quickStats.total_students), icon: <Users className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
+          { label: "Schools", value: asNumber(quickStats.total_schools), icon: <School className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
+          { label: "Teachers", value: asNumber(quickStats.total_teachers), icon: <GraduationCap className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
+          { label: "Subjects", value: asNumber(quickStats.total_subjects), icon: <BookOpen className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
         ].map((item) => (
           <span key={item.label} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold ${item.color}`}>
             {item.icon}

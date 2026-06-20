@@ -1,6 +1,5 @@
-from flask import jsonify, request
-
-from web.backend.extensions import csrf
+from web.backend.utils.response_helpers import jsonify, csrf
+from web.backend.utils.context import request
 from web.backend.domains.communication.chat_service import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from web.backend.utils.session import (
     current_auth_role,

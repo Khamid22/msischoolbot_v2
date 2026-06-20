@@ -5,7 +5,7 @@ Generates HTML pages directly from Python — no Jinja2 templates needed.
 
 How it works
 ------------
-  1. A Flask route builds a props dict (camelCase keys matching React component props).
+  1. A backend route builds a props dict (camelCase keys matching React component props).
   2. The route calls render_react_page("page-name", props, title="...").
   3. render_react_page() returns an HTML string with the props embedded as JSON.
   4. The browser loads React, which reads the JSON and renders the right page.
@@ -19,8 +19,24 @@ import re
 import threading
 from typing import Any
 
-from flask import current_app, url_for
 from markupsafe import escape
+
+ASSET_VERSION = "1"
+STATIC_FOLDER = ""
+
+
+def url_for(endpoint: str, **kwargs) -> str:
+    if endpoint == "static":
+        filename = kwargs.get("filename", "")
+        v = kwargs.get("v")
+        url = f"/static/{filename}"
+        if v:
+            url += f"?v={v}"
+        return url
+    if endpoint == "system.manifest":
+        return "/manifest.webmanifest"
+    raise ValueError(f"Unknown endpoint in render url_for: {endpoint}")
+
 
 
 # ---------------------------------------------------------------------------
@@ -77,13 +93,14 @@ _MINIMAL_CRITICAL_CSS = """
 """.rstrip()
 
 def _asset_version() -> str:
-    """Cache-busting version string, set once at startup in app.config."""
-    return str(current_app.config.get("ASSET_VERSION", "1"))
+    """Cache-busting version string, set once at startup."""
+    return str(ASSET_VERSION)
 
 
 def _react_manifest_path() -> str:
-    static_root = current_app.static_folder or ""
+    static_root = STATIC_FOLDER or ""
     return os.path.join(static_root, "react", "manifest.json")
+
 
 
 def clear_react_manifest_cache() -> None:
@@ -392,7 +409,18 @@ def render_admin_redirect(redirect_url: str) -> str:
         if (primary) primary.addEventListener("click", function (e) {{ e.preventDefault(); openAdminWebsite(); }});
         if (retry) retry.addEventListener("click", openAdminWebsite);
         window.setTimeout(openAdminWebsite, 80);
-      }})();
     </script>
   </body>
 </html>"""
+
+
+def generate_csrf() -> str:
+    import secrets
+    from web.backend.utils.context import get_current_request
+    request = get_current_request()
+    if request is None:
+        return ""
+    # We use a signed session cookie. Store token in session if not present.
+    if "csrf_token" not in request.session:
+        request.session["csrf_token"] = secrets.token_hex(16)
+    return request.session["csrf_token"]

@@ -1,4 +1,5 @@
-from flask import request, url_for
+from web.backend.utils.context import request
+from web.backend.utils.session import url_for
 
 from web.backend.render import render_react_page
 from web.backend.roles.student.services import payload_service

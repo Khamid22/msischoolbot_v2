@@ -3,7 +3,7 @@
 This project has four runtime areas:
 
 - `tgbot/` - Telegram bot only
-- `web/backend/` - Flask backend only
+- `web/backend/` - FastAPI backend only
 - `web/frontend/` - React frontend only
 - `shared/` - Python logic and PostgreSQL access shared by bot and backend
 
@@ -32,8 +32,7 @@ tgbot/
   helpers.py        bot-specific formatting helpers
 
 web/backend/
-  server.py         Flask app composition
-  auth/             web auth/session helpers
+  server.py         FastAPI app composition
   routes/           small system routes
   roles/            role-specific backend workflows
   domains/          reusable backend business domains
@@ -121,19 +120,17 @@ Required:
 - `DATABASE_URL`
 - `BOT_TOKEN`
 - `MINI_APP_URL`
-- `FLASK_SECRET_KEY`
+- `APP_SECRET_KEY`
 
 Common optional settings:
 
 - `RUN_MODE` (`both`, `web`, or `bot`)
-- `FLASK_HOST`
-- `FLASK_PORT`
+- `WEB_HOST`
+- `WEB_PORT`
 - `PORT`
-- `WAITRESS_THREADS`
 - `DB_POOL_MIN`
 - `DB_POOL_MAX`
 - `REDIS_URL`
 - `R2_ENABLED`
 - `OWNER_ADMIN_LOGIN`
 - `OWNER_ADMIN_PASSWORD`
-

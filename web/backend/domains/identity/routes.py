@@ -1,10 +1,9 @@
-from flask import current_app, jsonify, redirect, request, session, url_for
+import os
 
-from web.backend.render import render_admin_redirect
+from fastapi import Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from web.backend.auth.forms import LoginForm
-from web.backend.extensions import limiter
+from web.backend.render import render_admin_redirect
 from web.backend.utils.telegram_auth import telegram_user_id_from_init_data
 from shared.identity.account_service import (
     detect_login_role,
@@ -22,15 +21,28 @@ from web.backend.utils.session import (
     logout_portal_session,
     set_admin_session,
     set_student_session,
+    url_for,
 )
+from web.backend.utils.context import request as request_proxy, session
+from web.backend.utils.response_helpers import jsonify, redirect, abort
+from web.backend.utils.limiter import limiter
 
 _ADMIN_HANDOFF_SALT = "admin-website-handoff"
 _ADMIN_HANDOFF_MAX_AGE_SECONDS = 180
 
 
 def _admin_handoff_serializer():
+    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+    if not secret:
+        if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
+            secret = "dev-only-insecure-key-do-not-use-in-prod"
+        else:
+            raise RuntimeError(
+                "APP_SECRET_KEY must be set. Generate one with: "
+                'python -c "import secrets; print(secrets.token_hex(32))"'
+            )
     return URLSafeTimedSerializer(
-        str(current_app.config.get("SECRET_KEY", "") or ""),
+        secret,
         salt=_ADMIN_HANDOFF_SALT,
     )
 
@@ -123,7 +135,7 @@ def register_user_auth_routes(
     @students.get("/admin/continue")
     def admin_continue():
         admin_payload, handoff_error = _load_admin_handoff_payload(
-            request.args.get("handoff")
+            request_proxy.args.get("handoff")
         )
         if not admin_payload:
             return render_login_page(auth_error=handoff_error), 401
@@ -145,14 +157,14 @@ def register_user_auth_routes(
             if current_admin_role() == "parent":
                 return render_admin_page(admin_mode="parent", admin_panel="overview")
 
-            panel_arg = str(request.args.get("panel", "")).strip().lower()
-            school_arg = str(request.args.get("school", "")).strip().lower()
+            panel_arg = str(request_proxy.args.get("panel", "")).strip().lower()
+            school_arg = str(request_proxy.args.get("school", "")).strip().lower()
             saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
             saved_school = str(session.get("admin_last_school", "all")).strip().lower()
 
             panel = panel_arg or saved_panel or "overview"
             school_filter = school_arg or saved_school or "all"
-            edit_teacher_id = request.args.get("edit_teacher_id", "").strip()
+            edit_teacher_id = request_proxy.args.get("edit_teacher_id", "").strip()
             selected_teacher_edit = None
             if panel == "teachers" and edit_teacher_id:
                 try:
@@ -179,9 +191,9 @@ def register_user_auth_routes(
 
     @students.post("/auth/telegram")
     def telegram_auth():
-        init_data = str(request.form.get("init_data", "") or "").strip()
-        if not init_data and request.is_json:
-            json_body = request.get_json(silent=True) or {}
+        init_data = str(request_proxy.form.get("init_data", "") or "").strip()
+        if not init_data and request_proxy.is_json:
+            json_body = request_proxy.get_json(silent=True) or {}
             init_data = str(json_body.get("init_data", "") or "").strip()
 
         telegram_user_id = telegram_user_id_from_init_data(init_data)
@@ -205,23 +217,27 @@ def register_user_auth_routes(
         return jsonify({"ok": True, "linked": True, "redirect": redirect_url})
 
     @students.post("/login")
-    @limiter.limit("10 per minute; 50 per hour", methods=["POST"])
-    def login():
-        login_form = LoginForm()
-        login_value = str(login_form.login.data or "").strip()
-        if not login_form.validate_on_submit():
-            if login_form.csrf_token.errors:
-                error_message = (
-                    "Form security token is missing or invalid. Please refresh and try again."
-                )
-            else:
-                error_message = "Please enter both login and password."
+    @limiter.limit("10 per minute; 50 per hour")
+    def login(request: Request):
+        login_value = str(request_proxy.form.get("login", "")).strip()
+        password_value = str(request_proxy.form.get("password", ""))
+        init_data_value = str(request_proxy.form.get("init_data", ""))
+        csrf_token_value = str(request_proxy.form.get("csrf_token", ""))
+
+        # Validate CSRF manually
+        expected_csrf = session.get("csrf_token", "")
+        if not expected_csrf or csrf_token_value != expected_csrf:
             return render_login_page(
-                auth_error=error_message,
+                auth_error="Form security token is missing or invalid. Please refresh and try again.",
                 auth_login_input=login_value,
             ), 400
 
-        password_value = str(login_form.password.data or "")
+        if not login_value:
+            return render_login_page(
+                auth_error="Please enter both login and password.",
+                auth_login_input=login_value,
+            ), 400
+
         role_hint = detect_login_role(login_value)
 
         if role_hint == "admin":
@@ -245,7 +261,7 @@ def register_user_auth_routes(
 
             # Link the Telegram account only from a verified initData signature, never
             # from a client-supplied raw id (which could be forged to hijack a login).
-            telegram_user_id = telegram_user_id_from_init_data(login_form.init_data.data)
+            telegram_user_id = telegram_user_id_from_init_data(init_data_value)
             if telegram_user_id is not None:
                 linked = link_student_telegram_user(
                     int(student["id"]),
