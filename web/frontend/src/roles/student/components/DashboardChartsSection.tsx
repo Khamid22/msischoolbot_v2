@@ -32,8 +32,10 @@ interface DashboardChartsSectionProps {
   homeworkChartData: Array<Record<string, string | number | null>>;
 }
 
-const attendanceColors = ["#111111", "#888888", "#cccccc"];
+const attendanceColors = ["hsl(152 65% 42%)", "hsl(0 75% 58%)", "hsl(38 95% 55%)"];
 const homeworkYAxisLabels = [9, 7, 5, 3, 1];
+const PRIMARY_STROKE = "hsl(230 60% 24%)";
+const PRIMARY_GLOW = "hsl(245 70% 50%)";
 
 export default function DashboardChartsSection(props: DashboardChartsSectionProps) {
   const {
@@ -105,7 +107,7 @@ export default function DashboardChartsSection(props: DashboardChartsSectionProp
                   <Line
                     dataKey="bestScore"
                     name="Best score"
-                    stroke="#111111"
+                    stroke={PRIMARY_STROKE}
                     strokeWidth={2.5}
                     dot={{ r: 4 }}
                     activeDot={{ r: 5 }}
@@ -145,7 +147,13 @@ export default function DashboardChartsSection(props: DashboardChartsSectionProp
                     />
                     <YAxis domain={[1, 9]} hide />
                     <Tooltip />
-                    <Area type="monotone" dataKey="score" stroke="#111111" fill="#aaaaaa" fillOpacity={0.35} strokeWidth={2} />
+                    <defs>
+                      <linearGradient id="hwGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={PRIMARY_GLOW} stopOpacity={0.45} />
+                        <stop offset="100%" stopColor={PRIMARY_GLOW} stopOpacity={0.04} />
+                      </linearGradient>
+                    </defs>
+                    <Area type="monotone" dataKey="score" stroke={PRIMARY_STROKE} fill="url(#hwGradient)" strokeWidth={2.5} dot={{ r: 3, fill: PRIMARY_STROKE }} activeDot={{ r: 5 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

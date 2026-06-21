@@ -79,7 +79,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-BfKX-hXK.js",
+    "file": "assets/index-D8nd9HXT.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -99,10 +99,62 @@
       "src/roles/admin/pages/EditStudentProfile.tsx",
       "src/roles/student/pages/Chat.tsx",
       "src/roles/student/pages/StudentNotFound.tsx"
+    ],
+    "assets": [
+      "assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+      "assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+      "assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+      "assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+      "assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+      "assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+      "assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+      "assets/space-grotesk-vietnamese-wght-normal-D0rl6rjA.woff2",
+      "assets/space-grotesk-latin-ext-wght-normal-D9tNdqV9.woff2",
+      "assets/space-grotesk-latin-wght-normal-BhU9QXUp.woff2"
     ]
   },
+  "node_modules/@fontsource-variable/inter/files/inter-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2": {
+    "file": "assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-cyrillic-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-greek-ext-wght-normal.woff2": {
+    "file": "assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-greek-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-greek-wght-normal.woff2": {
+    "file": "assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-greek-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2": {
+    "file": "assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2": {
+    "file": "assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/inter/files/inter-vietnamese-wght-normal.woff2": {
+    "file": "assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+    "src": "node_modules/@fontsource-variable/inter/files/inter-vietnamese-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-ext-wght-normal.woff2": {
+    "file": "assets/space-grotesk-latin-ext-wght-normal-D9tNdqV9.woff2",
+    "src": "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2": {
+    "file": "assets/space-grotesk-latin-wght-normal-BhU9QXUp.woff2",
+    "src": "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-vietnamese-wght-normal.woff2": {
+    "file": "assets/space-grotesk-vietnamese-wght-normal-D0rl6rjA.woff2",
+    "src": "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-vietnamese-wght-normal.woff2"
+  },
   "src/roles/admin/pages/Admin.tsx": {
-    "file": "chunks/Admin-BmQ9i1Xs.js",
+    "file": "chunks/Admin-dVsCjl28.js",
     "name": "Admin",
     "src": "src/roles/admin/pages/Admin.tsx",
     "isDynamicEntry": true,
@@ -204,7 +256,7 @@
     ]
   },
   "src/roles/admin/panels/OverviewPanel.tsx": {
-    "file": "chunks/OverviewPanel-DfBu-DOv.js",
+    "file": "chunks/OverviewPanel-BGVmTbIS.js",
     "name": "OverviewPanel",
     "src": "src/roles/admin/panels/OverviewPanel.tsx",
     "isDynamicEntry": true,
@@ -291,7 +343,7 @@
     ]
   },
   "src/roles/parent/pages/ParentHome.tsx": {
-    "file": "chunks/ParentHome-wAqpKwCJ.js",
+    "file": "chunks/ParentHome-CheI4hyY.js",
     "name": "ParentHome",
     "src": "src/roles/parent/pages/ParentHome.tsx",
     "isDynamicEntry": true,
@@ -305,7 +357,7 @@
     ]
   },
   "src/roles/student/components/DashboardChartsSection.tsx": {
-    "file": "chunks/DashboardChartsSection-DSTBU3KT.js",
+    "file": "chunks/DashboardChartsSection-CdfI5Pi5.js",
     "name": "DashboardChartsSection",
     "src": "src/roles/student/components/DashboardChartsSection.tsx",
     "isDynamicEntry": true,
@@ -359,7 +411,7 @@
     ]
   },
   "src/roles/student/pages/Dashboard.tsx": {
-    "file": "chunks/Dashboard-LFlV2fAh.js",
+    "file": "chunks/Dashboard-CUZJJiRe.js",
     "name": "Dashboard",
     "src": "src/roles/student/pages/Dashboard.tsx",
     "isDynamicEntry": true,
@@ -436,7 +488,7 @@
     ]
   },
   "style.css": {
-    "file": "assets/style-D00vR8EQ.css",
+    "file": "assets/style-CHxCJsJu.css",
     "src": "style.css"
   }
 }

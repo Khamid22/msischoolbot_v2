@@ -1,57 +1,60 @@
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource-variable/space-grotesk/index.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* ✅ THEME VARIABLES (keep exactly as you had them) */
-    --font-display: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+    --font-body: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-    --background: 212 33% 93%;
-    --foreground: 219 43% 15%;
+    --background: 220 30% 97%;
+    --foreground: 222 47% 11%;
     --surface: 0 0% 100%;
     --card: 0 0% 100%;
-    --card-foreground: 219 43% 15%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 219 43% 15%;
-    --primary: 220 42% 20%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 230 60% 24%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 91%;
-    --secondary-foreground: 219 43% 15%;
-    --muted: 210 16% 92%;
-    --muted-foreground: 215 16% 45%;
-    --accent: 220 30% 94%;
-    --accent-foreground: 220 42% 20%;
-    --destructive: 0 72% 42%;
-    --destructive-foreground: 0 0% 98%;
-    --success: 142 76% 36%;
+    --primary-glow: 230 80% 60%;
+    --secondary: 220 25% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 22% 95%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 230 80% 96%;
+    --accent-foreground: 230 60% 24%;
+    --destructive: 0 75% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 65% 38%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 4%;
-    --info: 210 40% 40%;
+    --warning: 38 95% 52%;
+    --warning-foreground: 30 80% 12%;
+    --info: 210 90% 50%;
     --info-foreground: 0 0% 100%;
     --trophy: 43 96% 50%;
     --rank-gold: 43 96% 50%;
-    --rank-silver: 0 0% 65%;
-    --rank-bronze: 30 50% 45%;
-    --border: 210 20% 86%;
-    --hairline: 219 43% 15% / 0.08;
-    --input: 210 20% 90%;
-    --ring: 220 42% 20%;
-    --radius: 12px;
-    --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.05);
-    --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.05);
-    --card-shadow-neo: 3px 3px 0 0 rgba(18, 27, 43, 1);
-    --bg-progress-accent: linear-gradient(90deg, #1e2d4a 0%, #4a5d7e 100%);
-    --sidebar-background: 218 41% 12%;
-    --sidebar-foreground: 210 17% 80%;
-    --sidebar-primary: 220 42% 20%;
+    --rank-silver: 220 8% 65%;
+    --rank-bronze: 25 65% 45%;
+    --border: 220 18% 88%;
+    --hairline: 222 47% 11% / 0.08;
+    --input: 220 18% 90%;
+    --ring: 230 80% 60%;
+    --radius: 14px;
+    --card-shadow: 0 1px 2px hsl(222 47% 11% / 0.04), 0 4px 16px hsl(222 47% 11% / 0.06);
+    --card-shadow-hover: 0 2px 4px hsl(222 47% 11% / 0.06), 0 12px 32px hsl(230 60% 24% / 0.12);
+    --card-shadow-neo: 0 6px 0 0 hsl(230 60% 18%), 0 8px 20px -4px hsl(230 60% 24% / 0.4);
+    --bg-progress-accent: linear-gradient(90deg, hsl(230 60% 24%) 0%, hsl(245 70% 50%) 50%, hsl(265 80% 60%) 100%);
+    --sidebar-background: 230 50% 11%;
+    --sidebar-foreground: 220 14% 78%;
+    --sidebar-primary: 230 80% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 30% 18%;
+    --sidebar-accent: 230 40% 18%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 220 30% 15%;
-    --sidebar-ring: 220 42% 20%;
+    --sidebar-border: 230 40% 16%;
+    --sidebar-ring: 230 80% 60%;
 
     /* Safe-area defaults for first paint and non-Telegram browsers. */
     --tg-safe-area-inset-top: env(safe-area-inset-top, 0px);

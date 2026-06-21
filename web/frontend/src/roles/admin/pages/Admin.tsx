@@ -650,11 +650,6 @@ export default function AdminPage(props: AdminPageProps) {
     state.visibleTabs.find((tab: { key: string; label: string }) => tab.key === state.activeTab)?.label ||
     tabs.find((tab) => tab.key === state.activeTab)?.label ||
     "Overview";
-  const activeAdminMode: AdminMode =
-    state.adminMode && adminModeProfiles[state.adminMode as AdminMode]
-      ? (state.adminMode as AdminMode)
-      : "admin";
-  const activeAdminProfile = adminModeProfiles[activeAdminMode];
 
   useEffect(() => {
     if (!state.mobileNavOpen) {
@@ -748,25 +743,10 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4 xl:pr-10 2xl:pr-12"
+        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
-
-        <section className="mb-4 hidden items-center justify-between gap-4 lg:flex">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              {activeAdminProfile.label} Workspace
-            </p>
-            <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-foreground">
-              {activeTabLabel}
-            </h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
-            <span className="h-2 w-2 rounded-full bg-success" />
-            <span className="text-xs font-semibold text-muted-foreground">FastAPI backend online</span>
-          </div>
-        </section>
 
         {isTeacherWorkspace ? (
           <TeacherPreviewSelector
