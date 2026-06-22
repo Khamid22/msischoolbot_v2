@@ -500,6 +500,61 @@ def build_internal_overview_dataset(school_code=""):
     return {"dashboards_by_id": dashboards_by_id}
 
 
+def get_student_subject_enrollments(public_dashboard_id):
+    """All active enrollments for the SAME student as the given dashboard id.
+
+    Identifies the student by (full_name_norm, school_id) of the current
+    enrollment, then returns one entry per subject/group they are enrolled in.
+    This is the reliable source for the dashboard's subject switcher — it does
+    not depend on loading and name-matching the whole school dataset.
+    Returns: [{"student_id": <public_dashboard_id>, "subject", "group"}].
+    """
+    try:
+        dashboard_id = int(public_dashboard_id)
+    except (TypeError, ValueError):
+        return []
+
+    with queries.connect_auth_db() as conn:
+        if not _academic_tables_exist(conn):
+            return []
+
+        ref = conn.execute(
+            """
+            SELECT full_name_norm, school_id
+            FROM academic_enrollments
+            WHERE public_dashboard_id = %s
+            LIMIT 1
+            """,
+            (dashboard_id,),
+        ).fetchone()
+        if not ref:
+            return []
+
+        rows = conn.execute(
+            """
+            SELECT e.public_dashboard_id AS id, sub.name AS subject, g.name AS grp
+            FROM academic_enrollments e
+            JOIN academic_subjects sub ON sub.id = e.subject_id
+            JOIN academic_groups   g   ON g.id   = e.group_id
+            WHERE e.active = 1
+              AND e.full_name_norm = %s
+              AND e.school_id = %s
+            ORDER BY sub.name, g.name
+            """,
+            (ref["full_name_norm"], ref["school_id"]),
+        ).fetchall()
+
+    return [
+        {
+            "student_id": int(row["id"]),
+            "subject": str(row["subject"] or "").strip(),
+            "group": str(row["grp"] or "").strip(),
+        }
+        for row in rows
+        if row["id"]
+    ]
+
+
 def get_enrollment_dashboard(public_dashboard_id, school_code=""):
     """Return a dashboard payload dict from internal DB, or None if not found."""
     try:

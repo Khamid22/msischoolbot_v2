@@ -150,8 +150,44 @@ def build_subject_switch_options(
     current_name_norm = normalize_text(current_full_name)
     options = []
 
+    # Primary source: the student's own enrollments straight from the DB. This is
+    # reliable for multi-subject students and does not depend on loading and
+    # name-matching the whole school dataset (which can silently yield nothing at
+    # runtime, collapsing the switcher to a single subject). Dataset matching
+    # below remains a fallback when the DB source is unavailable.
+    try:
+        from web.backend.domains.academics.internal_dashboard_service import (
+            get_student_subject_enrollments,
+        )
+
+        db_options = get_student_subject_enrollments(current_student_id)
+    except Exception:
+        db_options = []
+    if db_options:
+        seen_db = set()
+        for entry in db_options:
+            key = (entry["student_id"], entry["subject"], entry["group"])
+            if key in seen_db:
+                continue
+            seen_db.add(key)
+            options.append(
+                {
+                    "student_id": entry["student_id"],
+                    "subject": entry["subject"],
+                    "subject_short": subject_short_name(entry["subject"]),
+                    "group": entry["group"],
+                }
+            )
+        options.sort(
+            key=lambda item: (
+                normalize_text(item.get("subject", "")),
+                normalize_text(item.get("group", "")),
+                int(item.get("student_id", 0)),
+            )
+        )
+
     cache_key = (int(id(dataset)), current_name_norm)
-    if isinstance(dataset, dict) and current_name_norm:
+    if not options and isinstance(dataset, dict) and current_name_norm:
         now = time.time()
         with _SUBJECT_SWITCH_CACHE_LOCK:
             cached_entry = _SUBJECT_SWITCH_CACHE.get(cache_key)
