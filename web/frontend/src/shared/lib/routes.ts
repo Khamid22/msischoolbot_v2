@@ -1,3 +1,6 @@
+const adminStudentQuery = (school = "all") =>
+  `school=${encodeURIComponent(String(school || "all"))}&embed=admin`;
+
 export const routes = {
   home: "/",
   login: "/login",
@@ -32,9 +35,12 @@ export const routes = {
   adminStudentsApi: "/admin/api/students",
   adminComplaintsApi: "/admin/api/complaints",
   adminComplaintApi: (complaintId: number | string) => `/admin/api/complaints/${complaintId}`,
+  adminComplaintReplies: (complaintId: number | string) =>
+    `/admin/api/complaints/${complaintId}/replies`,
   adminStudentPaymentsApi: (studentRowId: number | string) => `/admin/api/students/${studentRowId}/payments`,
   adminStudentPaymentApi: (paymentId: number | string) => `/admin/api/student-payments/${paymentId}`,
   adminAcademicSubjectCreate: "/admin/academic/subjects",
+  adminAcademicSchoolCreate: "/admin/academic/schools",
   adminAcademicGroupCreate: "/admin/academic/groups",
   adminAcademicScheduleCreate: "/admin/api/academic/schedules",
   adminAcademicGradebookApi: (groupId: number | string) => `/admin/api/academic/gradebook?group_id=${groupId}`,
@@ -53,9 +59,11 @@ export const routes = {
   adminParentChildren: "/admin/parent-children",
   adminParentChild: (studentRowId: number | string) => `/admin/parent-children/${studentRowId}`,
   adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
+  adminStudentPanel: (studentRowId: number | string, school = "all", panel = "student_dashboard") =>
+    `/?panel=${encodeURIComponent(String(panel || "student_dashboard"))}&school=${encodeURIComponent(String(school || "all"))}&student=${encodeURIComponent(String(studentRowId))}`,
   adminStudentDashboard: (studentRowId: number | string, school = "all") =>
-    `/admin/students/${studentRowId}/dashboard?school=${encodeURIComponent(String(school || "all"))}`,
+    `/admin/students/${studentRowId}/dashboard?${adminStudentQuery(school)}`,
   adminStudentDashboardTarget: (studentRowId: number | string, target: string, school = "all") =>
-    `/admin/students/${studentRowId}/dashboard/${encodeURIComponent(String(target || "dashboard"))}?school=${encodeURIComponent(String(school || "all"))}`,
+    `/admin/students/${studentRowId}/dashboard/${encodeURIComponent(String(target || "dashboard"))}?${adminStudentQuery(school)}`,
   adminStudentSave: (studentRowId: number | string) => `/admin/students/${studentRowId}/profile`,
 };

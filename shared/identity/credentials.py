@@ -15,13 +15,15 @@ from shared.identity.storage import init_storage
 # set _ADMIN_PASSWORDLESS_LOGIN = False (or delete it and restore the password
 # check in verify_admin_credentials below).
 # ─────────────────────────────────────────────────────────────────────────────
-_ADMIN_PASSWORDLESS_LOGIN = True
+_ADMIN_PASSWORDLESS_LOGIN = False
 
 
 def detect_login_role(login):
     normalized = (login or "").strip().casefold()
     if normalized == "admin" or normalized.startswith("staff"):
         return "admin"
+    if normalized.startswith("tch"):
+        return "teacher"
     if normalized.startswith("msi"):
         return "student"
     return ""
@@ -82,9 +84,30 @@ def verify_student_credentials(login, password):
     }
 
 
+def verify_teacher_credentials(login, password):
+    init_storage()
+    teacher_login = (login or "").strip()
+
+    with connect() as conn:
+        row = queries.get_teacher_login_row(conn, teacher_login)
+
+    if not row:
+        return None
+    if not check_password_hash(row["password_hash"], password or ""):
+        return None
+
+    return {
+        "id": int(row["id"]),
+        "full_name": str(row["full_name"]),
+        "login": str(row["login"]),
+        "assigned_group": str(row["assigned_group"] or "").strip(),
+    }
+
+
 __all__ = [
     "detect_login_role",
     "verify_admin_credentials",
     "verify_student_credentials",
+    "verify_teacher_credentials",
 ]
 

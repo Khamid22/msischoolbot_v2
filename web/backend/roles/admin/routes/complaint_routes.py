@@ -1,9 +1,12 @@
 from web.backend.utils.response_helpers import jsonify
 from web.backend.utils.context import request
+from web.backend.utils.session import current_admin_role, current_auth_login
 
 from web.backend.roles.admin.routes.request_payload import request_payload
 from web.backend.domains.complaints.service import (
+    add_complaint_reply,
     create_complaint,
+    get_complaint,
     list_complaints,
     update_complaint,
 )
@@ -38,6 +41,34 @@ def register_admin_complaint_routes(router):
         payload = request_payload()
         try:
             complaint = update_complaint(complaint_id, payload)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        if complaint is None:
+            return jsonify({"ok": False, "message": "Complaint was not found."}), 404
+
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True, "complaint": complaint})
+
+    @router.get("/admin/api/complaints/<int:complaint_id>")
+    def admin_get_complaint(complaint_id):
+        complaint = get_complaint(complaint_id)
+        if complaint is None:
+            return jsonify({"ok": False, "message": "Complaint was not found."}), 404
+        return jsonify({"ok": True, "complaint": complaint})
+
+    @router.post("/admin/api/complaints/<int:complaint_id>/replies")
+    def admin_reply_complaint(complaint_id):
+        payload = request_payload()
+        author_role = current_admin_role() or "admin"
+        author_login = current_auth_login()
+        try:
+            complaint = add_complaint_reply(
+                complaint_id,
+                payload,
+                author_role=author_role,
+                author_login=author_login,
+            )
         except (TypeError, ValueError) as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400
 

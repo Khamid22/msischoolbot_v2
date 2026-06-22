@@ -1,8 +1,29 @@
 """Teacher identity/profile helpers."""
 
+from werkzeug.security import generate_password_hash
+
 from shared.db import queries
 from shared.identity.common import DB_LOCK, connect, utc_now_iso
 from shared.identity.storage import init_storage
+
+
+def backfill_teacher_auth(conn):
+    """Provision teacher_auth (login + default password) for any teacher missing it.
+
+    Auto-provisioning, like students: the login is ``TCH00N`` and the default
+    password equals the login (admins can reset). Idempotent — safe to call on
+    every teacher-list load and right after a teacher is created.
+    """
+    missing = queries.list_teacher_ids_without_auth(conn)
+    if not missing:
+        return
+    now = utc_now_iso()
+    for row in missing:
+        teacher_id = int(row["id"])
+        login = queries.get_next_teacher_code(conn)
+        queries.insert_teacher_auth(
+            conn, teacher_id, login, login, generate_password_hash(login), now
+        )
 
 TEACHER_CATEGORIES = {"junior", "trained", "experienced_igcse"}
 TEACHER_SEMESTER_STAGES = {"1-2", "3-4", "5-6"}
@@ -65,13 +86,19 @@ def teacher_payload(row):
         ),
         "igcse_evidence": str(row_get(row, "igcse_evidence") or ""),
         "promotion_notes": str(row_get(row, "promotion_notes") or ""),
+        "login": str(row_get(row, "login") or ""),
+        "password": str(row_get(row, "password") or ""),
     }
 
 
 def list_teachers():
     init_storage()
-    with connect() as conn:
-        rows = queries.list_teachers_rows(conn)
+    with DB_LOCK:
+        with connect() as conn:
+            # Ensure every teacher has login credentials before listing them.
+            backfill_teacher_auth(conn)
+            conn.commit()
+            rows = queries.list_teachers_rows(conn)
     return [teacher_payload(row) for row in rows]
 
 
@@ -128,6 +155,8 @@ def upsert_teacher(
                 now,
                 now,
             )
+            # Auto-provision login credentials for the newly created teacher.
+            backfill_teacher_auth(conn)
             conn.commit()
     return True
 
@@ -263,6 +292,8 @@ def assign_teacher_to_group(group_name, teacher_name):
                 now,
                 now,
             )
+            # Auto-provision login credentials for the newly created teacher.
+            backfill_teacher_auth(conn)
             conn.commit()
     return True
 

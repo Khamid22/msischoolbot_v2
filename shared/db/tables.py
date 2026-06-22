@@ -476,6 +476,8 @@ def _create_tables_postgres(conn):
 
 def create_tables(conn):
     _create_tables_postgres(conn)
+    ensure_academic_reference_schema(conn)
+    ensure_office_hours_schema(conn)
 
 
 def ensure_students_schema(conn):
@@ -521,6 +523,13 @@ def ensure_admins_schema(conn):
         WHERE telegram_user_id IS NOT NULL
         """
     )
+    # Editable parent/guardian profile fields (parents are stored as admins with
+    # role='parent'). Additive only — never removes or renames existing columns.
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS telegram_username TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''")
 
 
 def ensure_parent_children_schema(conn):
@@ -620,6 +629,8 @@ def ensure_parent_complaints_schema(conn):
     conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT NOT NULL DEFAULT ''")
+    # Ticket-style fields. Additive only.
+    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS assigned_to TEXT NOT NULL DEFAULT ''")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_parent_complaints_status_updated
@@ -630,6 +641,31 @@ def ensure_parent_complaints_schema(conn):
         """
         CREATE INDEX IF NOT EXISTS idx_parent_complaints_parent
         ON parent_complaints(parent_admin_id, created_at)
+        """
+    )
+
+
+def ensure_complaint_messages_schema(conn):
+    # Conversation thread for a support ticket (parent_complaints row). The
+    # ticket's opening `message` is treated as the first message; every reply
+    # (parent/admin/support/ceo/system) is one row here.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parent_complaint_messages (
+            id BIGSERIAL PRIMARY KEY,
+            complaint_id BIGINT NOT NULL,
+            author_role TEXT NOT NULL,
+            author_login TEXT NOT NULL DEFAULT '',
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(complaint_id) REFERENCES parent_complaints(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parent_complaint_messages_complaint
+        ON parent_complaint_messages(complaint_id, created_at, id)
         """
     )
 
@@ -660,6 +696,30 @@ def ensure_subject_summaries_schema(conn):
         """
         CREATE INDEX IF NOT EXISTS idx_subject_summaries_school_key
         ON subject_summaries(school_key)
+        """
+    )
+
+
+def ensure_teacher_auth_schema(conn):
+    # Login credentials for the teacher role. Mirrors student_auth, but keeps a
+    # viewable login/password so admins can hand credentials to teachers (the
+    # students list shows passwords the same way).
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS teacher_auth (
+            teacher_id BIGINT PRIMARY KEY,
+            login TEXT NOT NULL,
+            password TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_auth_login_ci
+        ON teacher_auth ((lower(login)))
         """
     )
 
@@ -778,11 +838,106 @@ def ensure_teacher_candidates_schema(conn):
     )
 
 
+def ensure_academic_reference_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_schools (
+            id BIGSERIAL PRIMARY KEY,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_subjects (
+            id BIGSERIAL PRIMARY KEY,
+            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
+            key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            code TEXT NOT NULL DEFAULT '',
+            short_name TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(school_id, key)
+        )
+        """
+    )
+
+
+def ensure_office_hours_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS office_hour_availability (
+            id BIGSERIAL PRIMARY KEY,
+            teacher_id BIGINT NOT NULL,
+            subject_id BIGINT,
+            planned_topic TEXT NOT NULL DEFAULT '',
+            starts_at TEXT NOT NULL,
+            ends_at TEXT NOT NULL,
+            slot_minutes INTEGER NOT NULL DEFAULT 30,
+            room TEXT NOT NULL DEFAULT '',
+            capacity INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
+            FOREIGN KEY(subject_id) REFERENCES academic_subjects(id) ON DELETE SET NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_office_hour_availability_starts
+        ON office_hour_availability(starts_at, status)
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS office_hour_bookings (
+            id BIGSERIAL PRIMARY KEY,
+            availability_id BIGINT NOT NULL,
+            teacher_id BIGINT NOT NULL,
+            student_row_id BIGINT NOT NULL,
+            subject_id BIGINT,
+            starts_at TEXT NOT NULL,
+            ends_at TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'booked',
+            student_topic_request TEXT NOT NULL DEFAULT '',
+            student_note TEXT NOT NULL DEFAULT '',
+            teacher_note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(availability_id) REFERENCES office_hour_availability(id) ON DELETE RESTRICT,
+            FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
+            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE RESTRICT,
+            FOREIGN KEY(subject_id) REFERENCES academic_subjects(id) ON DELETE SET NULL
+        )
+        """
+    )
+    conn.execute("ALTER TABLE office_hour_availability ADD COLUMN IF NOT EXISTS planned_topic TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE office_hour_bookings ADD COLUMN IF NOT EXISTS student_topic_request TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_office_hour_bookings_student
+        ON office_hour_bookings(student_row_id, starts_at)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_office_hour_bookings_teacher
+        ON office_hour_bookings(teacher_id, starts_at)
+        """
+    )
+
+
 __all__ = [
     "create_tables",
     "ensure_admins_schema",
     "ensure_parent_children_schema",
     "ensure_parent_complaints_schema",
+    "ensure_complaint_messages_schema",
     "ensure_student_payments_schema",
     "ensure_students_schema",
     "ensure_lesson_catalog_schema",
@@ -791,4 +946,6 @@ __all__ = [
     "ensure_resource_comments_schema",
     "ensure_chat_schema",
     "ensure_teacher_candidates_schema",
+    "ensure_teacher_auth_schema",
+    "ensure_office_hours_schema",
 ]

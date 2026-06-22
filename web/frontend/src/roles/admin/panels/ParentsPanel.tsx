@@ -2,7 +2,7 @@ import { useEffect, useRef, useMemo, useState, type FormEvent } from "react";
 import { KeyRound, Plus, Search, UserMinus, UserPlus, UserRound, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, formatLastSeen } from "../shared";
+import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId } from "../shared";
 
 function initialsFor(value: unknown) {
   const parts = asString(value).split(/\s+/).filter(Boolean);
@@ -17,7 +17,7 @@ function initialsFor(value: unknown) {
 function studentLabel(student: Record<string, unknown>) {
   return [
     asString(student.full_name),
-    asString(student.student_id),
+    getStudentCode(student),
     asString(student.school_name),
   ]
     .filter(Boolean)
@@ -155,7 +155,7 @@ function StudentCombobox({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selected = students.find((s) => String(asNumber(s.id)) === value);
+  const selected = students.find((s) => String(getStudentRowId(s)) === value);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -177,7 +177,7 @@ function StudentCombobox({
     return (
       <div className="flex h-10 items-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3">
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {asString(selected.full_name) || asString(selected.student_id)}
+          {asString(selected.full_name) || getStudentCode(selected)}
         </span>
         <button
           type="button"
@@ -215,7 +215,8 @@ function StudentCombobox({
       {open && filtered.length > 0 ? (
         <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-foreground/10 bg-surface shadow-card-hover">
           {filtered.map((student) => {
-            const id = String(asNumber(student.id));
+            const id = String(getStudentRowId(student));
+            const studentCode = getStudentCode(student);
             return (
               <button
                 key={id}
@@ -236,7 +237,7 @@ function StudentCombobox({
                     {asString(student.full_name) || "Student"}
                   </span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {asString(student.student_id)} · {asString(student.school_name)}
+                    Code {studentCode || "-"} · {asString(student.school_name)}
                   </span>
                 </span>
               </button>
@@ -272,6 +273,17 @@ export default function ParentsPanel({ state }: { state: any }) {
   const [error, setError] = useState("");
   const [createError, setCreateError] = useState("");
 
+  const [profileForm, setProfileForm] = useState({
+    display_name: "",
+    phone: "",
+    email: "",
+    telegram_username: "",
+    notes: "",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+
   useEffect(() => {
     const nextParentId = asNumber(state.activeParentId);
     if (nextParentId > 0 && nextParentId !== selectedParentId) {
@@ -285,19 +297,40 @@ export default function ParentsPanel({ state }: { state: any }) {
   const selectedParentResolvedId = asNumber(selectedParent?.id);
   const children = parentChildren(selectedParent);
   const childIds = new Set(
-    children.map((child) => asNumber(child.id)).filter((id) => id > 0),
+    children.map((child) => getStudentRowId(child)).filter((id) => id > 0),
   );
+
+  useEffect(() => {
+    setProfileForm({
+      display_name: asString(selectedParent?.display_name),
+      phone: asString(selectedParent?.phone),
+      email: asString(selectedParent?.email),
+      telegram_username: asString(selectedParent?.telegram_username),
+      notes: asString(selectedParent?.notes),
+    });
+    setProfileError("");
+    setProfileSaved(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedParentResolvedId]);
 
   const visibleParents = useMemo(() => {
     const query = parentSearch.toLowerCase().trim();
     if (!query) return parentAccounts;
     return parentAccounts.filter((parent) =>
-      asString(parent.login).toLowerCase().includes(query),
+      [
+        parent.login,
+        parent.display_name,
+        parent.phone,
+        parent.email,
+        parent.telegram_username,
+      ]
+        .map((value) => asString(value).toLowerCase())
+        .some((value) => value.includes(query)),
     );
   }, [parentAccounts, parentSearch]);
 
   const availableStudents = useMemo(
-    () => students.filter((s) => !childIds.has(asNumber(s.id))),
+    () => students.filter((s) => !childIds.has(getStudentRowId(s))),
     [students, childIds],
   );
 
@@ -367,11 +400,45 @@ export default function ParentsPanel({ state }: { state: any }) {
     }
   }
 
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const parentId = selectedParentResolvedId;
+    if (!parentId || profileSaving) return;
+    setProfileSaving(true);
+    setProfileError("");
+    setProfileSaved(false);
+    try {
+      const response = await fetch(`${routes.adminParents}/${parentId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrf,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify(profileForm),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.ok) {
+        setProfileError(asString(json.message) || "Unable to save profile.");
+        return;
+      }
+      const parent = (json.parent || {}) as Record<string, unknown>;
+      setParentAccounts((current) =>
+        current.map((p) => (asNumber(p.id) === parentId ? { ...p, ...parent } : p)),
+      );
+      setProfileSaved(true);
+    } catch {
+      setProfileError("Network error. Please try again.");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
   async function addChild(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parentId = selectedParentResolvedId;
-    const studentId = asNumber(selectedStudentId);
-    if (!parentId || !studentId || saving) return;
+    const studentRowId = asNumber(selectedStudentId);
+    if (!parentId || !studentRowId || saving) return;
 
     setSaving(true);
     setError("");
@@ -383,7 +450,7 @@ export default function ParentsPanel({ state }: { state: any }) {
           "X-CSRFToken": csrf,
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify({ student_row_id: studentId }),
+        body: JSON.stringify({ student_row_id: studentRowId }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.ok) {
@@ -391,13 +458,13 @@ export default function ParentsPanel({ state }: { state: any }) {
         return;
       }
       const child = (json.child || {}) as Record<string, unknown>;
-      const childId = asNumber(child.id);
+      const childId = getStudentRowId(child);
       if (!childId) {
         setError("Student was linked, but the record could not be loaded.");
         return;
       }
       updateParentChildren(parentId, (current) => {
-        const deduped = current.filter((item) => asNumber(item.id) !== childId);
+        const deduped = current.filter((item) => getStudentRowId(item) !== childId);
         return [...deduped, child].sort((a, b) =>
           asString(a.full_name).localeCompare(asString(b.full_name)),
         );
@@ -412,8 +479,8 @@ export default function ParentsPanel({ state }: { state: any }) {
 
   async function removeChild(student: Record<string, unknown>) {
     const parentId = selectedParentResolvedId;
-    const studentId = asNumber(student.id);
-    if (!parentId || !studentId || saving) return;
+    const studentRowId = getStudentRowId(student);
+    if (!parentId || !studentRowId || saving) return;
     if (
       !window.confirm(
         `Remove ${asString(student.full_name) || "this student"} from this parent?`,
@@ -424,7 +491,7 @@ export default function ParentsPanel({ state }: { state: any }) {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(routes.adminParentChildFor(parentId, studentId), {
+      const response = await fetch(routes.adminParentChildFor(parentId, studentRowId), {
         method: "DELETE",
         headers: {
           "X-CSRFToken": csrf,
@@ -437,7 +504,7 @@ export default function ParentsPanel({ state }: { state: any }) {
         return;
       }
       updateParentChildren(parentId, (current) =>
-        current.filter((child) => asNumber(child.id) !== studentId),
+        current.filter((child) => getStudentRowId(child) !== studentRowId),
       );
     } catch {
       setError("Network error. Please try again.");
@@ -508,9 +575,10 @@ export default function ParentsPanel({ state }: { state: any }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-bold">
-                          {asString(parent.login)}
+                          {asString(parent.display_name) || asString(parent.login)}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
+                          {asString(parent.display_name) ? `${asString(parent.login)} · ` : ""}
                           {count} linked {count === 1 ? "student" : "students"}
                         </span>
                       </span>
@@ -531,7 +599,11 @@ export default function ParentsPanel({ state }: { state: any }) {
           </div>
         </ChartCard>
         <ChartCard
-          title={selectedParent ? asString(selectedParent.login) : "Parent Profile"}
+          title={
+            selectedParent
+              ? asString(selectedParent.display_name) || asString(selectedParent.login)
+              : "Parent Profile"
+          }
           subtitle={
             selectedParent
               ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
@@ -548,6 +620,67 @@ export default function ParentsPanel({ state }: { state: any }) {
 
             {selectedParent ? (
               <>
+                <form
+                  onSubmit={saveProfile}
+                  className="rounded-lg border border-foreground/10 bg-background p-3"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Profile
+                    </p>
+                    <span className="truncate text-[11px] text-muted-foreground">
+                      Login {asString(selectedParent.login)}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      value={profileForm.display_name}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, display_name: e.target.value }))}
+                      placeholder="Display name"
+                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
+                    />
+                    <input
+                      value={profileForm.phone}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="Phone"
+                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
+                    />
+                    <input
+                      value={profileForm.email}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="Email"
+                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
+                    />
+                    <input
+                      value={profileForm.telegram_username}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, telegram_username: e.target.value }))}
+                      placeholder="Telegram @username"
+                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
+                    />
+                  </div>
+                  <textarea
+                    value={profileForm.notes}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, notes: e.target.value }))}
+                    placeholder="Notes"
+                    rows={2}
+                    className="mt-2 w-full rounded-lg border border-foreground/10 bg-surface px-3 py-2 text-sm outline-none focus:border-foreground/30"
+                  />
+                  {profileError ? (
+                    <p className="mt-2 text-xs font-semibold text-destructive">{profileError}</p>
+                  ) : null}
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={profileSaving}
+                      className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground transition-opacity disabled:opacity-40"
+                    >
+                      {profileSaving ? "Saving…" : "Save profile"}
+                    </button>
+                    {profileSaved ? (
+                      <span className="text-[11px] font-semibold text-emerald-600">Saved</span>
+                    ) : null}
+                  </div>
+                </form>
                 <form
                   onSubmit={addChild}
                   className="flex items-center gap-2"
@@ -572,11 +705,12 @@ export default function ParentsPanel({ state }: { state: any }) {
                 {children.length ? (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {children.map((child) => {
-                      const studentId = asNumber(child.id);
+                      const studentRowId = getStudentRowId(child);
+                      const studentCode = getStudentCode(child);
                       const seen = formatLastSeen(child.last_seen_at);
                       return (
                         <div
-                          key={studentId || asString(child.student_id)}
+                          key={studentRowId || studentCode}
                           className="rounded-lg border border-foreground/10 bg-background p-3 shadow-card"
                         >
                           <div className="flex min-w-0 items-start gap-3">
@@ -588,7 +722,7 @@ export default function ParentsPanel({ state }: { state: any }) {
                                 {asString(child.full_name) || "Student"}
                               </p>
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {asString(child.student_id)} ·{" "}
+                                Code {studentCode || "-"} ·{" "}
                                 {asString(child.school_name) || "School"}
                               </p>
                               <p
@@ -602,7 +736,7 @@ export default function ParentsPanel({ state }: { state: any }) {
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <a
-                              href={routes.adminStudentDashboard(studentId, currentSchool)}
+                              href={routes.adminStudentPanel(studentRowId, currentSchool)}
                               className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-2.5 text-xs font-bold hover:bg-muted"
                             >
                               Dashboard

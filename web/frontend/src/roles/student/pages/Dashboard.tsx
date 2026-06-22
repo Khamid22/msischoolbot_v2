@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
+import { motion } from "@/shared/lib/motion";
 import {
   Activity,
   BarChart3,
@@ -65,6 +66,7 @@ interface DashboardPageProps {
   ratingBoardUrl?: string;
   resourcesUrl?: string;
   chatUrl?: string;
+  officeHoursUrl?: string;
   aapLessonsUrl?: string;
   arLessonsUrl?: string;
   currentSubjectName?: string;
@@ -257,7 +259,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                   ) : null}
                 </button>
                 {announcementsOpen ? (
-                  <div className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-foreground/5 bg-surface shadow-card-hover">
+                  <div className={`absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-xl border border-foreground/5 bg-surface shadow-card-hover ${motion.panel}`}>
                     <div className="flex items-center justify-between border-b border-foreground/5 px-4 py-2.5">
                       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Announcements</p>
                       {announcements.length ? <span className="text-[11px] font-bold text-muted-foreground">{announcements.length}</span> : null}
@@ -306,7 +308,7 @@ export default function DashboardPage(props: DashboardPageProps) {
                       </span>
                     )}
                     {subjectOpen ? (
-                      <nav className="absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-foreground/5 bg-surface py-1 shadow-card-hover">
+                      <nav className={`absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-foreground/5 bg-surface py-1 shadow-card-hover ${motion.panel}`}>
                         {subjectOptions.map((option) => (
                           <a
                             key={`${option.subject}-${option.group}`}
@@ -346,7 +348,7 @@ export default function DashboardPage(props: DashboardPageProps) {
             aria-label="Close menu"
           />
           <aside
-            className="relative flex h-full w-72 max-w-[86vw] flex-col bg-surface shadow-card-hover"
+            className="relative flex h-full w-72 max-w-[86vw] flex-col bg-surface shadow-card-hover animate-in slide-in-from-left duration-200 motion-reduce:animate-none"
             style={{
               paddingTop: "var(--app-top-inset)",
               paddingBottom: "var(--app-bottom-inset)",
@@ -396,6 +398,10 @@ export default function DashboardPage(props: DashboardPageProps) {
                 <MessageSquare className="h-4 w-4 shrink-0" />
                 Chat
               </a>
+              <a href={props.officeHoursUrl} className="flex min-h-11 items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted">
+                <Calendar className="h-4 w-4 shrink-0" />
+                Office Hours
+              </a>
             </nav>
             <div className="border-t border-foreground/5 py-2">
               <button
@@ -416,7 +422,7 @@ export default function DashboardPage(props: DashboardPageProps) {
 
       {profileModalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
+          <div className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Profile</h3>
             <div className="mt-4 space-y-3">
               <div className="flex justify-center">
@@ -474,7 +480,7 @@ export default function DashboardPage(props: DashboardPageProps) {
 
       {logoutOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className="max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
+          <div className={`max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Confirm Logout</h3>
             <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to logout?</p>
             <div className="mt-5 flex justify-end gap-2">
@@ -498,7 +504,7 @@ export default function DashboardPage(props: DashboardPageProps) {
 
       {passwordOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover">
+          <div className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Change Password</h3>
             <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-4">
               <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />

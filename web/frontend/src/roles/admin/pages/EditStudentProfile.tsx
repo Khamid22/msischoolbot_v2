@@ -4,13 +4,18 @@ import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/A
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
 import { FormAlert } from "@/shared/ui/PortalCard";
+import { asNumber, getStudentCode, getStudentRowId } from "../shared";
 
 interface StudentProfile {
   id: number;
+  studentRowId?: number;
+  student_row_id?: number;
   surname?: string;
   name?: string;
   full_name?: string;
   student_id?: string;
+  studentCode?: string;
+  student_code?: string;
   password?: string;
   group?: string;
   teacher_name?: string;
@@ -47,7 +52,10 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
   const initials = `${String(student.surname || "").slice(0, 1)}${String(student.name || "").slice(0, 1)}`.trim() || "ST";
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const profileTitle = student.full_name || `${student.surname || ""} ${student.name || ""}`.trim() || "Student";
-  const profileSubtitle = [student.group || "No group", student.student_id || "No username"].join(" · ");
+  const studentIdentity = student as unknown as Record<string, unknown>;
+  const studentRowId = getStudentRowId(studentIdentity);
+  const studentCode = getStudentCode(studentIdentity);
+  const profileSubtitle = [student.group || "No group", studentCode ? `Code ${studentCode}` : "No student code"].join(" · ");
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -149,9 +157,10 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
                     <User className="h-4 w-4 text-info" />
                     Student Info
                   </h3>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     <ReadOnlyField label="Surname and Name" value={`${student.surname || ""} ${student.name || ""}`.trim() || "-"} />
-                    <ReadOnlyField label="Username" value={student.student_id || "-"} />
+                    <ReadOnlyField label="Student Code" value={studentCode || "-"} />
+                    <ReadOnlyField label="Database Row ID" value={asNumber(studentRowId) ? String(studentRowId) : "-"} />
                     <ReadOnlyField label="Group" value={student.group || "-"} />
                   </div>
                 </div>

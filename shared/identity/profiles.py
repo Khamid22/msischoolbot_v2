@@ -79,12 +79,19 @@ def get_admin_student_profile(student_row_id):
     teacher_name = get_teacher_name_by_group(auto_context.get("group", ""))
     split = split_name(full_name)
 
+    student_row_id = int(row["id"])
+    student_code = str(row["student_id"]).strip()
+
     return {
-        "id": int(row["id"]),
+        "id": student_row_id,
+        "student_row_id": student_row_id,
+        "studentRowId": student_row_id,
         "full_name": full_name,
         "surname": split["surname"],
         "name": split["name"],
-        "student_id": str(row["student_id"]).strip(),
+        "student_id": student_code,
+        "student_code": student_code,
+        "studentCode": student_code,
         "password": str(row["password"]).strip(),
         "subjects": str(row["subjects"]).strip(),
         "photo_url": str(row["photo_url"] or "").strip(),
@@ -167,4 +174,3 @@ __all__ = [
     "get_student_db_id_by_enrollment_id",
     "split_name",
 ]
-

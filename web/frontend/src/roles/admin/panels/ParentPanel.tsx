@@ -12,7 +12,7 @@ import {
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, formatLastSeen, sortSubjectsMathFirst } from "../shared";
+import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
 
 type ParentSection = "overview" | "announcements" | "payments" | "contact";
 
@@ -277,20 +277,21 @@ function ChildSelector({
 }: {
   students: Array<Record<string, unknown>>;
   selectedChildId: number;
-  onSelect: (studentId: number) => void;
+  onSelect: (studentRowId: number) => void;
 }) {
   if (students.length <= 1) return null;
 
   return (
     <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1">
       {students.map((student) => {
-        const studentId = asNumber(student.id);
-        const isSelected = studentId === selectedChildId;
+        const studentRowId = getStudentRowId(student);
+        const studentCode = getStudentCode(student);
+        const isSelected = studentRowId === selectedChildId;
         return (
           <button
-            key={studentId || asString(student.student_id)}
+            key={studentRowId || studentCode}
             type="button"
-            onClick={() => onSelect(studentId)}
+            onClick={() => onSelect(studentRowId)}
             className={`inline-flex min-w-[13rem] snap-start items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
               isSelected
                 ? "border-foreground bg-foreground text-background"
@@ -303,7 +304,7 @@ function ChildSelector({
             <span className="min-w-0">
               <span className="block truncate text-xs font-bold">{asString(student.full_name) || "Student"}</span>
               <span className={`block truncate text-[11px] ${isSelected ? "text-background/70" : "text-muted-foreground"}`}>
-                {asString(student.student_id) || "Student ID"}
+                Code {studentCode || "-"}
               </span>
             </span>
           </button>
@@ -413,7 +414,8 @@ function ChildSummary({
     return <EmptyState label="No child record is connected yet." />;
   }
 
-  const studentId = asNumber(child.id);
+  const studentRowId = getStudentRowId(child);
+  const studentCode = getStudentCode(child);
   const seen = formatLastSeen(child.last_seen_at);
 
   return (
@@ -426,16 +428,16 @@ function ChildSummary({
           <div className="min-w-0">
             <h3 className="truncate text-lg font-bold">{asString(child.full_name) || "Student"}</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {asString(child.student_id) || "Student ID"} · {asString(child.school_name) || "School"}
+              Code {studentCode || "-"} · {asString(child.school_name) || "School"}
             </p>
             <p className={`mt-2 text-xs font-semibold ${seen.online ? "text-emerald-700" : "text-muted-foreground"}`}>
               {seen.label}
             </p>
           </div>
         </div>
-        {studentId ? (
+        {studentRowId ? (
           <ActionLink
-            href={routes.adminStudentDashboard(studentId, currentSchool)}
+            href={routes.adminStudentPanel(studentRowId, currentSchool)}
             label="View Dashboard"
             icon={<Eye className="h-3.5 w-3.5" />}
           />
@@ -712,7 +714,7 @@ function PaymentsSection({
   students: Array<Record<string, unknown>>;
   selectedChild: Record<string, unknown> | undefined;
   selectedChildId: number;
-  onSelectChild: (studentId: number) => void;
+  onSelectChild: (studentRowId: number) => void;
 }) {
   const overview = aggregatePaymentOverview(students);
   const selectedSummary = paymentSummaryFor(selectedChild);
@@ -734,13 +736,14 @@ function PaymentsSection({
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {students.map((child) => {
-          const childId = asNumber(child.id);
+          const childId = getStudentRowId(child);
+          const studentCode = getStudentCode(child);
           const summary = paymentSummaryFor(child);
           const childCompletion = programCompletionFor(child);
           const isSelected = childId === selectedChildId;
           return (
             <button
-              key={childId || asString(child.student_id)}
+              key={childId || studentCode}
               type="button"
               onClick={() => onSelectChild(childId)}
               className={`rounded-lg border bg-background p-3 text-left transition-colors ${
@@ -750,7 +753,7 @@ function PaymentsSection({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">{asString(child.full_name) || "Student"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{asString(child.student_id) || "Student ID"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Code {studentCode || "-"}</p>
                 </div>
                 <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold">{childCompletion}%</span>
               </div>
@@ -1028,11 +1031,11 @@ export default function ParentPanel({ state }: { state: any }) {
     activeParentResolvedId,
   );
 
-  const [selectedChildId, setSelectedChildId] = useState(() => asNumber(students[0]?.id));
+  const [selectedChildId, setSelectedChildId] = useState(() => getStudentRowId(students[0]));
   const [selectedSubjectKey, setSelectedSubjectKey] = useState("");
   const selectedChild =
-    students.find((student) => asNumber(student.id) === selectedChildId) || students[0];
-  const selectedChildIdResolved = asNumber(selectedChild?.id);
+    students.find((student) => getStudentRowId(student) === selectedChildId) || students[0];
+  const selectedChildIdResolved = getStudentRowId(selectedChild);
   const latestUpdates = announcements.slice(0, 3);
   const childIndicators = academicIndicators(selectedChild);
   const subjectOptions = childSubjectOptions(selectedChild, childIndicators);
@@ -1048,9 +1051,9 @@ export default function ParentPanel({ state }: { state: any }) {
     : recentLessons;
   const selectedLessons = selectedLessonsAll.slice(0, 3);
 
-  function selectChild(studentId: number) {
-    if (studentId > 0) {
-      setSelectedChildId(studentId);
+  function selectChild(studentRowId: number) {
+    if (studentRowId > 0) {
+      setSelectedChildId(studentRowId);
       setSelectedSubjectKey("");
     }
   }

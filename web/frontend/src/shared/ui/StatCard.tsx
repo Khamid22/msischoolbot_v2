@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { motion } from "@/shared/lib/motion";
 
 interface StatCardProps {
   title: string;
@@ -19,7 +20,7 @@ export function StatCard({ title, value, icon, href, colorClass = "text-foregrou
     </div>
   );
 
-  const baseClass = "rounded-lg border border-foreground/10 bg-surface shadow-card transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-card-hover";
+  const baseClass = `rounded-lg border border-foreground/10 bg-surface shadow-card ${motion.card}`;
 
   if (href) {
     return (

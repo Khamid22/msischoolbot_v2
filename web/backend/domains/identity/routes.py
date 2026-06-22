@@ -12,6 +12,7 @@ from shared.identity.account_service import (
     link_student_telegram_user,
     verify_admin_credentials,
     verify_student_credentials,
+    verify_teacher_credentials,
 )
 from web.backend.utils.session import (
     build_dashboard_url,
@@ -21,6 +22,7 @@ from web.backend.utils.session import (
     logout_portal_session,
     set_admin_session,
     set_student_session,
+    set_teacher_session,
     url_for,
 )
 from web.backend.utils.context import request as request_proxy, session
@@ -185,6 +187,9 @@ def register_user_auth_routes(
                 return redirect(build_dashboard_url(enrollment_id))
             return redirect(url_for("student.home"))
 
+        if role == "teacher":
+            return redirect("/teacher")
+
         # Telegram auto-login happens via POST /auth/telegram, which verifies the
         # signed initData HMAC. The login page's JS calls it on Mini App startup.
         return render_login_page()
@@ -282,6 +287,21 @@ def register_user_auth_routes(
             if enrollment_id:
                 return redirect(build_dashboard_url(enrollment_id, school=student.get("school_code", "")))
             return redirect(url_for("student.home"))
+
+        if role_hint == "teacher":
+            teacher = verify_teacher_credentials(login_value, password_value)
+            if not teacher:
+                return render_login_page(
+                    auth_error="Invalid teacher credentials.",
+                    auth_login_input=login_value,
+                ), 401
+
+            if not set_teacher_session(teacher):
+                return render_login_page(
+                    auth_error="Unable to initialize teacher session.",
+                    auth_login_input=login_value,
+                ), 500
+            return redirect("/teacher")
 
         # No role prefix matched — try parent credentials (free-form logins).
         admin = verify_admin_credentials(login_value, password_value)

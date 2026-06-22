@@ -7,6 +7,7 @@ export type ReactPageName =
   | "student-rating"
   | "student-aap"
   | "student-ar"
+  | "student-office-hours"
   | "admin-home"
   | "admin-edit-student"
   | "parent-home"
@@ -26,6 +27,7 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-rating",
   "student-aap",
   "student-ar",
+  "student-office-hours",
   "admin-home",
   "admin-edit-student",
   "parent-home",
@@ -47,6 +49,9 @@ function inferPageFromPath(pathname: string): ReactPageName | null {
   }
   if (/^\/dashboard\/\d+\/resources\/?$/.test(pathname)) {
     return "student-resources";
+  }
+  if (/^\/dashboard\/\d+\/office-hours\/?$/.test(pathname)) {
+    return "student-office-hours";
   }
   if (/^\/dashboard\/\d+\/?$/.test(pathname)) {
     return "student-dashboard";
@@ -70,6 +75,8 @@ function normalizePageName(page: unknown): ReactPageName | null {
     "student-aap-lessons": "student-aap",
     "ar-lessons": "student-ar",
     "aap-lessons": "student-aap",
+    "office-hours": "student-office-hours",
+    "student-office-hours": "student-office-hours",
   };
 
   return aliases[rawPage] || null;

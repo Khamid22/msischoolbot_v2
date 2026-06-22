@@ -106,8 +106,6 @@ def _is_address_in_use_error(exc):
 
 
 def run_web_server():
-    # Production ASGI server: uvicorn. Run with a single process since DB routes
-    # are synchronous 'def' endpoints offloaded to uvicorn's threadpool.
     import uvicorn
     from config import get_web_settings
 
@@ -147,15 +145,8 @@ async def run_bot():
     from aiogram import Bot, Dispatcher
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
-    from aiogram.types import (
-        BotCommand,
-        MenuButtonCommands,
-    )
 
-    from tgbot.handlers.account_link import router as account_link_router
-    from tgbot.handlers.contact_us import router as contact_us_router
-    from tgbot.handlers.quick_summary import router as quick_summary_router
-    from tgbot.handlers.start import router as start_router
+    from tgbot.handlers import ALL_ROUTERS
     from tgbot.settings import settings as bot_settings
 
     bot = Bot(
@@ -163,34 +154,11 @@ async def run_bot():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher()
-    dp.include_router(start_router)
-    dp.include_router(account_link_router)
-    dp.include_router(quick_summary_router)
-    dp.include_router(contact_us_router)
-    logging.info(
-        "Bot handlers loaded: start=%d account=%d quick=%d contact=%d",
-        len(start_router.message.handlers),
-        len(account_link_router.message.handlers),
-        len(quick_summary_router.callback_query.handlers),
-        len(contact_us_router.callback_query.handlers)
-        + len(contact_us_router.message.handlers),
-    )
 
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_chat_menu_button(
-        menu_button=MenuButtonCommands(),
-    )
-    await bot.set_my_commands(
-        commands=[
-            BotCommand(command="start", description="Open mini app"),
-            BotCommand(command="menu", description="Show quick actions"),
-            BotCommand(command="whoami", description="Show linked account"),
-            BotCommand(command="unlink_me", description="Unlink Telegram account"),
-        ]
-    )
-    await dp.start_polling(bot)
-
-
+    # Register all routers in a clean loop
+    for router in ALL_ROUTERS:
+        dp.include_router(router)
+        
 def _resolve_run_mode():
     raw_mode = ""
     if len(sys.argv) > 1:

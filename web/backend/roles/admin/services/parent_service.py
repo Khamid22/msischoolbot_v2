@@ -263,10 +263,16 @@ def _build_payment_summary(indicators, payment_records):
 
 
 def _to_child(row, conn=None):
+    student_row_id = int(row["id"])
+    student_code = str(row["student_id"] or "").strip()
     child = {
-        "id": int(row["id"]),
+        "id": student_row_id,
+        "student_row_id": student_row_id,
+        "studentRowId": student_row_id,
         "full_name": str(row["full_name"] or "").strip(),
-        "student_id": str(row["student_id"] or "").strip(),
+        "student_id": student_code,
+        "student_code": student_code,
+        "studentCode": student_code,
         "password": str(row["password"] or ""),
         "subjects": str(row["subjects"] or "").strip(),
         "telegram_user_id": (
@@ -310,25 +316,64 @@ def _normalize_positive_int(value):
     return parsed if parsed > 0 else 0
 
 
-def _to_parent(row, children=None):
+def _row_value(row, key):
+    try:
+        return str(row[key] or "").strip()
+    except (KeyError, IndexError, TypeError):
+        return ""
+
+
+def _to_parent(row, children=None, complaint_counts=None):
+    counts = complaint_counts or {}
+    parent_id = int(row["id"])
+    bucket = counts.get(parent_id, {})
+    display_name = _row_value(row, "display_name")
+    login = str(row["login"] or "").strip()
+    telegram_username = _row_value(row, "telegram_username")
     return {
-        "id": int(row["id"]),
-        "login": str(row["login"] or "").strip(),
+        "id": parent_id,
+        "login": login,
         "role": str(row["role"] or "").strip(),
+        "display_name": display_name,
+        "displayName": display_name,
+        "display": display_name or login,
+        "phone": _row_value(row, "phone"),
+        "email": _row_value(row, "email"),
+        "telegram_username": telegram_username,
+        "telegramUsername": telegram_username,
+        "notes": _row_value(row, "notes"),
         "telegram_user_id": (
             int(row["telegram_user_id"])
             if row["telegram_user_id"] is not None
             else None
         ),
         "created_at": str(row["created_at"] or "").strip(),
+        "ticket_count": int(bucket.get("total", 0)),
+        "open_ticket_count": int(bucket.get("open", 0)),
         "children": children or [],
     }
+
+
+def _complaint_counts_map(conn):
+    try:
+        queries.ensure_parent_complaints_schema(conn)
+        rows = queries.count_complaints_by_parent(conn)
+    except Exception:
+        return {}
+    counts = {}
+    for row in rows:
+        counts[int(row["parent_admin_id"])] = {
+            "total": int(row["total"] or 0),
+            "open": int(row["open_count"] or 0),
+        }
+    return counts
 
 
 def list_parent_accounts():
     with _connect() as conn:
         queries.ensure_admins_schema(conn)
         queries.ensure_parent_children_schema(conn)
+        complaint_counts = _complaint_counts_map(conn)
         parent_rows = queries.list_parent_admin_rows(conn)
         parents = []
         for parent_row in parent_rows:
@@ -337,12 +382,13 @@ def list_parent_accounts():
                 _to_parent(
                     parent_row,
                     [_to_child(row, conn=conn) for row in child_rows],
+                    complaint_counts,
                 )
             )
     return parents
 
 
-def create_parent_account(login, password):
+def create_parent_account(login, password, profile=None):
     login_value = str(login or "").strip()
     password_value = str(password or "")
     if len(login_value) < 3:
@@ -350,6 +396,7 @@ def create_parent_account(login, password):
     if len(password_value) < 6:
         raise ValueError("Temporary password must be at least 6 characters.")
 
+    profile = profile or {}
     with _connect() as conn:
         queries.ensure_admins_schema(conn)
         existing = queries.get_admin_id_by_login(conn, login_value)
@@ -361,6 +408,11 @@ def create_parent_account(login, password):
             login_value,
             generate_password_hash(password_value),
             _utc_now_iso(),
+            display_name=str(profile.get("display_name") or "").strip(),
+            phone=str(profile.get("phone") or "").strip(),
+            email=str(profile.get("email") or "").strip(),
+            telegram_username=str(profile.get("telegram_username") or "").strip(),
+            notes=str(profile.get("notes") or "").strip(),
         )
         conn.commit()
         row = queries.get_parent_admin_row(conn, parent_id)
@@ -368,6 +420,39 @@ def create_parent_account(login, password):
     if not row:
         raise ValueError("Unable to create parent account.")
     return _to_parent(row, [])
+
+
+def update_parent_profile(parent_admin_id, payload):
+    parent_id = _normalize_positive_int(parent_admin_id)
+    if not parent_id:
+        raise ValueError("Parent account is required.")
+    payload = payload or {}
+
+    with _connect() as conn:
+        queries.ensure_admins_schema(conn)
+        queries.ensure_parent_children_schema(conn)
+        parent_row = queries.get_parent_admin_row(conn, parent_id)
+        if not parent_row:
+            raise ValueError("Parent account was not found.")
+
+        queries.update_parent_profile(
+            conn,
+            parent_id,
+            display_name=str(payload.get("display_name") or "").strip(),
+            phone=str(payload.get("phone") or "").strip(),
+            email=str(payload.get("email") or "").strip(),
+            telegram_username=str(payload.get("telegram_username") or "").strip(),
+            notes=str(payload.get("notes") or "").strip(),
+        )
+        conn.commit()
+        complaint_counts = _complaint_counts_map(conn)
+        updated = queries.get_parent_admin_row(conn, parent_id)
+        child_rows = queries.list_parent_child_rows(conn, parent_id)
+        children = [_to_child(row, conn=conn) for row in child_rows]
+
+    if not updated:
+        raise ValueError("Unable to update parent profile.")
+    return _to_parent(updated, children, complaint_counts)
 
 
 def list_parent_children(parent_admin_id):
@@ -435,4 +520,5 @@ __all__ = [
     "list_parent_accounts",
     "list_parent_children",
     "remove_parent_child",
+    "update_parent_profile",
 ]

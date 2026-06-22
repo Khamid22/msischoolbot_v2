@@ -328,8 +328,12 @@ def list_students_for_admin(school_filter = canonical.ADMIN_SCHOOL_FILTER_ALL):
             {
                 "display_id": index,
                 "id": int(item["id"]),
+                "student_row_id": int(item["id"]),
+                "studentRowId": int(item["id"]),
                 "full_name": str(item["full_name"]),
                 "student_id": str(item["student_id"]),
+                "student_code": str(item["student_id"]),
+                "studentCode": str(item["student_id"]),
                 "password": str(item["password"]),
                 "subjects": ", ".join(subjects_sorted),
                 "school_name": str(item.get("school_name", "")).strip() or canonical.DEFAULT_SCHOOL_NAME,
@@ -369,4 +373,3 @@ def update_student_admin_profile(
             )
             conn.commit()
     return True
-

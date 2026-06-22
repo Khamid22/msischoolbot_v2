@@ -27,7 +27,7 @@ export default function LoginPage(props: LoginPageProps) {
               type="text"
               name="login"
               defaultValue={props.authLoginInput || ""}
-              placeholder="Staff or Student ID"
+              placeholder="Staff login or student code"
               autoComplete="username"
               required
               className="w-full rounded-xl border-2 border-foreground/10 bg-surface py-3 pl-10 pr-4 text-sm font-medium outline-none transition-colors focus:border-foreground/30"

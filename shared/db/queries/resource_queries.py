@@ -185,17 +185,6 @@ def update_resource_type_row(conn, resource_type_id, name, slug, updated_at):
     return int(updated.rowcount or 0)
 
 
-def delete_resource_type_row_by_id(conn, resource_type_id):
-    deleted = conn.execute(
-        """
-        DELETE FROM resource_types
-        WHERE id = %s
-        """,
-        (int(resource_type_id),),
-    )
-    return int(deleted.rowcount or 0)
-
-
 def ensure_default_resource_types(conn, created_at):
     defaults = [
         ("Definition", "definition", 1),
@@ -276,8 +265,8 @@ def insert_resource_row(
     inserted = conn.execute(
         """
         INSERT INTO resources (
-            canonical_subject_name,
-            canonical_subject_key,
+            subject_name,
+            subject_key,
             resource_type_id,
             folder_path,
             title,
@@ -294,8 +283,8 @@ def insert_resource_row(
         RETURNING id
         """,
         (
-            subject_name,
-            subject_key,
+            canonical_subject_name,
+            canonical_subject_key,
             int(resource_type_id),
             folder_path,
             title,
@@ -391,17 +380,6 @@ def update_resource_full_row(conn, resource_id, title, description, resource_fil
     return int(updated.rowcount or 0)
 
 
-def delete_resource_row_by_id(conn, resource_id):
-    deleted = conn.execute(
-        """
-        DELETE FROM resources
-        WHERE id = %s
-        """,
-        (int(resource_id),),
-    )
-    return int(deleted.rowcount or 0)
-
-
 def get_resource_row_by_id(conn, resource_id):
     return conn.execute(
         """
@@ -493,7 +471,6 @@ __all__ = [
     "insert_resource_type_row",
     "update_resource_type_active",
     "update_resource_type_row",
-    "delete_resource_type_row_by_id",
     "ensure_default_resource_types",
     "list_resource_subject_names",
     "insert_resource_row",
@@ -501,7 +478,6 @@ __all__ = [
     "update_resource_row",
     "update_resource_full_row",
     "count_resources_by_type",
-    "delete_resource_row_by_id",
     "get_resource_row_by_id",
     "list_resource_rows",
 ]

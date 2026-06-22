@@ -28,7 +28,7 @@ import {
 } from "recharts";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, findPreferredMathSubject } from "../shared";
+import { asNumber, asString, findPreferredMathSubject, getStudentCode, getStudentRowId } from "../shared";
 
 type ZoneKey = "red" | "yellow" | "green";
 
@@ -488,7 +488,9 @@ function ZonesDrawer({
   const activeColor = tabs.find((t) => t.key === activeTab)?.color ?? "";
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-96 flex-col border-l border-foreground/10 bg-surface shadow-xl">
+    <>
+      <div className="fixed inset-0 z-40 bg-foreground/30 backdrop-blur-xs" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 z-50 flex w-[min(24rem,100vw)] flex-col border-l border-foreground/10 bg-surface shadow-xl">
       <div className="flex shrink-0 items-center justify-between border-b border-foreground/8 px-5 py-3.5">
         <p className="text-sm font-bold">Performance Zones</p>
         <button type="button" onClick={onClose} className="rounded-md p-1 hover:bg-foreground/5">
@@ -519,9 +521,9 @@ function ZonesDrawer({
           );
         })}
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-auto">
         {rows.length ? (
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[320px]">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/8">
                 {["Group", "Subject", "AAP", "AR"].map((h) => (
@@ -550,7 +552,8 @@ function ZonesDrawer({
           <p className="px-4 py-6 text-sm text-muted-foreground">No groups in this zone.</p>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -648,7 +651,7 @@ function supportPaymentFollowUps(state: any) {
         return {
           parent: asString(parent.login) || "Parent",
           child: asString(child.full_name) || "Student",
-          studentId: asNumber(child.id),
+          studentRowId: getStudentRowId(child),
           currency: asString(summary.currency) || "UZS",
           debt,
           due,
@@ -678,16 +681,17 @@ function studentDashboardCards({
       {visible.length ? (
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((student) => {
-            const id = asNumber(student.id);
+            const studentRowId = getStudentRowId(student);
+            const studentCode = getStudentCode(student);
             return (
               <a
-                key={id || asString(student.student_id)}
-                href={routes.adminStudentDashboard(id, currentSchool)}
+                key={studentRowId || studentCode}
+                href={routes.adminStudentPanel(studentRowId, currentSchool)}
                 className="rounded-lg border border-foreground/8 bg-background px-3 py-3 transition-colors hover:bg-muted"
               >
                 <p className="truncate text-sm font-bold">{asString(student.full_name) || "Student"}</p>
                 <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {asString(student.student_id) || `ID ${id}`} · {asString(student.school_name) || "School"}
+                  Code {studentCode || "-"} · {asString(student.school_name) || "School"}
                 </p>
                 <p className="mt-2 text-[11px] font-bold text-info">Open dashboard</p>
               </a>
@@ -990,6 +994,114 @@ function RoleOverviewPanel({ state }: { state: any }) {
     );
   }
 
+  if (mode === "academic_director") {
+    const redZones = Array.isArray(state.props?.adminGroupZones?.red) ? state.props.adminGroupZones.red : [];
+    const yellowZones = Array.isArray(state.props?.adminGroupZones?.yellow) ? state.props.adminGroupZones.yellow : [];
+    const atRiskGroups = [...redZones, ...yellowZones];
+    const totalTeachers = state.quickStats?.total_teachers ?? teachers.length;
+    const totalStudents = state.quickStats?.total_students ?? students.length;
+
+    return (
+      <div className="space-y-3">
+        <div className="grid gap-2 md:grid-cols-4">
+          <button type="button" onClick={() => state.switchAdminTab("teachers")} className="text-left">
+            <RoleMetric label="Teachers" value={totalTeachers} detail="active teaching staff" icon={<Users className="h-4 w-4" />} tone="bg-sky-50" />
+          </button>
+          <button type="button" onClick={() => state.switchAdminTab("groups")} className="text-left">
+            <RoleMetric label="Groups" value={groups.length} detail="active class groups" icon={<School className="h-4 w-4" />} tone="bg-emerald-50" />
+          </button>
+          <button type="button" onClick={() => state.switchAdminTab("gradebook")} className="text-left">
+            <RoleMetric label="Students" value={totalStudents} detail="enrolled students" icon={<GraduationCap className="h-4 w-4" />} tone="bg-amber-50" />
+          </button>
+          <button type="button" onClick={() => state.switchAdminTab("gradebook")} className="text-left">
+            <RoleMetric label="At-Risk Groups" value={redZones.length} detail="AAP average < 5.0" icon={<AlertCircle className="h-4 w-4" />} tone={redZones.length ? "bg-rose-50" : "bg-slate-50"} />
+          </button>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+          <ChartCard title="Group Academic Risk" subtitle={`${atRiskGroups.length} groups in Yellow/Red zones`} icon={<AlertCircle className="h-4 w-4 text-info" />}>
+            {atRiskGroups.length ? (
+              <div className="max-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                    <tr className="border-b border-foreground/5">
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Group</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Subject</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">School</th>
+                      <th className="px-3 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground">AAP</th>
+                      <th className="px-3 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground">AR</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Zone</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-foreground/5 bg-background">
+                    {atRiskGroups.map((group, idx) => {
+                      const aap = asNumber(group.aap);
+                      const isRed = aap < 5;
+                      return (
+                        <tr key={idx} className="hover:bg-muted/50">
+                          <td className="px-3 py-2.5 font-semibold">{asString(group.group_name)}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{asString(group.subject_name)}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{asString(group.school_name)}</td>
+                          <td className="px-3 py-2.5 text-center font-bold">{aap.toFixed(1)}</td>
+                          <td className="px-3 py-2.5 text-center font-bold">{asNumber(group.ar).toFixed(0)}%</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                              isRed ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}>
+                              {isRed ? "Red" : "Yellow"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
+                <p className="text-sm font-bold">All groups are in the Green zone! Excellent health.</p>
+              </div>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Academic Quality / Teacher Performance" subtitle={`${teachers.length} teachers`} icon={<Trophy className="h-4 w-4 text-info" />}>
+            {teachers.length ? (
+              <div className="max-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                    <tr className="border-b border-foreground/5">
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Teacher</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Group</th>
+                      <th className="px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground">Category</th>
+                      <th className="px-3 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-foreground/5 bg-background">
+                    {teachers.map((teacher, idx) => {
+                      const score = asNumber(teacher.performance_score);
+                      return (
+                        <tr key={idx} className="hover:bg-muted/50">
+                          <td className="px-3 py-2.5 font-semibold">{asString(teacher.full_name)}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{asString(teacher.assigned_group)}</td>
+                          <td className="px-3 py-2.5 capitalize text-muted-foreground">{asString(teacher.category)}</td>
+                          <td className="px-3 py-2.5 text-center font-bold text-primary">{score.toFixed(1)}/10</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
+                <p className="text-sm font-bold">No teachers registered yet.</p>
+              </div>
+            )}
+          </ChartCard>
+        </div>
+      </div>
+    );
+  }
+
   if (mode === "sales") {
     const complaints = supportComplaintRows(state);
     const newComplaints = complaints.filter((item) => supportComplaintStatus(item.status) === "new");
@@ -1050,7 +1162,7 @@ function RoleOverviewPanel({ state }: { state: any }) {
               <div className="space-y-2">
                 {paymentFollowUps.map((item) => (
                   <button
-                    key={`${item.parent}-${item.studentId}`}
+                    key={`${item.parent}-${item.studentRowId}`}
                     type="button"
                     onClick={() => state.switchAdminTab("payments")}
                     className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-3 text-left transition-colors hover:bg-muted"
@@ -1389,14 +1501,9 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         : trendMonthRows;
   const graphIsAll = graphViewValue === "all";
   const graphDomain: [number, number] = graphMetric === "attendance" ? [0, 100] : [0, 9];
-  const graphStroke = graphMetric === "exam" ? "#8b5cf6" : graphMetric === "attendance" ? "#10b981" : "#2563eb";
-  const graphGridStroke = graphMetric === "exam" ? "#ede9fe" : graphMetric === "attendance" ? "#ccfbf1" : "#dbeafe";
-  const graphBorderClass =
-    graphMetric === "exam"
-      ? "border-violet-100 bg-gradient-to-br from-white via-violet-50/70 to-sky-50/60"
-      : graphMetric === "attendance"
-        ? "border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-cyan-50/60"
-        : "border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50";
+  const graphStroke = graphMetric === "exam" ? "#4a5d7e" : graphMetric === "attendance" ? "#059669" : "#1e2d4a";
+  const graphGridStroke = "#e2e8f0";
+  const graphBorderClass = "border-border bg-surface shadow-card relative overflow-hidden w-full";
   const graphTitle =
     graphMetric === "exam"
       ? graphIsAll
@@ -1440,6 +1547,11 @@ function SchoolOverviewPanel({ state }: { state: any }) {
           onClose={() => setZonesOpen(false)}
         />
       )}
+
+      <div className="flex flex-col gap-0.5 pb-1">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Academic Analytics Overview</h1>
+        <p className="text-xs text-muted-foreground">Real-time overview of students, schools, performance trends, and attendance risks.</p>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
         {[

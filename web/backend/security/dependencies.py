@@ -21,6 +21,9 @@ def get_current_user_role() -> str:
     if auth_role == "student":
         return roles.ROLE_STUDENT
 
+    if auth_role == "teacher":
+        return roles.ROLE_TEACHER
+
     if auth_role == "admin":
         admin_role = session_utils.current_admin_role()
         if admin_role:

@@ -10,6 +10,7 @@ from web.backend.roles.admin.routes.academic_routes import register_academic_adm
 from web.backend.roles.admin.routes.admins import register_admin_routes
 from web.backend.roles.admin.routes.announcement_routes import register_announcement_admin_routes
 from web.backend.roles.admin.routes.chat_admin_routes import register_admin_chat_routes
+from web.backend.roles.admin.routes.office_hours_routes import register_office_hours_admin_routes
 from web.backend.roles.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
@@ -54,6 +55,13 @@ def register_admin_page_routes(
         admin_school="all",
         admin_mode="",
     ):
+        requested_panel = str(request.args.get("panel", "") or "").strip()
+        requested_school = str(request.args.get("school", "") or "").strip()
+        if requested_panel and str(admin_panel or "overview").strip().lower() == "overview":
+            admin_panel = requested_panel
+        if requested_school and str(admin_school or "all").strip().lower() == "all":
+            admin_school = requested_school
+
         force_refresh = bool(
             str(auth_error or "").strip()
             or str(admin_notice or "").strip()
@@ -113,6 +121,8 @@ def register_admin_page_routes(
                 "adminAcademicLessons": academic_context.get("lessons", []),
                 "adminAcademicSchedules": academic_context.get("schedules", []),
                 "adminAcademicSessions": academic_context.get("sessions", []),
+                "adminAcademicCurriculumPrograms": academic_context.get("curriculum_programs", []),
+                "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
                 "adminAcademicEnrollmentSummary": academic_context.get("enrollment_summary", {}),
                 "adminAnnouncements": announcements,
                 "csrfToken": generate_csrf(),
@@ -174,5 +184,6 @@ def register_admin_page_routes(
         delete_uploaded_student_photo=delete_uploaded_student_photo,
     )
     register_admin_chat_routes(admin_routes)
+    register_office_hours_admin_routes(admin_routes)
     app.include_router(admin_routes)
     return render_admin_page

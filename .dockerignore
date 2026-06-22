@@ -1,0 +1,15 @@
+.env
+.venv/
+node_modules/
+web/frontend/node_modules/
+web/frontend/dist/
+backups/
+__pycache__/
+*.py[cod]
+*.log
+.DS_Store
+.git/
+.github/
+.vscode/
+web/backend/static/uploads/
+web/backend/static/js/bundles/

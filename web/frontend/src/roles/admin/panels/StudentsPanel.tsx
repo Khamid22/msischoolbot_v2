@@ -1,10 +1,237 @@
-import { useMemo, useState } from "react";
-import { Eye, Filter, Pencil, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { adminStickyTop, asNumber, asString, formatLastSeen } from "../shared";
+import { adminStickyTop, asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId } from "../shared";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
+
+type CreatedStudent = {
+  studentCode?: string;
+  password?: string;
+  fullName?: string;
+  schoolName?: string;
+  subjectName?: string;
+  groupName?: string;
+};
+
+function AddStudentModal({
+  schools,
+  groups,
+  csrf,
+  onClose,
+}: {
+  schools: Array<Record<string, unknown>>;
+  groups: Array<Record<string, unknown>>;
+  csrf: string;
+  onClose: () => void;
+}) {
+  const [schoolCode, setSchoolCode] = useState(() => asString(schools[0]?.code));
+  const [fullName, setFullName] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState<CreatedStudent | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const schoolGroups = useMemo(
+    () => groups.filter((group) => asString(group.school_code) === schoolCode),
+    [groups, schoolCode],
+  );
+
+  useEffect(() => {
+    // Keep the group valid whenever the chosen school changes.
+    setGroupId(asString(schoolGroups[0]?.id));
+  }, [schoolGroups]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(routes.adminStudentsApi, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrf,
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ full_name: fullName.trim(), group_id: Number(groupId) }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(asString(json.message) || "Could not add student.");
+        return;
+      }
+      setCreated(json.student as CreatedStudent);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleClose() {
+    // After a successful create, reload so the server-rendered list includes
+    // the new student; otherwise just dismiss.
+    if (created) window.location.reload();
+    else onClose();
+  }
+
+  async function copyCredentials() {
+    if (!created) return;
+    const text = `Student code: ${asString(created.studentCode)}\nPassword: ${asString(created.password)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-xl bg-surface shadow-card-hover"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
+          <h3 className="inline-flex items-center gap-2 text-sm font-bold">
+            <UserPlus className="h-4 w-4 text-info" />
+            Add Student
+          </h3>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {created ? (
+          <div className="space-y-4 px-4 py-4">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-sm font-bold text-emerald-800">{asString(created.fullName)} added</p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                Enrolled in {asString(created.groupName)} · {asString(created.subjectName)} · {asString(created.schoolName)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-foreground/10 bg-background p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Login credentials</p>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Student code</p>
+                  <p className="text-sm font-bold">{asString(created.studentCode)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Password</p>
+                  <p className="text-sm font-bold">{asString(created.password)}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={copyCredentials}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-foreground/10 px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy credentials"}
+              </button>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                The initial password is the student code. Share it with the student to log in.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-3 px-4 py-4">
+            {error ? (
+              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
+            ) : null}
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Full Name</span>
+              <input
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                placeholder="e.g. Гафурова Амина"
+                className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Client School</span>
+              <select
+                value={schoolCode}
+                onChange={(event) => setSchoolCode(event.target.value)}
+                required
+                className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
+              >
+                {schools.map((school) => (
+                  <option key={asString(school.code)} value={asString(school.code)}>
+                    {asString(school.name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Group</span>
+              <select
+                value={groupId}
+                onChange={(event) => setGroupId(event.target.value)}
+                required
+                disabled={schoolGroups.length === 0}
+                className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30 disabled:opacity-50"
+              >
+                {schoolGroups.length === 0 ? (
+                  <option value="">No groups for this school</option>
+                ) : (
+                  schoolGroups.map((group) => (
+                    <option key={asNumber(group.id)} value={asString(group.id)}>
+                      {asString(group.name)} · {asString(group.subject_name)}
+                    </option>
+                  ))
+                )}
+              </select>
+              <span className="mt-1 block text-[11px] text-muted-foreground">
+                The group sets the student's subject and school. The gradebook will show them right away.
+              </span>
+            </label>
+            <div className="flex justify-end gap-2 border-t border-foreground/8 pt-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg bg-muted px-4 py-2.5 text-sm font-bold text-muted-foreground hover:bg-foreground/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !fullName.trim() || !groupId}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                {submitting ? "Adding..." : "Add Student"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function subjectList(value: unknown) {
   return asString(value)
@@ -57,8 +284,16 @@ export default function StudentsPanel({ state }: { state: any }) {
     filteredStudents,
   } = state;
 
+  const props = state.props || {};
+  const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
+  const academicSchools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
+  const academicGroups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
+  const csrf = asString(props.csrfToken);
+
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [addOpen, setAddOpen] = useState(false);
+  const canAddStudents = !isTeacherMode && academicSchools.length > 0 && academicGroups.length > 0;
 
   const subjectOptions = useMemo(() => {
     const subjects = new Set<string>();
@@ -106,6 +341,14 @@ export default function StudentsPanel({ state }: { state: any }) {
 
   return (
     <div className="space-y-4">
+      {addOpen && !isTeacherMode ? (
+        <AddStudentModal
+          schools={academicSchools}
+          groups={academicGroups}
+          csrf={csrf}
+          onClose={() => setAddOpen(false)}
+        />
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Students" value={stats.total} hint={`${filteredStudents.length} before filters`} />
         <MetricCard label="Recently Active" value={stats.recent} hint="Seen in the last 7 days" />
@@ -124,7 +367,7 @@ export default function StudentsPanel({ state }: { state: any }) {
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Name, ID, subject, or school"
+              placeholder="Name, student code, subject, or school"
               className="h-10 w-full rounded-lg border border-foreground/10 bg-surface pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
             />
           </label>
@@ -179,17 +422,31 @@ export default function StudentsPanel({ state }: { state: any }) {
         subtitle={`${visibleStudents.length} shown`}
         icon={<Users className="h-4 w-4 text-info" />}
         headerActions={
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground">
-            <Filter className="h-3.5 w-3.5" />
-            {subjectFilter === "all" ? "All subjects" : subjectFilter}
-          </span>
+          <div className="flex items-center gap-2">
+            {!isTeacherMode ? (
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                disabled={!canAddStudents}
+                title={canAddStudents ? "Add a new student" : "Add a client school and group first"}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Student
+              </button>
+            ) : null}
+            <span className="hidden items-center gap-1.5 rounded-lg border border-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground sm:inline-flex">
+              <Filter className="h-3.5 w-3.5" />
+              {subjectFilter === "all" ? "All subjects" : subjectFilter}
+            </span>
+          </div>
         }
       >
         <div className="max-h-[68dvh] overflow-auto">
           <table className="w-full min-w-[860px] text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
-                {["Student", "ID", "Subjects", "School", "Last Seen", ""].map((heading) => (
+                {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
                   <th
                     key={heading || "actions"}
                     className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
@@ -203,12 +460,13 @@ export default function StudentsPanel({ state }: { state: any }) {
               {visibleStudents.length ? (
                 visibleStudents.map((student: Record<string, unknown>) => {
                   const seen = formatLastSeen(student.last_seen_at);
-                  const studentId = asNumber(student.id);
+                  const studentRowId = getStudentRowId(student);
+                  const studentCode = getStudentCode(student);
                   return (
-                    <tr key={studentId} className="border-b border-foreground/5 hover:bg-muted/40">
+                    <tr key={studentRowId} className="border-b border-foreground/5 hover:bg-muted/40">
                       <td className="px-3 py-2.5">
                         <a
-                          href={routes.adminStudentDashboard(studentId, currentSchool)}
+                          href={routes.adminStudentPanel(studentRowId, currentSchool)}
                           className="flex min-w-0 items-center gap-3 hover:underline"
                         >
                           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
@@ -216,16 +474,16 @@ export default function StudentsPanel({ state }: { state: any }) {
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-semibold">{asString(student.full_name)}</span>
-                            <span className="block truncate text-xs text-muted-foreground">{asString(student.student_id)}</span>
+                            <span className="block truncate text-xs text-muted-foreground">Code {studentCode || "-"}</span>
                           </span>
                         </a>
                       </td>
-                      <td className="px-3 py-2.5 text-xs font-bold">{asString(student.student_id)}</td>
+                      <td className="px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex max-w-xs flex-wrap gap-1">
                           {subjectList(student.subjects).map((subject) => (
                             <span
-                              key={`${studentId}-${subject}`}
+                              key={`${studentRowId}-${subject}`}
                               className="rounded-md border border-foreground/10 bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
                             >
                               {subject}
@@ -242,7 +500,7 @@ export default function StudentsPanel({ state }: { state: any }) {
                       <td className="px-3 py-2.5">
                         <div className="flex justify-end gap-1.5">
                           <a
-                            href={routes.adminStudentDashboard(studentId, currentSchool)}
+                            href={routes.adminStudentPanel(studentRowId, currentSchool)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
                             aria-label={`Open ${asString(student.full_name)} dashboard`}
                             title="Dashboard"
@@ -250,7 +508,7 @@ export default function StudentsPanel({ state }: { state: any }) {
                             <Eye className="h-3.5 w-3.5" />
                           </a>
                           <a
-                            href={routes.adminStudentProfile(studentId)}
+                            href={routes.adminStudentProfile(studentRowId)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
                             aria-label={`Edit ${asString(student.full_name)}`}
                             title="Edit"

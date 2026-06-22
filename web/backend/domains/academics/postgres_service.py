@@ -303,6 +303,8 @@ _REQUIRED_TABLES = {
     "academic_coin_events",
     "academic_schedules",
     "academic_lesson_sessions",
+    "academic_curriculum_programs",
+    "academic_curriculum_items",
 }
 
 
@@ -531,6 +533,49 @@ def _ensure_academic_schema_ddl(conn):
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_curriculum_programs (
+            id BIGSERIAL PRIMARY KEY,
+            subject_key TEXT NOT NULL UNIQUE,
+            subject_name TEXT NOT NULL,
+            subject_short TEXT NOT NULL DEFAULT '',
+            source_file TEXT NOT NULL DEFAULT '',
+            total_items INTEGER NOT NULL DEFAULT 0,
+            lesson_count INTEGER NOT NULL DEFAULT 0,
+            exam_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS academic_curriculum_items (
+            id BIGSERIAL PRIMARY KEY,
+            program_id BIGINT NOT NULL REFERENCES academic_curriculum_programs(id) ON DELETE CASCADE,
+            item_order INTEGER NOT NULL,
+            lesson_number TEXT NOT NULL,
+            item_type TEXT NOT NULL DEFAULT 'lesson',
+            title TEXT NOT NULL,
+            term_label TEXT NOT NULL DEFAULT '',
+            week_label TEXT NOT NULL DEFAULT '',
+            specification_points TEXT NOT NULL DEFAULT '',
+            book_pages TEXT NOT NULL DEFAULT '',
+            lesson_count TEXT NOT NULL DEFAULT '',
+            duration_hours TEXT NOT NULL DEFAULT '',
+            source_file TEXT NOT NULL DEFAULT '',
+            sheet_name TEXT NOT NULL DEFAULT '',
+            source_row INTEGER NOT NULL DEFAULT 0,
+            raw_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(program_id, item_order)
+        )
+        """
+    )
+    conn.execute("ALTER TABLE academic_lessons ADD COLUMN IF NOT EXISTS curriculum_item_id BIGINT")
+    conn.execute("ALTER TABLE academic_lesson_sessions ADD COLUMN IF NOT EXISTS curriculum_item_id BIGINT")
     for table, column in (
         ("academic_subjects", "school_id"),
         ("academic_groups", "subject_id"),
@@ -546,8 +591,16 @@ def _ensure_academic_schema_ddl(conn):
         ("academic_lesson_sessions", "schedule_id"),
         ("academic_lesson_sessions", "group_id"),
         ("academic_lesson_sessions", "session_date"),
+        ("academic_lessons", "curriculum_item_id"),
+        ("academic_lesson_sessions", "curriculum_item_id"),
     ):
         conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_{column} ON {table}({column})")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_academic_curriculum_items_program_type_order
+        ON academic_curriculum_items(program_id, item_type, item_order)
+        """
+    )
     conn.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS uniq_academic_exam_results_enrollment_label
@@ -909,6 +962,39 @@ def list_academic_admin_rows():
                 """
             ).fetchall()
         ]
+        curriculum_programs = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT p.id, p.subject_key, p.subject_name, p.subject_short,
+                       p.source_file, p.total_items, p.lesson_count, p.exam_count,
+                       p.updated_at,
+                       COUNT(DISTINCT sub.id) AS db_subject_count,
+                       COUNT(DISTINCT g.id) AS group_count
+                FROM academic_curriculum_programs p
+                LEFT JOIN academic_subjects sub ON sub.key = p.subject_key
+                LEFT JOIN academic_groups g ON g.subject_id = sub.id AND lower(g.name) <> 'online'
+                GROUP BY p.id, p.subject_key, p.subject_name, p.subject_short,
+                         p.source_file, p.total_items, p.lesson_count, p.exam_count,
+                         p.updated_at
+                ORDER BY p.subject_name
+                """
+            ).fetchall()
+        ]
+        curriculum_items = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT i.id, i.program_id, p.subject_key, p.subject_name,
+                       i.item_order, i.lesson_number, i.item_type, i.title,
+                       i.term_label, i.week_label, i.specification_points,
+                       i.book_pages, i.lesson_count, i.duration_hours
+                FROM academic_curriculum_items i
+                JOIN academic_curriculum_programs p ON p.id = i.program_id
+                ORDER BY p.subject_name, i.item_order
+                """
+            ).fetchall()
+        ]
         return {
             "schools": schools,
             "subjects": subjects,
@@ -917,6 +1003,8 @@ def list_academic_admin_rows():
             "lessons": lessons,
             "schedules": schedules,
             "sessions": sessions,
+            "curriculum_programs": curriculum_programs,
+            "curriculum_items": curriculum_items,
             "enrollment_summary": enrollment_summary,
         }
 
@@ -1078,6 +1166,177 @@ def create_group(school_code, subject_id, name, code=""):
             (int(school["id"]), int(subject_id), key, name, code, now, now),
         )
         conn.commit()
+
+
+def create_group_from_program(school_code, program_subject_key, group_name, group_code=""):
+    now = _utc_now_iso()
+    group_name = str(group_name or "Group").strip() or "Group"
+    key = _slugify(group_name)
+    with _connect() as conn:
+        _ensure(conn)
+        school = conn.execute(
+            "SELECT id FROM academic_schools WHERE code = %s", (school_code,)
+        ).fetchone()
+        if not school:
+            raise ValueError("Client school was not found.")
+        program = conn.execute(
+            """
+            SELECT subject_key, subject_name, subject_short
+            FROM academic_curriculum_programs
+            WHERE subject_key = %s
+            """,
+            (program_subject_key,),
+        ).fetchone()
+        if not program:
+            raise ValueError("Subject program was not found.")
+        subject_id = _upsert_subject(
+            conn, int(school["id"]), program["subject_name"], str(program["subject_short"] or ""), now
+        )
+        if not subject_id:
+            raise ValueError("Could not resolve subject for the selected program.")
+        conn.execute(
+            """
+            INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT(school_id, subject_id, key) DO UPDATE SET
+              name = excluded.name,
+              code = excluded.code,
+              updated_at = excluded.updated_at
+            """,
+            (int(school["id"]), subject_id, key, group_name, str(group_code or ""), now, now),
+        )
+        conn.commit()
+
+
+def create_school(name, code=""):
+    import re
+
+    now = _utc_now_iso()
+    name = str(name or "").strip()
+    if not name:
+        raise ValueError("School name is required.")
+    code_value = str(code or "").strip().casefold()
+    if not code_value:
+        code_value = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "school"
+    with _connect() as conn:
+        _ensure(conn)
+        existing = conn.execute(
+            "SELECT id FROM academic_schools WHERE code = %s", (code_value,)
+        ).fetchone()
+        if existing:
+            raise ValueError(f"A client school with code '{code_value}' already exists.")
+        conn.execute(
+            """
+            INSERT INTO academic_schools (code, name, created_at, updated_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (code_value, name, now, now),
+        )
+        conn.commit()
+
+
+def create_student_with_enrollment(full_name, group_id):
+    """Create a student login identity and enroll them into a group.
+
+    Mirrors the dataset-sync path (login row + auth + canonical code) but adds
+    an academic_enrollments row so the student shows in the group's gradebook.
+    No students_sheet_map row is written, so the Scheme of Work sync's stale
+    cleanup never touches this manually added student.
+    """
+    from werkzeug.security import generate_password_hash
+
+    full_name = str(full_name or "").strip()
+    group_id = int(group_id or 0)
+    if not full_name:
+        raise ValueError("Student full name is required.")
+    if group_id <= 0:
+        raise ValueError("A group is required.")
+
+    now = _utc_now_iso()
+    with _connect() as conn:
+        _ensure(conn)
+        group = conn.execute(
+            """
+            SELECT g.id, g.school_id, g.subject_id, g.name AS group_name,
+                   s.code AS school_code, s.name AS school_name,
+                   sub.name AS subject_name
+            FROM academic_groups g
+            JOIN academic_schools s ON s.id = g.school_id
+            JOIN academic_subjects sub ON sub.id = g.subject_id
+            WHERE g.id = %s
+            """,
+            (group_id,),
+        ).fetchone()
+        if not group:
+            raise ValueError("Group was not found.")
+
+        school_id = int(group["school_id"])
+        subject_id = int(group["subject_id"])
+        school_code = canonical.normalize_school_code(group["school_code"])
+        school_name = str(group["school_name"] or canonical.school_display_name(school_code))
+        subject_name = _canonical_subject_name(group["subject_name"])
+
+        # Login identity — same helpers the Scheme of Work sync uses.
+        student_code = queries.get_next_student_code(conn, canonical.student_code_prefix(school_code))
+        default_password = student_code
+        student_row_id = queries.insert_student(
+            conn,
+            full_name,
+            student_code,
+            default_password,
+            subject_name,
+            school_name,
+            school_code,
+        )
+        queries.insert_student_auth(
+            conn,
+            student_row_id,
+            generate_password_hash(default_password),
+            now,
+        )
+
+        # Academic enrollment so the student appears in the group's gradebook.
+        # Manual enrollments live in a high public_dashboard_id band to avoid
+        # colliding with sheet-imported enrollment ids.
+        row = conn.execute(
+            "SELECT coalesce(max(public_dashboard_id), 0) AS max_id FROM academic_enrollments WHERE school_id = %s",
+            (school_id,),
+        ).fetchone()
+        next_dashboard_id = max(int(row["max_id"] or 0), 9_000_000_000) + 1
+        enrollment = conn.execute(
+            """
+            INSERT INTO academic_enrollments (
+              student_row_id, school_id, subject_id, group_id, public_dashboard_id,
+              full_name, full_name_norm, active, enrollment_status, imported_from,
+              created_at, updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 'active', 'manual', %s, %s)
+            RETURNING id
+            """,
+            (
+                int(student_row_id),
+                school_id,
+                subject_id,
+                group_id,
+                next_dashboard_id,
+                full_name,
+                _normalize(full_name),
+                now,
+                now,
+            ),
+        ).fetchone()
+        conn.commit()
+
+    return {
+        "studentRowId": int(student_row_id),
+        "enrollmentId": int(enrollment["id"]) if enrollment else 0,
+        "studentCode": student_code,
+        "password": default_password,
+        "fullName": full_name,
+        "schoolName": school_name,
+        "subjectName": subject_name,
+        "groupName": str(group["group_name"]),
+    }
 
 
 def create_schedule(

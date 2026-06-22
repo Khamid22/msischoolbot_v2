@@ -14,6 +14,11 @@ from shared.identity.account_service import (
     list_teachers,
     update_student_admin_profile,
 )
+from web.backend.roles.admin.routes.request_payload import request_payload
+from web.backend.roles.admin.services.academic_service import (
+    create_student_with_enrollment_from_payload,
+)
+from web.backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from web.backend.roles.admin.services.route_service import resolve_sheet_student_for_admin
 
 
@@ -24,6 +29,8 @@ STUDENT_DASHBOARD_TARGET_ENDPOINTS = {
     "rating": "student.rating_board",
     "aap": "student.aap_lessons",
     "ar": "student.ar_lessons",
+    "office-hours": "student.student_office_hours",
+    "office_hours": "student.student_office_hours",
 }
 
 
@@ -41,6 +48,15 @@ def register_admin_student_routes(
             school_filter = "all"
         students = list_students_for_admin(school_filter=school_filter)
         return jsonify({"students": students})
+
+    @router.post("/admin/api/students")
+    def admin_create_student_api():
+        try:
+            result = create_student_with_enrollment_from_payload(request_payload())
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True, "student": result})
 
     @router.get("/admin/students/<int:student_row_id>")
     def admin_student_profile(student_row_id):
@@ -70,7 +86,7 @@ def register_admin_student_routes(
 
     def _redirect_admin_student_dashboard(student_row_id, target):
         requested_school = str(request.args.get("school", "")).strip().casefold()
-        embed_mode = str(request.args.get("embed", "")).strip()
+        embed_mode = str(request.args.get("embed", "")).strip() or "admin"
         if not requested_school:
             requested_school = (
                 str(session.get("admin_last_school", "all")).strip().casefold() or "all"

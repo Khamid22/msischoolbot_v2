@@ -3,7 +3,10 @@
 from shared.db import queries
 from web.backend.domains.academics.postgres_service import (
     create_group,
+    create_group_from_program,
     create_schedule,
+    create_school,
+    create_student_with_enrollment,
     create_subject,
     ensure_academic_schema,
     list_academic_admin_rows,
@@ -30,13 +33,30 @@ def create_subject_from_payload(payload):
 
 def create_group_from_payload(payload):
     school_code = str(payload.get("school_code", "") or "").strip()
-    subject_id = str(payload.get("subject_id", "") or "").strip()
+    program_subject_key = str(payload.get("program_subject_key", "") or "").strip()
     group_name = str(payload.get("group_name", "") or "").strip()
     group_code = str(payload.get("group_code", "") or "").strip()
-    if not school_code or not subject_id or not group_name:
-        raise ValueError("School, subject, and group name are required.")
-    create_group(school_code, int(subject_id), group_name, group_code)
+    if not school_code or not program_subject_key or not group_name:
+        raise ValueError("Client school, subject program, and group name are required.")
+    create_group_from_program(school_code, program_subject_key, group_name, group_code)
     return {"school_code": school_code}
+
+
+def create_school_from_payload(payload):
+    name = str(payload.get("school_name", "") or "").strip()
+    code = str(payload.get("school_code", "") or "").strip()
+    if not name:
+        raise ValueError("School name is required.")
+    create_school(name, code)
+    return {"name": name}
+
+
+def create_student_with_enrollment_from_payload(payload):
+    full_name = str(payload.get("full_name", "") or "").strip()
+    group_id = int(payload.get("group_id", 0) or 0)
+    if not full_name or group_id <= 0:
+        raise ValueError("Student name and group are required.")
+    return create_student_with_enrollment(full_name, group_id)
 
 
 def create_schedule_from_payload(payload):

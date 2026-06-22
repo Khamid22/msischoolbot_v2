@@ -12,9 +12,11 @@ const pageMap = {
   "student-aap": lazy(() => import("@/roles/student/pages/AAP")),
   "student-ar": lazy(() => import("@/roles/student/pages/AR")),
   "admin-home": lazy(() => import("@/roles/admin/pages/Admin")),
+  "teacher-home": lazy(() => import("@/roles/teacher/pages/TeacherHome")),
   "parent-home": lazy(() => import("@/roles/parent/pages/ParentHome")),
   "admin-edit-student": lazy(() => import("@/roles/admin/pages/EditStudentProfile")),
   "student-chat": lazy(() => import("@/roles/student/pages/Chat")),
+  "student-office-hours": lazy(() => import("@/roles/student/pages/OfficeHours")),
   "student-not-found": lazy(() => import("@/roles/student/pages/StudentNotFound")),
 } as const;
 

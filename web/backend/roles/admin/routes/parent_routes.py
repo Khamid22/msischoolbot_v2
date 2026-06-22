@@ -7,7 +7,15 @@ from web.backend.roles.admin.services.parent_service import (
     assign_parent_child,
     create_parent_account,
     remove_parent_child,
+    update_parent_profile,
 )
+
+
+_PARENT_PROFILE_FIELDS = ("display_name", "phone", "email", "telegram_username", "notes")
+
+
+def _parent_profile_from_payload(payload):
+    return {field: str(payload.get(field) or "").strip() for field in _PARENT_PROFILE_FIELDS}
 
 
 def _current_parent_admin_id():
@@ -26,6 +34,21 @@ def register_admin_parent_routes(router):
             parent = create_parent_account(
                 payload.get("login"),
                 payload.get("password"),
+                profile=_parent_profile_from_payload(payload),
+            )
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True, "parent": parent})
+
+    @router.patch("/admin/parents/<int:parent_admin_id>")
+    def admin_update_parent_profile(parent_admin_id):
+        payload = request_payload()
+        try:
+            parent = update_parent_profile(
+                parent_admin_id,
+                _parent_profile_from_payload(payload),
             )
         except (TypeError, ValueError) as exc:
             return jsonify({"ok": False, "message": str(exc)}), 400

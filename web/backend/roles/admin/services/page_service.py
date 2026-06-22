@@ -279,6 +279,10 @@ def build_admin_page_context(
         "student_rating",
         "student_aap",
         "student_ar",
+        "student_office_hours",
+        "office_hours",
+        "curriculum",
+        "gradebook",
     }:
         panel = "overview"
 

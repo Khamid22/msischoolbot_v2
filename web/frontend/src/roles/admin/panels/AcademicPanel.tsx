@@ -16,8 +16,25 @@ import {
   X,
 } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import {
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
+import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "./gradebookFormat";
+
+// Keep long student names from breaking chart axes: shorten to a compact label.
+function shortTick(value: string) {
+  const text = String(value || "");
+  return text.length > 12 ? `${text.slice(0, 11)}…` : text;
+}
 
 function FieldLabel({ children }: { children: string }) {
   return (
@@ -293,6 +310,7 @@ type GradebookData = {
   allEnrollments?: Enrollment[];
 };
 
+
 type ScheduleRow = {
   id: number;
   group_id: number;
@@ -414,20 +432,6 @@ type ActiveCell = {
 const ATT_VALUES = ["present", "absent", "justified"] as const;
 type AttValue = (typeof ATT_VALUES)[number] | "";
 
-function attLabel(v: string) {
-  if (v === "present") return "P";
-  if (v === "absent") return "A";
-  if (v === "justified") return "J";
-  return "";
-}
-
-function attCls(v: string) {
-  if (v === "present") return "bg-emerald-500 text-white";
-  if (v === "absent") return "bg-red-500 text-white";
-  if (v === "justified") return "bg-amber-400 text-white";
-  return "";
-}
-
 function EnrollmentList({
   title,
   icon,
@@ -471,7 +475,7 @@ function EnrollmentList({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{row.fullName}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    ID {row.publicDashboardId || row.enrollmentId}
+                    {row.publicDashboardId ? `Dashboard ID ${row.publicDashboardId}` : `Enrollment ID ${row.enrollmentId}`}
                     {row.disqualificationReason ? ` · ${row.disqualificationReason}` : ""}
                   </p>
                 </div>
@@ -519,6 +523,7 @@ function GroupGradebook({
   const [selectedStudent, setSelectedStudent] = useState<Enrollment | null>(null);
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
+  const [activeView, setActiveView] = useState<"gradebook" | "aap" | "ar" | "ep" | "students">("gradebook");
   const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -723,6 +728,107 @@ function GroupGradebook({
   const visibleActiveEnrollments = visibleAllEnrollments.filter((en) => en.status !== "disqualified" && en.status !== "banned");
   const visibleRemovedEnrollments = visibleAllEnrollments.filter((en) => en.status === "disqualified" || en.status === "banned");
 
+  // 1. AAP Metrics
+  const activeAAPGrades = enrollments.map(en => scoreOutOfNine(en.averageGrade)).filter(g => g > 0);
+  const classAAPAverage = activeAAPGrades.length > 0
+    ? (activeAAPGrades.reduce((sum, g) => sum + g, 0) / activeAAPGrades.length).toFixed(1)
+    : "—";
+
+  const aapData = enrollments.map(en => ({
+    name: en.fullName,
+    AAP: scoreOutOfNine(en.averageGrade),
+    isLow: en.averageGrade > 0 && en.averageGrade < 5
+  }));
+
+  // 2. Attendance Metrics
+  const totalPresent = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => v === "present").length, 0);
+  const totalAtt = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length, 0);
+  const classAttendanceRate = totalAtt > 0 ? Math.round((totalPresent / totalAtt) * 100) : 100;
+
+  const studentAttData = enrollments.map(en => {
+    const present = Object.values(en.attendance).filter(v => v === "present").length;
+    const total = Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+    return {
+      name: en.fullName,
+      rate,
+      present,
+      absent: Object.values(en.attendance).filter(v => v === "absent").length,
+      justified: Object.values(en.attendance).filter(v => v === "justified").length,
+      total
+    };
+  });
+
+  // 3. Exam Metrics
+  let totalExamScoreSum = 0;
+  let totalExamScoreCount = 0;
+  let highestExamScore = -Infinity;
+  enrollments.forEach(en => {
+    if (en.exams) {
+      Object.values(en.exams).forEach(score => {
+        if (typeof score === "number") {
+          const normalizedScore = scoreOutOfNine(score);
+          if (normalizedScore <= 0) return;
+          totalExamScoreSum += normalizedScore;
+          totalExamScoreCount++;
+          if (normalizedScore > highestExamScore) {
+            highestExamScore = normalizedScore;
+          }
+        }
+      });
+    }
+  });
+  const classExamAverage = totalExamScoreCount > 0 ? (totalExamScoreSum / totalExamScoreCount).toFixed(1) : "—";
+  const maxScore = highestExamScore !== -Infinity ? highestExamScore : "—";
+  const hasExamScores = totalExamScoreCount > 0;
+
+  const studentExamData = enrollments.map(en => {
+    let maxVal = -1;
+    let sumVal = 0;
+    let countVal = 0;
+    examLabels.forEach(label => {
+      const val = en.exams?.[label];
+      if (typeof val === 'number') {
+        const normalizedVal = scoreOutOfNine(val);
+        if (normalizedVal <= 0) return;
+        sumVal += normalizedVal;
+        countVal++;
+        if (normalizedVal > maxVal) {
+          maxVal = normalizedVal;
+        }
+      }
+    });
+    const avgScore = countVal > 0 ? Math.round((sumVal / countVal) * 10) / 10 : 0;
+    const bestScore = maxVal !== -1 ? maxVal : 0;
+    const missing = examLabels.length - countVal;
+    return {
+      name: en.fullName,
+      avgScore,
+      bestScore,
+      missing,
+      hasExams: countVal > 0
+    };
+  });
+
+  const studentsWithMissingExams = studentExamData.filter(s => s.missing > 0).length;
+
+  // 4. At-Risk Metrics
+  let atRiskCount = 0;
+  enrollments.forEach(en => {
+    const present = Object.values(en.attendance).filter(v => v === "present").length;
+    const total = Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length;
+    const attRate = total > 0 ? (present / total) * 100 : 100;
+    const isLowAAP = en.averageGrade > 0 && en.averageGrade < 5;
+    const isLowAtt = attRate < 80 && total > 0;
+    if (isLowAAP || isLowAtt) {
+      atRiskCount++;
+    }
+  });
+
+  useEffect(() => {
+    setActive(null);
+  }, [activeView]);
+
   const popTop = active
     ? Math.min(active.anchorRect.bottom + 4, window.innerHeight - 200)
     : 0;
@@ -732,6 +838,7 @@ function GroupGradebook({
 
   return (
     <div className="space-y-3">
+      {/* 1. Summary Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-4">
           <button
@@ -769,41 +876,415 @@ function GroupGradebook({
         </div>
       </div>
 
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : loading ? (
+        <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">Loading…</div>
+      ) : null}
+
+      {/* 2. Class Insights Cards */}
       {data && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <label className="relative block w-full sm:w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
-                value={enrollmentSearch}
-                onChange={(event) => setEnrollmentSearch(event.target.value)}
-                placeholder="Search students"
-                className="h-9 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
-              />
-            </label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average AAP</span>
+            <span className="mt-1 block text-lg font-bold">{classAAPAverage} <span className="text-xs font-normal text-muted-foreground">/ 9.0</span></span>
           </div>
+          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance Rate</span>
+            <span className="mt-1 block text-lg font-bold">{classAttendanceRate}%</span>
+          </div>
+          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exam Avg Score</span>
+            <span className="mt-1 block text-lg font-bold">
+              {classExamAverage}
+              {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
+            </span>
+          </div>
+          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">At-Risk Students</span>
+            <span className={`mt-1 block text-lg font-bold ${atRiskCount > 0 ? "text-red-500" : ""}`}>{atRiskCount}</span>
+          </div>
+        </div>
+      )}
+
+      {/* 3. View Switcher Buttons */}
+      {data && (
+        <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
+          {(["gradebook", "aap", "ar", "ep", "students"] as const).map((view) => {
+            const labels: Record<string, string> = {
+              gradebook: "Gradebook",
+              aap: "AAP",
+              ar: "AR",
+              ep: "EP",
+              students: "Students"
+            };
+            const isActive = activeView === view;
+            return (
+              <button
+                key={view}
+                type="button"
+                onClick={() => setActiveView(view)}
+                className={`border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {labels[view]}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 4. Active Panel Content */}
+      {data && activeView === "gradebook" && (
+        lessons.length === 0 ? (
+          <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">
+            No lessons found for this group.
+          </div>
+        ) : (
           <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+            <div className="border-b border-foreground/8 px-4 py-3">
+              <p className="text-sm font-bold">Gradebook</p>
+              <p className="text-xs text-muted-foreground">Attendance and homework by lesson</p>
+            </div>
+            <div className="max-h-[70dvh] overflow-auto">
+              <table className="min-w-full border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                  <tr className="bg-surface">
+                    <th rowSpan={2} className="sticky left-0 z-40 min-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      Student
+                    </th>
+                    <th rowSpan={2} className="sticky left-[180px] z-40 min-w-[48px] border-b border-r border-foreground/10 bg-surface px-2 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      AAP
+                    </th>
+                    {lessons.map((lesson) => (
+                      <th key={lesson.id} colSpan={2} className="min-w-[104px] border-l border-foreground/10 p-0 text-center align-top">
+                        <div
+                          title={`${lesson.lessonNumber} - ${lesson.topic}`}
+                          className="w-full px-2 py-2"
+                        >
+                          <span className="block whitespace-nowrap text-[10px] font-semibold leading-tight text-muted-foreground">
+                            {lesson.date || lesson.lessonNumber}
+                          </span>
+                          <span className="block whitespace-nowrap text-[9px] font-semibold text-muted-foreground/70">
+                            {lesson.lessonNumber}
+                          </span>
+                          <span className="mt-1 block whitespace-normal break-words text-[9px] font-normal italic leading-tight text-muted-foreground/70">
+                            {lesson.topic || "—"}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                  <tr className="bg-surface">
+                    {lessons.map((lesson) => (
+                      <>
+                        <th key={`${lesson.id}-att`} className="w-[28px] border-b border-t border-l border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">Att</th>
+                        <th key={`${lesson.id}-hw`} className="w-[36px] border-b border-t border-r border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">HW</th>
+                      </>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-foreground/5 bg-surface">
+                  {enrollments.map((en) => (
+                    <tr key={en.enrollmentId} className="hover:bg-foreground/[0.015]">
+                      <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                        {en.fullName}
+                      </td>
+                      <td className="sticky left-[180px] z-20 border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                        {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
+                      </td>
+                      {lessons.map((lesson) => {
+                        const att = (en.attendance[lesson.lessonNumber] || "") as AttValue;
+                        const hw = en.homework[lesson.lessonNumber];
+                        const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
+                        const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
+                        return (
+                          <>
+                            <td key={`${lesson.id}-att`} className="border-l border-foreground/5 p-0 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
+                                title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
+                                className={`h-[26px] w-[28px] rounded text-[10px] font-bold transition-opacity hover:opacity-75 ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
+                              >
+                                {att ? attLabel(att) : "·"}
+                              </button>
+                            </td>
+                            <td key={`${lesson.id}-hw`} className="border-r border-foreground/5 p-0 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
+                                title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
+                                className={`h-[26px] w-[36px] rounded text-[10px] transition-opacity hover:opacity-75 ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
+                              >
+                                {hw !== undefined ? hw : "·"}
+                              </button>
+                            </td>
+                          </>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+
+      {data && activeView === "aap" && (
+        <div className="rounded-xl border border-foreground/8 bg-surface p-4">
+          <div className="mb-3">
+            <h4 className="text-sm font-bold">Student AAP Performance</h4>
+            <p className="text-xs text-muted-foreground">Scores are on the 1–9 scale</p>
+          </div>
+          <div className="h-[260px] sm:h-[300px] lg:h-[360px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={aapData} margin={{ top: 10, right: 10, left: -25, bottom: 24 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                <XAxis
+                  dataKey="name"
+                  angle={-30}
+                  textAnchor="end"
+                  interval={0}
+                  height={56}
+                  tick={{ fontSize: 9 }}
+                  tickFormatter={shortTick}
+                  stroke="hsl(var(--muted-foreground))"
+                />
+                <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
+                  labelStyle={{ fontSize: 10, fontWeight: "bold" }}
+                />
+                <Bar dataKey="AAP" radius={[4, 4, 0, 0]}>
+                  {aapData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.isLow ? "#ef4444" : "#3b82f6"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {data && activeView === "ar" && (
+        <div className="rounded-xl border border-foreground/8 bg-surface p-4">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h4 className="text-sm font-bold">Student Attendance Rate</h4>
+              <p className="text-xs text-muted-foreground">AR is shown as percentage of attended lessons</p>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] font-semibold text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> P Present
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-red-500" /> A Absent
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-amber-400" /> J Justified
+              </span>
+            </div>
+          </div>
+          {totalAtt === 0 ? (
+            <div className="py-12 text-center text-xs text-muted-foreground">No attendance logs yet.</div>
+          ) : (
+            <div className="max-h-[60dvh] space-y-3 overflow-y-auto pr-1">
+              {studentAttData.map((st) => (
+                <div key={st.name} className="space-y-1">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs font-semibold">
+                    <span className="min-w-0 break-words">{st.name}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {st.rate}% <span className="text-[10px] font-normal">({st.present}/{st.total} lessons)</span>
+                    </span>
+                  </div>
+                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-foreground/10">
+                    <div className="h-full bg-emerald-500" style={{ width: `${st.rate}%` }} />
+                    <div className="h-full bg-red-500/80" style={{ width: `${st.total > 0 ? (st.absent / st.total) * 100 : 0}%` }} />
+                    <div className="h-full bg-amber-400" style={{ width: `${st.total > 0 ? (st.justified / st.total) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {data && activeView === "ep" && (
+        <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+          <div className="border-b border-foreground/8 px-4 py-3">
+            <p className="text-sm font-bold">Exam Performance</p>
+            <p className="text-xs text-muted-foreground">Best scores and exam attempts</p>
+          </div>
+          {examLabels.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No exam results are recorded for this group yet.
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Defined</span>
+                  <span className="mt-1 block text-lg font-bold">{examLabels.length}</span>
+                </div>
+                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
+                  <span className="mt-1 block text-lg font-bold">
+                    {classExamAverage}
+                    {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Highest Score</span>
+                  <span className="mt-1 block text-lg font-bold">
+                    {maxScore}
+                    {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}
+                  </span>
+                </div>
+                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">No Exam Score</span>
+                  <span className="mt-1 block text-lg font-bold">{studentsWithMissingExams}</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-foreground/8 p-4">
+                <div className="mb-3">
+                  <h4 className="text-sm font-bold">Student Exam Performance</h4>
+                  <p className="text-xs text-muted-foreground">Best exam score on the 1–9 scale</p>
+                </div>
+                <div className="h-[260px] sm:h-[300px] lg:h-[360px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={studentExamData} margin={{ top: 10, right: 10, left: -25, bottom: 24 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                      <XAxis
+                        dataKey="name"
+                        angle={-30}
+                        textAnchor="end"
+                        interval={0}
+                        height={56}
+                        tick={{ fontSize: 9 }}
+                        tickFormatter={shortTick}
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
+                        labelStyle={{ fontSize: 10, fontWeight: "bold" }}
+                      />
+                      <Bar dataKey="bestScore" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Best Score / 9" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-foreground/8">
+                <div className="max-h-64 overflow-auto">
+                  <table className="w-full min-w-[640px] text-left text-xs">
+                    <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                      <tr>
+                        <th className="sticky left-0 z-30 min-w-[180px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
+                        {examLabels.map((label) => (
+                          <th key={label} className="min-w-[80px] border-l border-foreground/8 px-3 py-2 text-center">
+                            {label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-foreground/5 bg-surface">
+                      {enrollments.map((en) => (
+                        <tr key={`${en.enrollmentId}-exams`} className="hover:bg-foreground/[0.015]">
+                          <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
+                            {en.fullName}
+                          </td>
+                          {examLabels.map((label) => {
+                            const score = en.exams?.[label];
+                            const displayScore = score !== undefined ? formatScoreOutOfNine(score) : "-";
+                            return (
+                              <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
+                                <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
+                                  {displayScore}
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {data && activeView === "students" && (
+        <div className="space-y-3">
+          <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+            <div className="flex flex-wrap items-center justify-between border-b border-foreground/8 px-4 py-3 gap-3">
+              <div>
+                <p className="text-sm font-bold">Students List</p>
+                <p className="text-xs text-muted-foreground">Manage qualifications and view indicators</p>
+              </div>
+              <label className="relative block w-full sm:w-64">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={enrollmentSearch}
+                  onChange={(event) => setEnrollmentSearch(event.target.value)}
+                  placeholder="Search students..."
+                  className="h-8 w-full rounded-lg border border-foreground/10 bg-background pl-8 pr-3 text-xs outline-none focus:border-foreground/30"
+                />
+              </label>
+            </div>
             <div className="max-h-64 overflow-auto">
-              <table className="w-full min-w-[760px] text-left text-xs">
+              <table className="w-full min-w-[600px] text-left text-xs">
                 <thead className="sticky top-0 z-20 bg-surface text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr>
                     <th className="px-3 py-2">Student</th>
                     <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2 text-center">AAP</th>
-                    <th className="px-3 py-2 text-center">Exams</th>
+                    <th className="px-3 py-2 text-center">AAP /9</th>
+                    <th className="px-3 py-2 text-center">AR %</th>
+                    <th className="px-3 py-2 text-center">EP /9</th>
                     <th className="px-3 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-foreground/5">
+                <tbody className="divide-y divide-foreground/5 bg-surface">
                   {visibleActiveEnrollments.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">No students found.</td>
+                      <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No students found.</td>
                     </tr>
                   ) : (
                     visibleActiveEnrollments.map((row) => {
                       const isBanned = row.status === "banned";
                       const examCount = Object.keys(row.exams || {}).length;
+                      
+                      // Calculate individual AR (allEnrollments rows may lack attendance)
+                      const attendanceValues = Object.values(row.attendance || {});
+                      const present = attendanceValues.filter(v => v === "present").length;
+                      const total = attendanceValues.filter(v => ["present", "absent", "justified"].includes(v)).length;
+                      const arVal = total > 0 ? Math.round((present / total) * 100) : 100;
+                      
+                      // Calculate individual EP (average exam score or missing count)
+                      let examScoreSum = 0;
+                      let examScoreCount = 0;
+                      if (row.exams) {
+                        Object.values(row.exams).forEach(score => {
+                          if (typeof score === "number") {
+                            const normalizedScore = scoreOutOfNine(score);
+                            if (normalizedScore <= 0) return;
+                            examScoreSum += normalizedScore;
+                            examScoreCount++;
+                          }
+                        });
+                      }
+                      const epAverage = examScoreCount > 0 ? examScoreSum / examScoreCount : 0;
+                      const epVal = examScoreCount > 0 ? `${formatScoreOutOfNine(epAverage)} / 9 (${examScoreCount} exams)` : "—";
+
                       return (
                         <tr
                           key={row.enrollmentId}
@@ -815,15 +1296,18 @@ function GroupGradebook({
                         >
                           <td className="px-3 py-2">
                             <p className="font-semibold">{row.fullName}</p>
-                            <p className="text-[11px] text-muted-foreground">ID {row.publicDashboardId || row.enrollmentId}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {row.publicDashboardId ? `Dashboard ID ${row.publicDashboardId}` : `Enrollment ID ${row.enrollmentId}`}
+                            </p>
                           </td>
                           <td className="px-3 py-2">
                             <span className={`rounded-md px-2 py-1 text-[10px] font-bold uppercase ${isBanned ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
                               {isBanned ? "Banned" : "Active"}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-center font-bold">{row.averageGrade > 0 ? row.averageGrade.toFixed(0) : "-"}</td>
-                          <td className="px-3 py-2 text-center font-bold">{examCount}</td>
+                          <td className="px-3 py-2 text-center font-bold">{row.averageGrade > 0 ? row.averageGrade.toFixed(1) : "-"}</td>
+                          <td className="px-3 py-2 text-center font-bold">{arVal}%</td>
+                          <td className="px-3 py-2 text-center font-bold">{epVal}</td>
                           <td className="px-3 py-2 text-right">
                             <button
                               type="button"
@@ -878,7 +1362,9 @@ function GroupGradebook({
                         >
                           <td className="px-3 py-2">
                             <p className="font-semibold text-red-950">{row.fullName}</p>
-                            <p className="text-[11px] text-red-700/75">ID {row.publicDashboardId || row.enrollmentId}</p>
+                            <p className="text-[11px] text-red-700/75">
+                              {row.publicDashboardId ? `Dashboard ID ${row.publicDashboardId}` : `Enrollment ID ${row.enrollmentId}`}
+                            </p>
                           </td>
                           <td className="px-3 py-2">
                             <span className="rounded-md bg-red-100 px-2 py-1 text-[10px] font-bold uppercase text-red-700">
@@ -909,141 +1395,6 @@ function GroupGradebook({
           ) : null}
         </div>
       )}
-      {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      ) : loading ? (
-        <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">Loading…</div>
-      ) : data && lessons.length === 0 ? (
-        <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">No lessons found for this group.</div>
-      ) : null}
-
-      {data && examLabels.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-          <div className="border-b border-foreground/8 px-4 py-3">
-            <p className="text-sm font-bold">Exam Results</p>
-            <p className="text-xs text-muted-foreground">Taken exam scores stored for this group.</p>
-          </div>
-          <div className="max-h-72 overflow-auto">
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                <tr>
-                  <th className="sticky left-0 z-30 min-w-[200px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
-                  {examLabels.map((label) => (
-                    <th key={label} className="min-w-[92px] border-l border-foreground/8 px-3 py-2 text-center">
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/5">
-                {enrollments.map((en) => (
-                  <tr key={`${en.enrollmentId}-exams`}>
-                    <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
-                      {en.fullName}
-                    </td>
-                    {examLabels.map((label) => {
-                      const score = en.exams?.[label];
-                      return (
-                        <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
-                          <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
-                            {score !== undefined ? score : "-"}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {data && lessons.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-          <div className="max-h-[70dvh] overflow-auto">
-            <table className="min-w-full border-collapse text-left text-xs">
-              <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                <tr className="bg-surface">
-                  <th rowSpan={2} className="sticky left-0 z-40 min-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
-                    Student
-                  </th>
-                  <th rowSpan={2} className="sticky left-[180px] z-40 min-w-[48px] border-b border-r border-foreground/10 bg-surface px-2 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
-                    AAP
-                  </th>
-                  {lessons.map((lesson) => (
-                    <th key={lesson.id} colSpan={2} className="min-w-[104px] border-l border-foreground/10 p-0 text-center align-top">
-                      <div
-                        title={`${lesson.lessonNumber} - ${lesson.topic}`}
-                        className="w-full px-2 py-2"
-                      >
-                        <span className="block whitespace-nowrap text-[10px] font-semibold leading-tight text-muted-foreground">
-                          {lesson.date || lesson.lessonNumber}
-                        </span>
-                        <span className="block whitespace-nowrap text-[9px] font-semibold text-muted-foreground/70">
-                          {lesson.lessonNumber}
-                        </span>
-                        <span className="mt-1 block whitespace-normal break-words text-[9px] font-normal italic leading-tight text-muted-foreground/70">
-                          {lesson.topic || "—"}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-                <tr className="bg-surface">
-                  {lessons.map((lesson) => (
-                    <>
-                      <th key={`${lesson.id}-att`} className="w-[28px] border-b border-t border-l border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">Att</th>
-                      <th key={`${lesson.id}-hw`} className="w-[36px] border-b border-t border-r border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">HW</th>
-                    </>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-foreground/5">
-                {enrollments.map((en) => (
-                  <tr key={en.enrollmentId} className="hover:bg-foreground/[0.015]">
-                    <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
-                      {en.fullName}
-                    </td>
-                    <td className="sticky left-[180px] z-20 border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
-                      {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
-                    </td>
-                    {lessons.map((lesson) => {
-                      const att = (en.attendance[lesson.lessonNumber] || "") as AttValue;
-                      const hw = en.homework[lesson.lessonNumber];
-                      const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
-                      const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
-                      return (
-                        <>
-                          <td key={`${lesson.id}-att`} className="border-l border-foreground/5 p-0 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
-                              title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                              className={`h-[26px] w-[28px] rounded text-[10px] font-bold transition-opacity hover:opacity-75 ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
-                            >
-                              {att ? attLabel(att) : "·"}
-                            </button>
-                          </td>
-                          <td key={`${lesson.id}-hw`} className="border-r border-foreground/5 p-0 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
-                              title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                              className={`h-[26px] w-[36px] rounded text-[10px] transition-opacity hover:opacity-75 ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
-                            >
-                              {hw !== undefined ? hw : "·"}
-                            </button>
-                          </td>
-                        </>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {selectedStudent ? (
         <div className="fixed inset-0 z-50 bg-foreground/45" onClick={() => setSelectedStudent(null)}>
@@ -1055,7 +1406,7 @@ function GroupGradebook({
               <div className="min-w-0">
                 <p className="truncate text-base font-bold">{selectedStudent.fullName}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ID {selectedStudent.publicDashboardId || selectedStudent.enrollmentId} · {selectedStudent.status === "banned" ? "Banned" : selectedStudent.status === "disqualified" ? "Disqualified" : "Active"}
+                  {selectedStudent.publicDashboardId ? `Dashboard ID ${selectedStudent.publicDashboardId}` : `Enrollment ID ${selectedStudent.enrollmentId}`} · {selectedStudent.status === "banned" ? "Banned" : selectedStudent.status === "disqualified" ? "Disqualified" : "Active"}
                 </p>
               </div>
               <button
@@ -1752,12 +2103,22 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const schools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
   const subjects = Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [];
   const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
+  const curriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
+    ? props.adminAcademicCurriculumPrograms
+    : [];
+  const curriculumItems = Array.isArray(props.adminAcademicCurriculumItems)
+    ? props.adminAcademicCurriculumItems
+    : [];
   const csrf: string = asString(props.csrfToken);
 
   const [openGroupId, setOpenGroupId] = useState<number | null>(null);
+  const [openProgramId, setOpenProgramId] = useState<number | null>(null);
+  const [programSearch, setProgramSearch] = useState("");
+  const [programTypeFilter, setProgramTypeFilter] = useState<"all" | "lesson" | "exam">("all");
   const [addGroupOpen, setAddGroupOpen] = useState(false);
+  const [manageSchoolsOpen, setManageSchoolsOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
-  const [groupSchool, setGroupSchool] = useState("all");
+  const [groupSchool, setGroupSchool] = useState<string>(() => asString(schools[0]?.code) || "all");
   const [groupSubject, setGroupSubject] = useState("all");
 
   const schoolNameByCode = useMemo(() => {
@@ -1769,27 +2130,83 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     return result;
   }, [schools]);
 
-  const groupSchoolOptions = useMemo(() => {
-    const codes = new Set<string>();
+  const schoolStats = useMemo(() => {
+    const map = new Map<string, { groups: number; activeStudents: number; programs: Set<string> }>();
     groups.forEach((group: Record<string, unknown>) => {
       const code = asString(group.school_code);
-      if (code) codes.add(code);
+      if (!code) return;
+      const entry = map.get(code) ?? { groups: 0, activeStudents: 0, programs: new Set<string>() };
+      entry.groups += 1;
+      entry.activeStudents += asNumber(group.students_count);
+      const subject = asString(group.subject_name);
+      if (subject) entry.programs.add(normalizeSubjectKey(subject));
+      map.set(code, entry);
     });
-    return Array.from(codes).sort((a, b) => {
-      const left = schoolNameByCode.get(a) || a;
-      const right = schoolNameByCode.get(b) || b;
-      return left.localeCompare(right);
-    });
-  }, [groups, schoolNameByCode]);
-
-  const groupSubjectOptions = useMemo(() => {
-    const names = new Set<string>();
-    groups.forEach((group: Record<string, unknown>) => {
-      const name = asString(group.subject_name);
-      if (name) names.add(name);
-    });
-    return Array.from(names).sort((a, b) => a.localeCompare(b));
+    return map;
   }, [groups]);
+
+  const subjectFilterOptions = useMemo(() => {
+    const map = new Map<string, { name: string; groups: number; students: number }>();
+    groups.forEach((group: Record<string, unknown>) => {
+      if (groupSchool !== "all" && asString(group.school_code) !== groupSchool) return;
+      const name = asString(group.subject_name);
+      if (!name) return;
+      const key = normalizeSubjectKey(name);
+      const entry = map.get(key) ?? { name, groups: 0, students: 0 };
+      entry.groups += 1;
+      entry.students += asNumber(group.students_count);
+      map.set(key, entry);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [groups, groupSchool]);
+
+  const selectedSchool =
+    groupSchool === "all"
+      ? null
+      : schools.find((school: Record<string, unknown>) => asString(school.code) === groupSchool) || null;
+
+  const contextSummary = useMemo(() => {
+    if (groupSchool === "all") {
+      const programs = new Set<string>();
+      let activeStudents = 0;
+      groups.forEach((group: Record<string, unknown>) => {
+        activeStudents += asNumber(group.students_count);
+        const subject = asString(group.subject_name);
+        if (subject) programs.add(normalizeSubjectKey(subject));
+      });
+      return { groups: groups.length, activeStudents, programs: programs.size };
+    }
+    const stats = schoolStats.get(groupSchool);
+    return {
+      groups: stats?.groups ?? 0,
+      activeStudents: stats?.activeStudents ?? 0,
+      programs: stats?.programs.size ?? 0,
+    };
+  }, [groupSchool, groups, schoolStats]);
+
+  const subjectsBySchool = useMemo(() => {
+    const map = new Map<
+      string,
+      { schoolName: string; schoolCode: string; subjects: Array<{ name: string; short: string }> }
+    >();
+    subjects.forEach((subject: Record<string, unknown>) => {
+      const schoolCode = asString(subject.school_code) || asString(subject.school_name) || "school";
+      const schoolName = asString(subject.school_name) || schoolCode;
+      const name = asString(subject.name);
+      if (!name) return;
+      const entry = map.get(schoolCode) ?? { schoolName, schoolCode, subjects: [] };
+      if (!entry.subjects.some((item) => normalizeSubjectKey(item.name) === normalizeSubjectKey(name))) {
+        entry.subjects.push({ name, short: asString(subject.short_name) });
+      }
+      map.set(schoolCode, entry);
+    });
+    return Array.from(map.values())
+      .map((entry) => ({
+        ...entry,
+        subjects: entry.subjects.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.schoolName.localeCompare(b.schoolName));
+  }, [subjects]);
 
   const filteredGroups = useMemo(() => {
     const query = groupSearch.trim().toLowerCase();
@@ -1806,6 +2223,34 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       return matchesQuery && matchesSchool && matchesSubject;
     });
   }, [groups, groupSearch, groupSchool, groupSubject, schoolNameByCode]);
+
+  const activeProgram =
+    curriculumPrograms.find((program: Record<string, unknown>) => asNumber(program.id) === openProgramId) ||
+    curriculumPrograms[0] ||
+    null;
+  const activeProgramId = asNumber(activeProgram?.id);
+  const activeProgramItems = useMemo(() => {
+    const query = programSearch.trim().toLowerCase();
+    return curriculumItems
+      .filter((item: Record<string, unknown>) => asNumber(item.program_id) === activeProgramId)
+      .filter((item: Record<string, unknown>) => {
+        if (programTypeFilter !== "all" && asString(item.item_type) !== programTypeFilter) return false;
+        if (!query) return true;
+        return [
+          item.lesson_number,
+          item.title,
+          item.item_type,
+          item.term_label,
+          item.week_label,
+          item.specification_points,
+          item.book_pages,
+        ]
+          .map(asString)
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      });
+  }, [activeProgramId, curriculumItems, programSearch, programTypeFilter]);
 
   if (kind === "groups" && openGroupId !== null) {
     return (
@@ -1826,44 +2271,224 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   return (
     <div className="space-y-4">
       {kind === "subjects" ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,380px),1fr]">
-          <ChartCard title="Add Subject" icon={<Plus className="h-4 w-4 text-info" />}>
-            <form action={routes.adminAcademicSubjectCreate} method="post" className="space-y-3">
-              <input type="hidden" name="csrf_token" value={csrf} />
-              <label className="block">
-                <FieldLabel>School</FieldLabel>
-                <Select name="school_code" required>
-                  {schools.map((school: Record<string, unknown>) => (
-                    <option key={asString(school.code)} value={asString(school.code)}>
-                      {asString(school.name)}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label className="block">
-                <FieldLabel>Subject Name</FieldLabel>
-                <TextInput name="subject_name" required placeholder="General English" />
-              </label>
-              <label className="block">
-                <FieldLabel>Code</FieldLabel>
-                <TextInput name="subject_code" placeholder="ENG" />
-              </label>
-              <button className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Save Subject</button>
-            </form>
-          </ChartCard>
-          <ChartCard title="Subjects" subtitle={`${subjects.length} total`}>
-            <div className="max-h-[70dvh] overflow-auto">
-              <table className="w-full min-w-[620px] text-left">
-                <thead className="sticky top-0 z-20 bg-surface text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                  <tr><th className="px-3 py-2">School</th><th className="px-3 py-2">Subject</th><th className="px-3 py-2">Code</th><th className="px-3 py-2">Short</th></tr>
-                </thead>
-                <tbody className="divide-y divide-foreground/5">
-                  {subjects.map((subject: Record<string, unknown>) => (
-                    <tr key={asNumber(subject.id)}><td className="px-3 py-2 text-xs">{asString(subject.school_name)}</td><td className="px-3 py-2 text-sm font-semibold">{asString(subject.name)}</td><td className="px-3 py-2 text-xs">{asString(subject.code)}</td><td className="px-3 py-2 text-xs">{asString(subject.short_name)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="space-y-3">
+          <div className="rounded-lg border border-info/15 bg-info/5 px-4 py-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold">Official Subject Programs</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Subjects are managed through complete scheme of work imports. Manual subject creation is disabled.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Pill>{curriculumPrograms.length} programs</Pill>
+                <Pill>{curriculumItems.length} program rows</Pill>
+                <Pill>{subjects.length} DB subjects</Pill>
+              </div>
             </div>
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-[minmax(16rem,0.36fr)_minmax(0,1fr)]">
+            <ChartCard
+              title="Subjects"
+              subtitle="Choose a program"
+              icon={<BookMarked className="h-4 w-4 text-info" />}
+            >
+              <div className="space-y-1.5">
+                {curriculumPrograms.length ? (
+                  curriculumPrograms.map((program: Record<string, unknown>) => {
+                    const programId = asNumber(program.id);
+                    const active = programId === activeProgramId;
+                    return (
+                      <button
+                        key={programId}
+                        type="button"
+                        onClick={() => {
+                          setOpenProgramId(programId);
+                          setProgramSearch("");
+                        }}
+                        className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          active
+                            ? "border-primary/50 bg-primary/10 shadow-sm"
+                            : "border-foreground/8 bg-background hover:bg-muted"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${subjectSwatch(asString(program.subject_name))}`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-bold">{asString(program.subject_name)}</p>
+                              <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                                {asString(program.subject_short)}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                              {asNumber(program.lesson_count)} lessons · {asNumber(program.exam_count)} exams
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center text-sm font-bold text-muted-foreground">
+                    No scheme of work programs are stored yet.
+                  </p>
+                )}
+              </div>
+            </ChartCard>
+
+            <ChartCard
+              title={activeProgram ? asString(activeProgram.subject_name) : "Program"}
+              subtitle={
+                activeProgram
+                  ? asString(activeProgram.source_file)
+                  : "Select a subject program"
+              }
+              headerActions={
+                <div className="relative w-full max-w-sm">
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="search"
+                    value={programSearch}
+                    onChange={(event) => setProgramSearch(event.target.value)}
+                    placeholder="Search program"
+                    className="h-9 w-full rounded-lg border border-foreground/10 bg-surface pl-8 pr-3 text-xs font-semibold outline-none focus:border-foreground/30"
+                  />
+                </div>
+              }
+            >
+              <div className="mb-3 grid gap-2 sm:grid-cols-3">
+                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Program Rows" value={asNumber(activeProgram?.total_items)} />
+                <MiniMetric icon={<Layers className="h-3.5 w-3.5" />} label="Lessons" value={asNumber(activeProgram?.lesson_count)} />
+                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Exams" value={asNumber(activeProgram?.exam_count)} />
+              </div>
+
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {[
+                  { key: "all", label: "All" },
+                  { key: "lesson", label: "Lessons" },
+                  { key: "exam", label: "Exams" },
+                ].map((option) => {
+                  const active = programTypeFilter === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setProgramTypeFilter(option.key as "all" | "lesson" | "exam")}
+                      className={`h-8 rounded-lg px-3 text-xs font-bold transition-colors ${
+                        active
+                          ? "bg-foreground text-background"
+                          : "border border-foreground/10 bg-surface text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+                <span className="ml-auto text-xs font-semibold text-muted-foreground">
+                  {activeProgramItems.length} shown
+                </span>
+              </div>
+
+              <div className="max-h-[62dvh] overflow-auto rounded-lg border border-foreground/8">
+                {activeProgramItems.length ? (
+                  <div className="divide-y divide-foreground/6">
+                    {activeProgramItems.map((item: Record<string, unknown>) => {
+                      const itemType = asString(item.item_type);
+                      const isExam = itemType === "exam";
+                      return (
+                        <div
+                          key={asNumber(item.id)}
+                          className={`grid gap-3 px-3 py-3 md:grid-cols-[5.25rem_1fr_9rem_8rem] ${
+                            isExam ? "bg-amber-50/70" : "bg-surface"
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs font-bold text-foreground">{asString(item.lesson_number)}</p>
+                            <span
+                              className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                isExam
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {isExam ? "Exam" : "Lesson"}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold leading-5">{asString(item.title)}</p>
+                            {asString(item.specification_points) ? (
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                                {asString(item.specification_points)}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="text-xs leading-5 text-muted-foreground">
+                            <span className="font-semibold text-foreground">{asString(item.term_label) || "Term not set"}</span>
+                            <br />
+                            {asString(item.week_label) || "Week not set"}
+                          </div>
+                          <div className="text-xs leading-5 text-muted-foreground">
+                            {asString(item.book_pages) || "No book pages"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="px-4 py-12 text-center text-sm font-bold text-muted-foreground">
+                    No program items match this search.
+                  </p>
+                )}
+              </div>
+            </ChartCard>
+          </div>
+
+          <ChartCard title="Subjects in Use" subtitle="Which subjects each client school runs">
+            {subjectsBySchool.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center text-sm font-bold text-muted-foreground">
+                No subjects are attached to any school yet.
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {subjectsBySchool.map((school) => (
+                  <div
+                    key={school.schoolCode}
+                    className="flex flex-col rounded-xl border border-foreground/8 bg-background p-4"
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Users className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold leading-tight">{school.schoolName}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">{school.schoolCode}</p>
+                        </div>
+                      </div>
+                      <Pill>{school.subjects.length} subjects</Pill>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {school.subjects.map((subject) => (
+                        <span
+                          key={subject.name}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/8 bg-surface px-2.5 py-1.5 text-xs font-semibold"
+                        >
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${subjectSwatch(subject.name)}`} />
+                          {subject.name}
+                          {subject.short ? (
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">
+                              {subject.short}
+                            </span>
+                          ) : null}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </ChartCard>
         </div>
       ) : null}
@@ -1892,24 +2517,46 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
                 <form action={routes.adminAcademicGroupCreate} method="post" className="space-y-3 px-4 py-4">
                   <input type="hidden" name="csrf_token" value={csrf} />
-                  <label className="block">
-                    <FieldLabel>School</FieldLabel>
-                    <Select name="school_code" required>
-                      {schools.map((school: Record<string, unknown>) => (
-                        <option key={asString(school.code)} value={asString(school.code)}>
-                          {asString(school.name)}
+                  {selectedSchool ? (
+                    <>
+                      <input type="hidden" name="school_code" value={asString(selectedSchool.code)} />
+                      <div className="rounded-lg border border-foreground/10 bg-muted/40 px-3 py-2.5">
+                        <FieldLabel>Client School</FieldLabel>
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <Users className="h-3.5 w-3.5" />
+                          </span>
+                          <p className="text-sm font-bold">{asString(selectedSchool.name)}</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <label className="block">
+                      <FieldLabel>Client School</FieldLabel>
+                      <Select name="school_code" required defaultValue="">
+                        <option value="" disabled>
+                          Choose a client school
                         </option>
-                      ))}
-                    </Select>
-                  </label>
+                        {schools.map((school: Record<string, unknown>) => (
+                          <option key={asString(school.code)} value={asString(school.code)}>
+                            {asString(school.name)}
+                          </option>
+                        ))}
+                      </Select>
+                    </label>
+                  )}
                   <label className="block">
-                    <FieldLabel>Subject</FieldLabel>
-                    <Select name="subject_id" required>
-                      {subjects.map((subject: Record<string, unknown>) => (
-                        <option key={asNumber(subject.id)} value={asNumber(subject.id)}>
-                          {asString(subject.school_name)} · {asString(subject.name)}
-                        </option>
-                      ))}
+                    <FieldLabel>Subject Program</FieldLabel>
+                    <Select name="program_subject_key" required>
+                      {curriculumPrograms.length === 0 ? (
+                        <option value="" disabled>No programs imported yet</option>
+                      ) : (
+                        curriculumPrograms.map((program: Record<string, unknown>) => (
+                          <option key={asString(program.subject_key)} value={asString(program.subject_key)}>
+                            {asString(program.subject_name)}
+                          </option>
+                        ))
+                      )}
                     </Select>
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1940,104 +2587,298 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
             </div>
           ) : null}
 
-            <ChartCard
-              title="Groups"
-              subtitle={`${filteredGroups.length} shown · ${groups.length} total`}
-              icon={<Layers className="h-4 w-4 text-info" />}
-              headerActions={isTeacherMode ? null :
+            {manageSchoolsOpen && !isTeacherMode ? (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4"
+                onClick={() => setManageSchoolsOpen(false)}
+              >
+                <div
+                  className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-surface shadow-card-hover"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
+                    <div>
+                      <h3 className="text-sm font-bold">Client Schools</h3>
+                      <p className="text-xs text-muted-foreground">{schools.length} registered</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setManageSchoolsOpen(false)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
+                      aria-label="Close"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                    <form action={routes.adminAcademicSchoolCreate} method="post" className="space-y-3 rounded-xl border border-foreground/8 bg-background p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Add a client school</p>
+                      <input type="hidden" name="csrf_token" value={csrf} />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="block">
+                          <FieldLabel>School Name</FieldLabel>
+                          <TextInput name="school_name" required placeholder="e.g. School 5" />
+                        </label>
+                        <label className="block">
+                          <FieldLabel>Code (optional)</FieldLabel>
+                          <TextInput name="school_code" placeholder="e.g. school5" />
+                        </label>
+                      </div>
+                      <div className="flex justify-end">
+                        <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">
+                          <Plus className="h-4 w-4" />
+                          Save School
+                        </button>
+                      </div>
+                    </form>
+                    {schools.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-6 text-center">
+                        <p className="text-sm font-bold text-muted-foreground">No client schools registered yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {schools.map((school: Record<string, unknown>) => {
+                          const code = asString(school.code);
+                          const stats = schoolStats.get(code);
+                          return (
+                            <div
+                              key={code}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-foreground/8 bg-background px-3 py-2.5"
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                  <Users className="h-4 w-4" />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-bold">{asString(school.name)}</p>
+                                  <p className="truncate text-[11px] text-muted-foreground">{code}</p>
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 gap-1.5">
+                                <Pill>{stats?.groups ?? 0} groups</Pill>
+                                <Pill>{stats?.activeStudents ?? 0} students</Pill>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <section className="sticky top-[calc(var(--app-top-inset)+4rem)] z-30 rounded-lg border border-foreground/10 bg-surface/95 p-3 shadow-card backdrop-blur lg:top-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-info" />
+                    <h3 className="text-sm font-bold">Client Schools & Groups</h3>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!isTeacherMode ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setManageSchoolsOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+                      >
+                        <Users className="h-4 w-4" />
+                        Schools
+                      </button>
+                      <button
+                        type="button"
+                        disabled={schools.length === 0}
+                        onClick={() => setAddGroupOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Group
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <MiniMetric icon={<Layers className="h-3.5 w-3.5" />} label="Groups" value={contextSummary.groups} />
+                <MiniMetric icon={<Users className="h-3.5 w-3.5" />} label="Active Students" value={contextSummary.activeStudents} />
+                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Subject Programs" value={contextSummary.programs} />
+              </div>
+
+              <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
                 <button
                   type="button"
-                  onClick={() => setAddGroupOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
+                  onClick={() => {
+                    setGroupSchool("all");
+                    setGroupSubject("all");
+                  }}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                    groupSchool === "all"
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-foreground/10 bg-background text-foreground hover:bg-muted"
+                  }`}
                 >
-                  <Plus className="h-4 w-4" />
-                  Add Group
+                  All Schools
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${groupSchool === "all" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    {groups.length}
+                  </span>
                 </button>
-              }
-            >
-              <div className="mb-3 grid gap-2 lg:grid-cols-[minmax(220px,1fr),180px,220px]">
+                {schools.map((school: Record<string, unknown>) => {
+                  const code = asString(school.code);
+                  const active = groupSchool === code;
+                  const stats = schoolStats.get(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => {
+                        setGroupSchool(code);
+                        setGroupSubject("all");
+                      }}
+                      className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                        active
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "border-foreground/10 bg-background text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {asString(school.name)}
+                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {stats?.groups ?? 0}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(220px,1fr),auto] lg:items-center">
                 <label className="relative block">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="search"
                     value={groupSearch}
                     onChange={(event) => setGroupSearch(event.target.value)}
-                    placeholder="Search groups"
+                    placeholder="Search group, school, or subject"
                     className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
                   />
                 </label>
-                <Select value={groupSchool} onChange={(event) => setGroupSchool(event.target.value)}>
-                  <option value="all">All schools</option>
-                  {groupSchoolOptions.map((code) => (
-                    <option key={code} value={code}>
-                      {schoolNameByCode.get(code) || code}
-                    </option>
+                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:max-w-[55vw]">
+                  <button
+                    type="button"
+                    onClick={() => setGroupSubject("all")}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold transition-colors ${
+                      groupSubject === "all"
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    All programs
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">{contextSummary.groups}</span>
+                  </button>
+                  {subjectFilterOptions.map((subject) => (
+                    <button
+                      key={subject.name}
+                      type="button"
+                      onClick={() => setGroupSubject(subject.name)}
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold transition-colors ${
+                        groupSubject === subject.name
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${subjectSwatch(subject.name)}`} />
+                      {subject.name}
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">{subject.groups}</span>
+                    </button>
                   ))}
-                </Select>
-                <Select value={groupSubject} onChange={(event) => setGroupSubject(event.target.value)}>
-                  <option value="all">All subjects</option>
-                  {groupSubjectOptions.map((subject) => (
-                    <option key={subject} value={subject}>
-                      {subject}
-                    </option>
-                  ))}
-                </Select>
+                </div>
               </div>
+            </section>
 
+            <ChartCard
+              title={selectedSchool ? `${asString(selectedSchool.name)} Groups` : "Groups"}
+              subtitle="Open a group to manage its gradebook"
+              icon={<Layers className="h-4 w-4 text-info" />}
+            >
               {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Try a different search or filter.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {schools.length === 0
+                      ? "Add a client school first, then create a group."
+                      : "Try a different search, or add a group for this school."}
+                  </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {filteredGroups.map((group: Record<string, unknown>) => {
-                    const id = asNumber(group.id);
-                    const name = asString(group.name);
-                    const subjectName = asString(group.subject_name);
-                    const schoolCode = asString(group.school_code);
-                    const schoolName = schoolNameByCode.get(schoolCode) || schoolCode;
-                    const studentsCount = asNumber(group.students_count);
-                    const disqualifiedCount = asNumber(group.disqualified_count);
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => setOpenGroupId(id)}
-                        className="group flex aspect-square min-h-0 flex-col rounded-lg border border-foreground/10 bg-background p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 sm:p-4"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span
-                            className={`h-9 w-9 shrink-0 rounded-lg ${subjectSwatch(subjectName)} sm:h-10 sm:w-10`}
-                            aria-hidden="true"
-                          />
-                          <Pill>{schoolCode || "school"}</Pill>
-                        </div>
-
-                        <div className="min-w-0 flex-1 py-3">
-                          <span className="block truncate text-lg font-bold leading-tight sm:text-xl">{name}</span>
-                          <span className="mt-1 block truncate text-xs text-muted-foreground">
-                            {subjectName || "No subject"}
-                          </span>
-                          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground/80">
-                            {schoolName}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1.5">
-                          <Pill>{studentsCount} active</Pill>
-                          {disqualifiedCount > 0 ? <Pill>{disqualifiedCount} disqualified</Pill> : null}
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-end border-t border-foreground/8 pt-2">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">
-                            Gradebook
-                            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="max-h-[calc(100dvh-25rem)] min-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+                  <div className="sticky top-0 z-10 hidden border-b border-foreground/10 bg-muted px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:grid sm:grid-cols-[1.7fr_1.4fr_5rem_6.5rem_auto_1.5rem] sm:items-center sm:gap-3">
+                    <span>Group</span>
+                    <span>Subject Program</span>
+                    <span className="text-center">Active</span>
+                    <span className="text-center">Disqualified</span>
+                    <span>Status</span>
+                    <span />
+                  </div>
+                  <div className="divide-y divide-foreground/8">
+                    {filteredGroups.map((group: Record<string, unknown>) => {
+                      const id = asNumber(group.id);
+                      const name = asString(group.name);
+                      const subjectName = asString(group.subject_name);
+                      const schoolCode = asString(group.school_code);
+                      const schoolName = schoolNameByCode.get(schoolCode) || schoolCode;
+                      const studentsCount = asNumber(group.students_count);
+                      const disqualifiedCount = asNumber(group.disqualified_count);
+                      const isActive = studentsCount > 0;
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => setOpenGroupId(id)}
+                          className="flex w-full flex-col gap-2 px-3 py-2.5 text-left transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:grid sm:grid-cols-[1.7fr_1.4fr_5rem_6.5rem_auto_1.5rem] sm:items-center sm:gap-3"
+                        >
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className={`h-8 w-8 shrink-0 rounded-lg ${subjectSwatch(subjectName)}`} aria-hidden="true" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold leading-tight">{name}</p>
+                              <p className="truncate text-[11px] text-muted-foreground">
+                                {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="min-w-0 text-sm">
+                            <span className="mr-1 text-[10px] font-bold uppercase text-muted-foreground sm:hidden">Program:</span>
+                            <span className="text-muted-foreground sm:text-foreground">{subjectName || "No program"}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:justify-center">
+                            <span className="text-sm font-bold">{studentsCount}</span>
+                            <span className="text-[11px] text-muted-foreground sm:hidden">active students</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:justify-center">
+                            <span className={`text-sm font-bold ${disqualifiedCount > 0 ? "text-amber-700" : "text-muted-foreground"}`}>
+                              {disqualifiedCount}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground sm:hidden">disqualified</span>
+                          </div>
+                          <div>
+                            <span
+                              className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                isActive ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {isActive ? "Active" : "Empty"}
+                            </span>
+                          </div>
+                          <div className="hidden items-center justify-end text-primary sm:flex">
+                            <ArrowRight className="h-4 w-4" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </ChartCard>

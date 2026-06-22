@@ -302,22 +302,12 @@ def delete_resource_type(resource_type_id):
             if not existing:
                 return False, "Resource type was not found."
 
-            usage_count = queries.count_resources_by_type(conn, type_id)
-            if usage_count > 0:
-                return (
-                    False,
-                    "Delete resources that use this type first.",
-                )
-
-            if bool(existing["is_system"]):
-                queries.update_resource_type_active(
-                    conn,
-                    type_id,
-                    False,
-                    _utc_now_iso(),
-                )
-            else:
-                queries.delete_resource_type_row_by_id(conn, type_id)
+            queries.update_resource_type_active(
+                conn,
+                type_id,
+                False,
+                _utc_now_iso(),
+            )
             conn.commit()
     return True, ""
 
@@ -372,9 +362,8 @@ def create_resource(
     normalized_url = str(resource_url or "").strip()
     normalized_file_path = str(resource_file_path or "").strip()
     normalized_thumbnail_path = str(thumbnail_file_path or "").strip()
-    if not normalized_file_path:
-        return False, "Please upload a resource file."
-    normalized_url = ""
+    if not normalized_file_path and not normalized_url:
+        return False, "Please upload a resource file or add an external URL."
 
     try:
         type_id = int(resource_type_id)
@@ -561,8 +550,6 @@ def delete_resource(resource_id):
     if parsed_resource_id <= 0:
         return False, "Invalid resource."
 
-    resource_file_path = ""
-    thumbnail_path = ""
     with _DB_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
@@ -570,15 +557,13 @@ def delete_resource(resource_id):
             if not existing:
                 return False, "Resource was not found."
 
-            resource_file_path = str(existing["resource_file_path"] or "").strip()
-            thumbnail_path = str(existing["thumbnail_file_path"] or "").strip()
-            queries.delete_resource_row_by_id(conn, parsed_resource_id)
+            queries.update_resource_active(
+                conn,
+                parsed_resource_id,
+                False,
+                _utc_now_iso(),
+            )
             conn.commit()
-
-    if resource_file_path:
-        delete_resource_file(resource_file_path)
-    if thumbnail_path:
-        delete_resource_file(thumbnail_path)
     return True, ""
 
 

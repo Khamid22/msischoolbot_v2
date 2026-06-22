@@ -17,10 +17,12 @@ from slowapi.errors import RateLimitExceeded
 from web.backend.utils.limiter import limiter
 
 from web.backend.utils.context import RequestContextMiddleware, session, request
+from web.backend.utils.demo_auth import maybe_apply_demo_auth
 from web.backend.utils.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
 from config import get_web_settings
 from web.backend.roles.admin.routes import register_admin_page_routes
 from web.backend.roles.student.routes import register_student_page_routes
+from web.backend.roles.teacher.routes import register_teacher_page_routes
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
@@ -68,6 +70,10 @@ PUBLIC_PATHS = {
     "/auth/telegram",
     "/admin",
     "/admin/continue",
+    # /teacher self-gates to the teacher role (see roles/teacher/routes.py). Listing
+    # it public keeps the teacher role OUT of the {admin, student} auth gate above,
+    # so a teacher session can reach ONLY /teacher + login/logout/static.
+    "/teacher",
     "/manifest.webmanifest",
     "/sw.js",
     "/docs",
@@ -93,6 +99,7 @@ class AuthAndSecurityMiddleware:
 
         request_obj = Request(scope, receive=receive)
         path = request_obj.url.path
+        maybe_apply_demo_auth(request_obj)
 
         # 1. Reject cross-origin state changes (Same-Origin check). Applies to
         # every mutating method on every path (not just /api/), so plain admin
@@ -125,6 +132,7 @@ class AuthAndSecurityMiddleware:
         is_public = (
             path in PUBLIC_PATHS
             or path.startswith("/static/")
+            or path.startswith("/teacher/")
         )
 
         if not is_public:
@@ -1021,6 +1029,7 @@ def _bootstrap_app(app_instance):
         compute_subject_rating=_compute_subject_rating,
         build_subject_leaderboard=_build_subject_leaderboard,
     )
+    register_teacher_page_routes(app_instance)
 
     _APP_BOOTSTRAPPED = True
     return app_instance

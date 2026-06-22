@@ -174,6 +174,13 @@ def register_dashboard_routes(
             group=requested_group or current_group,
             school=school_code,
         )
+        office_hours_url = url_for(
+            "student.student_office_hours",
+            student_id=student_id,
+            subject=requested_subject or current_subject,
+            group=requested_group or current_group,
+            school=school_code,
+        )
 
         return render_react_page(
             "student-dashboard",
@@ -186,6 +193,7 @@ def register_dashboard_routes(
                 "ratingBoardUrl": context["rating_board_url"],
                 "resourcesUrl": context["resources_url"],
                 "chatUrl": chat_url,
+                "officeHoursUrl": office_hours_url,
                 "aapLessonsUrl": context["aap_lessons_url"],
                 "arLessonsUrl": context["ar_lessons_url"],
                 "currentSubjectName": context["current_subject_name"],

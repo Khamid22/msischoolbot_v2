@@ -7,6 +7,7 @@ ROLE_TEACHER = "teacher"
 ROLE_CUSTOMER_SUPPORT = "customer_support"
 ROLE_PARENT = "parent"
 ROLE_STUDENT = "student"
+ROLE_ACADEMIC_DIRECTOR = "academic_director"
 
 ALL_ROLES = {
     ROLE_OWNER,
@@ -16,6 +17,7 @@ ALL_ROLES = {
     ROLE_CUSTOMER_SUPPORT,
     ROLE_PARENT,
     ROLE_STUDENT,
+    ROLE_ACADEMIC_DIRECTOR,
 }
 
 
@@ -24,3 +26,4 @@ def normalize_role(role: str) -> str:
     if not role:
         return ""
     return str(role).strip().lower()
+

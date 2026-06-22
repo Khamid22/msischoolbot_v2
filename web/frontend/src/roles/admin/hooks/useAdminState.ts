@@ -65,6 +65,14 @@ export function useAdminState(props: AdminPageProps) {
     }
   });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [activeStudentRowId, setActiveStudentRowId] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return Math.max(0, Math.floor(Number(params.get("student") || 0)));
+    } catch {
+      return 0;
+    }
+  });
   const currentSchool = props.adminSchool || "all";
   const schoolOptions = (
     Array.isArray(props.adminSchoolOptions) ? props.adminSchoolOptions : []
@@ -384,6 +392,9 @@ export function useAdminState(props: AdminPageProps) {
   }, [props.adminPanel]);
 
   useEffect(() => {
+    if (activeTab.startsWith("student_")) {
+      return;
+    }
     if (visibleTabs.some((tab) => tab.key === activeTab)) {
       return;
     }
@@ -513,6 +524,8 @@ export function useAdminState(props: AdminPageProps) {
   const filteredStudents = students.filter((student) => {
     const haystack = [
       asString(student.full_name),
+      asString(student.studentCode),
+      asString(student.student_code),
       asString(student.student_id),
       asString(student.subjects),
       asString(student.school_name),
@@ -599,6 +612,7 @@ export function useAdminState(props: AdminPageProps) {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       setActiveTab(normalizeAdminTab(params.get("panel")));
+      setActiveStudentRowId(Math.max(0, Math.floor(Number(params.get("student") || 0))));
       setMobileNavOpen(false);
     };
     window.addEventListener("popstate", handlePopState);
@@ -875,6 +889,8 @@ export function useAdminState(props: AdminPageProps) {
     visibleTabs,
     activeTab,
     setActiveTab,
+    activeStudentRowId,
+    setActiveStudentRowId,
     mobileNavOpen,
     setMobileNavOpen,
     currentSchool,

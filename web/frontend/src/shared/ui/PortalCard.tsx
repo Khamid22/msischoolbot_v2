@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { GraduationCap } from "lucide-react";
+import { motion } from "@/shared/lib/motion";
 
 interface CenteredPageProps {
   title: string;
@@ -20,9 +21,9 @@ export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
         WebkitOverflowScrolling: "touch",
       }}
     >
-      <div className="flex min-h-full flex-1 items-center justify-center">
+      <div className="flex min-h-[100dvh] flex-1 items-center justify-center">
         <div className="w-full max-w-md">
-          <div className="rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8">
+          <div className={`rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8 ${motion.panel}`}>
             <div className="mb-6 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-card">
                 <GraduationCap className="h-7 w-7" />

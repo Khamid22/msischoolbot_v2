@@ -3,6 +3,7 @@ import { ClipboardList, X, ChevronDown } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { asNumber, asString } from "../shared";
 import { routes } from "@/shared/lib/routes";
+import { attCls, attLabel } from "./gradebookFormat";
 
 type Lesson = {
   id: number;
@@ -37,20 +38,6 @@ type ActiveCell = {
 
 const ATT_VALUES = ["present", "absent", "justified"] as const;
 type AttValue = (typeof ATT_VALUES)[number] | "";
-
-function attLabel(v: string) {
-  if (v === "present") return "P";
-  if (v === "absent") return "A";
-  if (v === "justified") return "J";
-  return "";
-}
-
-function attCls(v: string) {
-  if (v === "present") return "bg-emerald-500 text-white";
-  if (v === "absent") return "bg-red-500 text-white";
-  if (v === "justified") return "bg-amber-400 text-white";
-  return "";
-}
 
 export default function GradebookPanel({ state }: { state: any }) {
   const props = state.props || {};

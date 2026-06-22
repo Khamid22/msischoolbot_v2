@@ -2033,7 +2033,7 @@ export default function TeachersPanel({ state }: { state: any }) {
     <div className="space-y-4">
       {toast ? (
         <div
-          className={`fixed right-4 top-4 z-[60] flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover ${
+          className={`fixed right-4 top-[calc(var(--app-top-inset)+4rem)] lg:top-4 z-[60] flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover ${
             toast.tone === "danger" ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"
           }`}
           role="status"
@@ -2401,7 +2401,14 @@ export default function TeachersPanel({ state }: { state: any }) {
                         </div>
                       </td>
                       <td className="px-3 py-2.5 text-xs">{asString(teacher.pay_rate) || "-"}</td>
-                      <td className="px-3 py-2.5 text-xs font-semibold">{asString(teacher.assigned_group) || "-"}</td>
+                      <td className="px-3 py-2.5 text-xs font-semibold">
+                        {asString(teacher.assigned_group) || "-"}
+                        {asString(teacher.login) ? (
+                          <span className="mt-1 block text-[10px] font-normal text-muted-foreground">
+                            Login {asString(teacher.login)} · Pass {asString(teacher.password) || "—"}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <a

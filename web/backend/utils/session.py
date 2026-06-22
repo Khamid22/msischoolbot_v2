@@ -6,9 +6,31 @@ from web.backend.utils.normalization import normalize_school_code
 
 def current_auth_role():
     role = str(session.get("auth_role", "")).strip().lower()
-    if role in {"admin", "student"}:
+    if role in {"admin", "student", "teacher"}:
         return role
     return ""
+
+
+def current_teacher_id():
+    if current_auth_role() != "teacher":
+        return None
+    try:
+        parsed_value = int(session.get("teacher_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
+
+
+def current_teacher_full_name():
+    if current_auth_role() != "teacher":
+        return ""
+    return str(session.get("teacher_full_name", "")).strip()
+
+
+def current_teacher_group():
+    if current_auth_role() != "teacher":
+        return ""
+    return str(session.get("teacher_group", "")).strip()
 
 
 def current_auth_login():
@@ -130,6 +152,27 @@ def set_student_session(student, telegram_user_id=None):
     return True
 
 
+def set_teacher_session(teacher):
+    if not isinstance(teacher, dict) or not teacher.get("id"):
+        return False
+
+    try:
+        teacher_id = int(teacher["id"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if teacher_id <= 0:
+        return False
+
+    session.clear()
+    session["auth_role"] = "teacher"
+    session["auth_login"] = str(teacher.get("login", "")).strip()
+    session["teacher_id"] = teacher_id
+    session["teacher_full_name"] = str(teacher.get("full_name", "")).strip()
+    session["teacher_group"] = str(teacher.get("assigned_group", "")).strip()
+    session.permanent = True
+    return True
+
+
 def try_auto_login_student_by_telegram(telegram_user_id, fetch_student_by_telegram):
     if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
         return False
@@ -177,12 +220,12 @@ def url_for(endpoint: str, **kwargs) -> str:
             url += "?" + "&".join(params)
         return url
 
-    if endpoint_clean in {"dashboard", "chat_room", "student_resources", "rating_board", "aap_lessons", "ar_lessons"}:
+    if endpoint_clean in {"dashboard", "chat_room", "student_resources", "rating_board", "aap_lessons", "ar_lessons", "student_office_hours"}:
         student_id = kwargs.get("student_id")
         subject = kwargs.get("subject", "")
         group = kwargs.get("group", "")
         school = kwargs.get("school", "")
-        
+
         path_map = {
             "dashboard": f"/dashboard/{student_id}",
             "chat_room": f"/dashboard/{student_id}/chat",
@@ -190,6 +233,7 @@ def url_for(endpoint: str, **kwargs) -> str:
             "rating_board": f"/dashboard/{student_id}/rating-board",
             "aap_lessons": f"/dashboard/{student_id}/aap-lessons",
             "ar_lessons": f"/dashboard/{student_id}/ar-lessons",
+            "student_office_hours": f"/dashboard/{student_id}/office-hours",
         }
         url = path_map[endpoint_clean]
         

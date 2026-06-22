@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Trophy,
   User,
+  UserPlus,
   UserRound,
   Users,
   X,
@@ -49,6 +50,21 @@ const ParentPanel = lazy(() => import("@/roles/admin/panels/ParentPanel"));
 const PaymentsPanel = lazy(() => import("@/roles/admin/panels/PaymentsPanel"));
 const ComplaintsPanel = lazy(() => import("@/roles/admin/panels/ComplaintsPanel"));
 const CareerGrowthPanel = lazy(() => import("@/roles/admin/panels/CareerGrowthPanel"));
+const OfficeHoursPanel = lazy(() => import("@/roles/admin/panels/OfficeHoursPanel"));
+
+// Role-mode panel maps. Each maps a tab key → a role-specific component; tabs not
+// present fall back to the default admin panel below. Components live under
+// roles/admin/modes/<role>/ and currently reuse the shared panels internally.
+import { ceoPanels } from "@/roles/admin/modes/ceo";
+import { supportPanels } from "@/roles/admin/modes/support";
+import { hrPanels } from "@/roles/admin/modes/hr";
+import type { ComponentType } from "react";
+
+const modePanelsByAdminMode: Record<string, Record<string, ComponentType<{ state: any }>>> = {
+  ceo: ceoPanels,
+  sales: supportPanels,
+  hr: hrPanels,
+};
 
 type StudentActionTab =
   | "student_dashboard"
@@ -57,7 +73,8 @@ type StudentActionTab =
   | "student_chat"
   | "student_rating"
   | "student_aap"
-  | "student_ar";
+  | "student_ar"
+  | "student_office_hours";
 
 const studentActionConfig: Record<
   StudentActionTab,
@@ -118,6 +135,13 @@ const studentActionConfig: Record<
     href: (studentId, school) => routes.adminStudentDashboardTarget(studentId, "ar", school),
     accent: "bg-rose-50 text-rose-700 border-rose-100",
   },
+  student_office_hours: {
+    title: "Office Hours",
+    subtitle: "Book and manage teacher office-hour sessions.",
+    icon: CalendarDays,
+    href: (studentId, school) => routes.adminStudentDashboardTarget(studentId, "office-hours", school),
+    accent: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  },
 };
 
 function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab }) {
@@ -129,7 +153,10 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
       ? (state.props.adminStudents as Array<Record<string, unknown>>)
       : [];
   const currentSchool = asString(state.currentSchool) || "all";
-  const student = students[0];
+  const requestedStudentId = asNumber(state.activeStudentRowId);
+  const student =
+    students.find((row) => asNumber(row.id) === requestedStudentId) ||
+    students[0];
   const studentId = asNumber(student?.id);
   const frameUrl = studentId ? withEmbedMode(config.href(studentId, currentSchool)) : "";
   const scrollableFrameTabs = new Set<StudentActionTab>([
@@ -137,6 +164,7 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
     "student_rating",
     "student_aap",
     "student_ar",
+    "student_office_hours",
   ]);
   const usesInternalFrameScroll = scrollableFrameTabs.has(tab);
   const [frameHeight, setFrameHeight] = useState(tab === "student_chat" ? 720 : 420);
@@ -420,6 +448,14 @@ function ActivePanel({ state }: { state: any }) {
     return <ParentPanel state={panelState} />;
   }
 
+  // Role modes (CEO / Customer Support / HR) render their own components for the
+  // tabs they specialize. Anything not overridden falls through to the default
+  // admin panels below, so Admin / Owner behavior is unchanged.
+  const ModeComponent = modePanelsByAdminMode[adminMode]?.[panelState.activeTab];
+  if (ModeComponent) {
+    return <ModeComponent state={panelState} />;
+  }
+
   switch (panelState.activeTab) {
     case "overview":
       return <OverviewPanel state={panelState} />;
@@ -435,6 +471,12 @@ function ActivePanel({ state }: { state: any }) {
       return <AcademicPanel state={panelState} kind="groups" />;
     case "schedule":
       return <AcademicPanel state={panelState} kind="schedule" />;
+    case "curriculum":
+      return <AcademicPanel state={panelState} kind="subjects" />;
+    case "gradebook":
+      return <AcademicPanel state={panelState} kind="groups" />;
+    case "office_hours":
+      return <OfficeHoursPanel state={panelState} />;
     case "announcements":
       return <AnnouncementsPanel state={panelState} />;
     case "resources":
@@ -454,6 +496,7 @@ function ActivePanel({ state }: { state: any }) {
     case "student_rating":
     case "student_aap":
     case "student_ar":
+    case "student_office_hours":
       return <StudentActionPanel state={panelState} tab={panelState.activeTab} />;
     default:
       return <OverviewPanel state={panelState} />;
@@ -477,6 +520,7 @@ const tabIcons: Record<string, LucideIcon> = {
   payments: CreditCard,
   complaints: AlertCircle,
   career_growth: TrendingUp,
+  candidates: UserPlus,
   contact: Phone,
   chat: MessageSquare,
   student_dashboard: LayoutDashboard,
@@ -486,6 +530,10 @@ const tabIcons: Record<string, LucideIcon> = {
   student_rating: Trophy,
   student_aap: GraduationCap,
   student_ar: Activity,
+  student_office_hours: CalendarDays,
+  curriculum: BookMarked,
+  gradebook: Layers,
+  office_hours: CalendarDays,
 };
 
 function AdminSidebar({
@@ -574,7 +622,7 @@ function AdminSidebar({
                 key={tab.key}
                 type="button"
                 onClick={() => state.switchAdminTab(tab.key)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
                   isActive
                     ? "bg-sidebar-primary text-sidebar-primary-foreground"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -725,7 +773,7 @@ export default function AdminPage(props: AdminPageProps) {
             aria-label="Close navigation"
           />
           <div
-            className="relative h-full w-[min(20rem,86vw)] max-w-full shadow-card-hover"
+            className="relative h-full w-[min(20rem,86vw)] max-w-full shadow-card-hover animate-in slide-in-from-left duration-200 motion-reduce:animate-none"
             style={{
               paddingTop: "var(--app-top-inset)",
               paddingBottom: "var(--app-bottom-inset)",

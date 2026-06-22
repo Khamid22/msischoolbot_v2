@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Check, CreditCard, Plus, Search, Trash2, Undo2, UserRound } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, sortSubjectsMathFirst } from "../shared";
+import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
 
 type PaymentRow = Record<string, unknown>;
 type FamilyTotals = {
@@ -214,8 +214,8 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const selectedParentResolvedId = asNumber(selectedParent?.id);
   const children = parentChildren(selectedParent);
   const selectedChild =
-    children.find((child) => asNumber(child.id) === selectedChildId) || children[0];
-  const selectedChildResolvedId = asNumber(selectedChild?.id);
+    children.find((child) => getStudentRowId(child) === selectedChildId) || children[0];
+  const selectedChildResolvedId = getStudentRowId(selectedChild);
 
   const visibleParents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -223,7 +223,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
     return parents.filter((parent) => {
       if (asString(parent.login).toLowerCase().includes(normalized)) return true;
       return parentChildren(parent).some((child) =>
-        [asString(child.full_name), asString(child.student_id)]
+        [asString(child.full_name), getStudentCode(child)]
           .join(" ")
           .toLowerCase()
           .includes(normalized),
@@ -247,7 +247,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
         current.map((parent) => ({
           ...parent,
           children: parentChildren(parent).map((child) =>
-            asNumber(child.id) === childId ? mergePaymentSummary(child, nextSummary) : child,
+            getStudentRowId(child) === childId ? mergePaymentSummary(child, nextSummary) : child,
           ),
         })),
       );
@@ -255,7 +255,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
     if (typeof state.setParentChildren === "function") {
       state.setParentChildren((current: Array<Record<string, unknown>>) =>
         current.map((child) =>
-          asNumber(child.id) === childId ? mergePaymentSummary(child, nextSummary) : child,
+          getStudentRowId(child) === childId ? mergePaymentSummary(child, nextSummary) : child,
         ),
       );
     }
@@ -418,7 +418,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search parents or students"
+              placeholder="Search parents, students, or student codes"
               className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
             />
           </label>
@@ -508,7 +508,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
                 <>
                   <div className="flex flex-wrap gap-2">
                     {children.map((child) => {
-                      const childId = asNumber(child.id);
+                      const childId = getStudentRowId(child);
                       const active = childId === selectedChildResolvedId;
                       const childDebt = moneyValue(paymentSummaryFor(child).debt_total);
                       return (
@@ -543,7 +543,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
                           {asString(selectedChild?.full_name) || "Student"}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {asString(selectedChild?.student_id) || "Student ID"} ·{" "}
+                          Code {getStudentCode(selectedChild) || "-"} ·{" "}
                           {asString(selectedChild?.school_name) || "School"}
                         </p>
                       </div>

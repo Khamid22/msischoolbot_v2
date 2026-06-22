@@ -13,6 +13,7 @@ export type AdminTab =
   | "payments"
   | "complaints"
   | "career_growth"
+  | "candidates"
   | "contact"
   | "chat"
   | "student_dashboard"
@@ -21,9 +22,13 @@ export type AdminTab =
   | "student_chat"
   | "student_rating"
   | "student_aap"
-  | "student_ar";
+  | "student_ar"
+  | "student_office_hours"
+  | "curriculum"
+  | "gradebook"
+  | "office_hours";
 export type OverviewGrade = "7" | "8";
-export type AdminMode = "admin" | "ceo" | "hr" | "sales" | "teacher" | "student" | "parent";
+export type AdminMode = "admin" | "ceo" | "hr" | "sales" | "teacher" | "student" | "parent" | "academic_director";
 
 export interface ResourceUploadState {
   active: boolean;
@@ -105,6 +110,7 @@ export const tabs: { key: AdminTab; label: string }[] = [
   { key: "payments", label: "Payments" },
   { key: "complaints", label: "Complaints" },
   { key: "career_growth", label: "Career Growth" },
+  { key: "candidates", label: "Candidates" },
   { key: "contact", label: "Contact" },
   { key: "chat", label: "Chat" },
   { key: "student_dashboard", label: "Academic Dashboard" },
@@ -114,6 +120,10 @@ export const tabs: { key: AdminTab; label: string }[] = [
   { key: "student_rating", label: "Rating" },
   { key: "student_aap", label: "AAP" },
   { key: "student_ar", label: "AR" },
+  { key: "student_office_hours", label: "Office Hours" },
+  { key: "curriculum", label: "Curriculum" },
+  { key: "gradebook", label: "Gradebook" },
+  { key: "office_hours", label: "Office Hours" },
 ];
 
 export const adminModeProfiles: Record<
@@ -135,13 +145,13 @@ export const adminModeProfiles: Record<
     label: "CEO",
     shortLabel: "CEO",
     description: "Performance, schools, staff, and decisions.",
-    tabs: ["overview", "students", "parents", "teachers", "groups", "schedule", "announcements", "resources", "payments", "complaints"],
+    tabs: ["overview", "students", "parents", "groups", "announcements", "resources", "payments", "complaints"],
   },
   hr: {
     label: "HR Manager",
     shortLabel: "HR",
     description: "Hiring pipeline, training, and teacher records.",
-    tabs: ["overview", "teachers", "announcements", "resources"],
+    tabs: ["overview", "teachers", "candidates", "career_growth", "announcements", "resources"],
   },
   sales: {
     label: "Customer Support",
@@ -159,7 +169,7 @@ export const adminModeProfiles: Record<
     label: "Student",
     shortLabel: "Student",
     description: "Student dashboard, progress, resources, and communication.",
-    tabs: ["student_dashboard", "student_profile", "student_resources", "student_chat", "student_rating", "student_aap", "student_ar"],
+    tabs: ["student_dashboard", "student_profile", "student_resources", "student_chat", "student_rating", "student_aap", "student_ar", "student_office_hours"],
   },
   parent: {
     label: "Parent",
@@ -167,9 +177,15 @@ export const adminModeProfiles: Record<
     description: "Student progress, announcements, payments, and support.",
     tabs: ["overview", "announcements", "payments", "contact"],
   },
+  academic_director: {
+    label: "Academic Director",
+    shortLabel: "Acad Dir",
+    description: "Teachers, groups, curriculum, timetable, quality, and student risk.",
+    tabs: ["overview", "teachers", "groups", "schedule", "gradebook", "curriculum", "office_hours"],
+  },
 };
 
-export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher", "student", "parent"];
+export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher", "student", "parent", "academic_director"];
 
 export function normalizeAdminMode(value: unknown): AdminMode {
   const normalized = asString(value).toLowerCase();
@@ -179,7 +195,8 @@ export function normalizeAdminMode(value: unknown): AdminMode {
     normalized === "sales" ||
     normalized === "teacher" ||
     normalized === "student" ||
-    normalized === "parent"
+    normalized === "parent" ||
+    normalized === "academic_director"
   ) {
     return normalized;
   }
@@ -281,6 +298,18 @@ export function findPreferredMathSubject(subjects: string[]) {
 export function asNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function getStudentRowId(student: Record<string, unknown> | null | undefined) {
+  return asNumber(student?.studentRowId ?? student?.student_row_id ?? student?.id);
+}
+
+export function getStudentCode(student: Record<string, unknown> | null | undefined) {
+  return asString(student?.studentCode ?? student?.student_code ?? student?.student_id);
+}
+
+export function getPublicDashboardId(student: Record<string, unknown> | null | undefined) {
+  return asNumber(student?.publicDashboardId ?? student?.public_dashboard_id ?? student?.enrollment_id);
 }
 
 export function asStringArray(value: unknown): string[] {
@@ -469,7 +498,11 @@ export function normalizeAdminTab(value: unknown): AdminTab {
     normalized === "student_chat" ||
     normalized === "student_rating" ||
     normalized === "student_aap" ||
-    normalized === "student_ar"
+    normalized === "student_ar" ||
+    normalized === "student_office_hours" ||
+    normalized === "curriculum" ||
+    normalized === "gradebook" ||
+    normalized === "office_hours"
   ) {
     return normalized;
   }

@@ -32,6 +32,7 @@ def init_storage():
             queries.ensure_resource_comments_schema(conn)
             queries.ensure_chat_schema(conn)
             queries.ensure_teacher_candidates_schema(conn)
+            queries.ensure_teacher_auth_schema(conn)
             queries.ensure_announcements_schema(conn)
             queries.ensure_default_resource_types(conn, utc_now_iso())
             ensure_owner_admin(conn)

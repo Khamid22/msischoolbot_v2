@@ -14,6 +14,7 @@ from web.backend.roles.student.routes.chat_page import register_chat_page_routes
 from web.backend.roles.student.routes.chat_routes import register_chat_routes
 from web.backend.roles.student.routes.comment_routes import register_comment_routes
 from web.backend.roles.student.routes.resources import register_resources_routes
+from web.backend.roles.student.routes.office_hours_routes import register_office_hours_routes
 from shared.identity.account_service import (
     get_student_db_id_by_enrollment_id,
     record_student_activity,
@@ -171,4 +172,5 @@ def register_student_page_routes(
     register_comment_routes(students)
     register_chat_page_routes(students, load_dashboard_payload=load_dashboard_payload)
     register_chat_routes(students)
+    register_office_hours_routes(students, load_dashboard_payload=load_dashboard_payload)
     app.include_router(students)

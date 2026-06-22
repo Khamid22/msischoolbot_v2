@@ -14,3 +14,4 @@ from .payment_queries import *
 from .resource_queries import *
 from .subject_summary_queries import *
 from .teacher_queries import *
+from .office_hours import *
