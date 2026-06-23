@@ -36,6 +36,11 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 DEMO_AUTH_ENABLED=0
 ```
 
+For temporary team testing only, set `DEMO_AUTH_ENABLED=1`. The app will create
+normal demo sessions automatically: admin pages open as an owner-level tester,
+teacher pages open as the first teacher, and `/dashboard/<student>` opens as
+that student. Set it back to `0` before using real accounts.
+
 Generate `APP_SECRET_KEY` locally:
 
 ```bash
