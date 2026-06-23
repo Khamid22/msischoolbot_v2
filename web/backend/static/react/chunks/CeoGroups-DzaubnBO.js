@@ -1,1 +1,0 @@
-import{j as r}from"./react-vendor-BBSa9SYs.js";import t from"./AcademicPanel-OITajEQd.js";import"./ChartCard-DHvgpL0y.js";import"./routes-VIUv1-HD.js";import"./shared-UhlBbG1n.js";import"./icons-36YEPkI-.js";import"./recharts-BRCsPKot.js";import"./vendor-BbMHAT_T.js";function f({state:o}){return r.jsx(t,{state:o,kind:"groups"})}export{f as default};

@@ -6,6 +6,7 @@ interface AdminEmbedLayoutProps {
   subtitle?: string;
   backUrl?: string;
   badge?: string;
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -14,6 +15,7 @@ export function AdminEmbedLayout({
   subtitle,
   backUrl,
   badge,
+  headerAction,
   children,
 }: AdminEmbedLayoutProps) {
   const normalizedBackUrl = withEmbedMode(backUrl);
@@ -37,10 +39,10 @@ export function AdminEmbedLayout({
               {subtitle ? <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p> : null}
             </div>
           </div>
-          {badge ? (
-            <span className="w-fit rounded-md bg-muted px-2.5 py-1 text-[11px] font-bold">
-              {badge}
-            </span>
+          {headerAction ? (
+            headerAction
+          ) : badge ? (
+            <span className="w-fit rounded-md bg-muted px-2.5 py-1 text-[11px] font-bold">{badge}</span>
           ) : null}
         </section>
         {children}

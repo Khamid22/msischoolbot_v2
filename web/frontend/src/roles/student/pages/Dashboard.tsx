@@ -93,6 +93,69 @@ const modalInsetStyle = {
   paddingLeft: "max(1rem, var(--app-left-inset))",
 } as const;
 
+function SubjectSwitcher({
+  options,
+  currentLabel,
+  open,
+  onToggle,
+  onClose,
+  embedMode,
+  align = "right",
+}: {
+  options: SubjectOption[];
+  currentLabel?: string;
+  open: boolean;
+  onToggle: () => void;
+  onClose?: () => void;
+  embedMode?: string;
+  align?: "left" | "right";
+}) {
+  const label = currentLabel || "Subject";
+  const menuAlignClass = align === "left" ? "left-0" : "right-0";
+
+  if (options.length <= 1) {
+    return <span className="block max-w-[9rem] truncate rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold sm:max-w-xs">{label}</span>;
+  }
+
+  return (
+    <div className="relative min-w-0">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        className="flex max-w-[9rem] items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold hover:bg-foreground/10 sm:max-w-xs"
+        aria-label="Switch subject"
+        aria-expanded={open}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className="h-3 w-3 shrink-0" />
+      </button>
+      {open ? (
+        <nav className={`absolute ${menuAlignClass} top-full z-50 mt-1 w-56 rounded-xl border border-foreground/5 bg-surface py-1 shadow-card-hover ${motion.panel}`}>
+          {options.map((option) => {
+            const optionUrl = isAdminEmbedMode(embedMode) ? withEmbedMode(option.url) : option.url;
+            return (
+              <a
+                key={`${option.subject}-${option.group}-${option.url}`}
+                href={optionUrl}
+                onClick={onClose}
+                className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs font-medium hover:bg-muted ${
+                  option.is_current ? "font-bold text-primary" : ""
+                }`}
+              >
+                <span className="min-w-0 truncate">{option.subject}</span>
+                <strong className="shrink-0 text-muted-foreground">{option.subject_short || option.group}</strong>
+              </a>
+            );
+          })}
+        </nav>
+      ) : null}
+    </div>
+  );
+}
+
 export default function DashboardPage(props: DashboardPageProps) {
   const payload = props.payload || {};
   const student =
@@ -130,6 +193,7 @@ export default function DashboardPage(props: DashboardPageProps) {
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const aapLessonsUrl = isAdminEmbed ? withEmbedMode(props.aapLessonsUrl) : props.aapLessonsUrl;
   const arLessonsUrl = isAdminEmbed ? withEmbedMode(props.arLessonsUrl) : props.arLessonsUrl;
+  const currentSubjectLabel = props.currentSubjectShortName || props.currentSubjectName;
 
   useEffect(() => {
     if (!sidebarOpen) {
@@ -211,7 +275,17 @@ export default function DashboardPage(props: DashboardPageProps) {
       <AdminEmbedLayout
         title="Academic Dashboard"
         subtitle={`${studentName || "Student"}${currentGroup ? ` · ${currentGroup}` : ""}`}
-        badge={props.currentSubjectShortName || props.currentSubjectName}
+        badge={currentSubjectLabel}
+        headerAction={
+          <SubjectSwitcher
+            options={subjectOptions}
+            currentLabel={currentSubjectLabel}
+            open={subjectOpen}
+            onToggle={() => setSubjectOpen((current) => !current)}
+            onClose={() => setSubjectOpen(false)}
+            embedMode={props.embedMode}
+          />
+        }
       >
         {dashboardContent}
       </AdminEmbedLayout>
@@ -288,42 +362,17 @@ export default function DashboardPage(props: DashboardPageProps) {
                 </p>
                 <div className="mt-0.5 flex min-w-0 items-center justify-end gap-2">
                   {currentGroup ? <span className="truncate text-xs text-muted-foreground">{currentGroup}</span> : null}
-                  <div className="relative min-w-0">
-                    {subjectOptions.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSubjectOpen((current) => !current);
-                          setAnnouncementsOpen(false);
-                        }}
-                        className="flex max-w-[9rem] items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold hover:bg-foreground/10 sm:max-w-xs"
-                      >
-                        <span className="truncate">{props.currentSubjectShortName || props.currentSubjectName}</span>
-                        <ChevronDown className="h-3 w-3 shrink-0" />
-                      </button>
-                    ) : (
-                      <span className="block max-w-[9rem] truncate rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold sm:max-w-xs">
-                        {props.currentSubjectShortName || props.currentSubjectName}
-                      </span>
-                    )}
-                    {subjectOpen ? (
-                      <nav className={`absolute right-0 top-full z-50 mt-1 w-52 rounded-xl border border-foreground/5 bg-surface py-1 shadow-card-hover ${motion.panel}`}>
-                        {subjectOptions.map((option) => (
-                          <a
-                            key={`${option.subject}-${option.group}`}
-                            href={option.url}
-                            className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs font-medium hover:bg-muted ${
-                              option.is_current ? "font-bold text-primary" : ""
-                            }`}
-                          >
-                            <strong>{option.subject_short}</strong>
-                            <span className="text-muted-foreground">{option.group}</span>
-                          </a>
-                        ))}
-                      </nav>
-                    ) : null}
-                  </div>
+                  <SubjectSwitcher
+                    options={subjectOptions}
+                    currentLabel={currentSubjectLabel}
+                    open={subjectOpen}
+                    onToggle={() => {
+                      setSubjectOpen((current) => !current);
+                      setAnnouncementsOpen(false);
+                    }}
+                    onClose={() => setSubjectOpen(false)}
+                    embedMode={props.embedMode}
+                  />
                 </div>
               </div>
             </div>
