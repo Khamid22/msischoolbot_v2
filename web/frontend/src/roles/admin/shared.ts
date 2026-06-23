@@ -145,19 +145,19 @@ export const adminModeProfiles: Record<
     label: "CEO",
     shortLabel: "CEO",
     description: "Performance, schools, staff, and decisions.",
-    tabs: ["overview", "students", "parents", "groups", "announcements", "resources", "payments", "complaints"],
+    tabs: ["overview", "groups", "payments", "complaints"],
   },
   hr: {
     label: "HR Manager",
     shortLabel: "HR",
-    description: "Hiring pipeline, training, and teacher records.",
-    tabs: ["overview", "teachers", "candidates", "career_growth", "announcements", "resources"],
+    description: "Hiring pipeline and teacher records.",
+    tabs: ["candidates", "teachers"],
   },
   sales: {
     label: "Customer Support",
     shortLabel: "Support",
     description: "Students, parent communication, payments, and follow-up.",
-    tabs: ["overview", "complaints", "payments", "students", "parents", "announcements", "groups", "chat"],
+    tabs: ["complaints", "students", "parents", "payments"],
   },
   teacher: {
     label: "Teacher",
@@ -181,7 +181,7 @@ export const adminModeProfiles: Record<
     label: "Academic Director",
     shortLabel: "Acad Dir",
     description: "Teachers, groups, curriculum, timetable, quality, and student risk.",
-    tabs: ["overview", "teachers", "groups", "schedule", "gradebook", "curriculum", "office_hours"],
+    tabs: ["teachers", "groups", "schedule", "curriculum", "gradebook", "office_hours", "career_growth"],
   },
 };
 

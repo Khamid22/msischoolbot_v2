@@ -1,10 +1,10 @@
 {
-  "_AdminEmbedLayout-BBk4QbWu.js": {
-    "file": "chunks/AdminEmbedLayout-BBk4QbWu.js",
+  "_AdminEmbedLayout-y1Wq6IC6.js": {
+    "file": "chunks/AdminEmbedLayout-y1Wq6IC6.js",
     "name": "AdminEmbedLayout",
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "_Avatar-DntxQ76S.js": {
@@ -21,13 +21,13 @@
       "_react-vendor-BBSa9SYs.js"
     ]
   },
-  "_PortalCard-BkBcoNFs.js": {
-    "file": "chunks/PortalCard-BkBcoNFs.js",
+  "_PortalCard-DF6YCW4r.js": {
+    "file": "chunks/PortalCard-DF6YCW4r.js",
     "name": "PortalCard",
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_motion-DWkO32uB.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "_ProgressBar-D5eTqNaz.js": {
@@ -37,16 +37,23 @@
       "_react-vendor-BBSa9SYs.js"
     ]
   },
-  "_TelegramLayout-CjS8DumV.js": {
-    "file": "chunks/TelegramLayout-CjS8DumV.js",
+  "_TelegramLayout-BoS3YE9U.js": {
+    "file": "chunks/TelegramLayout-BoS3YE9U.js",
     "name": "TelegramLayout",
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
-  "_icons-CwswAjLm.js": {
-    "file": "chunks/icons-CwswAjLm.js",
+  "_complaintFormat-XhRySNH4.js": {
+    "file": "chunks/complaintFormat-XhRySNH4.js",
+    "name": "complaintFormat",
+    "imports": [
+      "_shared-DGwaGp-v.js"
+    ]
+  },
+  "_icons-Cpn9Lmq8.js": {
+    "file": "chunks/icons-Cpn9Lmq8.js",
     "name": "icons",
     "imports": [
       "_react-vendor-BBSa9SYs.js"
@@ -76,8 +83,8 @@
     "file": "chunks/routes-VIUv1-HD.js",
     "name": "routes"
   },
-  "_shared-UhlBbG1n.js": {
-    "file": "chunks/shared-UhlBbG1n.js",
+  "_shared-DGwaGp-v.js": {
+    "file": "chunks/shared-DGwaGp-v.js",
     "name": "shared"
   },
   "_vendor-BbMHAT_T.js": {
@@ -88,7 +95,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-T1jRk1Jk.js",
+    "file": "assets/index-00xXgDgi.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -164,8 +171,20 @@
     "file": "assets/space-grotesk-vietnamese-wght-normal-D0rl6rjA.woff2",
     "src": "node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-vietnamese-wght-normal.woff2"
   },
+  "src/roles/admin/modes/ceo/CeoComplaints.tsx": {
+    "file": "chunks/CeoComplaints-DUhzldvU.js",
+    "name": "CeoComplaints",
+    "src": "src/roles/admin/modes/ceo/CeoComplaints.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_react-vendor-BBSa9SYs.js",
+      "_shared-DGwaGp-v.js",
+      "_complaintFormat-XhRySNH4.js",
+      "_icons-Cpn9Lmq8.js"
+    ]
+  },
   "src/roles/admin/modes/ceo/CeoGroups.tsx": {
-    "file": "chunks/CeoGroups-CPKf612Y.js",
+    "file": "chunks/CeoGroups-Bq3oj8Dc.js",
     "name": "CeoGroups",
     "src": "src/roles/admin/modes/ceo/CeoGroups.tsx",
     "isDynamicEntry": true,
@@ -174,14 +193,14 @@
       "src/roles/admin/panels/AcademicPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_recharts-BRCsPKot.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "src/roles/admin/modes/ceo/CeoHome.tsx": {
-    "file": "chunks/CeoHome-WTe5VaJ1.js",
+    "file": "chunks/CeoHome-3Qkn-RJT.js",
     "name": "CeoHome",
     "src": "src/roles/admin/modes/ceo/CeoHome.tsx",
     "isDynamicEntry": true,
@@ -190,28 +209,14 @@
       "src/roles/admin/panels/OverviewPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_recharts-BRCsPKot.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
-  "src/roles/admin/modes/ceo/CeoStudents.tsx": {
-    "file": "chunks/CeoStudents-CdHcnpc4.js",
-    "name": "CeoStudents",
-    "src": "src/roles/admin/modes/ceo/CeoStudents.tsx",
-    "isDynamicEntry": true,
-    "imports": [
-      "_react-vendor-BBSa9SYs.js",
-      "src/roles/admin/panels/StudentsPanel.tsx",
-      "_ChartCard-DHvgpL0y.js",
-      "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
-    ]
-  },
   "src/roles/admin/modes/hr/HrCandidates.tsx": {
-    "file": "chunks/HrCandidates-XvsL0tgV.js",
+    "file": "chunks/HrCandidates-ru98d-mz.js",
     "name": "HrCandidates",
     "src": "src/roles/admin/modes/hr/HrCandidates.tsx",
     "isDynamicEntry": true,
@@ -220,41 +225,12 @@
       "src/roles/admin/panels/TeachersPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
-    ]
-  },
-  "src/roles/admin/modes/hr/HrCareerGrowth.tsx": {
-    "file": "chunks/HrCareerGrowth-DolRUODZ.js",
-    "name": "HrCareerGrowth",
-    "src": "src/roles/admin/modes/hr/HrCareerGrowth.tsx",
-    "isDynamicEntry": true,
-    "imports": [
-      "_react-vendor-BBSa9SYs.js",
-      "src/roles/admin/panels/CareerGrowthPanel.tsx",
-      "_ChartCard-DHvgpL0y.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
-    ]
-  },
-  "src/roles/admin/modes/hr/HrHome.tsx": {
-    "file": "chunks/HrHome-B2BBnZAH.js",
-    "name": "HrHome",
-    "src": "src/roles/admin/modes/hr/HrHome.tsx",
-    "isDynamicEntry": true,
-    "imports": [
-      "_react-vendor-BBSa9SYs.js",
-      "src/roles/admin/panels/OverviewPanel.tsx",
-      "_ChartCard-DHvgpL0y.js",
-      "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
-      "_recharts-BRCsPKot.js",
-      "_vendor-BbMHAT_T.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/modes/hr/HrTeachers.tsx": {
-    "file": "chunks/HrTeachers-XvsL0tgV.js",
+    "file": "chunks/HrTeachers-ru98d-mz.js",
     "name": "HrTeachers",
     "src": "src/roles/admin/modes/hr/HrTeachers.tsx",
     "isDynamicEntry": true,
@@ -263,42 +239,26 @@
       "src/roles/admin/panels/TeachersPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/modes/support/SupportComplaints.tsx": {
-    "file": "chunks/SupportComplaints-B8G8G9Dq.js",
+    "file": "chunks/SupportComplaints-B1GY-F0g.js",
     "name": "SupportComplaints",
     "src": "src/roles/admin/modes/support/SupportComplaints.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "src/roles/admin/panels/ComplaintsPanel.tsx",
-      "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
-    ]
-  },
-  "src/roles/admin/modes/support/SupportHome.tsx": {
-    "file": "chunks/SupportHome-gfEqoFdF.js",
-    "name": "SupportHome",
-    "src": "src/roles/admin/modes/support/SupportHome.tsx",
-    "isDynamicEntry": true,
-    "imports": [
-      "_react-vendor-BBSa9SYs.js",
-      "src/roles/admin/panels/OverviewPanel.tsx",
-      "_ChartCard-DHvgpL0y.js",
-      "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
-      "_recharts-BRCsPKot.js",
-      "_vendor-BbMHAT_T.js"
+      "_shared-DGwaGp-v.js",
+      "_complaintFormat-XhRySNH4.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/modes/support/SupportParents.tsx": {
-    "file": "chunks/SupportParents-CsRuoWsN.js",
+    "file": "chunks/SupportParents-BHg7qgiA.js",
     "name": "SupportParents",
     "src": "src/roles/admin/modes/support/SupportParents.tsx",
     "isDynamicEntry": true,
@@ -307,12 +267,12 @@
       "src/roles/admin/panels/ParentsPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/modes/support/SupportPayments.tsx": {
-    "file": "chunks/SupportPayments-B2mHv-YV.js",
+    "file": "chunks/SupportPayments-Ru-9qEhI.js",
     "name": "SupportPayments",
     "src": "src/roles/admin/modes/support/SupportPayments.tsx",
     "isDynamicEntry": true,
@@ -321,12 +281,12 @@
       "src/roles/admin/panels/PaymentsPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/modes/support/SupportStudents.tsx": {
-    "file": "chunks/SupportStudents-DXeSfXbt.js",
+    "file": "chunks/SupportStudents-DGIbehbd.js",
     "name": "SupportStudents",
     "src": "src/roles/admin/modes/support/SupportStudents.tsx",
     "isDynamicEntry": true,
@@ -335,12 +295,12 @@
       "src/roles/admin/panels/StudentsPanel.tsx",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/pages/Admin.tsx": {
-    "file": "chunks/Admin-DV9vzLib.js",
+    "file": "chunks/Admin-22rTJ58f.js",
     "name": "Admin",
     "src": "src/roles/admin/pages/Admin.tsx",
     "isDynamicEntry": true,
@@ -348,26 +308,23 @@
       "index.html",
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_PortalCard-BkBcoNFs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_PortalCard-DF6YCW4r.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_motion-DWkO32uB.js"
     ],
     "dynamicImports": [
       "src/roles/admin/modes/ceo/CeoHome.tsx",
       "src/roles/admin/modes/ceo/CeoGroups.tsx",
-      "src/roles/admin/modes/ceo/CeoStudents.tsx",
-      "src/roles/admin/modes/support/SupportHome.tsx",
+      "src/roles/admin/modes/ceo/CeoComplaints.tsx",
       "src/roles/admin/modes/support/SupportStudents.tsx",
       "src/roles/admin/modes/support/SupportParents.tsx",
       "src/roles/admin/modes/support/SupportPayments.tsx",
       "src/roles/admin/modes/support/SupportComplaints.tsx",
-      "src/roles/admin/modes/hr/HrHome.tsx",
       "src/roles/admin/modes/hr/HrTeachers.tsx",
       "src/roles/admin/modes/hr/HrCandidates.tsx",
-      "src/roles/admin/modes/hr/HrCareerGrowth.tsx",
       "src/roles/admin/panels/OverviewPanel.tsx",
       "src/roles/admin/panels/StudentsPanel.tsx",
       "src/roles/admin/panels/ParentsPanel.tsx",
@@ -384,23 +341,23 @@
     ]
   },
   "src/roles/admin/pages/EditStudentProfile.tsx": {
-    "file": "chunks/EditStudentProfile-Bm-74sCm.js",
+    "file": "chunks/EditStudentProfile-O_12wW1q.js",
     "name": "EditStudentProfile",
     "src": "src/roles/admin/pages/EditStudentProfile.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
-      "_TelegramLayout-CjS8DumV.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
+      "_TelegramLayout-BoS3YE9U.js",
       "_Avatar-DntxQ76S.js",
-      "_PortalCard-BkBcoNFs.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_PortalCard-DF6YCW4r.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_motion-DWkO32uB.js"
     ]
   },
   "src/roles/admin/panels/AcademicPanel.tsx": {
-    "file": "chunks/AcademicPanel-DPudNh3P.js",
+    "file": "chunks/AcademicPanel-0MoWl4Xf.js",
     "name": "AcademicPanel",
     "src": "src/roles/admin/panels/AcademicPanel.tsx",
     "isDynamicEntry": true,
@@ -408,14 +365,14 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_recharts-BRCsPKot.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "src/roles/admin/panels/AnnouncementsPanel.tsx": {
-    "file": "chunks/AnnouncementsPanel-B81Ug1Bi.js",
+    "file": "chunks/AnnouncementsPanel-VeUsq-8D.js",
     "name": "AnnouncementsPanel",
     "src": "src/roles/admin/panels/AnnouncementsPanel.tsx",
     "isDynamicEntry": true,
@@ -423,59 +380,59 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/CareerGrowthPanel.tsx": {
-    "file": "chunks/CareerGrowthPanel-CIAmqFt3.js",
+    "file": "chunks/CareerGrowthPanel-IPKfzGI3.js",
     "name": "CareerGrowthPanel",
     "src": "src/roles/admin/panels/CareerGrowthPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/ChatPanel.tsx": {
-    "file": "chunks/ChatPanel-C-_IlEKn.js",
+    "file": "chunks/ChatPanel-Cr6nAM2m.js",
     "name": "ChatPanel",
     "src": "src/roles/admin/panels/ChatPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/ComplaintsPanel.tsx": {
-    "file": "chunks/ComplaintsPanel-DQ-U-WMD.js",
+    "file": "chunks/ComplaintsPanel-wbMvzr22.js",
     "name": "ComplaintsPanel",
     "src": "src/roles/admin/panels/ComplaintsPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_complaintFormat-XhRySNH4.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/OfficeHoursPanel.tsx": {
-    "file": "chunks/OfficeHoursPanel-BeLnAUMn.js",
+    "file": "chunks/OfficeHoursPanel-C8n0eStl.js",
     "name": "OfficeHoursPanel",
     "src": "src/roles/admin/panels/OfficeHoursPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/OverviewPanel.tsx": {
-    "file": "chunks/OverviewPanel-Bb5RGnAw.js",
+    "file": "chunks/OverviewPanel-B-K65ojL.js",
     "name": "OverviewPanel",
     "src": "src/roles/admin/panels/OverviewPanel.tsx",
     "isDynamicEntry": true,
@@ -483,28 +440,28 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js",
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js",
       "_recharts-BRCsPKot.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "src/roles/admin/panels/ParentPanel.tsx": {
-    "file": "chunks/ParentPanel-BEyulBhx.js",
+    "file": "chunks/ParentPanel-C5r9wfej.js",
     "name": "ParentPanel",
     "src": "src/roles/admin/panels/ParentPanel.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/ParentsPanel.tsx": {
-    "file": "chunks/ParentsPanel-Cd8X1kzF.js",
+    "file": "chunks/ParentsPanel-rG2VVUfH.js",
     "name": "ParentsPanel",
     "src": "src/roles/admin/panels/ParentsPanel.tsx",
     "isDynamicEntry": true,
@@ -512,12 +469,12 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/PaymentsPanel.tsx": {
-    "file": "chunks/PaymentsPanel-YrBLLT81.js",
+    "file": "chunks/PaymentsPanel-fVY9-4mW.js",
     "name": "PaymentsPanel",
     "src": "src/roles/admin/panels/PaymentsPanel.tsx",
     "isDynamicEntry": true,
@@ -525,12 +482,12 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/ResourcesPanel.tsx": {
-    "file": "chunks/ResourcesPanel-DklNiFsw.js",
+    "file": "chunks/ResourcesPanel-B2SOSBEv.js",
     "name": "ResourcesPanel",
     "src": "src/roles/admin/panels/ResourcesPanel.tsx",
     "isDynamicEntry": true,
@@ -538,12 +495,12 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/StudentsPanel.tsx": {
-    "file": "chunks/StudentsPanel-BFn7t0Ev.js",
+    "file": "chunks/StudentsPanel-Dy21HgqV.js",
     "name": "StudentsPanel",
     "src": "src/roles/admin/panels/StudentsPanel.tsx",
     "isDynamicEntry": true,
@@ -551,12 +508,12 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/admin/panels/TeachersPanel.tsx": {
-    "file": "chunks/TeachersPanel-DR-ST746.js",
+    "file": "chunks/TeachersPanel-BxN0N8HG.js",
     "name": "TeachersPanel",
     "src": "src/roles/admin/panels/TeachersPanel.tsx",
     "isDynamicEntry": true,
@@ -564,80 +521,80 @@
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
       "_routes-VIUv1-HD.js",
-      "_shared-UhlBbG1n.js",
-      "_icons-CwswAjLm.js"
+      "_shared-DGwaGp-v.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/parent/pages/ParentHome.tsx": {
-    "file": "chunks/ParentHome-CE5v-HYV.js",
+    "file": "chunks/ParentHome-i1hvDjzk.js",
     "name": "ParentHome",
     "src": "src/roles/parent/pages/ParentHome.tsx",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
       "_react-vendor-BBSa9SYs.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ],
     "dynamicImports": [
       "src/roles/admin/panels/ParentPanel.tsx"
     ]
   },
   "src/roles/student/components/DashboardChartsSection.tsx": {
-    "file": "chunks/DashboardChartsSection-Brv9x9oo.js",
+    "file": "chunks/DashboardChartsSection-BfgXaXBx.js",
     "name": "DashboardChartsSection",
     "src": "src/roles/student/components/DashboardChartsSection.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_ChartCard-DHvgpL0y.js",
-      "_icons-CwswAjLm.js",
+      "_icons-Cpn9Lmq8.js",
       "_recharts-BRCsPKot.js",
       "_vendor-BbMHAT_T.js"
     ]
   },
   "src/roles/student/pages/AAP.tsx": {
-    "file": "chunks/AAP-BUWlAJPc.js",
+    "file": "chunks/AAP-BCD2y1kj.js",
     "name": "AAP",
     "src": "src/roles/student/pages/AAP.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_ChartCard-DHvgpL0y.js",
       "_ProgressBar-D5eTqNaz.js",
-      "_TelegramLayout-CjS8DumV.js",
+      "_TelegramLayout-BoS3YE9U.js",
       "_lesson-date-CBdzB-Y1.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/AR.tsx": {
-    "file": "chunks/AR-DUdYdCML.js",
+    "file": "chunks/AR-D0Cknnt2.js",
     "name": "AR",
     "src": "src/roles/student/pages/AR.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_ChartCard-DHvgpL0y.js",
-      "_TelegramLayout-CjS8DumV.js",
+      "_TelegramLayout-BoS3YE9U.js",
       "_lesson-date-CBdzB-Y1.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/Chat.tsx": {
-    "file": "chunks/Chat-BBCb-0VC.js",
+    "file": "chunks/Chat-DSJCc3lO.js",
     "name": "Chat",
     "src": "src/roles/student/pages/Chat.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
-      "_TelegramLayout-CjS8DumV.js",
-      "_icons-CwswAjLm.js"
+      "_AdminEmbedLayout-y1Wq6IC6.js",
+      "_TelegramLayout-BoS3YE9U.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/Dashboard.tsx": {
-    "file": "chunks/Dashboard-uRZaHU3V.js",
+    "file": "chunks/Dashboard-6YjPA0jr.js",
     "name": "Dashboard",
     "src": "src/roles/student/pages/Dashboard.tsx",
     "isDynamicEntry": true,
@@ -648,101 +605,101 @@
       "_ChartCard-DHvgpL0y.js",
       "_ProgressBar-D5eTqNaz.js",
       "_Avatar-DntxQ76S.js",
-      "_TelegramLayout-CjS8DumV.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
-      "_icons-CwswAjLm.js"
+      "_TelegramLayout-BoS3YE9U.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
+      "_icons-Cpn9Lmq8.js"
     ],
     "dynamicImports": [
       "src/roles/student/components/DashboardChartsSection.tsx"
     ]
   },
   "src/roles/student/pages/Home.tsx": {
-    "file": "chunks/Home-3xh5t-_B.js",
+    "file": "chunks/Home-CPHUoOuh.js",
     "name": "Home",
     "src": "src/roles/student/pages/Home.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-BkBcoNFs.js",
+      "_PortalCard-DF6YCW4r.js",
       "_motion-DWkO32uB.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/Login.tsx": {
-    "file": "chunks/Login-BAvG9B9X.js",
+    "file": "chunks/Login-6kZTZYht.js",
     "name": "Login",
     "src": "src/roles/student/pages/Login.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-BkBcoNFs.js",
-      "_icons-CwswAjLm.js",
+      "_PortalCard-DF6YCW4r.js",
+      "_icons-Cpn9Lmq8.js",
       "_motion-DWkO32uB.js"
     ]
   },
   "src/roles/student/pages/OfficeHours.tsx": {
-    "file": "chunks/OfficeHours-CuBG3HDe.js",
+    "file": "chunks/OfficeHours-Czr2fo2T.js",
     "name": "OfficeHours",
     "src": "src/roles/student/pages/OfficeHours.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_ChartCard-DHvgpL0y.js",
-      "_TelegramLayout-CjS8DumV.js",
-      "_icons-CwswAjLm.js"
+      "_TelegramLayout-BoS3YE9U.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/Rating.tsx": {
-    "file": "chunks/Rating-CuIephYr.js",
+    "file": "chunks/Rating-DD1XzxzZ.js",
     "name": "Rating",
     "src": "src/roles/student/pages/Rating.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
+      "_AdminEmbedLayout-y1Wq6IC6.js",
       "_ChartCard-DHvgpL0y.js",
-      "_TelegramLayout-CjS8DumV.js",
-      "_icons-CwswAjLm.js"
+      "_TelegramLayout-BoS3YE9U.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/Resources.tsx": {
-    "file": "chunks/Resources-HlkWn21r.js",
+    "file": "chunks/Resources-B8bJ7s9Z.js",
     "name": "Resources",
     "src": "src/roles/student/pages/Resources.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_AdminEmbedLayout-BBk4QbWu.js",
-      "_TelegramLayout-CjS8DumV.js",
-      "_icons-CwswAjLm.js"
+      "_AdminEmbedLayout-y1Wq6IC6.js",
+      "_TelegramLayout-BoS3YE9U.js",
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "src/roles/student/pages/StudentNotFound.tsx": {
-    "file": "chunks/StudentNotFound-CtKnT16S.js",
+    "file": "chunks/StudentNotFound-CKVTVJmt.js",
     "name": "StudentNotFound",
     "src": "src/roles/student/pages/StudentNotFound.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
-      "_PortalCard-BkBcoNFs.js",
-      "_icons-CwswAjLm.js",
+      "_PortalCard-DF6YCW4r.js",
+      "_icons-Cpn9Lmq8.js",
       "_motion-DWkO32uB.js"
     ]
   },
   "src/roles/teacher/pages/TeacherHome.tsx": {
-    "file": "chunks/TeacherHome-BY8XEBit.js",
+    "file": "chunks/TeacherHome-wQUhtcTL.js",
     "name": "TeacherHome",
     "src": "src/roles/teacher/pages/TeacherHome.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_react-vendor-BBSa9SYs.js",
       "_routes-VIUv1-HD.js",
-      "_icons-CwswAjLm.js"
+      "_icons-Cpn9Lmq8.js"
     ]
   },
   "style.css": {
-    "file": "assets/style-CIPY1bAm.css",
+    "file": "assets/style-CFdpNcvX.css",
     "src": "style.css"
   }
 }

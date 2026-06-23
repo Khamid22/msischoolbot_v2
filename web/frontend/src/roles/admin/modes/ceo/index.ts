@@ -3,14 +3,14 @@ import type { ComponentType } from "react";
 
 const CeoHome = lazy(() => import("./CeoHome"));
 const CeoGroups = lazy(() => import("./CeoGroups"));
-const CeoStudents = lazy(() => import("./CeoStudents"));
+const CeoComplaints = lazy(() => import("./CeoComplaints"));
 
-// Tab key → CEO-specific component. Tabs not listed here fall back to the default
-// admin panel in Admin.tsx, so CEO keeps full access to the standard panels.
+// Tab key → CEO-specific component. The CEO sidebar is intentionally summary
+// focused; only the tabs exposed in adminModeProfiles.ceo can be reached.
 export const ceoPanels: Record<string, ComponentType<{ state: any }>> = {
   overview: CeoHome,
   groups: CeoGroups,
-  students: CeoStudents,
+  complaints: CeoComplaints,
 };
 
-export { CeoHome, CeoGroups, CeoStudents };
+export { CeoHome, CeoGroups, CeoComplaints };

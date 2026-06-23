@@ -1,6 +1,4 @@
-// Pure gradebook formatting helpers shared by the admin gradebook panels.
-// Extracted verbatim from AcademicPanel/GradebookPanel to remove duplication;
-// behavior is unchanged.
+// Pure gradebook formatting helpers for the admin academic gradebook.
 
 export function scoreOutOfNine(value: unknown) {
   const parsed = Number(value);
