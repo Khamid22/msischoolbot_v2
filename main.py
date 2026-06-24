@@ -158,7 +158,16 @@ async def run_bot():
     # Register all routers in a clean loop
     for router in ALL_ROUTERS:
         dp.include_router(router)
-        
+
+    logging.info("Starting Telegram bot polling (%d routers).", len(ALL_ROUTERS))
+    try:
+        # Clear any webhook + stale queued updates, then long-poll for updates.
+        await bot.delete_webhook(drop_pending_updates=True)
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
+
+
 def _resolve_run_mode():
     raw_mode = ""
     if len(sys.argv) > 1:
@@ -201,4 +210,14 @@ if __name__ == "__main__":
         )
         web_thread = threading.Thread(target=run_web_server, daemon=True)
         web_thread.start()
-        asyncio.run(run_bot())
+        try:
+            asyncio.run(run_bot())
+        except Exception:
+            # The web server runs on a daemon thread, so if the bot fails to
+            # start (missing/invalid BOT_TOKEN, no network) we must NOT let the
+            # main thread exit — that would tear the whole process down and take
+            # the web app with it. Log and keep serving web instead.
+            logging.exception(
+                "Telegram bot stopped; keeping the web server running."
+            )
+            web_thread.join()

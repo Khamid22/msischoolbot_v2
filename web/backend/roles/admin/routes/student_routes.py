@@ -1,6 +1,8 @@
 import os
 import time
 
+from itsdangerous import URLSafeTimedSerializer
+
 from web.backend.utils.response_helpers import jsonify, redirect
 from web.backend.utils.context import current_app, request, session
 from web.backend.utils.session import url_for
@@ -34,6 +36,21 @@ STUDENT_DASHBOARD_TARGET_ENDPOINTS = {
 }
 
 
+def _parent_invite_serializer():
+    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+    if not secret:
+        raise RuntimeError("APP_SECRET_KEY is required to generate parent invite links.")
+    return URLSafeTimedSerializer(secret_key=secret, salt="msi-parent-invite-v1")
+
+
+def _request_public_base_url():
+    proto = str(request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
+    if not proto:
+      proto = "https" if str(request.headers.get("x-forwarded-ssl", "")).lower() == "on" else "http"
+    host = str(request.headers.get("x-forwarded-host") or request.host or "").split(",")[0].strip()
+    return f"{proto}://{host}".rstrip("/") if host else ""
+
+
 def register_admin_student_routes(
     router,
     *,
@@ -57,6 +74,26 @@ def register_admin_student_routes(
             return jsonify({"ok": False, "message": str(exc)}), 400
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "student": result})
+
+    @router.post("/admin/api/students/<int:student_row_id>/parent-invite")
+    def admin_create_parent_invite(student_row_id):
+        profile = get_admin_student_profile(student_row_id)
+        if not profile:
+            return jsonify({"ok": False, "message": "Selected student was not found."}), 404
+
+        token = _parent_invite_serializer().dumps(
+            {
+                "student_row_id": int(student_row_id),
+                "student_code": str(profile.get("student_code") or profile.get("student_id") or "").strip(),
+                "student_name": str(profile.get("full_name") or "").strip(),
+                "issued_by": int(session.get("admin_id", 0) or 0),
+                "issued_at": int(time.time()),
+            }
+        )
+        invite_path = f"/parent/link/{token}"
+        base_url = _request_public_base_url()
+        invite_url = f"{base_url}{invite_path}" if base_url else invite_path
+        return jsonify({"ok": True, "invite_url": invite_url, "inviteUrl": invite_url})
 
     @router.get("/admin/students/<int:student_row_id>")
     def admin_student_profile(student_row_id):

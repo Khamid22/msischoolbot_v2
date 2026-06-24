@@ -791,7 +791,7 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className="w-full px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
+        className="flex min-h-[100dvh] w-full flex-col px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
@@ -837,9 +837,11 @@ export default function AdminPage(props: AdminPageProps) {
           </div>
         ) : null}
 
-        <Suspense fallback={<PanelFallback />}>
-          <ActivePanel state={panelState} />
-        </Suspense>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <Suspense fallback={<PanelFallback />}>
+            <ActivePanel state={panelState} />
+          </Suspense>
+        </div>
       </main>
 
       {state.editingResource ? (

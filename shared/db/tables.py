@@ -114,6 +114,8 @@ def _create_tables_postgres(conn):
         """
     )
 
+    _create_parent_accounts_tables(conn)
+
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS student_payments (
@@ -532,6 +534,77 @@ def ensure_admins_schema(conn):
     conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''")
 
 
+def _create_parent_accounts_tables(conn):
+    """Parent CLIENT accounts — deliberately separate from `admins`.
+
+    A parent is a customer responsible for their children, NOT a staff member:
+    these rows carry no login/password and grant no admin privileges. Populated
+    by the parent invite-link flow (web/backend/roles/parent). `source_admin_id`
+    records provenance when a legacy role='parent' admin is migrated in, so the
+    migration stays idempotent and the old row can be matched back.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parents (
+            id BIGSERIAL PRIMARY KEY,
+            full_name TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            telegram_username TEXT NOT NULL DEFAULT '',
+            telegram_user_id BIGINT,
+            source_admin_id BIGINT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(source_admin_id) REFERENCES admins(id) ON DELETE SET NULL
+        )
+        """
+    )
+    # Idempotent migration anchor: at most one parent per migrated admin row.
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_parents_source_admin
+        ON parents(source_admin_id)
+        WHERE source_admin_id IS NOT NULL
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parents_telegram_username
+        ON parents ((lower(telegram_username)))
+        WHERE telegram_username <> ''
+        """
+    )
+    conn.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_parents_telegram_user_id
+        ON parents(telegram_user_id)
+        WHERE telegram_user_id IS NOT NULL
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parent_student_links (
+            parent_id BIGINT NOT NULL,
+            student_row_id BIGINT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (parent_id, student_row_id),
+            FOREIGN KEY(parent_id) REFERENCES parents(id) ON DELETE CASCADE,
+            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parent_student_links_student
+        ON parent_student_links(student_row_id)
+        """
+    )
+
+
+def ensure_parent_accounts_schema(conn):
+    """Lazy guard so query code can create the parent tables on demand."""
+    _create_parent_accounts_tables(conn)
+
+
 def ensure_parent_children_schema(conn):
     conn.execute(
         """
@@ -631,6 +704,18 @@ def ensure_parent_complaints_schema(conn):
     conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT NOT NULL DEFAULT ''")
     # Ticket-style fields. Additive only.
     conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS assigned_to TEXT NOT NULL DEFAULT ''")
+    # New parent CLIENT anchor (parents table). Additive + nullable: existing
+    # complaints keep resolving via parent_admin_id -> admins; the migration
+    # backfills parent_id from the admin->parent mapping. Read paths still use
+    # parent_admin_id until complaints are re-anchored to parents.
+    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS parent_id BIGINT")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parent_complaints_parent_id
+        ON parent_complaints(parent_id)
+        WHERE parent_id IS NOT NULL
+        """
+    )
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_parent_complaints_status_updated
@@ -935,6 +1020,7 @@ def ensure_office_hours_schema(conn):
 __all__ = [
     "create_tables",
     "ensure_admins_schema",
+    "ensure_parent_accounts_schema",
     "ensure_parent_children_schema",
     "ensure_parent_complaints_schema",
     "ensure_complaint_messages_schema",

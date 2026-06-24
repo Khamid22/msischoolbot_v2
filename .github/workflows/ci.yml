@@ -7,26 +7,31 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    env:
+      # Placeholders so import-time config (config.get_settings) and the DB URL
+      # check pass. No step here opens a real database connection.
+      BOT_TOKEN: "123456:ci-placeholder"
+      MINI_APP_URL: "https://example.com"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/ci"
+      DEMO_AUTH_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - name: Install backend deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
       - name: Compile backend sources
         run: |
-          python -m compileall -q config.py main.py web/backend telegram_bot database_storage
-      - name: Import smoke test
-        env:
-          BOT_TOKEN: "ci-placeholder"
-          MINI_APP_URL: "https://example.com"
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/ci"
+          python -m compileall -q config.py main.py web/backend shared tgbot scripts
+      - name: Import smoke test (FastAPI app + bot routers)
         run: |
-          python -c "from web.backend.main import app; print('routes:', len(list(app.url_map.iter_rules())))"
-          python -c "import telegram_bot.handlers.start, telegram_bot.handlers.account_link, telegram_bot.handlers.quick_summary, telegram_bot.handlers.contact_us; print('bot handlers import ok')"
+          python -c "from web.backend.server import app; print('routes:', len(app.routes))"
+          python -c "from tgbot.handlers import ALL_ROUTERS; print('bot routers:', len(ALL_ROUTERS))"
+      - name: Run tests
+        run: pytest
 
   frontend:
     runs-on: ubuntu-latest

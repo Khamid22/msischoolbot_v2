@@ -32,8 +32,8 @@ export default function ParentHome(props: Record<string, unknown>) {
             <UserRound className="h-4 w-4 text-foreground" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold leading-tight">{authLogin || "Parent"}</p>
-            <p className="text-[11px] text-muted-foreground">Parent Portal</p>
+            <p className="truncate text-sm font-bold leading-tight">{authLogin || "Ota-ona"}</p>
+            <p className="text-[11px] text-muted-foreground">Ota-ona kabineti / Кабинет родителя</p>
           </div>
           <form onSubmit={handleLogout}>
             <button
@@ -41,7 +41,7 @@ export default function ParentHome(props: Record<string, unknown>) {
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-2.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <LogOut className="h-3.5 w-3.5" />
-              Sign out
+              Chiqish / Выйти
             </button>
           </form>
         </div>
@@ -50,7 +50,7 @@ export default function ParentHome(props: Record<string, unknown>) {
         <Suspense
           fallback={
             <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-              Loading…
+              Yuklanmoqda… / Загрузка…
             </div>
           }
         >

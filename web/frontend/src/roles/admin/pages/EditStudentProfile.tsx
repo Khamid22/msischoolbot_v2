@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from "react";
-import { Camera, FileText, KeyRound, Save, Trash2, User, Users } from "lucide-react";
+import { Camera, Check, Copy, FileText, KeyRound, Link2, Phone, Save, Send, Trash2, User, Users } from "lucide-react";
 import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
@@ -24,6 +24,14 @@ interface StudentProfile {
   profile_description?: string;
 }
 
+interface LinkedParent {
+  id: number;
+  fullName?: string;
+  phone?: string;
+  telegramUsername?: string;
+  linkedAt?: string;
+}
+
 interface EditStudentProfileProps {
   authLogin?: string;
   authError?: string;
@@ -33,6 +41,8 @@ interface EditStudentProfileProps {
   csrfToken?: string;
   saveUrl?: string;
   changePasswordUrl?: string;
+  parentInviteApiUrl?: string;
+  linkedParents?: LinkedParent[];
   viewDashboardUrl?: string;
   backUrl?: string;
   embedMode?: string;
@@ -49,6 +59,10 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
   const student = props.student || { id: 0 };
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(student.photo_url || "");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [parentInviteUrl, setParentInviteUrl] = useState("");
+  const [parentInviteCopied, setParentInviteCopied] = useState(false);
+  const [parentInviteError, setParentInviteError] = useState("");
+  const [parentInviteLoading, setParentInviteLoading] = useState(false);
   const initials = `${String(student.surname || "").slice(0, 1)}${String(student.name || "").slice(0, 1)}`.trim() || "ST";
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const profileTitle = student.full_name || `${student.surname || ""} ${student.name || ""}`.trim() || "Student";
@@ -78,6 +92,49 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
     }
     if (removeInput) {
       removeInput.value = "1";
+    }
+  }
+
+  async function copyText(value: string) {
+    if (!value) return false;
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function createParentInvite() {
+    if (!props.parentInviteApiUrl || parentInviteLoading) return;
+    setParentInviteLoading(true);
+    setParentInviteError("");
+    setParentInviteCopied(false);
+    try {
+      const response = await fetch(props.parentInviteApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": props.csrfToken || "",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.ok) {
+        setParentInviteError(String(json.message || "Could not create parent link."));
+        return;
+      }
+      const nextUrl = String(json.inviteUrl || json.invite_url || "");
+      setParentInviteUrl(nextUrl);
+      const copied = await copyText(nextUrl);
+      setParentInviteCopied(copied);
+      if (copied) {
+        window.setTimeout(() => setParentInviteCopied(false), 1800);
+      }
+    } catch {
+      setParentInviteError("Network error. Please try again.");
+    } finally {
+      setParentInviteLoading(false);
     }
   }
 
@@ -147,8 +204,86 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
                     Password
                   </button>
                 ) : null}
+                {props.parentInviteApiUrl ? (
+                  <button
+                    type="button"
+                    onClick={createParentInvite}
+                    disabled={parentInviteLoading}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-50"
+                  >
+                    {parentInviteCopied ? <Check className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+                    {parentInviteLoading ? "Creating..." : parentInviteCopied ? "Copied" : "Parent Link"}
+                  </button>
+                ) : null}
               </div>
             </div>
+
+            {(parentInviteUrl || parentInviteError) ? (
+              <div className="border-b border-foreground/8 bg-sky-50/70 px-4 py-3">
+                {parentInviteError ? (
+                  <p className="text-xs font-semibold text-destructive">{parentInviteError}</p>
+                ) : (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                        Parent invite link
+                      </p>
+                      <p className="truncate text-xs text-sky-900">{parentInviteUrl}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const copied = await copyText(parentInviteUrl);
+                        setParentInviteCopied(copied);
+                        if (copied) window.setTimeout(() => setParentInviteCopied(false), 1800);
+                      }}
+                      className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-white px-3 text-xs font-bold text-sky-700 hover:bg-sky-100"
+                    >
+                      {parentInviteCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {parentInviteCopied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {props.linkedParents && props.linkedParents.length > 0 ? (
+              <div className="border-b border-foreground/8 px-4 py-3">
+                <h3 className="flex items-center gap-2 text-sm font-bold">
+                  <Users className="h-4 w-4 text-info" />
+                  Linked Parents
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                    {props.linkedParents.length}
+                  </span>
+                </h3>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {props.linkedParents.map((parent) => (
+                    <div key={parent.id} className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
+                      <p className="truncate text-sm font-bold">{parent.fullName || "Parent"}</p>
+                      <div className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
+                        {parent.phone ? (
+                          <a href={`tel:${parent.phone}`} className="inline-flex items-center gap-1.5 hover:text-foreground">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{parent.phone}</span>
+                          </a>
+                        ) : null}
+                        {parent.telegramUsername ? (
+                          <a
+                            href={`https://t.me/${parent.telegramUsername}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 hover:text-foreground"
+                          >
+                            <Send className="h-3 w-3 shrink-0" />
+                            <span className="truncate">@{parent.telegramUsername}</span>
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr),minmax(18rem,0.45fr)]">
               <div className="space-y-4">

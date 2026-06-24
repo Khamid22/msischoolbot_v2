@@ -1,1 +1,0 @@
-import{j as o}from"./react-vendor-BBSa9SYs.js";import r from"./ComplaintsPanel-wbMvzr22.js";import"./routes-VIUv1-HD.js";import"./shared-DGwaGp-v.js";import"./complaintFormat-XhRySNH4.js";import"./icons-Cpn9Lmq8.js";function e({state:t}){return o.jsx(r,{state:t})}export{e as default};

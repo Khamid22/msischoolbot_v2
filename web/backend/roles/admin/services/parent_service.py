@@ -467,6 +467,33 @@ def list_parent_children(parent_admin_id):
     return children
 
 
+def list_linked_parents_for_student(student_row_id):
+    """Parent CLIENT accounts linked to a student via the invite-link flow.
+
+    Reads the new `parents` / `parent_student_links` tables (separate from
+    admins). Returns camelCase dicts for the edit-student page.
+    """
+    student_id = _normalize_positive_int(student_row_id)
+    if not student_id:
+        return []
+
+    with _connect() as conn:
+        rows = queries.get_parents_for_student(conn, student_id)
+
+    parents = []
+    for row in rows or []:
+        parents.append(
+            {
+                "id": int(row["id"]),
+                "fullName": str(row["full_name"] or "").strip(),
+                "phone": str(row["phone"] or "").strip(),
+                "telegramUsername": str(row["telegram_username"] or "").strip(),
+                "linkedAt": str(row["linked_at"] or "").strip(),
+            }
+        )
+    return parents
+
+
 def assign_parent_child(parent_admin_id, student_row_id):
     parent_id = _normalize_positive_int(parent_admin_id)
     student_id = _normalize_positive_int(student_row_id)
@@ -517,6 +544,7 @@ def remove_parent_child(parent_admin_id, student_row_id):
 __all__ = [
     "assign_parent_child",
     "create_parent_account",
+    "list_linked_parents_for_student",
     "list_parent_accounts",
     "list_parent_children",
     "remove_parent_child",

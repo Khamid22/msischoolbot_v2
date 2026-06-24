@@ -9,6 +9,7 @@ from .announcement_queries import *
 from .complaint_queries import *
 from .lesson_catalog_queries import *
 from .meta_queries import *
+from .parent_account_queries import *
 from .parent_queries import *
 from .payment_queries import *
 from .resource_queries import *

@@ -1,1 +1,0 @@
-import{j as r}from"./react-vendor-BBSa9SYs.js";import o from"./PaymentsPanel-fVY9-4mW.js";import"./ChartCard-DHvgpL0y.js";import"./routes-VIUv1-HD.js";import"./shared-DGwaGp-v.js";import"./icons-Cpn9Lmq8.js";function a({state:t}){return r.jsx(o,{state:t})}export{a as default};

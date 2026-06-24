@@ -276,7 +276,6 @@ export default function ParentsPanel({ state }: { state: any }) {
   const [profileForm, setProfileForm] = useState({
     display_name: "",
     phone: "",
-    email: "",
     telegram_username: "",
     notes: "",
   });
@@ -304,7 +303,6 @@ export default function ParentsPanel({ state }: { state: any }) {
     setProfileForm({
       display_name: asString(selectedParent?.display_name),
       phone: asString(selectedParent?.phone),
-      email: asString(selectedParent?.email),
       telegram_username: asString(selectedParent?.telegram_username),
       notes: asString(selectedParent?.notes),
     });
@@ -321,7 +319,6 @@ export default function ParentsPanel({ state }: { state: any }) {
         parent.login,
         parent.display_name,
         parent.phone,
-        parent.email,
         parent.telegram_username,
       ]
         .map((value) => asString(value).toLowerCase())
@@ -513,12 +510,16 @@ export default function ParentsPanel({ state }: { state: any }) {
     }
   }
 
+  const linkedParentCount = parentAccounts.filter((parent) => parentChildren(parent).length > 0).length;
+  const totalLinkedStudents = parentAccounts.reduce((total, parent) => total + parentChildren(parent).length, 0);
+  const openTicketCount = parentAccounts.reduce((total, parent) => total + asNumber(parent.open_ticket_count), 0);
+
   return (
     <>
-      <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.42fr)_minmax(0,1fr)]">
+      <div className="space-y-4">
         <ChartCard
           title="Parents"
-          subtitle={`${parentAccounts.length} account${parentAccounts.length === 1 ? "" : "s"}`}
+          subtitle="Parent accounts, contacts, linked students, and support tickets"
           icon={<UserRound className="h-4 w-4 text-info" />}
           headerActions={
             <button
@@ -527,87 +528,157 @@ export default function ParentsPanel({ state }: { state: any }) {
                 setCreateError("");
                 setShowCreate(true);
               }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-2.5 text-xs font-bold hover:bg-muted"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted"
             >
               <Plus className="h-3.5 w-3.5" />
-              Create
+              Create manual account
             </button>
           }
         >
-          <div className="space-y-3">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
-                value={parentSearch}
-                onChange={(e) => setParentSearch(e.target.value)}
-                placeholder="Search parents"
-                className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
-              />
-            </label>
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Parent accounts</p>
+                <p className="mt-1 text-xl font-bold">{parentAccounts.length}</p>
+              </div>
+              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Linked parents</p>
+                <p className="mt-1 text-xl font-bold">{linkedParentCount}</p>
+              </div>
+              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Open tickets</p>
+                <p className="mt-1 text-xl font-bold">{openTicketCount}</p>
+              </div>
+            </div>
 
-            <div className="space-y-1.5">
-              {visibleParents.length ? (
-                visibleParents.map((parent) => {
-                  const parentId = asNumber(parent.id);
-                  const active = parentId === selectedParentResolvedId;
-                  const count = parentChildren(parent).length;
-                  return (
-                    <button
-                      key={parentId}
-                      type="button"
-                      onClick={() => selectParent(parentId)}
-                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                        active
-                          ? "border-foreground/20 bg-foreground/6"
-                          : "border-transparent hover:border-foreground/10 hover:bg-muted"
-                      }`}
-                    >
-                      {active && (
-                        <span className="absolute left-0 h-5 w-0.5 rounded-full bg-foreground" />
-                      )}
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                          active ? "bg-foreground text-background" : "bg-muted text-foreground"
-                        }`}
-                      >
-                        {initialsFor(parent.login)}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold">
-                          {asString(parent.display_name) || asString(parent.login)}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {asString(parent.display_name) ? `${asString(parent.login)} · ` : ""}
-                          {count} linked {count === 1 ? "student" : "students"}
-                        </span>
-                      </span>
-                      {count > 0 && (
-                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold tabular-nums">
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })
-              ) : (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  {parentSearch ? "No parents match your search." : "No parent accounts yet."}
-                </p>
-              )}
+            <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
+              New flow: open a student profile, create a parent invite link, send it to the parent, and let the parent fill their own RU/UZ contact form. Manual accounts below are only a backup.
+            </div>
+
+            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="search"
+                  value={parentSearch}
+                  onChange={(e) => setParentSearch(e.target.value)}
+                  placeholder="Search by parent, phone, Telegram, or login"
+                  className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
+                />
+              </label>
+              <div className="flex items-center rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold text-muted-foreground">
+                {visibleParents.length} shown · {totalLinkedStudents} student links
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-foreground/10">
+              <div className="max-h-[52dvh] overflow-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="sticky top-0 z-10 bg-muted/70 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                    <tr>
+                      <th className="px-3 py-2">Parent</th>
+                      <th className="px-3 py-2">Contact</th>
+                      <th className="px-3 py-2">Linked students</th>
+                      <th className="px-3 py-2">Tickets</th>
+                      <th className="px-3 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-foreground/5 bg-background">
+                    {visibleParents.length ? (
+                      visibleParents.map((parent) => {
+                        const parentId = asNumber(parent.id);
+                        const active = parentId === selectedParentResolvedId;
+                        const parentKids = parentChildren(parent);
+                        const phone = asString(parent.phone);
+                        const telegram = asString(parent.telegram_username);
+                        return (
+                          <tr
+                            key={parentId}
+                            className={`transition-colors ${active ? "bg-foreground/5" : "hover:bg-muted/50"}`}
+                          >
+                            <td className="px-3 py-3">
+                              <button
+                                type="button"
+                                onClick={() => selectParent(parentId)}
+                                className="flex min-w-0 items-center gap-3 text-left"
+                              >
+                                <span
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                                    active ? "bg-foreground text-background" : "bg-muted text-foreground"
+                                  }`}
+                                >
+                                  {initialsFor(asString(parent.display_name) || asString(parent.login))}
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate font-bold">
+                                    {asString(parent.display_name) || asString(parent.login)}
+                                  </span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    Login {asString(parent.login)}
+                                  </span>
+                                </span>
+                              </button>
+                            </td>
+                            <td className="px-3 py-3 text-xs text-muted-foreground">
+                              <span className="block font-semibold text-foreground">{phone || "No phone"}</span>
+                              <span className="block">{telegram || "No Telegram"}</span>
+                            </td>
+                            <td className="px-3 py-3">
+                              <div className="flex max-w-md flex-wrap gap-1.5">
+                                {parentKids.length ? (
+                                  parentKids.map((child) => (
+                                    <span
+                                      key={getStudentRowId(child) || getStudentCode(child)}
+                                      className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold"
+                                    >
+                                      {asString(child.full_name) || getStudentCode(child)}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No linked students</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className="text-sm font-bold">{asNumber(parent.open_ticket_count)}</span>
+                              <span className="text-xs text-muted-foreground"> open</span>
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => selectParent(parentId)}
+                                className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted"
+                              >
+                                Open
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                          {parentSearch ? "No parents match your search." : "No parent accounts yet."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </ChartCard>
+
         <ChartCard
           title={
             selectedParent
               ? asString(selectedParent.display_name) || asString(selectedParent.login)
-              : "Parent Profile"
+              : "Parent Details"
           }
           subtitle={
             selectedParent
               ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
-              : "Select or create a parent"
+              : "Select a parent from the table"
           }
           icon={<Users className="h-4 w-4 text-info" />}
         >
@@ -625,9 +696,7 @@ export default function ParentsPanel({ state }: { state: any }) {
                   className="rounded-lg border border-foreground/10 bg-background p-3"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                      Profile
-                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Contact profile</p>
                     <span className="truncate text-[11px] text-muted-foreground">
                       Login {asString(selectedParent.login)}
                     </span>
@@ -636,19 +705,13 @@ export default function ParentsPanel({ state }: { state: any }) {
                     <input
                       value={profileForm.display_name}
                       onChange={(e) => setProfileForm((f) => ({ ...f, display_name: e.target.value }))}
-                      placeholder="Display name"
+                      placeholder="Parent full name"
                       className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                     />
                     <input
                       value={profileForm.phone}
                       onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="Phone"
-                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
-                    />
-                    <input
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="Email"
+                      placeholder="Phone number"
                       className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                     />
                     <input
@@ -674,34 +737,34 @@ export default function ParentsPanel({ state }: { state: any }) {
                       disabled={profileSaving}
                       className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground transition-opacity disabled:opacity-40"
                     >
-                      {profileSaving ? "Saving…" : "Save profile"}
+                      {profileSaving ? "Saving…" : "Save contact"}
                     </button>
                     {profileSaved ? (
                       <span className="text-[11px] font-semibold text-emerald-600">Saved</span>
                     ) : null}
                   </div>
                 </form>
-                <form
-                  onSubmit={addChild}
-                  className="flex items-center gap-2"
-                >
-                  <div className="flex-1">
-                    <StudentCombobox
-                      students={availableStudents}
-                      value={selectedStudentId}
-                      onChange={setSelectedStudentId}
-                      disabled={saving}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={saving || !selectedStudentId}
-                    className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-40"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Link
-                  </button>
-                </form>
+                <details className="rounded-lg border border-foreground/10 bg-background p-3">
+                  <summary className="cursor-pointer text-sm font-bold">Manual student link backup</summary>
+                  <form onSubmit={addChild} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex-1">
+                      <StudentCombobox
+                        students={availableStudents}
+                        value={selectedStudentId}
+                        onChange={setSelectedStudentId}
+                        disabled={saving}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={saving || !selectedStudentId}
+                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-40"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Link
+                    </button>
+                  </form>
+                </details>
                 {children.length ? (
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {children.map((child) => {

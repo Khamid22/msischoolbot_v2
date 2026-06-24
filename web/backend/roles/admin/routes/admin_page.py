@@ -20,6 +20,7 @@ from web.backend.utils.session import (
     current_auth_role,
 )
 from web.backend.roles.admin.services.academic_service import list_admin_academic_context
+from web.backend.roles.admin.services.parent_service import list_linked_parents_for_student
 from web.backend.domains.announcements.service import list_announcements
 
 
@@ -149,6 +150,8 @@ def register_admin_page_routes(
                 "csrfToken": generate_csrf(),
                 "saveUrl": url_for("admin.save_admin_student_profile", student_row_id=student_row_id),
                 "changePasswordUrl": url_for("admin.admin_change_student_password_route", student_row_id=student_row_id),
+                "parentInviteApiUrl": f"/admin/api/students/{student_row_id}/parent-invite",
+                "linkedParents": list_linked_parents_for_student(student_row_id),
                 "viewDashboardUrl": url_for("admin.admin_student_dashboard", student_row_id=student_row_id),
                 "backUrl": back_url,
                 "embedMode": request.args.get("embed", "").strip(),

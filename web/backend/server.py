@@ -17,10 +17,11 @@ from slowapi.errors import RateLimitExceeded
 from web.backend.utils.limiter import limiter
 
 from web.backend.utils.context import RequestContextMiddleware, session, request
-from web.backend.utils.demo_auth import maybe_apply_demo_auth
+from web.backend.utils.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from web.backend.utils.normalization import normalize_text as _normalize, normalize_school_code as _normalize_school_code
 from config import get_web_settings
 from web.backend.roles.admin.routes import register_admin_page_routes
+from web.backend.roles.parent.routes import register_parent_invite_routes
 from web.backend.roles.student.routes import register_student_page_routes
 from web.backend.roles.teacher.routes import register_teacher_page_routes
 
@@ -133,6 +134,10 @@ class AuthAndSecurityMiddleware:
             path in PUBLIC_PATHS
             or path.startswith("/static/")
             or path.startswith("/teacher/")
+            # Parent invite links are reached by a logged-out parent. Auth is the
+            # signed, server-verified token in the URL itself (same trust model as
+            # /auth/telegram), so the path must bypass the session-cookie gate.
+            or path.startswith("/parent/link/")
         )
 
         if not is_public:
@@ -993,6 +998,24 @@ def _bootstrap_app(app_instance):
     if _APP_BOOTSTRAPPED:
         return app_instance
 
+    # Loudly flag demo auth at startup. When DEMO_AUTH_ENABLED is on, anyone who
+    # reaches the app is auto-logged-in (owner-level for /admin) with no
+    # credentials. That is intentional for team testing, but must never be left
+    # on for real users — this banner makes it impossible to forget.
+    import logging as _logging
+
+    if is_demo_auth_enabled():
+        _is_prod = os.environ.get("APP_ENV", "").strip().lower() in {
+            "prod",
+            "production",
+        }
+        _logging.getLogger("uvicorn.error").warning(
+            "DEMO_AUTH_ENABLED is ON — all visitors are auto-authenticated WITHOUT "
+            "a password%s. Set DEMO_AUTH_ENABLED=0 before exposing this to real "
+            "users.",
+            " (APP_ENV=production!)" if _is_prod else "",
+        )
+
     # Set static files dependencies in render.py
     import web.backend.render as render
     render.ASSET_VERSION = _ASSET_VERSION
@@ -1030,6 +1053,7 @@ def _bootstrap_app(app_instance):
         build_subject_leaderboard=_build_subject_leaderboard,
     )
     register_teacher_page_routes(app_instance)
+    register_parent_invite_routes(app_instance)
 
     _APP_BOOTSTRAPPED = True
     return app_instance

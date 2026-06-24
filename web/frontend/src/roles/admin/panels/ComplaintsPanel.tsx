@@ -112,7 +112,7 @@ function TicketDetail({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Header + parent / student identity */}
       <div className="border-b border-foreground/8 pb-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -133,9 +133,6 @@ function TicketDetail({
           {asString(complaint.parent_phone) ? (
             <span className="text-muted-foreground">{asString(complaint.parent_phone)}</span>
           ) : null}
-          {asString(complaint.parent_email) ? (
-            <span className="text-muted-foreground">{asString(complaint.parent_email)}</span>
-          ) : null}
           <span className="text-muted-foreground">·</span>
           {asString(complaint.student_name) ? (
             studentHref ? (
@@ -155,14 +152,14 @@ function TicketDetail({
       </div>
 
       {/* Conversation thread */}
-      <div className="min-h-[8rem] flex-1 space-y-3 overflow-y-auto py-3">
+      <div className="min-h-[14rem] flex-1 space-y-3 overflow-y-auto py-3 lg:min-h-0">
         {messages.length ? (
           messages.map((message, index) => {
             const isParent = asString(message.author_role).toLowerCase() === "parent";
             return (
               <div key={`${message.id || 0}-${index}`} className={`flex ${isParent ? "justify-start" : "justify-end"}`}>
                 <div
-                  className={`max-w-[85%] rounded-lg border px-3 py-2 ${
+                  className={`max-w-[92%] rounded-lg border px-3 py-2 sm:max-w-[85%] ${
                     isParent
                       ? "border-foreground/10 bg-background"
                       : "border-sky-100 bg-sky-50"
@@ -184,7 +181,7 @@ function TicketDetail({
       </div>
 
       {/* Reply + actions */}
-      <div className="border-t border-foreground/8 pt-3">
+      <div className="shrink-0 border-t border-foreground/8 pt-3">
         <textarea
           value={reply}
           onChange={(event) => setReply(event.target.value)}
@@ -345,7 +342,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-[calc(100dvh-var(--app-top-inset)-6rem)] flex-col gap-3 lg:min-h-[calc(100dvh-2rem)]">
       {error ? (
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
           {error}
@@ -353,7 +350,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
       ) : null}
 
       {/* Top bar: search + status filter */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -368,7 +365,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
           aria-label="Filter tickets by status"
-          className="h-9 rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-semibold outline-none focus:border-foreground/30"
+          className="h-9 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-semibold outline-none focus:border-foreground/30"
         >
           {filterOptions.map((option) => (
             <option key={option.key} value={option.key}>
@@ -379,8 +376,8 @@ export default function ComplaintsPanel({ state }: { state: any }) {
       </div>
 
       {/* Queue (left) + conversation (right) */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <div className="max-h-[72dvh] space-y-2 overflow-y-auto pr-1">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.2fr)]">
+        <div className="min-h-[14rem] max-h-[38dvh] space-y-2 overflow-y-auto pr-1 lg:max-h-none lg:min-h-0">
           {filteredComplaints.length ? (
             filteredComplaints.map((complaint) => (
               <TicketListItem
@@ -395,7 +392,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
           )}
         </div>
 
-        <div className="rounded-lg border border-foreground/10 bg-background p-4">
+        <div className="min-h-[24rem] min-w-0 rounded-lg border border-foreground/10 bg-background p-4 lg:min-h-0">
           {selectedComplaint ? (
             <TicketDetail
               complaint={selectedComplaint}

@@ -949,8 +949,8 @@ function GroupGradebook({
               <p className="text-sm font-bold">Gradebook</p>
               <p className="text-xs text-muted-foreground">Attendance and homework by lesson</p>
             </div>
-            <div className="max-h-[70dvh] overflow-auto">
-              <table className="min-w-full border-collapse text-left text-xs">
+            <div className="max-h-[72dvh] overflow-auto">
+              <table className="min-w-[60rem] border-collapse text-left text-[11px] sm:min-w-full sm:text-xs">
                 <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr className="bg-surface">
                     <th rowSpan={2} className="sticky left-0 z-40 min-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
@@ -1008,7 +1008,7 @@ function GroupGradebook({
                                 type="button"
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                                className={`h-[26px] w-[28px] rounded text-[10px] font-bold transition-opacity hover:opacity-75 ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`h-8 w-8 rounded text-[11px] font-bold transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[28px] sm:text-[10px] ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
                               >
                                 {att ? attLabel(att) : "·"}
                               </button>
@@ -1018,7 +1018,7 @@ function GroupGradebook({
                                 type="button"
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`h-[26px] w-[36px] rounded text-[10px] transition-opacity hover:opacity-75 ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[36px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
                               >
                                 {hw !== undefined ? hw : "·"}
                               </button>
@@ -1041,17 +1041,19 @@ function GroupGradebook({
             <h4 className="text-sm font-bold">Student AAP Performance</h4>
             <p className="text-xs text-muted-foreground">Scores are on the 1–9 scale</p>
           </div>
-          <div className="h-[260px] sm:h-[300px] lg:h-[360px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={aapData} margin={{ top: 10, right: 10, left: -25, bottom: 24 }}>
+          <div className="overflow-x-auto pb-2">
+            <div className="h-[320px] min-w-[34rem] sm:h-[340px] lg:h-[400px] lg:min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={aapData} margin={{ top: 16, right: 12, left: -16, bottom: 56 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                 <XAxis
                   dataKey="name"
-                  angle={-30}
+                  angle={-35}
                   textAnchor="end"
                   interval={0}
-                  height={56}
-                  tick={{ fontSize: 9 }}
+                  height={82}
+                  tick={{ fontSize: 11 }}
+                  tickMargin={12}
                   tickFormatter={shortTick}
                   stroke="hsl(var(--muted-foreground))"
                 />
@@ -1065,8 +1067,9 @@ function GroupGradebook({
                     <Cell key={`cell-${index}`} fill={entry.isLow ? "#ef4444" : "#3b82f6"} />
                   ))}
                 </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
@@ -1156,17 +1159,19 @@ function GroupGradebook({
                   <h4 className="text-sm font-bold">Student Exam Performance</h4>
                   <p className="text-xs text-muted-foreground">Best exam score on the 1–9 scale</p>
                 </div>
-                <div className="h-[260px] sm:h-[300px] lg:h-[360px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={studentExamData} margin={{ top: 10, right: 10, left: -25, bottom: 24 }}>
+                <div className="overflow-x-auto pb-2">
+                  <div className="h-[320px] min-w-[34rem] sm:h-[340px] lg:h-[400px] lg:min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={studentExamData} margin={{ top: 16, right: 12, left: -16, bottom: 56 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                       <XAxis
                         dataKey="name"
-                        angle={-30}
+                        angle={-35}
                         textAnchor="end"
                         interval={0}
-                        height={56}
-                        tick={{ fontSize: 9 }}
+                        height={82}
+                        tick={{ fontSize: 11 }}
+                        tickMargin={12}
                         tickFormatter={shortTick}
                         stroke="hsl(var(--muted-foreground))"
                       />
@@ -1176,8 +1181,9 @@ function GroupGradebook({
                         labelStyle={{ fontSize: 10, fontWeight: "bold" }}
                       />
                       <Bar dataKey="bestScore" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Best Score / 9" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
 
