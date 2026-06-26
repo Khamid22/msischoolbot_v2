@@ -33,19 +33,62 @@ def _load_invite_payload(token):
         return None
 
 
-def _page(title, body_html, status_code=200):
+def _page(title, body_html, status_code=200, lang="uz"):
+    active_lang = "ru" if str(lang or "").lower() == "ru" else "uz"
     return HTMLResponse(
         f"""<!doctype html>
-<html lang="ru">
+<html lang="{active_lang}" data-lang="{active_lang}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{html.escape(title)}</title>
+    <style>
+      .lang-toggle {{
+        display:inline-flex; gap:4px; padding:4px; border:1px solid #dbe1ea;
+        border-radius:999px; background:#f8fafc;
+      }}
+      .lang-button {{
+        border:0; border-radius:999px; background:transparent; padding:7px 12px;
+        font-size:13px; font-weight:800; color:#64748b; cursor:pointer;
+      }}
+      html[data-lang="uz"] .lang-button[data-lang-button="uz"],
+      html[data-lang="ru"] .lang-button[data-lang-button="ru"] {{
+        background:#2563eb; color:white; box-shadow:0 6px 16px rgba(37,99,235,.22);
+      }}
+      html[data-lang="uz"] [data-lang="ru"],
+      html[data-lang="ru"] [data-lang="uz"] {{ display:none !important; }}
+    </style>
   </head>
   <body style="font-family:system-ui,-apple-system,sans-serif;background:#f5f7fb;margin:0;padding:24px;color:#111827">
     <main style="max-width:560px;margin:8vh auto;background:white;border:1px solid #e5e7eb;border-radius:18px;padding:24px;box-shadow:0 12px 35px rgba(15,23,42,.08)">
       {body_html}
     </main>
+    <script>
+      (function() {{
+        var root = document.documentElement;
+        var initial = {active_lang!r};
+        var stored = "";
+        try {{ stored = window.localStorage.getItem("msi_parent_link_lang") || ""; }} catch (err) {{}}
+        var current = stored === "ru" || stored === "uz" ? stored : initial;
+        function apply(lang) {{
+          current = lang === "ru" ? "ru" : "uz";
+          root.setAttribute("data-lang", current);
+          root.setAttribute("lang", current);
+          try {{ window.localStorage.setItem("msi_parent_link_lang", current); }} catch (err) {{}}
+          document.querySelectorAll("input[name='lang']").forEach(function(input) {{ input.value = current; }});
+          document.querySelectorAll("[data-lang-button]").forEach(function(button) {{
+            button.setAttribute("aria-pressed", button.getAttribute("data-lang-button") === current ? "true" : "false");
+          }});
+          document.querySelectorAll("[data-placeholder-uz]").forEach(function(input) {{
+            input.setAttribute("placeholder", input.getAttribute("data-placeholder-" + current) || "");
+          }});
+        }}
+        document.querySelectorAll("[data-lang-button]").forEach(function(button) {{
+          button.addEventListener("click", function() {{ apply(button.getAttribute("data-lang-button")); }});
+        }});
+        apply(current);
+      }})();
+    </script>
   </body>
 </html>""",
         status_code=status_code,
@@ -54,15 +97,31 @@ def _page(title, body_html, status_code=200):
 
 def _invalid_link_page():
     return _page(
-        "Ссылка недействительна",
+        "Havola yaroqsiz",
         """
-        <h1 style="font-size:24px;margin:0 0 12px">Havola yaroqsiz / Ссылка недействительна</h1>
+        <h1 style="font-size:24px;margin:0 0 12px">
+          <span data-lang="uz">Havola yaroqsiz</span>
+          <span data-lang="ru">Ссылка недействительна</span>
+        </h1>
         <p style="font-size:16px;line-height:1.5;color:#4b5563">
-          Iltimos, administratordan yangi havola so'rang. / Пожалуйста, попросите администратора отправить новую ссылку.
+          <span data-lang="uz">Iltimos, administratordan yangi havola so'rang.</span>
+          <span data-lang="ru">Пожалуйста, попросите администратора отправить новую ссылку.</span>
         </p>
         """,
         status_code=400,
     )
+
+
+def _language_toggle(lang):
+    return f"""
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px">
+      <p style="margin:0;font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#2563eb">MSI School</p>
+      <div class="lang-toggle" aria-label="Language">
+        <button class="lang-button" type="button" data-lang-button="uz" aria-pressed="{'true' if lang == 'uz' else 'false'}">UZ</button>
+        <button class="lang-button" type="button" data-lang-button="ru" aria-pressed="{'true' if lang == 'ru' else 'false'}">RU</button>
+      </div>
+    </div>
+    """
 
 
 def _student_card(student_name, student_code):
@@ -73,70 +132,104 @@ def _student_card(student_name, student_code):
     )
     return f"""
     <section style="border:1px solid #e5e7eb;border-radius:14px;background:#f9fafb;padding:16px;margin-bottom:18px">
-      <p style="margin:0 0 4px;color:#6b7280;font-size:13px">O'quvchi / Ученик</p>
+      <p style="margin:0 0 4px;color:#6b7280;font-size:13px">
+        <span data-lang="uz">O'quvchi</span>
+        <span data-lang="ru">Ученик</span>
+      </p>
       <p style="margin:0;font-size:20px;font-weight:800">{html.escape(student_name)}</p>
       {code_line}
     </section>
     """
 
 
-def _field(label, name, value, *, input_type="text", placeholder=""):
+def _field(label_uz, label_ru, name, value, *, input_type="text", placeholder_uz="", placeholder_ru=""):
     return f"""
     <label style="display:block;margin-bottom:14px">
-      <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#374151">{html.escape(label)}</span>
+      <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#374151">
+        <span data-lang="uz">{html.escape(label_uz)}</span>
+        <span data-lang="ru">{html.escape(label_ru)}</span>
+      </span>
       <input name="{html.escape(name)}" type="{input_type}" value="{html.escape(value)}"
-             placeholder="{html.escape(placeholder)}" autocomplete="off"
+             data-placeholder-uz="{html.escape(placeholder_uz)}"
+             data-placeholder-ru="{html.escape(placeholder_ru)}"
+             placeholder="{html.escape(placeholder_uz)}" autocomplete="off"
              style="width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:10px;padding:11px 12px;font-size:16px;outline:none">
     </label>
     """
 
 
-def _invite_form_page(token, student_name, student_code, *, error="", values=None):
+def _error_message(error_key):
+    messages = {
+        "full_name": ("Iltimos, to'liq ismni kiriting.", "Укажите полное имя."),
+        "phone": ("Iltimos, telefon raqamini kiriting.", "Укажите номер телефона."),
+        "technical": ("Texnik xatolik. Birozdan so'ng qayta urinib ko'ring.", "Техническая ошибка. Попробуйте ещё раз."),
+    }
+    return messages.get(error_key or "", ("", ""))
+
+
+def _invite_form_page(token, student_name, student_code, *, error_key="", values=None):
     values = values or {}
+    lang = "ru" if str(values.get("lang") or "").lower() == "ru" else "uz"
+    error_uz, error_ru = _error_message(error_key)
     error_html = (
         f'<p style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fef2f2;'
-        f'border:1px solid #fecaca;color:#b91c1c;font-size:14px">{html.escape(error)}</p>'
-        if error
+        f'border:1px solid #fecaca;color:#b91c1c;font-size:14px">'
+        f'<span data-lang="uz">{html.escape(error_uz)}</span>'
+        f'<span data-lang="ru">{html.escape(error_ru)}</span>'
+        f'</p>'
+        if error_key
         else ""
     )
     body = f"""
-    <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#2563eb">MSI School</p>
-    <h1 style="font-size:26px;margin:0 0 12px">Ota-ona ulanishi / Подключение родителя</h1>
+    {_language_toggle(lang)}
+    <h1 style="font-size:26px;margin:0 0 12px">
+      <span data-lang="uz">Ota-ona ulanishi</span>
+      <span data-lang="ru">Подключение родителя</span>
+    </h1>
     <p style="font-size:16px;line-height:1.5;color:#4b5563;margin:0 0 16px">
-      Farzandingiz kabinetiga ulanish uchun ma'lumotlaringizni kiriting. /
-      Заполните данные, чтобы подключиться к кабинету ученика.
+      <span data-lang="uz">Farzandingiz kabinetiga ulanish uchun ma'lumotlaringizni kiriting.</span>
+      <span data-lang="ru">Заполните данные, чтобы подключиться к кабинету ученика.</span>
     </p>
     {_student_card(student_name, student_code)}
     {error_html}
     <form method="post" action="/parent/link/{html.escape(token)}">
-      {_field("To'liq ism / Полное имя", "full_name", values.get("full_name", ""), placeholder="Familiya Ism")}
-      {_field("Telefon raqami / Номер телефона", "phone", values.get("phone", ""), input_type="tel", placeholder="+998 90 123 45 67")}
-      {_field("Telegram username", "telegram_username", values.get("telegram_username", ""), placeholder="@username")}
+      <input type="hidden" name="lang" value="{html.escape(lang)}">
+      {_field("To'liq ism", "Полное имя", "full_name", values.get("full_name", ""), placeholder_uz="Familiya Ism", placeholder_ru="Фамилия Имя")}
+      {_field("Telefon raqami", "Номер телефона", "phone", values.get("phone", ""), input_type="tel", placeholder_uz="+998 90 123 45 67", placeholder_ru="+998 90 123 45 67")}
+      {_field("Telegram username", "Telegram username", "telegram_username", values.get("telegram_username", ""), placeholder_uz="@username", placeholder_ru="@username")}
       <button type="submit"
               style="width:100%;border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:700;color:white;background:#2563eb;cursor:pointer">
-        Ulanish / Подключиться
+        <span data-lang="uz">Ulanish</span>
+        <span data-lang="ru">Подключиться</span>
       </button>
     </form>
     """
-    return _page("Подключение родителя", body)
+    return _page("Ota-ona ulanishi", body, lang=lang)
 
 
-def _confirmation_page(student_name, student_code, parent):
+def _confirmation_page(student_name, student_code, parent, *, lang="uz"):
     parent_name = html.escape(str((parent or {}).get("full_name") or "").strip())
+    greeting_uz = f"<b>{parent_name}</b>, " if parent_name else ""
+    greeting_ru = f"<b>{parent_name}</b>, " if parent_name else ""
     return _page(
-        "Вы подключены",
+        "Ulandingiz",
         f"""
-        <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#16a34a">MSI School</p>
-        <h1 style="font-size:26px;margin:0 0 12px">Ulandingiz / Вы подключены ✓</h1>
+        {_language_toggle('ru' if str(lang or '').lower() == 'ru' else 'uz')}
+        <h1 style="font-size:26px;margin:0 0 12px">
+          <span data-lang="uz">Ulandingiz ✓</span>
+          <span data-lang="ru">Вы подключены ✓</span>
+        </h1>
         <p style="font-size:16px;line-height:1.5;color:#4b5563;margin:0 0 16px">
-          {('<b>' + parent_name + '</b>, ') if parent_name else ''}siz quyidagi o'quvchiga muvaffaqiyatli ulandingiz. /
-          вы успешно подключены к ученику.
+          <span data-lang="uz">{greeting_uz}siz quyidagi o'quvchiga muvaffaqiyatli ulandingiz.</span>
+          <span data-lang="ru">{greeting_ru}вы успешно подключены к ученику.</span>
         </p>
         {_student_card(student_name, student_code)}
         <p style="font-size:14px;line-height:1.5;color:#6b7280;margin:0">
-          Administrator tez orada siz bilan bog'lanadi. / Администратор скоро свяжется с вами.
+          <span data-lang="uz">Administrator tez orada siz bilan bog'lanadi.</span>
+          <span data-lang="ru">Администратор скоро свяжется с вами.</span>
         </p>
         """,
+        lang=lang,
     )
 
 
@@ -168,17 +261,18 @@ def register_parent_invite_routes(app):
             "full_name": str(form.get("full_name") or "").strip(),
             "phone": str(form.get("phone") or "").strip(),
             "telegram_username": str(form.get("telegram_username") or "").strip(),
+            "lang": str(form.get("lang") or "uz").strip().lower(),
         }
 
         if not values["full_name"]:
             return _invite_form_page(
                 token, student_name, student_code,
-                error="Iltimos, to'liq ismni kiriting. / Укажите полное имя.", values=values,
+                error_key="full_name", values=values,
             )
         if not values["phone"]:
             return _invite_form_page(
                 token, student_name, student_code,
-                error="Iltimos, telefon raqamini kiriting. / Укажите номер телефона.", values=values,
+                error_key="phone", values=values,
             )
         if not student_row_id:
             return _invalid_link_page()
@@ -193,11 +287,11 @@ def register_parent_invite_routes(app):
         except Exception:
             return _invite_form_page(
                 token, student_name, student_code,
-                error="Texnik xatolik. Birozdan so'ng qayta urinib ko'ring. / Техническая ошибка. Попробуйте ещё раз.",
+                error_key="technical",
                 values=values,
             )
 
-        return _confirmation_page(student_name, student_code, parent)
+        return _confirmation_page(student_name, student_code, parent, lang=values["lang"])
 
 
 def build_render_parent_page():
