@@ -10,6 +10,7 @@ from shared.identity.account_service import (
     get_student_by_telegram_user_id,
     get_teacher_by_id,
     link_student_telegram_user,
+    record_student_activity,
     verify_admin_credentials,
     verify_student_credentials,
     verify_teacher_credentials,
@@ -213,6 +214,10 @@ def register_user_auth_routes(
         if not set_student_session(student, telegram_user_id):
             return jsonify({"ok": False, "error": "session_init_failed"}), 500
 
+        # Record the login immediately so "last seen" reflects this session even
+        # if a later heartbeat ping is missed.
+        record_student_activity(int(student["id"]))
+
         enrollment_id = student.get("enrollment_id")
         redirect_url = (
             build_dashboard_url(enrollment_id, school=student.get("school_code", ""))
@@ -283,6 +288,9 @@ def register_user_auth_routes(
                     auth_error="Unable to initialize student session.",
                     auth_login_input=login_value,
                 ), 500
+            # Record the login immediately so "last seen" reflects this session
+            # even if a later heartbeat ping is missed.
+            record_student_activity(int(student["id"]))
             enrollment_id = student.get("enrollment_id")
             if enrollment_id:
                 return redirect(build_dashboard_url(enrollment_id, school=student.get("school_code", "")))

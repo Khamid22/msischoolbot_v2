@@ -14,6 +14,7 @@ from web.backend.domains.resources.service import list_resources
 from web.backend.render import render_react_page
 from web.backend.roles.admin.services.parent_service import list_parent_children
 from web.backend.roles.parent.services import link_parent_via_invite
+from web.backend.utils.telegram_auth import telegram_user_from_init_data
 
 _INVITE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 
@@ -33,8 +34,13 @@ def _load_invite_payload(token):
         return None
 
 
-def _page(title, body_html, status_code=200, lang="uz"):
+def _page(title, body_html, status_code=200, lang="uz", telegram_webapp=False):
     active_lang = "ru" if str(lang or "").lower() == "ru" else "uz"
+    telegram_script = (
+        '<script src="https://telegram.org/js/telegram-web-app.js"></script>'
+        if telegram_webapp
+        else ""
+    )
     return HTMLResponse(
         f"""<!doctype html>
 <html lang="{active_lang}" data-lang="{active_lang}">
@@ -42,6 +48,7 @@ def _page(title, body_html, status_code=200, lang="uz"):
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{html.escape(title)}</title>
+    {telegram_script}
     <style>
       .lang-toggle {{
         display:inline-flex; gap:4px; padding:4px; border:1px solid #dbe1ea;
@@ -162,9 +169,116 @@ def _error_message(error_key):
     messages = {
         "full_name": ("Iltimos, to'liq ismni kiriting.", "Укажите полное имя."),
         "phone": ("Iltimos, telefon raqamini kiriting.", "Укажите номер телефона."),
+        "telegram": (
+            "Telegram orqali tasdiqlash amalga oshmadi. Havolani Telegram ichidan qayta oching.",
+            "Не удалось подтвердить Telegram. Откройте ссылку внутри Telegram ещё раз.",
+        ),
         "technical": ("Texnik xatolik. Birozdan so'ng qayta urinib ko'ring.", "Техническая ошибка. Попробуйте ещё раз."),
     }
     return messages.get(error_key or "", ("", ""))
+
+
+def _telegram_connect_page(token, student_name, student_code, *, error_key="", lang="uz"):
+    active_lang = "ru" if str(lang or "").lower() == "ru" else "uz"
+    error_uz, error_ru = _error_message(error_key)
+    error_html = (
+        f'<p style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fef2f2;'
+        f'border:1px solid #fecaca;color:#b91c1c;font-size:14px">'
+        f'<span data-lang="uz">{html.escape(error_uz)}</span>'
+        f'<span data-lang="ru">{html.escape(error_ru)}</span>'
+        f'</p>'
+        if error_key
+        else ""
+    )
+    body = f"""
+    {_language_toggle(active_lang)}
+    <h1 style="font-size:26px;margin:0 0 12px">
+      <span data-lang="uz">Telegram orqali ulanish</span>
+      <span data-lang="ru">Подключение через Telegram</span>
+    </h1>
+    <p style="font-size:16px;line-height:1.5;color:#4b5563;margin:0 0 16px">
+      <span data-lang="uz">Shaxsingiz Telegram orqali avtomatik tasdiqlanadi. Ma'lumot kiritish shart emas.</span>
+      <span data-lang="ru">Ваш профиль Telegram будет подтверждён автоматически. Заполнять форму не нужно.</span>
+    </p>
+    {_student_card(student_name, student_code)}
+    {error_html}
+    <div id="tg-status" style="border:1px solid #dbeafe;border-radius:14px;background:#eff6ff;padding:14px 16px;color:#1e40af;font-size:15px;line-height:1.45">
+      <strong>
+        <span data-lang="uz">Ulanmoqda...</span>
+        <span data-lang="ru">Подключаем...</span>
+      </strong>
+      <div style="margin-top:4px;color:#475569">
+        <span data-lang="uz">Telegram oynasini yopmang.</span>
+        <span data-lang="ru">Не закрывайте окно Telegram.</span>
+      </div>
+    </div>
+    <div id="tg-fallback" style="display:none;margin-top:14px;border:1px solid #fed7aa;border-radius:14px;background:#fff7ed;padding:14px 16px;color:#9a3412;font-size:15px;line-height:1.45">
+      <strong>
+        <span data-lang="uz">Telegram Mini App kerak</span>
+        <span data-lang="ru">Нужен Telegram Mini App</span>
+      </strong>
+      <div style="margin-top:4px">
+        <span data-lang="uz">Bu havolani Telegram bot ichidagi tugma orqali oching. Oddiy brauzer ota-onani avtomatik aniqlay olmaydi.</span>
+        <span data-lang="ru">Откройте ссылку через кнопку внутри Telegram-бота. Обычный браузер не может автоматически определить родителя.</span>
+      </div>
+    </div>
+    <form id="tg-claim-form" method="post" action="/parent/link/{html.escape(token)}" style="display:none">
+      <input type="hidden" name="lang" value="{html.escape(active_lang)}">
+      <input id="tg-init-data" type="hidden" name="init_data" value="">
+    </form>
+    <script>
+      (function() {{
+        var attempts = 0;
+        var maxAttempts = 20;
+        var form = document.getElementById("tg-claim-form");
+        var input = document.getElementById("tg-init-data");
+        var fallback = document.getElementById("tg-fallback");
+        var status = document.getElementById("tg-status");
+
+        function showFallback() {{
+          if (fallback) fallback.style.display = "block";
+          if (status) {{
+            status.style.borderColor = "#fed7aa";
+            status.style.background = "#fff7ed";
+            status.style.color = "#9a3412";
+            status.innerHTML =
+              '<strong><span data-lang="uz">Avtomatik ulanish topilmadi</span><span data-lang="ru">Автоподключение недоступно</span></strong>';
+          }}
+        }}
+
+        function trySubmit() {{
+          attempts += 1;
+          var tg = window.Telegram && window.Telegram.WebApp;
+          if (tg && tg.initData) {{
+            try {{
+              tg.ready();
+              tg.expand();
+            }} catch (err) {{}}
+            input.value = tg.initData;
+            form.submit();
+            return;
+          }}
+          if (attempts >= maxAttempts) {{
+            showFallback();
+            return;
+          }}
+          window.setTimeout(trySubmit, 100);
+        }}
+
+        if (document.readyState === "loading") {{
+          document.addEventListener("DOMContentLoaded", trySubmit);
+        }} else {{
+          trySubmit();
+        }}
+      }})();
+    </script>
+    """
+    return _page(
+        "Telegram orqali ulanish",
+        body,
+        lang=active_lang,
+        telegram_webapp=True,
+    )
 
 
 def _invite_form_page(token, student_name, student_code, *, error_key="", values=None):
@@ -233,6 +347,26 @@ def _confirmation_page(student_name, student_code, parent, *, lang="uz"):
     )
 
 
+def _telegram_parent_from_init_data(init_data):
+    user = telegram_user_from_init_data(init_data)
+    if not user:
+        return None
+
+    first_name = str(user.get("first_name") or "").strip()
+    last_name = str(user.get("last_name") or "").strip()
+    username = str(user.get("username") or "").strip().lstrip("@")
+    full_name = " ".join(part for part in (first_name, last_name) if part).strip()
+    if not full_name:
+        full_name = f"Telegram parent {int(user['id'])}"
+
+    return {
+        "telegram_user_id": int(user["id"]),
+        "full_name": full_name,
+        "phone": "",
+        "telegram_username": username,
+    }
+
+
 def register_parent_invite_routes(app):
     @app.get("/parent/link/{token}")
     def parent_invite_link(token: str):
@@ -241,7 +375,10 @@ def register_parent_invite_routes(app):
             return _invalid_link_page()
         student_name = str(payload.get("student_name") or "Student").strip()
         student_code = str(payload.get("student_code") or "").strip()
-        return _invite_form_page(token, student_name, student_code)
+        lang = str(ctx_request.args.get("lang") or "uz").strip().lower()
+        if str(ctx_request.args.get("manual") or "").strip() == "1":
+            return _invite_form_page(token, student_name, student_code, values={"lang": lang})
+        return _telegram_connect_page(token, student_name, student_code, lang=lang)
 
     @app.post("/parent/link/{token}")
     def parent_invite_submit(token: str):
@@ -257,11 +394,44 @@ def register_parent_invite_routes(app):
         # read it via the Flask-style proxy (re-reading the ASGI body here would
         # hang, since the stream is already consumed).
         form = ctx_request.form
+        lang = str(form.get("lang") or "uz").strip().lower()
+        init_data = str(form.get("init_data") or "").strip()
+        if init_data:
+            telegram_parent = _telegram_parent_from_init_data(init_data)
+            if not telegram_parent:
+                return _telegram_connect_page(
+                    token,
+                    student_name,
+                    student_code,
+                    error_key="telegram",
+                    lang=lang,
+                )
+            if not student_row_id:
+                return _invalid_link_page()
+            try:
+                parent = link_parent_via_invite(
+                    student_row_id,
+                    full_name=telegram_parent["full_name"],
+                    phone=telegram_parent["phone"],
+                    telegram_username=telegram_parent["telegram_username"],
+                    telegram_user_id=telegram_parent["telegram_user_id"],
+                )
+            except Exception:
+                return _telegram_connect_page(
+                    token,
+                    student_name,
+                    student_code,
+                    error_key="technical",
+                    lang=lang,
+                )
+
+            return _confirmation_page(student_name, student_code, parent, lang=lang)
+
         values = {
             "full_name": str(form.get("full_name") or "").strip(),
             "phone": str(form.get("phone") or "").strip(),
             "telegram_username": str(form.get("telegram_username") or "").strip(),
-            "lang": str(form.get("lang") or "uz").strip().lower(),
+            "lang": lang,
         }
 
         if not values["full_name"]:
@@ -283,6 +453,7 @@ def register_parent_invite_routes(app):
                 full_name=values["full_name"],
                 phone=values["phone"],
                 telegram_username=values["telegram_username"],
+                telegram_user_id=None,
             )
         except Exception:
             return _invite_form_page(

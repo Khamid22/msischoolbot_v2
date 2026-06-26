@@ -108,7 +108,31 @@ def telegram_user_id_from_init_data(init_data, bot_token=None, max_age_seconds=N
     return user_id if user_id > 0 else None
 
 
+def telegram_user_from_init_data(init_data, bot_token=None, max_age_seconds=None):
+    """Return the verified Telegram WebApp user object, or ``None``."""
+    fields = verify_telegram_init_data(init_data, bot_token, max_age_seconds)
+    if not fields:
+        return None
+
+    try:
+        user = json.loads(fields.get("user", ""))
+    except (TypeError, ValueError):
+        return None
+
+    if not isinstance(user, dict):
+        return None
+    try:
+        user_id = int(user.get("id"))
+    except (TypeError, ValueError):
+        return None
+    if user_id <= 0:
+        return None
+    user["id"] = user_id
+    return user
+
+
 __all__ = [
     "verify_telegram_init_data",
     "telegram_user_id_from_init_data",
+    "telegram_user_from_init_data",
 ]

@@ -16,8 +16,14 @@ from web.backend.domains.payments.service import (  # noqa: F401
 )
 
 
-def link_parent_via_invite(student_row_id, full_name, phone, telegram_username):
-    """Create/update a parent CLIENT record from the invite form and link them
+def link_parent_via_invite(
+    student_row_id,
+    full_name,
+    phone,
+    telegram_username,
+    telegram_user_id=None,
+):
+    """Create/update a parent CLIENT record from an invite and link them
     to the student. Writes to the dedicated `parents` tables — never `admins`."""
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     with queries.connect_auth_db() as conn:
@@ -27,6 +33,7 @@ def link_parent_via_invite(student_row_id, full_name, phone, telegram_username):
             full_name=full_name,
             phone=phone,
             telegram_username=telegram_username,
+            telegram_user_id=telegram_user_id,
             now=now,
         )
     return dict(parent) if parent else None
@@ -42,4 +49,3 @@ __all__ = [
     "payment_summary_for_student",
     "remove_parent_child",
 ]
-

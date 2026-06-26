@@ -13,6 +13,14 @@ def _clean_username(value):
     return str(value or "").strip().lstrip("@").strip()
 
 
+def _clean_positive_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 def _parent_row(conn, parent_id):
     return conn.execute(
         """
@@ -25,13 +33,21 @@ def _parent_row(conn, parent_id):
     ).fetchone()
 
 
-def link_parent_from_invite(conn, *, student_row_id, full_name, phone, telegram_username, now):
-    """Create or update a parent from the invite form, then link to the student.
+def link_parent_from_invite(
+    conn,
+    *,
+    student_row_id,
+    full_name,
+    phone,
+    telegram_username,
+    now,
+    telegram_user_id=None,
+):
+    """Create or update a parent from an invite, then link to the student.
 
-    Idempotent per student: if a parent already linked to this student matches
-    the submitted Telegram username (case-insensitive) or phone, that record is
-    updated in place instead of creating a duplicate — so refreshing/re-submitting
-    the page does not spawn extra parent rows. Returns the parent row.
+    Telegram Mini App claims are anchored by the verified ``telegram_user_id``.
+    Manual fallbacks stay idempotent per student by matching username or phone.
+    Returns the parent row.
     """
     ensure_parent_accounts_schema(conn)
 
@@ -39,41 +55,70 @@ def link_parent_from_invite(conn, *, student_row_id, full_name, phone, telegram_
     full_name = str(full_name or "").strip()
     phone = str(phone or "").strip()
     username = _clean_username(telegram_username)
+    telegram_user_id = _clean_positive_int(telegram_user_id)
 
-    existing = conn.execute(
-        """
-        SELECT p.id
-        FROM parents p
-        JOIN parent_student_links l ON l.parent_id = p.id
-        WHERE l.student_row_id = %s
-          AND (
-              (%s <> '' AND lower(p.telegram_username) = lower(%s))
-              OR (%s <> '' AND p.phone = %s)
-          )
-        ORDER BY p.id ASC
-        LIMIT 1
-        """,
-        (student_row_id, username, username, phone, phone),
-    ).fetchone()
+    if telegram_user_id is not None:
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM parents
+            WHERE telegram_user_id = %s
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (telegram_user_id,),
+        ).fetchone()
+    else:
+        existing = conn.execute(
+            """
+            SELECT p.id
+            FROM parents p
+            JOIN parent_student_links l ON l.parent_id = p.id
+            WHERE l.student_row_id = %s
+              AND (
+                  (%s <> '' AND lower(p.telegram_username) = lower(%s))
+                  OR (%s <> '' AND p.phone = %s)
+              )
+            ORDER BY p.id ASC
+            LIMIT 1
+            """,
+            (student_row_id, username, username, phone, phone),
+        ).fetchone()
 
     if existing:
         parent_id = int(existing["id"])
         conn.execute(
             """
             UPDATE parents
-            SET full_name = %s, phone = %s, telegram_username = %s, updated_at = %s
+            SET full_name = CASE WHEN %s <> '' THEN %s ELSE full_name END,
+                phone = CASE WHEN %s <> '' THEN %s ELSE phone END,
+                telegram_username = CASE WHEN %s <> '' THEN %s ELSE telegram_username END,
+                telegram_user_id = COALESCE(%s, telegram_user_id),
+                updated_at = %s
             WHERE id = %s
             """,
-            (full_name, phone, username, now, parent_id),
+            (
+                full_name,
+                full_name,
+                phone,
+                phone,
+                username,
+                username,
+                telegram_user_id,
+                now,
+                parent_id,
+            ),
         )
     else:
         inserted = conn.execute(
             """
-            INSERT INTO parents (full_name, phone, telegram_username, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO parents (
+                full_name, phone, telegram_username, telegram_user_id, created_at, updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (full_name, phone, username, now, now),
+            (full_name, phone, username, telegram_user_id, now, now),
         ).fetchone()
         parent_id = int(inserted["id"])
 
