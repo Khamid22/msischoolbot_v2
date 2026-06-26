@@ -231,6 +231,49 @@ export function tabsForAdminMode(mode: AdminMode) {
     });
 }
 
+// Sidebar grouping. Tabs are bucketed into labelled sections for the admin
+// navigation. This is presentation-only: routes and per-mode permissions still
+// come from `tabsForAdminMode` — `groupTabsBySection` only reorganizes the
+// already-filtered tabs. Any tab not listed in a section falls into a trailing
+// "More" group so nothing is ever hidden.
+export interface NavSection {
+  label: string;
+  keys: AdminTab[];
+}
+
+export const navSections: NavSection[] = [
+  { label: "Overview", keys: ["overview"] },
+  { label: "People", keys: ["students", "parents", "teachers", "candidates"] },
+  { label: "Academics", keys: ["subjects", "groups", "schedule", "curriculum", "gradebook", "office_hours", "career_growth"] },
+  { label: "Communication", keys: ["announcements", "chat", "complaints", "contact"] },
+  { label: "Operations", keys: ["payments", "resources"] },
+];
+
+export function groupTabsBySection<T extends { key: string }>(
+  visibleTabs: T[],
+): Array<{ label: string; tabs: T[] }> {
+  const byKey = new Map(visibleTabs.map((tab) => [tab.key, tab] as const));
+  const used = new Set<string>();
+  const grouped: Array<{ label: string; tabs: T[] }> = [];
+
+  for (const section of navSections) {
+    const tabs = section.keys
+      .map((key) => byKey.get(key))
+      .filter((tab): tab is T => Boolean(tab));
+    tabs.forEach((tab) => used.add(tab.key));
+    if (tabs.length) {
+      grouped.push({ label: section.label, tabs });
+    }
+  }
+
+  const leftovers = visibleTabs.filter((tab) => !used.has(tab.key));
+  if (leftovers.length) {
+    grouped.push({ label: "More", tabs: leftovers });
+  }
+
+  return grouped;
+}
+
 // Keep all admin pages on one semantic top inset variable.
 const _appTopInset = "var(--app-top-inset)";
 export const adminHeaderPadTop = _appTopInset;

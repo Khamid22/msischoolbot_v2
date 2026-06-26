@@ -1,0 +1,1 @@
+import{j as t}from"./react-vendor-BBSa9SYs.js";import o from"./TeachersPanel-VSoxi7Uw.js";import"./ChartCard-DHvgpL0y.js";import"./routes-3iv9_ULB.js";import"./shared-BRN8E7xH.js";import"./icons-BUrkiohj.js";function n({state:r}){return t.jsx(o,{state:r})}export{n as default};

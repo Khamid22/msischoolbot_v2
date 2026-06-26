@@ -532,6 +532,8 @@ def ensure_admins_schema(conn):
     conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS telegram_username TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''")
+    # Account lifecycle: a disabled parent account keeps its data but cannot log in.
+    conn.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS disabled SMALLINT NOT NULL DEFAULT 0")
 
 
 def _create_parent_accounts_tables(conn):

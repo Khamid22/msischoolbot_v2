@@ -34,6 +34,7 @@ import {
   adminModes,
   asNumber,
   asString,
+  groupTabsBySection,
   tabs,
 } from "@/roles/admin/shared";
 import { useAdminState } from "@/roles/admin/hooks/useAdminState";
@@ -610,29 +611,34 @@ function AdminSidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-        <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Manage
-        </p>
-        <nav className="space-y-1" aria-label="Admin navigation">
-          {state.visibleTabs.map((tab: { key: string; label: string }) => {
-            const Icon = tabIcons[tab.key] || LayoutDashboard;
-            const isActive = state.activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => state.switchAdminTab(tab.key)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
-                  isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        <nav className="space-y-4" aria-label="Admin navigation">
+          {groupTabsBySection(state.visibleTabs as Array<{ key: string; label: string }>).map((section) => (
+            <div key={section.label} className="space-y-1">
+              <p className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {section.label}
+              </p>
+              {section.tabs.map((tab) => {
+                const Icon = tabIcons[tab.key] || LayoutDashboard;
+                const isActive = state.activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => state.switchAdminTab(tab.key)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
       </div>
 

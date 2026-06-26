@@ -89,7 +89,7 @@ def update_parent_profile(
 def get_admin_credentials_row(conn, login):
     return conn.execute(
         """
-        SELECT id, login, password_hash, role, is_owner
+        SELECT id, login, password_hash, role, is_owner, disabled
         FROM admins
         WHERE lower(login) = lower(%s)
         """,
@@ -112,7 +112,7 @@ def get_parent_admin_row(conn, admin_id):
     return conn.execute(
         """
         SELECT id, login, role, is_owner, telegram_user_id, created_at,
-               display_name, phone, email, telegram_username, notes
+               display_name, phone, email, telegram_username, notes, disabled
         FROM admins
         WHERE id = %s
           AND lower(role) = 'parent'
@@ -125,12 +125,47 @@ def list_parent_admin_rows(conn):
     return conn.execute(
         """
         SELECT id, login, role, is_owner, telegram_user_id, created_at,
-               display_name, phone, email, telegram_username, notes
+               display_name, phone, email, telegram_username, notes, disabled
         FROM admins
         WHERE lower(role) = 'parent'
         ORDER BY lower(login) ASC, id ASC
         """
     ).fetchall()
+
+
+def update_parent_password(conn, parent_admin_id, password_hash):
+    return conn.execute(
+        """
+        UPDATE admins
+        SET password_hash = %s
+        WHERE id = %s
+          AND lower(role) = 'parent'
+        """,
+        (password_hash, int(parent_admin_id)),
+    ).rowcount
+
+
+def set_parent_disabled(conn, parent_admin_id, disabled):
+    return conn.execute(
+        """
+        UPDATE admins
+        SET disabled = %s
+        WHERE id = %s
+          AND lower(role) = 'parent'
+        """,
+        (1 if disabled else 0, int(parent_admin_id)),
+    ).rowcount
+
+
+def delete_parent_admin(conn, parent_admin_id):
+    return conn.execute(
+        """
+        DELETE FROM admins
+        WHERE id = %s
+          AND lower(role) = 'parent'
+        """,
+        (int(parent_admin_id),),
+    ).rowcount
 
 
 def get_admin_by_telegram_id(conn, telegram_user_id):
@@ -187,6 +222,9 @@ __all__ = [
     "get_parent_admin_row",
     "list_parent_admin_rows",
     "update_parent_profile",
+    "update_parent_password",
+    "set_parent_disabled",
+    "delete_parent_admin",
     "get_admin_by_telegram_id",
     "clear_admin_telegram_user_conflicts",
     "update_admin_telegram_user",

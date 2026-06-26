@@ -6,7 +6,10 @@ from web.backend.roles.admin.services.page_service import invalidate_admin_page_
 from web.backend.roles.admin.services.parent_service import (
     assign_parent_child,
     create_parent_account,
+    delete_parent_account,
     remove_parent_child,
+    reset_parent_password,
+    set_parent_account_disabled,
     update_parent_profile,
 )
 
@@ -55,6 +58,48 @@ def register_admin_parent_routes(router):
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "parent": parent})
+
+    @router.post("/admin/parents/<int:parent_admin_id>/reset-password")
+    def admin_reset_parent_password(parent_admin_id):
+        try:
+            result = reset_parent_password(parent_admin_id)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        invalidate_admin_page_context_cache()
+        return jsonify(
+            {
+                "ok": True,
+                "parent": result["parent"],
+                "temporary_password": result["temporary_password"],
+                "temporaryPassword": result["temporary_password"],
+            }
+        )
+
+    @router.post("/admin/parents/<int:parent_admin_id>/status")
+    def admin_set_parent_status(parent_admin_id):
+        payload = request_payload()
+        disabled = bool(payload.get("disabled"))
+        try:
+            parent = set_parent_account_disabled(parent_admin_id, disabled)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True, "parent": parent})
+
+    @router.delete("/admin/parents/<int:parent_admin_id>")
+    def admin_delete_parent_account(parent_admin_id):
+        try:
+            deleted = delete_parent_account(parent_admin_id)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        if not deleted:
+            return jsonify({"ok": False, "message": "Parent account was not found."}), 404
+
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True})
 
     @router.post("/admin/parents/<int:parent_admin_id>/children")
     def admin_assign_selected_parent_child(parent_admin_id):

@@ -48,6 +48,14 @@ def verify_admin_credentials(login, password):
     elif not check_password_hash(row["password_hash"], password or ""):
         return None
 
+    # Disabled accounts (currently only parent client accounts can be disabled)
+    # keep their data but are blocked from signing in.
+    try:
+        if int(row["disabled"] or 0) == 1:
+            return None
+    except (KeyError, IndexError, TypeError):
+        pass
+
     return {
         "id": int(row["id"]),
         "login": str(row["login"]),

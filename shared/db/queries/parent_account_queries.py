@@ -105,4 +105,38 @@ def get_parents_for_student(conn, student_row_id):
     ).fetchall()
 
 
-__all__ = ["link_parent_from_invite", "get_parents_for_student"]
+def list_invite_parent_rows(conn):
+    """All parent CLIENT accounts with their linked students for admin visibility."""
+    ensure_parent_accounts_schema(conn)
+    return conn.execute(
+        """
+        SELECT
+            p.id AS parent_id,
+            p.full_name,
+            p.phone,
+            p.telegram_username,
+            p.telegram_user_id,
+            p.source_admin_id,
+            p.created_at,
+            p.updated_at,
+            l.created_at AS linked_at,
+            s.id AS student_row_id,
+            s.full_name AS student_full_name,
+            s.student_id,
+            s.password,
+            s.subjects,
+            s.telegram_user_id AS student_telegram_user_id,
+            s.photo_url,
+            s.profile_description,
+            s.class_name,
+            s.school_name,
+            s.last_seen_at
+        FROM parents p
+        LEFT JOIN parent_student_links l ON l.parent_id = p.id
+        LEFT JOIN students s ON s.id = l.student_row_id
+        ORDER BY lower(p.full_name) ASC, p.id ASC, lower(s.full_name) ASC, s.id ASC
+        """
+    ).fetchall()
+
+
+__all__ = ["link_parent_from_invite", "get_parents_for_student", "list_invite_parent_rows"]

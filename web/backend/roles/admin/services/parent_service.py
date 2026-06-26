@@ -1,4 +1,6 @@
 import math
+import secrets
+import string
 from datetime import datetime
 
 from werkzeug.security import generate_password_hash
@@ -323,6 +325,13 @@ def _row_value(row, key):
         return ""
 
 
+def _row_disabled(row):
+    try:
+        return int(row["disabled"] or 0) == 1
+    except (KeyError, IndexError, TypeError, ValueError):
+        return False
+
+
 def _to_parent(row, children=None, complaint_counts=None):
     counts = complaint_counts or {}
     parent_id = int(row["id"])
@@ -330,6 +339,7 @@ def _to_parent(row, children=None, complaint_counts=None):
     display_name = _row_value(row, "display_name")
     login = str(row["login"] or "").strip()
     telegram_username = _row_value(row, "telegram_username")
+    disabled = _row_disabled(row)
     return {
         "id": parent_id,
         "login": login,
@@ -350,8 +360,141 @@ def _to_parent(row, children=None, complaint_counts=None):
         "created_at": str(row["created_at"] or "").strip(),
         "ticket_count": int(bucket.get("total", 0)),
         "open_ticket_count": int(bucket.get("open", 0)),
+        "disabled": disabled,
+        "status": "disabled" if disabled else "active",
         "children": children or [],
     }
+
+
+def _to_invite_child(row, conn=None):
+    student_row_id = _normalize_positive_int(_row_value(row, "student_row_id"))
+    if not student_row_id:
+        return None
+    child = {
+        "id": student_row_id,
+        "student_row_id": student_row_id,
+        "studentRowId": student_row_id,
+        "full_name": _row_value(row, "student_full_name"),
+        "student_id": _row_value(row, "student_id"),
+        "student_code": _row_value(row, "student_id"),
+        "studentCode": _row_value(row, "student_id"),
+        "password": _row_value(row, "password"),
+        "subjects": _row_value(row, "subjects"),
+        "telegram_user_id": (
+            int(row["student_telegram_user_id"])
+            if row["student_telegram_user_id"] is not None
+            else None
+        ),
+        "photo_url": _row_value(row, "photo_url"),
+        "profile_description": _row_value(row, "profile_description"),
+        "class_name": _row_value(row, "class_name"),
+        "school_name": _row_value(row, "school_name") or "School 5",
+        "last_seen_at": row["last_seen_at"] if row["last_seen_at"] is not None else None,
+        "assigned_at": _row_value(row, "linked_at"),
+    }
+    if conn is not None:
+        child["academic_indicators"] = _list_child_academic_indicators(conn, {
+            "id": student_row_id,
+            "full_name": child["full_name"],
+        })
+        child["recent_lessons"] = _list_child_recent_lessons(conn, {
+            "id": student_row_id,
+            "full_name": child["full_name"],
+        })
+        payment_records = _list_child_payment_records(conn, {"id": student_row_id})
+    else:
+        child["academic_indicators"] = []
+        child["recent_lessons"] = []
+        payment_records = []
+    try:
+        child["payment_summary"] = _build_payment_summary(
+            child["academic_indicators"],
+            payment_records,
+        )
+    except Exception:
+        child["payment_summary"] = summarize_payment_records(
+            [],
+            progress=_average_program_completion(child["academic_indicators"]),
+        )
+    return child
+
+
+def _to_invite_parent(parent_id, rows, conn=None):
+    first = rows[0]
+    full_name = _row_value(first, "full_name")
+    phone = _row_value(first, "phone")
+    telegram_username = _row_value(first, "telegram_username")
+    children = []
+    seen_student_row_ids = set()
+    for row in rows:
+        child = _to_invite_child(row, conn=conn)
+        if not child:
+            continue
+        student_row_id = int(child["student_row_id"])
+        if student_row_id in seen_student_row_ids:
+            continue
+        seen_student_row_ids.add(student_row_id)
+        children.append(child)
+
+    display_name = full_name or phone or telegram_username or f"Parent {parent_id}"
+    login = (
+        phone
+        or (f"@{telegram_username}" if telegram_username else "")
+        or f"parent-{parent_id}"
+    )
+    return {
+        "id": -int(parent_id),
+        "parent_id": int(parent_id),
+        "parentId": int(parent_id),
+        "source": "invite",
+        "sourceLabel": "Registered",
+        "login": login,
+        "role": "parent",
+        "display_name": display_name,
+        "displayName": display_name,
+        "display": display_name,
+        "phone": phone,
+        "email": "",
+        "telegram_username": telegram_username,
+        "telegramUsername": telegram_username,
+        "notes": "",
+        "telegram_user_id": (
+            int(first["telegram_user_id"])
+            if first["telegram_user_id"] is not None
+            else None
+        ),
+        "created_at": _row_value(first, "created_at"),
+        "ticket_count": 0,
+        "open_ticket_count": 0,
+        "disabled": False,
+        "status": "active",
+        "children": children,
+    }
+
+
+def _list_invite_parent_accounts(conn):
+    try:
+        rows = queries.list_invite_parent_rows(conn)
+    except Exception:
+        return []
+
+    grouped = {}
+    for row in rows or []:
+        parent_id = _normalize_positive_int(_row_value(row, "parent_id"))
+        if not parent_id:
+            continue
+        grouped.setdefault(parent_id, []).append(row)
+
+    return [
+        _to_invite_parent(parent_id, parent_rows, conn=conn)
+        for parent_id, parent_rows in sorted(
+            grouped.items(),
+            key=lambda item: (
+                _row_value(item[1][0], "full_name").casefold(),
+                item[0],
+            ),
+        )
+    ]
 
 
 def _complaint_counts_map(conn):
@@ -385,6 +528,7 @@ def list_parent_accounts():
                     complaint_counts,
                 )
             )
+        parents.extend(_list_invite_parent_accounts(conn))
     return parents
 
 
@@ -522,6 +666,84 @@ def assign_parent_child(parent_admin_id, student_row_id):
     raise ValueError("Unable to assign this student.")
 
 
+def _generate_temporary_password(length=10):
+    # Unambiguous alphabet (no O/0/I/l/1) so a handed-over password is easy to read.
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def reset_parent_password(parent_admin_id):
+    parent_id = _normalize_positive_int(parent_admin_id)
+    if not parent_id:
+        raise ValueError("Parent account is required.")
+
+    temporary_password = _generate_temporary_password()
+    with _connect() as conn:
+        queries.ensure_admins_schema(conn)
+        queries.ensure_parent_children_schema(conn)
+        parent_row = queries.get_parent_admin_row(conn, parent_id)
+        if not parent_row:
+            raise ValueError("Parent account was not found.")
+
+        queries.update_parent_password(
+            conn,
+            parent_id,
+            generate_password_hash(temporary_password),
+        )
+        conn.commit()
+        complaint_counts = _complaint_counts_map(conn)
+        updated = queries.get_parent_admin_row(conn, parent_id)
+        child_rows = queries.list_parent_child_rows(conn, parent_id)
+        children = [_to_child(row, conn=conn) for row in child_rows]
+
+    if not updated:
+        raise ValueError("Unable to reset parent password.")
+    parent = _to_parent(updated, children, complaint_counts)
+    return {"parent": parent, "temporary_password": temporary_password}
+
+
+def set_parent_account_disabled(parent_admin_id, disabled):
+    parent_id = _normalize_positive_int(parent_admin_id)
+    if not parent_id:
+        raise ValueError("Parent account is required.")
+
+    with _connect() as conn:
+        queries.ensure_admins_schema(conn)
+        queries.ensure_parent_children_schema(conn)
+        parent_row = queries.get_parent_admin_row(conn, parent_id)
+        if not parent_row:
+            raise ValueError("Parent account was not found.")
+
+        queries.set_parent_disabled(conn, parent_id, bool(disabled))
+        conn.commit()
+        complaint_counts = _complaint_counts_map(conn)
+        updated = queries.get_parent_admin_row(conn, parent_id)
+        child_rows = queries.list_parent_child_rows(conn, parent_id)
+        children = [_to_child(row, conn=conn) for row in child_rows]
+
+    if not updated:
+        raise ValueError("Unable to update parent account.")
+    return _to_parent(updated, children, complaint_counts)
+
+
+def delete_parent_account(parent_admin_id):
+    parent_id = _normalize_positive_int(parent_admin_id)
+    if not parent_id:
+        raise ValueError("Parent account is required.")
+
+    with _connect() as conn:
+        queries.ensure_admins_schema(conn)
+        queries.ensure_parent_children_schema(conn)
+        parent_row = queries.get_parent_admin_row(conn, parent_id)
+        if not parent_row:
+            raise ValueError("Parent account was not found.")
+
+        # parent_children rows cascade via the ON DELETE CASCADE foreign key.
+        deleted = queries.delete_parent_admin(conn, parent_id)
+        conn.commit()
+    return deleted > 0
+
+
 def remove_parent_child(parent_admin_id, student_row_id):
     parent_id = _normalize_positive_int(parent_admin_id)
     student_id = _normalize_positive_int(student_row_id)
@@ -544,9 +766,12 @@ def remove_parent_child(parent_admin_id, student_row_id):
 __all__ = [
     "assign_parent_child",
     "create_parent_account",
+    "delete_parent_account",
     "list_linked_parents_for_student",
     "list_parent_accounts",
     "list_parent_children",
     "remove_parent_child",
+    "reset_parent_password",
+    "set_parent_account_disabled",
     "update_parent_profile",
 ]

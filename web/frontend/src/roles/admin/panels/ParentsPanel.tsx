@@ -1,848 +1,484 @@
-import { useEffect, useRef, useMemo, useState, type FormEvent } from "react";
-import { KeyRound, Plus, Search, UserMinus, UserPlus, UserRound, Users, X } from "lucide-react";
-import { ChartCard } from "@/shared/ui/ChartCard";
+import { useMemo, useState, type ReactNode } from "react";
+import { AlertCircle, CheckCircle2, Plus, UserRound, X } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId } from "../shared";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { asNumber, asString } from "../shared";
+import {
+  type ParentFilters,
+  type ParentRow,
+  collectGroupOptions,
+  countActiveFilters,
+  defaultParentFilters,
+  filterParents,
+  isDisabled,
+  parentChildren,
+  parentDisplayName,
+} from "./parents/types";
+import { type ParentHandlers } from "./parents/actions";
+import { ParentSummaryCards } from "./parents/ParentSummaryCards";
+import { ParentToolbar } from "./parents/ParentToolbar";
+import { ParentTable } from "./parents/ParentTable";
+import { ParentDrawer } from "./parents/ParentDrawer";
+import { ParentFormModal, type ParentProfilePayload } from "./parents/ParentFormModal";
+import { LinkStudentModal } from "./parents/LinkStudentModal";
 
-function initialsFor(value: unknown) {
-  const parts = asString(value).split(/\s+/).filter(Boolean);
+type Banner = { kind: "error" | "success"; text: string } | null;
+
+type ConfirmKind = "unlink" | "disable" | "delete" | "reset";
+type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
+
+const PAGE_DESCRIPTION = "Manage parent accounts, contact details, linked students, and support tickets.";
+
+function HeaderBar({ onAdd }: { onAdd: () => void }) {
   return (
-    parts
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() || "")
-      .join("") || "PA"
-  );
-}
-
-function studentLabel(student: Record<string, unknown>) {
-  return [
-    asString(student.full_name),
-    getStudentCode(student),
-    asString(student.school_name),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function parentChildren(parent: Record<string, unknown> | undefined) {
-  return Array.isArray(parent?.children)
-    ? (parent.children as Array<Record<string, unknown>>)
-    : [];
-}
-
-function CreateParentModal({
-  csrf,
-  saving,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  csrf: string;
-  saving: boolean;
-  error: string;
-  onClose: () => void;
-  onSubmit: (login: string, password: string) => Promise<void>;
-}) {
-  const [login, setLogin] = useState("");
-  const [password, setPassword] = useState("");
-  const loginRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    loginRef.current?.focus();
-  }, []);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await onSubmit(login, password);
-    setLogin("");
-    setPassword("");
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm overflow-hidden rounded-lg bg-surface shadow-card-hover"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
-          <div>
-            <h3 className="flex items-center gap-1.5 text-sm font-bold">
-              <KeyRound className="h-4 w-4 text-info" />
-              Create Parent
-            </h3>
-            <p className="text-xs text-muted-foreground">Login and temporary password</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-muted"
-          >
-            <X className="h-4 w-4" />
-          </button>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-info">
+          <UserRound className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="font-display text-lg font-bold leading-tight">Parents</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">{PAGE_DESCRIPTION}</p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 p-4">
-          {error ? (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
-              {error}
-            </div>
-          ) : null}
-
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Login
-            </span>
-            <input
-              ref={loginRef}
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm outline-none focus:border-foreground/30"
-              placeholder="parent-login"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Temporary password
-            </span>
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm outline-none focus:border-foreground/30"
-              placeholder="At least 6 characters"
-            />
-          </label>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-10 flex-1 rounded-lg border border-foreground/10 text-sm font-bold hover:bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !login.trim() || password.length < 6}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-bold text-primary-foreground disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-              Create
-            </button>
-          </div>
-        </form>
       </div>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+      >
+        <Plus className="h-4 w-4" />
+        Add parent
+      </button>
     </div>
   );
 }
 
-function StudentCombobox({
-  students,
-  value,
-  onChange,
-  disabled,
-}: {
-  students: Array<Record<string, unknown>>;
-  value: string;
-  onChange: (id: string) => void;
-  disabled: boolean;
-}) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const selected = students.find((s) => String(getStudentRowId(s)) === value);
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
-    if (!q) return students.slice(0, 8);
-    return students.filter((s) => studentLabel(s).toLowerCase().includes(q)).slice(0, 8);
-  }, [students, query]);
-
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  if (selected) {
-    return (
-      <div className="flex h-10 items-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3">
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {asString(selected.full_name) || getStudentCode(selected)}
-        </span>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => {
-            onChange("");
-            setQuery("");
-          }}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted hover:bg-muted/80"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </div>
-    );
-  }
-
+function EmptyState({ title, hint, action }: { title: string; hint: string; action?: ReactNode }) {
   return (
-    <div ref={containerRef} className="relative">
-      <label className="relative block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={query}
-          disabled={disabled || !students.length}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder={students.length ? "Search student to link…" : "No available students"}
-          className="h-10 w-full rounded-lg border border-foreground/10 bg-surface pl-9 pr-3 text-sm outline-none focus:border-foreground/30 disabled:opacity-50"
-        />
-      </label>
+    <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-12 text-center">
+      <p className="text-sm font-bold">{title}</p>
+      <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">{hint}</p>
+      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
+    </div>
+  );
+}
 
-      {open && filtered.length > 0 ? (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-foreground/10 bg-surface shadow-card-hover">
-          {filtered.map((student) => {
-            const id = String(getStudentRowId(student));
-            const studentCode = getStudentCode(student);
-            return (
-              <button
-                key={id}
-                type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  onChange(id);
-                  setQuery("");
-                  setOpen(false);
-                }}
-                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-bold">
-                  {initialsFor(student.full_name)}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">
-                    {asString(student.full_name) || "Student"}
-                  </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    Code {studentCode || "-"} · {asString(student.school_name)}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+function TableSkeleton() {
+  return (
+    <div className="space-y-2" aria-hidden>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={index} className="h-14 animate-pulse rounded-lg border border-foreground/10 bg-muted/40" />
+      ))}
     </div>
   );
 }
 
 export default function ParentsPanel({ state }: { state: any }) {
   const csrf = asString(state.props?.csrfToken);
-  const currentSchool = asString(state.currentSchool) || "all";
-  const students = Array.isArray(state.students)
-    ? (state.students as Array<Record<string, unknown>>)
-    : Array.isArray(state.props?.adminStudents)
-      ? (state.props.adminStudents as Array<Record<string, unknown>>)
-      : [];
-  const parentAccounts = Array.isArray(state.parentAccounts)
-    ? (state.parentAccounts as Array<Record<string, unknown>>)
+  const currentSchool = asString(state.currentSchool || state.props?.adminSchool) || "all";
+  const parents: ParentRow[] = Array.isArray(state.parentAccounts)
+    ? state.parentAccounts
     : Array.isArray(state.props?.adminParents)
-      ? (state.props.adminParents as Array<Record<string, unknown>>)
+      ? state.props.adminParents
       : [];
+  const students: ParentRow[] = Array.isArray(state.students) && state.students.length
+    ? state.students
+    : Array.isArray(state.props?.adminStudents)
+      ? state.props.adminStudents
+      : [];
+  const loading = !Array.isArray(state.parentAccounts) && !Array.isArray(state.props?.adminParents);
 
-  const [selectedParentId, setSelectedParentIdState] = useState(
-    () => asNumber(state.activeParentId) || asNumber(parentAccounts[0]?.id),
-  );
-  const [parentSearch, setParentSearch] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [createError, setCreateError] = useState("");
+  const [filters, setFilters] = useState<ParentFilters>(defaultParentFilters);
+  const [drawerParentId, setDrawerParentId] = useState<number | null>(null);
+  const [form, setForm] = useState<{ mode: "create" | "edit"; parent: ParentRow | null } | null>(null);
+  const [formSaving, setFormSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [linkParentId, setLinkParentId] = useState<number | null>(null);
+  const [linkSaving, setLinkSaving] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [banner, setBanner] = useState<Banner>(null);
+  const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
 
-  const [profileForm, setProfileForm] = useState({
-    display_name: "",
-    phone: "",
-    telegram_username: "",
-    notes: "",
-  });
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileError, setProfileError] = useState("");
-  const [profileSaved, setProfileSaved] = useState(false);
+  const filtered = useMemo(() => filterParents(parents, filters), [parents, filters]);
+  const groupOptions = useMemo(() => collectGroupOptions(parents), [parents]);
+  const activeCount = countActiveFilters(filters);
 
-  useEffect(() => {
-    const nextParentId = asNumber(state.activeParentId);
-    if (nextParentId > 0 && nextParentId !== selectedParentId) {
-      setSelectedParentIdState(nextParentId);
-    }
-  }, [selectedParentId, state.activeParentId]);
+  const drawerParent = drawerParentId != null ? parents.find((p) => asNumber(p.id) === drawerParentId) || null : null;
+  const linkParent = linkParentId != null ? parents.find((p) => asNumber(p.id) === linkParentId) || null : null;
 
-  const selectedParent =
-    parentAccounts.find((parent) => asNumber(parent.id) === selectedParentId) ||
-    parentAccounts[0];
-  const selectedParentResolvedId = asNumber(selectedParent?.id);
-  const children = parentChildren(selectedParent);
-  const childIds = new Set(
-    children.map((child) => getStudentRowId(child)).filter((id) => id > 0),
-  );
-
-  useEffect(() => {
-    setProfileForm({
-      display_name: asString(selectedParent?.display_name),
-      phone: asString(selectedParent?.phone),
-      telegram_username: asString(selectedParent?.telegram_username),
-      notes: asString(selectedParent?.notes),
-    });
-    setProfileError("");
-    setProfileSaved(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedParentResolvedId]);
-
-  const visibleParents = useMemo(() => {
-    const query = parentSearch.toLowerCase().trim();
-    if (!query) return parentAccounts;
-    return parentAccounts.filter((parent) =>
-      [
-        parent.login,
-        parent.display_name,
-        parent.phone,
-        parent.telegram_username,
-      ]
-        .map((value) => asString(value).toLowerCase())
-        .some((value) => value.includes(query)),
-    );
-  }, [parentAccounts, parentSearch]);
-
-  const availableStudents = useMemo(
-    () => students.filter((s) => !childIds.has(getStudentRowId(s))),
-    [students, childIds],
-  );
-
-  function selectParent(parentId: number) {
-    setSelectedParentIdState(parentId);
-    if (typeof state.setActiveParentId === "function") {
-      state.setActiveParentId(parentId);
-    }
-  }
-
-  function setParentAccounts(
-    updater: (current: Array<Record<string, unknown>>) => Array<Record<string, unknown>>,
-  ) {
+  function setParents(updater: (current: ParentRow[]) => ParentRow[]) {
     if (typeof state.setParentAccounts === "function") {
       state.setParentAccounts(updater);
     }
   }
 
-  function updateParentChildren(
-    parentId: number,
-    updater: (children: Array<Record<string, unknown>>) => Array<Record<string, unknown>>,
-  ) {
-    setParentAccounts((current) =>
-      current.map((parent) => {
-        if (asNumber(parent.id) !== parentId) return parent;
-        return { ...parent, children: updater(parentChildren(parent)) };
-      }),
-    );
+  function patchParent(id: number, next: ParentRow) {
+    setParents((current) => current.map((p) => (asNumber(p.id) === id ? next : p)));
   }
 
-  async function createParent(login: string, password: string) {
-    if (saving) return;
-    setSaving(true);
-    setCreateError("");
+  function applyFilters(patch: Partial<ParentFilters>) {
+    setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  async function request(method: string, url: string, body?: unknown) {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrf,
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok || !json.ok) {
+      throw new Error(asString(json.message) || "Something went wrong. Please try again.");
+    }
+    return json as Record<string, unknown>;
+  }
+
+  // ── Create / edit ──────────────────────────────────────────────────────────
+  async function submitForm(payload: ParentProfilePayload) {
+    if (!form || formSaving) return;
+    setFormSaving(true);
+    setFormError("");
     try {
-      const response = await fetch(routes.adminParents, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ login, password }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setCreateError(asString(json.message) || "Unable to create parent.");
-        return;
+      if (form.mode === "create") {
+        const json = await request("POST", routes.adminParents, payload);
+        const parent = (json.parent || {}) as ParentRow;
+        setParents((current) =>
+          [...current, parent].sort((a, b) => asString(a.login).localeCompare(asString(b.login))),
+        );
+        setBanner({ kind: "success", text: `Added ${parentDisplayName(parent)}.` });
+      } else if (form.parent) {
+        const id = asNumber(form.parent.id);
+        const json = await request("PATCH", routes.adminParent(id), payload);
+        patchParent(id, (json.parent || {}) as ParentRow);
+        setBanner({ kind: "success", text: "Parent profile updated." });
       }
-      const parent = (json.parent || {}) as Record<string, unknown>;
-      const parentId = asNumber(parent.id);
-      if (!parentId) {
-        setCreateError("Parent was created, but the record could not be loaded.");
-        return;
-      }
-      setParentAccounts((current) =>
-        [...current, parent].sort((a, b) =>
-          asString(a.login).localeCompare(asString(b.login)),
+      setForm(null);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to save.");
+    } finally {
+      setFormSaving(false);
+    }
+  }
+
+  // ── Link / unlink ──────────────────────────────────────────────────────────
+  async function linkStudent(parent: ParentRow, studentRowId: number) {
+    if (linkSaving) return;
+    setLinkSaving(true);
+    setLinkError("");
+    try {
+      const id = asNumber(parent.id);
+      const json = await request("POST", routes.adminParentChildrenFor(id), { student_row_id: studentRowId });
+      const child = (json.child || {}) as ParentRow;
+      setParents((current) =>
+        current.map((p) =>
+          asNumber(p.id) === id ? { ...p, children: [...parentChildren(p), child] } : p,
         ),
       );
-      selectParent(parentId);
-      setShowCreate(false);
-    } catch {
-      setCreateError("Network error. Please try again.");
+      setLinkParentId(null);
+      setBanner({ kind: "success", text: "Student linked." });
+    } catch (error) {
+      setLinkError(error instanceof Error ? error.message : "Unable to link student.");
     } finally {
-      setSaving(false);
+      setLinkSaving(false);
     }
   }
 
-  async function saveProfile(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parentId = selectedParentResolvedId;
-    if (!parentId || profileSaving) return;
-    setProfileSaving(true);
-    setProfileError("");
-    setProfileSaved(false);
-    try {
-      const response = await fetch(`${routes.adminParents}/${parentId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify(profileForm),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setProfileError(asString(json.message) || "Unable to save profile.");
-        return;
-      }
-      const parent = (json.parent || {}) as Record<string, unknown>;
-      setParentAccounts((current) =>
-        current.map((p) => (asNumber(p.id) === parentId ? { ...p, ...parent } : p)),
-      );
-      setProfileSaved(true);
-    } catch {
-      setProfileError("Network error. Please try again.");
-    } finally {
-      setProfileSaving(false);
+  async function unlinkChild(parent: ParentRow, child: ParentRow) {
+    const id = asNumber(parent.id);
+    const studentRowId = asNumber(child.student_row_id ?? child.id);
+    await request("DELETE", routes.adminParentChildFor(id, studentRowId));
+    setParents((current) =>
+      current.map((p) =>
+        asNumber(p.id) === id
+          ? { ...p, children: parentChildren(p).filter((c) => asNumber(c.student_row_id ?? c.id) !== studentRowId) }
+          : p,
+      ),
+    );
+    setBanner({ kind: "success", text: "Student unlinked." });
+  }
+
+  // ── Account actions ────────────────────────────────────────────────────────
+  async function resetPassword(parent: ParentRow) {
+    const id = asNumber(parent.id);
+    const json = await request("POST", routes.adminParentResetPassword(id), {});
+    patchParent(id, (json.parent || parent) as ParentRow);
+    setResetResult({ name: parentDisplayName(parent), password: asString(json.temporary_password) });
+  }
+
+  async function toggleDisabled(parent: ParentRow, disabled: boolean) {
+    const id = asNumber(parent.id);
+    const json = await request("POST", routes.adminParentStatus(id), { disabled });
+    patchParent(id, (json.parent || parent) as ParentRow);
+    setBanner({ kind: "success", text: disabled ? "Account disabled." : "Account enabled." });
+  }
+
+  async function deleteParent(parent: ParentRow) {
+    const id = asNumber(parent.id);
+    await request("DELETE", routes.adminParent(id));
+    setParents((current) => current.filter((p) => asNumber(p.id) !== id));
+    if (drawerParentId === id) setDrawerParentId(null);
+    setBanner({ kind: "success", text: `Deleted ${parentDisplayName(parent)}.` });
+  }
+
+  function openTickets(parent: ParentRow) {
+    if (typeof state.setActiveParentId === "function") {
+      state.setActiveParentId(asNumber(parent.id));
+    }
+    if (typeof state.switchAdminTab === "function") {
+      state.switchAdminTab("complaints");
     }
   }
 
-  async function addChild(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const parentId = selectedParentResolvedId;
-    const studentRowId = asNumber(selectedStudentId);
-    if (!parentId || !studentRowId || saving) return;
-
-    setSaving(true);
-    setError("");
+  // ── Confirm-gated dispatch ──────────────────────────────────────────────────
+  async function runConfirm() {
+    if (!confirm || confirmBusy) return;
+    setConfirmBusy(true);
     try {
-      const response = await fetch(routes.adminParentChildrenFor(parentId), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ student_row_id: studentRowId }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to link student.");
-        return;
+      if (confirm.kind === "unlink" && confirm.child) {
+        await unlinkChild(confirm.parent, confirm.child);
+      } else if (confirm.kind === "disable") {
+        await toggleDisabled(confirm.parent, true);
+      } else if (confirm.kind === "delete") {
+        await deleteParent(confirm.parent);
+      } else if (confirm.kind === "reset") {
+        await resetPassword(confirm.parent);
       }
-      const child = (json.child || {}) as Record<string, unknown>;
-      const childId = getStudentRowId(child);
-      if (!childId) {
-        setError("Student was linked, but the record could not be loaded.");
-        return;
+      setConfirm(null);
+    } catch (error) {
+      setBanner({ kind: "error", text: error instanceof Error ? error.message : "Action failed." });
+      setConfirm(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  const handlers: ParentHandlers = {
+    onView: (parent) => setDrawerParentId(asNumber(parent.id)),
+    onEdit: (parent) => setForm({ mode: "edit", parent }),
+    onLinkStudent: (parent) => {
+      setLinkError("");
+      setLinkParentId(asNumber(parent.id));
+    },
+    onUnlinkStudent: (parent) => {
+      const kids = parentChildren(parent);
+      if (kids.length === 1) {
+        setConfirm({ kind: "unlink", parent, child: kids[0] });
+      } else if (kids.length > 1) {
+        setDrawerParentId(asNumber(parent.id));
       }
-      updateParentChildren(parentId, (current) => {
-        const deduped = current.filter((item) => getStudentRowId(item) !== childId);
-        return [...deduped, child].sort((a, b) =>
-          asString(a.full_name).localeCompare(asString(b.full_name)),
+    },
+    onUnlinkChild: (parent, child) => setConfirm({ kind: "unlink", parent, child }),
+    onResetPassword: (parent) => setConfirm({ kind: "reset", parent }),
+    onToggleDisabled: (parent) => {
+      if (isDisabled(parent)) {
+        void toggleDisabled(parent, false).catch((error) =>
+          setBanner({ kind: "error", text: error instanceof Error ? error.message : "Action failed." }),
         );
-      });
-      setSelectedStudentId("");
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function removeChild(student: Record<string, unknown>) {
-    const parentId = selectedParentResolvedId;
-    const studentRowId = getStudentRowId(student);
-    if (!parentId || !studentRowId || saving) return;
-    if (
-      !window.confirm(
-        `Remove ${asString(student.full_name) || "this student"} from this parent?`,
-      )
-    )
-      return;
-
-    setSaving(true);
-    setError("");
-    try {
-      const response = await fetch(routes.adminParentChildFor(parentId, studentRowId), {
-        method: "DELETE",
-        headers: {
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to unlink student.");
-        return;
+      } else {
+        setConfirm({ kind: "disable", parent });
       }
-      updateParentChildren(parentId, (current) =>
-        current.filter((child) => getStudentRowId(child) !== studentRowId),
-      );
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
+    },
+    onDelete: (parent) => setConfirm({ kind: "delete", parent }),
+    onOpenTickets: openTickets,
+  };
 
-  const linkedParentCount = parentAccounts.filter((parent) => parentChildren(parent).length > 0).length;
-  const totalLinkedStudents = parentAccounts.reduce((total, parent) => total + parentChildren(parent).length, 0);
-  const openTicketCount = parentAccounts.reduce((total, parent) => total + asNumber(parent.open_ticket_count), 0);
+  const confirmConfig: Record<ConfirmKind, { title: string; message: string; confirmLabel: string; danger: boolean }> = {
+    unlink: {
+      title: "Unlink student",
+      message: confirm?.child
+        ? `Remove ${asString(confirm.child.full_name) || "this student"} from ${parentDisplayName(confirm.parent)}? The parent will lose access to this student.`
+        : "Remove this student?",
+      confirmLabel: "Unlink",
+      danger: true,
+    },
+    disable: {
+      title: "Disable account",
+      message: confirm ? `${parentDisplayName(confirm.parent)} will be blocked from signing in until re-enabled. Their data is kept.` : "",
+      confirmLabel: "Disable",
+      danger: true,
+    },
+    delete: {
+      title: "Delete account",
+      message: confirm ? `Permanently delete ${parentDisplayName(confirm.parent)} and all student links. This cannot be undone.` : "",
+      confirmLabel: "Delete",
+      danger: true,
+    },
+    reset: {
+      title: "Reset password",
+      message: confirm ? `Generate a new temporary password for ${parentDisplayName(confirm.parent)}? Their current password will stop working.` : "",
+      confirmLabel: "Reset password",
+      danger: false,
+    },
+  };
+
+  const onlySearch = filters.search.trim() && activeCount === 1;
 
   return (
-    <>
-      <div className="space-y-4">
-        <ChartCard
-          title="Parents"
-          subtitle="Parent accounts, contacts, linked students, and support tickets"
-          icon={<UserRound className="h-4 w-4 text-info" />}
-          headerActions={
-            <button
-              type="button"
-              onClick={() => {
-                setCreateError("");
-                setShowCreate(true);
-              }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Create manual account
-            </button>
-          }
+    <div className="flex min-h-[calc(100dvh-var(--app-top-inset)-2rem)] flex-col gap-4">
+      <HeaderBar onAdd={() => { setFormError(""); setForm({ mode: "create", parent: null }); }} />
+
+      {banner ? (
+        <div
+          role="status"
+          className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
+            banner.kind === "error"
+              ? "border-destructive/20 bg-destructive/10 text-destructive"
+              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+          }`}
         >
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Parent accounts</p>
-                <p className="mt-1 text-xl font-bold">{parentAccounts.length}</p>
-              </div>
-              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Linked parents</p>
-                <p className="mt-1 text-xl font-bold">{linkedParentCount}</p>
-              </div>
-              <div className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Open tickets</p>
-                <p className="mt-1 text-xl font-bold">{openTicketCount}</p>
-              </div>
-            </div>
+          {banner.kind === "error" ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
+          <span className="min-w-0 flex-1 break-words">{banner.text}</span>
+          <button type="button" onClick={() => setBanner(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 hover:bg-foreground/10">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
-            <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
-              New flow: open a student profile, create a parent invite link, send it to the parent, and let the parent fill their own RU/UZ contact form. Manual accounts below are only a backup.
-            </div>
+      <ParentSummaryCards parents={parents} filters={filters} onApply={applyFilters} />
 
-            <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="search"
-                  value={parentSearch}
-                  onChange={(e) => setParentSearch(e.target.value)}
-                  placeholder="Search by parent, phone, Telegram, or login"
-                  className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
-                />
-              </label>
-              <div className="flex items-center rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold text-muted-foreground">
-                {visibleParents.length} shown · {totalLinkedStudents} student links
-              </div>
-            </div>
+      <ParentToolbar
+        filters={filters}
+        groupOptions={groupOptions}
+        activeCount={activeCount}
+        onChange={applyFilters}
+        onClear={() => setFilters(defaultParentFilters)}
+      />
 
-            <div className="overflow-hidden rounded-lg border border-foreground/10">
-              <div className="max-h-[52dvh] overflow-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="sticky top-0 z-10 bg-muted/70 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                    <tr>
-                      <th className="px-3 py-2">Parent</th>
-                      <th className="px-3 py-2">Contact</th>
-                      <th className="px-3 py-2">Linked students</th>
-                      <th className="px-3 py-2">Tickets</th>
-                      <th className="px-3 py-2 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-foreground/5 bg-background">
-                    {visibleParents.length ? (
-                      visibleParents.map((parent) => {
-                        const parentId = asNumber(parent.id);
-                        const active = parentId === selectedParentResolvedId;
-                        const parentKids = parentChildren(parent);
-                        const phone = asString(parent.phone);
-                        const telegram = asString(parent.telegram_username);
-                        return (
-                          <tr
-                            key={parentId}
-                            className={`transition-colors ${active ? "bg-foreground/5" : "hover:bg-muted/50"}`}
-                          >
-                            <td className="px-3 py-3">
-                              <button
-                                type="button"
-                                onClick={() => selectParent(parentId)}
-                                className="flex min-w-0 items-center gap-3 text-left"
-                              >
-                                <span
-                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                                    active ? "bg-foreground text-background" : "bg-muted text-foreground"
-                                  }`}
-                                >
-                                  {initialsFor(asString(parent.display_name) || asString(parent.login))}
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block truncate font-bold">
-                                    {asString(parent.display_name) || asString(parent.login)}
-                                  </span>
-                                  <span className="block truncate text-xs text-muted-foreground">
-                                    Login {asString(parent.login)}
-                                  </span>
-                                </span>
-                              </button>
-                            </td>
-                            <td className="px-3 py-3 text-xs text-muted-foreground">
-                              <span className="block font-semibold text-foreground">{phone || "No phone"}</span>
-                              <span className="block">{telegram || "No Telegram"}</span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="flex max-w-md flex-wrap gap-1.5">
-                                {parentKids.length ? (
-                                  parentKids.map((child) => (
-                                    <span
-                                      key={getStudentRowId(child) || getStudentCode(child)}
-                                      className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold"
-                                    >
-                                      {asString(child.full_name) || getStudentCode(child)}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">No linked students</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="text-sm font-bold">{asNumber(parent.open_ticket_count)}</span>
-                              <span className="text-xs text-muted-foreground"> open</span>
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => selectParent(parentId)}
-                                className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted"
-                              >
-                                Open
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                          {parentSearch ? "No parents match your search." : "No parent accounts yet."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </ChartCard>
-
-        <ChartCard
-          title={
-            selectedParent
-              ? asString(selectedParent.display_name) || asString(selectedParent.login)
-              : "Parent Details"
-          }
-          subtitle={
-            selectedParent
-              ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
-              : "Select a parent from the table"
-          }
-          icon={<Users className="h-4 w-4 text-info" />}
-        >
-          <div className="space-y-4">
-            {error ? (
-              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
-                {error}
-              </div>
-            ) : null}
-
-            {selectedParent ? (
-              <>
-                <form
-                  onSubmit={saveProfile}
-                  className="rounded-lg border border-foreground/10 bg-background p-3"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Contact profile</p>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      Login {asString(selectedParent.login)}
-                    </span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <input
-                      value={profileForm.display_name}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, display_name: e.target.value }))}
-                      placeholder="Parent full name"
-                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
-                    />
-                    <input
-                      value={profileForm.phone}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="Phone number"
-                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
-                    />
-                    <input
-                      value={profileForm.telegram_username}
-                      onChange={(e) => setProfileForm((f) => ({ ...f, telegram_username: e.target.value }))}
-                      placeholder="Telegram @username"
-                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
-                    />
-                  </div>
-                  <textarea
-                    value={profileForm.notes}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, notes: e.target.value }))}
-                    placeholder="Notes"
-                    rows={2}
-                    className="mt-2 w-full rounded-lg border border-foreground/10 bg-surface px-3 py-2 text-sm outline-none focus:border-foreground/30"
-                  />
-                  {profileError ? (
-                    <p className="mt-2 text-xs font-semibold text-destructive">{profileError}</p>
-                  ) : null}
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      type="submit"
-                      disabled={profileSaving}
-                      className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground transition-opacity disabled:opacity-40"
-                    >
-                      {profileSaving ? "Saving…" : "Save contact"}
-                    </button>
-                    {profileSaved ? (
-                      <span className="text-[11px] font-semibold text-emerald-600">Saved</span>
-                    ) : null}
-                  </div>
-                </form>
-                <details className="rounded-lg border border-foreground/10 bg-background p-3">
-                  <summary className="cursor-pointer text-sm font-bold">Manual student link backup</summary>
-                  <form onSubmit={addChild} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="flex-1">
-                      <StudentCombobox
-                        students={availableStudents}
-                        value={selectedStudentId}
-                        onChange={setSelectedStudentId}
-                        disabled={saving}
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={saving || !selectedStudentId}
-                      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-40"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Link
-                    </button>
-                  </form>
-                </details>
-                {children.length ? (
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {children.map((child) => {
-                      const studentRowId = getStudentRowId(child);
-                      const studentCode = getStudentCode(child);
-                      const seen = formatLastSeen(child.last_seen_at);
-                      return (
-                        <div
-                          key={studentRowId || studentCode}
-                          className="rounded-lg border border-foreground/10 bg-background p-3 shadow-card"
-                        >
-                          <div className="flex min-w-0 items-start gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
-                              {initialsFor(child.full_name)}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-bold">
-                                {asString(child.full_name) || "Student"}
-                              </p>
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                Code {studentCode || "-"} ·{" "}
-                                {asString(child.school_name) || "School"}
-                              </p>
-                              <p
-                                className={`mt-1.5 text-[11px] font-semibold ${
-                                  seen.online ? "text-emerald-600" : "text-muted-foreground"
-                                }`}
-                              >
-                                {seen.label}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <a
-                              href={routes.adminStudentPanel(studentRowId, currentSchool)}
-                              className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-2.5 text-xs font-bold hover:bg-muted"
-                            >
-                              Dashboard
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => removeChild(child)}
-                              disabled={saving}
-                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/10 px-2.5 text-xs font-bold text-destructive hover:bg-destructive/15 disabled:opacity-50"
-                            >
-                              <UserMinus className="h-3.5 w-3.5" />
-                              Unlink
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="py-2 text-sm text-muted-foreground">
-                    No students linked to this parent yet. Search above to link one.
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="py-2 text-sm text-muted-foreground">
-                Select a parent from the list, or create a new one.
-              </p>
-            )}
-          </div>
-        </ChartCard>
+      <div className="flex min-h-[22rem] flex-1 flex-col gap-3">
+        {loading ? (
+          <TableSkeleton />
+        ) : parents.length === 0 ? (
+          <EmptyState
+            title="No parents yet"
+            hint="Add a parent account to start linking students and managing support."
+            action={
+              <button
+                type="button"
+                onClick={() => setForm({ mode: "create", parent: null })}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground"
+              >
+                <Plus className="h-4 w-4" />
+                Add parent
+              </button>
+            }
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title={onlySearch ? "No parents found" : "No parents match the selected filters"}
+            hint="Try changing your search or clearing the filters."
+            action={
+              <button
+                type="button"
+                onClick={() => setFilters(defaultParentFilters)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-3.5 text-sm font-bold hover:bg-muted"
+              >
+                Clear filters
+              </button>
+            }
+          />
+        ) : (
+          <>
+            <p className="shrink-0 text-xs font-semibold text-muted-foreground">
+              Showing {filtered.length} of {parents.length} parents
+            </p>
+            <ParentTable parents={filtered} handlers={handlers} className="min-h-0 flex-1" />
+          </>
+        )}
       </div>
 
-      {showCreate ? (
-        <CreateParentModal
-          csrf={csrf}
-          saving={saving}
-          error={createError}
-          onClose={() => setShowCreate(false)}
-          onSubmit={createParent}
+      <ParentDrawer
+        parent={drawerParent}
+        handlers={handlers}
+        currentSchool={currentSchool}
+        onClose={() => setDrawerParentId(null)}
+      />
+
+      {form ? (
+        <ParentFormModal
+          mode={form.mode}
+          parent={form.parent}
+          saving={formSaving}
+          error={formError}
+          onClose={() => setForm(null)}
+          onSubmit={submitForm}
         />
       ) : null}
 
-    </>
+      {linkParent ? (
+        <LinkStudentModal
+          parent={linkParent}
+          students={students}
+          saving={linkSaving}
+          error={linkError}
+          onClose={() => setLinkParentId(null)}
+          onLink={(studentRowId) => linkStudent(linkParent, studentRowId)}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm ? confirmConfig[confirm.kind].title : ""}
+        message={confirm ? confirmConfig[confirm.kind].message : ""}
+        confirmLabel={confirm ? confirmConfig[confirm.kind].confirmLabel : "Confirm"}
+        danger={confirm ? confirmConfig[confirm.kind].danger : false}
+        busy={confirmBusy}
+        onConfirm={runConfirm}
+        onCancel={() => setConfirm(null)}
+      />
+
+      {resetResult ? (
+        <ResetPasswordDialog
+          name={resetResult.name}
+          password={resetResult.password}
+          onClose={() => setResetResult(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ResetPasswordDialog({ name, password, onClose }: { name: string; password: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-surface shadow-card-hover" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pt-5">
+          <h3 className="text-sm font-bold">Temporary password</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Share this password with {name}. It only shows once — they should change it after signing in.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <code className="flex-1 truncate rounded-lg border border-foreground/10 bg-background px-3 py-2 font-mono text-sm font-bold">
+              {password || "—"}
+            </code>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(password);
+                  setCopied(true);
+                } catch {
+                  setCopied(false);
+                }
+              }}
+              className="h-9 shrink-0 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+        <div className="mt-5 px-5 pb-5">
+          <button type="button" onClick={onClose} className="h-10 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
