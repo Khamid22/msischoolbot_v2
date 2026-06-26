@@ -99,7 +99,60 @@ export default function RatingPage(props: RatingPageProps) {
         </div>
       ) : null}
       {leaderboard.length ? (
-        <div className="max-h-[70dvh] overflow-auto">
+        <>
+        <div className="space-y-2 sm:hidden">
+          {leaderboard.map((row, index) => (
+            <div
+              key={`${row.rank}-${row.studentId}-${row.group}-${row.displayName}-mobile`}
+              className={`rounded-lg border p-3 ${
+                row.studentId === props.currentStudentId
+                  ? "border-info/30 bg-info/5"
+                  : "border-foreground/8 bg-background"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {row.isProvisional ? "Provisional" : `Rank #${row.rank || index + 1}`}
+                  </p>
+                  <p className="mt-0.5 break-words text-sm font-bold leading-snug">{row.displayName}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.group || "No group"}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-display text-xl font-bold leading-none">{row.averageCompositeDisplay}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">AVG</p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-muted px-2 py-2">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">EP</p>
+                  <p className="mt-0.5 text-xs font-bold">{row.examPerformanceDisplay || row.examPerformance}/9</p>
+                </div>
+                <div className="rounded-lg bg-muted px-2 py-2">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">AAP</p>
+                  <p className="mt-0.5 text-xs font-bold">{row.aapDisplay || row.aap}/9</p>
+                </div>
+                <div className="rounded-lg bg-muted px-2 py-2">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">AR</p>
+                  <p className="mt-0.5 text-xs font-bold">{row.attendanceRate}%</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <span
+                  className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ${
+                    row.isProvisional
+                      ? "bg-warning/20 text-foreground"
+                      : "bg-success/10 text-success"
+                  }`}
+                >
+                  {row.isProvisional ? "Needs more data" : "Official ranking"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="miniapp-table-scroll hidden max-h-[70dvh] sm:block">
           <table className="w-full min-w-[820px] text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
@@ -151,6 +204,7 @@ export default function RatingPage(props: RatingPageProps) {
             </tbody>
           </table>
         </div>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">No rating data available.</p>
       )}

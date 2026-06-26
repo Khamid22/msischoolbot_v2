@@ -91,7 +91,7 @@
   }
 
   html, body, #root {
-    min-height: 100dvh;
+    min-height: var(--tg-app-height);
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
@@ -112,7 +112,8 @@
   html.tg-miniapp,
   html.tg-miniapp body,
   html.tg-miniapp #root {
-    height: 100dvh;
+    height: var(--tg-app-height);
+    min-height: var(--tg-app-height);
     overflow: hidden;
     overscroll-behavior-y: none;
   }
@@ -124,6 +125,10 @@
   a, button, input, select, textarea {
     touch-action: manipulation;
   }
+
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 @layer utilities {
@@ -133,4 +138,63 @@
   .shadow-card-hover { box-shadow: var(--card-shadow-hover); }
   .shadow-neo { box-shadow: var(--card-shadow-neo); }
   .bg-progress-accent { background: var(--bg-progress-accent); }
+  .app-height { height: var(--tg-app-height); }
+  .app-min-height { min-height: var(--tg-app-height); }
+  .miniapp-scroll {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .miniapp-table-scroll {
+    max-width: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .miniapp-table-scroll table {
+    max-width: none;
+  }
+  .miniapp-touch-target {
+    min-height: 2.5rem;
+  }
+  .safe-x {
+    padding-left: max(0.75rem, calc(var(--app-left-inset) + 0.5rem));
+    padding-right: max(0.75rem, calc(var(--app-right-inset) + 0.5rem));
+  }
+  .safe-y {
+    padding-top: calc(var(--app-top-inset) + 0.75rem);
+    padding-bottom: calc(var(--app-bottom-inset) + 0.75rem);
+  }
+}
+
+@layer components {
+  @media (max-width: 640px) {
+    html.tg-miniapp .shadow-card,
+    html.tg-miniapp .shadow-card-hover {
+      box-shadow: 0 1px 2px hsl(222 47% 11% / 0.05), 0 6px 18px hsl(222 47% 11% / 0.06);
+    }
+
+    html.tg-miniapp table {
+      font-size: 0.75rem;
+    }
+
+    html.tg-miniapp th,
+    html.tg-miniapp td {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+
+    html.tg-miniapp .recharts-wrapper,
+    html.tg-miniapp .recharts-surface {
+      max-width: 100%;
+    }
+
+    html.tg-miniapp .overflow-auto,
+    html.tg-miniapp .overflow-x-auto,
+    html.tg-miniapp .overflow-y-auto {
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
 }

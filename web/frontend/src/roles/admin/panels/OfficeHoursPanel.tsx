@@ -372,7 +372,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
           subtitle={`${filteredSlots.length} available sessions`}
           icon={<CalendarDays className="h-4 w-4 text-info" />}
         >
-          <div className="overflow-x-auto rounded-lg border border-foreground/10">
+          <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">

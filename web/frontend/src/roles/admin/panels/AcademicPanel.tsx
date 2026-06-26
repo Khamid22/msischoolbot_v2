@@ -949,7 +949,7 @@ function GroupGradebook({
               <p className="text-sm font-bold">Gradebook</p>
               <p className="text-xs text-muted-foreground">Attendance and homework by lesson</p>
             </div>
-            <div className="max-h-[72dvh] overflow-auto">
+            <div className="miniapp-table-scroll max-h-[72dvh]">
               <table className="min-w-[60rem] border-collapse text-left text-[11px] sm:min-w-full sm:text-xs">
                 <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr className="bg-surface">
@@ -1854,7 +1854,7 @@ function SchedulePanel({ state }: { state: any }) {
           </Select>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-foreground/10 bg-background">
+        <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
           <div className="min-w-[880px]">
             <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b border-foreground/10 bg-muted/40">
               <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
@@ -1915,7 +1915,7 @@ function SchedulePanel({ state }: { state: any }) {
               })}
             </div>
             <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]">
-              <div className="relative h-[720px] border-r border-foreground/10 bg-muted/20">
+              <div className="relative h-[min(720px,calc(var(--tg-app-height)-9rem))] min-h-[34rem] border-r border-foreground/10 bg-muted/20">
                 {hours.map((hour) => (
                   <div
                     key={hour}
@@ -1934,7 +1934,7 @@ function SchedulePanel({ state }: { state: any }) {
                 const dayIso = isoDate(day);
                 const daySessions = layoutSessionsForDay(timetableBlocks.filter((session) => asString(session.session_date) === dayIso));
                 return (
-                  <div key={dayIso} className="relative h-[720px] border-l border-foreground/10">
+                  <div key={dayIso} className="relative h-[min(720px,calc(var(--tg-app-height)-9rem))] min-h-[34rem] border-l border-foreground/10">
                     {hours.map((hour) => (
                       <div
                         key={`${dayIso}-${hour}`}
@@ -2397,7 +2397,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </span>
               </div>
 
-              <div className="max-h-[62dvh] overflow-auto rounded-lg border border-foreground/8">
+              <div className="miniapp-table-scroll max-h-[62dvh] rounded-lg border border-foreground/8">
                 {activeProgramItems.length ? (
                   <div className="divide-y divide-foreground/6">
                     {activeProgramItems.map((item: Record<string, unknown>) => {
@@ -2820,7 +2820,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </p>
                 </div>
               ) : (
-                <div className="max-h-[calc(100dvh-25rem)] min-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+                <div className="max-h-[calc(var(--tg-app-height)-25rem)] min-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
                   <div className="sticky top-0 z-10 hidden border-b border-foreground/10 bg-muted px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:grid sm:grid-cols-[1.7fr_1.4fr_5rem_6.5rem_auto_1.5rem] sm:items-center sm:gap-3">
                     <span>Group</span>
                     <span>Subject Program</span>

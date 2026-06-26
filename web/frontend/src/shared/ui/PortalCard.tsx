@@ -11,7 +11,7 @@ interface CenteredPageProps {
 export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
   return (
     <div
-      className="flex h-[100dvh] flex-col overflow-y-auto bg-background"
+      className="flex app-height flex-col overflow-y-auto bg-background"
       style={{
         paddingTop: "calc(var(--app-top-inset) + 1rem)",
         paddingRight: "max(0.75rem, calc(var(--app-right-inset) + 0.5rem))",
@@ -21,7 +21,7 @@ export function CenteredPage({ title, subtitle, children }: CenteredPageProps) {
         WebkitOverflowScrolling: "touch",
       }}
     >
-      <div className="flex min-h-[100dvh] flex-1 items-center justify-center">
+      <div className="flex min-h-full flex-1 items-center justify-center">
         <div className="w-full max-w-md">
           <div className={`rounded-3xl border border-primary/10 bg-surface/95 p-6 shadow-card sm:p-8 ${motion.panel}`}>
             <div className="mb-6 text-center">

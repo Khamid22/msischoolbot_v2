@@ -1,5 +1,6 @@
 import { Component, Suspense, lazy, useEffect } from "react";
 import { readBootstrap } from "@/shared/lib/bootstrap";
+import { initTelegramViewport } from "@/shared/lib/telegram";
 
 const bootstrap = readBootstrap();
 
@@ -90,6 +91,10 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
 }
 
 const App = () => {
+  useEffect(() => {
+    initTelegramViewport();
+  }, []);
+
   useStudentActivityHeartbeat(bootstrap.page, bootstrap.props);
 
   return (

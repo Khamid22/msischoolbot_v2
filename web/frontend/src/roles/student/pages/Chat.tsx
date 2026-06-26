@@ -266,7 +266,7 @@ export default function ChatPage(props: ChatPageProps) {
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const pageContent = (
     <>
-      <div className={`flex flex-col animate-in ${isAdminEmbed ? "h-[calc(100dvh-8rem)] min-h-[34rem]" : "h-full"}`}>
+      <div className={`flex flex-col animate-in ${isAdminEmbed ? "h-[calc(var(--tg-app-height)-8rem)] min-h-[34rem]" : "h-full"}`}>
         <div className="mb-3 flex gap-2 overflow-x-auto pb-0.5">
           {rooms.map((room) => (
             <button

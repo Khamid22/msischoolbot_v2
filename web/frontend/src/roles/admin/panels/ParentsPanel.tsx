@@ -320,7 +320,7 @@ export default function ParentsPanel({ state }: { state: any }) {
   const onlySearch = filters.search.trim() && activeCount === 1;
 
   return (
-    <div className="flex min-h-[calc(100dvh-var(--app-top-inset)-2rem)] flex-col gap-4">
+    <div className="flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-1rem)] flex-col gap-3 sm:gap-4">
       <HeaderBar onAdd={() => { setFormError(""); setForm({ mode: "create", parent: null }); }} />
 
       {banner ? (

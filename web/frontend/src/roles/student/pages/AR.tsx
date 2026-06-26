@@ -157,7 +157,7 @@ export default function ARPage(props: ArPageProps) {
                 ))}
               </div>
 
-              <div className="hidden max-h-[70dvh] overflow-auto sm:block">
+              <div className="miniapp-table-scroll hidden max-h-[70dvh] sm:block">
                 <table className="w-full min-w-[720px] text-left">
                   <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                     <tr className="border-b border-foreground/5">

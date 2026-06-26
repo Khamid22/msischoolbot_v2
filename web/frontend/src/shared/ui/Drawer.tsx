@@ -72,14 +72,20 @@ export function Drawer({
         ref={panelRef}
         tabIndex={-1}
         className={`absolute inset-0 flex w-full flex-col bg-surface shadow-card-hover outline-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full ${widthClass} animate-in slide-in-from-right duration-200 motion-reduce:animate-none`}
+        style={{
+          paddingTop: "var(--app-top-inset)",
+          paddingRight: "var(--app-right-inset)",
+          paddingBottom: "var(--app-bottom-inset)",
+          paddingLeft: "var(--app-left-inset)",
+        }}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/8 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <h2 id={headingId} className="font-display truncate text-base font-bold leading-tight">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-foreground/8 px-3 py-3 sm:px-5">
+          <div className="min-w-0 flex-1">
+            <h2 id={headingId} className="font-display break-words text-base font-bold leading-tight">
               {title}
             </h2>
             {description ? (
-              <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
+              <div className="mt-0.5 break-words text-xs text-muted-foreground">{description}</div>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -95,10 +101,10 @@ export function Drawer({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-surface px-4 py-4 sm:px-5">{children}</div>
+        <div className="miniapp-scroll flex-1 bg-surface px-3 py-3 sm:px-5 sm:py-4">{children}</div>
 
         {footer ? (
-          <div className="shrink-0 border-t border-foreground/8 bg-surface/95 px-4 py-3 shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:px-5">
+          <div className="shrink-0 border-t border-foreground/8 bg-surface/95 px-3 py-3 shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:px-5">
             {footer}
           </div>
         ) : null}

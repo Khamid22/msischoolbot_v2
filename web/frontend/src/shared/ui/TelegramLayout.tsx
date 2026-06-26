@@ -88,7 +88,7 @@ interface TelegramLayoutProps {
 export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
   return (
     // overflow: hidden clips the shell so body-level scroll stays disabled.
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
+    <div className="flex app-height flex-col overflow-hidden bg-background">
       {topbar}
 
       {/*
@@ -96,13 +96,11 @@ export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
        * Without min-h-0 the item can't shrink, overflow-y-auto never fires,
        * and content is silently clipped by the shell's overflow:hidden.
        *
-       * No overflow-x set here — the shell's overflow:hidden clips any
-       * stray horizontal overflow at the viewport edge. Keeping overflow-x
-       * unset (defaults to auto due to CSS spec when overflow-y is set)
-       * lets child overflow-x-auto scroll rows work on all browsers.
+       * overflow-x-hidden keeps the page itself from drifting sideways; dense
+       * tables and carousels use their own inner scroll containers.
        */}
       <main
-        className="min-h-0 flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 lg:px-8"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 lg:px-8"
         style={{
           paddingTop: mainPadTop,
           paddingBottom: mainPadBottom,

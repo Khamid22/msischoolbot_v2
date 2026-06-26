@@ -114,7 +114,7 @@ function GroupGradebookCard({ group }: { group: GroupGradebook }) {
       ) : lessons.length === 0 ? (
         <div className="p-6 text-center text-sm text-muted-foreground">No lessons recorded yet.</div>
       ) : (
-        <div className="max-h-[70dvh] overflow-auto">
+        <div className="miniapp-table-scroll max-h-[70dvh]">
           <table className="min-w-full border-collapse text-left text-xs">
             <thead className="sticky top-0 z-30">
               <tr className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
@@ -330,7 +330,7 @@ export default function TeacherHome(props: TeacherPageProps) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="app-min-height bg-background">
       <header
         className="sticky top-0 z-40 border-b border-foreground/8 bg-surface/95 backdrop-blur"
         style={{ paddingTop: "var(--app-top-inset)" }}
@@ -455,7 +455,7 @@ export default function TeacherHome(props: TeacherPageProps) {
               <div className="border-b border-foreground/8 px-4 py-3 bg-surface/50">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Upcoming Bookings</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="miniapp-table-scroll">
                 <table className="min-w-full border-collapse text-left text-xs">
                   <thead>
                     <tr className="bg-muted/30 border-b border-foreground/8">
@@ -554,7 +554,7 @@ export default function TeacherHome(props: TeacherPageProps) {
               <div className="border-b border-foreground/8 px-4 py-3 bg-surface/50">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">My Availability</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="miniapp-table-scroll">
                 <table className="min-w-full border-collapse text-left text-xs">
                   <thead>
                     <tr className="bg-muted/30 border-b border-foreground/8">

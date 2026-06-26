@@ -369,11 +369,28 @@ export function asPositiveNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+/**
+ * Parse a stored timestamp as UTC. Activity timestamps are written as UTC, but
+ * not every row carries an explicit `Z`/offset — a naive string like
+ * "2026-06-26 10:00:00" would otherwise be read as *local* time and show the
+ * wrong "last seen". When no timezone is present we treat the value as UTC.
+ */
+export function parseTimestampUtc(value: unknown): number {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return NaN;
+  if (/([zZ]|[+-]\d{2}:?\d{2})$/.test(raw)) {
+    return Date.parse(raw);
+  }
+  const normalized = `${raw.replace(" ", "T")}Z`;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : Date.parse(raw);
+}
+
 export function formatLastSeen(value: unknown): { label: string; online: boolean } {
   const raw = typeof value === "string" ? value.trim() : "";
   if (!raw) return { label: "Never", online: false };
 
-  const ts = Date.parse(raw);
+  const ts = parseTimestampUtc(raw);
   if (!Number.isFinite(ts)) return { label: "Never", online: false };
 
   const diffSec = Math.floor((Date.now() - ts) / 1000);

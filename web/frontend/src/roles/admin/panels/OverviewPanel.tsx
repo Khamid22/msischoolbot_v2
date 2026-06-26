@@ -1021,7 +1021,7 @@ function RoleOverviewPanel({ state }: { state: any }) {
         <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
           <ChartCard title="Group Academic Risk" subtitle={`${atRiskGroups.length} groups in Yellow/Red zones`} icon={<AlertCircle className="h-4 w-4 text-info" />}>
             {atRiskGroups.length ? (
-              <div className="max-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+              <div className="miniapp-table-scroll max-h-[22rem] rounded-lg border border-foreground/10">
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                     <tr className="border-b border-foreground/5">
@@ -1066,7 +1066,7 @@ function RoleOverviewPanel({ state }: { state: any }) {
 
           <ChartCard title="Academic Quality / Teacher Performance" subtitle={`${teachers.length} teachers`} icon={<Trophy className="h-4 w-4 text-info" />}>
             {teachers.length ? (
-              <div className="max-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
+              <div className="miniapp-table-scroll max-h-[22rem] rounded-lg border border-foreground/10">
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                     <tr className="border-b border-foreground/5">

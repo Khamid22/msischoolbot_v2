@@ -670,7 +670,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
                       </button>
                     </div>
                   </form>
-                  <div className="overflow-x-auto rounded-lg border border-foreground/10">
+                  <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
                     <table className="w-full min-w-[48rem] text-left">
                       <thead className="bg-muted/60">
                         <tr>

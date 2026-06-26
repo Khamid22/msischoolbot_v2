@@ -342,7 +342,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-var(--app-top-inset)-6rem)] flex-col gap-3 lg:min-h-[calc(100dvh-2rem)]">
+    <div className="flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-6rem)] flex-col gap-3 lg:min-h-[calc(var(--tg-app-height)-2rem)]">
       {error ? (
         <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
           {error}

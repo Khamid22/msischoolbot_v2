@@ -2275,7 +2275,7 @@ export default function TeachersPanel({ state }: { state: any }) {
               <option value="name">Name (A–Z)</option>
             </select>
           </div>
-          <div className="max-h-[70dvh] overflow-auto">
+          <div className="miniapp-table-scroll max-h-[70dvh]">
             <table className="w-full min-w-[640px] text-left">
               <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">
@@ -2360,7 +2360,7 @@ export default function TeachersPanel({ state }: { state: any }) {
           subtitle={`${teachers.length} assigned`}
           icon={<Users className="h-4 w-4 text-info" />}
         >
-          <div className="max-h-[70dvh] overflow-auto">
+          <div className="miniapp-table-scroll max-h-[70dvh]">
             <table className="w-full min-w-[920px] text-left">
               <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">

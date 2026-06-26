@@ -644,7 +644,7 @@ function PaymentRowsTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-foreground/10">
+    <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
       <table className="w-full min-w-[38rem] text-left">
         <thead className="bg-muted/60">
           <tr>

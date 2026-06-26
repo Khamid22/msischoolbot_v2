@@ -199,7 +199,7 @@ export default function ResourcesPanel({ state }: { state: any }) {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-foreground/10">
-          <div className="max-h-[58dvh] overflow-auto">
+          <div className="miniapp-table-scroll max-h-[58dvh]">
             <table className="w-full min-w-[920px] text-left">
               <thead className="sticky top-0 z-20 bg-muted shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr>

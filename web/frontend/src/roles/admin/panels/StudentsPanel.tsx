@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { adminStickyTop, asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId } from "../shared";
+import { adminStickyTop, asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
 
@@ -251,7 +251,7 @@ function initialsFor(name: unknown) {
 function activityBucket(lastSeen: unknown): ActivityFilter {
   const raw = typeof lastSeen === "string" ? lastSeen.trim() : "";
   if (!raw) return "never";
-  const timestamp = Date.parse(raw);
+  const timestamp = parseTimestampUtc(raw);
   if (!Number.isFinite(timestamp)) return "never";
   const diffDays = (Date.now() - timestamp) / 86_400_000;
   return diffDays <= 7 ? "recent" : "inactive";
@@ -442,7 +442,69 @@ export default function StudentsPanel({ state }: { state: any }) {
           </div>
         }
       >
-        <div className="max-h-[68dvh] overflow-auto">
+        {visibleStudents.length ? (
+          <div className="space-y-2 sm:hidden">
+            {visibleStudents.map((student: Record<string, unknown>) => {
+              const seen = formatLastSeen(student.last_seen_at);
+              const studentRowId = getStudentRowId(student);
+              const studentCode = getStudentCode(student);
+              return (
+                <div key={`${studentRowId}-mobile`} className="rounded-lg border border-foreground/8 bg-background p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold">
+                      {initialsFor(student.full_name) || "ST"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <a
+                        href={routes.adminStudentPanel(studentRowId, currentSchool)}
+                        className="block break-words text-sm font-bold leading-snug hover:underline"
+                      >
+                        {asString(student.full_name)}
+                      </a>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Code {studentCode || "-"}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{asString(student.school_name)}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <a
+                        href={routes.adminStudentPanel(studentRowId, currentSchool)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                        aria-label={`Open ${asString(student.full_name)} dashboard`}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </a>
+                      <a
+                        href={routes.adminStudentProfile(studentRowId)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                        aria-label={`Edit ${asString(student.full_name)}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {subjectList(student.subjects).slice(0, 4).map((subject) => (
+                      <span
+                        key={`${studentRowId}-mobile-${subject}`}
+                        className="rounded-md border border-foreground/10 bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+                      >
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                  <p className={`mt-2 text-xs ${seen.online ? "font-semibold text-green-600" : "text-muted-foreground"}`}>
+                    {seen.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="rounded-lg border border-dashed border-foreground/15 bg-background px-3 py-8 text-center text-sm text-muted-foreground sm:hidden">
+            No students match your filters.
+          </p>
+        )}
+
+        <div className="miniapp-table-scroll hidden max-h-[68dvh] sm:block">
           <table className="w-full min-w-[860px] text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">

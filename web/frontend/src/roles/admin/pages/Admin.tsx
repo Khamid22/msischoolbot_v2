@@ -203,7 +203,7 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
       src={frameUrl}
       title={`${config.title} - ${asString(student.full_name) || "Student"}`}
       className="block w-full bg-background"
-      style={{ height: usesInternalFrameScroll ? "calc(100dvh - 1.5rem)" : `${frameHeight}px` }}
+      style={{ height: usesInternalFrameScroll ? "calc(var(--tg-app-height) - 1.5rem)" : `${frameHeight}px` }}
       scrolling={usesInternalFrameScroll ? "auto" : "no"}
       onLoad={(event) => {
         const frame = event.currentTarget;
@@ -727,7 +727,7 @@ export default function AdminPage(props: AdminPageProps) {
   }, [state.mobileNavOpen, state.setMobileNavOpen]);
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="app-min-height bg-background">
       <AdminSidebar state={state} csrfToken={props.csrfToken} />
 
       <header
@@ -797,7 +797,7 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className="flex min-h-[100dvh] w-full flex-col px-3 pb-6 pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
+        className="flex app-min-height w-full flex-col px-3 pb-[calc(var(--app-bottom-inset)+1rem)] pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:w-[calc(100%-16rem)] lg:pt-4"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
