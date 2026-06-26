@@ -1,3 +1,4 @@
+import base64
 import os
 import time
 
@@ -51,6 +52,19 @@ def _request_public_base_url():
     return f"{proto}://{host}".rstrip("/") if host else ""
 
 
+def _telegram_parent_invite_url(token):
+    bot_username = (
+        os.environ.get("TELEGRAM_BOT_USERNAME")
+        or os.environ.get("BOT_USERNAME")
+        or ""
+    )
+    bot_username = str(bot_username).strip().lstrip("@")
+    if not bot_username:
+        return ""
+    safe_token = base64.urlsafe_b64encode(str(token).encode("utf-8")).decode("ascii").rstrip("=")
+    return f"https://t.me/{bot_username}?startapp=parent_{safe_token}"
+
+
 def register_admin_student_routes(
     router,
     *,
@@ -92,8 +106,20 @@ def register_admin_student_routes(
         )
         invite_path = f"/parent/link/{token}"
         base_url = _request_public_base_url()
-        invite_url = f"{base_url}{invite_path}" if base_url else invite_path
-        return jsonify({"ok": True, "invite_url": invite_url, "inviteUrl": invite_url})
+        web_invite_url = f"{base_url}{invite_path}" if base_url else invite_path
+        telegram_invite_url = _telegram_parent_invite_url(token)
+        invite_url = telegram_invite_url or web_invite_url
+        return jsonify(
+            {
+                "ok": True,
+                "invite_url": invite_url,
+                "inviteUrl": invite_url,
+                "telegram_invite_url": telegram_invite_url,
+                "telegramInviteUrl": telegram_invite_url,
+                "web_invite_url": web_invite_url,
+                "webInviteUrl": web_invite_url,
+            }
+        )
 
     @router.get("/admin/students/<int:student_row_id>")
     def admin_student_profile(student_row_id):

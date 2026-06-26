@@ -1,6 +1,6 @@
 import { Component, Suspense, lazy, useEffect } from "react";
 import { readBootstrap } from "@/shared/lib/bootstrap";
-import { initTelegramViewport } from "@/shared/lib/telegram";
+import { getTelegramStartParam, initTelegramViewport } from "@/shared/lib/telegram";
 
 const bootstrap = readBootstrap();
 
@@ -22,6 +22,18 @@ const pageMap = {
 } as const;
 
 const ResolvedPage = pageMap[bootstrap.page] || pageMap["student-not-found"];
+
+function decodeParentStartToken(encodedToken: string): string {
+  try {
+    const padded = encodedToken.replace(/-/g, "+").replace(/_/g, "/").padEnd(
+      Math.ceil(encodedToken.length / 4) * 4,
+      "=",
+    );
+    return window.atob(padded);
+  } catch {
+    return "";
+  }
+}
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -93,6 +105,13 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
 const App = () => {
   useEffect(() => {
     initTelegramViewport();
+    const startParam = getTelegramStartParam();
+    if (startParam.startsWith("parent_")) {
+      const token = decodeParentStartToken(startParam.slice("parent_".length));
+      if (token) {
+        window.location.replace(`/parent/link/${encodeURIComponent(token)}`);
+      }
+    }
   }, []);
 
   useStudentActivityHeartbeat(bootstrap.page, bootstrap.props);

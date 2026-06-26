@@ -95,7 +95,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-CT6lFST5.js",
+    "file": "assets/index-5Pln2l1q.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -299,7 +299,7 @@
     ]
   },
   "src/roles/admin/pages/Admin.tsx": {
-    "file": "chunks/Admin-Ddo9URcK.js",
+    "file": "chunks/Admin-Be9QGTu5.js",
     "name": "Admin",
     "src": "src/roles/admin/pages/Admin.tsx",
     "isDynamicEntry": true,
@@ -524,7 +524,7 @@
     ]
   },
   "src/roles/parent/pages/ParentHome.tsx": {
-    "file": "chunks/ParentHome-C67pBNaX.js",
+    "file": "chunks/ParentHome-DCodFe4y.js",
     "name": "ParentHome",
     "src": "src/roles/parent/pages/ParentHome.tsx",
     "isDynamicEntry": true,
@@ -592,7 +592,7 @@
     ]
   },
   "src/roles/student/pages/Dashboard.tsx": {
-    "file": "chunks/Dashboard-CTzDXHBP.js",
+    "file": "chunks/Dashboard-Bovkxl_z.js",
     "name": "Dashboard",
     "src": "src/roles/student/pages/Dashboard.tsx",
     "isDynamicEntry": true,

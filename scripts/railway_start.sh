@@ -1,7 +1,7 @@
 #!/bin/sh
-# Railway web start: bind uvicorn to Railway's injected $PORT on all interfaces.
-# (No pre-flight import — that only added a startup failure mode for no benefit.)
+# Railway start: bind FastAPI to Railway's injected $PORT and run bot polling.
 set -eu
 
-echo "railway_start: port=${PORT:-8080}"
-exec uvicorn web.backend.server:app --host 0.0.0.0 --port "${PORT:-8080}"
+export RUN_MODE="${RUN_MODE:-both}"
+echo "railway_start: port=${PORT:-8080} run_mode=${RUN_MODE}"
+exec python main.py "${RUN_MODE}"

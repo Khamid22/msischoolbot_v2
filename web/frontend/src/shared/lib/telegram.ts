@@ -18,6 +18,9 @@ interface TelegramWebApp {
   viewportStableHeight?: number;
   platform?: string;
   initData?: string;
+  initDataUnsafe?: {
+    start_param?: string;
+  };
   onEvent?: (event: string, handler: () => void) => void;
 }
 
@@ -81,4 +84,17 @@ export function initTelegramViewport(): void {
 
   syncViewport();
   tg.onEvent?.("viewportChanged", syncViewport);
+}
+
+export function getTelegramStartParam(): string {
+  const unsafeParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+  if (typeof unsafeParam === "string" && unsafeParam.trim()) {
+    return unsafeParam.trim();
+  }
+
+  try {
+    return new URLSearchParams(window.location.search).get("tgWebAppStartParam")?.trim() || "";
+  } catch {
+    return "";
+  }
 }
