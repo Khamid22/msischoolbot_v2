@@ -277,7 +277,7 @@ def render_react_page(
 
     tg_script = f'\n    <script defer src="{tg_bundle_url}"></script>' if telegram else ""
 
-    body_attrs = ""
+    body_attrs = f' data-react-page="{str(escape(page_name))}"'
     if back_mode:
         body_attrs += f' data-tg-back-mode="{str(escape(back_mode))}"'
     if back_url:

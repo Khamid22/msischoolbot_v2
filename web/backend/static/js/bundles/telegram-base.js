@@ -433,7 +433,11 @@
       })
       .then(function (data) {
         if (data && data.ok && data.redirect) {
-          window.location.replace(data.redirect);
+          const targetUrl = new URL(data.redirect, window.location.href);
+          const currentUrl = new URL(window.location.href);
+          if (targetUrl.href !== currentUrl.href) {
+            window.location.replace(targetUrl.href);
+          }
         }
       })
       .catch(function () {
