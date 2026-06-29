@@ -15,10 +15,11 @@ import os
 import time
 from urllib.parse import parse_qsl
 
-# Per Telegram's spec the data-check-string excludes the ``hash`` field (the
-# HMAC we verify) and the ``signature`` field (a separate Ed25519 signature for
-# third-party validation that is not part of the bot-token HMAC).
-_EXCLUDED_FIELDS = ("hash", "signature")
+# Per Telegram's bot-token validation spec, the data-check-string excludes only
+# the ``hash`` field that carries the HMAC we verify. Newer clients may also
+# include a separate Ed25519 ``signature`` field; when present, it is still one
+# of the received fields and must remain in the bot-token data-check-string.
+_EXCLUDED_FIELDS = ("hash",)
 
 
 def _bot_token():

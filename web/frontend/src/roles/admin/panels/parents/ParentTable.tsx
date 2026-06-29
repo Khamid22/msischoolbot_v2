@@ -142,7 +142,7 @@ export function ParentTable({
   className?: string;
 }) {
   return (
-    <div className={className}>
+    <div className={`min-h-0 ${className}`}>
       {/* Desktop / laptop table */}
       <div className="hidden h-full min-h-0 overflow-hidden rounded-lg border border-foreground/10 bg-background md:flex md:flex-col">
         <div className="min-h-0 flex-1 overflow-auto">
