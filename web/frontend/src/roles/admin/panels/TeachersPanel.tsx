@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ClipboardCheck,
@@ -39,6 +39,8 @@ const hiringStages = [
 ];
 
 const TRAINING_TARGET_LESSONS = 12;
+const HIRING_STAGE_PAGE_SIZE = 2;
+const TABLE_PAGE_SIZE = 8;
 
 const trainingRubric: Array<{ key: string; label: string; detail: string }> = [
   {
@@ -400,6 +402,48 @@ function StageButton({
     >
       {label}
     </button>
+  );
+}
+
+function PaginationControls({
+  page,
+  totalPages,
+  onPageChange,
+  label,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  label?: string;
+}) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2 border-t border-foreground/5 pt-2">
+      <span className="text-[11px] font-semibold text-muted-foreground">
+        {label || `Page ${page} of ${totalPages}`}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          className="h-7 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          className="h-7 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1715,18 +1759,38 @@ function CandidateDetailModal({
   );
 }
 
-export default function TeachersPanel({ state }: { state: any }) {
+export default function TeachersPanel({
+  state,
+  view = "combined",
+}: {
+  state: any;
+  view?: "combined" | "candidates" | "teachers";
+}) {
   const { teacherEdit, props, currentSchool } = state;
   const csrf: string = props.csrfToken || "";
 
+  const defaultTab: TeacherTab = view === "teachers" ? "active" : "hiring";
+  const visibleTabs = useMemo(
+    () =>
+      view === "candidates"
+        ? tabs.filter((tab) => tab.key !== "active")
+        : view === "teachers"
+          ? tabs.filter((tab) => tab.key === "active")
+          : tabs,
+    [view],
+  );
+
   const [activeTab, setActiveTab] = useState<TeacherTab>(() => {
+    if (view !== "combined") {
+      return defaultTab;
+    }
     if (typeof window !== "undefined") {
       const saved = window.sessionStorage.getItem(TAB_STORAGE_KEY);
       if (saved === "hiring" || saved === "training" || saved === "active") {
         return saved;
       }
     }
-    return "hiring";
+    return defaultTab;
   });
 
   const [teachers, setTeachers] = useState<Teacher[]>(
@@ -1762,7 +1826,16 @@ export default function TeachersPanel({ state }: { state: any }) {
   const [trainingSearch, setTrainingSearch] = useState("");
   const [trainingSort, setTrainingSort] = useState<"recent" | "progress" | "average" | "name">("recent");
   const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const [stagePages, setStagePages] = useState<Record<string, number>>({});
+  const [trainingPage, setTrainingPage] = useState(1);
+  const [teacherPage, setTeacherPage] = useState(1);
   const toastTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(defaultTab);
+    }
+  }, [activeTab, defaultTab, visibleTabs]);
 
   useEffect(() => {
     return () => {
@@ -1804,9 +1877,11 @@ export default function TeachersPanel({ state }: { state: any }) {
 
   function selectTab(tab: TeacherTab) {
     setActiveTab(tab);
-    try {
-      window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
-    } catch {
+    if (view === "combined") {
+      try {
+        window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
+      } catch {
+      }
     }
   }
 
@@ -2030,6 +2105,26 @@ export default function TeachersPanel({ state }: { state: any }) {
       }
       return asString(b.updated_at).localeCompare(asString(a.updated_at));
     });
+  const trainingTotalPages = Math.max(1, Math.ceil(trainingRows.length / TABLE_PAGE_SIZE));
+  const effectiveTrainingPage = Math.min(trainingPage, trainingTotalPages);
+  const pagedTrainingRows = trainingRows.slice(
+    (effectiveTrainingPage - 1) * TABLE_PAGE_SIZE,
+    effectiveTrainingPage * TABLE_PAGE_SIZE,
+  );
+  const teacherTotalPages = Math.max(1, Math.ceil(teachers.length / TABLE_PAGE_SIZE));
+  const effectiveTeacherPage = Math.min(teacherPage, teacherTotalPages);
+  const pagedTeachers = teachers.slice(
+    (effectiveTeacherPage - 1) * TABLE_PAGE_SIZE,
+    effectiveTeacherPage * TABLE_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setTrainingPage(1);
+  }, [trainingFilter, trainingSearch, trainingSort]);
+
+  useEffect(() => {
+    setTeacherPage(1);
+  }, [teachers.length]);
 
   return (
     <div className="space-y-4">
@@ -2115,30 +2210,41 @@ export default function TeachersPanel({ state }: { state: any }) {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border border-foreground/10 bg-surface p-1 shadow-card">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => selectTab(tab.key)}
-                className={`rounded-md px-3 py-2 text-left text-xs font-bold transition-colors sm:px-4 ${
-                  isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                <span className="block">{tab.label}</span>
-                <span
-                  className={`hidden text-[10px] font-semibold sm:block ${
-                    isActive ? "text-background/70" : "text-muted-foreground"
+        {visibleTabs.length > 1 ? (
+          <div className="inline-flex rounded-lg border border-foreground/10 bg-surface p-1 shadow-card">
+            {visibleTabs.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => selectTab(tab.key)}
+                  className={`rounded-md px-3 py-2 text-left text-xs font-bold transition-colors sm:px-4 ${
+                    isActive ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  {tab.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span className="block">{tab.label}</span>
+                  <span
+                    className={`hidden text-[10px] font-semibold sm:block ${
+                      isActive ? "text-background/70" : "text-muted-foreground"
+                    }`}
+                  >
+                    {tab.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              HR Manager / {activeTab === "active" ? "Teachers" : "Candidates"}
+            </p>
+            <h2 className="text-2xl font-bold">
+              {activeTab === "active" ? "Teachers" : activeTab === "training" ? "Training" : "Candidates"}
+            </h2>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {activeTab === "hiring" ? (
@@ -2181,6 +2287,12 @@ export default function TeachersPanel({ state }: { state: any }) {
               const stageCandidates = activeCandidates.filter(
                 (candidate) => (asString(candidate.status) || "new") === stage.key,
               );
+              const totalPages = Math.max(1, Math.ceil(stageCandidates.length / HIRING_STAGE_PAGE_SIZE));
+              const page = Math.min(stagePages[stage.key] || 1, totalPages);
+              const pagedCandidates = stageCandidates.slice(
+                (page - 1) * HIRING_STAGE_PAGE_SIZE,
+                page * HIRING_STAGE_PAGE_SIZE,
+              );
               return (
                 <div
                   key={stage.key}
@@ -2196,9 +2308,9 @@ export default function TeachersPanel({ state }: { state: any }) {
                     </span>
                   </div>
 
-                  <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
+                  <div className="grid min-h-0 flex-1 content-start gap-2">
                     {stageCandidates.length ? (
-                      stageCandidates.map((candidate) => (
+                      pagedCandidates.map((candidate) => (
                         <CandidateCard
                           key={asNumber(candidate.id)}
                           candidate={candidate}
@@ -2212,6 +2324,12 @@ export default function TeachersPanel({ state }: { state: any }) {
                       </div>
                     )}
                   </div>
+                  <PaginationControls
+                    page={page}
+                    totalPages={totalPages}
+                    onPageChange={(nextPage) => setStagePages((prev) => ({ ...prev, [stage.key]: nextPage }))}
+                    label={`${stageCandidates.length} total`}
+                  />
                 </div>
               );
             })}
@@ -2277,9 +2395,9 @@ export default function TeachersPanel({ state }: { state: any }) {
               <option value="name">Name (A–Z)</option>
             </select>
           </div>
-          <div className="miniapp-table-scroll max-h-[70dvh]">
+          <div className="overflow-x-auto rounded-lg border border-foreground/8">
             <table className="w-full min-w-[640px] text-left">
-              <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+              <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">
                   {["Candidate", "Progress", "Average", "Last evaluated", ""].map((heading) => (
                     <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -2290,7 +2408,7 @@ export default function TeachersPanel({ state }: { state: any }) {
               </thead>
               <tbody>
                 {trainingRows.length ? (
-                  trainingRows.map((candidate) => {
+                  pagedTrainingRows.map((candidate) => {
                     const meta = trainingMeta(candidate);
                     return (
                       <tr
@@ -2353,6 +2471,12 @@ export default function TeachersPanel({ state }: { state: any }) {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            page={effectiveTrainingPage}
+            totalPages={trainingTotalPages}
+            onPageChange={setTrainingPage}
+            label={`Showing ${pagedTrainingRows.length} of ${trainingRows.length} candidates`}
+          />
         </ChartCard>
       ) : null}
 
@@ -2362,9 +2486,9 @@ export default function TeachersPanel({ state }: { state: any }) {
           subtitle={`${teachers.length} assigned`}
           icon={<Users className="h-4 w-4 text-info" />}
         >
-          <div className="miniapp-table-scroll max-h-[70dvh]">
+          <div className="overflow-x-auto rounded-lg border border-foreground/8">
             <table className="w-full min-w-[920px] text-left">
-              <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+              <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">
                   {["Teacher", "Rank", "Progress", "Pay Rate", "Assigned Group", "Actions"].map((heading) => (
                     <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -2375,7 +2499,7 @@ export default function TeachersPanel({ state }: { state: any }) {
               </thead>
               <tbody>
                 {teachers.length ? (
-                  teachers.map((teacher) => (
+                  pagedTeachers.map((teacher) => (
                     <tr key={asNumber(teacher.id)} className="border-b border-foreground/5">
                       <td className="px-3 py-2.5">
                         <span className="block text-sm font-bold">{asString(teacher.full_name)}</span>
@@ -2442,6 +2566,12 @@ export default function TeachersPanel({ state }: { state: any }) {
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            page={effectiveTeacherPage}
+            totalPages={teacherTotalPages}
+            onPageChange={setTeacherPage}
+            label={`Showing ${pagedTeachers.length} of ${teachers.length} teachers`}
+          />
         </ChartCard>
       ) : null}
     </div>

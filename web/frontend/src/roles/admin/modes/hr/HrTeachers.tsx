@@ -1,7 +1,6 @@
 import TeachersPanel from "@/roles/admin/panels/TeachersPanel";
 
-// HR Manager teacher records. Reuses TeachersPanel (which also contains the
-// Hiring/Training candidate pipeline via its internal tabs).
+// HR Manager teacher records only. Candidates live in the Candidates tab.
 export default function HrTeachers({ state }: { state: any }) {
-  return <TeachersPanel state={state} />;
+  return <TeachersPanel state={state} view="teachers" />;
 }
