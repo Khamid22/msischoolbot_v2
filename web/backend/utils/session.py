@@ -6,7 +6,7 @@ from web.backend.utils.normalization import normalize_school_code
 
 def current_auth_role():
     role = str(session.get("auth_role", "")).strip().lower()
-    if role in {"admin", "student", "teacher"}:
+    if role in {"admin", "student", "teacher", "parent"}:
         return role
     return ""
 
@@ -35,6 +35,16 @@ def current_teacher_group():
 
 def current_auth_login():
     return str(session.get("auth_login", "")).strip()
+
+
+def current_parent_id():
+    if current_auth_role() != "parent":
+        return None
+    try:
+        parsed_value = int(session.get("parent_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
 
 
 def current_student_enrollment_id():
@@ -173,6 +183,31 @@ def set_teacher_session(teacher):
     return True
 
 
+def set_parent_session(parent, telegram_user_id=None):
+    if not isinstance(parent, dict) or not parent.get("id"):
+        return False
+
+    try:
+        parent_id = int(parent["id"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    if parent_id <= 0:
+        return False
+
+    session.clear()
+    session["auth_role"] = "parent"
+    session["auth_login"] = str(parent.get("full_name") or parent.get("telegram_username") or f"parent-{parent_id}").strip()
+    session["parent_id"] = parent_id
+    session["parent_full_name"] = str(parent.get("full_name", "")).strip()
+    parsed_telegram_user_id = parse_telegram_user_id(
+        telegram_user_id if telegram_user_id is not None else parent.get("telegram_user_id")
+    )
+    if parsed_telegram_user_id is not None:
+        session["telegram_user_id"] = parsed_telegram_user_id
+    session.permanent = True
+    return True
+
+
 def try_auto_login_student_by_telegram(telegram_user_id, fetch_student_by_telegram):
     if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
         return False
@@ -291,16 +326,17 @@ __all__ = [
     "current_auth_role",
     "current_admin_role",
     "current_auth_login",
+    "current_parent_id",
     "current_student_enrollment_id",
     "current_student_db_id",
     "current_student_full_name",
     "current_student_school_code",
     "parse_telegram_user_id",
     "set_admin_session",
+    "set_parent_session",
     "set_student_session",
     "try_auto_login_student_by_telegram",
     "build_dashboard_url",
     "url_for",
     "logout_portal_session",
 ]
-

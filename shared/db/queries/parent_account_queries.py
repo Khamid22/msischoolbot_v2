@@ -150,6 +150,58 @@ def get_parents_for_student(conn, student_row_id):
     ).fetchall()
 
 
+def get_parent_by_telegram_id(conn, telegram_user_id):
+    ensure_parent_accounts_schema(conn)
+    parent_id = _clean_positive_int(telegram_user_id)
+    if parent_id is None:
+        return None
+    return conn.execute(
+        """
+        SELECT id, full_name, phone, telegram_username, telegram_user_id,
+               source_admin_id, created_at, updated_at
+        FROM parents
+        WHERE telegram_user_id = %s
+        LIMIT 1
+        """,
+        (parent_id,),
+    ).fetchone()
+
+
+def list_parent_client_child_rows(conn, parent_id):
+    ensure_parent_accounts_schema(conn)
+    return conn.execute(
+        """
+        SELECT
+            p.id AS parent_id,
+            p.full_name,
+            p.phone,
+            p.telegram_username,
+            p.telegram_user_id,
+            p.source_admin_id,
+            p.created_at,
+            p.updated_at,
+            l.created_at AS linked_at,
+            s.id AS student_row_id,
+            s.full_name AS student_full_name,
+            s.student_id,
+            s.password,
+            s.subjects,
+            s.telegram_user_id AS student_telegram_user_id,
+            s.photo_url,
+            s.profile_description,
+            s.class_name,
+            s.school_name,
+            s.last_seen_at
+        FROM parent_student_links l
+        JOIN parents p ON p.id = l.parent_id
+        JOIN students s ON s.id = l.student_row_id
+        WHERE p.id = %s
+        ORDER BY lower(s.full_name) ASC, s.id ASC
+        """,
+        (int(parent_id),),
+    ).fetchall()
+
+
 def list_invite_parent_rows(conn):
     """All parent CLIENT accounts with their linked students for admin visibility."""
     ensure_parent_accounts_schema(conn)
@@ -184,4 +236,10 @@ def list_invite_parent_rows(conn):
     ).fetchall()
 
 
-__all__ = ["link_parent_from_invite", "get_parents_for_student", "list_invite_parent_rows"]
+__all__ = [
+    "get_parent_by_telegram_id",
+    "get_parents_for_student",
+    "link_parent_from_invite",
+    "list_invite_parent_rows",
+    "list_parent_client_child_rows",
+]

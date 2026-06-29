@@ -15,6 +15,7 @@ from shared.identity.account_service import (
     verify_student_credentials,
     verify_teacher_credentials,
 )
+from web.backend.roles.parent.services import parent_from_telegram_user_id
 from web.backend.utils.session import (
     build_dashboard_url,
     current_admin_role,
@@ -22,6 +23,7 @@ from web.backend.utils.session import (
     current_student_enrollment_id,
     logout_portal_session,
     set_admin_session,
+    set_parent_session,
     set_student_session,
     set_teacher_session,
     url_for,
@@ -191,6 +193,9 @@ def register_user_auth_routes(
         if role == "teacher":
             return redirect("/teacher")
 
+        if role == "parent":
+            return render_parent_page()
+
         # Telegram auto-login happens via POST /auth/telegram, which verifies the
         # signed initData HMAC. The login page's JS calls it on Mini App startup.
         return render_login_page()
@@ -208,6 +213,12 @@ def register_user_auth_routes(
 
         student = get_student_by_telegram_user_id(telegram_user_id)
         if not student:
+            parent = parent_from_telegram_user_id(telegram_user_id)
+            if parent:
+                if not set_parent_session(parent, telegram_user_id):
+                    return jsonify({"ok": False, "error": "session_init_failed"}), 500
+                return jsonify({"ok": True, "linked": True, "role": "parent", "redirect": "/"})
+
             # Signature is valid but this Telegram account is not linked yet.
             return jsonify({"ok": True, "linked": False})
 

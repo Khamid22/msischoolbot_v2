@@ -138,11 +138,12 @@ class AuthAndSecurityMiddleware:
             # signed, server-verified token in the URL itself (same trust model as
             # /auth/telegram), so the path must bypass the session-cookie gate.
             or path.startswith("/parent/link/")
+            or path.startswith("/parent/invite/")
         )
 
         if not is_public:
             auth_role = request_obj.session.get("auth_role")
-            if not auth_role or auth_role not in {"admin", "student"}:
+            if not auth_role or auth_role not in {"admin", "student", "parent"}:
                 requested_with = request_obj.headers.get("X-Requested-With") or ""
                 is_xhr = requested_with == "XMLHttpRequest"
                 if path.startswith("/api/") or is_xhr:

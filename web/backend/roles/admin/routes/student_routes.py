@@ -1,8 +1,6 @@
 import os
 import time
 
-from itsdangerous import URLSafeTimedSerializer
-
 from web.backend.utils.response_helpers import jsonify, redirect
 from web.backend.utils.context import current_app, request, session
 from web.backend.utils.session import url_for
@@ -16,7 +14,7 @@ from shared.identity.account_service import (
     list_teachers,
     update_student_admin_profile,
 )
-from shared.identity.parent_invites import create_parent_invite_code
+from shared.identity.parent_invites import create_parent_invite_code, create_parent_invite_token
 from web.backend.roles.admin.routes.request_payload import request_payload
 from web.backend.roles.admin.services.academic_service import (
     create_student_with_enrollment_from_payload,
@@ -35,13 +33,6 @@ STUDENT_DASHBOARD_TARGET_ENDPOINTS = {
     "office-hours": "student.student_office_hours",
     "office_hours": "student.student_office_hours",
 }
-
-
-def _parent_invite_serializer():
-    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
-    if not secret:
-        raise RuntimeError("APP_SECRET_KEY is required to generate parent invite links.")
-    return URLSafeTimedSerializer(secret_key=secret, salt="msi-parent-invite-v1")
 
 
 def _request_public_base_url():
@@ -94,7 +85,7 @@ def register_admin_student_routes(
         if not profile:
             return jsonify({"ok": False, "message": "Selected student was not found."}), 404
 
-        token = _parent_invite_serializer().dumps(
+        token = create_parent_invite_token(
             {
                 "student_row_id": int(student_row_id),
                 "student_code": str(profile.get("student_code") or profile.get("student_id") or "").strip(),

@@ -1,10 +1,8 @@
 """Parent portal page renderer + invite-link flow."""
 
 import html
-import os
 
 from fastapi.responses import HTMLResponse
-from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from web.backend.utils.context import session, request as ctx_request
 from web.backend.render import generate_csrf
@@ -13,26 +11,10 @@ from web.backend.domains.announcements.service import list_announcements
 from web.backend.domains.resources.service import list_resources
 from web.backend.render import render_react_page
 from web.backend.roles.admin.services.parent_service import list_parent_children
-from web.backend.roles.parent.services import link_parent_via_invite
+from web.backend.roles.parent.services import link_parent_via_invite, list_parent_client_children
 from web.backend.utils.telegram_auth import telegram_user_from_init_data
-from shared.identity.parent_invites import get_parent_invite_token
-
-_INVITE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
-
-
-def _parent_invite_serializer():
-    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
-    if not secret:
-        raise RuntimeError("APP_SECRET_KEY is required to read parent invite links.")
-    return URLSafeTimedSerializer(secret_key=secret, salt="msi-parent-invite-v1")
-
-
-def _load_invite_payload(token):
-    """Return the signed invite payload, or None if the token is bad/expired."""
-    try:
-        return _parent_invite_serializer().loads(str(token or ""), max_age=_INVITE_MAX_AGE)
-    except BadSignature:
-        return None
+from web.backend.utils.session import set_parent_session
+from shared.identity.parent_invites import get_parent_invite_token, load_parent_invite_payload
 
 
 def _page(title, body_html, status_code=200, lang="uz", telegram_webapp=False):
@@ -377,7 +359,7 @@ def register_parent_invite_routes(app):
         token = get_parent_invite_token(code)
         if not token:
             return _invalid_link_page()
-        payload = _load_invite_payload(token)
+        payload = load_parent_invite_payload(token)
         if payload is None:
             return _invalid_link_page()
         student_name = str(payload.get("student_name") or "Student").strip()
@@ -389,7 +371,7 @@ def register_parent_invite_routes(app):
 
     @app.get("/parent/link/{token}")
     def parent_invite_link(token: str):
-        payload = _load_invite_payload(token)
+        payload = load_parent_invite_payload(token)
         if payload is None:
             return _invalid_link_page()
         student_name = str(payload.get("student_name") or "Student").strip()
@@ -401,7 +383,7 @@ def register_parent_invite_routes(app):
 
     @app.post("/parent/link/{token}")
     def parent_invite_submit(token: str):
-        payload = _load_invite_payload(token)
+        payload = load_parent_invite_payload(token)
         if payload is None:
             return _invalid_link_page()
 
@@ -444,6 +426,7 @@ def register_parent_invite_routes(app):
                     lang=lang,
                 )
 
+            set_parent_session(parent, telegram_parent["telegram_user_id"])
             return _confirmation_page(student_name, student_code, parent, lang=lang)
 
         values = {
@@ -481,17 +464,22 @@ def register_parent_invite_routes(app):
                 values=values,
             )
 
+        set_parent_session(parent)
         return _confirmation_page(student_name, student_code, parent, lang=values["lang"])
 
 
 def build_render_parent_page():
     def render_parent_page():
         try:
+            parent_id = int(session.get("parent_id", 0) or 0)
             admin_id = int(session.get("admin_id", 0) or 0)
         except (TypeError, ValueError):
+            parent_id = 0
             admin_id = 0
 
-        children = list_parent_children(admin_id) if admin_id else []
+        children = list_parent_client_children(parent_id) if parent_id else []
+        if not children and admin_id:
+            children = list_parent_children(admin_id)
 
         resources = []
         try:

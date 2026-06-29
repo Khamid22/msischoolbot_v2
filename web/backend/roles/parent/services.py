@@ -1,9 +1,13 @@
 """Parent role service facade."""
 
-from datetime import datetime
-
 from shared.db import queries
+from shared.identity.parent_accounts import (
+    link_parent_via_invite,
+    parent_children,
+    parent_from_telegram_user_id,
+)
 from web.backend.roles.admin.services.parent_service import (  # noqa: F401
+    _to_invite_child,
     assign_parent_child,
     create_parent_account,
     list_parent_accounts,
@@ -16,27 +20,17 @@ from web.backend.domains.payments.service import (  # noqa: F401
 )
 
 
-def link_parent_via_invite(
-    student_row_id,
-    full_name,
-    phone,
-    telegram_username,
-    telegram_user_id=None,
-):
-    """Create/update a parent CLIENT record from an invite and link them
-    to the student. Writes to the dedicated `parents` tables — never `admins`."""
-    now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+def list_parent_client_children(parent_id):
+    """Children for a parent CLIENT account, shaped for the parent portal."""
+    raw_rows = parent_children(parent_id)
+    if not raw_rows:
+        return []
     with queries.connect_auth_db() as conn:
-        parent = queries.link_parent_from_invite(
-            conn,
-            student_row_id=int(student_row_id),
-            full_name=full_name,
-            phone=phone,
-            telegram_username=telegram_username,
-            telegram_user_id=telegram_user_id,
-            now=now,
-        )
-    return dict(parent) if parent else None
+        return [
+            child
+            for child in (_to_invite_child(row, conn=conn) for row in raw_rows)
+            if child
+        ]
 
 
 __all__ = [
@@ -44,8 +38,10 @@ __all__ = [
     "create_parent_account",
     "link_parent_via_invite",
     "list_parent_accounts",
+    "list_parent_client_children",
     "list_parent_children",
     "list_student_payments",
     "payment_summary_for_student",
+    "parent_from_telegram_user_id",
     "remove_parent_child",
 ]
