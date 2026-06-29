@@ -71,6 +71,19 @@ def sync_students_from_dataset(dataset):
 
     with _DB_LOCK:
         with _connect() as conn:
+            # One login per person: index existing logins by (school, normalized
+            # name) so several sheet ids for the same student attach to a single
+            # row instead of minting a duplicate code. Updated as we insert.
+            identity_index = {}
+            for existing in conn.execute(
+                "SELECT id, full_name, school_key FROM students"
+            ).fetchall():
+                identity_key = (
+                    canonical.normalize_school_code(existing["school_key"]),
+                    canonical.normalize_text(existing["full_name"]),
+                )
+                identity_index.setdefault(identity_key, int(existing["id"]))
+
             for student in students:
                 if not isinstance(student, dict):
                     continue
@@ -96,6 +109,8 @@ def sync_students_from_dataset(dataset):
                     school_key=school_code,
                 )
 
+                identity_key = (school_code, canonical.normalize_text(full_name))
+
                 if mapping:
                     student_row_id = int(mapping["student_row_id"])
                     queries.update_student_profile(
@@ -104,6 +119,28 @@ def sync_students_from_dataset(dataset):
                         subject_label,
                         school_name,
                         student_row_id,
+                        school_code,
+                    )
+                    identity_index.setdefault(identity_key, student_row_id)
+                    updated += 1
+                    continue
+
+                # Same person, another sheet id (e.g. a second subject): attach
+                # this id to their existing login instead of minting a new code.
+                existing_row_id = identity_index.get(identity_key)
+                if existing_row_id:
+                    queries.insert_students_sheet_map(
+                        conn,
+                        enrollment_id,
+                        existing_row_id,
+                        school_code,
+                    )
+                    queries.update_student_profile(
+                        conn,
+                        full_name,
+                        subject_label,
+                        school_name,
+                        existing_row_id,
                         school_code,
                     )
                     updated += 1
@@ -132,20 +169,26 @@ def sync_students_from_dataset(dataset):
                     student_row_id,
                     school_code,
                 )
+                identity_index[identity_key] = student_row_id
                 added += 1
 
-            # Remove stale students whose enrollment IDs are no longer present.
+            # Remove stale students. A login can own several sheet ids, so it is
+            # only stale when EVERY one of its ids has gone — deleting on the
+            # first stale id would wrongly remove a still-active student.
             stale_student_row_ids = []
             for school_code, active_enrollment_ids in active_enrollment_ids_by_school.items():
                 mapping_rows = queries.list_students_sheet_map_rows_by_school(
                     conn,
                     school_key=school_code,
                 )
+                ids_by_student = {}
                 for mapping_row in mapping_rows:
-                    mapped_enrollment_id = mapping_row["enrollment_id"]
-                    if mapped_enrollment_id in active_enrollment_ids:
-                        continue
-                    stale_student_row_ids.append(int(mapping_row["student_row_id"]))
+                    ids_by_student.setdefault(int(mapping_row["student_row_id"]), []).append(
+                        mapping_row["enrollment_id"]
+                    )
+                for student_row_id, enrollment_ids in ids_by_student.items():
+                    if not any(eid in active_enrollment_ids for eid in enrollment_ids):
+                        stale_student_row_ids.append(student_row_id)
 
             if stale_student_row_ids:
                 queries.delete_students_by_ids(conn, stale_student_row_ids)

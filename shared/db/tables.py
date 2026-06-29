@@ -71,10 +71,16 @@ def _create_tables_postgres(conn):
         CREATE TABLE IF NOT EXISTS students_sheet_map (
             school_key TEXT NOT NULL,
             sheet_student_id BIGINT NOT NULL,
-            student_row_id BIGINT NOT NULL UNIQUE,
+            student_row_id BIGINT NOT NULL,
             PRIMARY KEY (school_key, sheet_student_id),
             FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
         )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_students_sheet_map_student_row_id
+        ON students_sheet_map(student_row_id)
         """
     )
     conn.execute(
@@ -489,6 +495,15 @@ def ensure_students_schema(conn):
         ON students(telegram_user_id)
         WHERE telegram_user_id IS NOT NULL
         """
+    )
+    # A student can legitimately map to several sheet ids (the old Sheets import
+    # gave each subject its own public_dashboard_id). Drop the historical
+    # one-map-per-student UNIQUE so a single login can own multiple subject ids.
+    conn.execute(
+        "ALTER TABLE students_sheet_map DROP CONSTRAINT IF EXISTS students_sheet_map_student_row_id_key"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_students_sheet_map_student_row_id ON students_sheet_map(student_row_id)"
     )
     conn.execute(
         """

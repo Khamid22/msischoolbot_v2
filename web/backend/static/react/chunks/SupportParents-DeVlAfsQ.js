@@ -1,1 +1,0 @@
-import{j as t}from"./react-vendor-BBSa9SYs.js";import o from"./ParentsPanel-BY_Vjl-P.js";import"./routes-3iv9_ULB.js";import"./icons-BUrkiohj.js";import"./shared-BHgZxgWY.js";function s({state:r}){return t.jsx(o,{state:r})}export{s as default};

@@ -40,19 +40,19 @@ from scripts.find_duplicate_students import (  # noqa: E402
 )
 
 
-def _pick_canonical_unmapped(rows):
-    """Best canonical among unmapped rows: telegram link > has activity > lowest id."""
+def _pick_canonical(rows):
+    """Canonical to KEEP: telegram link > most attached data > lowest id."""
     return sorted(
         rows,
         key=lambda r: (
             0 if r["telegram_user_id"] is not None else 1,
-            0 if r["last_seen_at"] else 1,
+            -(int(r["parent_children"]) + int(r["parent_links"]) + int(r["payments"]) + int(r["complaints"]) + int(r["bookings"])),
             int(r["id"]),
         ),
     )[0]
 
 
-def plan_group(group, merge_unmapped):
+def plan_group(group, merge_unmapped, merge_multi_mapped):
     """Return (canonical, orphans, skip_reason). Exactly one of (orphans / skip) is meaningful."""
     mapped = [r for r in group if r["has_map"]]
     unmapped = [r for r in group if not r["has_map"]]
@@ -62,10 +62,13 @@ def plan_group(group, merge_unmapped):
     elif len(mapped) == 0:
         if not merge_unmapped:
             return None, [], "unmapped-only (use --merge-unmapped)"
-        canonical = _pick_canonical_unmapped(unmapped)
+        canonical = _pick_canonical(unmapped)
         orphans = [r for r in unmapped if r["id"] != canonical["id"]]
     else:
-        return None, [], "multi-mapped (2+ live identities — review manually)"
+        if not merge_multi_mapped:
+            return None, [], "multi-mapped (use --merge-multi-mapped)"
+        canonical = _pick_canonical(mapped)
+        orphans = [r for r in group if r["id"] != canonical["id"]]
 
     if not orphans:
         return canonical, [], "no orphans"
@@ -108,6 +111,13 @@ def merge_group(conn, canonical, orphans, counts):
     for orphan in orphans:
         orphan_id = int(orphan["id"])
 
+        # Move the orphan's sheet id(s) onto the canonical login so the sync
+        # keeps recognising them (student_row_id is no longer unique here).
+        counts["sheet_maps"] += conn.execute(
+            "UPDATE students_sheet_map SET student_row_id = %s WHERE student_row_id = %s",
+            (canonical_id, orphan_id),
+        ).rowcount
+
         counts["parent_children"] += _repoint_with_pk(conn, "parent_children", "parent_admin_id", canonical_id, orphan_id)
         counts["parent_links"] += _repoint_with_pk(conn, "parent_student_links", "parent_id", canonical_id, orphan_id)
         counts["payments"] += conn.execute(
@@ -145,6 +155,19 @@ def merge_group(conn, canonical, orphans, counts):
             (best, canonical_id, best),
         )
 
+    # Union the subject lists so the surviving login keeps every subject.
+    merged_subjects = []
+    for record in [canonical, *orphans]:
+        for part in str(record["subjects"] or "").replace(";", ",").split(","):
+            label = part.strip()
+            if label and label.casefold() not in [s.casefold() for s in merged_subjects]:
+                merged_subjects.append(label)
+    if merged_subjects:
+        conn.execute(
+            "UPDATE students SET subjects = %s WHERE id = %s",
+            (", ".join(merged_subjects), canonical_id),
+        )
+
     counts["groups_merged"] += 1
 
 
@@ -157,11 +180,17 @@ def main():
         action="store_true",
         help="Also merge all-unmapped groups (manual/leftover rows), picking the best as canonical.",
     )
+    parser.add_argument(
+        "--merge-multi-mapped",
+        action="store_true",
+        help="Also merge multi-mapped groups (same person held under several synced sheet ids).",
+    )
     args = parser.parse_args()
 
     counts = {
         "groups_merged": 0,
         "orphans_deleted": 0,
+        "sheet_maps": 0,
         "parent_children": 0,
         "parent_links": 0,
         "payments": 0,
@@ -177,7 +206,7 @@ def main():
         groups = group_duplicates(rows, school_filter=args.school)
 
         for (school, name), group in sorted(groups.items()):
-            canonical, orphans, reason = plan_group(group, args.merge_unmapped)
+            canonical, orphans, reason = plan_group(group, args.merge_unmapped, args.merge_multi_mapped)
             if not orphans:
                 if reason and reason != "no orphans":
                     skipped.append((school, name, reason))
@@ -199,6 +228,7 @@ def main():
     for key in (
         "groups_merged",
         "orphans_deleted",
+        "sheet_maps",
         "parent_children",
         "parent_links",
         "payments",

@@ -12,7 +12,7 @@ import {
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
+import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../../admin/shared";
 
 type ParentSection = "overview" | "announcements" | "payments" | "contact";
 
@@ -1003,7 +1003,7 @@ function ContactSection({
   );
 }
 
-export default function ParentPanel({ state }: { state: any }) {
+export default function ParentDashboard({ state }: { state: any }) {
   const currentSchool = asString(state.currentSchool) || "all";
   const section = normalizeSection(state.activeTab);
   const activeParentId = asNumber(state.activeParentId);

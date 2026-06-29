@@ -24,3 +24,5 @@ credentials.json
 web/backend/static/uploads/
 web/backend/static/js/bundles/
 web/frontend/dist/
+# Vite output — rebuilt at deploy (Dockerfile/nixpacks/railpack run npm run build)
+web/backend/static/react/

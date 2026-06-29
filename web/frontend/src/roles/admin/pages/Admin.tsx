@@ -47,7 +47,7 @@ const AcademicPanel = lazy(() => import("@/roles/admin/panels/AcademicPanel"));
 const AnnouncementsPanel = lazy(() => import("@/roles/admin/panels/AnnouncementsPanel"));
 const ResourcesPanel = lazy(() => import("@/roles/admin/panels/ResourcesPanel"));
 const ChatPanel = lazy(() => import("@/roles/admin/panels/ChatPanel"));
-const ParentPanel = lazy(() => import("@/roles/admin/panels/ParentPanel"));
+const ParentDashboard = lazy(() => import("@/roles/parent/pages/ParentDashboard"));
 const PaymentsPanel = lazy(() => import("@/roles/admin/panels/PaymentsPanel"));
 const ComplaintsPanel = lazy(() => import("@/roles/admin/panels/ComplaintsPanel"));
 const CareerGrowthPanel = lazy(() => import("@/roles/admin/panels/CareerGrowthPanel"));
@@ -446,7 +446,7 @@ function ActivePanel({ state }: { state: any }) {
     adminMode === "parent" &&
     ["overview", "announcements", "payments", "contact"].includes(panelState.activeTab)
   ) {
-    return <ParentPanel state={panelState} />;
+    return <ParentDashboard state={panelState} />;
   }
 
   // Role modes (CEO / Customer Support / HR) render their own components for the

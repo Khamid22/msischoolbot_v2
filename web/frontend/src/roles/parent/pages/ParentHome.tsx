@@ -1,14 +1,14 @@
 import { lazy, Suspense } from "react";
 import { LogOut, UserRound } from "lucide-react";
 
-const ParentPanel = lazy(() => import("@/roles/admin/panels/ParentPanel"));
+const ParentDashboard = lazy(() => import("@/roles/parent/pages/ParentDashboard"));
 
 export default function ParentHome(props: Record<string, unknown>) {
   const authLogin = String(props.authLogin || "");
   const logoutUrl = String(props.logoutUrl || "/logout");
   const csrfToken = String(props.csrfToken || "");
 
-  // ParentPanel reads state.props?.adminAnnouncements, so mirror top-level props there.
+  // ParentDashboard reads state.props?.adminAnnouncements, so mirror top-level props there.
   const state = { ...props, props };
 
   async function handleLogout(e: React.FormEvent<HTMLFormElement>) {
@@ -54,7 +54,7 @@ export default function ParentHome(props: Record<string, unknown>) {
             </div>
           }
         >
-          <ParentPanel state={state} />
+          <ParentDashboard state={state} />
         </Suspense>
       </main>
     </div>

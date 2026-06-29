@@ -35,6 +35,7 @@ from shared.academics import canonical  # noqa: E402
 
 def _ensure_schema(conn):
     queries.create_tables(conn)
+    queries.ensure_students_schema(conn)  # drops the legacy one-map-per-student UNIQUE
     queries.ensure_parent_children_schema(conn)
     queries.ensure_parent_accounts_schema(conn)
     queries.ensure_student_payments_schema(conn)
@@ -45,16 +46,15 @@ def _ensure_schema(conn):
 def fetch_student_rows(conn):
     return conn.execute(
         """
-        SELECT s.id, s.student_id, s.full_name, s.school_key,
+        SELECT s.id, s.student_id, s.full_name, s.school_key, s.subjects,
                s.telegram_user_id, s.last_seen_at,
-               (m.student_row_id IS NOT NULL) AS has_map,
+               EXISTS (SELECT 1 FROM students_sheet_map m WHERE m.student_row_id = s.id) AS has_map,
                (SELECT count(*) FROM parent_children pc WHERE pc.student_row_id = s.id) AS parent_children,
                (SELECT count(*) FROM parent_student_links pl WHERE pl.student_row_id = s.id) AS parent_links,
                (SELECT count(*) FROM student_payments sp WHERE sp.student_row_id = s.id) AS payments,
                (SELECT count(*) FROM parent_complaints px WHERE px.student_row_id = s.id) AS complaints,
                (SELECT count(*) FROM office_hour_bookings ob WHERE ob.student_row_id = s.id) AS bookings
         FROM students s
-        LEFT JOIN students_sheet_map m ON m.student_row_id = s.id
         ORDER BY s.school_key, s.full_name, s.id
         """
     ).fetchall()

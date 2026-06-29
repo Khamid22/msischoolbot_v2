@@ -1,1 +1,0 @@
-import{j as s}from"./react-vendor-BBSa9SYs.js";function o({value:t,max:e=100,className:r=""}){const a=Math.min(100,Math.max(0,t/e*100));return s.jsx("div",{className:`h-2 w-full overflow-hidden rounded-full bg-muted ${r}`,children:s.jsx("div",{className:"bg-progress-accent h-full rounded-full transition-all duration-500 ease-out",style:{width:`${a}%`}})})}export{o as P};

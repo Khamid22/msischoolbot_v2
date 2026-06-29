@@ -1276,24 +1276,53 @@ def create_student_with_enrollment(full_name, group_id):
         school_name = str(group["school_name"] or canonical.school_display_name(school_code))
         subject_name = _canonical_subject_name(group["subject_name"])
 
-        # Login identity — same helpers the Scheme of Work sync uses.
-        student_code = queries.get_next_student_code(conn, canonical.student_code_prefix(school_code))
-        default_password = student_code
-        student_row_id = queries.insert_student(
-            conn,
-            full_name,
-            student_code,
-            default_password,
-            subject_name,
-            school_name,
-            school_code,
-        )
-        queries.insert_student_auth(
-            conn,
-            student_row_id,
-            generate_password_hash(default_password),
-            now,
-        )
+        # Login identity. Reuse an existing students row for the same person
+        # (same normalized name + school) instead of minting a duplicate code.
+        # This keeps ONE login per person: adding someone who is already in the
+        # system (e.g. enrolling them into another group) links to their
+        # existing login rather than creating a second, divergent row.
+        target_norm = _normalize(full_name)
+        existing_student = None
+        for candidate in conn.execute(
+            "SELECT id, full_name, student_id, password, subjects FROM students WHERE school_key = %s",
+            (school_code,),
+        ).fetchall():
+            if _normalize(candidate["full_name"]) == target_norm:
+                existing_student = candidate
+                break
+
+        if existing_student:
+            reused = True
+            student_row_id = int(existing_student["id"])
+            student_code = str(existing_student["student_id"] or "")
+            default_password = str(existing_student["password"] or "")
+            # Keep the student's subject list inclusive of the new subject.
+            subjects = canonical.split_subjects(existing_student["subjects"])
+            if subject_name and subject_name not in subjects:
+                subjects.append(subject_name)
+                conn.execute(
+                    "UPDATE students SET subjects = %s WHERE id = %s",
+                    (", ".join(subjects), student_row_id),
+                )
+        else:
+            reused = False
+            student_code = queries.get_next_student_code(conn, canonical.student_code_prefix(school_code))
+            default_password = student_code
+            student_row_id = queries.insert_student(
+                conn,
+                full_name,
+                student_code,
+                default_password,
+                subject_name,
+                school_name,
+                school_code,
+            )
+            queries.insert_student_auth(
+                conn,
+                student_row_id,
+                generate_password_hash(default_password),
+                now,
+            )
 
         # Academic enrollment so the student appears in the group's gradebook.
         # Manual enrollments live in a high public_dashboard_id band to avoid
@@ -1332,6 +1361,7 @@ def create_student_with_enrollment(full_name, group_id):
         "enrollmentId": int(enrollment["id"]) if enrollment else 0,
         "studentCode": student_code,
         "password": default_password,
+        "reused": reused,
         "fullName": full_name,
         "schoolName": school_name,
         "subjectName": subject_name,

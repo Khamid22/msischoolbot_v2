@@ -77,6 +77,16 @@ def get_students_sheet_map_row(conn, enrollment_id, school_key=_DEFAULT_SCHOOL_K
     ).fetchone()
 
 
+def _merge_subject_labels(existing, new_label):
+    """Union the subject list. A login can own several subjects (one per sheet
+    id), so each sync pass must ADD its subject, never overwrite the others."""
+    items = [part.strip() for part in str(existing or "").replace(";", ",").split(",") if part.strip()]
+    new_label = str(new_label or "").strip()
+    if new_label and not any(part.casefold() == new_label.casefold() for part in items):
+        items.append(new_label)
+    return ", ".join(items)
+
+
 def update_student_profile(
     conn,
     full_name,
@@ -85,6 +95,11 @@ def update_student_profile(
     student_row_id,
     school_key=_DEFAULT_SCHOOL_KEY,
 ):
+    current = conn.execute(
+        "SELECT subjects FROM students WHERE id = %s",
+        (student_row_id,),
+    ).fetchone()
+    merged_subjects = _merge_subject_labels(current["subjects"] if current else "", subject_label)
     conn.execute(
         """
         UPDATE students
@@ -97,7 +112,7 @@ def update_student_profile(
         """,
         (
             full_name,
-            subject_label,
+            merged_subjects,
             school_name,
             _normalize_school_key(school_key),
             student_row_id,

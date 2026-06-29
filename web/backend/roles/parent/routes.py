@@ -348,7 +348,10 @@ def _confirmation_page(student_name, student_code, parent, *, lang="uz"):
 
 
 def _telegram_parent_from_init_data(init_data):
-    user = telegram_user_from_init_data(init_data)
+    # Parent invite links already carry their own signed, expiring token. Keep
+    # Telegram HMAC validation, but do not reject restored Mini App sessions
+    # only because Telegram's auth_date is older than WEBAPP_INIT_DATA_TTL.
+    user = telegram_user_from_init_data(init_data, max_age_seconds=0)
     if not user:
         return None
 
