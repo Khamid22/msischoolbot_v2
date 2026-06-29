@@ -38,6 +38,19 @@ def start_menu_keyboard(mini_app_url):
     )
 
 
+def parent_invite_keyboard(invite_url):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Open Parent Mini App",
+                    web_app=WebAppInfo(url=invite_url),
+                )
+            ]
+        ]
+    )
+
+
 def url_keyboard(button_text, target_url):
     return InlineKeyboardMarkup(
         inline_keyboard=[

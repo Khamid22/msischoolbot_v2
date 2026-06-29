@@ -15,6 +15,7 @@ from web.backend.render import render_react_page
 from web.backend.roles.admin.services.parent_service import list_parent_children
 from web.backend.roles.parent.services import link_parent_via_invite
 from web.backend.utils.telegram_auth import telegram_user_from_init_data
+from shared.identity.parent_invites import get_parent_invite_token
 
 _INVITE_MAX_AGE = 60 * 60 * 24 * 14  # 14 days
 
@@ -371,6 +372,21 @@ def _telegram_parent_from_init_data(init_data):
 
 
 def register_parent_invite_routes(app):
+    @app.get("/parent/invite/{code}")
+    def parent_invite_code_link(code: str):
+        token = get_parent_invite_token(code)
+        if not token:
+            return _invalid_link_page()
+        payload = _load_invite_payload(token)
+        if payload is None:
+            return _invalid_link_page()
+        student_name = str(payload.get("student_name") or "Student").strip()
+        student_code = str(payload.get("student_code") or "").strip()
+        lang = str(ctx_request.args.get("lang") or "uz").strip().lower()
+        if str(ctx_request.args.get("manual") or "").strip() == "1":
+            return _invite_form_page(token, student_name, student_code, values={"lang": lang})
+        return _telegram_connect_page(token, student_name, student_code, lang=lang)
+
     @app.get("/parent/link/{token}")
     def parent_invite_link(token: str):
         payload = _load_invite_payload(token)

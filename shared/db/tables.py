@@ -622,6 +622,35 @@ def ensure_parent_accounts_schema(conn):
     _create_parent_accounts_tables(conn)
 
 
+def ensure_parent_invites_schema(conn):
+    """Short bot deep-link codes for parent invite tokens.
+
+    Telegram `/start` payloads are intentionally short, so the full signed web
+    invite token is stored server-side and referenced by a compact code.
+    """
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS parent_invites (
+            code TEXT PRIMARY KEY,
+            token TEXT NOT NULL,
+            student_row_id BIGINT NOT NULL,
+            issued_by BIGINT,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL DEFAULT '',
+            used_at TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE,
+            FOREIGN KEY(issued_by) REFERENCES admins(id) ON DELETE SET NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_parent_invites_student
+        ON parent_invites(student_row_id, created_at)
+        """
+    )
+
+
 def ensure_parent_children_schema(conn):
     conn.execute(
         """
@@ -1038,6 +1067,7 @@ __all__ = [
     "create_tables",
     "ensure_admins_schema",
     "ensure_parent_accounts_schema",
+    "ensure_parent_invites_schema",
     "ensure_parent_children_schema",
     "ensure_parent_complaints_schema",
     "ensure_complaint_messages_schema",

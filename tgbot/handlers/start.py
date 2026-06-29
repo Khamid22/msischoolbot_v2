@@ -1,14 +1,39 @@
 from aiogram import Router
 from aiogram.filters import Command, CommandStart
 
-from tgbot.keyboards.inline_keyboard import start_menu_keyboard, student_menu_keyboard
+from tgbot.keyboards.inline_keyboard import (
+    parent_invite_keyboard,
+    start_menu_keyboard,
+    student_menu_keyboard,
+)
 from tgbot.settings import settings
 from shared.identity.account_service import record_bot_user
 
 router = Router()
 
 
+def _start_payload(message):
+    text = str(getattr(message, "text", "") or "").strip()
+    parts = text.split(maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+
+def _parent_invite_url(code):
+    return f"{settings.mini_app_url.rstrip('/')}/parent/invite/{code}"
+
+
 async def _send_start_payload(message):
+    payload = _start_payload(message)
+    if payload.startswith("parent_"):
+        code = payload.removeprefix("parent_").strip()
+        if code:
+            await message.answer(
+                "👋 <b>Welcome!</b>\n\n"
+                "Parent link received. Open the mini app below to connect to your child's dashboard.",
+                reply_markup=parent_invite_keyboard(_parent_invite_url(code)),
+            )
+            return
+
     await message.answer(
         "👋 <b>Welcome!</b>\n\n"
         "Open the mini app to continue, or use the quick bot tools below.\n\n"

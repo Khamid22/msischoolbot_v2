@@ -1,4 +1,3 @@
-import base64
 import os
 import time
 
@@ -17,6 +16,7 @@ from shared.identity.account_service import (
     list_teachers,
     update_student_admin_profile,
 )
+from shared.identity.parent_invites import create_parent_invite_code
 from web.backend.roles.admin.routes.request_payload import request_payload
 from web.backend.roles.admin.services.academic_service import (
     create_student_with_enrollment_from_payload,
@@ -52,7 +52,7 @@ def _request_public_base_url():
     return f"{proto}://{host}".rstrip("/") if host else ""
 
 
-def _telegram_parent_invite_url(token):
+def _telegram_parent_invite_url(code):
     bot_username = (
         os.environ.get("TELEGRAM_BOT_USERNAME")
         or os.environ.get("BOT_USERNAME")
@@ -61,8 +61,7 @@ def _telegram_parent_invite_url(token):
     bot_username = str(bot_username).strip().lstrip("@")
     if not bot_username:
         return ""
-    safe_token = base64.urlsafe_b64encode(str(token).encode("utf-8")).decode("ascii").rstrip("=")
-    return f"https://t.me/{bot_username}?startapp=parent_{safe_token}"
+    return f"https://t.me/{bot_username}?start=parent_{code}"
 
 
 def register_admin_student_routes(
@@ -107,11 +106,18 @@ def register_admin_student_routes(
         invite_path = f"/parent/link/{token}"
         base_url = _request_public_base_url()
         web_invite_url = f"{base_url}{invite_path}" if base_url else invite_path
-        telegram_invite_url = _telegram_parent_invite_url(token)
+        invite_code = create_parent_invite_code(
+            token,
+            student_row_id,
+            issued_by=int(session.get("admin_id", 0) or 0),
+        )
+        telegram_invite_url = _telegram_parent_invite_url(invite_code)
         invite_url = telegram_invite_url or web_invite_url
         return jsonify(
             {
                 "ok": True,
+                "invite_code": invite_code,
+                "inviteCode": invite_code,
                 "invite_url": invite_url,
                 "inviteUrl": invite_url,
                 "telegram_invite_url": telegram_invite_url,
