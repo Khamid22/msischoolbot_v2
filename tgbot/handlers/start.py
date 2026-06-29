@@ -81,7 +81,7 @@ async def _send_start_payload(message):
                     "👋 <b>Welcome!</b>\n\n"
                     "Your Telegram account is connected to your child's dashboard. "
                     "Open the mini app below.",
-                    reply_markup=parent_invite_keyboard(settings.mini_app_url),
+                    reply_markup=parent_invite_keyboard(_parent_invite_url(code)),
                 )
                 return
 

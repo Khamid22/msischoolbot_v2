@@ -4,6 +4,7 @@ import html
 
 from fastapi.responses import HTMLResponse
 
+from web.backend.utils.response_helpers import redirect
 from web.backend.utils.context import session, request as ctx_request
 from web.backend.render import generate_csrf
 
@@ -427,7 +428,7 @@ def register_parent_invite_routes(app):
                 )
 
             set_parent_session(parent, telegram_parent["telegram_user_id"])
-            return _confirmation_page(student_name, student_code, parent, lang=lang)
+            return redirect("/")
 
         values = {
             "full_name": str(form.get("full_name") or "").strip(),
