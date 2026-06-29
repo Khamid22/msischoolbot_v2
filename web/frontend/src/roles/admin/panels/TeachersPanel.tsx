@@ -648,7 +648,7 @@ function CandidateCard({
   }
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
+    <div className="min-w-0 overflow-hidden rounded-lg border border-foreground/8 bg-surface p-2.5 shadow-card">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold" title={asString(candidate.full_name)}>
@@ -657,7 +657,7 @@ function CandidateCard({
           <p className="truncate text-xs text-muted-foreground">{asString(candidate.subject) || "Subject not set"}</p>
         </div>
         <div className="flex min-w-0 shrink-0 items-start gap-1">
-          <span className="max-w-[6.5rem] truncate rounded-md bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">
+          <span className="max-w-[5.75rem] truncate rounded-md bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">
             {statusLabels[status] || status}
           </span>
           <button
@@ -674,7 +674,7 @@ function CandidateCard({
       </div>
 
       {(asString(candidate.phone) || asString(candidate.telegram_username) || asString(candidate.source)) ? (
-        <div className="mt-2 grid gap-1 text-[11px] text-muted-foreground">
+        <div className="mt-2 grid gap-0.5 text-[11px] leading-4 text-muted-foreground">
           {asString(candidate.phone) ? <span>{asString(candidate.phone)}</span> : null}
           {asString(candidate.telegram_username) ? <span>{asString(candidate.telegram_username)}</span> : null}
           {asString(candidate.source) ? <span>Source: {asString(candidate.source)}</span> : null}
@@ -682,7 +682,7 @@ function CandidateCard({
       ) : null}
 
       {latestEvent ? (
-        <div className="mt-2 rounded-md bg-background px-2.5 py-2 text-[11px] text-muted-foreground">
+        <div className="mt-2 rounded-md bg-background px-2.5 py-1.5 text-[11px] text-muted-foreground">
           <span className="font-bold text-foreground">{formatCandidateEvent(latestEvent.result)}</span>
           {latestEventAuthor ? <span> · by {latestEventAuthor}</span> : null}
           {latestEvent.score !== null && latestEvent.score !== undefined ? (
@@ -727,7 +727,7 @@ function CandidateCard({
         </div>
       ) : null}
 
-      <div className="mt-3 grid gap-2">
+      <div className="mt-2.5 grid gap-2">
         {status === "new" ? (
           <StageButton
             label="Move to Interview"
@@ -2176,7 +2176,7 @@ export default function TeachersPanel({ state }: { state: any }) {
           subtitle={`${activeCandidates.length} active · ${closedCandidates.length} closed`}
           icon={<ClipboardCheck className="h-4 w-4 text-info" />}
         >
-          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:h-[calc(var(--tg-app-height)-13rem)] lg:min-h-[30rem] lg:grid-cols-4">
             {hiringStages.map((stage) => {
               const stageCandidates = activeCandidates.filter(
                 (candidate) => (asString(candidate.status) || "new") === stage.key,
@@ -2184,19 +2184,19 @@ export default function TeachersPanel({ state }: { state: any }) {
               return (
                 <div
                   key={stage.key}
-                  className="min-w-0 rounded-lg border border-foreground/8 bg-background p-3"
+                  className="flex min-h-0 min-w-0 flex-col rounded-lg border border-foreground/8 bg-background p-2.5"
                 >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold">{stage.title}</p>
+                  <div className="mb-2.5 flex shrink-0 items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{stage.title}</p>
                       <p className="text-[11px] leading-4 text-muted-foreground">{stage.detail}</p>
                     </div>
-                    <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                    <span className="shrink-0 rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
                       {stageCandidates.length}
                     </span>
                   </div>
 
-                  <div className="grid gap-2">
+                  <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto pr-1">
                     {stageCandidates.length ? (
                       stageCandidates.map((candidate) => (
                         <CandidateCard
