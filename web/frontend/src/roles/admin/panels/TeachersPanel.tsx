@@ -396,7 +396,7 @@ function StageButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`h-8 rounded-lg px-3 text-xs font-bold transition-opacity disabled:opacity-50 ${toneClass}`}
+      className={`min-h-8 min-w-0 rounded-lg px-3 py-1.5 text-xs font-bold leading-tight transition-opacity disabled:opacity-50 ${toneClass}`}
     >
       {label}
     </button>
@@ -648,14 +648,16 @@ function CandidateCard({
   }
 
   return (
-    <div className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">{asString(candidate.full_name)}</p>
+    <div className="min-w-0 overflow-hidden rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold" title={asString(candidate.full_name)}>
+            {asString(candidate.full_name)}
+          </p>
           <p className="truncate text-xs text-muted-foreground">{asString(candidate.subject) || "Subject not set"}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="rounded-md bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">
+        <div className="flex min-w-0 shrink-0 items-start gap-1">
+          <span className="max-w-[6.5rem] truncate rounded-md bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">
             {statusLabels[status] || status}
           </span>
           <button
@@ -781,7 +783,7 @@ function CandidateCard({
               value={score}
               onChange={(event) => setScore(event.target.value)}
               placeholder="Test score (optional)"
-              className="h-8 rounded-lg border border-foreground/10 bg-surface px-2 text-xs outline-none"
+              className="h-8 min-w-0 rounded-lg border border-foreground/10 bg-surface px-2 text-xs outline-none"
             />
             <div className="grid grid-cols-2 gap-2">
               <StageButton
@@ -2174,45 +2176,47 @@ export default function TeachersPanel({ state }: { state: any }) {
           subtitle={`${activeCandidates.length} active · ${closedCandidates.length} closed`}
           icon={<ClipboardCheck className="h-4 w-4 text-info" />}
         >
-          <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 xl:grid xl:grid-cols-4 xl:overflow-visible">
-            {hiringStages.map((stage) => {
-              const stageCandidates = activeCandidates.filter(
-                (candidate) => (asString(candidate.status) || "new") === stage.key,
-              );
-              return (
-                <div
-                  key={stage.key}
-                  className="min-h-[13rem] w-[16rem] shrink-0 snap-start rounded-lg border border-foreground/8 bg-background p-3 xl:w-auto"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold">{stage.title}</p>
-                      <p className="text-[11px] leading-4 text-muted-foreground">{stage.detail}</p>
-                    </div>
-                    <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
-                      {stageCandidates.length}
-                    </span>
-                  </div>
-
-                  <div className="grid gap-2">
-                    {stageCandidates.length ? (
-                      stageCandidates.map((candidate) => (
-                        <CandidateCard
-                          key={asNumber(candidate.id)}
-                          candidate={candidate}
-                          busy={busyCandidateId === asNumber(candidate.id)}
-                          onAction={runCandidateAction}
-                        />
-                      ))
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-foreground/12 bg-surface/60 px-3 py-6 text-center">
-                        <p className="text-xs font-bold text-muted-foreground">No candidates</p>
+          <div className="-mx-1 overflow-x-auto px-1 pb-2">
+            <div className="grid min-w-[76rem] grid-cols-4 gap-3">
+              {hiringStages.map((stage) => {
+                const stageCandidates = activeCandidates.filter(
+                  (candidate) => (asString(candidate.status) || "new") === stage.key,
+                );
+                return (
+                  <div
+                    key={stage.key}
+                    className="min-w-0 rounded-lg border border-foreground/8 bg-background p-3"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold">{stage.title}</p>
+                        <p className="text-[11px] leading-4 text-muted-foreground">{stage.detail}</p>
                       </div>
-                    )}
+                      <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                        {stageCandidates.length}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2">
+                      {stageCandidates.length ? (
+                        stageCandidates.map((candidate) => (
+                          <CandidateCard
+                            key={asNumber(candidate.id)}
+                            candidate={candidate}
+                            busy={busyCandidateId === asNumber(candidate.id)}
+                            onAction={runCandidateAction}
+                          />
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-foreground/12 bg-surface/60 px-3 py-6 text-center">
+                          <p className="text-xs font-bold text-muted-foreground">No candidates</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </ChartCard>
       ) : null}
