@@ -28,6 +28,15 @@ def link_parent_via_invite(
             telegram_user_id=telegram_user_id,
             now=now,
         )
+        if parent and telegram_user_id:
+            parsed_telegram_user_id = int(telegram_user_id)
+            queries.clear_student_telegram_user_conflicts(conn, parsed_telegram_user_id, -1)
+            queries.clear_admin_telegram_user_conflicts(conn, parsed_telegram_user_id)
+            queries.clear_parent_telegram_user_conflicts(
+                conn,
+                parsed_telegram_user_id,
+                int(parent["id"]),
+            )
     return dict(parent) if parent else None
 
 

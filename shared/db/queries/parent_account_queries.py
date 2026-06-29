@@ -167,6 +167,37 @@ def get_parent_by_telegram_id(conn, telegram_user_id):
     ).fetchone()
 
 
+def clear_parent_telegram_user_conflicts(conn, telegram_user_id, parent_id=None):
+    ensure_parent_accounts_schema(conn)
+    parsed_telegram_user_id = _clean_positive_int(telegram_user_id)
+    if parsed_telegram_user_id is None:
+        return
+
+    if parent_id is not None:
+        parsed_parent_id = _clean_positive_int(parent_id)
+        if parsed_parent_id is None:
+            return
+        conn.execute(
+            """
+            UPDATE parents
+            SET telegram_user_id = NULL
+            WHERE telegram_user_id = %s
+              AND id <> %s
+            """,
+            (parsed_telegram_user_id, parsed_parent_id),
+        )
+        return
+
+    conn.execute(
+        """
+        UPDATE parents
+        SET telegram_user_id = NULL
+        WHERE telegram_user_id = %s
+        """,
+        (parsed_telegram_user_id,),
+    )
+
+
 def list_parent_client_child_rows(conn, parent_id):
     ensure_parent_accounts_schema(conn)
     return conn.execute(
@@ -237,6 +268,7 @@ def list_invite_parent_rows(conn):
 
 
 __all__ = [
+    "clear_parent_telegram_user_conflicts",
     "get_parent_by_telegram_id",
     "get_parents_for_student",
     "link_parent_from_invite",

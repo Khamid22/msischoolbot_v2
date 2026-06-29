@@ -1,7 +1,12 @@
 from aiogram import Router
 from aiogram.filters import Command
 
-from tgbot.helpers import escape, linked_admin_from_user, linked_student_from_user
+from tgbot.helpers import (
+    escape,
+    linked_admin_from_user,
+    linked_parent_from_user,
+    linked_student_from_user,
+)
 from shared.identity.account_service import unlink_telegram_user_links
 
 router = Router()
@@ -16,6 +21,7 @@ async def whoami_handler(message):
         return
 
     linked_admin = linked_admin_from_user(user)
+    linked_parent = linked_parent_from_user(user)
     linked_student = linked_student_from_user(user)
 
     lines = [f"Telegram ID: <code>{telegram_user_id}</code>"]
@@ -35,9 +41,16 @@ async def whoami_handler(message):
             f"Student ID: <b>{escape(linked_student.get('student_id', ''))}</b>"
         )
 
-    if not linked_admin and not linked_student:
+    if linked_parent:
         lines.append("")
-        lines.append("No linked admin/student account found for this Telegram ID.")
+        lines.append("👨‍👩‍👧 Linked as <b>Parent</b>")
+        lines.append(f"Name: <b>{escape(linked_parent.get('full_name', ''))}</b>")
+        if linked_parent.get("telegram_username"):
+            lines.append(f"Telegram: <b>@{escape(linked_parent.get('telegram_username', ''))}</b>")
+
+    if not linked_admin and not linked_student and not linked_parent:
+        lines.append("")
+        lines.append("No linked account found for this Telegram ID.")
 
     await message.answer("\n".join(lines))
 
@@ -57,7 +70,8 @@ async def unlink_me_handler(message):
 
     had_admin_link = bool(result.get("had_admin_link"))
     had_student_link = bool(result.get("had_student_link"))
-    if not had_admin_link and not had_student_link:
+    had_parent_link = bool(result.get("had_parent_link"))
+    if not had_admin_link and not had_student_link and not had_parent_link:
         await message.answer("No linked account was found. Nothing to unlink.")
         return
 
@@ -66,6 +80,8 @@ async def unlink_me_handler(message):
         unlinked_roles.append("admin")
     if had_student_link:
         unlinked_roles.append("student")
+    if had_parent_link:
+        unlinked_roles.append("parent")
 
     await message.answer(
         "✅ Unlinked this Telegram account from: "
