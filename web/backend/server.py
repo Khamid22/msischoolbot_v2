@@ -1026,6 +1026,12 @@ def _bootstrap_app(app_instance):
     import web.backend.routes.system as system_routes
     system_routes.STATIC_FOLDER = _STATIC_DIR
 
+    # Build small legacy Telegram helper bundles at startup. Some deploy
+    # environments start from source without generated bundle artifacts, and
+    # render_react_page still loads this helper when Telegram support is enabled.
+    from web.backend.js_bundles import ensure_js_bundles
+    ensure_js_bundles(_STATIC_DIR)
+
     # Include system router
     from web.backend.routes.system import router as system_router
     app_instance.include_router(system_router)

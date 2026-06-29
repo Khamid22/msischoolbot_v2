@@ -262,6 +262,7 @@ def build_admin_page_context(
         "students",
         "parents",
         "teachers",
+        "candidates",
         "resources",
         "payments",
         "complaints",
