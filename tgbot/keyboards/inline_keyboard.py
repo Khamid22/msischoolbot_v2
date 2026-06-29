@@ -23,6 +23,21 @@ def registration_keyboard(mini_app_url):
     )
 
 
+def start_menu_keyboard(mini_app_url):
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Open Mini App",
+                    web_app=WebAppInfo(url=mini_app_url),
+                )
+            ],
+            [InlineKeyboardButton(text="🟢 Quick Summary", callback_data="student_quick_summary")],
+            [InlineKeyboardButton(text="🔵 Contact US", callback_data="student_contact_us")],
+        ]
+    )
+
+
 def url_keyboard(button_text, target_url):
     return InlineKeyboardMarkup(
         inline_keyboard=[
