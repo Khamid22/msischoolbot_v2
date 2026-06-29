@@ -2176,47 +2176,45 @@ export default function TeachersPanel({ state }: { state: any }) {
           subtitle={`${activeCandidates.length} active · ${closedCandidates.length} closed`}
           icon={<ClipboardCheck className="h-4 w-4 text-info" />}
         >
-          <div className="-mx-1 overflow-x-auto px-1 pb-2">
-            <div className="grid min-w-[76rem] grid-cols-4 gap-3">
-              {hiringStages.map((stage) => {
-                const stageCandidates = activeCandidates.filter(
-                  (candidate) => (asString(candidate.status) || "new") === stage.key,
-                );
-                return (
-                  <div
-                    key={stage.key}
-                    className="min-w-0 rounded-lg border border-foreground/8 bg-background p-3"
-                  >
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold">{stage.title}</p>
-                        <p className="text-[11px] leading-4 text-muted-foreground">{stage.detail}</p>
-                      </div>
-                      <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
-                        {stageCandidates.length}
-                      </span>
+          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-4">
+            {hiringStages.map((stage) => {
+              const stageCandidates = activeCandidates.filter(
+                (candidate) => (asString(candidate.status) || "new") === stage.key,
+              );
+              return (
+                <div
+                  key={stage.key}
+                  className="min-w-0 rounded-lg border border-foreground/8 bg-background p-3"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold">{stage.title}</p>
+                      <p className="text-[11px] leading-4 text-muted-foreground">{stage.detail}</p>
                     </div>
-
-                    <div className="grid gap-2">
-                      {stageCandidates.length ? (
-                        stageCandidates.map((candidate) => (
-                          <CandidateCard
-                            key={asNumber(candidate.id)}
-                            candidate={candidate}
-                            busy={busyCandidateId === asNumber(candidate.id)}
-                            onAction={runCandidateAction}
-                          />
-                        ))
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-foreground/12 bg-surface/60 px-3 py-6 text-center">
-                          <p className="text-xs font-bold text-muted-foreground">No candidates</p>
-                        </div>
-                      )}
-                    </div>
+                    <span className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                      {stageCandidates.length}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+
+                  <div className="grid gap-2">
+                    {stageCandidates.length ? (
+                      stageCandidates.map((candidate) => (
+                        <CandidateCard
+                          key={asNumber(candidate.id)}
+                          candidate={candidate}
+                          busy={busyCandidateId === asNumber(candidate.id)}
+                          onAction={runCandidateAction}
+                        />
+                      ))
+                    ) : (
+                      <div className="rounded-lg border border-dashed border-foreground/12 bg-surface/60 px-3 py-6 text-center">
+                        <p className="text-xs font-bold text-muted-foreground">No candidates</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </ChartCard>
       ) : null}
