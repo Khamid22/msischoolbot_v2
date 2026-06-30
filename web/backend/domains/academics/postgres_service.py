@@ -602,13 +602,17 @@ def create_student_with_enrollment(full_name, group_id):
             reused = False
             student_code = _next_student_code(conn, canonical.student_code_prefix(school_code))
             default_password = student_code
+            legacy_student_row_id = _mint_legacy_id(conn, "students", "legacy_student_row_id")
             inserted = conn.execute(
                 """
-                INSERT INTO msi_v2.students (student_code, full_name, school_id, status)
-                VALUES (%s, %s, %s, 'active')
+                INSERT INTO msi_v2.students (
+                    student_code, full_name, school_id, status,
+                    password_plain, legacy_student_row_id
+                )
+                VALUES (%s, %s, %s, 'active', %s, %s)
                 RETURNING id
                 """,
-                (student_code, full_name, school_id),
+                (student_code, full_name, school_id, default_password, legacy_student_row_id),
             ).fetchone()
             student_id = int(inserted["id"])
             conn.execute(

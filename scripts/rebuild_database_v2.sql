@@ -583,6 +583,15 @@ ALTER TABLE msi_v2.group_students ADD COLUMN IF NOT EXISTS disqualified_at TIMES
 ALTER TABLE msi_v2.group_schedule_rules ADD COLUMN IF NOT EXISTS teacher_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL;
 ALTER TABLE msi_v2.group_schedule_rules ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
 
+-- Student profile fields kept on the row so the admin Students panel and login
+-- behave exactly as they did on the old denormalized students table:
+--   password_plain  -> admin "view login" credential (kept in sync on change)
+--   class_name / teacher_name / last_seen_at -> admin profile + activity display
+ALTER TABLE msi_v2.students ADD COLUMN IF NOT EXISTS password_plain TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.students ADD COLUMN IF NOT EXISTS class_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.students ADD COLUMN IF NOT EXISTS teacher_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.students ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+
 -- Schedule-generated calendar sessions are stored in lesson_sessions and tagged
 -- with their originating schedule rule, so the admin "sessions" list can show only
 -- generated calendar entries (program_item_id NULL) and keep them separate from the

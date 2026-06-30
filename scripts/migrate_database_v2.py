@@ -137,7 +137,8 @@ MIGRATION_STEPS: tuple[tuple[str, str], ...] = (
         """
         INSERT INTO msi_v2.students (
             student_code, full_name, school_id, telegram_user_id, photo_url,
-            profile_description, status, legacy_student_row_id, created_at, updated_at
+            profile_description, status, legacy_student_row_id,
+            password_plain, class_name, teacher_name, last_seen_at, created_at, updated_at
         )
         SELECT old.student_id,
                old.full_name,
@@ -147,6 +148,10 @@ MIGRATION_STEPS: tuple[tuple[str, str], ...] = (
                COALESCE(old.profile_description, ''),
                'active',
                old.id,
+               COALESCE(old.password, ''),
+               COALESCE(old.class_name, ''),
+               COALESCE(old.teacher_name, ''),
+               CASE WHEN COALESCE(old.last_seen_at, '') <> '' THEN old.last_seen_at::timestamptz ELSE NULL END,
                now(),
                now()
         FROM students old

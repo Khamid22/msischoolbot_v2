@@ -293,22 +293,22 @@ def list_students_for_admin(school_filter = canonical.ADMIN_SCHOOL_FILTER_ALL):
         rows = queries.list_students_for_admin_rows(conn, school_key=school_key)
         online_only_rows = conn.execute(
             """
-            SELECT DISTINCT e.full_name, s.name AS school_name
-            FROM academic_enrollments e
-            JOIN academic_groups g ON g.id = e.group_id
-            JOIN academic_schools s ON s.id = e.school_id
-            WHERE e.active = 1
-              AND e.enrollment_status = 'active'
-              AND lower(g.name) = 'online'
+            SELECT DISTINCT st.full_name, s.school_name AS school_name
+            FROM msi_v2.group_students gs
+            JOIN msi_v2.students st ON st.id = gs.student_id
+            JOIN msi_v2.groups g ON g.id = gs.group_id
+            JOIN msi_v2.schools s ON s.id = g.school_id
+            WHERE gs.enrollment_status = 'active'
+              AND lower(g.group_name) = 'online'
               AND NOT EXISTS (
                 SELECT 1
-                FROM academic_enrollments other_e
-                JOIN academic_groups other_g ON other_g.id = other_e.group_id
-                WHERE other_e.school_id = e.school_id
-                  AND lower(trim(other_e.full_name)) = lower(trim(e.full_name))
-                  AND other_e.active = 1
-                  AND other_e.enrollment_status = 'active'
-                  AND lower(other_g.name) <> 'online'
+                FROM msi_v2.group_students other_gs
+                JOIN msi_v2.groups other_g ON other_g.id = other_gs.group_id
+                JOIN msi_v2.students other_st ON other_st.id = other_gs.student_id
+                WHERE other_g.school_id = g.school_id
+                  AND lower(trim(other_st.full_name)) = lower(trim(st.full_name))
+                  AND other_gs.enrollment_status = 'active'
+                  AND lower(other_g.group_name) <> 'online'
               )
             """
         ).fetchall()
