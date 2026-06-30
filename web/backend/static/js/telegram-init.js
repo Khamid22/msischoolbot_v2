@@ -29,9 +29,33 @@
       initDataInput.value = initData;
     }
 
-    // Skip silent auto-login right after an explicit logout.
+    const pageName = document.body ? String(document.body.dataset.reactPage || "") : "";
     const currentUrl = new URL(window.location.href);
+
+    // Skip silent auto-login right after an explicit logout so staff can use
+    // manual credentials inside Telegram without being bounced back to the
+    // linked parent/student account.
     if (currentUrl.searchParams.get("logged_out") === "1") {
+      try {
+        window.sessionStorage.setItem("msiManualLoginMode", "1");
+      } catch (_error) {
+        // Ignore storage failures; the URL guard still protects this page load.
+      }
+      return;
+    }
+
+    // Telegram auto-auth is only a login-page convenience. Running it on admin,
+    // parent, or student pages can replace an intentional session with whichever
+    // account is linked to the current Telegram user.
+    if (pageName !== "login") {
+      return;
+    }
+
+    try {
+      if (window.sessionStorage.getItem("msiManualLoginMode") === "1") {
+        return;
+      }
+    } catch (_error) {
       return;
     }
 

@@ -13,6 +13,11 @@ export default function ParentHome(props: Record<string, unknown>) {
 
   async function handleLogout(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    try {
+      window.sessionStorage.setItem("msiManualLoginMode", "1");
+    } catch {
+      // If storage is unavailable, the logged_out URL flag still prevents auto-login.
+    }
     await fetch(logoutUrl, {
       method: "POST",
       headers: {
@@ -21,7 +26,7 @@ export default function ParentHome(props: Record<string, unknown>) {
       },
       credentials: "same-origin",
     }).catch(() => {});
-    window.location.href = "/";
+    window.location.href = "/?logged_out=1";
   }
 
   return (
