@@ -1,7 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertCircle, CheckCircle2, Plus, UserRound, X } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { Pagination } from "@/shared/ui/Pagination";
 import { asNumber, asString } from "../shared";
 import {
   type ParentFilters,
@@ -28,6 +29,7 @@ type ConfirmKind = "unlink" | "disable" | "delete" | "reset";
 type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
 
 const PAGE_DESCRIPTION = "Manage parent accounts, contact details, linked students, and support tickets.";
+const PARENTS_PAGE_SIZE = 9;
 
 function HeaderBar({ onAdd }: { onAdd: () => void }) {
   return (
@@ -100,13 +102,24 @@ export default function ParentsPanel({ state }: { state: any }) {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
   const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => filterParents(parents, filters), [parents, filters]);
   const groupOptions = useMemo(() => collectGroupOptions(parents), [parents]);
   const activeCount = countActiveFilters(filters);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PARENTS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedParents = filtered.slice(
+    (currentPage - 1) * PARENTS_PAGE_SIZE,
+    currentPage * PARENTS_PAGE_SIZE,
+  );
 
   const drawerParent = drawerParentId != null ? parents.find((p) => asNumber(p.id) === drawerParentId) || null : null;
   const linkParent = linkParentId != null ? parents.find((p) => asNumber(p.id) === linkParentId) || null : null;
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   function setParents(updater: (current: ParentRow[]) => ParentRow[]) {
     if (typeof state.setParentAccounts === "function") {
@@ -387,7 +400,13 @@ export default function ParentsPanel({ state }: { state: any }) {
             <p className="shrink-0 text-xs font-semibold text-muted-foreground">
               Showing {filtered.length} of {parents.length} parents
             </p>
-            <ParentTable parents={filtered} handlers={handlers} className="min-h-0 flex-1" />
+            <ParentTable parents={pagedParents} handlers={handlers} className="min-h-0 flex-1" />
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              label={`Showing ${pagedParents.length} of ${filtered.length} parents`}
+            />
           </>
         )}
       </div>

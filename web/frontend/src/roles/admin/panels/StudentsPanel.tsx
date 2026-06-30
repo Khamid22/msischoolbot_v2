@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { Pagination } from "@/shared/ui/Pagination";
 import { routes } from "@/shared/lib/routes";
 import { adminStickyTop, asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
+const STUDENTS_PAGE_SIZE = 10;
 
 type CreatedStudent = {
   studentCode?: string;
@@ -293,6 +295,7 @@ export default function StudentsPanel({ state }: { state: any }) {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const canAddStudents = !isTeacherMode && academicSchools.length > 0 && academicGroups.length > 0;
 
   const subjectOptions = useMemo(() => {
@@ -339,8 +342,19 @@ export default function StudentsPanel({ state }: { state: any }) {
     };
   }, [visibleStudents]);
 
+  const totalPages = Math.max(1, Math.ceil(visibleStudents.length / STUDENTS_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedStudents = visibleStudents.slice(
+    (currentPage - 1) * STUDENTS_PAGE_SIZE,
+    currentPage * STUDENTS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [activityFilter, searchQuery, subjectFilter, currentSchool]);
+
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-1rem)] flex-col gap-3 lg:h-full lg:min-h-0">
       {addOpen && !isTeacherMode ? (
         <AddStudentModal
           schools={academicSchools}
@@ -349,7 +363,7 @@ export default function StudentsPanel({ state }: { state: any }) {
           onClose={() => setAddOpen(false)}
         />
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Students" value={stats.total} hint={`${filteredStudents.length} before filters`} />
         <MetricCard label="Recently Active" value={stats.recent} hint="Seen in the last 7 days" />
         <MetricCard label="Subjects" value={stats.subjects} hint="In current results" />
@@ -357,7 +371,7 @@ export default function StudentsPanel({ state }: { state: any }) {
       </div>
 
       <div
-        className="sticky z-30 -mx-3 bg-background/95 px-3 pb-3 pt-1 backdrop-blur sm:-mx-4 sm:px-4 md:-mx-6 md:px-6"
+        className="sticky z-30 -mx-3 shrink-0 bg-background/95 px-3 pb-2 pt-1 backdrop-blur sm:-mx-4 sm:px-4 md:-mx-6 md:px-6"
         style={{ top: adminStickyTop }}
       >
         <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr),190px,190px,210px]">
@@ -421,6 +435,8 @@ export default function StudentsPanel({ state }: { state: any }) {
         title="Students"
         subtitle={`${visibleStudents.length} shown`}
         icon={<Users className="h-4 w-4 text-info" />}
+        className="flex min-h-0 flex-1 flex-col"
+        bodyClassName="flex min-h-0 flex-1 flex-col gap-2"
         headerActions={
           <div className="flex items-center gap-2">
             {!isTeacherMode ? (
@@ -444,7 +460,7 @@ export default function StudentsPanel({ state }: { state: any }) {
       >
         {visibleStudents.length ? (
           <div className="space-y-2 sm:hidden">
-            {visibleStudents.map((student: Record<string, unknown>) => {
+            {pagedStudents.map((student: Record<string, unknown>) => {
               const seen = formatLastSeen(student.last_seen_at);
               const studentRowId = getStudentRowId(student);
               const studentCode = getStudentCode(student);
@@ -504,8 +520,8 @@ export default function StudentsPanel({ state }: { state: any }) {
           </p>
         )}
 
-        <div className="miniapp-table-scroll hidden max-h-[68dvh] sm:block">
-          <table className="w-full min-w-[860px] text-left">
+        <div className="hidden min-h-0 flex-1 overflow-hidden rounded-lg border border-foreground/8 sm:block">
+          <table className="h-full w-full min-w-[760px] table-fixed text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
@@ -520,13 +536,13 @@ export default function StudentsPanel({ state }: { state: any }) {
             </thead>
             <tbody>
               {visibleStudents.length ? (
-                visibleStudents.map((student: Record<string, unknown>) => {
+                pagedStudents.map((student: Record<string, unknown>) => {
                   const seen = formatLastSeen(student.last_seen_at);
                   const studentRowId = getStudentRowId(student);
                   const studentCode = getStudentCode(student);
                   return (
                     <tr key={studentRowId} className="border-b border-foreground/5 hover:bg-muted/40">
-                      <td className="px-3 py-2.5">
+                      <td className="w-[30%] px-3 py-2.5">
                         <a
                           href={routes.adminStudentPanel(studentRowId, currentSchool)}
                           className="flex min-w-0 items-center gap-3 hover:underline"
@@ -540,10 +556,10 @@ export default function StudentsPanel({ state }: { state: any }) {
                           </span>
                         </a>
                       </td>
-                      <td className="px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex max-w-xs flex-wrap gap-1">
-                          {subjectList(student.subjects).map((subject) => (
+                      <td className="w-[12%] px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
+                      <td className="w-[28%] px-3 py-2.5">
+                        <div className="flex flex-wrap gap-1">
+                          {subjectList(student.subjects).slice(0, 3).map((subject) => (
                             <span
                               key={`${studentRowId}-${subject}`}
                               className="rounded-md border border-foreground/10 bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
@@ -553,13 +569,13 @@ export default function StudentsPanel({ state }: { state: any }) {
                           ))}
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
-                      <td className="px-3 py-2.5 text-xs">
+                      <td className="w-[14%] truncate px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
+                      <td className="w-[12%] px-3 py-2.5 text-xs">
                         <span className={seen.online ? "font-semibold text-green-600" : "text-muted-foreground"}>
                           {seen.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="w-[4%] px-3 py-2.5">
                         <div className="flex justify-end gap-1.5">
                           <a
                             href={routes.adminStudentPanel(studentRowId, currentSchool)}
@@ -592,6 +608,12 @@ export default function StudentsPanel({ state }: { state: any }) {
             </tbody>
           </table>
         </div>
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          label={`Showing ${pagedStudents.length} of ${visibleStudents.length} students`}
+        />
       </ChartCard>
     </div>
   );

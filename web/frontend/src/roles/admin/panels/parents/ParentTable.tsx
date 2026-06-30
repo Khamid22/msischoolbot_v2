@@ -144,49 +144,47 @@ export function ParentTable({
   return (
     <div className={`min-h-0 ${className}`}>
       {/* Desktop / laptop table */}
-      <div className="hidden h-full min-h-0 overflow-hidden rounded-lg border border-foreground/10 bg-background md:flex md:flex-col">
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[840px] text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/90 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
-              <tr>
-                <th className="px-3 py-2">Parent</th>
-                <th className="px-3 py-2">Contact</th>
-                <th className="px-3 py-2">Linked students</th>
-                <th className="px-3 py-2">Account status</th>
-                <th className="px-3 py-2">Open tickets</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+      <div className="hidden h-full min-h-0 overflow-hidden rounded-lg border border-foreground/10 bg-background md:block">
+        <table className="h-full w-full min-w-[820px] table-fixed text-left text-xs">
+          <thead className="sticky top-0 z-10 bg-muted/90 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
+            <tr>
+              <th className="w-[22%] px-3 py-2">Parent</th>
+              <th className="w-[20%] px-3 py-2">Contact</th>
+              <th className="w-[24%] px-3 py-2">Linked students</th>
+              <th className="w-[14%] px-3 py-2">Account status</th>
+              <th className="w-[10%] px-3 py-2">Open tickets</th>
+              <th className="w-[10%] px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-foreground/5">
+            {parents.map((parent) => (
+              <tr
+                key={parentKey(parent)}
+                onClick={() => handlers.onView(parent)}
+                className="cursor-pointer transition-colors hover:bg-muted/40"
+              >
+                <td className="px-3 py-2.5">
+                  <ParentIdentity parent={parent} onView={() => handlers.onView(parent)} />
+                </td>
+                <td className="px-3 py-2.5">
+                  <ContactCell parent={parent} />
+                </td>
+                <td className="px-3 py-2.5">
+                  <LinkedStudentsCell parent={parent} />
+                </td>
+                <td className="px-3 py-2.5">
+                  <ParentStatusBadges parent={parent} />
+                </td>
+                <td className="px-3 py-2.5">
+                  <TicketsBadge parent={parent} onOpen={() => handlers.onOpenTickets(parent)} />
+                </td>
+                <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                  <RowActions parent={parent} handlers={handlers} />
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-foreground/5">
-              {parents.map((parent) => (
-                <tr
-                  key={parentKey(parent)}
-                  onClick={() => handlers.onView(parent)}
-                  className="cursor-pointer transition-colors hover:bg-muted/40"
-                >
-                  <td className="px-3 py-3">
-                    <ParentIdentity parent={parent} onView={() => handlers.onView(parent)} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <ContactCell parent={parent} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <LinkedStudentsCell parent={parent} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <ParentStatusBadges parent={parent} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <TicketsBadge parent={parent} onOpen={() => handlers.onOpenTickets(parent)} />
-                  </td>
-                  <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                    <RowActions parent={parent} handlers={handlers} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Mobile cards */}

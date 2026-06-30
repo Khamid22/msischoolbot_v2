@@ -219,7 +219,7 @@ export default function DashboardPage(props: DashboardPageProps) {
   const dashboardContent = (
     <>
       <div
-        className="space-y-4 pt-2 sm:pt-0"
+        className="space-y-3 pt-2 sm:pt-0"
         onClick={() => {
           setAnnouncementsOpen(false);
           setSubjectOpen(false);
@@ -228,27 +228,27 @@ export default function DashboardPage(props: DashboardPageProps) {
         {props.profileError ? <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">{props.profileError}</div> : null}
         {props.profileNotice ? <div className="rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm">{props.profileNotice}</div> : null}
 
-        <section className="rounded-xl border border-foreground/10 bg-surface p-4 shadow-card">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <section className="rounded-lg border border-foreground/10 bg-surface p-3 shadow-card sm:p-3.5">
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Program Progress</p>
               <p className="mt-0.5 text-sm font-semibold">
                 {props.programCompletedLessons || 0}/180 lessons completed
               </p>
             </div>
-            <p className="font-display text-2xl font-bold">{completionRate}%</p>
+            <p className="font-display text-xl font-bold sm:text-2xl">{completionRate}%</p>
           </div>
           <ProgressBar value={completionRate} />
         </section>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           <StatCard title="AAP" value={`${averageGrade}/9`} icon={<GraduationCap className="h-3.5 w-3.5" />} href={aapLessonsUrl} />
           <StatCard title="AR" value={`${attendanceRate}%`} icon={<Calendar className="h-3.5 w-3.5" />} href={arLessonsUrl} />
           <StatCard title="EP" value={`${examPerformance}/9`} icon={<BarChart3 className="h-3.5 w-3.5" />} />
           <StatCard title="Coins" value={String(coins)} icon={<Activity className="h-3.5 w-3.5" />} />
         </div>
 
-        <div ref={chartsRef} className="space-y-4">
+        <div ref={chartsRef} className="space-y-3">
           {chartsVisible ? (
             <Suspense fallback={<ChartsFallback />}>
               <DashboardChartsSection

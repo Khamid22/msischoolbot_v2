@@ -2127,7 +2127,7 @@ export default function TeachersPanel({
   }, [teachers.length]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-[calc(var(--tg-app-height)-7rem)] flex-col gap-3 lg:h-full lg:min-h-0">
       {toast ? (
         <div
           className={`fixed right-4 top-[calc(var(--app-top-inset)+4rem)] lg:top-4 z-[60] flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover ${
@@ -2281,8 +2281,10 @@ export default function TeachersPanel({
           title="Hiring Pipeline"
           subtitle={`${activeCandidates.length} active · ${closedCandidates.length} closed`}
           icon={<ClipboardCheck className="h-4 w-4 text-info" />}
+          className="flex min-h-0 flex-1 flex-col"
+          bodyClassName="flex min-h-0 flex-1 flex-col"
         >
-          <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 lg:h-[calc(var(--tg-app-height)-13rem)] lg:min-h-[30rem] lg:grid-cols-4">
+          <div className="grid w-full flex-1 grid-cols-1 gap-3 md:grid-cols-2 lg:min-h-[30rem] lg:grid-cols-4">
             {hiringStages.map((stage) => {
               const stageCandidates = activeCandidates.filter(
                 (candidate) => (asString(candidate.status) || "new") === stage.key,
@@ -2342,6 +2344,8 @@ export default function TeachersPanel({
           title="Training"
           subtitle={`${inTrainingCount} in training · ${trainingPassedCount} awaiting decision`}
           icon={<GraduationCap className="h-4 w-4 text-info" />}
+          className="flex min-h-0 flex-1 flex-col"
+          bodyClassName="flex min-h-0 flex-1 flex-col"
           headerActions={
             <button
               type="button"
@@ -2353,7 +2357,7 @@ export default function TeachersPanel({
             </button>
           }
         >
-          <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="mb-3 grid shrink-0 grid-cols-3 gap-2">
             {trainingFilters.map((filter) => {
               const isActive = trainingFilter === filter.key;
               return (
@@ -2375,7 +2379,7 @@ export default function TeachersPanel({
               );
             })}
           </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
             <input
               type="text"
               value={trainingSearch}
@@ -2395,8 +2399,8 @@ export default function TeachersPanel({
               <option value="name">Name (A–Z)</option>
             </select>
           </div>
-          <div className="overflow-x-auto rounded-lg border border-foreground/8">
-            <table className="w-full min-w-[640px] text-left">
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-lg border border-foreground/8">
+            <table className="h-full w-full min-w-[640px] table-fixed text-left">
               <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">
                   {["Candidate", "Progress", "Average", "Last evaluated", ""].map((heading) => (
@@ -2485,9 +2489,11 @@ export default function TeachersPanel({
           title="Active Teachers"
           subtitle={`${teachers.length} assigned`}
           icon={<Users className="h-4 w-4 text-info" />}
+          className="flex min-h-0 flex-1 flex-col"
+          bodyClassName="flex min-h-0 flex-1 flex-col"
         >
-          <div className="overflow-x-auto rounded-lg border border-foreground/8">
-            <table className="w-full min-w-[920px] text-left">
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-lg border border-foreground/8">
+            <table className="h-full w-full min-w-[920px] table-fixed text-left">
               <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                 <tr className="border-b border-foreground/5">
                   {["Teacher", "Rank", "Progress", "Pay Rate", "Assigned Group", "Actions"].map((heading) => (

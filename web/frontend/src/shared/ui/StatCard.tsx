@@ -11,12 +11,12 @@ interface StatCardProps {
 
 export function StatCard({ title, value, icon, href, colorClass = "text-foreground" }: StatCardProps) {
   const content = (
-    <div className="flex min-h-[5.25rem] flex-col justify-between gap-2 p-3 sm:p-3.5">
+    <div className="flex min-h-[4.5rem] flex-col justify-between gap-1.5 p-2.5 sm:min-h-[4.75rem] sm:p-3">
       <p className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground ${colorClass}`}>
         {icon}
         {title}
       </p>
-      <h3 className="font-display text-xl font-bold leading-none sm:text-2xl">{value}</h3>
+      <h3 className="font-display text-lg font-bold leading-none sm:text-xl">{value}</h3>
     </div>
   );
 

@@ -110,7 +110,7 @@ export function TelegramLayout({ children, topbar }: TelegramLayoutProps) {
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <div className="mx-auto w-full max-w-4xl">
+        <div className="mx-auto w-full max-w-none 2xl:max-w-[108rem]">
           {children}
         </div>
       </main>
