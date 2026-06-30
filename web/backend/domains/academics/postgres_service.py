@@ -1,7 +1,12 @@
-"""Runtime raw-SQL helpers for the internal academic admin model."""
+"""Runtime raw-SQL helpers for the internal academic admin model.
 
-import math
-from datetime import datetime, timedelta
+All reads and writes target the clean ``msi_v2`` schema. The admin gradebook
+and dashboards (in ``academic_service`` / ``internal_dashboard_service``) read
+from ``msi_v2`` as well; the write helpers here keep the same return shapes the
+frontend already consumes so nothing on the admin pages breaks.
+"""
+
+from datetime import datetime, time, timedelta
 
 from shared.academics import canonical
 from shared.db import queries
@@ -31,140 +36,6 @@ def _canonical_subject_short(value):
     return canonical.subject_short_name(value)
 
 
-def _canonical_db_date(value):
-    return canonical.format_date(value)
-
-
-def _average_homework_grade(homework_grades):
-    scores = []
-    if not isinstance(homework_grades, list):
-        return 0.0
-    for item in homework_grades:
-        if not isinstance(item, dict):
-            continue
-        try:
-            score = float(item.get("score"))
-        except (TypeError, ValueError):
-            continue
-        if score != score:
-            continue
-        scores.append(max(0.0, min(9.0, score)))
-    if not scores:
-        return 0.0
-    return math.floor((sum(scores) / len(scores)) * 10 + 0.5) / 10
-
-
-def _is_placeholder_date(value):
-    # Canonical placeholder/date logic lives in shared.academics.canonical.
-    return canonical.is_placeholder_date(value)
-
-
-def _date_sort_key(value):
-    # Unparseable dates sort last. Canonical date parsing lives in shared.academics.canonical.
-    return canonical.date_sort_key(value, on_unparseable=datetime.max)
-
-
-def _choose_earlier_date(current, candidate):
-    if _is_placeholder_date(candidate):
-        return current
-    if _is_placeholder_date(current):
-        return str(candidate or "").strip()
-    return str(candidate or "").strip() if _date_sort_key(candidate) < _date_sort_key(current) else current
-
-
-def repair_placeholder_academic_dates(conn, now=None):
-    """Repair imported placeholder lesson dates such as Chemistry's HOMEWORK header."""
-    now = now or _utc_now_iso()
-    attendance_rows = conn.execute(
-        """
-        SELECT e.group_id, a.enrollment_id, a.lesson_label, a.topic, a.lesson_date
-        FROM academic_attendance_records a
-        JOIN academic_enrollments e ON e.id = a.enrollment_id
-        WHERE coalesce(a.lesson_date, '') <> ''
-        """
-    ).fetchall()
-
-    enrollment_topic_dates = {}
-    enrollment_label_dates = {}
-    group_topic_dates = {}
-    group_label_dates = {}
-    for row in attendance_rows:
-        lesson_label = _normalize(row["lesson_label"])
-        topic = _normalize(row["topic"])
-        lesson_date = str(row["lesson_date"] or "").strip()
-        if _is_placeholder_date(lesson_date):
-            continue
-        enrollment_id = int(row["enrollment_id"])
-        group_id = int(row["group_id"])
-        if lesson_label and topic:
-            key = (enrollment_id, lesson_label, topic)
-            enrollment_topic_dates[key] = _choose_earlier_date(enrollment_topic_dates.get(key), lesson_date)
-            group_key = (group_id, lesson_label, topic)
-            group_topic_dates[group_key] = _choose_earlier_date(group_topic_dates.get(group_key), lesson_date)
-        if lesson_label:
-            key = (enrollment_id, lesson_label)
-            enrollment_label_dates[key] = _choose_earlier_date(enrollment_label_dates.get(key), lesson_date)
-            group_key = (group_id, lesson_label)
-            group_label_dates[group_key] = _choose_earlier_date(group_label_dates.get(group_key), lesson_date)
-
-    homework_rows = conn.execute(
-        """
-        SELECT h.id, h.enrollment_id, e.group_id, h.lesson_label, h.topic, h.lesson_date
-        FROM academic_homework_scores h
-        JOIN academic_enrollments e ON e.id = h.enrollment_id
-        """
-    ).fetchall()
-    for row in homework_rows:
-        if not _is_placeholder_date(row["lesson_date"]):
-            continue
-        enrollment_id = int(row["enrollment_id"])
-        lesson_label = _normalize(row["lesson_label"])
-        topic = _normalize(row["topic"])
-        repaired_date = None
-        if lesson_label and topic:
-            repaired_date = enrollment_topic_dates.get((enrollment_id, lesson_label, topic))
-        if not repaired_date and lesson_label:
-            repaired_date = enrollment_label_dates.get((enrollment_id, lesson_label))
-        if repaired_date:
-            conn.execute(
-                "UPDATE academic_homework_scores SET lesson_date = %s, updated_at = %s WHERE id = %s",
-                (_canonical_db_date(repaired_date), now, int(row["id"])),
-            )
-        else:
-            conn.execute(
-                "UPDATE academic_homework_scores SET lesson_date = '', updated_at = %s WHERE id = %s",
-                (now, int(row["id"])),
-            )
-
-    lesson_rows = conn.execute(
-        "SELECT id, group_id, lesson_number, topic, lesson_date FROM academic_lessons"
-    ).fetchall()
-    for row in lesson_rows:
-        lesson_number_norm = _normalize(row["lesson_number"])
-        topic_norm = _normalize(row["topic"])
-        if lesson_number_norm in {"h/w", "hw", "homework"} and topic_norm == "topic":
-            conn.execute("DELETE FROM academic_lessons WHERE id = %s", (int(row["id"]),))
-            continue
-        if not _is_placeholder_date(row["lesson_date"]):
-            continue
-        group_id = int(row["group_id"])
-        repaired_date = None
-        if lesson_number_norm and topic_norm:
-            repaired_date = group_topic_dates.get((group_id, lesson_number_norm, topic_norm))
-        if not repaired_date and lesson_number_norm:
-            repaired_date = group_label_dates.get((group_id, lesson_number_norm))
-        if repaired_date:
-            conn.execute(
-                "UPDATE academic_lessons SET lesson_date = %s, updated_at = %s WHERE id = %s",
-                (_canonical_db_date(repaired_date), now, int(row["id"])),
-            )
-        else:
-            conn.execute(
-                "UPDATE academic_lessons SET lesson_date = '', updated_at = %s WHERE id = %s",
-                (now, int(row["id"])),
-            )
-
-
 def _slugify(value):
     import re
 
@@ -172,6 +43,90 @@ def _slugify(value):
     return text or "item"
 
 
+def ensure_academic_schema(conn):
+    """Compatibility no-op.
+
+    The clean ``msi_v2`` schema is created at startup by
+    ``shared.identity.storage.ensure_clean_v2_schema``. A few call sites still
+    invoke this helper; keep it as a no-op until they are cut over.
+    """
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Legacy-id minting
+# ---------------------------------------------------------------------------
+# The frontend identifies enrollments, groups and dashboards by the integer
+# ``legacy_*`` ids stored on the msi_v2 rows. Migrated rows keep their original
+# id; rows created after the cutover get a fresh id in a high band so they never
+# collide with migrated ids or with low-numbered msi_v2 primary keys.
+_LEGACY_ID_FLOOR = 9_000_000_000
+
+
+def _mint_legacy_id(conn, table, column, floor=_LEGACY_ID_FLOOR):
+    row = conn.execute(
+        f"SELECT coalesce(max({column}), 0) AS m FROM msi_v2.{table}"
+    ).fetchone()
+    return max(int(row["m"] or 0), floor) + 1
+
+
+# ---------------------------------------------------------------------------
+# Resolvers (accept legacy or v2 ids coming from the frontend)
+# ---------------------------------------------------------------------------
+_GROUP_MATCH = "(g.legacy_group_id = %s OR (g.legacy_group_id IS NULL AND g.id = %s))"
+
+
+def _resolve_group(conn, group_id):
+    return conn.execute(
+        f"""
+        SELECT g.id, g.school_id, g.program_id, g.group_name,
+               s.school_key, s.school_name,
+               subj.id AS subject_id, subj.subject_name
+        FROM msi_v2.groups g
+        JOIN msi_v2.schools s ON s.id = g.school_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE {_GROUP_MATCH}
+        """,
+        (int(group_id or 0), int(group_id or 0)),
+    ).fetchone()
+
+
+def _resolve_teacher_id(conn, teacher_id):
+    """Resolve an incoming (legacy or v2) teacher id to the msi_v2 teachers.id."""
+    teacher_id = int(teacher_id or 0)
+    if teacher_id <= 0:
+        return 0
+    row = conn.execute(
+        "SELECT id FROM msi_v2.teachers WHERE legacy_teacher_id = %s OR id = %s LIMIT 1",
+        (teacher_id, teacher_id),
+    ).fetchone()
+    if not row:
+        raise ValueError("Teacher was not found.")
+    return int(row["id"])
+
+
+def _next_student_code(conn, prefix="MSI"):
+    normalized_prefix = str(prefix or "MSI").strip().upper() or "MSI"
+    rows = conn.execute(
+        "SELECT student_code FROM msi_v2.students WHERE upper(student_code) LIKE %s",
+        (f"{normalized_prefix}%",),
+    ).fetchall()
+    max_num = 0
+    prefix_length = len(normalized_prefix)
+    for row in rows:
+        raw = str(row["student_code"] or "").strip().upper()
+        if not raw.startswith(normalized_prefix):
+            continue
+        numeric_part = raw[prefix_length:]
+        if numeric_part.isdigit():
+            max_num = max(max_num, int(numeric_part))
+    return f"{normalized_prefix}{max_num + 1:05d}"
+
+
+# ---------------------------------------------------------------------------
+# Schedule helpers (date/time/weekday parsing + conflict detection)
+# ---------------------------------------------------------------------------
 def _parse_date_input(value, field_name):
     text = str(value or "").strip()
     parsed = canonical.parse_date(text)
@@ -195,6 +150,11 @@ def _time_to_minutes(value, field_name):
     return total
 
 
+def _parse_time(value, field_name):
+    minutes = _time_to_minutes(value, field_name)
+    return time(hour=minutes // 60, minute=minutes % 60)
+
+
 def _normalize_weekdays(value):
     raw = value
     if isinstance(value, str):
@@ -203,20 +163,13 @@ def _normalize_weekdays(value):
         raw = []
     weekdays = []
     names = {
-        "mon": 0,
-        "monday": 0,
-        "tue": 1,
-        "tuesday": 1,
-        "wed": 2,
-        "wednesday": 2,
-        "thu": 3,
-        "thursday": 3,
-        "fri": 4,
-        "friday": 4,
-        "sat": 5,
-        "saturday": 5,
-        "sun": 6,
-        "sunday": 6,
+        "mon": 0, "monday": 0,
+        "tue": 1, "tuesday": 1,
+        "wed": 2, "wednesday": 2,
+        "thu": 3, "thursday": 3,
+        "fri": 4, "friday": 4,
+        "sat": 5, "saturday": 5,
+        "sun": 6, "sunday": 6,
     }
     for item in raw:
         text = str(item or "").strip().casefold()
@@ -244,19 +197,36 @@ def _time_ranges_overlap(start_a, end_a, start_b, end_b):
     return start_a < end_b and start_b < end_a
 
 
-def _schedule_conflict_message(conn, *, group_id, teacher_id, weekdays, start_date, end_date, start_time, end_time):
+def _generated_schedule_dates(start_date, end_date, weekdays):
+    current = start_date
+    wanted = set(weekdays)
+    dates = []
+    while current <= end_date:
+        if current.weekday() in wanted:
+            dates.append(current)
+        current += timedelta(days=1)
+    return dates
+
+
+def _schedule_conflict_message(
+    conn, *, group_v2_id, teacher_v2_id, weekdays, start_date, end_date, start_time, end_time
+):
     rows = conn.execute(
         """
-        SELECT sch.id, sch.group_id, sch.teacher_id, sch.weekdays, sch.start_date,
-               sch.end_date, sch.start_time, sch.end_time, g.name AS group_name,
+        SELECT sch.id, sch.group_id, sch.teacher_id, sch.weekdays,
+               to_char(sch.start_date, 'DD/MM/YYYY') AS start_date,
+               to_char(sch.end_date, 'DD/MM/YYYY') AS end_date,
+               to_char(sch.start_time, 'HH24:MI') AS start_time,
+               to_char(sch.end_time, 'HH24:MI') AS end_time,
+               g.group_name AS group_name,
                coalesce(t.full_name, '') AS teacher_name
-        FROM academic_schedules sch
-        JOIN academic_groups g ON g.id = sch.group_id
-        LEFT JOIN teachers t ON t.id = sch.teacher_id
+        FROM msi_v2.group_schedule_rules sch
+        JOIN msi_v2.groups g ON g.id = sch.group_id
+        LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
         WHERE sch.status = 'active'
           AND (sch.group_id = %s OR (%s > 0 AND sch.teacher_id = %s))
         """,
-        (int(group_id), int(teacher_id or 0), int(teacher_id or 0)),
+        (int(group_v2_id), int(teacher_v2_id or 0), int(teacher_v2_id or 0)),
     ).fetchall()
     wanted_days = set(weekdays)
     wanted_start = _time_to_minutes(start_time, "Start time")
@@ -273,573 +243,33 @@ def _schedule_conflict_message(conn, *, group_id, teacher_id, weekdays, start_da
         other_end = _time_to_minutes(row["end_time"], "Existing end time")
         if not _time_ranges_overlap(wanted_start, wanted_end, other_start, other_end):
             continue
-        if int(row["group_id"]) == int(group_id):
+        if int(row["group_id"]) == int(group_v2_id):
             return f"Group {row['group_name']} already has a class during that time."
         teacher_name = str(row["teacher_name"] or "Teacher").strip()
         return f"{teacher_name} already has a class during that time."
     return ""
 
 
-def _generated_schedule_dates(start_date, end_date, weekdays):
-    current = start_date
-    wanted = set(weekdays)
-    dates = []
-    while current <= end_date:
-        if current.weekday() in wanted:
-            dates.append(current)
-        current += timedelta(days=1)
-    return dates
-
-
-_REQUIRED_TABLES = {
-    "academic_schools",
-    "academic_subjects",
-    "academic_groups",
-    "academic_lessons",
-    "academic_enrollments",
-    "academic_attendance_records",
-    "academic_homework_scores",
-    "academic_exam_results",
-    "academic_coin_events",
-    "academic_schedules",
-    "academic_lesson_sessions",
-    "academic_curriculum_programs",
-    "academic_curriculum_items",
-}
-
-
-_ACADEMIC_SCHEMA_READY = False
-
-
-def ensure_academic_schema(conn):
-    # Schema DDL is idempotent but not free (catalog locks + round-trips). Running
-    # it on every read/write was a per-request tax; gate it to once per process.
-    global _ACADEMIC_SCHEMA_READY
-    if _ACADEMIC_SCHEMA_READY:
-        return
-    _ensure_academic_schema_ddl(conn)
-    _ACADEMIC_SCHEMA_READY = True
-
-
-def _ensure_academic_schema_ddl(conn):
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_schools (
-            id BIGSERIAL PRIMARY KEY,
-            code TEXT NOT NULL UNIQUE,
-            name TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_subjects (
-            id BIGSERIAL PRIMARY KEY,
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            key TEXT NOT NULL,
-            name TEXT NOT NULL,
-            code TEXT NOT NULL DEFAULT '',
-            short_name TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(school_id, key)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_groups (
-            id BIGSERIAL PRIMARY KEY,
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
-            key TEXT NOT NULL,
-            name TEXT NOT NULL,
-            code TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(school_id, subject_id, key)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_enrollments (
-            id BIGSERIAL PRIMARY KEY,
-            student_row_id BIGINT REFERENCES students(id),
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
-            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
-            public_dashboard_id BIGINT NOT NULL,
-            full_name TEXT NOT NULL,
-            full_name_norm TEXT NOT NULL,
-            active INTEGER NOT NULL DEFAULT 1,
-            enrollment_status TEXT NOT NULL DEFAULT 'active',
-            disqualification_reason TEXT NOT NULL DEFAULT '',
-            disqualified_at TEXT NOT NULL DEFAULT '',
-            average_grade DOUBLE PRECISION NOT NULL DEFAULT 0,
-            coins INTEGER NOT NULL DEFAULT 0,
-            student_payload_json TEXT NOT NULL DEFAULT '{}',
-            dashboard_payload_json TEXT NOT NULL DEFAULT '{}',
-            imported_from TEXT NOT NULL DEFAULT 'internal',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(school_id, public_dashboard_id)
-        )
-        """
-    )
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS enrollment_status TEXT NOT NULL DEFAULT 'active'")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS disqualification_reason TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS disqualified_at TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS student_row_id BIGINT")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS full_name_norm TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS student_payload_json TEXT NOT NULL DEFAULT '{}'")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS dashboard_payload_json TEXT NOT NULL DEFAULT '{}'")
-    conn.execute("ALTER TABLE academic_enrollments ADD COLUMN IF NOT EXISTS imported_from TEXT NOT NULL DEFAULT 'internal'")
-    conn.execute(
-        """
-        UPDATE academic_enrollments
-        SET full_name_norm = lower(trim(full_name))
-        WHERE trim(coalesce(full_name_norm, '')) = ''
-        """
-    )
-    conn.execute(
-        """
-        UPDATE academic_enrollments
-        SET enrollment_status = CASE WHEN active = 1 THEN 'active' ELSE 'inactive' END
-        WHERE trim(coalesce(enrollment_status, '')) = ''
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_lessons (
-            id BIGSERIAL PRIMARY KEY,
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
-            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
-            lesson_number TEXT NOT NULL,
-            topic TEXT NOT NULL,
-            lesson_date TEXT NOT NULL DEFAULT '',
-            lesson_order INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(school_id, subject_id, group_id, lesson_number)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_attendance_records (
-            id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
-            lesson_id BIGINT REFERENCES academic_lessons(id),
-            lesson_label TEXT NOT NULL,
-            topic TEXT NOT NULL DEFAULT '',
-            lesson_date TEXT NOT NULL DEFAULT '',
-            attendance_type TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL,
-            lesson_order INTEGER NOT NULL DEFAULT 0,
-            updated_at TEXT NOT NULL,
-            UNIQUE(enrollment_id, lesson_label, lesson_order, attendance_type)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_homework_scores (
-            id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
-            lesson_id BIGINT REFERENCES academic_lessons(id),
-            lesson_label TEXT NOT NULL,
-            topic TEXT NOT NULL DEFAULT '',
-            lesson_date TEXT NOT NULL DEFAULT '',
-            score_type TEXT NOT NULL DEFAULT 'Homework',
-            score DOUBLE PRECISION NOT NULL,
-            lesson_order INTEGER NOT NULL DEFAULT 0,
-            updated_at TEXT NOT NULL,
-            UNIQUE(enrollment_id, lesson_label, lesson_order)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_exam_results (
-            id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
-            label TEXT NOT NULL,
-            exam_name TEXT NOT NULL DEFAULT '',
-            attempt TEXT NOT NULL DEFAULT '',
-            score DOUBLE PRECISION NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(enrollment_id, label)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_coin_events (
-            id BIGSERIAL PRIMARY KEY,
-            enrollment_id BIGINT NOT NULL REFERENCES academic_enrollments(id) ON DELETE CASCADE,
-            amount INTEGER NOT NULL DEFAULT 0,
-            source TEXT NOT NULL DEFAULT 'import',
-            occurred_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(enrollment_id, source)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_schedules (
-            id BIGSERIAL PRIMARY KEY,
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
-            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
-            teacher_id BIGINT REFERENCES teachers(id),
-            title TEXT NOT NULL DEFAULT '',
-            weekdays TEXT NOT NULL DEFAULT '',
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date TEXT NOT NULL,
-            room TEXT NOT NULL DEFAULT '',
-            online_url TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'active',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_lesson_sessions (
-            id BIGSERIAL PRIMARY KEY,
-            schedule_id BIGINT NOT NULL REFERENCES academic_schedules(id) ON DELETE CASCADE,
-            lesson_id BIGINT REFERENCES academic_lessons(id),
-            school_id BIGINT NOT NULL REFERENCES academic_schools(id),
-            subject_id BIGINT NOT NULL REFERENCES academic_subjects(id),
-            group_id BIGINT NOT NULL REFERENCES academic_groups(id),
-            teacher_id BIGINT REFERENCES teachers(id),
-            session_date TEXT NOT NULL,
-            start_time TEXT NOT NULL,
-            end_time TEXT NOT NULL,
-            room TEXT NOT NULL DEFAULT '',
-            online_url TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'scheduled',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(schedule_id, session_date, start_time)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_curriculum_programs (
-            id BIGSERIAL PRIMARY KEY,
-            subject_key TEXT NOT NULL UNIQUE,
-            subject_name TEXT NOT NULL,
-            subject_short TEXT NOT NULL DEFAULT '',
-            source_file TEXT NOT NULL DEFAULT '',
-            total_items INTEGER NOT NULL DEFAULT 0,
-            lesson_count INTEGER NOT NULL DEFAULT 0,
-            exam_count INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS academic_curriculum_items (
-            id BIGSERIAL PRIMARY KEY,
-            program_id BIGINT NOT NULL REFERENCES academic_curriculum_programs(id) ON DELETE CASCADE,
-            item_order INTEGER NOT NULL,
-            lesson_number TEXT NOT NULL,
-            item_type TEXT NOT NULL DEFAULT 'lesson',
-            title TEXT NOT NULL,
-            term_label TEXT NOT NULL DEFAULT '',
-            week_label TEXT NOT NULL DEFAULT '',
-            specification_points TEXT NOT NULL DEFAULT '',
-            book_pages TEXT NOT NULL DEFAULT '',
-            lesson_count TEXT NOT NULL DEFAULT '',
-            duration_hours TEXT NOT NULL DEFAULT '',
-            source_file TEXT NOT NULL DEFAULT '',
-            sheet_name TEXT NOT NULL DEFAULT '',
-            source_row INTEGER NOT NULL DEFAULT 0,
-            raw_json TEXT NOT NULL DEFAULT '{}',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE(program_id, item_order)
-        )
-        """
-    )
-    conn.execute("ALTER TABLE academic_lessons ADD COLUMN IF NOT EXISTS curriculum_item_id BIGINT")
-    conn.execute("ALTER TABLE academic_lesson_sessions ADD COLUMN IF NOT EXISTS curriculum_item_id BIGINT")
-    for table, column in (
-        ("academic_subjects", "school_id"),
-        ("academic_groups", "subject_id"),
-        ("academic_enrollments", "public_dashboard_id"),
-        ("academic_enrollments", "full_name_norm"),
-        ("academic_lessons", "group_id"),
-        ("academic_attendance_records", "enrollment_id"),
-        ("academic_homework_scores", "enrollment_id"),
-        ("academic_exam_results", "enrollment_id"),
-        ("academic_coin_events", "enrollment_id"),
-        ("academic_schedules", "group_id"),
-        ("academic_schedules", "teacher_id"),
-        ("academic_lesson_sessions", "schedule_id"),
-        ("academic_lesson_sessions", "group_id"),
-        ("academic_lesson_sessions", "session_date"),
-        ("academic_lessons", "curriculum_item_id"),
-        ("academic_lesson_sessions", "curriculum_item_id"),
-    ):
-        conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_{column} ON {table}({column})")
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_academic_curriculum_items_program_type_order
-        ON academic_curriculum_items(program_id, item_type, item_order)
-        """
-    )
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS uniq_academic_exam_results_enrollment_label
-        ON academic_exam_results(enrollment_id, label)
-        """
-    )
-
-
-def _tables_exist(conn) -> bool:
-    rows = conn.execute(
-        "SELECT tablename AS name FROM pg_tables WHERE schemaname = current_schema()"
-    ).fetchall()
-    existing = {str(row["name"]) for row in rows}
-    return _REQUIRED_TABLES.issubset(existing)
-
-
-def _existing_tables(conn):
-    rows = conn.execute(
-        "SELECT tablename AS name FROM pg_tables WHERE schemaname = current_schema()"
-    ).fetchall()
-    return {str(row["name"]) for row in rows}
-
-
-def _update_if_changed(conn, table, row_id, values, pk_column="id"):
-    if not values:
-        return 0
-    set_clause = ", ".join(f"{column} = %s" for column in values)
-    conn.execute(
-        f"UPDATE {table} SET {set_clause} WHERE {pk_column} = %s",
-        list(values.values()) + [int(row_id)],
-    )
-    return 1
-
-
-def consolidate_postgres_values(conn):
-    """Normalize existing PostgreSQL values into the app's canonical DB format."""
-    ensure_academic_schema(conn)
-    existing = _existing_tables(conn)
-    now = _utc_now_iso()
-    result = {
-        "subjects": 0,
-        "student_subjects": 0,
-        "subject_summaries": 0,
-        "lesson_catalog": 0,
-        "resources": 0,
-        "dates": 0,
-        "name_keys": 0,
-        "school_keys": 0,
-        "skipped_subject_keys": 0,
-    }
-
-    if "academic_subjects" in existing:
-        rows = conn.execute("SELECT id, school_id, key, name, code, short_name FROM academic_subjects").fetchall()
-        for row in rows:
-            subject_id = int(row["id"])
-            canonical_name = _canonical_subject_name(row["name"])
-            canonical_key = _canonical_subject_key(canonical_name)
-            canonical_short = _canonical_subject_short(canonical_name)
-            updates = {}
-            if str(row["name"] or "").strip() != canonical_name:
-                updates["name"] = canonical_name
-            if str(row["code"] or "").strip() != canonical_short:
-                updates["code"] = canonical_short
-            if str(row["short_name"] or "").strip() != canonical_short:
-                updates["short_name"] = canonical_short
-            if str(row["key"] or "").strip() != canonical_key:
-                conflict = conn.execute(
-                    """
-                    SELECT id FROM academic_subjects
-                    WHERE school_id = %s AND key = %s AND id != %s
-                    """,
-                    (int(row["school_id"]), canonical_key, subject_id),
-                ).fetchone()
-                if conflict:
-                    result["skipped_subject_keys"] += 1
-                else:
-                    updates["key"] = canonical_key
-            if updates:
-                updates["updated_at"] = now
-                result["subjects"] += _update_if_changed(conn, "academic_subjects", subject_id, updates)
-
-    if "students" in existing:
-        rows = conn.execute("SELECT id, subjects, school_key FROM students").fetchall()
-        for row in rows:
-            updates = {}
-            canonical_subjects = ", ".join(
-                canonical.canonical_subject_name(part)
-                for part in canonical.split_subjects(row["subjects"])
-                if canonical.canonical_subject_name(part)
-            )
-            if not canonical_subjects and str(row["subjects"] or "").strip():
-                canonical_subjects = canonical.canonical_subject_name(row["subjects"])
-            if canonical_subjects and str(row["subjects"] or "").strip() != canonical_subjects:
-                updates["subjects"] = canonical_subjects
-                result["student_subjects"] += 1
-            school_key = canonical.normalize_school_code(row["school_key"])
-            if str(row["school_key"] or "").strip() != school_key:
-                updates["school_key"] = school_key
-                result["school_keys"] += 1
-            if updates:
-                _update_if_changed(conn, "students", int(row["id"]), updates)
-
-    if "academic_schools" in existing:
-        rows = conn.execute("SELECT id, code, name FROM academic_schools").fetchall()
-        for row in rows:
-            school_code = canonical.normalize_school_code(row["code"])
-            school_name = canonical.school_display_name(school_code)
-            updates = {}
-            if str(row["code"] or "").strip() != school_code:
-                updates["code"] = school_code
-            if str(row["name"] or "").strip() != school_name:
-                updates["name"] = school_name
-            if updates:
-                updates["updated_at"] = now
-                result["school_keys"] += _update_if_changed(conn, "academic_schools", int(row["id"]), updates)
-
-    if "academic_enrollments" in existing:
-        rows = conn.execute("SELECT id, full_name, full_name_norm FROM academic_enrollments").fetchall()
-        for row in rows:
-            full_name_norm = canonical.normalize_text(row["full_name"])
-            if str(row["full_name_norm"] or "").strip() != full_name_norm:
-                conn.execute(
-                    "UPDATE academic_enrollments SET full_name_norm = %s, updated_at = %s WHERE id = %s",
-                    (full_name_norm, now, int(row["id"])),
-                )
-                result["name_keys"] += 1
-
-    for table, pk_column, name_column, short_column in (
-        ("subject_summaries", "sheet_student_id", "subject_name", "subject_short"),
-        ("lesson_catalog", "id", "subject_name", ""),
-        ("resources", "id", "subject_name", ""),
-    ):
-        if table not in existing:
-            continue
-        select_columns = f"{pk_column}, {name_column}"
-        if short_column:
-            select_columns += f", {short_column}"
-        if table == "resources":
-            select_columns += ", subject_key"
-        rows = conn.execute(f"SELECT {select_columns} FROM {table}").fetchall()
-        for row in rows:
-            canonical_name = _canonical_subject_name(row[name_column])
-            updates = {}
-            if str(row[name_column] or "").strip() != canonical_name:
-                updates[name_column] = canonical_name
-            if short_column:
-                canonical_short = _canonical_subject_short(canonical_name)
-                if str(row[short_column] or "").strip() != canonical_short:
-                    updates[short_column] = canonical_short
-            if table == "resources":
-                canonical_key = _canonical_subject_key(canonical_name)
-                if str(row["subject_key"] or "").strip() != canonical_key:
-                    updates["subject_key"] = canonical_key
-            if updates:
-                if table == "lesson_catalog" and "subject_name" in updates:
-                    conflict = conn.execute(
-                        """
-                        SELECT id FROM lesson_catalog
-                        WHERE subject_name = %s
-                          AND group_name = (
-                            SELECT group_name FROM lesson_catalog WHERE id = %s
-                          )
-                          AND lesson_number = (
-                            SELECT lesson_number FROM lesson_catalog WHERE id = %s
-                          )
-                          AND id != %s
-                        """,
-                        (canonical_name, int(row[pk_column]), int(row[pk_column]), int(row[pk_column])),
-                    ).fetchone()
-                    if conflict:
-                        continue
-                if table in {"lesson_catalog", "resources"}:
-                    updates["updated_at"] = now
-                result_key = {
-                    "subject_summaries": "subject_summaries",
-                    "lesson_catalog": "lesson_catalog",
-                    "resources": "resources",
-                }[table]
-                result[result_key] += _update_if_changed(
-                    conn,
-                    table,
-                    int(row[pk_column]),
-                    updates,
-                    pk_column=pk_column,
-                )
-
-    for table, columns in (
-        ("academic_lessons", ("lesson_date",)),
-        ("academic_attendance_records", ("lesson_date",)),
-        ("academic_homework_scores", ("lesson_date",)),
-        ("academic_schedules", ("start_date", "end_date")),
-        ("academic_lesson_sessions", ("session_date",)),
-        ("lesson_catalog", ("lesson_date",)),
-    ):
-        if table not in existing:
-            continue
-        rows = conn.execute(f"SELECT id, {', '.join(columns)} FROM {table}").fetchall()
-        for row in rows:
-            updates = {}
-            for column in columns:
-                canonical_date = _canonical_db_date(row[column])
-                if str(row[column] or "").strip() != canonical_date:
-                    updates[column] = canonical_date
-            if updates:
-                if table != "academic_lesson_sessions":
-                    updates["updated_at"] = now
-                result["dates"] += _update_if_changed(conn, table, int(row["id"]), updates)
-
-    return result
-
-
-def _ensure(conn):
-    ensure_academic_schema(conn)
-    if not _tables_exist(conn):
-        raise RuntimeError(
-            "Internal academic tables are missing. Run the archived Google Sheets updater."
-        )
-
-
+# ---------------------------------------------------------------------------
+# Admin context (read)
+# ---------------------------------------------------------------------------
 def list_academic_admin_rows():
     with _connect() as conn:
-        ensure_academic_schema(conn)
-        if not _tables_exist(conn):
-            return {"schools": [], "subjects": [], "groups": [], "lessons": []}
         schools = [
             dict(row)
             for row in conn.execute(
-                "SELECT id, code, name FROM academic_schools ORDER BY name"
+                "SELECT id, school_key AS code, school_name AS name FROM msi_v2.schools ORDER BY school_name"
             ).fetchall()
         ]
         subjects = [
             dict(row)
             for row in conn.execute(
                 """
-                SELECT sub.id, sub.school_id, s.code AS school_code, s.name AS school_name,
-                       sub.name, sub.code, sub.short_name
-                FROM academic_subjects sub
-                JOIN academic_schools s ON s.id = sub.school_id
-                ORDER BY s.name, sub.name
+                SELECT id, subject_name AS name, subject_key AS key,
+                       subject_short AS code, subject_short AS short_name
+                FROM msi_v2.subjects
+                WHERE status = 'active'
+                ORDER BY subject_name
                 """
             ).fetchall()
         ]
@@ -847,17 +277,21 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT g.id, g.school_id, s.code AS school_code, g.subject_id,
-                       sub.name AS subject_name, g.name, g.code,
-                       count(e.id) FILTER (WHERE e.active = 1 AND e.enrollment_status = 'active') AS students_count,
-                       count(e.id) FILTER (WHERE e.enrollment_status = 'disqualified') AS disqualified_count
-                FROM academic_groups g
-                JOIN academic_schools s ON s.id = g.school_id
-                JOIN academic_subjects sub ON sub.id = g.subject_id
-                LEFT JOIN academic_enrollments e ON e.group_id = g.id
-                WHERE lower(g.name) <> 'online'
-                GROUP BY g.id, g.school_id, s.code, s.name, g.subject_id, sub.name, g.name, g.code
-                ORDER BY s.name, sub.name, g.name
+                SELECT coalesce(g.legacy_group_id, g.id) AS id,
+                       g.school_id, s.school_key AS school_code,
+                       subj.id AS subject_id, subj.subject_name AS subject_name,
+                       g.group_name AS name, g.group_code AS code,
+                       count(*) FILTER (WHERE gs.enrollment_status = 'active') AS students_count,
+                       count(*) FILTER (WHERE gs.enrollment_status = 'disqualified') AS disqualified_count
+                FROM msi_v2.groups g
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                LEFT JOIN msi_v2.group_students gs ON gs.group_id = g.id
+                WHERE lower(g.group_name) <> 'online'
+                GROUP BY g.id, g.legacy_group_id, g.school_id, s.school_key, s.school_name,
+                         subj.id, subj.subject_name, g.group_name, g.group_code
+                ORDER BY s.school_name, subj.subject_name, g.group_name
                 """
             ).fetchall()
         ]
@@ -865,19 +299,23 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT e.id, e.public_dashboard_id, e.full_name,
-                       e.school_id, s.code AS school_code, s.name AS school_name,
-                       e.subject_id, sub.name AS subject_name,
-                       e.group_id, g.name AS group_name,
-                       e.active, e.enrollment_status
-                FROM academic_enrollments e
-                JOIN academic_schools s ON s.id = e.school_id
-                JOIN academic_subjects sub ON sub.id = e.subject_id
-                JOIN academic_groups g ON g.id = e.group_id
-                WHERE lower(g.name) <> 'online'
-                  AND e.active = 1
-                  AND e.enrollment_status = 'active'
-                ORDER BY s.name, sub.name, g.name, e.full_name
+                SELECT gs.legacy_enrollment_id AS id,
+                       coalesce(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
+                       st.full_name,
+                       g.school_id, s.school_key AS school_code, s.school_name,
+                       subj.id AS subject_id, subj.subject_name,
+                       coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+                       (gs.enrollment_status = 'active') AS active, gs.enrollment_status
+                FROM msi_v2.group_students gs
+                JOIN msi_v2.students st ON st.id = gs.student_id
+                JOIN msi_v2.groups g ON g.id = gs.group_id
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE lower(g.group_name) <> 'online'
+                  AND gs.enrollment_status = 'active'
+                  AND gs.legacy_enrollment_id IS NOT NULL
+                ORDER BY s.school_name, subj.subject_name, g.group_name, st.full_name
                 """
             ).fetchall()
         ]
@@ -885,16 +323,15 @@ def list_academic_admin_rows():
             conn.execute(
                 """
                 SELECT
-                  count(*) FILTER (WHERE e.active = 1 AND e.enrollment_status = 'active') AS active_enrollments,
-                  count(DISTINCT lower(trim(e.full_name))) FILTER (
-                    WHERE e.active = 1
-                      AND e.enrollment_status = 'active'
-                      AND trim(e.full_name) <> ''
+                  count(*) FILTER (WHERE gs.enrollment_status = 'active') AS active_enrollments,
+                  count(DISTINCT lower(trim(st.full_name))) FILTER (
+                    WHERE gs.enrollment_status = 'active' AND trim(st.full_name) <> ''
                   ) AS active_unique_students,
-                  count(*) FILTER (WHERE e.enrollment_status = 'disqualified') AS disqualified_enrollments
-                FROM academic_enrollments e
-                JOIN academic_groups g ON g.id = e.group_id
-                WHERE lower(g.name) <> 'online'
+                  count(*) FILTER (WHERE gs.enrollment_status = 'disqualified') AS disqualified_enrollments
+                FROM msi_v2.group_students gs
+                JOIN msi_v2.students st ON st.id = gs.student_id
+                JOIN msi_v2.groups g ON g.id = gs.group_id
+                WHERE lower(g.group_name) <> 'online'
                 """
             ).fetchone()
             or {}
@@ -907,16 +344,20 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT l.id, l.school_id, l.subject_id, l.group_id,
-                       s.code AS school_code, sub.name AS subject_name,
-                       g.name AS group_name, l.lesson_number, l.topic AS lesson_topic,
-                       l.lesson_date, l.lesson_order
-                FROM academic_lessons l
-                JOIN academic_schools s ON s.id = l.school_id
-                JOIN academic_subjects sub ON sub.id = l.subject_id
-                JOIN academic_groups g ON g.id = l.group_id
-                WHERE lower(g.name) <> 'online'
-                ORDER BY s.name, sub.name, g.name, l.lesson_order
+                SELECT ls.id, g.school_id, subj.id AS subject_id,
+                       coalesce(g.legacy_group_id, g.id) AS group_id,
+                       s.school_key AS school_code, subj.subject_name,
+                       g.group_name, spi.lesson_number, spi.title AS lesson_topic,
+                       coalesce(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
+                       spi.item_order AS lesson_order
+                FROM msi_v2.lesson_sessions ls
+                JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+                JOIN msi_v2.groups g ON g.id = ls.group_id
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE spi.item_type = 'lesson' AND lower(g.group_name) <> 'online'
+                ORDER BY s.school_name, subj.subject_name, g.group_name, spi.item_order
                 """
             ).fetchall()
         ]
@@ -924,20 +365,25 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT sch.id, sch.school_id, s.code AS school_code, s.name AS school_name,
-                       sch.subject_id, sub.name AS subject_name,
-                       sch.group_id, g.name AS group_name,
-                       sch.teacher_id, coalesce(t.full_name, '') AS teacher_name,
-                       sch.title, sch.weekdays, sch.start_time, sch.end_time,
-                       sch.start_date, sch.end_date, sch.room, sch.online_url,
-                       sch.status
-                FROM academic_schedules sch
-                JOIN academic_schools s ON s.id = sch.school_id
-                JOIN academic_subjects sub ON sub.id = sch.subject_id
-                JOIN academic_groups g ON g.id = sch.group_id
-                LEFT JOIN teachers t ON t.id = sch.teacher_id
-                WHERE lower(g.name) <> 'online'
-                ORDER BY s.name, sub.name, g.name, sch.start_time
+                SELECT sch.id, g.school_id, s.school_key AS school_code, s.school_name,
+                       subj.id AS subject_id, subj.subject_name,
+                       coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+                       coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
+                       coalesce(t.full_name, '') AS teacher_name,
+                       sch.title, sch.weekdays,
+                       coalesce(to_char(sch.start_time, 'HH24:MI'), '') AS start_time,
+                       coalesce(to_char(sch.end_time, 'HH24:MI'), '') AS end_time,
+                       coalesce(to_char(sch.start_date, 'DD/MM/YYYY'), '') AS start_date,
+                       coalesce(to_char(sch.end_date, 'DD/MM/YYYY'), '') AS end_date,
+                       sch.room, sch.online_url, sch.status
+                FROM msi_v2.group_schedule_rules sch
+                JOIN msi_v2.groups g ON g.id = sch.group_id
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
+                WHERE lower(g.group_name) <> 'online'
+                ORDER BY s.school_name, subj.subject_name, g.group_name, sch.start_time
                 """
             ).fetchall()
         ]
@@ -945,20 +391,24 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT sess.id, sess.schedule_id, sess.lesson_id,
-                       sess.school_id, s.code AS school_code, s.name AS school_name,
-                       sess.subject_id, sub.name AS subject_name,
-                       sess.group_id, g.name AS group_name,
-                       sess.teacher_id, coalesce(t.full_name, '') AS teacher_name,
-                       sess.session_date, sess.start_time, sess.end_time,
-                       sess.room, sess.online_url, sess.status
-                FROM academic_lesson_sessions sess
-                JOIN academic_schools s ON s.id = sess.school_id
-                JOIN academic_subjects sub ON sub.id = sess.subject_id
-                JOIN academic_groups g ON g.id = sess.group_id
-                LEFT JOIN teachers t ON t.id = sess.teacher_id
-                WHERE lower(g.name) <> 'online'
-                ORDER BY sess.session_date, sess.start_time, s.name, g.name
+                SELECT ls.id, ls.schedule_rule_id AS schedule_id, ls.program_item_id AS lesson_id,
+                       g.school_id, s.school_key AS school_code, s.school_name,
+                       subj.id AS subject_id, subj.subject_name,
+                       coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+                       coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
+                       coalesce(t.full_name, '') AS teacher_name,
+                       coalesce(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS session_date,
+                       coalesce(to_char(ls.start_time, 'HH24:MI'), '') AS start_time,
+                       coalesce(to_char(ls.end_time, 'HH24:MI'), '') AS end_time,
+                       ls.room, ls.online_url, ls.status
+                FROM msi_v2.lesson_sessions ls
+                JOIN msi_v2.groups g ON g.id = ls.group_id
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                LEFT JOIN msi_v2.teachers t ON t.id = ls.teacher_id
+                WHERE ls.schedule_rule_id IS NOT NULL AND lower(g.group_name) <> 'online'
+                ORDER BY ls.session_date, ls.start_time, s.school_name, g.group_name
                 """
             ).fetchall()
         ]
@@ -966,18 +416,18 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT p.id, p.subject_key, p.subject_name, p.subject_short,
-                       p.source_file, p.total_items, p.lesson_count, p.exam_count,
-                       p.updated_at,
-                       COUNT(DISTINCT sub.id) AS db_subject_count,
-                       COUNT(DISTINCT g.id) AS group_count
-                FROM academic_curriculum_programs p
-                LEFT JOIN academic_subjects sub ON sub.key = p.subject_key
-                LEFT JOIN academic_groups g ON g.subject_id = sub.id AND lower(g.name) <> 'online'
-                GROUP BY p.id, p.subject_key, p.subject_name, p.subject_short,
-                         p.source_file, p.total_items, p.lesson_count, p.exam_count,
-                         p.updated_at
-                ORDER BY p.subject_name
+                SELECT sp.id, subj.subject_key, subj.subject_name, subj.subject_short,
+                       sp.source_file, sp.total_items, sp.lesson_count, sp.exam_count,
+                       sp.updated_at::text AS updated_at,
+                       1 AS db_subject_count,
+                       (
+                         SELECT count(*) FROM msi_v2.groups g
+                         WHERE g.program_id = sp.id AND lower(g.group_name) <> 'online'
+                       ) AS group_count
+                FROM msi_v2.subject_programs sp
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE sp.status = 'active'
+                ORDER BY subj.subject_name
                 """
             ).fetchall()
         ]
@@ -985,13 +435,14 @@ def list_academic_admin_rows():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT i.id, i.program_id, p.subject_key, p.subject_name,
-                       i.item_order, i.lesson_number, i.item_type, i.title,
-                       i.term_label, i.week_label, i.specification_points,
-                       i.book_pages, i.lesson_count, i.duration_hours
-                FROM academic_curriculum_items i
-                JOIN academic_curriculum_programs p ON p.id = i.program_id
-                ORDER BY p.subject_name, i.item_order
+                SELECT spi.id, spi.program_id, subj.subject_key, subj.subject_name,
+                       spi.item_order, spi.lesson_number, spi.item_type, spi.title,
+                       spi.term_label, spi.week_label, spi.specification_points,
+                       spi.book_pages, spi.lesson_count, spi.duration_hours
+                FROM msi_v2.subject_program_items spi
+                JOIN msi_v2.subject_programs sp ON sp.id = spi.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                ORDER BY subj.subject_name, spi.item_order
                 """
             ).fetchall()
         ]
@@ -1009,209 +460,12 @@ def list_academic_admin_rows():
         }
 
 
-def _upsert_school(conn, code, name, now):
-    code = str(code or "school5").strip().casefold() or "school5"
-    name = str(name or ("Sehriyo" if code == "sehriyo" else "School 5")).strip()
-    row = conn.execute("SELECT id FROM academic_schools WHERE code = %s", (code,)).fetchone()
-    if row:
-        conn.execute(
-            "UPDATE academic_schools SET name = %s, updated_at = %s WHERE id = %s",
-            (name, now, int(row["id"])),
-        )
-        return int(row["id"])
-    cur = conn.execute(
-        """
-        INSERT INTO academic_schools (code, name, created_at, updated_at)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-        """,
-        (code, name, now, now),
-    )
-    inserted = cur.fetchone()
-    return int(inserted["id"]) if inserted else 0
-
-
-def _upsert_subject(conn, school_id, name, code, now):
-    name = _canonical_subject_name(name)
-    key = _canonical_subject_key(name)
-    short_name = _canonical_subject_short(name)
-    row = conn.execute(
-        "SELECT id FROM academic_subjects WHERE school_id = %s AND key = %s",
-        (school_id, key),
-    ).fetchone()
-    if row:
-        conn.execute(
-            """
-            UPDATE academic_subjects
-            SET name = %s, code = %s, short_name = %s, updated_at = %s
-            WHERE id = %s
-            """,
-            (name, short_name, short_name, now, int(row["id"])),
-        )
-        return int(row["id"])
-    cur = conn.execute(
-        """
-        INSERT INTO academic_subjects (school_id, key, name, code, short_name, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (school_id, key, name, short_name, short_name, now, now),
-    )
-    inserted = cur.fetchone()
-    return int(inserted["id"]) if inserted else 0
-
-
-def _upsert_group(conn, school_id, subject_id, name, code, now):
-    name = str(name or "Group").strip() or "Group"
-    key = _slugify(name)
-    row = conn.execute(
-        """
-        SELECT id FROM academic_groups
-        WHERE school_id = %s AND subject_id = %s AND key = %s
-        """,
-        (school_id, subject_id, key),
-    ).fetchone()
-    if row:
-        conn.execute(
-            "UPDATE academic_groups SET name = %s, code = %s, updated_at = %s WHERE id = %s",
-            (name, str(code or ""), now, int(row["id"])),
-        )
-        return int(row["id"])
-    cur = conn.execute(
-        """
-        INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (school_id, subject_id, key, name, str(code or ""), now, now),
-    )
-    inserted = cur.fetchone()
-    return int(inserted["id"]) if inserted else 0
-
-
-def _student_row_id(conn, school_key, enrollment_id, full_name):
-    row = conn.execute(
-        """
-        SELECT student_row_id
-        FROM students_sheet_map
-        WHERE school_key = %s AND sheet_student_id = %s
-        """,
-        (school_key, enrollment_id),
-    ).fetchone()
-    if row:
-        return int(row["student_row_id"])
-    row = conn.execute(
-        """
-        SELECT id FROM students
-        WHERE lower(full_name) = lower(%s)
-          AND lower(coalesce(school_key, '')) = lower(%s)
-        LIMIT 1
-        """,
-        (full_name, school_key),
-    ).fetchone()
-    return int(row["id"]) if row else None
-
-
-def create_subject(school_code, name, code=""):
-    now = _utc_now_iso()
-    name = _canonical_subject_name(name)
-    key = _canonical_subject_key(name)
-    short_name = _canonical_subject_short(name)
-    with _connect() as conn:
-        _ensure(conn)
-        school = conn.execute(
-            "SELECT id FROM academic_schools WHERE code = %s",
-            (school_code,),
-        ).fetchone()
-        if not school:
-            raise ValueError("School was not found.")
-        conn.execute(
-            """
-            INSERT INTO academic_subjects (school_id, key, name, code, short_name, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(school_id, key) DO UPDATE SET
-              name = excluded.name,
-              code = excluded.code,
-              short_name = excluded.short_name,
-              updated_at = excluded.updated_at
-            """,
-            (int(school["id"]), key, name, short_name, short_name, now, now),
-        )
-        conn.commit()
-
-
-def create_group(school_code, subject_id, name, code=""):
-    now = _utc_now_iso()
-    key = "-".join(str(name or "").strip().casefold().split())
-    with _connect() as conn:
-        _ensure(conn)
-        school = conn.execute("SELECT id FROM academic_schools WHERE code = %s", (school_code,)).fetchone()
-        if not school:
-            raise ValueError("School was not found.")
-        subject = conn.execute(
-            "SELECT id FROM academic_subjects WHERE id = %s AND school_id = %s",
-            (subject_id, int(school["id"])),
-        ).fetchone()
-        if not subject:
-            raise ValueError("Subject was not found for the selected school.")
-        conn.execute(
-            """
-            INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(school_id, subject_id, key) DO UPDATE SET
-              name = excluded.name,
-              code = excluded.code,
-              updated_at = excluded.updated_at
-            """,
-            (int(school["id"]), int(subject_id), key, name, code, now, now),
-        )
-        conn.commit()
-
-
-def create_group_from_program(school_code, program_subject_key, group_name, group_code=""):
-    now = _utc_now_iso()
-    group_name = str(group_name or "Group").strip() or "Group"
-    key = _slugify(group_name)
-    with _connect() as conn:
-        _ensure(conn)
-        school = conn.execute(
-            "SELECT id FROM academic_schools WHERE code = %s", (school_code,)
-        ).fetchone()
-        if not school:
-            raise ValueError("Client school was not found.")
-        program = conn.execute(
-            """
-            SELECT subject_key, subject_name, subject_short
-            FROM academic_curriculum_programs
-            WHERE subject_key = %s
-            """,
-            (program_subject_key,),
-        ).fetchone()
-        if not program:
-            raise ValueError("Subject program was not found.")
-        subject_id = _upsert_subject(
-            conn, int(school["id"]), program["subject_name"], str(program["subject_short"] or ""), now
-        )
-        if not subject_id:
-            raise ValueError("Could not resolve subject for the selected program.")
-        conn.execute(
-            """
-            INSERT INTO academic_groups (school_id, subject_id, key, name, code, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(school_id, subject_id, key) DO UPDATE SET
-              name = excluded.name,
-              code = excluded.code,
-              updated_at = excluded.updated_at
-            """,
-            (int(school["id"]), subject_id, key, group_name, str(group_code or ""), now, now),
-        )
-        conn.commit()
-
-
+# ---------------------------------------------------------------------------
+# Admin context (write)
+# ---------------------------------------------------------------------------
 def create_school(name, code=""):
     import re
 
-    now = _utc_now_iso()
     name = str(name or "").strip()
     if not name:
         raise ValueError("School name is required.")
@@ -1219,29 +473,93 @@ def create_school(name, code=""):
     if not code_value:
         code_value = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "school"
     with _connect() as conn:
-        _ensure(conn)
         existing = conn.execute(
-            "SELECT id FROM academic_schools WHERE code = %s", (code_value,)
+            "SELECT id FROM msi_v2.schools WHERE lower(school_key) = lower(%s)",
+            (code_value,),
         ).fetchone()
         if existing:
             raise ValueError(f"A client school with code '{code_value}' already exists.")
         conn.execute(
-            """
-            INSERT INTO academic_schools (code, name, created_at, updated_at)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (code_value, name, now, now),
+            "INSERT INTO msi_v2.schools (school_key, school_name) VALUES (%s, %s)",
+            (code_value, name),
         )
+        conn.commit()
+
+
+def create_subject(school_code, name, code=""):
+    # Subjects are universal in msi_v2; the school_code is accepted for backward
+    # compatibility with the old per-school form but no longer scopes the row.
+    name = _canonical_subject_name(name)
+    key = _canonical_subject_key(name)
+    short_name = _canonical_subject_short(name)
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO msi_v2.subjects (subject_key, subject_name, subject_short, status)
+            VALUES (%s, %s, %s, 'active')
+            ON CONFLICT ((lower(subject_key))) DO UPDATE SET
+              subject_name = excluded.subject_name,
+              subject_short = excluded.subject_short,
+              status = 'active',
+              updated_at = now()
+            """,
+            (key, name, short_name),
+        )
+        conn.commit()
+
+
+def create_group_from_program(school_code, program_subject_key, group_name, group_code=""):
+    group_name = str(group_name or "Group").strip() or "Group"
+    with _connect() as conn:
+        school = conn.execute(
+            "SELECT id FROM msi_v2.schools WHERE lower(school_key) = lower(%s)",
+            (school_code,),
+        ).fetchone()
+        if not school:
+            raise ValueError("Client school was not found.")
+        program = conn.execute(
+            """
+            SELECT sp.id
+            FROM msi_v2.subject_programs sp
+            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+            WHERE lower(subj.subject_key) = lower(%s) AND sp.status = 'active'
+            ORDER BY sp.id DESC
+            LIMIT 1
+            """,
+            (program_subject_key,),
+        ).fetchone()
+        if not program:
+            raise ValueError("Subject program was not found.")
+        existing = conn.execute(
+            """
+            SELECT id FROM msi_v2.groups
+            WHERE school_id = %s AND program_id = %s AND lower(group_name) = lower(%s)
+            """,
+            (int(school["id"]), int(program["id"]), group_name),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE msi_v2.groups SET group_code = %s, updated_at = now() WHERE id = %s",
+                (str(group_code or ""), int(existing["id"])),
+            )
+        else:
+            legacy_group_id = _mint_legacy_id(conn, "groups", "legacy_group_id")
+            conn.execute(
+                """
+                INSERT INTO msi_v2.groups (school_id, program_id, group_name, group_code, status, legacy_group_id)
+                VALUES (%s, %s, %s, %s, 'active', %s)
+                """,
+                (int(school["id"]), int(program["id"]), group_name, str(group_code or ""), legacy_group_id),
+            )
         conn.commit()
 
 
 def create_student_with_enrollment(full_name, group_id):
     """Create a student login identity and enroll them into a group.
 
-    Mirrors the dataset-sync path (login row + auth + canonical code) but adds
-    an academic_enrollments row so the student shows in the group's gradebook.
-    No students_sheet_map row is written, so the Scheme of Work sync's stale
-    cleanup never touches this manually added student.
+    Reuses an existing student (same normalized name + school) instead of minting
+    a duplicate code, then writes a ``group_students`` row with freshly minted
+    legacy ids so the student immediately shows in the group's gradebook.
     """
     from werkzeug.security import generate_password_hash
 
@@ -1252,40 +570,24 @@ def create_student_with_enrollment(full_name, group_id):
     if group_id <= 0:
         raise ValueError("A group is required.")
 
-    now = _utc_now_iso()
     with _connect() as conn:
-        _ensure(conn)
-        group = conn.execute(
-            """
-            SELECT g.id, g.school_id, g.subject_id, g.name AS group_name,
-                   s.code AS school_code, s.name AS school_name,
-                   sub.name AS subject_name
-            FROM academic_groups g
-            JOIN academic_schools s ON s.id = g.school_id
-            JOIN academic_subjects sub ON sub.id = g.subject_id
-            WHERE g.id = %s
-            """,
-            (group_id,),
-        ).fetchone()
+        group = _resolve_group(conn, group_id)
         if not group:
             raise ValueError("Group was not found.")
 
+        v2_group_id = int(group["id"])
         school_id = int(group["school_id"])
-        subject_id = int(group["subject_id"])
-        school_code = canonical.normalize_school_code(group["school_code"])
+        school_code = canonical.normalize_school_code(group["school_key"])
         school_name = str(group["school_name"] or canonical.school_display_name(school_code))
         subject_name = _canonical_subject_name(group["subject_name"])
 
-        # Login identity. Reuse an existing students row for the same person
-        # (same normalized name + school) instead of minting a duplicate code.
-        # This keeps ONE login per person: adding someone who is already in the
-        # system (e.g. enrolling them into another group) links to their
-        # existing login rather than creating a second, divergent row.
+        # Reuse an existing login for the same person (same normalized name +
+        # school) so a person keeps one login across subjects/groups.
         target_norm = _normalize(full_name)
         existing_student = None
         for candidate in conn.execute(
-            "SELECT id, full_name, student_id, password, subjects FROM students WHERE school_key = %s",
-            (school_code,),
+            "SELECT id, full_name, student_code FROM msi_v2.students WHERE school_id = %s",
+            (school_id,),
         ).fetchall():
             if _normalize(candidate["full_name"]) == target_norm:
                 existing_student = candidate
@@ -1293,72 +595,55 @@ def create_student_with_enrollment(full_name, group_id):
 
         if existing_student:
             reused = True
-            student_row_id = int(existing_student["id"])
-            student_code = str(existing_student["student_id"] or "")
-            default_password = str(existing_student["password"] or "")
-            # Keep the student's subject list inclusive of the new subject.
-            subjects = canonical.split_subjects(existing_student["subjects"])
-            if subject_name and subject_name not in subjects:
-                subjects.append(subject_name)
-                conn.execute(
-                    "UPDATE students SET subjects = %s WHERE id = %s",
-                    (", ".join(subjects), student_row_id),
-                )
+            student_id = int(existing_student["id"])
+            student_code = str(existing_student["student_code"] or "")
+            default_password = ""  # unknown for an existing login
         else:
             reused = False
-            student_code = queries.get_next_student_code(conn, canonical.student_code_prefix(school_code))
+            student_code = _next_student_code(conn, canonical.student_code_prefix(school_code))
             default_password = student_code
-            student_row_id = queries.insert_student(
-                conn,
-                full_name,
-                student_code,
-                default_password,
-                subject_name,
-                school_name,
-                school_code,
-            )
-            queries.insert_student_auth(
-                conn,
-                student_row_id,
-                generate_password_hash(default_password),
-                now,
+            inserted = conn.execute(
+                """
+                INSERT INTO msi_v2.students (student_code, full_name, school_id, status)
+                VALUES (%s, %s, %s, 'active')
+                RETURNING id
+                """,
+                (student_code, full_name, school_id),
+            ).fetchone()
+            student_id = int(inserted["id"])
+            conn.execute(
+                """
+                INSERT INTO msi_v2.student_auth (student_id, password_hash, must_change_password, updated_at)
+                VALUES (%s, %s, false, now())
+                ON CONFLICT (student_id) DO UPDATE SET
+                    password_hash = excluded.password_hash,
+                    updated_at = now()
+                """,
+                (student_id, generate_password_hash(default_password)),
             )
 
-        # Academic enrollment so the student appears in the group's gradebook.
-        # Manual enrollments live in a high public_dashboard_id band to avoid
-        # colliding with sheet-imported enrollment ids.
-        row = conn.execute(
-            "SELECT coalesce(max(public_dashboard_id), 0) AS max_id FROM academic_enrollments WHERE school_id = %s",
-            (school_id,),
-        ).fetchone()
-        next_dashboard_id = max(int(row["max_id"] or 0), 9_000_000_000) + 1
+        next_enrollment_id = _mint_legacy_id(conn, "group_students", "legacy_enrollment_id")
+        next_dashboard_id = _mint_legacy_id(conn, "group_students", "legacy_public_dashboard_id")
         enrollment = conn.execute(
             """
-            INSERT INTO academic_enrollments (
-              student_row_id, school_id, subject_id, group_id, public_dashboard_id,
-              full_name, full_name_norm, active, enrollment_status, imported_from,
-              created_at, updated_at
+            INSERT INTO msi_v2.group_students (
+                group_id, student_id, enrollment_status, joined_at,
+                legacy_enrollment_id, legacy_public_dashboard_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 'active', 'manual', %s, %s)
-            RETURNING id
+            VALUES (%s, %s, 'active', now(), %s, %s)
+            ON CONFLICT (group_id, student_id) DO UPDATE SET
+                enrollment_status = 'active',
+                left_at = NULL
+            RETURNING legacy_enrollment_id
             """,
-            (
-                int(student_row_id),
-                school_id,
-                subject_id,
-                group_id,
-                next_dashboard_id,
-                full_name,
-                _normalize(full_name),
-                now,
-                now,
-            ),
+            (v2_group_id, student_id, next_enrollment_id, next_dashboard_id),
         ).fetchone()
+        enrollment_id = int(enrollment["legacy_enrollment_id"] or next_enrollment_id) if enrollment else next_enrollment_id
         conn.commit()
 
     return {
-        "studentRowId": int(student_row_id),
-        "enrollmentId": int(enrollment["id"]) if enrollment else 0,
+        "studentRowId": int(student_id),
+        "enrollmentId": int(enrollment_id),
         "studentCode": student_code,
         "password": default_password,
         "reused": reused,
@@ -1383,7 +668,6 @@ def create_schedule(
     title="",
 ):
     group_id = int(group_id or 0)
-    teacher_id = int(teacher_id or 0)
     weekdays = _normalize_weekdays(weekdays)
     start_date_obj = _parse_date_input(start_date, "Start date")
     end_date_obj = _parse_date_input(end_date, "End date")
@@ -1400,33 +684,24 @@ def create_schedule(
     if not generated_dates:
         raise ValueError("The selected date range does not contain the selected weekdays.")
 
-    now = _utc_now_iso()
     weekdays_text = ",".join(str(day) for day in weekdays)
     title = str(title or "").strip()
     room = str(room or "").strip()
     online_url = str(online_url or "").strip()
+    start_time_obj = _parse_time(start_time, "Start time")
+    end_time_obj = _parse_time(end_time, "End time")
 
     with _connect() as conn:
-        _ensure(conn)
-        group = conn.execute(
-            """
-            SELECT g.id, g.school_id, g.subject_id, g.name, sub.name AS subject_name
-            FROM academic_groups g
-            JOIN academic_subjects sub ON sub.id = g.subject_id
-            WHERE g.id = %s
-            """,
-            (group_id,),
-        ).fetchone()
+        group = _resolve_group(conn, group_id)
         if not group:
             raise ValueError("Group was not found.")
-        if teacher_id:
-            teacher = conn.execute("SELECT id FROM teachers WHERE id = %s", (teacher_id,)).fetchone()
-            if not teacher:
-                raise ValueError("Teacher was not found.")
+        v2_group_id = int(group["id"])
+        teacher_v2_id = _resolve_teacher_id(conn, teacher_id)
+
         conflict = _schedule_conflict_message(
             conn,
-            group_id=group_id,
-            teacher_id=teacher_id,
+            group_v2_id=v2_group_id,
+            teacher_v2_id=teacher_v2_id,
             weekdays=weekdays,
             start_date=start_date_obj,
             end_date=end_date_obj,
@@ -1436,119 +711,54 @@ def create_schedule(
         if conflict:
             raise ValueError(conflict)
 
-        cur = conn.execute(
+        inserted_rule = conn.execute(
             """
-            INSERT INTO academic_schedules (
-              school_id, subject_id, group_id, teacher_id, title, weekdays,
-              start_time, end_time, start_date, end_date, room, online_url,
-              status, created_at, updated_at
+            INSERT INTO msi_v2.group_schedule_rules (
+              group_id, teacher_id, title, weekdays, start_time, end_time,
+              start_date, end_date, room, online_url, status
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
             RETURNING id
             """,
             (
-                int(group["school_id"]),
-                int(group["subject_id"]),
-                group_id,
-                teacher_id or None,
+                v2_group_id,
+                teacher_v2_id or None,
                 title,
                 weekdays_text,
-                str(start_time).strip(),
-                str(end_time).strip(),
-                _canonical_db_date(start_date_obj),
-                _canonical_db_date(end_date_obj),
+                start_time_obj,
+                end_time_obj,
+                start_date_obj,
+                end_date_obj,
                 room,
                 online_url,
-                now,
-                now,
             ),
-        )
-        inserted_schedule = cur.fetchone()
-        schedule_id = int(inserted_schedule["id"]) if inserted_schedule else 0
-
-        row = conn.execute(
-            "SELECT coalesce(max(lesson_order), 0) AS max_order FROM academic_lessons WHERE group_id = %s",
-            (group_id,),
         ).fetchone()
-        lesson_order = int(row["max_order"] or 0)
-        topic = title or str(group["subject_name"] or "Scheduled lesson")
+        schedule_id = int(inserted_rule["id"]) if inserted_rule else 0
 
         session_ids = []
         for session_date in generated_dates:
-            lesson_order += 1
-            lesson_number = f"S{schedule_id}-{session_date.strftime('%Y%m%d')}"
-            lesson_cur = conn.execute(
-                """
-                INSERT INTO academic_lessons (
-                  school_id, subject_id, group_id, lesson_number, topic,
-                  lesson_date, lesson_order, created_at, updated_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT(school_id, subject_id, group_id, lesson_number) DO UPDATE SET
-                  topic = excluded.topic,
-                  lesson_date = excluded.lesson_date,
-                  lesson_order = excluded.lesson_order,
-                  updated_at = excluded.updated_at
-                RETURNING id
-                """,
-                (
-                    int(group["school_id"]),
-                    int(group["subject_id"]),
-                    group_id,
-                    lesson_number,
-                    topic,
-                    _canonical_db_date(session_date),
-                    lesson_order,
-                    now,
-                    now,
-                ),
-            )
-            inserted_lesson = lesson_cur.fetchone()
-            lesson_id = int(inserted_lesson["id"]) if inserted_lesson else 0
-            if not lesson_id:
-                existing = conn.execute(
-                    """
-                    SELECT id FROM academic_lessons
-                    WHERE school_id = %s AND subject_id = %s AND group_id = %s AND lesson_number = %s
-                    """,
-                    (int(group["school_id"]), int(group["subject_id"]), group_id, lesson_number),
-                ).fetchone()
-                lesson_id = int(existing["id"]) if existing else None
             session_cur = conn.execute(
                 """
-                INSERT INTO academic_lesson_sessions (
-                  schedule_id, lesson_id, school_id, subject_id, group_id, teacher_id,
-                  session_date, start_time, end_time, room, online_url, status,
-                  created_at, updated_at
+                INSERT INTO msi_v2.lesson_sessions (
+                  group_id, schedule_rule_id, teacher_id, session_date,
+                  start_time, end_time, room, online_url, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'scheduled', %s, %s)
-                ON CONFLICT(schedule_id, session_date, start_time) DO UPDATE SET
-                  lesson_id = excluded.lesson_id,
-                  end_time = excluded.end_time,
-                  room = excluded.room,
-                  online_url = excluded.online_url,
-                  updated_at = excluded.updated_at
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'scheduled')
                 RETURNING id
                 """,
                 (
+                    v2_group_id,
                     schedule_id,
-                    lesson_id,
-                    int(group["school_id"]),
-                    int(group["subject_id"]),
-                    group_id,
-                    teacher_id or None,
-                    _canonical_db_date(session_date),
-                    str(start_time).strip(),
-                    str(end_time).strip(),
+                    teacher_v2_id or None,
+                    session_date,
+                    start_time_obj,
+                    end_time_obj,
                     room,
                     online_url,
-                    now,
-                    now,
                 ),
-            )
-            inserted_session = session_cur.fetchone()
-            if inserted_session:
-                session_ids.append(int(inserted_session["id"] or 0))
+            ).fetchone()
+            if session_cur:
+                session_ids.append(int(session_cur["id"] or 0))
         conn.commit()
 
     return {
@@ -1556,153 +766,3 @@ def create_schedule(
         "sessionCount": len(generated_dates),
         "sessionIds": [session_id for session_id in session_ids if session_id],
     }
-
-
-def create_lesson(group_id, lesson_number, topic, lesson_date="", lesson_order=None):
-    now = _utc_now_iso()
-    with _connect() as conn:
-        _ensure(conn)
-        group = conn.execute(
-            "SELECT school_id, subject_id FROM academic_groups WHERE id = %s",
-            (group_id,),
-        ).fetchone()
-        if not group:
-            raise ValueError("Group was not found.")
-        if not lesson_order:
-            row = conn.execute(
-                "SELECT coalesce(max(lesson_order), 0) AS max_order FROM academic_lessons WHERE group_id = %s",
-                (group_id,),
-            ).fetchone()
-            lesson_order = int(row["max_order"] or 0) + 1
-        conn.execute(
-            """
-            INSERT INTO academic_lessons (
-              school_id, subject_id, group_id, lesson_number, topic, lesson_date,
-              lesson_order, created_at, updated_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT(school_id, subject_id, group_id, lesson_number) DO UPDATE SET
-              topic = excluded.topic,
-              lesson_date = excluded.lesson_date,
-              lesson_order = excluded.lesson_order,
-              updated_at = excluded.updated_at
-            """,
-            (
-                int(group["school_id"]),
-                int(group["subject_id"]),
-                int(group_id),
-                str(lesson_number or "").strip(),
-                str(topic or "").strip(),
-                _canonical_db_date(lesson_date),
-                int(lesson_order),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-
-
-def update_lesson(lesson_id, lesson_number=None, topic=None, lesson_date=None):
-    now = _utc_now_iso()
-    with _connect() as conn:
-        _ensure(conn)
-        row = conn.execute(
-            "SELECT id FROM academic_lessons WHERE id = %s", (lesson_id,)
-        ).fetchone()
-        if not row:
-            raise ValueError("Lesson not found.")
-        updates = {"updated_at": now}
-        if lesson_number is not None:
-            updates["lesson_number"] = str(lesson_number).strip()
-        if topic is not None:
-            updates["topic"] = str(topic).strip()
-        if lesson_date is not None:
-            updates["lesson_date"] = _canonical_db_date(lesson_date)
-        set_clause = ", ".join(f"{k} = %s" for k in updates)
-        conn.execute(
-            f"UPDATE academic_lessons SET {set_clause} WHERE id = %s",
-            list(updates.values()) + [int(lesson_id)],
-        )
-        conn.commit()
-
-
-def _insert_record(table, values):
-    now = _utc_now_iso()
-    columns = list(values.keys()) + ["updated_at"]
-    params = list(values.values()) + [now]
-    placeholders = ",".join(["%s"] * len(params))
-    with _connect() as conn:
-        _ensure(conn)
-        cur = conn.execute(
-            f"INSERT INTO {table} ({','.join(columns)}) VALUES ({placeholders}) RETURNING id",
-            params,
-        )
-        inserted = cur.fetchone()
-        conn.commit()
-        return int(inserted["id"] or 0) if inserted else 0
-
-
-def record_attendance(enrollment_id, lesson_label, status, topic="", lesson_date="", attendance_type=""):
-    status = str(status or "").strip().casefold()
-    if status not in {"present", "absent", "justified"}:
-        raise ValueError("Attendance status must be present, absent, or justified.")
-    return _insert_record(
-        "academic_attendance_records",
-        {
-            "enrollment_id": int(enrollment_id),
-            "lesson_label": str(lesson_label or "").strip(),
-            "topic": str(topic or "").strip(),
-            "lesson_date": _canonical_db_date(lesson_date),
-            "attendance_type": str(attendance_type or "").strip(),
-            "status": status,
-            "lesson_order": 0,
-        },
-    )
-
-
-def record_homework_score(enrollment_id, lesson_label, score, topic="", lesson_date="", score_type="Homework"):
-    return _insert_record(
-        "academic_homework_scores",
-        {
-            "enrollment_id": int(enrollment_id),
-            "lesson_label": str(lesson_label or "").strip(),
-            "topic": str(topic or "").strip(),
-            "lesson_date": _canonical_db_date(lesson_date),
-            "score_type": str(score_type or "Homework").strip() or "Homework",
-            "score": float(score),
-            "lesson_order": 0,
-        },
-    )
-
-
-def record_exam_result(enrollment_id, label, score, exam_name="", attempt=""):
-    return _insert_record(
-        "academic_exam_results",
-        {
-            "enrollment_id": int(enrollment_id),
-            "label": str(label or "").strip(),
-            "exam_name": str(exam_name or "").strip(),
-            "attempt": str(attempt or "").strip(),
-            "score": float(score),
-        },
-    )
-
-
-def record_coin_event(enrollment_id, amount, source="manual"):
-    now = _utc_now_iso()
-    with _connect() as conn:
-        _ensure(conn)
-        cur = conn.execute(
-            """
-            INSERT INTO academic_coin_events (enrollment_id, amount, source, occurred_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT(enrollment_id, source) DO UPDATE SET
-              amount = excluded.amount,
-              updated_at = excluded.updated_at
-            RETURNING id
-            """,
-            (int(enrollment_id), int(amount), source or "manual", now, now),
-        )
-        inserted = cur.fetchone()
-        conn.commit()
-        return int(inserted["id"] or 0) if inserted else 0
