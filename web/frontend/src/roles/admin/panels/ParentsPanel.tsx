@@ -43,14 +43,6 @@ function HeaderBar({ onAdd }: { onAdd: () => void }) {
           <p className="mt-0.5 text-sm text-muted-foreground">{PAGE_DESCRIPTION}</p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onAdd}
-        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
-      >
-        <Plus className="h-4 w-4" />
-        Add parent
-      </button>
     </div>
   );
 }
@@ -369,17 +361,7 @@ export default function ParentsPanel({ state }: { state: any }) {
         ) : parents.length === 0 ? (
           <EmptyState
             title="No parents yet"
-            hint="Add a parent account to start linking students and managing support."
-            action={
-              <button
-                type="button"
-                onClick={() => setForm({ mode: "create", parent: null })}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground"
-              >
-                <Plus className="h-4 w-4" />
-                Add parent
-              </button>
-            }
+            hint="Parents appear here once they register through their Telegram invite link."
           />
         ) : filtered.length === 0 ? (
           <EmptyState

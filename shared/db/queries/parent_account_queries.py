@@ -1,15 +1,14 @@
-"""Parent CLIENT account SQL helpers (separate from `admins`).
+"""Parent CLIENT account queries against the clean msi_v2 schema.
 
-These back the parent invite-link flow: a parent fills in their details on the
-signed invite page and is linked to a student. Parents here are customers, not
-staff — no login, no admin privileges. See tables._create_parent_accounts_tables.
+Parents are Telegram/invite clients (no web password login). They live in
+`msi_v2.parents` and link to students via `msi_v2.parent_student_links`. The
+external ids exposed here are: parent_id = `msi_v2.parents.id`, student_row_id =
+`msi_v2.students.legacy_student_row_id`, dashboard id =
+`legacy_public_dashboard_id`.
 """
-
-from shared.db.tables import ensure_parent_accounts_schema
 
 
 def _clean_username(value):
-    """Store a Telegram handle without a leading @ and surrounding space."""
     return str(value or "").strip().lstrip("@").strip()
 
 
@@ -21,16 +20,67 @@ def _clean_positive_int(value):
     return parsed if parsed > 0 else None
 
 
+# Subjects derived from a student's active enrollments (st = msi_v2.students alias).
+_STUDENT_SUBJECTS_SUBQUERY = """
+    COALESCE((
+        SELECT string_agg(s.subject_name, ', ' ORDER BY s.subject_name)
+        FROM (
+            SELECT DISTINCT subj.subject_name
+            FROM msi_v2.group_students gs
+            JOIN msi_v2.groups g ON g.id = gs.group_id
+            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+            WHERE gs.student_id = st.id AND gs.enrollment_status = 'active'
+        ) s
+    ), '')
+"""
+
+# Student columns shared by the parent child-list queries.
+_CHILD_STUDENT_COLUMNS = f"""
+    st.legacy_student_row_id AS student_row_id,
+    st.full_name AS student_full_name,
+    st.student_code AS student_id,
+    st.password_plain AS password,
+    {_STUDENT_SUBJECTS_SUBQUERY} AS subjects,
+    st.telegram_user_id AS student_telegram_user_id,
+    st.photo_url,
+    st.profile_description,
+    st.class_name,
+    COALESCE(sch.school_name, '') AS school_name,
+    COALESCE(to_char(st.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS last_seen_at
+"""
+
+_PARENT_COLUMNS = """
+    p.id AS parent_id,
+    p.display_name AS full_name,
+    p.phone,
+    p.telegram_username,
+    p.telegram_user_id,
+    p.legacy_admin_id AS source_admin_id,
+    to_char(p.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+    to_char(p.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at
+"""
+
+
 def _parent_row(conn, parent_id):
     return conn.execute(
         """
-        SELECT id, full_name, phone, telegram_username, telegram_user_id,
-               source_admin_id, created_at, updated_at
-        FROM parents
+        SELECT id, display_name AS full_name, phone, telegram_username,
+               telegram_user_id, legacy_admin_id AS source_admin_id,
+               created_at, updated_at
+        FROM msi_v2.parents
         WHERE id = %s
         """,
         (int(parent_id),),
     ).fetchone()
+
+
+def _resolve_student_v2_id(conn, student_row_id):
+    row = conn.execute(
+        "SELECT id FROM msi_v2.students WHERE legacy_student_row_id = %s",
+        (int(student_row_id),),
+    ).fetchone()
+    return int(row["id"]) if row else None
 
 
 def link_parent_from_invite(
@@ -49,9 +99,10 @@ def link_parent_from_invite(
     Manual fallbacks stay idempotent per student by matching username or phone.
     Returns the parent row.
     """
-    ensure_parent_accounts_schema(conn)
+    student_v2_id = _resolve_student_v2_id(conn, student_row_id)
+    if student_v2_id is None:
+        return None
 
-    student_row_id = int(student_row_id)
     full_name = str(full_name or "").strip()
     phone = str(phone or "").strip()
     username = _clean_username(telegram_username)
@@ -60,11 +111,9 @@ def link_parent_from_invite(
     if telegram_user_id is not None:
         existing = conn.execute(
             """
-            SELECT id
-            FROM parents
+            SELECT id FROM msi_v2.parents
             WHERE telegram_user_id = %s
-            ORDER BY id ASC
-            LIMIT 1
+            ORDER BY id ASC LIMIT 1
             """,
             (telegram_user_id,),
         ).fetchone()
@@ -72,78 +121,68 @@ def link_parent_from_invite(
         existing = conn.execute(
             """
             SELECT p.id
-            FROM parents p
-            JOIN parent_student_links l ON l.parent_id = p.id
-            WHERE l.student_row_id = %s
+            FROM msi_v2.parents p
+            JOIN msi_v2.parent_student_links l ON l.parent_id = p.id
+            WHERE l.student_id = %s
               AND (
                   (%s <> '' AND lower(p.telegram_username) = lower(%s))
                   OR (%s <> '' AND p.phone = %s)
               )
-            ORDER BY p.id ASC
-            LIMIT 1
+            ORDER BY p.id ASC LIMIT 1
             """,
-            (student_row_id, username, username, phone, phone),
+            (student_v2_id, username, username, phone, phone),
         ).fetchone()
 
     if existing:
         parent_id = int(existing["id"])
         conn.execute(
             """
-            UPDATE parents
-            SET full_name = CASE WHEN %s <> '' THEN %s ELSE full_name END,
+            UPDATE msi_v2.parents
+            SET display_name = CASE WHEN %s <> '' THEN %s ELSE display_name END,
                 phone = CASE WHEN %s <> '' THEN %s ELSE phone END,
                 telegram_username = CASE WHEN %s <> '' THEN %s ELSE telegram_username END,
                 telegram_user_id = COALESCE(%s, telegram_user_id),
-                updated_at = %s
+                updated_at = now()
             WHERE id = %s
             """,
-            (
-                full_name,
-                full_name,
-                phone,
-                phone,
-                username,
-                username,
-                telegram_user_id,
-                now,
-                parent_id,
-            ),
+            (full_name, full_name, phone, phone, username, username, telegram_user_id, parent_id),
         )
     else:
         inserted = conn.execute(
             """
-            INSERT INTO parents (
-                full_name, phone, telegram_username, telegram_user_id, created_at, updated_at
+            INSERT INTO msi_v2.parents (
+                display_name, phone, telegram_username, telegram_user_id, status
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, 'active')
             RETURNING id
             """,
-            (full_name, phone, username, telegram_user_id, now, now),
+            (full_name, phone, username, telegram_user_id),
         ).fetchone()
         parent_id = int(inserted["id"])
 
     conn.execute(
         """
-        INSERT INTO parent_student_links (parent_id, student_row_id, created_at)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (parent_id, student_row_id) DO NOTHING
+        INSERT INTO msi_v2.parent_student_links (parent_id, student_id, relationship, status)
+        VALUES (%s, %s, 'parent', 'active')
+        ON CONFLICT (parent_id, student_id) DO UPDATE SET status = 'active'
         """,
-        (parent_id, student_row_id, now),
+        (parent_id, student_v2_id),
     )
 
     return _parent_row(conn, parent_id)
 
 
 def get_parents_for_student(conn, student_row_id):
-    """All linked parents for a student (for future admin visibility)."""
-    ensure_parent_accounts_schema(conn)
+    """All linked parents for a student (admin visibility)."""
     return conn.execute(
         """
-        SELECT p.id, p.full_name, p.phone, p.telegram_username,
-               p.telegram_user_id, l.created_at AS linked_at
-        FROM parent_student_links l
-        JOIN parents p ON p.id = l.parent_id
-        WHERE l.student_row_id = %s
+        SELECT p.id, p.display_name AS full_name, p.phone, p.telegram_username,
+               p.telegram_user_id,
+               to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS linked_at
+        FROM msi_v2.parent_student_links l
+        JOIN msi_v2.parents p ON p.id = l.parent_id
+        JOIN msi_v2.students st ON st.id = l.student_id
+        WHERE st.legacy_student_row_id = %s
         ORDER BY l.created_at ASC, p.id ASC
         """,
         (int(student_row_id),),
@@ -151,34 +190,32 @@ def get_parents_for_student(conn, student_row_id):
 
 
 def get_parent_by_telegram_id(conn, telegram_user_id):
-    ensure_parent_accounts_schema(conn)
-    parent_id = _clean_positive_int(telegram_user_id)
-    if parent_id is None:
+    parsed = _clean_positive_int(telegram_user_id)
+    if parsed is None:
         return None
     return conn.execute(
         """
-        SELECT id, full_name, phone, telegram_username, telegram_user_id,
-               source_admin_id, created_at, updated_at
-        FROM parents
+        SELECT id, display_name AS full_name, phone, telegram_username,
+               telegram_user_id, legacy_admin_id AS source_admin_id, created_at, updated_at
+        FROM msi_v2.parents
         WHERE telegram_user_id = %s
         LIMIT 1
         """,
-        (parent_id,),
+        (parsed,),
     ).fetchone()
 
 
 def get_parent_child_link(conn, parent_id, student_row_id):
-    ensure_parent_accounts_schema(conn)
     parsed_parent_id = _clean_positive_int(parent_id)
     parsed_student_row_id = _clean_positive_int(student_row_id)
     if parsed_parent_id is None or parsed_student_row_id is None:
         return None
     return conn.execute(
         """
-        SELECT parent_id, student_row_id, created_at
-        FROM parent_student_links
-        WHERE parent_id = %s
-          AND student_row_id = %s
+        SELECT l.parent_id, st.legacy_student_row_id AS student_row_id, l.created_at
+        FROM msi_v2.parent_student_links l
+        JOIN msi_v2.students st ON st.id = l.student_id
+        WHERE l.parent_id = %s AND st.legacy_student_row_id = %s
         LIMIT 1
         """,
         (parsed_parent_id, parsed_student_row_id),
@@ -186,19 +223,20 @@ def get_parent_child_link(conn, parent_id, student_row_id):
 
 
 def get_parent_child_link_by_dashboard_id(conn, parent_id, dashboard_student_id):
-    ensure_parent_accounts_schema(conn)
     parsed_parent_id = _clean_positive_int(parent_id)
     parsed_dashboard_student_id = _clean_positive_int(dashboard_student_id)
     if parsed_parent_id is None or parsed_dashboard_student_id is None:
         return None
     return conn.execute(
         """
-        SELECT l.parent_id, l.student_row_id, e.public_dashboard_id
-        FROM parent_student_links l
-        JOIN academic_enrollments e ON e.student_row_id = l.student_row_id
+        SELECT l.parent_id, st.legacy_student_row_id AS student_row_id,
+               COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id
+        FROM msi_v2.parent_student_links l
+        JOIN msi_v2.students st ON st.id = l.student_id
+        JOIN msi_v2.group_students gs ON gs.student_id = st.id
         WHERE l.parent_id = %s
-          AND e.public_dashboard_id = %s
-          AND e.active = 1
+          AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
+          AND gs.enrollment_status = 'active'
         LIMIT 1
         """,
         (parsed_parent_id, parsed_dashboard_student_id),
@@ -206,101 +244,59 @@ def get_parent_child_link_by_dashboard_id(conn, parent_id, dashboard_student_id)
 
 
 def clear_parent_telegram_user_conflicts(conn, telegram_user_id, parent_id=None):
-    ensure_parent_accounts_schema(conn)
     parsed_telegram_user_id = _clean_positive_int(telegram_user_id)
     if parsed_telegram_user_id is None:
         return
-
     if parent_id is not None:
         parsed_parent_id = _clean_positive_int(parent_id)
         if parsed_parent_id is None:
             return
         conn.execute(
             """
-            UPDATE parents
+            UPDATE msi_v2.parents
             SET telegram_user_id = NULL
-            WHERE telegram_user_id = %s
-              AND id <> %s
+            WHERE telegram_user_id = %s AND id <> %s
             """,
             (parsed_telegram_user_id, parsed_parent_id),
         )
         return
-
     conn.execute(
-        """
-        UPDATE parents
-        SET telegram_user_id = NULL
-        WHERE telegram_user_id = %s
-        """,
+        "UPDATE msi_v2.parents SET telegram_user_id = NULL WHERE telegram_user_id = %s",
         (parsed_telegram_user_id,),
     )
 
 
 def list_parent_client_child_rows(conn, parent_id):
-    ensure_parent_accounts_schema(conn)
     return conn.execute(
-        """
+        f"""
         SELECT
-            p.id AS parent_id,
-            p.full_name,
-            p.phone,
-            p.telegram_username,
-            p.telegram_user_id,
-            p.source_admin_id,
-            p.created_at,
-            p.updated_at,
-            l.created_at AS linked_at,
-            s.id AS student_row_id,
-            s.full_name AS student_full_name,
-            s.student_id,
-            s.password,
-            s.subjects,
-            s.telegram_user_id AS student_telegram_user_id,
-            s.photo_url,
-            s.profile_description,
-            s.class_name,
-            s.school_name,
-            s.last_seen_at
-        FROM parent_student_links l
-        JOIN parents p ON p.id = l.parent_id
-        JOIN students s ON s.id = l.student_row_id
+            {_PARENT_COLUMNS},
+            to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS linked_at,
+            {_CHILD_STUDENT_COLUMNS}
+        FROM msi_v2.parent_student_links l
+        JOIN msi_v2.parents p ON p.id = l.parent_id
+        JOIN msi_v2.students st ON st.id = l.student_id
+        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
         WHERE p.id = %s
-        ORDER BY lower(s.full_name) ASC, s.id ASC
+        ORDER BY lower(st.full_name) ASC, st.id ASC
         """,
         (int(parent_id),),
     ).fetchall()
 
 
 def list_invite_parent_rows(conn):
-    """All parent CLIENT accounts with their linked students for admin visibility."""
-    ensure_parent_accounts_schema(conn)
+    """All parent CLIENT accounts with their linked students, for admin visibility."""
     return conn.execute(
-        """
+        f"""
         SELECT
-            p.id AS parent_id,
-            p.full_name,
-            p.phone,
-            p.telegram_username,
-            p.telegram_user_id,
-            p.source_admin_id,
-            p.created_at,
-            p.updated_at,
-            l.created_at AS linked_at,
-            s.id AS student_row_id,
-            s.full_name AS student_full_name,
-            s.student_id,
-            s.password,
-            s.subjects,
-            s.telegram_user_id AS student_telegram_user_id,
-            s.photo_url,
-            s.profile_description,
-            s.class_name,
-            s.school_name,
-            s.last_seen_at
-        FROM parents p
-        LEFT JOIN parent_student_links l ON l.parent_id = p.id
-        LEFT JOIN students s ON s.id = l.student_row_id
-        ORDER BY lower(p.full_name) ASC, p.id ASC, lower(s.full_name) ASC, s.id ASC
+            {_PARENT_COLUMNS},
+            to_char(l.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS linked_at,
+            {_CHILD_STUDENT_COLUMNS}
+        FROM msi_v2.parents p
+        LEFT JOIN msi_v2.parent_student_links l ON l.parent_id = p.id
+        LEFT JOIN msi_v2.students st ON st.id = l.student_id
+        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
+        ORDER BY lower(p.display_name) ASC, p.id ASC, lower(st.full_name) ASC, st.id ASC
         """
     ).fetchall()
 

@@ -9,7 +9,6 @@ from shared.identity.parent_accounts import (
 from web.backend.roles.admin.services.parent_service import (  # noqa: F401
     _to_invite_child,
     assign_parent_child,
-    create_parent_account,
     list_parent_accounts,
     list_parent_children,
     remove_parent_child,
@@ -77,22 +76,23 @@ def resolve_parent_child_dashboard(student_row_id):
         row = conn.execute(
             """
             SELECT
-                e.public_dashboard_id,
-                sub.name AS subject_name,
-                g.name AS group_name,
-                COALESCE(s.code, '') AS school_code
-            FROM academic_enrollments e
-            JOIN academic_subjects sub ON sub.id = e.subject_id
-            JOIN academic_groups g ON g.id = e.group_id
-            LEFT JOIN academic_schools s ON s.id = g.school_id
-            WHERE e.student_row_id = %s
-              AND e.active = 1
-              AND e.public_dashboard_id IS NOT NULL
+                COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
+                subj.subject_name AS subject_name,
+                g.group_name AS group_name,
+                COALESCE(s.school_key, '') AS school_code
+            FROM msi_v2.group_students gs
+            JOIN msi_v2.students st ON st.id = gs.student_id
+            JOIN msi_v2.groups g ON g.id = gs.group_id
+            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+            LEFT JOIN msi_v2.schools s ON s.id = g.school_id
+            WHERE st.legacy_student_row_id = %s
+              AND gs.enrollment_status = 'active'
+              AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
             ORDER BY
-                CASE WHEN e.enrollment_status = 'active' THEN 0 ELSE 1 END,
-                lower(sub.name) ASC,
-                lower(g.name) ASC,
-                e.id ASC
+                lower(subj.subject_name) ASC,
+                lower(g.group_name) ASC,
+                gs.legacy_enrollment_id ASC
             LIMIT 1
             """,
             (parsed_student_row_id,),
@@ -115,7 +115,6 @@ def resolve_parent_child_dashboard(student_row_id):
 
 __all__ = [
     "assign_parent_child",
-    "create_parent_account",
     "link_parent_via_invite",
     "list_parent_accounts",
     "list_parent_client_children",

@@ -1,13 +1,16 @@
-import math
-import secrets
-import string
-from datetime import datetime
+"""Parent CLIENT (Telegram/invite) account service.
 
-from werkzeug.security import generate_password_hash
+Parents are customers linked to students via the invite flow (no web password
+login, no admin records). All reads/writes target msi_v2.parents /
+msi_v2.parent_student_links. Child academic indicators come from the msi_v2
+gradebook tables.
+"""
+
+import math
+from datetime import datetime
 
 from shared.academics import canonical
 from shared.db import queries
-from web.backend.domains.academics.postgres_service import ensure_academic_schema
 from web.backend.domains.payments.service import (
     payment_row_to_record,
     summarize_payment_records,
@@ -56,7 +59,6 @@ def _round_grade_half_up(value):
 
 
 def _date_sort_value(value):
-    # Unparseable dates sort first. Canonical date parsing lives in shared.academics.canonical.
     return canonical.date_sort_key(value, on_unparseable=datetime.min)
 
 
@@ -104,29 +106,6 @@ def _to_academic_indicator(row):
     }
 
 
-def _to_subject_summary_indicator(row):
-    subject_name = str(row["subject_name"] or "").strip()
-    subject_display_name = _subject_display_name(subject_name)
-    return {
-        "enrollment_id": int(row["enrollment_id"]),
-        "subject_name": subject_name,
-        "subject_display_name": subject_display_name,
-        "subject_key": _subject_key(subject_display_name),
-        "subject_short": str(row["subject_short"] or "").strip(),
-        "group_name": str(row["group_name"] or "").strip(),
-        "aap": max(0.0, min(9.0, _safe_float(row["aap"]))),
-        "ar": max(0, min(100, _safe_int(row["ar"]))),
-        "ep": max(0, min(9, _safe_int(row["ep"]))),
-        "total_coins": _safe_int(row["total_coins"]),
-        "program_completed_lessons": 0,
-        "program_total_lessons": PROGRAM_TOTAL_LESSONS,
-        "program_completion_rate": 0,
-        "rating_rank": _safe_int(row["rating_rank"]),
-        "rating_total": _safe_int(row["rating_total"]),
-        "updated_at": str(row["updated_at"] or "").strip(),
-    }
-
-
 def _to_recent_lesson(row):
     subject_name = str(row["subject_name"] or "").strip()
     subject_display_name = _subject_display_name(subject_name)
@@ -155,42 +134,17 @@ def _list_child_academic_indicators(conn, child_row):
     student_row_id = int(child_row["id"])
     full_name = str(child_row["full_name"] or "").strip()
     try:
-        ensure_academic_schema(conn)
         rows = queries.list_parent_subject_indicator_rows(conn, student_row_id, full_name)
     except Exception:
         rows = []
-
-    indicators = [_to_academic_indicator(row) for row in rows]
-    if indicators:
-        return indicators
-
-    try:
-        queries.ensure_subject_summaries_schema(conn)
-        summary_rows = queries.list_subject_summary_rows_by_full_name_norm(
-            conn,
-            _normalize_text(child_row["full_name"]),
-        )
-    except Exception:
-        summary_rows = []
-
-    return [
-        _to_subject_summary_indicator(row)
-        for row in summary_rows
-        if str(row["group_name"] or "").strip().casefold() != "online"
-    ]
+    return [_to_academic_indicator(row) for row in rows]
 
 
 def _list_child_recent_lessons(conn, child_row):
     student_row_id = int(child_row["id"])
     full_name = str(child_row["full_name"] or "").strip()
     try:
-        ensure_academic_schema(conn)
-        rows = queries.list_parent_recent_lesson_rows(
-            conn,
-            student_row_id,
-            full_name,
-            limit=200,
-        )
+        rows = queries.list_parent_recent_lesson_rows(conn, student_row_id, full_name, limit=200)
     except Exception:
         rows = []
 
@@ -264,52 +218,6 @@ def _build_payment_summary(indicators, payment_records):
     return summarize_payment_records(payment_records, progress=progress)
 
 
-def _to_child(row, conn=None):
-    student_row_id = int(row["id"])
-    student_code = str(row["student_id"] or "").strip()
-    child = {
-        "id": student_row_id,
-        "student_row_id": student_row_id,
-        "studentRowId": student_row_id,
-        "full_name": str(row["full_name"] or "").strip(),
-        "student_id": student_code,
-        "student_code": student_code,
-        "studentCode": student_code,
-        "password": str(row["password"] or ""),
-        "subjects": str(row["subjects"] or "").strip(),
-        "telegram_user_id": (
-            int(row["telegram_user_id"])
-            if row["telegram_user_id"] is not None
-            else None
-        ),
-        "photo_url": str(row["photo_url"] or "").strip(),
-        "profile_description": str(row["profile_description"] or "").strip(),
-        "class_name": str(row["class_name"] or "").strip(),
-        "school_name": str(row["school_name"] or "").strip() or "School 5",
-        "last_seen_at": row["last_seen_at"] if row["last_seen_at"] is not None else None,
-        "assigned_at": str(row["assigned_at"] or "").strip(),
-    }
-    if conn is not None:
-        child["academic_indicators"] = _list_child_academic_indicators(conn, row)
-        child["recent_lessons"] = _list_child_recent_lessons(conn, row)
-        payment_records = _list_child_payment_records(conn, row)
-    else:
-        child["academic_indicators"] = []
-        child["recent_lessons"] = []
-        payment_records = []
-    try:
-        child["payment_summary"] = _build_payment_summary(
-            child["academic_indicators"],
-            payment_records,
-        )
-    except Exception:
-        child["payment_summary"] = summarize_payment_records(
-            [],
-            progress=_average_program_completion(child["academic_indicators"]),
-        )
-    return child
-
-
 def _normalize_positive_int(value):
     try:
         parsed = int(value)
@@ -323,47 +231,6 @@ def _row_value(row, key):
         return str(row[key] or "").strip()
     except (KeyError, IndexError, TypeError):
         return ""
-
-
-def _row_disabled(row):
-    try:
-        return int(row["disabled"] or 0) == 1
-    except (KeyError, IndexError, TypeError, ValueError):
-        return False
-
-
-def _to_parent(row, children=None, complaint_counts=None):
-    counts = complaint_counts or {}
-    parent_id = int(row["id"])
-    bucket = counts.get(parent_id, {})
-    display_name = _row_value(row, "display_name")
-    login = str(row["login"] or "").strip()
-    telegram_username = _row_value(row, "telegram_username")
-    disabled = _row_disabled(row)
-    return {
-        "id": parent_id,
-        "login": login,
-        "role": str(row["role"] or "").strip(),
-        "display_name": display_name,
-        "displayName": display_name,
-        "display": display_name or login,
-        "phone": _row_value(row, "phone"),
-        "email": _row_value(row, "email"),
-        "telegram_username": telegram_username,
-        "telegramUsername": telegram_username,
-        "notes": _row_value(row, "notes"),
-        "telegram_user_id": (
-            int(row["telegram_user_id"])
-            if row["telegram_user_id"] is not None
-            else None
-        ),
-        "created_at": str(row["created_at"] or "").strip(),
-        "ticket_count": int(bucket.get("total", 0)),
-        "open_ticket_count": int(bucket.get("open", 0)),
-        "disabled": disabled,
-        "status": "disabled" if disabled else "active",
-        "children": children or [],
-    }
 
 
 def _to_invite_child(row, conn=None):
@@ -497,126 +364,13 @@ def _list_invite_parent_accounts(conn):
     ]
 
 
-def _complaint_counts_map(conn):
-    try:
-        queries.ensure_parent_complaints_schema(conn)
-        rows = queries.count_complaints_by_parent(conn)
-    except Exception:
-        return {}
-    counts = {}
-    for row in rows:
-        counts[int(row["parent_admin_id"])] = {
-            "total": int(row["total"] or 0),
-            "open": int(row["open_count"] or 0),
-        }
-    return counts
-
-
 def list_parent_accounts():
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        complaint_counts = _complaint_counts_map(conn)
-        parent_rows = queries.list_parent_admin_rows(conn)
-        parents = []
-        for parent_row in parent_rows:
-            child_rows = queries.list_parent_child_rows(conn, int(parent_row["id"]))
-            parents.append(
-                _to_parent(
-                    parent_row,
-                    [_to_child(row, conn=conn) for row in child_rows],
-                    complaint_counts,
-                )
-            )
-        parents.extend(_list_invite_parent_accounts(conn))
-    return parents
-
-
-def create_parent_account(login, password, profile=None):
-    login_value = str(login or "").strip()
-    password_value = str(password or "")
-    if len(login_value) < 3:
-        raise ValueError("Parent login must be at least 3 characters.")
-    if len(password_value) < 6:
-        raise ValueError("Temporary password must be at least 6 characters.")
-
-    profile = profile or {}
-    with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        existing = queries.get_admin_id_by_login(conn, login_value)
-        if existing:
-            raise ValueError("This login already exists.")
-
-        parent_id = queries.insert_parent_admin(
-            conn,
-            login_value,
-            generate_password_hash(password_value),
-            _utc_now_iso(),
-            display_name=str(profile.get("display_name") or "").strip(),
-            phone=str(profile.get("phone") or "").strip(),
-            email=str(profile.get("email") or "").strip(),
-            telegram_username=str(profile.get("telegram_username") or "").strip(),
-            notes=str(profile.get("notes") or "").strip(),
-        )
-        conn.commit()
-        row = queries.get_parent_admin_row(conn, parent_id)
-
-    if not row:
-        raise ValueError("Unable to create parent account.")
-    return _to_parent(row, [])
-
-
-def update_parent_profile(parent_admin_id, payload):
-    parent_id = _normalize_positive_int(parent_admin_id)
-    if not parent_id:
-        raise ValueError("Parent account is required.")
-    payload = payload or {}
-
-    with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
-            raise ValueError("Parent account was not found.")
-
-        queries.update_parent_profile(
-            conn,
-            parent_id,
-            display_name=str(payload.get("display_name") or "").strip(),
-            phone=str(payload.get("phone") or "").strip(),
-            email=str(payload.get("email") or "").strip(),
-            telegram_username=str(payload.get("telegram_username") or "").strip(),
-            notes=str(payload.get("notes") or "").strip(),
-        )
-        conn.commit()
-        complaint_counts = _complaint_counts_map(conn)
-        updated = queries.get_parent_admin_row(conn, parent_id)
-        child_rows = queries.list_parent_child_rows(conn, parent_id)
-        children = [_to_child(row, conn=conn) for row in child_rows]
-
-    if not updated:
-        raise ValueError("Unable to update parent profile.")
-    return _to_parent(updated, children, complaint_counts)
-
-
-def list_parent_children(parent_admin_id):
-    parent_id = _normalize_positive_int(parent_admin_id)
-    if not parent_id:
-        return []
-
-    with _connect() as conn:
-        queries.ensure_parent_children_schema(conn)
-        rows = queries.list_parent_child_rows(conn, parent_id)
-        children = [_to_child(row, conn=conn) for row in rows]
-    return children
+        return _list_invite_parent_accounts(conn)
 
 
 def list_linked_parents_for_student(student_row_id):
-    """Parent CLIENT accounts linked to a student via the invite-link flow.
-
-    Reads the new `parents` / `parent_student_links` tables (separate from
-    admins). Returns camelCase dicts for the edit-student page.
-    """
+    """Parent CLIENT accounts linked to a student via the invite-link flow."""
     student_id = _normalize_positive_int(student_row_id)
     if not student_id:
         return []
@@ -638,8 +392,17 @@ def list_linked_parents_for_student(student_row_id):
     return parents
 
 
-def assign_parent_child(parent_admin_id, student_row_id):
-    parent_id = _normalize_positive_int(parent_admin_id)
+def list_parent_children(parent_id):
+    parent_id = _normalize_positive_int(parent_id)
+    if not parent_id:
+        return []
+    with _connect() as conn:
+        rows = queries.list_parent_client_child_rows(conn, parent_id)
+        return [child for child in (_to_invite_child(row, conn=conn) for row in rows) if child]
+
+
+def assign_parent_child(parent_id, student_row_id):
+    parent_id = _normalize_positive_int(parent_id)
     student_id = _normalize_positive_int(student_row_id)
     if not parent_id:
         raise ValueError("Parent account is required.")
@@ -647,105 +410,34 @@ def assign_parent_child(parent_admin_id, student_row_id):
         raise ValueError("Student is required.")
 
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
+        parent = conn.execute(
+            "SELECT id FROM msi_v2.parents WHERE id = %s", (parent_id,)
+        ).fetchone()
+        if not parent:
             raise ValueError("Parent account was not found.")
-        student_row = queries.get_student_admin_row(conn, student_id)
-        if not student_row:
+        student = conn.execute(
+            "SELECT id FROM msi_v2.students WHERE legacy_student_row_id = %s", (student_id,)
+        ).fetchone()
+        if not student:
             raise ValueError("Student was not found.")
-
-        queries.insert_parent_child_row(conn, parent_id, student_id, _utc_now_iso())
+        conn.execute(
+            """
+            INSERT INTO msi_v2.parent_student_links (parent_id, student_id, relationship, status)
+            VALUES (%s, %s, 'parent', 'active')
+            ON CONFLICT (parent_id, student_id) DO UPDATE SET status = 'active'
+            """,
+            (parent_id, int(student["id"])),
+        )
         conn.commit()
-        rows = queries.list_parent_child_rows(conn, parent_id)
-
+        rows = queries.list_parent_client_child_rows(conn, parent_id)
         for row in rows:
-            if int(row["id"]) == student_id:
-                return _to_child(row, conn=conn)
+            if int(row["student_row_id"]) == student_id:
+                return _to_invite_child(row, conn=conn)
     raise ValueError("Unable to assign this student.")
 
 
-def _generate_temporary_password(length=10):
-    # Unambiguous alphabet (no O/0/I/l/1) so a handed-over password is easy to read.
-    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
-    return "".join(secrets.choice(alphabet) for _ in range(length))
-
-
-def reset_parent_password(parent_admin_id):
-    parent_id = _normalize_positive_int(parent_admin_id)
-    if not parent_id:
-        raise ValueError("Parent account is required.")
-
-    temporary_password = _generate_temporary_password()
-    with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
-            raise ValueError("Parent account was not found.")
-
-        queries.update_parent_password(
-            conn,
-            parent_id,
-            generate_password_hash(temporary_password),
-        )
-        conn.commit()
-        complaint_counts = _complaint_counts_map(conn)
-        updated = queries.get_parent_admin_row(conn, parent_id)
-        child_rows = queries.list_parent_child_rows(conn, parent_id)
-        children = [_to_child(row, conn=conn) for row in child_rows]
-
-    if not updated:
-        raise ValueError("Unable to reset parent password.")
-    parent = _to_parent(updated, children, complaint_counts)
-    return {"parent": parent, "temporary_password": temporary_password}
-
-
-def set_parent_account_disabled(parent_admin_id, disabled):
-    parent_id = _normalize_positive_int(parent_admin_id)
-    if not parent_id:
-        raise ValueError("Parent account is required.")
-
-    with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
-            raise ValueError("Parent account was not found.")
-
-        queries.set_parent_disabled(conn, parent_id, bool(disabled))
-        conn.commit()
-        complaint_counts = _complaint_counts_map(conn)
-        updated = queries.get_parent_admin_row(conn, parent_id)
-        child_rows = queries.list_parent_child_rows(conn, parent_id)
-        children = [_to_child(row, conn=conn) for row in child_rows]
-
-    if not updated:
-        raise ValueError("Unable to update parent account.")
-    return _to_parent(updated, children, complaint_counts)
-
-
-def delete_parent_account(parent_admin_id):
-    parent_id = _normalize_positive_int(parent_admin_id)
-    if not parent_id:
-        raise ValueError("Parent account is required.")
-
-    with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
-            raise ValueError("Parent account was not found.")
-
-        # parent_children rows cascade via the ON DELETE CASCADE foreign key.
-        deleted = queries.delete_parent_admin(conn, parent_id)
-        conn.commit()
-    return deleted > 0
-
-
-def remove_parent_child(parent_admin_id, student_row_id):
-    parent_id = _normalize_positive_int(parent_admin_id)
+def remove_parent_child(parent_id, student_row_id):
+    parent_id = _normalize_positive_int(parent_id)
     student_id = _normalize_positive_int(student_row_id)
     if not parent_id:
         raise ValueError("Parent account is required.")
@@ -753,25 +445,24 @@ def remove_parent_child(parent_admin_id, student_row_id):
         raise ValueError("Student is required.")
 
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
-        if not parent_row:
-            raise ValueError("Parent account was not found.")
-        removed = queries.delete_parent_child_row(conn, parent_id, student_id)
+        deleted = conn.execute(
+            """
+            DELETE FROM msi_v2.parent_student_links l
+            USING msi_v2.students st
+            WHERE l.student_id = st.id
+              AND l.parent_id = %s
+              AND st.legacy_student_row_id = %s
+            """,
+            (parent_id, student_id),
+        )
         conn.commit()
-    return removed > 0
+    return int(deleted.rowcount or 0) > 0
 
 
 __all__ = [
     "assign_parent_child",
-    "create_parent_account",
-    "delete_parent_account",
     "list_linked_parents_for_student",
     "list_parent_accounts",
     "list_parent_children",
     "remove_parent_child",
-    "reset_parent_password",
-    "set_parent_account_disabled",
-    "update_parent_profile",
 ]
