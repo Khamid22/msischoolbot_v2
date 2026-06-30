@@ -19,18 +19,20 @@ SUBJECT_CANONICAL_NAMES = {
     "general english": "English as a Second Language",
     "english": "English as a Second Language",
     "eng": "English as a Second Language",
-    "biology": "Biology",
-    "bio": "Biology",
-    "physics": "Physics",
-    "phy": "Physics",
+    "igcse biology": "IGCSE Biology",
+    "biology": "IGCSE Biology",
+    "bio": "IGCSE Biology",
+    "igcse physics": "IGCSE Physics",
+    "physics": "IGCSE Physics",
+    "phy": "IGCSE Physics",
 }
 
 SUBJECT_SHORT_NAMES = {
     "igcse mathematics a": "Math",
     "igcse chemistry": "Chem",
     "english as a second language": "Eng",
-    "biology": "Bio",
-    "physics": "Phys",
+    "igcse biology": "Bio",
+    "igcse physics": "Phy",
 }
 
 SUBJECT_SORT_ORDER = {
@@ -38,7 +40,7 @@ SUBJECT_SORT_ORDER = {
     "eng": 1,
     "chem": 2,
     "bio": 3,
-    "phys": 4,
+    "phy": 4,
 }
 
 

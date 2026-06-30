@@ -2,6 +2,7 @@
 
 import logging
 import os
+from pathlib import Path
 
 from werkzeug.security import generate_password_hash
 
@@ -12,6 +13,16 @@ OWNER_LOGIN = (os.environ.get("OWNER_ADMIN_LOGIN", "admin") or "admin").strip()
 OWNER_PASSWORD = (os.environ.get("OWNER_ADMIN_PASSWORD", "") or "").strip()
 
 _STORAGE_READY = False
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_V2_SCHEMA_SQL = _PROJECT_ROOT / "scripts" / "rebuild_database_v2.sql"
+
+
+def ensure_clean_v2_schema(conn):
+    """Create the clean msi_v2 schema if the deployment includes the SQL file."""
+    if not _V2_SCHEMA_SQL.exists():
+        logging.warning("Clean database schema file is missing: %s", _V2_SCHEMA_SQL)
+        return
+    conn.execute(_V2_SCHEMA_SQL.read_text(encoding="utf-8"))
 
 
 def init_storage():
@@ -24,6 +35,7 @@ def init_storage():
             return
         with connect() as conn:
             queries.create_tables(conn)
+            ensure_clean_v2_schema(conn)
             queries.ensure_admins_schema(conn)
             queries.ensure_students_schema(conn)
             queries.ensure_lesson_catalog_schema(conn)
@@ -108,5 +120,4 @@ def ensure_owner_admin(conn):
     )
 
 
-__all__ = ["init_storage", "ensure_owner_admin"]
-
+__all__ = ["init_storage", "ensure_owner_admin", "ensure_clean_v2_schema"]
