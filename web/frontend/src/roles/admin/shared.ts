@@ -550,6 +550,7 @@ export function normalizeAdminTab(value: unknown): AdminTab {
     normalized === "payments" ||
     normalized === "complaints" ||
     normalized === "career_growth" ||
+    normalized === "candidates" ||
     normalized === "contact" ||
     normalized === "chat" ||
     normalized === "student_dashboard" ||

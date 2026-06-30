@@ -562,7 +562,7 @@ function AdminSidebar({
           : "fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex"
       }
     >
-      <div className="border-b border-white/10 px-4 py-4">
+      <div className="border-b border-white/10 px-3 py-3">
         <div className="flex items-start gap-2">
           <button
             type="button"
@@ -610,11 +610,11 @@ function AdminSidebar({
         </label>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
-        <nav className="space-y-4" aria-label="Admin navigation">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <nav className="space-y-2" aria-label="Admin navigation">
           {groupTabsBySection(state.visibleTabs as Array<{ key: string; label: string }>).map((section) => (
-            <div key={section.label} className="space-y-1">
-              <p className="px-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <div key={section.label} className="space-y-0.5">
+              <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {section.label}
               </p>
               {section.tabs.map((tab) => {
@@ -626,7 +626,7 @@ function AdminSidebar({
                     type="button"
                     onClick={() => state.switchAdminTab(tab.key)}
                     aria-current={isActive ? "page" : undefined}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
                       isActive
                         ? "bg-sidebar-primary text-sidebar-primary-foreground"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

@@ -371,10 +371,10 @@ export default function StudentsPanel({ state }: { state: any }) {
       </div>
 
       <div
-        className="sticky z-30 -mx-3 shrink-0 bg-background/95 px-3 pb-2 pt-1 backdrop-blur sm:-mx-4 sm:px-4 md:-mx-6 md:px-6"
+        className="sticky z-30 shrink-0 rounded-lg bg-background/95 pb-2 pt-1 backdrop-blur"
         style={{ top: adminStickyTop }}
       >
-        <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr),190px,190px,210px]">
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_170px_170px_190px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -498,10 +498,11 @@ export default function StudentsPanel({ state }: { state: any }) {
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1">
-                    {subjectList(student.subjects).slice(0, 4).map((subject) => (
+                    {subjectList(student.subjects).slice(0, 3).map((subject) => (
                       <span
                         key={`${studentRowId}-mobile-${subject}`}
-                        className="rounded-md border border-foreground/10 bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+                        title={subject}
+                        className="max-w-[160px] truncate rounded border border-foreground/10 bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
                       >
                         {subject}
                       </span>
@@ -521,7 +522,7 @@ export default function StudentsPanel({ state }: { state: any }) {
         )}
 
         <div className="hidden min-h-0 flex-1 overflow-hidden rounded-lg border border-foreground/8 sm:block">
-          <table className="h-full w-full min-w-[760px] table-fixed text-left">
+          <table className="h-full w-full table-fixed text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
@@ -557,16 +558,22 @@ export default function StudentsPanel({ state }: { state: any }) {
                         </a>
                       </td>
                       <td className="w-[12%] px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
-                      <td className="w-[28%] px-3 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {subjectList(student.subjects).slice(0, 3).map((subject) => (
+                      <td className="w-[26%] px-3 py-2.5">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {subjectList(student.subjects).slice(0, 2).map((subject) => (
                             <span
                               key={`${studentRowId}-${subject}`}
-                              className="rounded-md border border-foreground/10 bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground"
+                              title={subject}
+                              className="max-w-[150px] truncate rounded border border-foreground/10 bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground"
                             >
                               {subject}
                             </span>
                           ))}
+                          {subjectList(student.subjects).length > 2 ? (
+                            <span className="rounded border border-foreground/10 bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              +{subjectList(student.subjects).length - 2}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="w-[14%] truncate px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>

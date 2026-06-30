@@ -2278,73 +2278,40 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     <div className="space-y-4">
       {kind === "subjects" ? (
         <div className="space-y-3">
-          <div className="rounded-lg border border-info/15 bg-info/5 px-4 py-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-bold">Official Subject Programs</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Subjects are managed through complete scheme of work imports. Manual subject creation is disabled.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <Pill>{curriculumPrograms.length} programs</Pill>
-                <Pill>{curriculumItems.length} program rows</Pill>
-                <Pill>{subjects.length} DB subjects</Pill>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 xl:grid-cols-[minmax(16rem,0.36fr)_minmax(0,1fr)]">
-            <ChartCard
-              title="Subjects"
-              subtitle="Choose a program"
-              icon={<BookMarked className="h-4 w-4 text-info" />}
-            >
-              <div className="space-y-1.5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <label className="flex min-w-0 items-center gap-2">
+              <BookMarked className="h-4 w-4 shrink-0 text-info" />
+              <select
+                value={activeProgramId || ""}
+                onChange={(event) => {
+                  setOpenProgramId(Number(event.target.value));
+                  setProgramSearch("");
+                }}
+                className="h-9 min-w-0 max-w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold outline-none focus:border-foreground/30"
+                aria-label="Subject program"
+              >
                 {curriculumPrograms.length ? (
                   curriculumPrograms.map((program: Record<string, unknown>) => {
                     const programId = asNumber(program.id);
-                    const active = programId === activeProgramId;
                     return (
-                      <button
-                        key={programId}
-                        type="button"
-                        onClick={() => {
-                          setOpenProgramId(programId);
-                          setProgramSearch("");
-                        }}
-                        className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                          active
-                            ? "border-primary/50 bg-primary/10 shadow-sm"
-                            : "border-foreground/8 bg-background hover:bg-muted"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${subjectSwatch(asString(program.subject_name))}`} />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-bold">{asString(program.subject_name)}</p>
-                              <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
-                                {asString(program.subject_short)}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                              {asNumber(program.lesson_count)} lessons · {asNumber(program.exam_count)} exams
-                            </p>
-                          </div>
-                        </div>
-                      </button>
+                      <option key={programId} value={programId}>
+                        {asString(program.subject_name)} · {asNumber(program.lesson_count)} lessons · {asNumber(program.exam_count)} exams
+                      </option>
                     );
                   })
                 ) : (
-                  <p className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center text-sm font-bold text-muted-foreground">
-                    No scheme of work programs are stored yet.
-                  </p>
+                  <option value="">No scheme of work programs yet</option>
                 )}
-              </div>
-            </ChartCard>
+              </select>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              <Pill>{curriculumPrograms.length} programs</Pill>
+              <Pill>{curriculumItems.length} program rows</Pill>
+              <Pill>{subjects.length} DB subjects</Pill>
+            </div>
+          </div>
 
-            <ChartCard
+          <ChartCard
               title={activeProgram ? asString(activeProgram.subject_name) : "Program"}
               subtitle={
                 activeProgram
@@ -2449,7 +2416,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 )}
               </div>
             </ChartCard>
-          </div>
 
           <ChartCard title="Subjects in Use" subtitle="Which subjects each client school runs">
             {subjectsBySchool.length === 0 ? (
