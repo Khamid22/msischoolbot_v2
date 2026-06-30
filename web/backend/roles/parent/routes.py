@@ -12,9 +12,14 @@ from web.backend.domains.announcements.service import list_announcements
 from web.backend.domains.resources.service import list_resources
 from web.backend.render import render_react_page
 from web.backend.roles.admin.services.parent_service import list_parent_children
-from web.backend.roles.parent.services import link_parent_via_invite, list_parent_client_children
+from web.backend.roles.parent.services import (
+    link_parent_via_invite,
+    list_parent_client_children,
+    parent_can_access_student,
+    resolve_parent_child_dashboard,
+)
 from web.backend.utils.telegram_auth import telegram_user_from_init_data
-from web.backend.utils.session import set_parent_session
+from web.backend.utils.session import set_parent_session, url_for
 from shared.identity.parent_invites import get_parent_invite_token, load_parent_invite_payload
 
 
@@ -467,6 +472,49 @@ def register_parent_invite_routes(app):
 
         set_parent_session(parent)
         return _confirmation_page(student_name, student_code, parent, lang=values["lang"])
+
+    @app.get("/parent/dashboard/{student_row_id}")
+    def parent_child_dashboard(student_row_id: int):
+        try:
+            parent_id = int(session.get("parent_id", 0) or 0)
+        except (TypeError, ValueError):
+            parent_id = 0
+        if parent_id <= 0:
+            return redirect("/")
+
+        if not parent_can_access_student(parent_id, student_row_id):
+            return _page(
+                "Access denied",
+                """
+                <h1>Access denied</h1>
+                <p>This student is not linked to your parent account.</p>
+                <p><a href="/">Return to parent portal</a></p>
+                """,
+                status_code=403,
+            )
+
+        resolved = resolve_parent_child_dashboard(student_row_id)
+        if not resolved:
+            return _page(
+                "Dashboard unavailable",
+                """
+                <h1>Dashboard unavailable</h1>
+                <p>No dashboard data was found for this student.</p>
+                <p><a href="/">Return to parent portal</a></p>
+                """,
+                status_code=404,
+            )
+
+        return redirect(
+            url_for(
+                "student.dashboard",
+                student_id=int(resolved["student_id"]),
+                subject=resolved.get("subject", ""),
+                group=resolved.get("group", ""),
+                school=resolved.get("school", ""),
+                parent_return="1",
+            )
+        )
 
 
 def build_render_parent_page():

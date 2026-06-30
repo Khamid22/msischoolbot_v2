@@ -437,7 +437,7 @@ function ChildSummary({
         </div>
         {studentRowId ? (
           <ActionLink
-            href={routes.adminStudentPanel(studentRowId, currentSchool)}
+            href={routes.parentStudentDashboard(studentRowId)}
             label="View Dashboard"
             icon={<Eye className="h-3.5 w-3.5" />}
           />

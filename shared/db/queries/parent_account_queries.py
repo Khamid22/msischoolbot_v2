@@ -167,6 +167,44 @@ def get_parent_by_telegram_id(conn, telegram_user_id):
     ).fetchone()
 
 
+def get_parent_child_link(conn, parent_id, student_row_id):
+    ensure_parent_accounts_schema(conn)
+    parsed_parent_id = _clean_positive_int(parent_id)
+    parsed_student_row_id = _clean_positive_int(student_row_id)
+    if parsed_parent_id is None or parsed_student_row_id is None:
+        return None
+    return conn.execute(
+        """
+        SELECT parent_id, student_row_id, created_at
+        FROM parent_student_links
+        WHERE parent_id = %s
+          AND student_row_id = %s
+        LIMIT 1
+        """,
+        (parsed_parent_id, parsed_student_row_id),
+    ).fetchone()
+
+
+def get_parent_child_link_by_dashboard_id(conn, parent_id, dashboard_student_id):
+    ensure_parent_accounts_schema(conn)
+    parsed_parent_id = _clean_positive_int(parent_id)
+    parsed_dashboard_student_id = _clean_positive_int(dashboard_student_id)
+    if parsed_parent_id is None or parsed_dashboard_student_id is None:
+        return None
+    return conn.execute(
+        """
+        SELECT l.parent_id, l.student_row_id, e.public_dashboard_id
+        FROM parent_student_links l
+        JOIN academic_enrollments e ON e.student_row_id = l.student_row_id
+        WHERE l.parent_id = %s
+          AND e.public_dashboard_id = %s
+          AND e.active = 1
+        LIMIT 1
+        """,
+        (parsed_parent_id, parsed_dashboard_student_id),
+    ).fetchone()
+
+
 def clear_parent_telegram_user_conflicts(conn, telegram_user_id, parent_id=None):
     ensure_parent_accounts_schema(conn)
     parsed_telegram_user_id = _clean_positive_int(telegram_user_id)
@@ -270,6 +308,8 @@ def list_invite_parent_rows(conn):
 __all__ = [
     "clear_parent_telegram_user_conflicts",
     "get_parent_by_telegram_id",
+    "get_parent_child_link",
+    "get_parent_child_link_by_dashboard_id",
     "get_parents_for_student",
     "link_parent_from_invite",
     "list_invite_parent_rows",

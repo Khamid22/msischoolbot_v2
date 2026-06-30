@@ -105,10 +105,26 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
 const App = () => {
   useEffect(() => {
     initTelegramViewport();
+    // Send the parent to the invite-link page ONCE per launch. Telegram keeps
+    // initDataUnsafe.start_param for the whole mini-app session, so without this
+    // guard every reload — including after a parent logs out to sign in as an
+    // admin — would re-trigger registration and trap them back in parent mode.
     const startParam = getTelegramStartParam();
     if (startParam.startsWith("parent_")) {
-      const token = decodeParentStartToken(startParam.slice("parent_".length));
+      const handledKey = `msi_parent_link_handled:${startParam}`;
+      let alreadyHandled = false;
+      try {
+        alreadyHandled = window.sessionStorage.getItem(handledKey) === "1";
+      } catch {
+        alreadyHandled = false;
+      }
+      const token = alreadyHandled ? "" : decodeParentStartToken(startParam.slice("parent_".length));
       if (token) {
+        try {
+          window.sessionStorage.setItem(handledKey, "1");
+        } catch {
+          /* ignore */
+        }
         window.location.replace(`/parent/link/${encodeURIComponent(token)}`);
       }
     }

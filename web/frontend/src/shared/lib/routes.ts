@@ -64,6 +64,7 @@ export const routes = {
     `/admin/parents/${parentAdminId}/children/${studentRowId}`,
   adminParentChildren: "/admin/parent-children",
   adminParentChild: (studentRowId: number | string) => `/admin/parent-children/${studentRowId}`,
+  parentStudentDashboard: (studentRowId: number | string) => `/parent/dashboard/${studentRowId}`,
   adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
   adminStudentPanel: (studentRowId: number | string, school = "all", panel = "student_dashboard") =>
     `/?panel=${encodeURIComponent(String(panel || "student_dashboard"))}&school=${encodeURIComponent(String(school || "all"))}&student=${encodeURIComponent(String(studentRowId))}`,

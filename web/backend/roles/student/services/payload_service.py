@@ -3,9 +3,11 @@
 from .access_service import is_student_owner_of_payload
 from web.backend.utils.session import (
     current_auth_role,
+    current_parent_id,
     current_student_enrollment_id,
     current_student_full_name,
 )
+from web.backend.roles.parent.services import parent_can_access_dashboard
 
 
 def load_student_payload_for_view(
@@ -39,6 +41,13 @@ def load_student_payload_for_view(
         if not current_student_enrollment_id() and not current_student_full_name():
             return None, dataset, session_invalid_message, 401
         return None, dataset, forbidden_message, 403
+
+    if current_auth_role() == "parent":
+        parent_id = current_parent_id()
+        if not parent_id:
+            return None, dataset, "Parent session is invalid. Please open the mini app again.", 401
+        if not parent_can_access_dashboard(parent_id, student_id):
+            return None, dataset, "Access denied: this student is not linked to your parent account.", 403
 
     return payload, dataset, "", 200
 

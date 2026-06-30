@@ -419,6 +419,8 @@ def build_dashboard_page_context(
             panel=return_panel,
             school=return_school,
         )
+    elif auth_role == "parent":
+        dashboard_back_url = url_for("student.home")
 
     return {
         "payload": payload,
@@ -438,7 +440,7 @@ def build_dashboard_page_context(
         "profile_notice": profile_notice,
         "profile_error": profile_error,
         "dashboard_back_url": dashboard_back_url,
-        "show_dashboard_back": auth_role == "admin",
+        "show_dashboard_back": auth_role in {"admin", "parent"},
     }
 
 
