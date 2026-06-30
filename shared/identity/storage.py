@@ -62,22 +62,25 @@ def ensure_owner_admin(conn):
         return
     desired_password_hash = generate_password_hash(OWNER_PASSWORD)
 
-    existing_desired_login = queries.get_admin_id_by_login(conn, desired_login)
+    existing_desired_login = conn.execute(
+        "SELECT id FROM msi_v2.msi_staff WHERE lower(login) = lower(%s)",
+        (desired_login,),
+    ).fetchone()
     if existing_desired_login:
         target_id = int(existing_desired_login["id"])
         conn.execute(
             """
-            UPDATE admins
-            SET password_hash = %s, role = 'owner', is_owner = 1
+            UPDATE msi_v2.msi_staff
+            SET password_hash = %s, role = 'owner', status = 'active', updated_at = now()
             WHERE id = %s
             """,
             (desired_password_hash, target_id),
         )
         conn.execute(
             """
-            UPDATE admins
-            SET role = 'admin', is_owner = 0
-            WHERE is_owner = 1 AND id != %s
+            UPDATE msi_v2.msi_staff
+            SET role = 'admin', updated_at = now()
+            WHERE lower(role) = 'owner' AND id != %s
             """,
             (target_id,),
         )
@@ -86,8 +89,8 @@ def ensure_owner_admin(conn):
     owner_row = conn.execute(
         """
         SELECT id
-        FROM admins
-        WHERE is_owner = 1
+        FROM msi_v2.msi_staff
+        WHERE lower(role) = 'owner'
         ORDER BY id ASC
         LIMIT 1
         """
@@ -96,17 +99,17 @@ def ensure_owner_admin(conn):
         owner_id = int(owner_row["id"])
         conn.execute(
             """
-            UPDATE admins
-            SET login = %s, password_hash = %s, role = 'owner', is_owner = 1
+            UPDATE msi_v2.msi_staff
+            SET login = %s, password_hash = %s, role = 'owner', status = 'active', updated_at = now()
             WHERE id = %s
             """,
             (desired_login, desired_password_hash, owner_id),
         )
         conn.execute(
             """
-            UPDATE admins
-            SET role = 'admin', is_owner = 0
-            WHERE is_owner = 1 AND id != %s
+            UPDATE msi_v2.msi_staff
+            SET role = 'admin', updated_at = now()
+            WHERE lower(role) = 'owner' AND id != %s
             """,
             (owner_id,),
         )
