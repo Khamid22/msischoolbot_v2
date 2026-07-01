@@ -486,7 +486,7 @@ export default function StudentsPanel({ state }: { state: any }) {
                         <Eye className="h-3.5 w-3.5" />
                       </a>
                       <a
-                        href={routes.adminStudentProfile(studentRowId)}
+                        href={routes.adminStudentPanel(studentRowId, currentSchool, "student_profile")}
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
                         aria-label={`Edit ${asString(student.full_name)}`}
                       >
@@ -590,7 +590,7 @@ export default function StudentsPanel({ state }: { state: any }) {
                             <Eye className="h-3.5 w-3.5" />
                           </a>
                           <a
-                            href={routes.adminStudentProfile(studentRowId)}
+                            href={routes.adminStudentPanel(studentRowId, currentSchool, "student_profile")}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
                             aria-label={`Edit ${asString(student.full_name)}`}
                             title="Edit"

@@ -28,6 +28,43 @@ def _expires_at(days=14):
     return (datetime.utcnow() + timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _is_unique_violation(exc):
+    return (
+        getattr(exc, "sqlstate", "") == "23505"
+        or exc.__class__.__name__ == "UniqueViolation"
+    )
+
+
+def _student_db_id_for_legacy_row(conn, student_row_id):
+    row = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.students
+        WHERE legacy_student_row_id = %s
+        """,
+        (student_row_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError("Selected student was not found.")
+    return int(row["id"])
+
+
+def _staff_db_id_for_admin_id(conn, admin_id):
+    if not admin_id:
+        return None
+    row = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.msi_staff
+        WHERE id = %s OR legacy_admin_id = %s
+        ORDER BY CASE WHEN id = %s THEN 0 ELSE 1 END
+        LIMIT 1
+        """,
+        (admin_id, admin_id, admin_id),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
 def create_parent_invite_token(payload):
     return _serializer().dumps(payload)
 
@@ -52,6 +89,8 @@ def create_parent_invite_code(token, student_row_id, issued_by=0, *, expires_day
 
     with connect() as conn:
         _ensure(conn)
+        student_db_id = _student_db_id_for_legacy_row(conn, student_row_id)
+        staff_db_id = _staff_db_id_for_admin_id(conn, issued_by)
         for _ in range(5):
             code = secrets.token_urlsafe(9).rstrip("=")
             try:
@@ -71,15 +110,17 @@ def create_parent_invite_code(token, student_row_id, issued_by=0, *, expires_day
                     (
                         code,
                         token,
-                        student_row_id,
-                        issued_by,
+                        student_db_id,
+                        staff_db_id,
                         utc_now_iso(),
                         _expires_at(expires_days),
                     ),
                 )
                 return code
-            except Exception:
+            except Exception as exc:
                 conn.rollback()
+                if not _is_unique_violation(exc):
+                    raise
         raise RuntimeError("Could not generate a unique parent invite code")
 
 

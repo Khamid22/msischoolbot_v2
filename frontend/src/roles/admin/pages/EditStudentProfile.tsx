@@ -62,6 +62,7 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
   const [parentInviteUrl, setParentInviteUrl] = useState("");
   const [parentInviteCopied, setParentInviteCopied] = useState(false);
   const [parentInviteError, setParentInviteError] = useState("");
+  const [parentInviteMessage, setParentInviteMessage] = useState("");
   const [parentInviteLoading, setParentInviteLoading] = useState(false);
   const initials = `${String(student.surname || "").slice(0, 1)}${String(student.name || "").slice(0, 1)}`.trim() || "ST";
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
@@ -109,15 +110,18 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
     if (!props.parentInviteApiUrl || parentInviteLoading) return;
     setParentInviteLoading(true);
     setParentInviteError("");
+    setParentInviteMessage("");
     setParentInviteCopied(false);
     try {
       const response = await fetch(props.parentInviteApiUrl, {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
           "X-CSRFToken": props.csrfToken || "",
           "X-Requested-With": "XMLHttpRequest",
         },
+        body: JSON.stringify({}),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.ok) {
@@ -125,9 +129,14 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
         return;
       }
       const nextUrl = String(json.inviteUrl || json.invite_url || "");
+      if (!nextUrl) {
+        setParentInviteError("Parent link was created, but no URL was returned.");
+        return;
+      }
       setParentInviteUrl(nextUrl);
       const copied = await copyText(nextUrl);
       setParentInviteCopied(copied);
+      setParentInviteMessage(copied ? "Parent link copied." : "Parent link created. Copy it from below.");
       if (copied) {
         window.setTimeout(() => setParentInviteCopied(false), 1800);
       }
@@ -229,12 +238,16 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
                         Parent invite link
                       </p>
                       <p className="truncate text-xs text-sky-900">{parentInviteUrl}</p>
+                      {parentInviteMessage ? (
+                        <p className="mt-1 text-[11px] font-semibold text-sky-700">{parentInviteMessage}</p>
+                      ) : null}
                     </div>
                     <button
                       type="button"
                       onClick={async () => {
                         const copied = await copyText(parentInviteUrl);
                         setParentInviteCopied(copied);
+                        setParentInviteMessage(copied ? "Parent link copied." : "Could not copy automatically. Select the link and copy it.");
                         if (copied) window.setTimeout(() => setParentInviteCopied(false), 1800);
                       }}
                       className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-sky-200 bg-white px-3 text-xs font-bold text-sky-700 hover:bg-sky-100"
