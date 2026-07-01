@@ -2239,6 +2239,17 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       return matchesQuery && matchesSchool && matchesSubject;
     });
   }, [groups, groupSearch, groupSchool, groupSubject, schoolNameByCode]);
+  const filteredGroupSections = useMemo(() => {
+    const sections = new Map<string, { name: string; groups: Record<string, unknown>[] }>();
+    filteredGroups.forEach((group: Record<string, unknown>) => {
+      const name = asString(group.subject_name) || "No program";
+      const key = normalizeSubjectKey(name);
+      const section = sections.get(key) ?? { name, groups: [] };
+      section.groups.push(group);
+      sections.set(key, section);
+    });
+    return Array.from(sections.values()).sort((left, right) => left.name.localeCompare(right.name));
+  }, [filteredGroups]);
   const activeGroupFilterCount =
     (groupSchool !== "all" ? 1 : 0) +
     (groupSubject !== "all" ? 1 : 0) +
@@ -2784,64 +2795,83 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
               ) : (
                 <div className="min-h-[32rem] flex-1 overflow-auto p-0.5">
-                  <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredGroups.map((group: Record<string, unknown>) => {
-                      const id = asNumber(group.id);
-                      const name = asString(group.name);
-                      const subjectName = asString(group.subject_name);
-                      const schoolCode = asString(group.school_code);
-                      const schoolName = schoolNameByCode.get(schoolCode) || schoolCode;
-                      const studentsCount = asNumber(group.students_count);
-                      const disqualifiedCount = asNumber(group.disqualified_count);
-                      const isActive = studentsCount > 0;
-                      const swatch = programColor(subjectName);
+                  <div className="space-y-4">
+                    {filteredGroupSections.map((section) => {
+                      const sectionSwatch = programColor(section.name);
                       return (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setOpenGroupId(id)}
-                          className="group flex flex-col rounded-xl border border-foreground/10 bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                        >
-                          <div className="flex items-start gap-3">
-                            <span
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${swatch}`}
-                              aria-hidden="true"
-                            >
-                              {programInitials(subjectName)}
+                        <section key={normalizeSubjectKey(section.name)} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${sectionSwatch}`} aria-hidden="true" />
+                            <p className="truncate text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                              {section.name}
+                            </p>
+                            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                              {section.groups.length} {section.groups.length === 1 ? "group" : "groups"}
                             </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-bold leading-tight">{name}</p>
-                              <p className="truncate text-[11px] text-muted-foreground">
-                                {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
-                              </p>
-                            </div>
-                            <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                            <span className="h-px min-w-6 flex-1 bg-foreground/10" aria-hidden="true" />
                           </div>
+                          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                            {section.groups.map((group: Record<string, unknown>) => {
+                              const id = asNumber(group.id);
+                              const name = asString(group.name);
+                              const subjectName = asString(group.subject_name);
+                              const schoolCode = asString(group.school_code);
+                              const schoolName = schoolNameByCode.get(schoolCode) || schoolCode;
+                              const studentsCount = asNumber(group.students_count);
+                              const disqualifiedCount = asNumber(group.disqualified_count);
+                              const isActive = studentsCount > 0;
+                              const swatch = programColor(subjectName);
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={() => setOpenGroupId(id)}
+                                  className="group flex flex-col rounded-xl border border-foreground/10 bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <span
+                                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${swatch}`}
+                                      aria-hidden="true"
+                                    >
+                                      {programInitials(subjectName)}
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-bold leading-tight">{name}</p>
+                                      <p className="truncate text-[11px] text-muted-foreground">
+                                        {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
+                                      </p>
+                                    </div>
+                                    <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                                  </div>
 
-                          <div className="mt-3 flex items-center gap-1.5">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${swatch}`} aria-hidden="true" />
-                            <span className="truncate text-xs font-semibold">{subjectName || "No program"}</span>
-                          </div>
+                                  <div className="mt-3 flex items-center gap-1.5">
+                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${swatch}`} aria-hidden="true" />
+                                    <span className="truncate text-xs font-semibold">{subjectName || "No program"}</span>
+                                  </div>
 
-                          <div className="mt-3 flex items-center justify-between border-t border-foreground/8 pt-3">
-                            <div className="flex items-baseline gap-1.5">
-                              <span className="text-lg font-bold leading-none">{studentsCount}</span>
-                              <span className="text-[11px] text-muted-foreground">active</span>
-                              {disqualifiedCount > 0 ? (
-                                <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                                  {disqualifiedCount} disq.
-                                </span>
-                              ) : null}
-                            </div>
-                            <span
-                              className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                isActive ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {isActive ? "Active" : "Empty"}
-                            </span>
+                                  <div className="mt-3 flex items-center justify-between border-t border-foreground/8 pt-3">
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-lg font-bold leading-none">{studentsCount}</span>
+                                      <span className="text-[11px] text-muted-foreground">active</span>
+                                      {disqualifiedCount > 0 ? (
+                                        <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                          {disqualifiedCount} disq.
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <span
+                                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                        isActive ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
+                                      }`}
+                                    >
+                                      {isActive ? "Active" : "Empty"}
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
-                        </button>
+                        </section>
                       );
                     })}
                   </div>
