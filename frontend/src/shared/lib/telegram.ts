@@ -8,6 +8,13 @@
 // height in sync. It is a no-op outside a real Telegram client, so the
 // browser-based admin console is unaffected.
 
+interface TelegramInsets {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
 interface TelegramWebApp {
   ready: () => void;
   expand?: () => void;
@@ -16,6 +23,8 @@ interface TelegramWebApp {
   isExpanded?: boolean;
   viewportHeight?: number;
   viewportStableHeight?: number;
+  safeAreaInset?: TelegramInsets;
+  contentSafeAreaInset?: TelegramInsets;
   platform?: string;
   initData?: string;
   initDataUnsafe?: {
@@ -34,6 +43,11 @@ declare global {
 function isRealTelegramClient(tg: TelegramWebApp): boolean {
   const platform = String(tg.platform || "unknown").toLowerCase();
   return platform !== "" && platform !== "unknown";
+}
+
+function safePixel(value: unknown): string {
+  const parsed = Number(value);
+  return `${Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0}px`;
 }
 
 export function initTelegramViewport(): void {
@@ -80,10 +94,23 @@ export function initTelegramViewport(): void {
         /* ignore */
       }
     }
+
+    const safeArea = tg.safeAreaInset || {};
+    const contentSafeArea = tg.contentSafeAreaInset || {};
+    root.style.setProperty("--tg-safe-area-inset-top", safePixel(safeArea.top));
+    root.style.setProperty("--tg-safe-area-inset-right", safePixel(safeArea.right));
+    root.style.setProperty("--tg-safe-area-inset-bottom", safePixel(safeArea.bottom));
+    root.style.setProperty("--tg-safe-area-inset-left", safePixel(safeArea.left));
+    root.style.setProperty("--tg-content-safe-area-inset-top", safePixel(contentSafeArea.top));
+    root.style.setProperty("--tg-content-safe-area-inset-right", safePixel(contentSafeArea.right));
+    root.style.setProperty("--tg-content-safe-area-inset-bottom", safePixel(contentSafeArea.bottom));
+    root.style.setProperty("--tg-content-safe-area-inset-left", safePixel(contentSafeArea.left));
   };
 
   syncViewport();
   tg.onEvent?.("viewportChanged", syncViewport);
+  tg.onEvent?.("safeAreaChanged", syncViewport);
+  tg.onEvent?.("contentSafeAreaChanged", syncViewport);
 }
 
 export function getTelegramStartParam(): string {

@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { FormEvent, useEffect } from "react";
 import { ArrowRight, LogOut, UserRound } from "lucide-react";
+import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 
 function asArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
@@ -53,7 +54,7 @@ export default function ParentHome(props: Record<string, unknown>) {
     }
   }, [children, hasSingleChild]);
 
-  async function handleLogout(e: React.FormEvent<HTMLFormElement>) {
+  async function handleLogout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       window.sessionStorage.setItem("msiManualLoginMode", "1");
@@ -71,30 +72,33 @@ export default function ParentHome(props: Record<string, unknown>) {
     window.location.href = "/?logged_out=1";
   }
 
-  return (
-    <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-30 border-b border-foreground/8 bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <UserRound className="h-4 w-4 text-foreground" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold leading-tight">{authLogin}</p>
-            <p className="text-[11px] text-muted-foreground">Ota-ona kabineti / Кабинет родителя</p>
-          </div>
-          <form onSubmit={handleLogout}>
-            <button
-              type="submit"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Chiqish / Выйти
-            </button>
-          </form>
-        </div>
-      </header>
+  const topbar = (
+    <Topbar
+      title={authLogin}
+      subtitle="Ota-ona kabineti / Кабинет родителя"
+      leadingContent={
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <UserRound className="h-4 w-4 text-foreground" />
+        </span>
+      }
+      rightContent={
+        <form onSubmit={handleLogout}>
+          <button
+            type="submit"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-auto sm:gap-1.5 sm:px-3"
+            aria-label="Chiqish / Выйти"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Chiqish / Выйти</span>
+          </button>
+        </form>
+      }
+    />
+  );
 
-      <main className="mx-auto flex min-h-[calc(100dvh-4.25rem)] max-w-4xl flex-col justify-center px-4 py-6">
+  return (
+    <TelegramLayout topbar={topbar}>
+      <div className="mx-auto flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-7.5rem)] w-full max-w-4xl flex-col justify-center py-4">
         {hasSingleChild ? (
           <section className="rounded-xl border border-foreground/10 bg-surface p-5 text-center shadow-card">
             <p className="text-sm font-bold text-foreground">Kabinet ochilmoqda… / Открываем кабинет…</p>
@@ -146,7 +150,7 @@ export default function ParentHome(props: Record<string, unknown>) {
             </p>
           </section>
         )}
-      </main>
-    </div>
+      </div>
+    </TelegramLayout>
   );
 }
