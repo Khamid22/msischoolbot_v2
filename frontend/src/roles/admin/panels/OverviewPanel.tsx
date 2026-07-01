@@ -1596,16 +1596,16 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-1 text-xs text-muted-foreground">
         {[
-          { label: "Students", value: asNumber(quickStats.total_students), icon: <Users className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
-          { label: "Schools", value: asNumber(quickStats.total_schools), icon: <School className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
-          { label: "Teachers", value: asNumber(quickStats.total_teachers), icon: <GraduationCap className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
-          { label: "Subjects", value: asNumber(quickStats.total_subjects), icon: <BookOpen className="h-3.5 w-3.5" />, color: "bg-slate-100 text-slate-800 border border-border" },
+          { label: "Students", value: asNumber(quickStats.total_students), icon: <Users className="h-3.5 w-3.5" /> },
+          { label: "Schools", value: asNumber(quickStats.total_schools), icon: <School className="h-3.5 w-3.5" /> },
+          { label: "Teachers", value: asNumber(quickStats.total_teachers), icon: <GraduationCap className="h-3.5 w-3.5" /> },
+          { label: "Subjects", value: asNumber(quickStats.total_subjects), icon: <BookOpen className="h-3.5 w-3.5" /> },
         ].map((item) => (
-          <span key={item.label} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold ${item.color}`}>
-            {item.icon}
-            <span className="font-bold text-current">{item.value}</span>
+          <span key={item.label} className="inline-flex items-center gap-1.5">
+            <span className="text-muted-foreground/70">{item.icon}</span>
+            <span className="text-sm font-bold text-foreground">{item.value}</span>
             {item.label}
           </span>
         ))}
@@ -1615,61 +1615,101 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         title="Subject Performance"
         icon={<BarChart3 className="h-4 w-4 text-info" />}
         headerActions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={openZonesDrawer}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-surface px-3 text-xs font-bold text-foreground hover:bg-muted"
-            >
-              <AlertCircle className="h-3.5 w-3.5" />
-              Action Queue
-            </button>
-            <select
-              value={selectedOverviewSchool}
-              onChange={(event) => {
-                const nextSchool = event.target.value;
-                setSelectedOverviewSchool(nextSchool);
-                setSelectedSehriyoGrade("");
-                setSelectedExam("");
-                setSelectedAcademicYear("");
-                setSelectedTrendMonth("all");
-                const nextRows = subjectInfo.filter(
-                  (row: Record<string, unknown>) => asString(row.school_key).toLowerCase() === nextSchool,
-                );
-                setSelectedSubjectName(
-                  findPreferredMathSubject(nextRows.map((row: Record<string, unknown>) => asString(row.subject_name))),
-                );
-              }}
-              className="rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none"
-            >
-              {availableSubjectSchools.map((option: { code: string; label: string }) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={selectedSubjectName}
-              onChange={(event) => {
-                setSelectedSubjectName(event.target.value);
-                setSelectedSehriyoGrade("");
-                setSelectedExam("");
-                setSelectedAcademicYear("");
-                setSelectedTrendMonth("all");
-              }}
-              className="rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-xs font-medium outline-none"
-            >
-              {schoolSubjectRows.map((row: Record<string, unknown>) => (
-                <option key={asString(row.subject_name)} value={asString(row.subject_name)}>
-                  {asString(row.subject_name)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <button
+            type="button"
+            onClick={openZonesDrawer}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-surface px-3 text-xs font-bold text-foreground hover:bg-muted"
+          >
+            <AlertCircle className="h-3.5 w-3.5" />
+            Action Queue
+          </button>
         }
       >
         {selectedSubjectRow ? (
           <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-foreground/8 bg-background/60 px-2.5 py-2">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Scope</span>
+              <select
+                value={selectedOverviewSchool}
+                onChange={(event) => {
+                  const nextSchool = event.target.value;
+                  setSelectedOverviewSchool(nextSchool);
+                  setSelectedSehriyoGrade("");
+                  setSelectedExam("");
+                  setSelectedAcademicYear("");
+                  setSelectedTrendMonth("all");
+                  const nextRows = subjectInfo.filter(
+                    (row: Record<string, unknown>) => asString(row.school_key).toLowerCase() === nextSchool,
+                  );
+                  setSelectedSubjectName(
+                    findPreferredMathSubject(nextRows.map((row: Record<string, unknown>) => asString(row.subject_name))),
+                  );
+                }}
+                className="h-8 rounded-md border border-foreground/10 bg-surface px-2 text-xs font-semibold text-foreground outline-none focus:border-foreground/30"
+                aria-label="School"
+              >
+                {availableSubjectSchools.map((option: { code: string; label: string }) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedSubjectName}
+                onChange={(event) => {
+                  setSelectedSubjectName(event.target.value);
+                  setSelectedSehriyoGrade("");
+                  setSelectedExam("");
+                  setSelectedAcademicYear("");
+                  setSelectedTrendMonth("all");
+                }}
+                className="h-8 rounded-md border border-foreground/10 bg-surface px-2 text-xs font-semibold text-foreground outline-none focus:border-foreground/30"
+                aria-label="Subject"
+              >
+                {schoolSubjectRows.map((row: Record<string, unknown>) => (
+                  <option key={asString(row.subject_name)} value={asString(row.subject_name)}>
+                    {asString(row.subject_name)}
+                  </option>
+                ))}
+              </select>
+              {Array.isArray(availableOverviewGrades) && availableOverviewGrades.length > 1 ? (
+                <select
+                  value={activeOverviewGrade || availableOverviewGrades[0]}
+                  onChange={(event) => {
+                    setSelectedSehriyoGrade(event.target.value as "7" | "8");
+                    setSelectedExam("");
+                    setSelectedAcademicYear("");
+                    setSelectedTrendMonth("all");
+                  }}
+                  className="h-8 rounded-md border border-foreground/10 bg-surface px-2 text-xs font-semibold text-foreground outline-none focus:border-foreground/30"
+                  aria-label="Class"
+                >
+                  {availableOverviewGrades.map((grade: "7" | "8") => (
+                    <option key={grade} value={grade}>
+                      Grade {grade}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              {graphMetric !== "exam" && academicYearOptions.length > 1 ? (
+                <select
+                  value={selectedAcademicYearKey}
+                  onChange={(event) => {
+                    setSelectedAcademicYear(event.target.value);
+                    setSelectedTrendMonth("all");
+                  }}
+                  className="h-8 rounded-md border border-foreground/10 bg-surface px-2 text-xs font-semibold text-foreground outline-none focus:border-foreground/30"
+                  aria-label="Academic year"
+                >
+                  {academicYearOptions.map((year) => (
+                    <option key={year.key} value={year.key}>
+                      {year.label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+
             <div className="grid gap-2 md:grid-cols-3">
               <Indicator
                 label="AAP"
@@ -1710,42 +1750,34 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   <p className="text-xs text-muted-foreground">{graphTitle}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={graphMetric}
-                    onChange={(event) => {
-                      const nextMetric = event.target.value as "aap" | "attendance" | "exam";
-                      setGraphMetric(nextMetric);
-                      if (nextMetric === "exam") {
-                        setSelectedExam("");
-                      } else {
-                        setSelectedTrendMonth("all");
-                      }
-                    }}
-                    className="h-8 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
-                  >
-                    <option value="aap">AAP</option>
-                    <option value="attendance">Attendance</option>
-                    <option value="exam">Exam</option>
-                  </select>
-                  {Array.isArray(availableOverviewGrades) && availableOverviewGrades.length > 1 ? (
-                    <select
-                      value={activeOverviewGrade || availableOverviewGrades[0]}
-                      onChange={(event) => {
-                        setSelectedSehriyoGrade(event.target.value as "7" | "8");
-                        setSelectedExam("");
-                        setSelectedAcademicYear("");
-                        setSelectedTrendMonth("all");
-                      }}
-                      className="h-8 rounded-md border border-foreground/10 bg-white/85 px-2 text-xs font-bold text-foreground outline-none"
-                      aria-label="Class"
-                    >
-                      {availableOverviewGrades.map((grade: "7" | "8") => (
-                        <option key={grade} value={grade}>
-                          Grade {grade}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
+                  <div className="inline-flex items-center rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
+                    {([
+                      { key: "aap", label: "AAP" },
+                      { key: "attendance", label: "Attendance" },
+                      { key: "exam", label: "Exam" },
+                    ] as const).map((option) => {
+                      const active = graphMetric === option.key;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => {
+                            setGraphMetric(option.key);
+                            if (option.key === "exam") {
+                              setSelectedExam("");
+                            } else {
+                              setSelectedTrendMonth("all");
+                            }
+                          }}
+                          className={`rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                            active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   {graphMetric === "exam" ? (
                     <select
                       value={examSelectValue}
@@ -1760,43 +1792,24 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                       ))}
                     </select>
                   ) : (
-                    <>
-                      {academicYearOptions.length > 1 ? (
-                        <select
-                          value={selectedAcademicYearKey}
-                          onChange={(event) => {
-                            setSelectedAcademicYear(event.target.value);
-                            setSelectedTrendMonth("all");
-                          }}
-                          className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
-                          aria-label="Academic year"
-                        >
-                          {academicYearOptions.map((year) => (
-                            <option key={year.key} value={year.key}>
-                              {year.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : null}
-                      <select
-                        value={
-                          selectedTrendMonth === "all" ||
-                          visibleMonthOptions.some((month) => month.key === selectedTrendMonth)
-                            ? selectedTrendMonth
-                            : "all"
-                        }
-                        onChange={(event) => setSelectedTrendMonth(event.target.value)}
-                        className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
-                        aria-label="Month"
-                      >
-                        <option value="all">All {selectedAcademicYearLabel}</option>
-                        {visibleMonthOptions.map((month: MonthOption) => (
-                          <option key={month.key || month.index} value={month.key}>
-                            {month.label}
-                          </option>
-                        ))}
-                      </select>
-                    </>
+                    <select
+                      value={
+                        selectedTrendMonth === "all" ||
+                        visibleMonthOptions.some((month) => month.key === selectedTrendMonth)
+                          ? selectedTrendMonth
+                          : "all"
+                      }
+                      onChange={(event) => setSelectedTrendMonth(event.target.value)}
+                      className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
+                      aria-label="Month"
+                    >
+                      <option value="all">All {selectedAcademicYearLabel}</option>
+                      {visibleMonthOptions.map((month: MonthOption) => (
+                        <option key={month.key || month.index} value={month.key}>
+                          {month.label}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </div>
               </div>
