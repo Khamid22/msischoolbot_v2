@@ -89,7 +89,7 @@ def _to_academic_indicator(row):
     )
 
     return {
-        "enrollment_id": int(row["enrollment_id"]),
+        "enrollment_id": _safe_int(row["enrollment_id"]),
         "subject_name": subject_name,
         "subject_display_name": subject_display_name,
         "subject_key": _subject_key(subject_display_name),

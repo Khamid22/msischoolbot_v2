@@ -205,6 +205,8 @@ def get_group_gradebook(group_id):
         attendance_by_enrollment = {}
         homework_by_enrollment = {}
         exams_by_enrollment = {}
+        exam_dates_by_enrollment = {}
+        exam_dates_by_label = {}
         exam_labels = []
         if enrollment_ids:
             placeholders = ",".join(["%s"] * len(enrollment_ids))
@@ -245,10 +247,23 @@ def get_group_gradebook(group_id):
             for row in conn.execute(
                 f"""
                 SELECT gs.legacy_enrollment_id AS enrollment_id,
-                       er.exam_name, er.attempt, er.score
+                       er.exam_name, er.attempt, er.score,
+                       COALESCE(
+                         to_char(exam_session.session_date, 'DD/MM/YYYY'),
+                         to_char(er.created_at, 'DD/MM/YYYY'),
+                         ''
+                       ) AS exam_date
                 FROM msi_v2.exam_results er
                 JOIN msi_v2.group_students gs
                      ON gs.group_id = er.group_id AND gs.student_id = er.student_id
+                LEFT JOIN LATERAL (
+                    SELECT ls.session_date
+                    FROM msi_v2.lesson_sessions ls
+                    WHERE ls.group_id = er.group_id
+                      AND ls.program_item_id = er.program_item_id
+                    ORDER BY ls.session_date NULLS LAST, ls.id
+                    LIMIT 1
+                ) exam_session ON TRUE
                 WHERE gs.legacy_enrollment_id IN ({placeholders})
                 ORDER BY er.exam_name, er.attempt
                 """,
@@ -258,7 +273,11 @@ def get_group_gradebook(group_id):
                 if not label:
                     continue
                 score = float(row["score"])
+                exam_date = str(row["exam_date"] or "").strip()
                 exams_by_enrollment.setdefault(int(row["enrollment_id"]), {})[label] = score
+                exam_dates_by_enrollment.setdefault(int(row["enrollment_id"]), {})[label] = exam_date
+                if label not in exam_dates_by_label or not exam_dates_by_label[label]:
+                    exam_dates_by_label[label] = exam_date
                 if label not in exam_labels:
                     exam_labels.append(label)
 
@@ -282,6 +301,7 @@ def get_group_gradebook(group_id):
             for row in lesson_rows
         ],
         "examLabels": exam_labels,
+        "examDates": exam_dates_by_label,
         "enrollments": [
             {
                 "enrollmentId": int(row["legacy_enrollment_id"] or 0),
@@ -291,6 +311,7 @@ def get_group_gradebook(group_id):
                 "attendance": attendance_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "homework": homework_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "exams": exams_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "examDates": exam_dates_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
             }
             for row in active_enrollment_rows
             if int(row["legacy_enrollment_id"] or 0) > 0
@@ -307,6 +328,7 @@ def get_group_gradebook(group_id):
                 "disqualificationReason": str(row["disqualification_reason"] or ""),
                 "disqualifiedAt": str(row["disqualified_at"] or ""),
                 "exams": exams_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "examDates": exam_dates_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
             }
             for row in enrollment_rows
             if int(row["legacy_enrollment_id"] or 0) > 0

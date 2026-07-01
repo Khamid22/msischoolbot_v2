@@ -21,6 +21,7 @@ import {
   BarChart,
   Bar,
   Cell,
+  Legend,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -31,10 +32,129 @@ import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "./gradebookFormat";
 
-// Keep long student names from breaking chart axes: shorten to a compact label.
-function shortTick(value: string) {
-  const text = String(value || "");
-  return text.length > 12 ? `${text.slice(0, 11)}…` : text;
+const monthLabels = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+type PeriodParts = {
+  month: string;
+  year: string;
+};
+
+type AxisTickProps = {
+  x?: number;
+  y?: number;
+  payload?: {
+    value?: unknown;
+  };
+};
+
+function parsePeriodDate(value: unknown): PeriodParts | null {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    return {
+      month: slash[2].padStart(2, "0"),
+      year: slash[3],
+    };
+  }
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    return {
+      month: iso[2].padStart(2, "0"),
+      year: iso[1],
+    };
+  }
+  return null;
+}
+
+function matchesPeriod(value: unknown, month: string, year: string) {
+  if (month === "all" && year === "all") return true;
+  const parts = parsePeriodDate(value);
+  if (!parts) return false;
+  return (month === "all" || parts.month === month) && (year === "all" || parts.year === year);
+}
+
+function collectPeriodOptions(values: unknown[]) {
+  const months = new Set<string>();
+  const years = new Set<string>();
+  values.forEach((value) => {
+    const parts = parsePeriodDate(value);
+    if (!parts) return;
+    months.add(parts.month);
+    years.add(parts.year);
+  });
+  return {
+    months: [...months].sort((a, b) => Number(a) - Number(b)),
+    years: [...years].sort((a, b) => Number(b) - Number(a)),
+  };
+}
+
+function averageScore(values: Array<number | null | undefined>) {
+  const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (!valid.length) return null;
+  return Math.round((valid.reduce((sum, value) => sum + value, 0) / valid.length) * 10) / 10;
+}
+
+function chartMinWidth(count: number) {
+  return Math.max(760, count * 132);
+}
+
+function wrapWords(value: unknown, maxChars = 13, maxLines = 3) {
+  const text = String(value || "").trim();
+  if (!text) return ["—"];
+  const words = text.split(/\s+/).flatMap((word) => {
+    if (word.length <= maxChars) return [word];
+    const chunks: string[] = [];
+    for (let index = 0; index < word.length; index += maxChars) {
+      chunks.push(word.slice(index, index + maxChars));
+    }
+    return chunks;
+  });
+  const lines: string[] = [];
+  words.forEach((word) => {
+    const current = lines[lines.length - 1] || "";
+    if (!current) {
+      lines.push(word);
+      return;
+    }
+    if (`${current} ${word}`.length <= maxChars) {
+      lines[lines.length - 1] = `${current} ${word}`;
+      return;
+    }
+    lines.push(word);
+  });
+  if (lines.length <= maxLines) return lines;
+  const visible = lines.slice(0, maxLines);
+  visible[maxLines - 1] = `${visible[maxLines - 1].slice(0, Math.max(1, maxChars - 1))}…`;
+  return visible;
+}
+
+function StudentNameTick({ x = 0, y = 0, payload }: AxisTickProps) {
+  const lines = wrapWords(payload?.value);
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={11}>
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 14 : 13}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
 }
 
 function FieldLabel({ children }: { children: string }) {
@@ -60,6 +180,55 @@ function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
       {...props}
       className="w-full rounded-lg border border-foreground/10 bg-surface px-3 py-2 text-sm outline-none focus:border-foreground/30"
     />
+  );
+}
+
+function PeriodFilter({
+  month,
+  year,
+  months,
+  years,
+  onMonthChange,
+  onYearChange,
+}: {
+  month: string;
+  year: string;
+  months: string[];
+  years: string[];
+  onMonthChange: (value: string) => void;
+  onYearChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <Filter className="h-3.5 w-3.5" />
+        Filter
+      </span>
+      <select
+        value={month}
+        onChange={(event) => onMonthChange(event.target.value)}
+        className="h-9 min-w-[8.5rem] rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30"
+      >
+        <option value="all">All months</option>
+        {months.map((value) => (
+          <option key={value} value={value}>
+            {monthLabels.find((item) => item.value === value)?.label || value}
+          </option>
+        ))}
+      </select>
+      <select
+        value={year}
+        onChange={(event) => onYearChange(event.target.value)}
+        className="h-9 min-w-[6.5rem] rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30"
+      >
+        <option value="all">All years</option>
+        {years.map((value) => (
+          <option key={value} value={value}>
+            {value}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -333,6 +502,7 @@ type Enrollment = {
   attendance: Record<string, string>;
   homework: Record<string, number>;
   exams?: Record<string, number>;
+  examDates?: Record<string, string>;
 };
 
 type GradebookData = {
@@ -340,6 +510,7 @@ type GradebookData = {
   lessons: Lesson[];
   enrollments: Enrollment[];
   examLabels?: string[];
+  examDates?: Record<string, string>;
   allEnrollments?: Enrollment[];
 };
 
@@ -551,18 +722,32 @@ function GroupGradebook({
   const [active, setActive] = useState<ActiveCell | null>(null);
   const [hwInput, setHwInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [enrollmentSearch, setEnrollmentSearch] = useState("");
   const [statusSavingId, setStatusSavingId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Enrollment | null>(null);
+  const [riskPanelOpen, setRiskPanelOpen] = useState(false);
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
-  const [activeView, setActiveView] = useState<"gradebook" | "aap" | "ar" | "ep" | "students">("gradebook");
+  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep">("gradebook");
+  const [indicatorMonth, setIndicatorMonth] = useState("all");
+  const [indicatorYear, setIndicatorYear] = useState("all");
+  const [examMonth, setExamMonth] = useState("all");
+  const [examYear, setExamYear] = useState("all");
   const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     load(groupId, controller.signal);
     return () => controller.abort();
+  }, [groupId]);
+
+  useEffect(() => {
+    setActiveView("gradebook");
+    setSelectedStudent(null);
+    setRiskPanelOpen(false);
+    setIndicatorMonth("all");
+    setIndicatorYear("all");
+    setExamMonth("all");
+    setExamYear("all");
   }, [groupId]);
 
   useEffect(() => {
@@ -748,18 +933,31 @@ function GroupGradebook({
 
   const lessons = data?.lessons ?? [];
   const examLabels = data?.examLabels ?? [];
+  const examDateByLabel = data?.examDates ?? {};
   const enrollments = data?.enrollments ?? [];
   const allEnrollments = data?.allEnrollments ?? enrollments;
   const disqualifiedEnrollments = allEnrollments.filter((en) => en.status === "disqualified");
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
-  const removedEnrollments = allEnrollments.filter((en) => en.status === "disqualified" || en.status === "banned");
-  const enrollmentQuery = enrollmentSearch.trim().toLowerCase();
-  const visibleAllEnrollments = allEnrollments.filter((en) => {
-    if (!enrollmentQuery) return true;
-    return `${en.fullName} ${en.publicDashboardId || ""}`.toLowerCase().includes(enrollmentQuery);
-  });
-  const visibleActiveEnrollments = visibleAllEnrollments.filter((en) => en.status !== "disqualified" && en.status !== "banned");
-  const visibleRemovedEnrollments = visibleAllEnrollments.filter((en) => en.status === "disqualified" || en.status === "banned");
+
+  const academicPeriodOptions = collectPeriodOptions(lessons.map((lesson) => lesson.date));
+  const examPeriodOptions = collectPeriodOptions([
+    ...Object.values(examDateByLabel),
+    ...enrollments.flatMap((en) => Object.values(en.examDates || {})),
+  ]);
+  const indicatorFilterActive = indicatorMonth !== "all" || indicatorYear !== "all";
+  const examFilterActive = examMonth !== "all" || examYear !== "all";
+  const indicatorLessons = indicatorFilterActive
+    ? lessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
+    : lessons;
+  const examLabelsForPeriod = examFilterActive
+    ? examLabels.filter((label) =>
+        enrollments.some((en) => {
+          const score = en.exams?.[label];
+          if (typeof score !== "number" || scoreOutOfNine(score) <= 0) return false;
+          return matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear);
+        }),
+      )
+    : examLabels;
 
   // 1. AAP Metrics
   const activeAAPGrades = enrollments.map(en => scoreOutOfNine(en.averageGrade)).filter(g => g > 0);
@@ -767,35 +965,46 @@ function GroupGradebook({
     ? (activeAAPGrades.reduce((sum, g) => sum + g, 0) / activeAAPGrades.length).toFixed(1)
     : "—";
 
-  const aapData = enrollments.map(en => ({
-    name: en.fullName,
-    AAP: scoreOutOfNine(en.averageGrade),
-    isLow: en.averageGrade > 0 && en.averageGrade < 5
-  }));
-
   // 2. Attendance Metrics
   const totalPresent = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => v === "present").length, 0);
   const totalAtt = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length, 0);
   const classAttendanceRate = totalAtt > 0 ? Math.round((totalPresent / totalAtt) * 100) : 100;
 
-  const studentAttData = enrollments.map(en => {
-    const present = Object.values(en.attendance).filter(v => v === "present").length;
-    const total = Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length;
-    const rate = total > 0 ? Math.round((present / total) * 100) : 100;
+  const academicIndicatorData = enrollments.map(en => {
+    const homeworkScores = indicatorLessons
+      .map((lesson) => scoreOutOfNine(en.homework[lesson.lessonNumber]))
+      .filter((score) => score > 0);
+    const filteredAAP = averageScore(homeworkScores);
+    const aap = filteredAAP ?? (indicatorFilterActive ? null : scoreOutOfNine(en.averageGrade) || null);
+    const attendanceValues = indicatorLessons
+      .map((lesson) => en.attendance[lesson.lessonNumber])
+      .filter((status) => ["present", "absent", "justified"].includes(status));
+    const present = attendanceValues.filter((status) => status === "present").length;
+    const total = attendanceValues.length;
+    const arRate = total > 0 ? Math.round((present / total) * 100) : null;
+    const arScore = arRate === null ? null : Math.round((arRate / 100) * 90) / 10;
+    const averagePerformance = averageScore([aap, arScore]);
     return {
       name: en.fullName,
-      rate,
+      AAP: aap,
+      AR: arScore,
+      arRate,
+      averagePerformance,
+      isLowAAP: aap !== null && aap < 5,
+      isLowAR: arRate !== null && arRate < 80,
       present,
-      absent: Object.values(en.attendance).filter(v => v === "absent").length,
-      justified: Object.values(en.attendance).filter(v => v === "justified").length,
-      total
+      total,
     };
   });
+  const hasAcademicIndicatorData = academicIndicatorData.some((row) => row.AAP !== null || row.AR !== null);
+  const academicAverageAAP = averageScore(academicIndicatorData.map((row) => row.AAP));
+  const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
+  const academicAverageARRate = averageScore(academicIndicatorData.map((row) => row.arRate));
+  const academicAveragePerformance = averageScore(academicIndicatorData.map((row) => row.averagePerformance));
 
   // 3. Exam Metrics
   let totalExamScoreSum = 0;
   let totalExamScoreCount = 0;
-  let highestExamScore = -Infinity;
   enrollments.forEach(en => {
     if (en.exams) {
       Object.values(en.exams).forEach(score => {
@@ -804,26 +1013,31 @@ function GroupGradebook({
           if (normalizedScore <= 0) return;
           totalExamScoreSum += normalizedScore;
           totalExamScoreCount++;
-          if (normalizedScore > highestExamScore) {
-            highestExamScore = normalizedScore;
-          }
         }
       });
     }
   });
   const classExamAverage = totalExamScoreCount > 0 ? (totalExamScoreSum / totalExamScoreCount).toFixed(1) : "—";
-  const maxScore = highestExamScore !== -Infinity ? highestExamScore : "—";
   const hasExamScores = totalExamScoreCount > 0;
 
+  let filteredExamScoreSum = 0;
+  let filteredExamScoreCount = 0;
+  let filteredHighestExamScore = -Infinity;
   const studentExamData = enrollments.map(en => {
     let maxVal = -1;
     let sumVal = 0;
     let countVal = 0;
-    examLabels.forEach(label => {
+    examLabelsForPeriod.forEach(label => {
       const val = en.exams?.[label];
+      if (!matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear)) return;
       if (typeof val === 'number') {
         const normalizedVal = scoreOutOfNine(val);
         if (normalizedVal <= 0) return;
+        filteredExamScoreSum += normalizedVal;
+        filteredExamScoreCount++;
+        if (normalizedVal > filteredHighestExamScore) {
+          filteredHighestExamScore = normalizedVal;
+        }
         sumVal += normalizedVal;
         countVal++;
         if (normalizedVal > maxVal) {
@@ -833,7 +1047,7 @@ function GroupGradebook({
     });
     const avgScore = countVal > 0 ? Math.round((sumVal / countVal) * 10) / 10 : 0;
     const bestScore = maxVal !== -1 ? maxVal : 0;
-    const missing = examLabels.length - countVal;
+    const missing = Math.max(0, examLabelsForPeriod.length - countVal);
     return {
       name: en.fullName,
       avgScore,
@@ -843,20 +1057,32 @@ function GroupGradebook({
     };
   });
 
-  const studentsWithMissingExams = studentExamData.filter(s => s.missing > 0).length;
+  const filteredClassExamAverage = filteredExamScoreCount > 0 ? (filteredExamScoreSum / filteredExamScoreCount).toFixed(1) : "—";
+  const filteredMaxScore = filteredHighestExamScore !== -Infinity ? filteredHighestExamScore : "—";
+  const hasFilteredExamScores = filteredExamScoreCount > 0;
+  const studentsWithMissingExams = examLabelsForPeriod.length > 0 ? studentExamData.filter(s => s.missing > 0).length : 0;
 
   // 4. At-Risk Metrics
-  let atRiskCount = 0;
-  enrollments.forEach(en => {
+  const atRiskStudents = enrollments.map(en => {
     const present = Object.values(en.attendance).filter(v => v === "present").length;
     const total = Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length;
-    const attRate = total > 0 ? (present / total) * 100 : 100;
-    const isLowAAP = en.averageGrade > 0 && en.averageGrade < 5;
+    const attRate = total > 0 ? Math.round((present / total) * 100) : 100;
+    const aap = scoreOutOfNine(en.averageGrade);
+    const isLowAAP = aap > 0 && aap < 5;
     const isLowAtt = attRate < 80 && total > 0;
-    if (isLowAAP || isLowAtt) {
-      atRiskCount++;
-    }
-  });
+    const reasons = [
+      isLowAAP ? `AAP ${formatScoreOutOfNine(aap)} / 9` : "",
+      isLowAtt ? `AR ${attRate}%` : "",
+    ].filter(Boolean);
+    return {
+      enrollment: en,
+      aap,
+      arRate: attRate,
+      reasons,
+      atRisk: isLowAAP || isLowAtt,
+    };
+  }).filter((row) => row.atRisk);
+  const atRiskCount = atRiskStudents.length;
 
   useEffect(() => {
     setActive(null);
@@ -933,23 +1159,26 @@ function GroupGradebook({
               {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
             </span>
           </div>
-          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+          <button
+            type="button"
+            onClick={() => setRiskPanelOpen(true)}
+            className="rounded-xl border border-foreground/8 bg-surface p-3 text-left transition-colors hover:border-red-200 hover:bg-red-50/30 focus:outline-none focus:ring-2 focus:ring-red-200"
+            aria-label="Show at-risk students"
+          >
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">At-Risk Students</span>
             <span className={`mt-1 block text-lg font-bold ${atRiskCount > 0 ? "text-red-500" : ""}`}>{atRiskCount}</span>
-          </div>
+          </button>
         </div>
       )}
 
       {/* 3. View Switcher Buttons */}
       {data && (
         <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
-          {(["gradebook", "aap", "ar", "ep", "students"] as const).map((view) => {
+          {(["gradebook", "academic", "ep"] as const).map((view) => {
             const labels: Record<string, string> = {
               gradebook: "Gradebook",
-              aap: "AAP",
-              ar: "AR",
-              ep: "EP",
-              students: "Students"
+              academic: "Academic Indicators",
+              ep: "Exam Performance",
             };
             const isActive = activeView === view;
             return (
@@ -1024,7 +1253,17 @@ function GroupGradebook({
                   {enrollments.map((en) => (
                     <tr key={en.enrollmentId} className="hover:bg-foreground/[0.015]">
                       <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
-                        {en.fullName}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedStudent(en);
+                            setMoveGroupId("");
+                          }}
+                          className="max-w-[11rem] break-words text-left font-semibold text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          title={`Manage ${en.fullName}`}
+                        >
+                          {en.fullName}
+                        </button>
                       </td>
                       <td className="sticky left-[180px] z-20 border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
                         {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
@@ -1068,83 +1307,85 @@ function GroupGradebook({
         )
       )}
 
-      {data && activeView === "aap" && (
+      {data && activeView === "academic" && (
         <div className="rounded-xl border border-foreground/8 bg-surface p-4">
-          <div className="mb-3">
-            <h4 className="text-sm font-bold">Student AAP Performance</h4>
-            <p className="text-xs text-muted-foreground">Scores are on the 1–9 scale</p>
-          </div>
-          <div className="overflow-x-auto pb-2">
-            <div className="h-[320px] min-w-[34rem] sm:h-[340px] lg:h-[400px] lg:min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={aapData} margin={{ top: 16, right: 12, left: -16, bottom: 56 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
-                <XAxis
-                  dataKey="name"
-                  angle={-35}
-                  textAnchor="end"
-                  interval={0}
-                  height={82}
-                  tick={{ fontSize: 11 }}
-                  tickMargin={12}
-                  tickFormatter={shortTick}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
-                  labelStyle={{ fontSize: 10, fontWeight: "bold" }}
-                />
-                <Bar dataKey="AAP" radius={[4, 4, 0, 0]}>
-                  {aapData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.isLow ? "#ef4444" : "#3b82f6"} />
-                  ))}
-                </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {data && activeView === "ar" && (
-        <div className="rounded-xl border border-foreground/8 bg-surface p-4">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h4 className="text-sm font-bold">Student Attendance Rate</h4>
-              <p className="text-xs text-muted-foreground">AR is shown as percentage of attended lessons</p>
+              <h4 className="text-sm font-bold">Academic Indicators</h4>
+              <p className="text-xs text-muted-foreground">AAP and AR score are shown on the 1-9 scale</p>
             </div>
-            <div className="flex items-center gap-3 text-[10px] font-semibold text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> P Present
+            <PeriodFilter
+              month={indicatorMonth}
+              year={indicatorYear}
+              months={academicPeriodOptions.months}
+              years={academicPeriodOptions.years}
+              onMonthChange={setIndicatorMonth}
+              onYearChange={setIndicatorYear}
+            />
+          </div>
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
+              <span className="mt-1 block text-lg font-bold">{academicAverageAAP ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
+            </div>
+            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
+              <span className="mt-1 block text-lg font-bold">
+                {academicAverageARRate ?? "—"}<span className="text-xs font-normal text-muted-foreground">%</span>
               </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-red-500" /> A Absent
+              <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">
+                {academicAverageAR ?? "—"} / 9 score
               </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-400" /> J Justified
-              </span>
+            </div>
+            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
+              <span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
+            </div>
+            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Lessons Matched</span>
+              <span className="mt-1 block text-lg font-bold">{indicatorLessons.length}</span>
             </div>
           </div>
-          {totalAtt === 0 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">No attendance logs yet.</div>
+          {hasAcademicIndicatorData ? (
+            <div className="overflow-x-auto pb-2">
+              <div
+                className="h-[520px] sm:h-[560px]"
+                style={{ minWidth: chartMinWidth(academicIndicatorData.length) }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={academicIndicatorData} margin={{ top: 20, right: 18, left: -10, bottom: 112 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                    <XAxis
+                      dataKey="name"
+                      interval={0}
+                      height={108}
+                      tick={<StudentNameTick />}
+                      tickLine={false}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
+                    <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
+                      labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                    />
+                    <Legend verticalAlign="top" height={28} />
+                    <Bar dataKey="AAP" name="AAP / 9" radius={[4, 4, 0, 0]} maxBarSize={42}>
+                      {academicIndicatorData.map((entry, index) => (
+                        <Cell key={`academic-aap-${index}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="AR" name="AR score / 9" radius={[4, 4, 0, 0]} maxBarSize={42}>
+                      {academicIndicatorData.map((entry, index) => (
+                        <Cell key={`academic-ar-${index}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           ) : (
-            <div className="max-h-[60dvh] space-y-3 overflow-y-auto pr-1">
-              {studentAttData.map((st) => (
-                <div key={st.name} className="space-y-1">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs font-semibold">
-                    <span className="min-w-0 break-words">{st.name}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {st.rate}% <span className="text-[10px] font-normal">({st.present}/{st.total} lessons)</span>
-                    </span>
-                  </div>
-                  <div className="flex h-2 w-full overflow-hidden rounded-full bg-foreground/10">
-                    <div className="h-full bg-emerald-500" style={{ width: `${st.rate}%` }} />
-                    <div className="h-full bg-red-500/80" style={{ width: `${st.total > 0 ? (st.absent / st.total) * 100 : 0}%` }} />
-                    <div className="h-full bg-amber-400" style={{ width: `${st.total > 0 ? (st.justified / st.total) * 100 : 0}%` }} />
-                  </div>
-                </div>
-              ))}
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              No academic indicator data matches this filter.
             </div>
           )}
         </div>
@@ -1152,9 +1393,19 @@ function GroupGradebook({
 
       {data && activeView === "ep" && (
         <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-          <div className="border-b border-foreground/8 px-4 py-3">
-            <p className="text-sm font-bold">Exam Performance</p>
-            <p className="text-xs text-muted-foreground">Best scores and exam attempts</p>
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/8 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Exam Performance</p>
+              <p className="text-xs text-muted-foreground">Student results for taken exams</p>
+            </div>
+            <PeriodFilter
+              month={examMonth}
+              year={examYear}
+              months={examPeriodOptions.months}
+              years={examPeriodOptions.years}
+              onMonthChange={setExamMonth}
+              onYearChange={setExamYear}
+            />
           </div>
           {examLabels.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
@@ -1164,21 +1415,21 @@ function GroupGradebook({
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-lg border border-foreground/8 bg-background p-3">
-                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Defined</span>
-                  <span className="mt-1 block text-lg font-bold">{examLabels.length}</span>
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Taken</span>
+                  <span className="mt-1 block text-lg font-bold">{examLabelsForPeriod.length}</span>
                 </div>
                 <div className="rounded-lg border border-foreground/8 bg-background p-3">
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
                   <span className="mt-1 block text-lg font-bold">
-                    {classExamAverage}
-                    {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
+                    {filteredClassExamAverage}
+                    {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
                   </span>
                 </div>
                 <div className="rounded-lg border border-foreground/8 bg-background p-3">
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Highest Score</span>
                   <span className="mt-1 block text-lg font-bold">
-                    {maxScore}
-                    {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}
+                    {filteredMaxScore}
+                    {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}
                   </span>
                 </div>
                 <div className="rounded-lg border border-foreground/8 bg-background p-3">
@@ -1192,41 +1443,48 @@ function GroupGradebook({
                   <h4 className="text-sm font-bold">Student Exam Performance</h4>
                   <p className="text-xs text-muted-foreground">Best exam score on the 1–9 scale</p>
                 </div>
-                <div className="overflow-x-auto pb-2">
-                  <div className="h-[320px] min-w-[34rem] sm:h-[340px] lg:h-[400px] lg:min-w-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={studentExamData} margin={{ top: 16, right: 12, left: -16, bottom: 56 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
-                      <XAxis
-                        dataKey="name"
-                        angle={-35}
-                        textAnchor="end"
-                        interval={0}
-                        height={82}
-                        tick={{ fontSize: 11 }}
-                        tickMargin={12}
-                        tickFormatter={shortTick}
-                        stroke="hsl(var(--muted-foreground))"
-                      />
-                      <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
-                        labelStyle={{ fontSize: 10, fontWeight: "bold" }}
-                      />
-                      <Bar dataKey="bestScore" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Best Score / 9" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                {hasFilteredExamScores ? (
+                  <div className="overflow-x-auto pb-2">
+                    <div
+                      className="h-[500px] sm:h-[540px]"
+                      style={{ minWidth: chartMinWidth(studentExamData.length) }}
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={studentExamData} margin={{ top: 20, right: 18, left: -10, bottom: 112 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                          <XAxis
+                            dataKey="name"
+                            interval={0}
+                            height={108}
+                            tick={<StudentNameTick />}
+                            tickLine={false}
+                            stroke="hsl(var(--muted-foreground))"
+                          />
+                          <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
+                            labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                          />
+                          <Bar dataKey="bestScore" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Best Score / 9" maxBarSize={48} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="py-16 text-center text-sm text-muted-foreground">
+                    No exam scores match this filter.
+                  </div>
+                )}
               </div>
 
+              {examLabelsForPeriod.length > 0 ? (
               <div className="overflow-hidden rounded-lg border border-foreground/8">
                 <div className="max-h-64 overflow-auto">
                   <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                       <tr>
                         <th className="sticky left-0 z-30 min-w-[180px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
-                        {examLabels.map((label) => (
+                        {examLabelsForPeriod.map((label) => (
                           <th key={label} className="min-w-[80px] border-l border-foreground/8 px-3 py-2 text-center">
                             {label}
                           </th>
@@ -1239,12 +1497,13 @@ function GroupGradebook({
                           <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
                             {en.fullName}
                           </td>
-                          {examLabels.map((label) => {
+                          {examLabelsForPeriod.map((label) => {
                             const score = en.exams?.[label];
-                            const displayScore = score !== undefined ? formatScoreOutOfNine(score) : "-";
+                            const scoreInPeriod = matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear);
+                            const displayScore = score !== undefined && scoreInPeriod ? formatScoreOutOfNine(score) : "-";
                             return (
                               <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
-                                <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
+                                <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined && scoreInPeriod ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
                                   {displayScore}
                                 </span>
                               </td>
@@ -1256,184 +1515,74 @@ function GroupGradebook({
                   </table>
                 </div>
               </div>
+              ) : null}
             </div>
           )}
         </div>
       )}
 
-      {data && activeView === "students" && (
-        <div className="space-y-3">
-          <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-            <div className="flex flex-wrap items-center justify-between border-b border-foreground/8 px-4 py-3 gap-3">
-              <div>
-                <p className="text-sm font-bold">Students List</p>
-                <p className="text-xs text-muted-foreground">Manage qualifications and view indicators</p>
+      {riskPanelOpen ? (
+        <div className="fixed inset-0 z-50 bg-foreground/45" onClick={() => setRiskPanelOpen(false)}>
+          <aside
+            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="At-risk students"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-foreground/8 px-5 py-4">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-base font-bold">
+                  <UserX className="h-4 w-4 text-red-500" />
+                  At-Risk Students
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Students flagged by low AAP or attendance rate
+                </p>
               </div>
-              <label className="relative block w-full sm:w-64">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="search"
-                  value={enrollmentSearch}
-                  onChange={(event) => setEnrollmentSearch(event.target.value)}
-                  placeholder="Search students..."
-                  className="h-8 w-full rounded-lg border border-foreground/10 bg-background pl-8 pr-3 text-xs outline-none focus:border-foreground/30"
-                />
-              </label>
+              <button
+                type="button"
+                onClick={() => setRiskPanelOpen(false)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
+                aria-label="Close at-risk students"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div className="max-h-64 overflow-auto">
-              <table className="w-full min-w-[600px] text-left text-xs">
-                <thead className="sticky top-0 z-20 bg-surface text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                  <tr>
-                    <th className="px-3 py-2">Student</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2 text-center">AAP /9</th>
-                    <th className="px-3 py-2 text-center">AR %</th>
-                    <th className="px-3 py-2 text-center">EP /9</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-foreground/5 bg-surface">
-                  {visibleActiveEnrollments.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-sm text-muted-foreground">No students found.</td>
-                    </tr>
-                  ) : (
-                    visibleActiveEnrollments.map((row) => {
-                      const isBanned = row.status === "banned";
-                      const examCount = Object.keys(row.exams || {}).length;
-                      
-                      // Calculate individual AR (allEnrollments rows may lack attendance)
-                      const attendanceValues = Object.values(row.attendance || {});
-                      const present = attendanceValues.filter(v => v === "present").length;
-                      const total = attendanceValues.filter(v => ["present", "absent", "justified"].includes(v)).length;
-                      const arVal = total > 0 ? Math.round((present / total) * 100) : 100;
-                      
-                      // Calculate individual EP (average exam score or missing count)
-                      let examScoreSum = 0;
-                      let examScoreCount = 0;
-                      if (row.exams) {
-                        Object.values(row.exams).forEach(score => {
-                          if (typeof score === "number") {
-                            const normalizedScore = scoreOutOfNine(score);
-                            if (normalizedScore <= 0) return;
-                            examScoreSum += normalizedScore;
-                            examScoreCount++;
-                          }
-                        });
-                      }
-                      const epAverage = examScoreCount > 0 ? examScoreSum / examScoreCount : 0;
-                      const epVal = examScoreCount > 0 ? `${formatScoreOutOfNine(epAverage)} / 9 (${examScoreCount} exams)` : "—";
-
-                      return (
-                        <tr
-                          key={row.enrollmentId}
-                          className="cursor-pointer hover:bg-foreground/[0.025]"
-                          onClick={() => {
-                            setSelectedStudent(row);
-                            setMoveGroupId("");
-                          }}
-                        >
-                          <td className="px-3 py-2">
-                            <p className="font-semibold">{row.fullName}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {row.publicDashboardId ? `Dashboard ID ${row.publicDashboardId}` : `Enrollment ID ${row.enrollmentId}`}
-                            </p>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className={`rounded-md px-2 py-1 text-[10px] font-bold uppercase ${isBanned ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
-                              {isBanned ? "Banned" : "Active"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold">{row.averageGrade > 0 ? row.averageGrade.toFixed(1) : "-"}</td>
-                          <td className="px-3 py-2 text-center font-bold">{arVal}%</td>
-                          <td className="px-3 py-2 text-center font-bold">{epVal}</td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              disabled={statusSavingId === row.enrollmentId}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedStudent(row);
-                                setMoveGroupId("");
-                              }}
-                              className="rounded-lg bg-muted px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-foreground/10 disabled:opacity-50"
-                            >
-                              Manage
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {atRiskStudents.length ? (
+                <div className="space-y-2">
+                  {atRiskStudents.map((row) => (
+                    <button
+                      key={row.enrollment.enrollmentId}
+                      type="button"
+                      onClick={() => {
+                        setRiskPanelOpen(false);
+                        setSelectedStudent(row.enrollment);
+                        setMoveGroupId("");
+                      }}
+                      className="w-full rounded-xl border border-foreground/8 bg-background p-3 text-left transition-colors hover:border-red-200 hover:bg-red-50/40 focus:outline-none focus:ring-2 focus:ring-red-200"
+                    >
+                      <span className="block break-words text-sm font-bold">{row.enrollment.fullName}</span>
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {row.reasons.map((reason) => (
+                          <span key={reason} className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">
+                            {reason}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-foreground/8 bg-background px-4 py-8 text-center text-sm text-muted-foreground">
+                  No students are currently marked at risk.
+                </div>
+              )}
             </div>
-          </div>
-          {removedEnrollments.length > 0 ? (
-            <div className="overflow-hidden rounded-xl border border-red-200 bg-red-50/45">
-              <div className="border-b border-red-200 px-3 py-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-red-700">Disqualified / banned students</p>
-              </div>
-              <div className="max-h-56 overflow-auto">
-                <table className="w-full min-w-[640px] text-left text-xs">
-                  <thead className="sticky top-0 z-20 bg-red-50 text-[10px] font-bold uppercase tracking-wider text-red-700 shadow-[0_1px_0_rgba(185,28,28,0.18)]">
-                    <tr>
-                      <th className="px-3 py-2">Student</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Reason</th>
-                      <th className="px-3 py-2 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-red-200/70">
-                    {visibleRemovedEnrollments.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-6 text-center text-sm text-red-700/70">No removed students match the search.</td>
-                      </tr>
-                    ) : (
-                      visibleRemovedEnrollments.map((row) => (
-                        <tr
-                          key={`${row.enrollmentId}-removed`}
-                          className="cursor-pointer hover:bg-red-100/50"
-                          onClick={() => {
-                            setSelectedStudent(row);
-                            setMoveGroupId("");
-                          }}
-                        >
-                          <td className="px-3 py-2">
-                            <p className="font-semibold text-red-950">{row.fullName}</p>
-                            <p className="text-[11px] text-red-700/75">
-                              {row.publicDashboardId ? `Dashboard ID ${row.publicDashboardId}` : `Enrollment ID ${row.enrollmentId}`}
-                            </p>
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="rounded-md bg-red-100 px-2 py-1 text-[10px] font-bold uppercase text-red-700">
-                              {row.status === "banned" ? "Banned" : "Disqualified"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-red-800/80">{row.disqualificationReason || "-"}</td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedStudent(row);
-                                setMoveGroupId("");
-                              }}
-                              className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"
-                            >
-                              Manage
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
+          </aside>
         </div>
-      )}
+      ) : null}
 
       {selectedStudent ? (
         <div className="fixed inset-0 z-50 bg-foreground/45" onClick={() => setSelectedStudent(null)}>
