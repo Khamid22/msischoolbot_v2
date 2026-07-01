@@ -1586,7 +1586,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-full flex-col gap-3">
       {zonesOpen && (
         <ZonesDrawer
           zoneRows={zoneRows}
@@ -1614,6 +1614,8 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       <ChartCard
         title="Subject Performance"
         icon={<BarChart3 className="h-4 w-4 text-info" />}
+        className="flex min-h-0 flex-1 flex-col"
+        bodyClassName="flex min-h-0 flex-1 flex-col"
         headerActions={
           <button
             type="button"
@@ -1626,7 +1628,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         }
       >
         {selectedSubjectRow ? (
-          <div className="space-y-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-foreground/8 bg-background/60 px-2.5 py-2">
               <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Scope</span>
               <select
@@ -1743,8 +1745,8 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               />
             </div>
 
-            <div className={`rounded-xl border p-3 ${graphBorderClass}`}>
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div className={`flex min-h-[34rem] flex-1 flex-col rounded-xl border p-3 ${graphBorderClass}`}>
+              <div className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold">Performance Graph</p>
                   <p className="text-xs text-muted-foreground">{graphTitle}</p>
@@ -1815,7 +1817,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               </div>
 
               {graphIsAll && graphLineLabels.length ? (
-                <div className="h-[22rem]">
+                <div className="min-h-[28rem] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={graphLineData} margin={{ top: 10, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -1851,7 +1853,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   </ResponsiveContainer>
                 </div>
               ) : graphBarRows.length ? (
-                <div className="h-[22rem]">
+                <div className="min-h-[28rem] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={graphBarRows} margin={{ top: 18, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -1869,7 +1871,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex h-[22rem] items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground">
+                <div className="flex min-h-[28rem] flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground">
                   No graph data for this selection yet.
                 </div>
               )}
