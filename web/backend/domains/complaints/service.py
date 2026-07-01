@@ -97,7 +97,7 @@ def _build_thread(conn, base):
     msi_v2.ticket_messages. The legacy flat `message`/`reply` fields are kept
     only as a fallback for older rows while the UI contract is being retired.
     """
-    queries.ensure_complaint_messages_schema(conn)
+    queries.ensure_ticket_messages_schema(conn)
     message_rows = [_message_from_row(r) for r in queries.list_complaint_message_rows(conn, base["id"])]
     if message_rows:
         staff_rows = [m for m in message_rows if m["author_role"] != "parent"]
@@ -149,8 +149,8 @@ def _complaint_payload(conn, row):
 
 def list_complaints(parent_admin_id=0):
     with _connect() as conn:
-        queries.ensure_parent_complaints_schema(conn)
-        queries.ensure_complaint_messages_schema(conn)
+        queries.ensure_support_tickets_schema(conn)
+        queries.ensure_ticket_messages_schema(conn)
         rows = queries.list_parent_complaint_rows(conn, int(parent_admin_id or 0))
         return [_complaint_payload(conn, row) for row in rows]
 
@@ -160,8 +160,8 @@ def get_complaint(complaint_id):
     if complaint_id <= 0:
         return None
     with _connect() as conn:
-        queries.ensure_parent_complaints_schema(conn)
-        queries.ensure_complaint_messages_schema(conn)
+        queries.ensure_support_tickets_schema(conn)
+        queries.ensure_ticket_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)
         if not row:
             return None
@@ -185,8 +185,8 @@ def create_complaint(parent_admin_id, student_row_id, payload):
     now = _utc_now_iso()
 
     with _connect() as conn:
-        queries.ensure_parent_complaints_schema(conn)
-        queries.ensure_complaint_messages_schema(conn)
+        queries.ensure_support_tickets_schema(conn)
+        queries.ensure_ticket_messages_schema(conn)
         parent_row = conn.execute(
             """
             SELECT id
@@ -228,8 +228,8 @@ def update_complaint(complaint_id, payload):
 
     now = _utc_now_iso()
     with _connect() as conn:
-        queries.ensure_parent_complaints_schema(conn)
-        queries.ensure_complaint_messages_schema(conn)
+        queries.ensure_support_tickets_schema(conn)
+        queries.ensure_ticket_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)
         if not row:
             return None
@@ -274,8 +274,8 @@ def add_complaint_reply(complaint_id, payload, *, author_role="admin", author_lo
 
     now = _utc_now_iso()
     with _connect() as conn:
-        queries.ensure_parent_complaints_schema(conn)
-        queries.ensure_complaint_messages_schema(conn)
+        queries.ensure_support_tickets_schema(conn)
+        queries.ensure_ticket_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)
         if not row:
             return None

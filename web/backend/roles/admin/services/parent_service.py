@@ -174,7 +174,7 @@ def _list_child_recent_lessons(conn, child_row):
 
 def _list_child_payment_records(conn, child_row):
     try:
-        queries.ensure_student_payments_schema(conn)
+        queries.ensure_payments_schema(conn)
         rows = queries.list_student_payment_rows(conn, int(child_row["id"]))
     except Exception:
         return []

@@ -163,7 +163,7 @@ def summarize_payment_records(records, progress=None):
 
 def list_student_payments(student_row_id):
     with _connect() as conn:
-        queries.ensure_student_payments_schema(conn)
+        queries.ensure_payments_schema(conn)
         rows = queries.list_student_payment_rows(conn, int(student_row_id))
     return [_payment_record_from_row(row) for row in rows]
 
@@ -195,7 +195,7 @@ def create_student_payment(student_row_id, payload, created_by_admin_id=0):
 
     with _connect() as conn:
         queries.ensure_students_schema(conn)
-        queries.ensure_student_payments_schema(conn)
+        queries.ensure_payments_schema(conn)
         student_row = queries.get_student_admin_row(conn, student_id)
         if not student_row:
             raise ValueError("Student was not found.")
@@ -242,7 +242,7 @@ def set_student_payment_paid(payment_id, paid=True, paid_at=None):
     now = _utc_now_iso()
 
     with _connect() as conn:
-        queries.ensure_student_payments_schema(conn)
+        queries.ensure_payments_schema(conn)
         row = queries.get_student_payment_row(conn, payment_id)
         if not row:
             return None
@@ -269,7 +269,7 @@ def delete_student_payment(payment_id):
         raise ValueError("Payment record is required.")
 
     with _connect() as conn:
-        queries.ensure_student_payments_schema(conn)
+        queries.ensure_payments_schema(conn)
         row = queries.get_student_payment_row(conn, payment_id)
         if not row:
             return None

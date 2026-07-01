@@ -21,7 +21,7 @@ def _serializer():
 
 
 def _ensure(conn):
-    queries.ensure_parent_invites_schema(conn)
+    queries.ensure_account_invites_schema(conn)
 
 
 def _expires_at(days=14):

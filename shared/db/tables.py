@@ -1,11 +1,3 @@
-"""Small v2-only schema guards.
-
-The canonical schema lives in scripts/rebuild_database_v2.sql. These helpers are
-kept for old callers that still ask for an ``ensure_*`` function, but none of
-them may create or mutate legacy public tables.
-"""
-
-
 def create_tables(conn):
     conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
 
@@ -26,23 +18,7 @@ def ensure_students_schema(conn):
     )
 
 
-def ensure_admins_schema(conn):
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_msi_staff_login_ci
-        ON msi_v2.msi_staff ((lower(login)))
-        """
-    )
-    conn.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_msi_staff_telegram_user_id
-        ON msi_v2.msi_staff(telegram_user_id)
-        WHERE telegram_user_id IS NOT NULL
-        """
-    )
-
-
-def ensure_parent_accounts_schema(conn):
+def ensure_parents_schema(conn):
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS msi_v2.parents (
@@ -74,7 +50,7 @@ def ensure_parent_accounts_schema(conn):
     )
 
 
-def ensure_parent_invites_schema(conn):
+def ensure_account_invites_schema(conn):
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS msi_v2.account_invites (
@@ -103,7 +79,7 @@ def ensure_parent_invites_schema(conn):
     )
 
 
-def ensure_parent_complaints_schema(conn):
+def ensure_support_tickets_schema(conn):
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS msi_v2.support_tickets (
@@ -130,7 +106,7 @@ def ensure_parent_complaints_schema(conn):
     )
 
 
-def ensure_complaint_messages_schema(conn):
+def ensure_ticket_messages_schema(conn):
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS msi_v2.ticket_messages (
@@ -152,7 +128,7 @@ def ensure_complaint_messages_schema(conn):
     )
 
 
-def ensure_student_payments_schema(conn):
+def ensure_payments_schema(conn):
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_payments_student_due
@@ -167,17 +143,13 @@ def ensure_student_payments_schema(conn):
     )
 
 
-def ensure_lesson_catalog_schema(conn):
+def ensure_curriculum_items_schema(conn):
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_subject_program_items_program_type_order
         ON msi_v2.subject_program_items(program_id, item_type, item_order)
         """
     )
-
-
-def ensure_teacher_auth_schema(conn):
-    ensure_admins_schema(conn)
 
 
 def ensure_resources_schema(conn):
@@ -325,18 +297,16 @@ def ensure_office_hours_schema(conn):
 
 __all__ = [
     "create_tables",
-    "ensure_admins_schema",
-    "ensure_parent_accounts_schema",
-    "ensure_parent_invites_schema",
-    "ensure_parent_complaints_schema",
-    "ensure_complaint_messages_schema",
-    "ensure_student_payments_schema",
+    "ensure_parents_schema",
+    "ensure_account_invites_schema",
+    "ensure_support_tickets_schema",
+    "ensure_ticket_messages_schema",
+    "ensure_payments_schema",
     "ensure_students_schema",
-    "ensure_lesson_catalog_schema",
+    "ensure_curriculum_items_schema",
     "ensure_resources_schema",
     "ensure_resource_comments_schema",
     "ensure_chat_schema",
     "ensure_teacher_candidates_schema",
-    "ensure_teacher_auth_schema",
     "ensure_office_hours_schema",
 ]

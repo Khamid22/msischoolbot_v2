@@ -23,7 +23,7 @@ def _is_cancelled_text(value):
 def _ensure_storage(conn):
     queries.create_tables(conn)
     queries.ensure_students_schema(conn)
-    queries.ensure_lesson_catalog_schema(conn)
+    queries.ensure_curriculum_items_schema(conn)
 
 
 def _load_dataset(load_dataset, force_refresh = False):
