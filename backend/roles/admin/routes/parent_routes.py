@@ -5,6 +5,7 @@ from backend.roles.admin.routes.request_payload import request_payload
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.parent_service import (
     assign_parent_child,
+    delete_parent_account,
     remove_parent_child,
 )
 
@@ -39,6 +40,19 @@ def register_admin_parent_routes(router):
 
         if not removed:
             return jsonify({"ok": False, "message": "Child assignment was not found."}), 404
+
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True})
+
+    @router.delete("/admin/parents/<int:parent_admin_id>")
+    def admin_delete_parent_account(parent_admin_id):
+        try:
+            deleted = delete_parent_account(parent_admin_id)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 400
+
+        if not deleted:
+            return jsonify({"ok": False, "message": "Parent account was not found."}), 404
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True})

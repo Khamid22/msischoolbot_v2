@@ -24,7 +24,7 @@ import { LinkStudentModal } from "./parents/LinkStudentModal";
 
 type Banner = { kind: "error" | "success"; text: string } | null;
 
-type ConfirmKind = "unlink";
+type ConfirmKind = "unlink" | "delete";
 type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
 
 const PAGE_DESCRIPTION = "Manage parent accounts, contact details, linked students, and support tickets.";
@@ -173,6 +173,16 @@ export default function ParentsPanel({ state }: { state: any }) {
     setBanner({ kind: "success", text: "Student unlinked." });
   }
 
+  async function deleteParent(parent: ParentRow) {
+    const id = parentAccountId(parent);
+    if (id <= 0) throw new Error("Parent account is required.");
+    await request("DELETE", routes.adminParentAccount(id));
+    setParents((current) => current.filter((p) => parentAccountId(p) !== id));
+    if (drawerParentId === id) setDrawerParentId(null);
+    if (linkParentId === id) setLinkParentId(null);
+    setBanner({ kind: "success", text: "Parent deleted." });
+  }
+
   function openTickets(parent: ParentRow) {
     const id = parentAccountId(parent);
     if (typeof state.setActiveParentId === "function") {
@@ -189,6 +199,8 @@ export default function ParentsPanel({ state }: { state: any }) {
     try {
       if (confirm.kind === "unlink" && confirm.child) {
         await unlinkChild(confirm.parent, confirm.child);
+      } else if (confirm.kind === "delete") {
+        await deleteParent(confirm.parent);
       }
       setConfirm(null);
     } catch (error) {
@@ -232,6 +244,7 @@ export default function ParentsPanel({ state }: { state: any }) {
     },
     onUnlinkChild: (parent, child) => setConfirm({ kind: "unlink", parent, child }),
     onOpenTickets: openTickets,
+    onDeleteParent: (parent) => setConfirm({ kind: "delete", parent }),
   };
 
   const confirmConfig: Record<ConfirmKind, { title: string; message: string; confirmLabel: string; danger: boolean }> = {
@@ -241,6 +254,14 @@ export default function ParentsPanel({ state }: { state: any }) {
         ? `Remove ${asString(confirm.child.full_name) || "this student"} from ${parentDisplayName(confirm.parent)}? The parent will lose access to this student.`
         : "Remove this student?",
       confirmLabel: "Unlink",
+      danger: true,
+    },
+    delete: {
+      title: "Delete parent",
+      message: confirm
+        ? `Delete ${parentDisplayName(confirm.parent)}? This only works when the parent has no linked students, tickets, or payment history.`
+        : "Delete this parent?",
+      confirmLabel: "Delete",
       danger: true,
     },
   };

@@ -1,4 +1,4 @@
-import { Eye, Link2, Link2Off, Ticket } from "lucide-react";
+import { Eye, Link2, Link2Off, Ticket, Trash2 } from "lucide-react";
 import { Badge } from "@/shared/ui/Badge";
 import { type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import {
@@ -14,6 +14,7 @@ export interface ParentHandlers {
   onUnlinkStudent: (parent: ParentRow) => void;
   onUnlinkChild: (parent: ParentRow, child: ParentRow) => void;
   onOpenTickets: (parent: ParentRow) => void;
+  onDeleteParent: (parent: ParentRow) => void;
 }
 
 /** Primary account/link status badges shown in the Account status column and drawer. */
@@ -67,6 +68,14 @@ export function buildParentMenuItems(parent: ParentRow, handlers: ParentHandlers
       label: "Open tickets",
       icon: <Ticket className="h-4 w-4" />,
       onClick: () => handlers.onOpenTickets(parent),
+    },
+    { separator: true, key: "danger-separator" },
+    {
+      key: "delete",
+      label: "Delete parent",
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: () => handlers.onDeleteParent(parent),
+      danger: true,
     },
   ];
 

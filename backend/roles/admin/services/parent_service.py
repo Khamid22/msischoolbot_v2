@@ -459,8 +459,64 @@ def remove_parent_child(parent_id, student_row_id):
     return int(deleted.rowcount or 0) > 0
 
 
+def delete_parent_account(parent_id):
+    parent_id = _normalize_positive_int(parent_id)
+    if not parent_id:
+        raise ValueError("Parent account is required.")
+
+    with _connect() as conn:
+        parent = conn.execute(
+            "SELECT id FROM msi_v2.parents WHERE id = %s",
+            (parent_id,),
+        ).fetchone()
+        if not parent:
+            raise ValueError("Parent account was not found.")
+
+        link_count = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM msi_v2.parent_student_links
+            WHERE parent_id = %s
+            """,
+            (parent_id,),
+        ).fetchone()
+        if _safe_int(link_count["count"] if link_count else 0) > 0:
+            raise ValueError("Unlink all students before deleting this parent.")
+
+        ticket_count = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM msi_v2.support_tickets
+            WHERE parent_id = %s
+            """,
+            (parent_id,),
+        ).fetchone()
+        if _safe_int(ticket_count["count"] if ticket_count else 0) > 0:
+            raise ValueError("Resolve or reassign this parent's tickets before deleting.")
+
+        message_count = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM msi_v2.ticket_messages
+            WHERE author_parent_id = %s
+            """,
+            (parent_id,),
+        ).fetchone()
+        if _safe_int(message_count["count"] if message_count else 0) > 0:
+            raise ValueError("This parent has ticket messages and cannot be deleted safely.")
+
+        deleted = conn.execute(
+            "DELETE FROM msi_v2.parents WHERE id = %s",
+            (parent_id,),
+        )
+        conn.commit()
+
+    return int(deleted.rowcount or 0) > 0
+
+
 __all__ = [
     "assign_parent_child",
+    "delete_parent_account",
     "list_linked_parents_for_student",
     "list_parent_accounts",
     "list_parent_children",

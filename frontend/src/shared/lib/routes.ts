@@ -54,6 +54,7 @@ export const routes = {
   adminAnnouncementApi: (announcementId: number | string) => `/admin/api/announcements/${announcementId}`,
   adminParentInvite: (studentRowId: number | string) =>
     `/admin/api/students/${studentRowId}/parent-invite`,
+  adminParentAccount: (parentAdminId: number | string) => `/admin/parents/${parentAdminId}`,
   adminParentChildrenFor: (parentAdminId: number | string) => `/admin/parents/${parentAdminId}/children`,
   adminParentChildFor: (parentAdminId: number | string, studentRowId: number | string) =>
     `/admin/parents/${parentAdminId}/children/${studentRowId}`,
