@@ -90,6 +90,24 @@ function MiniMetric({
   );
 }
 
+function CompactMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+      {icon}
+      <span className="font-bold text-foreground">{value}</span>
+      {label}
+    </span>
+  );
+}
+
 const subjectSwatches = [
   "bg-primary",
   "bg-info",
@@ -2580,35 +2598,42 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
             ) : null}
 
-            <section className="flex min-h-0 flex-col rounded-lg border border-foreground/10 bg-surface p-3 shadow-card lg:flex-1">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-info" />
-                    <h3 className="text-sm font-bold">Client Schools & Groups</h3>
+            <section className="flex min-h-0 flex-col rounded-lg border border-foreground/10 bg-surface p-2.5 shadow-card lg:flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Users className="h-4 w-4 text-info" />
+                      <h3 className="truncate text-sm font-bold">Client Schools & Groups</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <CompactMetric icon={<Layers className="h-3 w-3" />} label="groups" value={contextSummary.groups} />
+                      <CompactMetric icon={<Users className="h-3 w-3" />} label="students" value={contextSummary.activeStudents} />
+                      <CompactMetric icon={<BookMarked className="h-3 w-3" />} label="programs" value={contextSummary.programs} />
+                    </div>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown · open a group to manage its gradebook
+                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-wrap gap-1.5">
                   {!isTeacherMode ? (
                     <>
                       <button
                         type="button"
                         onClick={() => setManageSchoolsOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-muted"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-foreground/10 bg-background px-2.5 text-xs font-bold text-foreground hover:bg-muted"
                       >
-                        <Users className="h-4 w-4" />
+                        <Users className="h-3.5 w-3.5" />
                         Schools
                       </button>
                       <button
                         type="button"
                         disabled={schools.length === 0}
                         onClick={() => setAddGroupOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-3.5 w-3.5" />
                         Add Group
                       </button>
                     </>
@@ -2616,27 +2641,21 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <MiniMetric icon={<Layers className="h-3.5 w-3.5" />} label="Groups" value={contextSummary.groups} />
-                <MiniMetric icon={<Users className="h-3.5 w-3.5" />} label="Active Students" value={contextSummary.activeStudents} />
-                <MiniMetric icon={<BookMarked className="h-3.5 w-3.5" />} label="Subject Programs" value={contextSummary.programs} />
-              </div>
-
-              <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
+              <div className="-mx-0.5 mt-2 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
                 <button
                   type="button"
                   onClick={() => {
                     setGroupSchool("all");
                     setGroupSubject("all");
                   }}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors ${
                     groupSchool === "all"
                       ? "border-primary/50 bg-primary/10 text-primary"
                       : "border-foreground/10 bg-background text-foreground hover:bg-muted"
                   }`}
                 >
                   All Schools
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${groupSchool === "all" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${groupSchool === "all" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
                     {groups.length}
                   </span>
                 </button>
@@ -2652,14 +2671,14 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                         setGroupSchool(code);
                         setGroupSubject("all");
                       }}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors ${
                         active
                           ? "border-primary/50 bg-primary/10 text-primary"
                           : "border-foreground/10 bg-background text-foreground hover:bg-muted"
                       }`}
                     >
                       {asString(school.name)}
-                      <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {stats?.groups ?? 0}
                       </span>
                     </button>
@@ -2667,22 +2686,22 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 })}
               </div>
 
-              <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(220px,1fr),auto] lg:items-center">
+              <div className="mt-1.5 grid gap-1.5 xl:grid-cols-[minmax(220px,0.45fr),1fr] xl:items-center">
                 <label className="relative block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="search"
                     value={groupSearch}
                     onChange={(event) => setGroupSearch(event.target.value)}
                     placeholder="Search group, school, or subject"
-                    className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
+                    className="h-8 w-full rounded-md border border-foreground/10 bg-background pl-8 pr-2.5 text-xs font-semibold outline-none focus:border-foreground/30"
                   />
                 </label>
-                <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:max-w-[55vw]">
+                <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-0.5">
                   <button
                     type="button"
                     onClick={() => setGroupSubject("all")}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold transition-colors ${
+                    className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
                       groupSubject === "all"
                         ? "border-primary/50 bg-primary/10 text-primary"
                         : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -2696,7 +2715,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                       key={subject.name}
                       type="button"
                       onClick={() => setGroupSubject(subject.name)}
-                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-bold transition-colors ${
+                      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
                         groupSubject === subject.name
                           ? "border-primary/50 bg-primary/10 text-primary"
                           : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -2710,7 +2729,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
               </div>
 
-              <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-3">
+              <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-2">
                 {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
@@ -2721,7 +2740,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </p>
                 </div>
               ) : (
-                <div className="min-h-0 flex-1 overflow-auto p-0.5">
+                <div className="min-h-[32rem] flex-1 overflow-auto p-0.5">
                   <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                     {filteredGroups.map((group: Record<string, unknown>) => {
                       const id = asNumber(group.id);
