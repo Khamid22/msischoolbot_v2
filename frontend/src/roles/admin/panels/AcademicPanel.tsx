@@ -22,6 +22,7 @@ import {
   Bar,
   Cell,
   Legend,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -29,6 +30,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { routes } from "@/shared/lib/routes";
+import { motion } from "@/shared/lib/motion";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "./gradebookFormat";
 
@@ -109,7 +111,13 @@ function averageScore(values: Array<number | null | undefined>) {
 }
 
 function chartMinWidth(count: number) {
-  return Math.max(760, count * 132);
+  return Math.max(680, count * 124);
+}
+
+function formatBarLabel(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "";
+  return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(1);
 }
 
 function wrapWords(value: unknown, maxChars = 13, maxLines = 3) {
@@ -199,35 +207,37 @@ function PeriodFilter({
   onYearChange: (value: string) => void;
 }) {
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
         <Filter className="h-3.5 w-3.5" />
         Filter
       </span>
-      <select
-        value={month}
-        onChange={(event) => onMonthChange(event.target.value)}
-        className="h-9 min-w-[8.5rem] rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30"
-      >
-        <option value="all">All months</option>
-        {months.map((value) => (
-          <option key={value} value={value}>
-            {monthLabels.find((item) => item.value === value)?.label || value}
-          </option>
-        ))}
-      </select>
-      <select
-        value={year}
-        onChange={(event) => onYearChange(event.target.value)}
-        className="h-9 min-w-[6.5rem] rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30"
-      >
-        <option value="all">All years</option>
-        {years.map((value) => (
-          <option key={value} value={value}>
-            {value}
-          </option>
-        ))}
-      </select>
+      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+        <select
+          value={month}
+          onChange={(event) => onMonthChange(event.target.value)}
+          className="h-9 w-full min-w-0 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30 sm:min-w-[8.5rem]"
+        >
+          <option value="all">All months</option>
+          {months.map((value) => (
+            <option key={value} value={value}>
+              {monthLabels.find((item) => item.value === value)?.label || value}
+            </option>
+          ))}
+        </select>
+        <select
+          value={year}
+          onChange={(event) => onYearChange(event.target.value)}
+          className="h-9 w-full min-w-0 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30 sm:min-w-[6.5rem]"
+        >
+          <option value="all">All years</option>
+          {years.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
@@ -1094,11 +1104,15 @@ function GroupGradebook({
   const popLeft = active
     ? Math.min(active.anchorRect.left, window.innerWidth - 220)
     : 0;
+  const summaryMetricClass = `rounded-xl border border-foreground/8 bg-surface p-3 shadow-card ${motion.card}`;
+  const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
+  const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
+  const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${motion.panel}`}>
       {/* 1. Summary Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-surface px-4 py-3">
+      <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-surface px-4 py-3 shadow-card ${motion.card}`}>
         <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"
@@ -1144,15 +1158,15 @@ function GroupGradebook({
       {/* 2. Class Insights Cards */}
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+          <div className={summaryMetricClass}>
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average AAP</span>
             <span className="mt-1 block text-lg font-bold">{classAAPAverage} <span className="text-xs font-normal text-muted-foreground">/ 9.0</span></span>
           </div>
-          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+          <div className={summaryMetricClass}>
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance Rate</span>
             <span className="mt-1 block text-lg font-bold">{classAttendanceRate}%</span>
           </div>
-          <div className="rounded-xl border border-foreground/8 bg-surface p-3">
+          <div className={summaryMetricClass}>
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exam Avg Score</span>
             <span className="mt-1 block text-lg font-bold">
               {classExamAverage}
@@ -1162,7 +1176,7 @@ function GroupGradebook({
           <button
             type="button"
             onClick={() => setRiskPanelOpen(true)}
-            className="rounded-xl border border-foreground/8 bg-surface p-3 text-left transition-colors hover:border-red-200 hover:bg-red-50/30 focus:outline-none focus:ring-2 focus:ring-red-200"
+            className={`rounded-xl border border-foreground/8 bg-surface p-3 text-left shadow-card transition-colors hover:border-red-200 hover:bg-red-50/30 focus:outline-none focus:ring-2 focus:ring-red-200 ${motion.card}`}
             aria-label="Show at-risk students"
           >
             <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">At-Risk Students</span>
@@ -1186,7 +1200,7 @@ function GroupGradebook({
                 key={view}
                 type="button"
                 onClick={() => setActiveView(view)}
-                className={`border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap ${
+                className={`border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${motion.button} ${
                   isActive
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1308,7 +1322,7 @@ function GroupGradebook({
       )}
 
       {data && activeView === "academic" && (
-        <div className="rounded-xl border border-foreground/8 bg-surface p-4">
+        <div className={`${panelCardClass} p-4`}>
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-bold">Academic Indicators</h4>
@@ -1324,11 +1338,11 @@ function GroupGradebook({
             />
           </div>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+            <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
               <span className="mt-1 block text-lg font-bold">{academicAverageAAP ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
             </div>
-            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+            <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
               <span className="mt-1 block text-lg font-bold">
                 {academicAverageARRate ?? "—"}<span className="text-xs font-normal text-muted-foreground">%</span>
@@ -1337,28 +1351,28 @@ function GroupGradebook({
                 {academicAverageAR ?? "—"} / 9 score
               </span>
             </div>
-            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+            <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
               <span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
             </div>
-            <div className="rounded-lg border border-foreground/8 bg-background p-3">
+            <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Lessons Matched</span>
               <span className="mt-1 block text-lg font-bold">{indicatorLessons.length}</span>
             </div>
           </div>
           {hasAcademicIndicatorData ? (
-            <div className="overflow-x-auto pb-2">
+            <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
               <div
-                className="h-[520px] sm:h-[560px]"
+                className="h-[410px] sm:h-[440px] lg:h-[460px]"
                 style={{ minWidth: chartMinWidth(academicIndicatorData.length) }}
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={academicIndicatorData} margin={{ top: 20, right: 18, left: -10, bottom: 112 }}>
+                  <BarChart data={academicIndicatorData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                     <XAxis
                       dataKey="name"
                       interval={0}
-                      height={108}
+                      height={70}
                       tick={<StudentNameTick />}
                       tickLine={false}
                       stroke="hsl(var(--muted-foreground))"
@@ -1369,12 +1383,31 @@ function GroupGradebook({
                       labelStyle={{ fontSize: 11, fontWeight: "bold" }}
                     />
                     <Legend verticalAlign="top" height={28} />
-                    <Bar dataKey="AAP" name="AAP / 9" radius={[4, 4, 0, 0]} maxBarSize={42}>
+                    <Bar
+                      dataKey="AAP"
+                      name="AAP / 9"
+                      radius={[5, 5, 0, 0]}
+                      maxBarSize={42}
+                      isAnimationActive
+                      animationDuration={650}
+                      animationEasing="ease-out"
+                    >
+                      <LabelList dataKey="AAP" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-aap-${index}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />
                       ))}
                     </Bar>
-                    <Bar dataKey="AR" name="AR score / 9" radius={[4, 4, 0, 0]} maxBarSize={42}>
+                    <Bar
+                      dataKey="AR"
+                      name="AR score / 9"
+                      radius={[5, 5, 0, 0]}
+                      maxBarSize={42}
+                      isAnimationActive
+                      animationBegin={90}
+                      animationDuration={650}
+                      animationEasing="ease-out"
+                    >
+                      <LabelList dataKey="AR" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={formatBarLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-ar-${index}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />
                       ))}
@@ -1392,7 +1425,7 @@ function GroupGradebook({
       )}
 
       {data && activeView === "ep" && (
-        <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
+        <div className={`overflow-hidden ${panelCardClass}`}>
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/8 px-4 py-3">
             <div>
               <p className="text-sm font-bold">Exam Performance</p>
@@ -1414,48 +1447,48 @@ function GroupGradebook({
           ) : (
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Taken</span>
                   <span className="mt-1 block text-lg font-bold">{examLabelsForPeriod.length}</span>
                 </div>
-                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
                   <span className="mt-1 block text-lg font-bold">
                     {filteredClassExamAverage}
                     {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
                   </span>
                 </div>
-                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Highest Score</span>
                   <span className="mt-1 block text-lg font-bold">
                     {filteredMaxScore}
                     {hasFilteredExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}
                   </span>
                 </div>
-                <div className="rounded-lg border border-foreground/8 bg-background p-3">
+                <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">No Exam Score</span>
                   <span className="mt-1 block text-lg font-bold">{studentsWithMissingExams}</span>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-foreground/8 p-4">
+              <div className={chartPanelClass}>
                 <div className="mb-3">
                   <h4 className="text-sm font-bold">Student Exam Performance</h4>
                   <p className="text-xs text-muted-foreground">Best exam score on the 1–9 scale</p>
                 </div>
                 {hasFilteredExamScores ? (
-                  <div className="overflow-x-auto pb-2">
+                  <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
                     <div
-                      className="h-[500px] sm:h-[540px]"
+                      className="h-[390px] sm:h-[420px] lg:h-[445px]"
                       style={{ minWidth: chartMinWidth(studentExamData.length) }}
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={studentExamData} margin={{ top: 20, right: 18, left: -10, bottom: 112 }}>
+                        <BarChart data={studentExamData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                           <XAxis
                             dataKey="name"
                             interval={0}
-                            height={108}
+                            height={70}
                             tick={<StudentNameTick />}
                             tickLine={false}
                             stroke="hsl(var(--muted-foreground))"
@@ -1465,7 +1498,18 @@ function GroupGradebook({
                             contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
                             labelStyle={{ fontSize: 11, fontWeight: "bold" }}
                           />
-                          <Bar dataKey="bestScore" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Best Score / 9" maxBarSize={48} />
+                          <Bar
+                            dataKey="bestScore"
+                            fill="#3b82f6"
+                            radius={[5, 5, 0, 0]}
+                            name="Best Score / 9"
+                            maxBarSize={48}
+                            isAnimationActive
+                            animationDuration={650}
+                            animationEasing="ease-out"
+                          >
+                            <LabelList dataKey="bestScore" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1522,9 +1566,9 @@ function GroupGradebook({
       )}
 
       {riskPanelOpen ? (
-        <div className="fixed inset-0 z-50 bg-foreground/45" onClick={() => setRiskPanelOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-foreground/45 animate-in fade-in duration-150 motion-reduce:animate-none" onClick={() => setRiskPanelOpen(false)}>
           <aside
-            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover"
+            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover animate-in slide-in-from-right duration-200 motion-reduce:animate-none"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -1561,7 +1605,7 @@ function GroupGradebook({
                         setSelectedStudent(row.enrollment);
                         setMoveGroupId("");
                       }}
-                      className="w-full rounded-xl border border-foreground/8 bg-background p-3 text-left transition-colors hover:border-red-200 hover:bg-red-50/40 focus:outline-none focus:ring-2 focus:ring-red-200"
+                      className={`w-full rounded-xl border border-foreground/8 bg-background p-3 text-left hover:border-red-200 hover:bg-red-50/40 focus:outline-none focus:ring-2 focus:ring-red-200 ${motion.card}`}
                     >
                       <span className="block break-words text-sm font-bold">{row.enrollment.fullName}</span>
                       <span className="mt-2 flex flex-wrap gap-1.5">
@@ -1585,9 +1629,9 @@ function GroupGradebook({
       ) : null}
 
       {selectedStudent ? (
-        <div className="fixed inset-0 z-50 bg-foreground/45" onClick={() => setSelectedStudent(null)}>
+        <div className="fixed inset-0 z-50 bg-foreground/45 animate-in fade-in duration-150 motion-reduce:animate-none" onClick={() => setSelectedStudent(null)}>
           <aside
-            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover"
+            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover animate-in slide-in-from-right duration-200 motion-reduce:animate-none"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-foreground/8 px-5 py-4">
@@ -1679,7 +1723,7 @@ function GroupGradebook({
         <div
           ref={popRef}
           style={{ position: "fixed", top: popTop, left: popLeft, zIndex: 9999 }}
-          className="w-52 rounded-xl border border-foreground/10 bg-surface shadow-xl"
+          className="w-52 rounded-xl border border-foreground/10 bg-surface shadow-xl animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none"
         >
           <div className="flex items-center justify-between border-b border-foreground/8 px-3 py-2">
             <div className="min-w-0">
