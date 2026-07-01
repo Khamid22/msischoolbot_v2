@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Filter,
   Layers,
   Plus,
   RotateCcw,
@@ -2144,6 +2145,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [groupSearch, setGroupSearch] = useState("");
   const [groupSchool, setGroupSchool] = useState<string>(() => asString(schools[0]?.code) || "all");
   const [groupSubject, setGroupSubject] = useState("all");
+  const [groupFiltersOpen, setGroupFiltersOpen] = useState(false);
 
   const schoolNameByCode = useMemo(() => {
     const result = new Map<string, string>();
@@ -2237,6 +2239,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       return matchesQuery && matchesSchool && matchesSubject;
     });
   }, [groups, groupSearch, groupSchool, groupSubject, schoolNameByCode]);
+  const activeGroupFilterCount =
+    (groupSchool !== "all" ? 1 : 0) +
+    (groupSubject !== "all" ? 1 : 0) +
+    (groupSearch.trim() ? 1 : 0);
 
   const activeProgram =
     curriculumPrograms.find((program: Record<string, unknown>) => asNumber(program.id) === openProgramId) ||
@@ -2598,7 +2604,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
             ) : null}
 
-            <section className="flex min-h-0 flex-col rounded-lg border border-foreground/10 bg-surface p-2.5 shadow-card lg:flex-1">
+            <section className="relative flex min-h-0 flex-col rounded-lg border border-foreground/10 bg-surface p-2.5 shadow-card lg:flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -2617,6 +2623,24 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setGroupFiltersOpen((open) => !open)}
+                    className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors ${
+                      groupFiltersOpen || activeGroupFilterCount > 0
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "border-foreground/10 bg-background text-foreground hover:bg-muted"
+                    }`}
+                    aria-expanded={groupFiltersOpen}
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                    Filters
+                    {activeGroupFilterCount > 0 ? (
+                      <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">
+                        {activeGroupFilterCount}
+                      </span>
+                    ) : null}
+                  </button>
                   {!isTeacherMode ? (
                     <>
                       <button
@@ -2641,93 +2665,112 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
               </div>
 
-              <div className="-mx-0.5 mt-2 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGroupSchool("all");
-                    setGroupSubject("all");
-                  }}
-                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors ${
-                    groupSchool === "all"
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "border-foreground/10 bg-background text-foreground hover:bg-muted"
-                  }`}
-                >
-                  All Schools
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${groupSchool === "all" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                    {groups.length}
-                  </span>
-                </button>
-                {schools.map((school: Record<string, unknown>) => {
-                  const code = asString(school.code);
-                  const active = groupSchool === code;
-                  const stats = schoolStats.get(code);
-                  return (
+              {groupFiltersOpen ? (
+                <div className="absolute right-2 top-12 z-30 w-[min(42rem,calc(100vw-2rem))] rounded-lg border border-foreground/10 bg-surface p-3 shadow-card-hover">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Filters</p>
                     <button
-                      key={code}
                       type="button"
                       onClick={() => {
-                        setGroupSchool(code);
+                        setGroupSearch("");
+                        setGroupSchool("all");
                         setGroupSubject("all");
                       }}
-                      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors ${
-                        active
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : "border-foreground/10 bg-background text-foreground hover:bg-muted"
-                      }`}
+                      className="text-xs font-bold text-primary hover:text-primary/80"
                     >
-                      {asString(school.name)}
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
-                        {stats?.groups ?? 0}
-                      </span>
+                      Reset
                     </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-1.5 grid gap-1.5 xl:grid-cols-[minmax(220px,0.45fr),1fr] xl:items-center">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="search"
-                    value={groupSearch}
-                    onChange={(event) => setGroupSearch(event.target.value)}
-                    placeholder="Search group, school, or subject"
-                    className="h-8 w-full rounded-md border border-foreground/10 bg-background pl-8 pr-2.5 text-xs font-semibold outline-none focus:border-foreground/30"
-                  />
-                </label>
-                <div className="-mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setGroupSubject("all")}
-                    className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
-                      groupSubject === "all"
-                        ? "border-primary/50 bg-primary/10 text-primary"
-                        : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    All programs
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">{contextSummary.groups}</span>
-                  </button>
-                  {subjectFilterOptions.map((subject) => (
-                    <button
-                      key={subject.name}
-                      type="button"
-                      onClick={() => setGroupSubject(subject.name)}
-                      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
-                        groupSubject === subject.name
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${programColor(subject.name)}`} />
-                      {subject.name}
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">{subject.groups}</span>
-                    </button>
-                  ))}
+                  </div>
+                  <label className="relative mt-2 block">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={groupSearch}
+                      onChange={(event) => setGroupSearch(event.target.value)}
+                      placeholder="Search group, school, or subject"
+                      className="h-9 w-full rounded-md border border-foreground/10 bg-background pl-8 pr-2.5 text-xs font-semibold outline-none focus:border-foreground/30"
+                    />
+                  </label>
+                  <div className="mt-3 space-y-2">
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">School</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGroupSchool("all");
+                            setGroupSubject("all");
+                          }}
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                            groupSchool === "all"
+                              ? "border-primary/50 bg-primary/10 text-primary"
+                              : "border-foreground/10 bg-background text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          All Schools
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{groups.length}</span>
+                        </button>
+                        {schools.map((school: Record<string, unknown>) => {
+                          const code = asString(school.code);
+                          const active = groupSchool === code;
+                          const stats = schoolStats.get(code);
+                          return (
+                            <button
+                              key={code}
+                              type="button"
+                              onClick={() => {
+                                setGroupSchool(code);
+                                setGroupSubject("all");
+                              }}
+                              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                                active
+                                  ? "border-primary/50 bg-primary/10 text-primary"
+                                  : "border-foreground/10 bg-background text-foreground hover:bg-muted"
+                              }`}
+                            >
+                              {asString(school.name)}
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{stats?.groups ?? 0}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Program</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setGroupSubject("all")}
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                            groupSubject === "all"
+                              ? "border-primary/50 bg-primary/10 text-primary"
+                              : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          All programs
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{contextSummary.groups}</span>
+                        </button>
+                        {subjectFilterOptions.map((subject) => (
+                          <button
+                            key={subject.name}
+                            type="button"
+                            onClick={() => setGroupSubject(subject.name)}
+                            className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-bold transition-colors ${
+                              groupSubject === subject.name
+                                ? "border-primary/50 bg-primary/10 text-primary"
+                                : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${programColor(subject.name)}`} />
+                            {subject.name}
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{subject.groups}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-2">
                 {filteredGroups.length === 0 ? (
