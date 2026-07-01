@@ -2190,30 +2190,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     };
   }, [groupSchool, groups, schoolStats]);
 
-  const subjectsBySchool = useMemo(() => {
-    const map = new Map<
-      string,
-      { schoolName: string; schoolCode: string; subjects: Array<{ name: string; short: string }> }
-    >();
-    subjects.forEach((subject: Record<string, unknown>) => {
-      const schoolCode = asString(subject.school_code) || asString(subject.school_name) || "school";
-      const schoolName = asString(subject.school_name) || schoolCode;
-      const name = asString(subject.name);
-      if (!name) return;
-      const entry = map.get(schoolCode) ?? { schoolName, schoolCode, subjects: [] };
-      if (!entry.subjects.some((item) => normalizeSubjectKey(item.name) === normalizeSubjectKey(name))) {
-        entry.subjects.push({ name, short: asString(subject.short_name) });
-      }
-      map.set(schoolCode, entry);
-    });
-    return Array.from(map.values())
-      .map((entry) => ({
-        ...entry,
-        subjects: entry.subjects.sort((a, b) => a.name.localeCompare(b.name)),
-      }))
-      .sort((a, b) => a.schoolName.localeCompare(b.schoolName));
-  }, [subjects]);
-
   const filteredGroups = useMemo(() => {
     const query = groupSearch.trim().toLowerCase();
     return groups.filter((group: Record<string, unknown>) => {
@@ -2417,51 +2393,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
             </ChartCard>
 
-          <ChartCard title="Subjects in Use" subtitle="Which subjects each client school runs">
-            {subjectsBySchool.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center text-sm font-bold text-muted-foreground">
-                No subjects are attached to any school yet.
-              </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {subjectsBySchool.map((school) => (
-                  <div
-                    key={school.schoolCode}
-                    className="flex flex-col rounded-xl border border-foreground/8 bg-background p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <Users className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-bold leading-tight">{school.schoolName}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">{school.schoolCode}</p>
-                        </div>
-                      </div>
-                      <Pill>{school.subjects.length} subjects</Pill>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {school.subjects.map((subject) => (
-                        <span
-                          key={subject.name}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/8 bg-surface px-2.5 py-1.5 text-xs font-semibold"
-                        >
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${subjectSwatch(subject.name)}`} />
-                          {subject.name}
-                          {subject.short ? (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">
-                              {subject.short}
-                            </span>
-                          ) : null}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ChartCard>
         </div>
       ) : null}
 
