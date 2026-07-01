@@ -45,6 +45,21 @@ type MonthlyGroupRow = {
 };
 
 type ExamClassOption = { shortName: string; label: string; average: number | null; rows: Array<{ label: string; average: number | null }> };
+type GraphMetric = "academic" | "exam";
+type GraphLineSeries = {
+  key: string;
+  dataKey: string;
+  name: string;
+  yAxisId: "aap" | "ar" | "score";
+  color: string;
+  strokeDasharray?: string;
+};
+type AcademicBarRow = {
+  label: string;
+  aapAverage: number | null;
+  arAverage: number | null;
+  sortAverage: number | null;
+};
 type MonthOption = {
   index: number;
   key: string;
@@ -88,9 +103,31 @@ function averageGraphValue(values: unknown[]): number | null {
   return nums.reduce((sum, value) => sum + value, 0) / nums.length;
 }
 
+function normalizedAcademicAverage(aapValues: unknown[], arValues: unknown[]): number | null {
+  const normalized = [
+    ...aapValues
+      .map((value) => numericGraphValue(value))
+      .filter((value): value is number => value != null)
+      .map((value) => value / 9),
+    ...arValues
+      .map((value) => numericGraphValue(value))
+      .filter((value): value is number => value != null)
+      .map((value) => value / 100),
+  ];
+  if (!normalized.length) return null;
+  return normalized.reduce((sum, value) => sum + value, 0) / normalized.length;
+}
+
 function compareAverageRowsDesc<T extends { label: string; average: number | null }>(left: T, right: T): number {
   const leftAverage = left.average ?? Number.NEGATIVE_INFINITY;
   const rightAverage = right.average ?? Number.NEGATIVE_INFINITY;
+  if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+  return groupNameCollator.compare(right.label, left.label);
+}
+
+function compareAcademicRowsDesc<T extends { label: string; sortAverage: number | null }>(left: T, right: T): number {
+  const leftAverage = left.sortAverage ?? Number.NEGATIVE_INFINITY;
+  const rightAverage = right.sortAverage ?? Number.NEGATIVE_INFINITY;
   if (leftAverage !== rightAverage) return rightAverage - leftAverage;
   return groupNameCollator.compare(right.label, left.label);
 }
@@ -1282,7 +1319,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   const [selectedExam, setSelectedExam] = useState("");
   const [selectedTrendMonth, setSelectedTrendMonth] = useState("all");
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
-  const [graphMetric, setGraphMetric] = useState<"aap" | "attendance" | "exam">("aap");
+  const [graphMetric, setGraphMetric] = useState<GraphMetric>("academic");
   const [zonesOpen, setZonesOpen] = useState(false);
   const [zonesTab, setZonesTab] = useState<ZoneKey>("green");
 
@@ -1468,7 +1505,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       ? null
       : visibleMonthOptions.find((month: MonthOption) => month.key === selectedTrendMonth) ||
         visibleMonthOptions[visibleMonthOptions.length - 1];
-  const trendMonthRows = activeTrendMonth
+  const trendMonthRows: Array<{ label: string; average: number | null }> = activeTrendMonth
     ? monthlySeries
         .map((seriesRow: Record<string, unknown>) => {
           const rawValues = Array.isArray(seriesRow.values) ? (seriesRow.values as unknown[]) : [];
@@ -1489,7 +1526,16 @@ function SchoolOverviewPanel({ state }: { state: any }) {
           ) => compareAverageRowsDesc(a, b),
         )
     : [];
-  const monthlyClassLineData = visibleMonthOptions.map((monthOption: MonthOption) => {
+  const monthlyClassLineLabels = (monthlySeries as Array<Record<string, unknown>>)
+    .map((seriesRow) => asString(seriesRow.label))
+    .filter(Boolean);
+  const attendanceClassLineLabels = (filteredMonthlyArSeries as Array<Record<string, unknown>>)
+    .map((seriesRow) => asString(seriesRow.label))
+    .filter(Boolean);
+  const academicClassLabels = Array.from(new Set([...monthlyClassLineLabels, ...attendanceClassLineLabels]));
+  const academicAapKey = (label: string) => `${label} AAP`;
+  const academicArKey = (label: string) => `${label} AR`;
+  const academicClassLineData = visibleMonthOptions.map((monthOption: MonthOption) => {
     const point: Record<string, string | number | null> = {
       label: monthOption.label,
     };
@@ -1498,32 +1544,68 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       const rawValues = Array.isArray(seriesRow.values) ? (seriesRow.values as unknown[]) : [];
       const value = rawValues[monthOption.index];
       if (classLabel) {
-        point[classLabel] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
+        point[academicAapKey(classLabel)] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
       }
     });
-    return point;
-  });
-  const monthlyClassLineLabels = (monthlySeries as Array<Record<string, unknown>>)
-    .map((seriesRow) => asString(seriesRow.label))
-    .filter(Boolean);
-  const attendanceClassLineData = visibleMonthOptions.map((monthOption: MonthOption) => {
-    const point: Record<string, string | number | null> = {
-      label: monthOption.label,
-    };
     (filteredMonthlyArSeries as Array<Record<string, unknown>>).forEach((seriesRow) => {
       const classLabel = asString(seriesRow.label);
       const rawValues = Array.isArray(seriesRow.values) ? (seriesRow.values as unknown[]) : [];
       const value = rawValues[monthOption.index];
       if (classLabel) {
-        point[classLabel] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
+        point[academicArKey(classLabel)] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
       }
     });
     return point;
   });
-  const attendanceClassLineLabels = (filteredMonthlyArSeries as Array<Record<string, unknown>>)
-    .map((seriesRow) => asString(seriesRow.label))
-    .filter(Boolean);
-  const attendanceMonthRows = activeTrendMonth
+  const academicClassLineLabels = [...academicClassLabels].sort((left, right) => {
+    const leftAverage =
+      normalizedAcademicAverage(
+        academicClassLineData.map((row) => row[academicAapKey(left)]),
+        academicClassLineData.map((row) => row[academicArKey(left)]),
+      ) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage =
+      normalizedAcademicAverage(
+        academicClassLineData.map((row) => row[academicAapKey(right)]),
+        academicClassLineData.map((row) => row[academicArKey(right)]),
+      ) ?? Number.NEGATIVE_INFINITY;
+    if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+    return groupNameCollator.compare(right, left);
+  });
+  const academicClassLineSeries = academicClassLineLabels.flatMap((label, index): GraphLineSeries[] => {
+    const color = lineColors[index % lineColors.length];
+    return [
+      {
+        key: `aap-${label}`,
+        dataKey: academicAapKey(label),
+        name: `${label} AAP`,
+        yAxisId: "aap",
+        color,
+      },
+      {
+        key: `ar-${label}`,
+        dataKey: academicArKey(label),
+        name: `${label} AR`,
+        yAxisId: "ar",
+        color,
+        strokeDasharray: "5 4",
+      },
+    ];
+  });
+  const sortedAcademicClassLineData = [...academicClassLineData].sort((left, right) => {
+    const leftAverage =
+      normalizedAcademicAverage(
+        academicClassLineLabels.map((label) => left[academicAapKey(label)]),
+        academicClassLineLabels.map((label) => left[academicArKey(label)]),
+      ) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage =
+      normalizedAcademicAverage(
+        academicClassLineLabels.map((label) => right[academicAapKey(label)]),
+        academicClassLineLabels.map((label) => right[academicArKey(label)]),
+      ) ?? Number.NEGATIVE_INFINITY;
+    if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+    return groupNameCollator.compare(asString(right.label), asString(left.label));
+  });
+  const attendanceMonthRows: Array<{ label: string; average: number | null }> = activeTrendMonth
     ? (filteredMonthlyArSeries as Array<Record<string, unknown>>)
         .map((seriesRow) => {
           const rawValues = Array.isArray(seriesRow.values) ? (seriesRow.values as unknown[]) : [];
@@ -1537,29 +1619,39 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         .sort(compareAverageRowsDesc)
     : [];
   const graphViewValue = graphMetric === "exam" ? examSelectValue : selectedTrendMonth;
-  const rawGraphLineData =
-    graphMetric === "exam"
-      ? examClassLineData
-      : graphMetric === "attendance"
-        ? attendanceClassLineData
-        : monthlyClassLineData;
-  const rawGraphLineLabels =
-    graphMetric === "exam"
-      ? examClassLineLabels
-      : graphMetric === "attendance"
-        ? attendanceClassLineLabels
-        : monthlyClassLineLabels;
-  const graphLineData = [...rawGraphLineData].sort(compareLineRowsDesc(rawGraphLineLabels));
-  const graphLineLabels = [...rawGraphLineLabels].sort(compareLineLabelsDesc(rawGraphLineData));
+  const examGraphLineLabels = [...examClassLineLabels].sort(compareLineLabelsDesc(examClassLineData));
+  const examGraphLineData = [...examClassLineData].sort(compareLineRowsDesc(examGraphLineLabels));
+  const examGraphLineSeries = examGraphLineLabels.map((label, index): GraphLineSeries => ({
+    key: label,
+    dataKey: label,
+    name: label,
+    yAxisId: "score",
+    color: lineColors[index % lineColors.length],
+  }));
+  const graphLineData = graphMetric === "exam" ? examGraphLineData : sortedAcademicClassLineData;
+  const graphLineSeries = graphMetric === "exam" ? examGraphLineSeries : academicClassLineSeries;
+  const academicBarRows: AcademicBarRow[] = activeTrendMonth
+    ? Array.from(new Set([...trendMonthRows.map((row) => row.label), ...attendanceMonthRows.map((row) => row.label)]))
+        .map((label) => {
+          const aapAverage = trendMonthRows.find((row) => row.label === label)?.average ?? null;
+          const arAverage = attendanceMonthRows.find((row) => row.label === label)?.average ?? null;
+          return {
+            label,
+            aapAverage,
+            arAverage,
+            sortAverage: normalizedAcademicAverage([aapAverage], [arAverage]),
+          };
+        })
+        .filter((row) => row.aapAverage != null || row.arAverage != null)
+        .sort(compareAcademicRowsDesc)
+    : [];
   const graphBarRows =
     graphMetric === "exam"
       ? [...(activeExamOption?.rows || [])].sort(compareAverageRowsDesc)
-      : graphMetric === "attendance"
-        ? [...attendanceMonthRows].sort(compareAverageRowsDesc)
-        : [...trendMonthRows].sort(compareAverageRowsDesc);
+      : academicBarRows;
   const graphIsAll = graphViewValue === "all";
-  const graphDomain: [number, number] = graphMetric === "attendance" ? [0, 100] : [0, 9];
-  const graphStroke = graphMetric === "exam" ? "#4a5d7e" : graphMetric === "attendance" ? "#059669" : "#1e2d4a";
+  const graphDomain: [number, number] = [0, 9];
+  const graphStroke = graphMetric === "exam" ? "#4a5d7e" : "#1e2d4a";
   const graphGridStroke = "#e2e8f0";
   const graphBorderClass = "border-border bg-surface shadow-card relative overflow-hidden w-full";
   const graphTitle =
@@ -1567,18 +1659,22 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       ? graphIsAll
         ? "Class scores across all exams."
         : "Class averages for the selected exam."
-      : graphMetric === "attendance"
-        ? graphIsAll
-          ? "Class attendance across all months."
-          : "Class attendance for the selected month."
-        : graphIsAll
-          ? "Class AAP across all months."
-          : "Class AAP for the selected month.";
-  const graphValueLabel = graphMetric === "attendance" ? "Attendance" : graphMetric === "exam" ? "Exam score" : "AAP";
-  const formatGraphValue = (value: unknown) => {
+      : graphIsAll
+        ? "Class AAP and AR across all months."
+        : "Class AAP and AR for the selected month.";
+  const formatAapValue = (value: unknown) => {
     const numericValue = Number(value);
     if (!Number.isFinite(numericValue)) return "-";
-    return graphMetric === "attendance" ? `${numericValue.toFixed(1)}%` : numericValue.toFixed(1);
+    return numericValue.toFixed(1);
+  };
+  const formatArValue = (value: unknown) => {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return "-";
+    return `${numericValue.toFixed(1)}%`;
+  };
+  const formatGraphValue = (value: unknown, name?: unknown) => {
+    if (graphMetric === "academic" && asString(name).endsWith(" AR")) return formatArValue(value);
+    return formatAapValue(value);
   };
   const openZonesDrawer = () => {
     setZonesTab(zoneRows.red.length ? "red" : zoneRows.yellow.length ? "yellow" : "green");
@@ -1754,9 +1850,8 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="inline-flex items-center rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
                     {([
-                      { key: "aap", label: "AAP" },
-                      { key: "attendance", label: "Attendance" },
-                      { key: "exam", label: "Exam" },
+                      { key: "academic", label: "Academic Indicators" },
+                      { key: "exam", label: "Exam Performance" },
                     ] as const).map((option) => {
                       const active = graphMetric === option.key;
                       return (
@@ -1816,16 +1911,29 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                 </div>
               </div>
 
-              {graphIsAll && graphLineLabels.length ? (
+              {graphIsAll && graphLineSeries.length ? (
                 <div className="min-h-[28rem] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={graphLineData} margin={{ top: 10, right: 12, left: -6, bottom: 0 }}>
+                    <LineChart data={graphLineData} margin={{ top: 10, right: graphMetric === "academic" ? 4 : 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
                       <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
+                      {graphMetric === "academic" ? (
+                        <YAxis
+                          yAxisId="ar"
+                          orientation="right"
+                          domain={[0, 100]}
+                          tick={{ fontSize: 12 }}
+                          width={46}
+                          tickMargin={4}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                      ) : null}
                       <Tooltip
                         contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
-                        formatter={(value, name) => [formatGraphValue(value), asString(name)]}
+                        formatter={(value, name) => [formatGraphValue(value, name), asString(name)]}
                         labelFormatter={(label) =>
                           graphMetric === "exam"
                             ? examClassOptions.find((point) => point.shortName === label)?.label || asString(label)
@@ -1833,40 +1941,67 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                         }
                       />
                       <Legend iconSize={13} wrapperStyle={{ fontSize: 13, fontWeight: 700 }} />
-                      {graphLineLabels.map((label, index) => {
-                        const color = lineColors[index % lineColors.length];
-                        return (
-                          <Line
-                            key={label}
-                            type="monotone"
-                            dataKey={label}
-                            name={label}
-                            stroke={color}
-                            strokeWidth={3}
-                            dot={{ r: 4.5, fill: color, strokeWidth: 0 }}
-                            activeDot={{ r: 7, strokeWidth: 0 }}
-                            connectNulls
-                          />
-                        );
-                      })}
+                      {graphLineSeries.map((series) => (
+                        <Line
+                          key={series.key}
+                          yAxisId={series.yAxisId}
+                          type="monotone"
+                          dataKey={series.dataKey}
+                          name={series.name}
+                          stroke={series.color}
+                          strokeWidth={3}
+                          strokeDasharray={series.strokeDasharray}
+                          dot={{ r: 4.5, fill: series.color, strokeWidth: 0 }}
+                          activeDot={{ r: 7, strokeWidth: 0 }}
+                          connectNulls
+                        />
+                      ))}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               ) : graphBarRows.length ? (
                 <div className="min-h-[28rem] flex-1">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={graphBarRows} margin={{ top: 18, right: 12, left: -6, bottom: 0 }}>
+                    <BarChart data={graphBarRows} margin={{ top: 24, right: graphMetric === "academic" ? 4 : 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} interval={0} axisLine={false} tickLine={false} />
-                      <YAxis domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
+                      {graphMetric === "academic" ? (
+                        <YAxis
+                          yAxisId="ar"
+                          orientation="right"
+                          domain={[0, 100]}
+                          tick={{ fontSize: 12 }}
+                          width={46}
+                          tickMargin={4}
+                          axisLine={false}
+                          tickLine={false}
+                          tickFormatter={(value) => `${value}%`}
+                        />
+                      ) : null}
                       <Tooltip
                         contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
-                        formatter={(value) => [formatGraphValue(value), graphValueLabel]}
+                        formatter={(value, name) => {
+                          const label = asString(name);
+                          return [label === "AR" ? formatArValue(value) : formatAapValue(value), label];
+                        }}
                         labelFormatter={(label) => asString(label)}
                       />
-                      <Bar dataKey="average" name={graphValueLabel} fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48}>
-                        <LabelList dataKey="average" position="top" fontSize={12} fontWeight={700} fill={graphStroke} formatter={(value: number) => formatGraphValue(value)} />
-                      </Bar>
+                      {graphMetric === "exam" ? (
+                        <Bar yAxisId="score" dataKey="average" name="Exam score" fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48}>
+                          <LabelList dataKey="average" position="top" fontSize={12} fontWeight={700} fill={graphStroke} formatter={(value: number) => formatAapValue(value)} />
+                        </Bar>
+                      ) : (
+                        <>
+                          <Legend iconSize={13} wrapperStyle={{ fontSize: 13, fontWeight: 700 }} />
+                          <Bar yAxisId="aap" dataKey="aapAverage" name="AAP" fill="#1e2d4a" radius={[6, 6, 0, 0]} maxBarSize={38}>
+                            <LabelList dataKey="aapAverage" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={(value: number) => formatAapValue(value)} />
+                          </Bar>
+                          <Bar yAxisId="ar" dataKey="arAverage" name="AR" fill="#059669" radius={[6, 6, 0, 0]} maxBarSize={38}>
+                            <LabelList dataKey="arAverage" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={(value: number) => formatArValue(value)} />
+                          </Bar>
+                        </>
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
