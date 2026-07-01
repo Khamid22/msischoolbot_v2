@@ -23,18 +23,6 @@ const pageMap = {
 
 const ResolvedPage = pageMap[bootstrap.page] || pageMap["student-not-found"];
 
-function decodeParentStartToken(encodedToken: string): string {
-  try {
-    const padded = encodedToken.replace(/-/g, "+").replace(/_/g, "/").padEnd(
-      Math.ceil(encodedToken.length / 4) * 4,
-      "=",
-    );
-    return window.atob(padded);
-  } catch {
-    return "";
-  }
-}
-
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
 
@@ -118,14 +106,14 @@ const App = () => {
       } catch {
         alreadyHandled = false;
       }
-      const token = alreadyHandled ? "" : decodeParentStartToken(startParam.slice("parent_".length));
-      if (token) {
+      const inviteCode = alreadyHandled ? "" : startParam.slice("parent_".length).trim();
+      if (inviteCode) {
         try {
           window.sessionStorage.setItem(handledKey, "1");
         } catch {
           /* ignore */
         }
-        window.location.replace(`/parent/link/${encodeURIComponent(token)}`);
+        window.location.replace(`/parent/invite/${encodeURIComponent(inviteCode)}`);
       }
     }
   }, []);

@@ -1,10 +1,12 @@
 import os
+import json
 
 from fastapi import Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from backend.render import render_admin_redirect
-from backend.utils.telegram_auth import telegram_user_id_from_init_data
+from backend.utils.telegram_auth import telegram_user_id_from_init_data, verify_telegram_init_data
+from backend.identity.parent_invites import load_parent_invite_code_payload
 from backend.identity.account_service import (
     detect_login_role,
     get_student_by_telegram_user_id,
@@ -15,7 +17,7 @@ from backend.identity.account_service import (
     verify_student_credentials,
     verify_teacher_credentials,
 )
-from backend.roles.parent.services import parent_from_telegram_user_id
+from backend.roles.parent.services import link_parent_via_invite, parent_from_telegram_user_id
 from backend.utils.session import (
     build_dashboard_url,
     current_admin_role,
@@ -34,6 +36,68 @@ from backend.utils.limiter import limiter
 
 _ADMIN_HANDOFF_SALT = "admin-website-handoff"
 _ADMIN_HANDOFF_MAX_AGE_SECONDS = 180
+
+
+def _telegram_auth_context(init_data):
+    fields = verify_telegram_init_data(init_data)
+    if not fields:
+        return None
+    try:
+        user = json.loads(fields.get("user", ""))
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(user, dict):
+        return None
+    try:
+        telegram_user_id = int(user.get("id"))
+    except (TypeError, ValueError):
+        return None
+    if telegram_user_id <= 0:
+        return None
+
+    first_name = str(user.get("first_name") or "").strip()
+    last_name = str(user.get("last_name") or "").strip()
+    username = str(user.get("username") or "").strip().lstrip("@")
+    full_name = " ".join(part for part in (first_name, last_name) if part).strip()
+    if not full_name:
+        full_name = f"Telegram parent {telegram_user_id}"
+
+    return {
+        "telegram_user_id": telegram_user_id,
+        "full_name": full_name,
+        "telegram_username": username,
+        "start_param": str(fields.get("start_param") or "").strip(),
+    }
+
+
+def _link_parent_from_telegram_start_param(telegram_context):
+    if not isinstance(telegram_context, dict):
+        return None
+    start_param = str(telegram_context.get("start_param") or "").strip()
+    if not start_param.startswith("parent_"):
+        return None
+
+    invite_code = start_param.removeprefix("parent_").strip()
+    if not invite_code:
+        return None
+
+    payload = load_parent_invite_code_payload(invite_code)
+    if not payload:
+        return None
+    try:
+        student_row_id = int(payload.get("student_row_id") or 0)
+    except (TypeError, ValueError):
+        student_row_id = 0
+    if student_row_id <= 0:
+        return None
+
+    return link_parent_via_invite(
+        student_row_id,
+        full_name=str(telegram_context.get("full_name") or "").strip(),
+        phone="",
+        telegram_username=str(telegram_context.get("telegram_username") or "").strip(),
+        telegram_user_id=int(telegram_context["telegram_user_id"]),
+    )
 
 
 def _admin_handoff_serializer():
@@ -207,9 +271,16 @@ def register_user_auth_routes(
             json_body = request_proxy.get_json(silent=True) or {}
             init_data = str(json_body.get("init_data", "") or "").strip()
 
-        telegram_user_id = telegram_user_id_from_init_data(init_data)
-        if telegram_user_id is None:
+        telegram_context = _telegram_auth_context(init_data)
+        if not telegram_context:
             return jsonify({"ok": False, "error": "invalid_init_data"}), 401
+        telegram_user_id = int(telegram_context["telegram_user_id"])
+
+        invite_parent = _link_parent_from_telegram_start_param(telegram_context)
+        if invite_parent:
+            if not set_parent_session(invite_parent, telegram_user_id):
+                return jsonify({"ok": False, "error": "session_init_failed"}), 500
+            return jsonify({"ok": True, "linked": True, "role": "parent", "redirect": "/"})
 
         student = get_student_by_telegram_user_id(telegram_user_id)
         if not student:
