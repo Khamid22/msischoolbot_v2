@@ -2280,11 +2280,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 )}
               </select>
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              <Pill>{curriculumPrograms.length} programs</Pill>
-              <Pill>{curriculumItems.length} program rows</Pill>
-              <Pill>{subjects.length} DB subjects</Pill>
-            </div>
           </div>
 
           <ChartCard

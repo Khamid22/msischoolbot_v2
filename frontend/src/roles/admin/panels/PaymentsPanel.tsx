@@ -405,72 +405,114 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const progress = courseProgress(selectedChild);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(18rem,0.34fr)_minmax(0,1fr)]">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-lg border border-foreground/8 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <UserRound className="h-4 w-4 text-info" />
+            <h2 className="text-base font-bold">Payments</h2>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Parent accounts, linked students, debts, and payment records.
+          </p>
+        </div>
+        <label className="relative block w-full lg:max-w-xl">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search parents, students, or student codes"
+            className="h-10 w-full rounded-lg border border-foreground/10 bg-surface pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
+          />
+        </label>
+      </div>
+
       <ChartCard
         title="Parents"
-        subtitle={`${parents.length} account${parents.length === 1 ? "" : "s"}`}
+        subtitle={`Showing ${visibleParents.length} of ${parents.length} account${parents.length === 1 ? "" : "s"}`}
         icon={<UserRound className="h-4 w-4 text-info" />}
       >
-        <div className="space-y-3">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search parents, students, or student codes"
-              className="h-10 w-full rounded-lg border border-foreground/10 bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
-            />
-          </label>
-
-          <div className="max-h-[34rem] space-y-1.5 overflow-y-auto pr-1">
-            {visibleParents.map((parent) => {
-              const parentId = asNumber(parent.id);
-              const active = parentId === selectedParentResolvedId;
-              const count = parentChildren(parent).length;
-              const debt = familyTotals(parent).debt;
-              return (
-                <button
-                  key={parentId}
-                  type="button"
-                  onClick={() => selectParent(parentId)}
-                  className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                    active
-                      ? "border-foreground/20 bg-foreground text-background"
-                      : "border-foreground/10 bg-background hover:bg-muted"
-                  }`}
-                >
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                      active ? "bg-background/15 text-background" : "bg-muted text-foreground"
-                    }`}
+        <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
+          <table className="w-full min-w-[48rem] text-left">
+            <thead className="bg-muted/60">
+              <tr>
+                {["Parent", "Linked Students", "Family Debt", "Due", "Paid", "Action"].map((heading) => (
+                  <th
+                    key={heading}
+                    className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
                   >
-                    {initialsFor(parent.login)}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold">{asString(parent.login)}</span>
-                    <span
-                      className={`block truncate text-xs ${active ? "text-background/70" : "text-muted-foreground"}`}
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleParents.length ? (
+                visibleParents.map((parent) => {
+                  const parentId = asNumber(parent.id);
+                  const active = parentId === selectedParentResolvedId;
+                  const count = parentChildren(parent).length;
+                  const parentTotals = familyTotals(parent);
+                  const currency = parentTotals.currency || "UZS";
+                  return (
+                    <tr
+                      key={parentId}
+                      className={`border-t border-foreground/5 transition-colors ${
+                        active ? "bg-primary/5" : "hover:bg-muted/50"
+                      }`}
                     >
-                      {count} {count === 1 ? "student" : "students"}
-                    </span>
-                  </span>
-                  {debt > 0 ? (
-                    <span className="shrink-0 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">
-                      Debt {formatMoney(debt, familyTotals(parent).currency || "UZS")}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-            {!visibleParents.length ? (
-              <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-bold text-muted-foreground">
-                {query ? "No parents match your search." : "No parent accounts yet."}
-              </p>
-            ) : null}
-          </div>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-foreground">
+                            {initialsFor(parent.login)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">{asString(parent.login)}</p>
+                            <p className="truncate text-xs text-muted-foreground">Parent account</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm font-semibold text-muted-foreground">
+                        {count} {count === 1 ? "student" : "students"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm font-bold text-rose-700">
+                        {formatMoney(parentTotals.debt, currency)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-amber-700">
+                        {formatMoney(parentTotals.due, currency)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-sm font-semibold text-emerald-700">
+                        {formatMoney(parentTotals.paid, currency)}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => selectParent(parentId)}
+                          className={`inline-flex h-8 items-center rounded-lg px-3 text-xs font-bold ${
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "border border-foreground/10 bg-background text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {active ? "Selected" : "View"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-3 py-10 text-center text-sm font-bold text-muted-foreground">
+                    {query ? "No parents match your search." : "No parent accounts yet."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </ChartCard>
+
       <ChartCard
         title={selectedParent ? asString(selectedParent.login) : "Payments"}
         subtitle={
