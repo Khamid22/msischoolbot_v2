@@ -518,7 +518,7 @@ export default function StudentsPanel({ state }: { state: any }) {
           </p>
         )}
 
-        <div className="hidden min-h-0 flex-1 overflow-hidden rounded-lg border border-foreground/8 sm:block">
+        <div className="hidden min-h-0 flex-1 overflow-y-auto rounded-lg border border-foreground/8 sm:block">
           <table className="h-full w-full table-fixed text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">

@@ -143,11 +143,11 @@ export function ParentTable({
   className?: string;
 }) {
   return (
-    <div className={`min-h-0 ${className}`}>
+    <div className={`flex min-h-0 flex-col ${className}`}>
       {/* Desktop / laptop table */}
-      <div className="hidden min-h-0 overflow-visible rounded-lg border border-foreground/10 bg-white md:block">
+      <div className="hidden min-h-0 flex-1 overflow-auto rounded-lg border border-foreground/10 bg-white md:block">
         <table className="w-full min-w-[820px] table-fixed text-left text-xs">
-          <thead className="bg-muted/80 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+          <thead className="sticky top-0 z-10 bg-muted text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
             <tr>
               <th className="w-[22%] px-3 py-2">Parent</th>
               <th className="w-[20%] px-3 py-2">Contact</th>

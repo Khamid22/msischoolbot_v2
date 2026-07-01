@@ -1,5 +1,0 @@
-# Test/dev-only dependencies. Install with:
-#   pip install -r requirements.txt -r requirements-dev.txt
-pytest>=8.0
-# Only used by scripts/import_subject_programs_v2.py to read the SOW .xlsx files.
-openpyxl>=3.1

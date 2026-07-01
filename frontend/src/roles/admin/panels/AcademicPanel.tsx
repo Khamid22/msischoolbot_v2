@@ -100,9 +100,9 @@ const subjectSwatches = [
   "bg-violet-500",
 ] as const;
 
-function subjectSwatch(value: string) {
-  const seed = Array.from(value || "group").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return subjectSwatches[seed % subjectSwatches.length];
+function programInitials(value: unknown) {
+  const first = asString(value).trim().split(/\s+/)[0] || "";
+  return (first.slice(0, 2) || "—").toUpperCase();
 }
 
 const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -2166,6 +2166,20 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [groups, groupSchool]);
 
+  // Assign each distinct program a stable palette color (index-based, not hashed)
+  // so different programs are always visually distinct — the old hash collided.
+  const programColor = useMemo(() => {
+    const programNames = groups
+      .map((group: Record<string, unknown>) => asString(group.subject_name))
+      .filter((name: string) => Boolean(name));
+    const names = Array.from(new Set<string>(programNames)).sort((left: string, right: string) =>
+      left.localeCompare(right),
+    );
+    const map = new Map<string, string>();
+    names.forEach((name, index) => map.set(name, subjectSwatches[index % subjectSwatches.length]));
+    return (name: unknown) => map.get(asString(name)) ?? subjectSwatches[0];
+  }, [groups]);
+
   const selectedSchool =
     groupSchool === "all"
       ? null
@@ -2688,7 +2702,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                           : "border-foreground/10 bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
-                      <span className={`h-2 w-2 rounded-full ${subjectSwatch(subject.name)}`} />
+                      <span className={`h-2 w-2 rounded-full ${programColor(subject.name)}`} />
                       {subject.name}
                       <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px]">{subject.groups}</span>
                     </button>
@@ -2712,16 +2726,8 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </p>
                 </div>
               ) : (
-                <div className="max-h-[calc(var(--tg-app-height)-25rem)] min-h-[22rem] overflow-auto rounded-lg border border-foreground/10">
-                  <div className="sticky top-0 z-10 hidden border-b border-foreground/10 bg-muted px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:grid sm:grid-cols-[1.7fr_1.4fr_5rem_6.5rem_auto_1.5rem] sm:items-center sm:gap-3">
-                    <span>Group</span>
-                    <span>Subject Program</span>
-                    <span className="text-center">Active</span>
-                    <span className="text-center">Disqualified</span>
-                    <span>Status</span>
-                    <span />
-                  </div>
-                  <div className="divide-y divide-foreground/8">
+                <div className="max-h-[calc(var(--tg-app-height)-25rem)] min-h-[22rem] overflow-auto p-0.5">
+                  <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                     {filteredGroups.map((group: Record<string, unknown>) => {
                       const id = asNumber(group.id);
                       const name = asString(group.name);
@@ -2731,37 +2737,45 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                       const studentsCount = asNumber(group.students_count);
                       const disqualifiedCount = asNumber(group.disqualified_count);
                       const isActive = studentsCount > 0;
+                      const swatch = programColor(subjectName);
                       return (
                         <button
                           key={id}
                           type="button"
                           onClick={() => setOpenGroupId(id)}
-                          className="flex w-full flex-col gap-2 px-3 py-2.5 text-left transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:grid sm:grid-cols-[1.7fr_1.4fr_5rem_6.5rem_auto_1.5rem] sm:items-center sm:gap-3"
+                          className="group flex flex-col rounded-xl border border-foreground/10 bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                         >
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <span className={`h-8 w-8 shrink-0 rounded-lg ${subjectSwatch(subjectName)}`} aria-hidden="true" />
-                            <div className="min-w-0">
+                          <div className="flex items-start gap-3">
+                            <span
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${swatch}`}
+                              aria-hidden="true"
+                            >
+                              {programInitials(subjectName)}
+                            </span>
+                            <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-bold leading-tight">{name}</p>
                               <p className="truncate text-[11px] text-muted-foreground">
                                 {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
                               </p>
                             </div>
+                            <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
                           </div>
-                          <div className="min-w-0 text-sm">
-                            <span className="mr-1 text-[10px] font-bold uppercase text-muted-foreground sm:hidden">Program:</span>
-                            <span className="text-muted-foreground sm:text-foreground">{subjectName || "No program"}</span>
+
+                          <div className="mt-3 flex items-center gap-1.5">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${swatch}`} aria-hidden="true" />
+                            <span className="truncate text-xs font-semibold">{subjectName || "No program"}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 sm:justify-center">
-                            <span className="text-sm font-bold">{studentsCount}</span>
-                            <span className="text-[11px] text-muted-foreground sm:hidden">active students</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 sm:justify-center">
-                            <span className={`text-sm font-bold ${disqualifiedCount > 0 ? "text-amber-700" : "text-muted-foreground"}`}>
-                              {disqualifiedCount}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground sm:hidden">disqualified</span>
-                          </div>
-                          <div>
+
+                          <div className="mt-3 flex items-center justify-between border-t border-foreground/8 pt-3">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-lg font-bold leading-none">{studentsCount}</span>
+                              <span className="text-[11px] text-muted-foreground">active</span>
+                              {disqualifiedCount > 0 ? (
+                                <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                  {disqualifiedCount} disq.
+                                </span>
+                              ) : null}
+                            </div>
                             <span
                               className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
                                 isActive ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"
@@ -2769,9 +2783,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                             >
                               {isActive ? "Active" : "Empty"}
                             </span>
-                          </div>
-                          <div className="hidden items-center justify-end text-primary sm:flex">
-                            <ArrowRight className="h-4 w-4" />
                           </div>
                         </button>
                       );
