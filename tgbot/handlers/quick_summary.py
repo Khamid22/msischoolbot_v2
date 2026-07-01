@@ -3,7 +3,7 @@ import math
 from aiogram import F, Router
 
 from tgbot.helpers import escape, linked_admin_from_user, linked_student_from_user
-from shared.academics.performance_summary import get_subject_summaries_for_student
+from database.academics.performance_summary import get_subject_summaries_for_student
 
 router = Router()
 

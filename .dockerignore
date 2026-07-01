@@ -1,8 +1,8 @@
 .env
 .venv/
 node_modules/
-web/frontend/node_modules/
-web/frontend/dist/
+frontend/node_modules/
+frontend/dist/
 backups/
 __pycache__/
 *.py[cod]
@@ -11,5 +11,5 @@ __pycache__/
 .git/
 .github/
 .vscode/
-web/backend/static/uploads/
-web/backend/static/js/bundles/
+backend/static/uploads/
+backend/static/js/bundles/

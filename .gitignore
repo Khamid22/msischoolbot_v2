@@ -2,7 +2,7 @@
 .vscode/
 .venv/
 node_modules/
-web/frontend/node_modules/
+frontend/node_modules/
 .claude/worktrees/
 backups/
 __pycache__/
@@ -15,14 +15,14 @@ __pycache__/
 
 # Local environment and secrets
 .env
-web/.env
+.env
 credentials.json
 
 # Build/runtime artifacts
 *.log
 *.sqlite3
-web/backend/static/uploads/
-web/backend/static/js/bundles/
-web/frontend/dist/
+backend/static/uploads/
+backend/static/js/bundles/
+frontend/dist/
 # Vite output — rebuilt at deploy (Dockerfile/nixpacks/railpack run npm run build)
-web/backend/static/react/
+backend/static/react/

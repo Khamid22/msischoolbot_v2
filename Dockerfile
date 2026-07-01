@@ -12,11 +12,11 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY web/frontend/package*.json web/frontend/
-RUN cd web/frontend && npm ci
+COPY frontend/package*.json frontend/
+RUN cd frontend && npm ci
 
 COPY . .
-RUN cd web/frontend && npm run build
+RUN cd frontend && npm run build
 RUN chmod +x scripts/railway_start.sh
 
 EXPOSE 8080

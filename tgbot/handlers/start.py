@@ -7,9 +7,9 @@ from tgbot.keyboards.inline_keyboard import (
     student_menu_keyboard,
 )
 from tgbot.settings import settings
-from shared.identity.account_service import record_bot_user
-from shared.identity.parent_accounts import link_parent_via_invite
-from shared.identity.parent_invites import load_parent_invite_code_payload
+from backend.identity.account_service import record_bot_user
+from backend.identity.parent_accounts import link_parent_via_invite
+from backend.identity.parent_invites import load_parent_invite_code_payload
 
 router = Router()
 

@@ -4,7 +4,7 @@ import json
 import time
 from urllib.parse import urlencode
 
-from web.backend.utils.telegram_auth import telegram_user_from_init_data
+from backend.utils.telegram_auth import telegram_user_from_init_data
 
 
 def _signed_init_data(bot_token, fields):

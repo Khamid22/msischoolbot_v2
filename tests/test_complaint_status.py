@@ -5,7 +5,7 @@ new / in_progress / escalated / resolved, and the React helpdesk relies on
 aliases (open -> in_progress, closed/done -> resolved) resolving consistently.
 """
 
-from web.backend.domains.complaints.service import (
+from backend.domains.complaints.service import (
     _normalize_category,
     _normalize_status,
 )

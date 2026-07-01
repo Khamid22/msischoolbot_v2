@@ -7,7 +7,7 @@ import logging
 import threading
 
 from config import get_web_settings
-from shared.identity.account_service import init_storage
+from backend.identity.account_service import init_storage
 
 
 _ADDRESS_IN_USE_ERRNOS = {
@@ -124,7 +124,7 @@ def run_web_server():
     )
     try:
         uvicorn.run(
-            "web.backend.server:app",
+            "backend.server:app",
             host=host,
             port=port,
             log_level="info",

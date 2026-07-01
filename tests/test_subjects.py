@@ -1,6 +1,6 @@
 """Canonical subject rules — shared/academics/subjects.py."""
 
-from shared.academics.subjects import (
+from database.academics.subjects import (
     canonical_subject_name,
     split_subjects,
     subject_key,

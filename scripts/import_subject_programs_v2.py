@@ -16,11 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from shared.academics.curriculum import CurriculumItem, load_default_curricula
-from shared.db import queries
+from database.academics.curriculum import CurriculumItem, load_default_curricula
+from database import queries
 
 
-SCHEMA_SQL = PROJECT_ROOT / "scripts" / "rebuild_database_v2.sql"
+SCHEMA_SQL = PROJECT_ROOT / "database" / "rebuild_database_v2.sql"
 
 
 def _utc_now_iso() -> str:

@@ -1,6 +1,6 @@
 """School code canonicalization — shared/academics/schools.py."""
 
-from shared.academics.schools import (
+from database.academics.schools import (
     normalize_admin_school_filter,
     normalize_school_code,
     school_display_name,

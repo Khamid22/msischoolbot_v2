@@ -1,10 +1,10 @@
 import html
 
-from shared.identity.account_service import (
+from backend.identity.account_service import (
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
 )
-from shared.identity.parent_accounts import parent_from_telegram_user_id
+from backend.identity.parent_accounts import parent_from_telegram_user_id
 
 
 def escape(value):
