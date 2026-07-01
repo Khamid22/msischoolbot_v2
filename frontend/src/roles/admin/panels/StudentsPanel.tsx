@@ -523,7 +523,7 @@ export default function StudentsPanel({ state }: { state: any }) {
 
         <div className="hidden min-h-0 flex-1 overflow-hidden rounded-lg border border-foreground/8 sm:block">
           <table className="h-full w-full table-fixed text-left">
-            <thead className="sticky top-[calc(var(--app-top-inset)+7.75rem)] lg:top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+            <thead className="static lg:sticky lg:top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
                   <th
