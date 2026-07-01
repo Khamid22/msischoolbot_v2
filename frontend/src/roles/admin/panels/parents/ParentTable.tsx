@@ -144,9 +144,9 @@ export function ParentTable({
   return (
     <div className={`min-h-0 ${className}`}>
       {/* Desktop / laptop table */}
-      <div className="hidden h-full min-h-0 overflow-hidden rounded-lg border border-foreground/10 bg-background md:block">
-        <table className="h-full w-full min-w-[820px] table-fixed text-left text-xs">
-          <thead className="sticky top-0 z-10 bg-muted/90 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
+      <div className="hidden min-h-0 overflow-visible rounded-lg border border-foreground/10 bg-white md:block">
+        <table className="w-full min-w-[820px] table-fixed text-left text-xs">
+          <thead className="bg-muted/80 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
             <tr>
               <th className="w-[22%] px-3 py-2">Parent</th>
               <th className="w-[20%] px-3 py-2">Contact</th>
@@ -161,24 +161,24 @@ export function ParentTable({
               <tr
                 key={parentKey(parent)}
                 onClick={() => handlers.onView(parent)}
-                className="cursor-pointer transition-colors hover:bg-muted/40"
+                className="cursor-pointer bg-white transition-colors hover:bg-muted/30"
               >
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3">
                   <ParentIdentity parent={parent} onView={() => handlers.onView(parent)} />
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3">
                   <ContactCell parent={parent} />
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3">
                   <LinkedStudentsCell parent={parent} />
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3">
                   <ParentStatusBadges parent={parent} />
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-3">
                   <TicketsBadge parent={parent} onOpen={() => handlers.onOpenTickets(parent)} />
                 </td>
-                <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                <td className="relative px-3 py-3" onClick={(event) => event.stopPropagation()}>
                   <RowActions parent={parent} handlers={handlers} />
                 </td>
               </tr>
@@ -193,7 +193,7 @@ export function ParentTable({
           <div
             key={parentKey(parent)}
             onClick={() => handlers.onView(parent)}
-            className="cursor-pointer rounded-lg border border-foreground/10 bg-background p-3 shadow-card"
+            className="cursor-pointer rounded-lg border border-foreground/10 bg-white p-3 shadow-card"
           >
             <div className="flex items-start justify-between gap-2">
               <ParentIdentity parent={parent} onView={() => handlers.onView(parent)} />
