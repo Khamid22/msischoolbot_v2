@@ -34,17 +34,8 @@ def init_storage():
         if _STORAGE_READY:
             return
         with connect() as conn:
-            queries.create_tables(conn)
             ensure_clean_v2_schema(conn)
             queries.ensure_office_hours_schema(conn)
-            queries.ensure_admins_schema(conn)
-            queries.ensure_students_schema(conn)
-            queries.ensure_lesson_catalog_schema(conn)
-            queries.ensure_resources_schema(conn)
-            queries.ensure_resource_comments_schema(conn)
-            queries.ensure_chat_schema(conn)
-            queries.ensure_teacher_candidates_schema(conn)
-            queries.ensure_teacher_auth_schema(conn)
             queries.ensure_announcements_schema(conn)
             queries.ensure_default_resource_types(conn, utc_now_iso())
             ensure_owner_admin(conn)

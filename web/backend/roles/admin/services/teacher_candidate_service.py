@@ -43,7 +43,7 @@ def _row_to_candidate(row):
         "full_name": str(row["full_name"] or ""),
         "phone": str(row["phone"] or ""),
         "telegram_username": str(row["telegram_username"] or ""),
-        "email": str(row["email"] or ""),
+        "email": str(row.get("email") or ""),
         "subject": str(row["subject"] or ""),
         "source": str(row["source"] or ""),
         "status": str(row["status"] or "new"),
@@ -73,25 +73,45 @@ def _ensure_schema(conn):
     queries.ensure_teacher_candidates_schema(conn)
 
 
+def _subject_id_for_label(conn, subject):
+    raw = str(subject or "").strip()
+    if not raw:
+        return None
+    row = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.subjects
+        WHERE lower(subject_name) = lower(%s)
+           OR lower(subject_short) = lower(%s)
+           OR lower(subject_key) = lower(%s)
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (raw, raw, raw),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
 def list_teacher_candidates():
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
         candidate_rows = conn.execute(
             """
             SELECT
-                id,
-                full_name,
-                phone,
-                telegram_username,
-                email,
-                subject,
-                source,
-                status,
-                notes,
-                created_at,
-                updated_at
-            FROM teacher_candidates
-            ORDER BY updated_at DESC, id DESC
+                c.id,
+                c.full_name,
+                c.phone,
+                c.telegram_username,
+                '' AS email,
+                COALESCE(s.subject_name, '') AS subject,
+                c.source,
+                c.status,
+                c.notes,
+                c.created_at::text AS created_at,
+                c.updated_at::text AS updated_at
+            FROM msi_v2.teacher_candidates c
+            LEFT JOIN msi_v2.subjects s ON s.id = c.subject_id
+            ORDER BY c.updated_at DESC, c.id DESC
             """
         ).fetchall()
         event_rows = conn.execute(
@@ -104,9 +124,9 @@ def list_teacher_candidates():
                 score,
                 notes,
                 created_by,
-                created_at,
-                detail_json
-            FROM teacher_candidate_events
+                created_at::text AS created_at,
+                detail_json::text AS detail_json
+            FROM msi_v2.teacher_candidate_events
             ORDER BY created_at DESC, id DESC
             """
         ).fetchall()
@@ -139,29 +159,28 @@ def create_teacher_candidate(
     now = _utc_now_iso()
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
+        subject_id = _subject_id_for_label(conn, subject)
         row = conn.execute(
             """
-            INSERT INTO teacher_candidates (
+            INSERT INTO msi_v2.teacher_candidates (
                 full_name,
                 phone,
                 telegram_username,
-                email,
-                subject,
+                subject_id,
                 source,
                 status,
                 notes,
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, 'new', %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, 'new', %s, %s::timestamptz, %s::timestamptz)
             RETURNING id
             """,
             (
                 normalized_name,
                 str(phone or "").strip(),
                 str(telegram_username or "").strip(),
-                str(email or "").strip(),
-                str(subject or "").strip(),
+                subject_id,
                 str(source or "").strip(),
                 str(notes or "").strip(),
                 now,
@@ -171,7 +190,7 @@ def create_teacher_candidate(
         candidate_id = int(row["id"])
         conn.execute(
             """
-            INSERT INTO teacher_candidate_events (
+            INSERT INTO msi_v2.teacher_candidate_events (
                 candidate_id,
                 event_type,
                 result,
@@ -179,7 +198,7 @@ def create_teacher_candidate(
                 created_by,
                 created_at
             )
-            VALUES (%s, 'created', 'created', %s, %s, %s)
+            VALUES (%s, 'created', 'created', %s, %s, %s::timestamptz)
             """,
             (
                 candidate_id,
@@ -238,7 +257,7 @@ def update_teacher_candidate_status(
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
         existing = conn.execute(
-            "SELECT id FROM teacher_candidates WHERE id = %s",
+            "SELECT id FROM msi_v2.teacher_candidates WHERE id = %s",
             (parsed_candidate_id,),
         ).fetchone()
         if not existing:
@@ -246,15 +265,15 @@ def update_teacher_candidate_status(
 
         conn.execute(
             """
-            UPDATE teacher_candidates
-            SET status = %s, updated_at = %s
+            UPDATE msi_v2.teacher_candidates
+            SET status = %s, updated_at = %s::timestamptz
             WHERE id = %s
             """,
             (normalized_status, now, parsed_candidate_id),
         )
         conn.execute(
             """
-            INSERT INTO teacher_candidate_events (
+            INSERT INTO msi_v2.teacher_candidate_events (
                 candidate_id,
                 event_type,
                 result,
@@ -264,7 +283,7 @@ def update_teacher_candidate_status(
                 created_at,
                 detail_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::timestamptz, %s::jsonb)
             """,
             (
                 parsed_candidate_id,
@@ -293,10 +312,12 @@ def get_teacher_candidate(candidate_id):
         _ensure_schema(conn)
         row = conn.execute(
             """
-            SELECT id, full_name, phone, telegram_username, email, subject,
-                   source, status, notes, created_at, updated_at
-            FROM teacher_candidates
-            WHERE id = %s
+            SELECT c.id, c.full_name, c.phone, c.telegram_username, '' AS email,
+                   COALESCE(s.subject_name, '') AS subject, c.source, c.status,
+                   c.notes, c.created_at::text AS created_at, c.updated_at::text AS updated_at
+            FROM msi_v2.teacher_candidates c
+            LEFT JOIN msi_v2.subjects s ON s.id = c.subject_id
+            WHERE c.id = %s
             """,
             (parsed_candidate_id,),
         ).fetchone()
@@ -318,7 +339,7 @@ def get_teacher_candidate_training_summary(candidate_id):
         rows = conn.execute(
             """
             SELECT result, score, detail_json
-            FROM teacher_candidate_events
+            FROM msi_v2.teacher_candidate_events
             WHERE candidate_id = %s AND event_type = 'training_evaluation'
             """,
             (parsed_candidate_id,),
@@ -388,7 +409,7 @@ def update_candidate_event(
         _ensure_schema(conn)
         existing = conn.execute(
             """
-            SELECT id, event_type FROM teacher_candidate_events
+            SELECT id, event_type FROM msi_v2.teacher_candidate_events
             WHERE id = %s AND candidate_id = %s
             """,
             (parsed_event_id, parsed_candidate_id),
@@ -400,8 +421,8 @@ def update_candidate_event(
 
         conn.execute(
             """
-            UPDATE teacher_candidate_events
-            SET result = %s, score = %s, notes = %s, detail_json = %s
+            UPDATE msi_v2.teacher_candidate_events
+            SET result = %s, score = %s, notes = %s, detail_json = %s::jsonb
             WHERE id = %s AND candidate_id = %s
             """,
             (
@@ -414,7 +435,7 @@ def update_candidate_event(
             ),
         )
         conn.execute(
-            "UPDATE teacher_candidates SET updated_at = %s WHERE id = %s",
+            "UPDATE msi_v2.teacher_candidates SET updated_at = %s::timestamptz WHERE id = %s",
             (now, parsed_candidate_id),
         )
         conn.commit()
@@ -433,7 +454,7 @@ def delete_candidate_event(*, candidate_id, event_id):
         _ensure_schema(conn)
         existing = conn.execute(
             """
-            SELECT id, event_type FROM teacher_candidate_events
+            SELECT id, event_type FROM msi_v2.teacher_candidate_events
             WHERE id = %s AND candidate_id = %s
             """,
             (parsed_event_id, parsed_candidate_id),
@@ -444,11 +465,11 @@ def delete_candidate_event(*, candidate_id, event_id):
             return False, "Only training evaluations can be deleted."
 
         conn.execute(
-            "DELETE FROM teacher_candidate_events WHERE id = %s AND candidate_id = %s",
+            "DELETE FROM msi_v2.teacher_candidate_events WHERE id = %s AND candidate_id = %s",
             (parsed_event_id, parsed_candidate_id),
         )
         conn.execute(
-            "UPDATE teacher_candidates SET updated_at = %s WHERE id = %s",
+            "UPDATE msi_v2.teacher_candidates SET updated_at = %s::timestamptz WHERE id = %s",
             (now, parsed_candidate_id),
         )
         conn.commit()

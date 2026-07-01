@@ -392,8 +392,12 @@ def _create_tables_postgres(conn):
 
 
 def create_tables(conn):
-    _create_tables_postgres(conn)
-    ensure_academic_reference_schema(conn)
+    """Compatibility hook retained for old callers.
+
+    The live application now bootstraps the canonical msi_v2 schema from
+    scripts/rebuild_database_v2.sql. Do not recreate legacy public tables here.
+    """
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
 
 
 def ensure_students_schema(conn):
@@ -771,66 +775,52 @@ def ensure_resource_comments_schema(conn):
 def ensure_teacher_candidates_schema(conn):
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS teacher_candidates (
+        CREATE TABLE IF NOT EXISTS msi_v2.teacher_candidates (
             id BIGSERIAL PRIMARY KEY,
             full_name TEXT NOT NULL,
             phone TEXT NOT NULL DEFAULT '',
             telegram_username TEXT NOT NULL DEFAULT '',
-            email TEXT NOT NULL DEFAULT '',
-            subject TEXT NOT NULL DEFAULT '',
+            subject_id BIGINT REFERENCES msi_v2.subjects(id) ON DELETE SET NULL,
             source TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'new',
             notes TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            legacy_candidate_id BIGINT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
     )
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS telegram_username TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new'")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidates ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_teacher_candidates_status_updated
-        ON teacher_candidates(status, updated_at)
+        ON msi_v2.teacher_candidates(status, updated_at)
         """
     )
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_teacher_candidates_name_ci
-        ON teacher_candidates ((lower(full_name)))
+        ON msi_v2.teacher_candidates ((lower(full_name)))
         """
     )
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS teacher_candidate_events (
+        CREATE TABLE IF NOT EXISTS msi_v2.teacher_candidate_events (
             id BIGSERIAL PRIMARY KEY,
-            candidate_id BIGINT NOT NULL,
+            candidate_id BIGINT NOT NULL REFERENCES msi_v2.teacher_candidates(id) ON DELETE CASCADE,
             event_type TEXT NOT NULL,
             result TEXT NOT NULL DEFAULT '',
-            score DOUBLE PRECISION,
+            score NUMERIC(4, 1),
             notes TEXT NOT NULL DEFAULT '',
             created_by TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(candidate_id) REFERENCES teacher_candidates(id) ON DELETE CASCADE
+            detail_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
     )
-    conn.execute("ALTER TABLE teacher_candidate_events ADD COLUMN IF NOT EXISTS result TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidate_events ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION")
-    conn.execute("ALTER TABLE teacher_candidate_events ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidate_events ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE teacher_candidate_events ADD COLUMN IF NOT EXISTS detail_json TEXT NOT NULL DEFAULT '{}'")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_teacher_candidate_events_candidate_created
-        ON teacher_candidate_events(candidate_id, created_at)
+        ON msi_v2.teacher_candidate_events(candidate_id, created_at)
         """
     )
 

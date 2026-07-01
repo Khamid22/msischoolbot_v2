@@ -8,27 +8,26 @@ framework-free shared services can provision it without importing web services.
 def ensure_announcements_schema(conn):
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS announcements (
+        CREATE TABLE IF NOT EXISTS msi_v2.announcements (
             id BIGSERIAL PRIMARY KEY,
             title TEXT NOT NULL,
-            body TEXT NOT NULL,
+            body TEXT NOT NULL DEFAULT '',
             audience TEXT NOT NULL DEFAULT 'all',
-            priority TEXT NOT NULL DEFAULT 'info',
-            status TEXT NOT NULL DEFAULT 'draft',
-            pinned INTEGER NOT NULL DEFAULT 0,
-            author TEXT NOT NULL DEFAULT '',
-            views INTEGER NOT NULL DEFAULT 0,
-            published_at TEXT NOT NULL DEFAULT '',
-            scheduled_at TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            priority TEXT NOT NULL DEFAULT 'normal',
+            status TEXT NOT NULL DEFAULT 'published',
+            pinned BOOLEAN NOT NULL DEFAULT false,
+            author_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            legacy_announcement_id BIGINT,
+            published_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
     )
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_announcements_status_pinned
-        ON announcements(status, pinned, updated_at)
+        ON msi_v2.announcements(status, pinned, updated_at)
         """
     )
 

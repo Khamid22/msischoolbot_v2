@@ -46,10 +46,10 @@ def _row_to_dict(row):
         "priority": str(row["priority"] or "info"),
         "status": str(row["status"] or "draft"),
         "pinned": bool(row["pinned"]),
-        "author": str(row["author"] or ""),
-        "views": int(row["views"] or 0),
+        "author": str(row.get("author") or ""),
+        "views": int(row.get("views") or 0),
         "publishedAt": str(row["published_at"] or ""),
-        "scheduledAt": str(row["scheduled_at"] or ""),
+        "scheduledAt": str(row.get("scheduled_at") or ""),
         "createdAt": str(row["created_at"] or ""),
         "updatedAt": str(row["updated_at"] or ""),
     }
@@ -61,14 +61,16 @@ def list_announcements(include_drafts=True):
         if include_drafts:
             rows = conn.execute(
                 """
-                SELECT * FROM announcements
+                SELECT *, '' AS author, 0 AS views, '' AS scheduled_at
+                FROM msi_v2.announcements
                 ORDER BY pinned DESC, updated_at DESC, id DESC
                 """
             ).fetchall()
         else:
             rows = conn.execute(
                 """
-                SELECT * FROM announcements
+                SELECT *, '' AS author, 0 AS views, '' AS scheduled_at
+                FROM msi_v2.announcements
                 WHERE status = 'published'
                 ORDER BY pinned DESC, published_at DESC, updated_at DESC, id DESC
                 """
@@ -101,11 +103,11 @@ def create_announcement(
         ensure_announcements_schema(conn)
         cur = conn.execute(
             """
-            INSERT INTO announcements (
-                title, body, audience, priority, status, pinned, author, views,
-                published_at, scheduled_at, created_at, updated_at
+            INSERT INTO msi_v2.announcements (
+                title, body, audience, priority, status, pinned,
+                published_at, created_at, updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz, %s::timestamptz)
             RETURNING id
             """,
             (
@@ -114,10 +116,8 @@ def create_announcement(
                 _normalize_choice(audience, AUDIENCES, "all"),
                 _normalize_choice(priority, PRIORITIES, "info"),
                 normalized_status,
-                int(bool(pinned)),
-                str(author or "").strip(),
-                published_at,
-                str(scheduled_at or "").strip(),
+                bool(pinned),
+                published_at or None,
                 now,
                 now,
             ),
@@ -125,7 +125,10 @@ def create_announcement(
         inserted = cur.fetchone()
         announcement_id = int(inserted["id"] or 0) if inserted else 0
         conn.commit()
-        row = conn.execute("SELECT * FROM announcements WHERE id = %s", (announcement_id,)).fetchone()
+        row = conn.execute(
+            "SELECT *, '' AS author, 0 AS views, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
+            (announcement_id,),
+        ).fetchone()
     return _row_to_dict(row)
 
 
@@ -134,7 +137,7 @@ def update_announcement(announcement_id, **values):
     with _connect() as conn:
         ensure_announcements_schema(conn)
         existing = conn.execute(
-            "SELECT * FROM announcements WHERE id = %s",
+            "SELECT *, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
             (int(announcement_id),),
         ).fetchone()
         if not existing:
@@ -160,9 +163,9 @@ def update_announcement(announcement_id, **values):
 
         conn.execute(
             """
-            UPDATE announcements
+            UPDATE msi_v2.announcements
             SET title = %s, body = %s, audience = %s, priority = %s, status = %s,
-                pinned = %s, published_at = %s, scheduled_at = %s, updated_at = %s
+                pinned = %s, published_at = %s::timestamptz, updated_at = %s::timestamptz
             WHERE id = %s
             """,
             (
@@ -179,22 +182,17 @@ def update_announcement(announcement_id, **values):
                     "info",
                 ),
                 status,
-                int(bool(existing["pinned"] if values.get("pinned") is None else values.get("pinned"))),
-                published_at,
-                str(
-                    (
-                        existing["scheduled_at"]
-                        if values.get("scheduled_at") is None
-                        else values.get("scheduled_at")
-                    )
-                    or ""
-                ).strip(),
+                bool(existing["pinned"] if values.get("pinned") is None else values.get("pinned")),
+                published_at or None,
                 now,
                 int(announcement_id),
             ),
         )
         conn.commit()
-        row = conn.execute("SELECT * FROM announcements WHERE id = %s", (int(announcement_id),)).fetchone()
+        row = conn.execute(
+            "SELECT *, '' AS author, 0 AS views, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
+            (int(announcement_id),),
+        ).fetchone()
     return _row_to_dict(row)
 
 
@@ -202,7 +200,7 @@ def delete_announcement(announcement_id):
     with _connect() as conn:
         ensure_announcements_schema(conn)
         cur = conn.execute(
-            "DELETE FROM announcements WHERE id = %s",
+            "DELETE FROM msi_v2.announcements WHERE id = %s",
             (int(announcement_id),),
         )
         conn.commit()

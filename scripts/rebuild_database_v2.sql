@@ -547,9 +547,24 @@ CREATE TABLE IF NOT EXISTS msi_v2.teacher_candidates (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS msi_v2.teacher_candidate_events (
+    id BIGSERIAL PRIMARY KEY,
+    candidate_id BIGINT NOT NULL REFERENCES msi_v2.teacher_candidates(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    result TEXT NOT NULL DEFAULT '',
+    score NUMERIC(4, 1),
+    notes TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    detail_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_teacher_candidates_legacy_id
 ON msi_v2.teacher_candidates (legacy_candidate_id)
 WHERE legacy_candidate_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_teacher_candidate_events_candidate_created
+ON msi_v2.teacher_candidate_events (candidate_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS msi_v2.app_settings (
     key TEXT PRIMARY KEY,

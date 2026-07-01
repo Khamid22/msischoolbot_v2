@@ -74,7 +74,6 @@ def _resource_old_to_new_sort_key(row):
 
 def _ensure_storage(conn):
     queries.create_tables(conn)
-    queries.ensure_resources_schema(conn)
     queries.ensure_default_resource_types(conn, _utc_now_iso())
 
 

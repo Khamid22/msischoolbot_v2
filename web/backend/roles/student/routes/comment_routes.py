@@ -57,7 +57,7 @@ def register_comment_routes(students):
         with _DB_LOCK:
             with connect_chat_db() as conn:
                 exists = conn.execute(
-                    "SELECT 1 FROM resources WHERE id = %s AND is_active = 1",
+                    "SELECT 1 FROM msi_v2.resources WHERE id = %s AND is_active IS TRUE",
                     (resource_id,),
                 ).fetchone()
                 if not exists:
