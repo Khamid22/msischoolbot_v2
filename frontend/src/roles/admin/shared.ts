@@ -185,7 +185,7 @@ export const adminModeProfiles: Record<
   },
 };
 
-export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher", "student", "parent", "academic_director"];
+export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher", "student", "academic_director"];
 
 export function normalizeAdminMode(value: unknown): AdminMode {
   const normalized = asString(value).toLowerCase();
@@ -195,7 +195,6 @@ export function normalizeAdminMode(value: unknown): AdminMode {
     normalized === "sales" ||
     normalized === "teacher" ||
     normalized === "student" ||
-    normalized === "parent" ||
     normalized === "academic_director"
   ) {
     return normalized;

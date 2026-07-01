@@ -47,7 +47,6 @@ const AcademicPanel = lazy(() => import("@/roles/admin/panels/AcademicPanel"));
 const AnnouncementsPanel = lazy(() => import("@/roles/admin/panels/AnnouncementsPanel"));
 const ResourcesPanel = lazy(() => import("@/roles/admin/panels/ResourcesPanel"));
 const ChatPanel = lazy(() => import("@/roles/admin/panels/ChatPanel"));
-const ParentDashboard = lazy(() => import("@/roles/parent/pages/ParentDashboard"));
 const PaymentsPanel = lazy(() => import("@/roles/admin/panels/PaymentsPanel"));
 const ComplaintsPanel = lazy(() => import("@/roles/admin/panels/ComplaintsPanel"));
 const CareerGrowthPanel = lazy(() => import("@/roles/admin/panels/CareerGrowthPanel"));
@@ -442,12 +441,6 @@ function scopeTeacherState(state: any) {
 function ActivePanel({ state }: { state: any }) {
   const panelState = scopeTeacherState(state);
   const adminMode = asString(panelState.adminMode).toLowerCase();
-  if (
-    adminMode === "parent" &&
-    ["overview", "announcements", "payments", "contact"].includes(panelState.activeTab)
-  ) {
-    return <ParentDashboard state={panelState} />;
-  }
 
   // Role modes (CEO / Customer Support / HR) render their own components for the
   // tabs they specialize. Anything not overridden falls through to the default
