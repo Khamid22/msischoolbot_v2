@@ -2265,7 +2265,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   }
 
   return (
-    <div className="space-y-4">
+    <div className={kind === "groups" ? "flex flex-col gap-4 lg:h-full lg:min-h-0" : "space-y-4"}>
       {kind === "subjects" ? (
         <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -2580,7 +2580,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
             ) : null}
 
-            <section className="rounded-lg border border-foreground/10 bg-surface p-3 shadow-card">
+            <section className="flex min-h-0 flex-col rounded-lg border border-foreground/10 bg-surface p-3 shadow-card lg:flex-1">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -2710,7 +2710,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                 </div>
               </div>
 
-              <div className="mt-3 border-t border-foreground/8 pt-3">
+              <div className="mt-3 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-3">
                 {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
@@ -2721,7 +2721,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </p>
                 </div>
               ) : (
-                <div className="max-h-[calc(var(--tg-app-height)-25rem)] min-h-[22rem] overflow-auto p-0.5">
+                <div className="min-h-0 flex-1 overflow-auto p-0.5">
                   <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                     {filteredGroups.map((group: Record<string, unknown>) => {
                       const id = asNumber(group.id);
