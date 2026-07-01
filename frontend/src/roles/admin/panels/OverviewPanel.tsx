@@ -73,6 +73,57 @@ const candidateStatusLabels: Record<string, string> = {
 };
 
 const lineColors = ["#8b5cf6", "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#14b8a6", "#ec4899", "#64748b"];
+const groupNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function numericGraphValue(value: unknown): number | null {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function averageGraphValue(values: unknown[]): number | null {
+  const nums = values
+    .map((value) => numericGraphValue(value))
+    .filter((value): value is number => value != null);
+  if (!nums.length) return null;
+  return nums.reduce((sum, value) => sum + value, 0) / nums.length;
+}
+
+function compareAverageRowsDesc<T extends { label: string; average: number | null }>(left: T, right: T): number {
+  const leftAverage = left.average ?? Number.NEGATIVE_INFINITY;
+  const rightAverage = right.average ?? Number.NEGATIVE_INFINITY;
+  if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+  return groupNameCollator.compare(right.label, left.label);
+}
+
+function compareZoneGroupRowsDesc(left: Record<string, unknown>, right: Record<string, unknown>): number {
+  const groupCompare = groupNameCollator.compare(asString(right.group_name), asString(left.group_name));
+  if (groupCompare !== 0) return groupCompare;
+  return groupNameCollator.compare(asString(right.subject_name), asString(left.subject_name));
+}
+
+function lineRowAverage(row: Record<string, unknown>, labels: string[]): number | null {
+  return averageGraphValue(labels.map((label) => row[label]));
+}
+
+function compareLineRowsDesc(labels: string[]) {
+  return (left: Record<string, unknown>, right: Record<string, unknown>) => {
+    const leftAverage = lineRowAverage(left, labels) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage = lineRowAverage(right, labels) ?? Number.NEGATIVE_INFINITY;
+    if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+    const leftLabel = asString(left.shortName) || asString(left.label);
+    const rightLabel = asString(right.shortName) || asString(right.label);
+    return groupNameCollator.compare(rightLabel, leftLabel);
+  };
+}
+
+function compareLineLabelsDesc(data: Array<Record<string, unknown>>) {
+  return (left: string, right: string) => {
+    const leftAverage = averageGraphValue(data.map((row) => row[left])) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage = averageGraphValue(data.map((row) => row[right])) ?? Number.NEGATIVE_INFINITY;
+    if (leftAverage !== rightAverage) return rightAverage - leftAverage;
+    return groupNameCollator.compare(right, left);
+  };
+}
 
 const zoneStyles: Record<ZoneKey, { soft: string; text: string; ring: string; dot: string }> = {
   red: {
@@ -1310,7 +1361,6 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   const monthAverage = metricAverage(monthlyRows.map((row: MonthlyGroupRow) => row.current));
   const previousAverage = metricAverage(monthlyRows.map((row: MonthlyGroupRow) => row.previous));
   const monthDelta = monthAverage != null && previousAverage != null ? monthAverage - previousAverage : null;
-  const groupsWithData = monthlyRows.filter((row: MonthlyGroupRow) => row.current != null).length;
   const weakestRows = monthlyRows.filter((row: MonthlyGroupRow) => row.current != null).slice(0, 3);
   const monthArAverage = metricAverage(monthlyRows.map((row: MonthlyGroupRow) => row.monthly_ar));
   const prevMonthArAverage = useMemo(() => {
@@ -1324,9 +1374,15 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   const monthArDelta = monthArAverage != null && prevMonthArAverage != null ? monthArAverage - prevMonthArAverage : null;
 
   const zoneRows = {
-    red:    Array.isArray(props.adminGroupZones?.red)    ? props.adminGroupZones.red    : [],
-    yellow: Array.isArray(props.adminGroupZones?.yellow) ? props.adminGroupZones.yellow : [],
-    green:  Array.isArray(props.adminGroupZones?.green)  ? props.adminGroupZones.green  : [],
+    red: Array.isArray(props.adminGroupZones?.red)
+      ? [...props.adminGroupZones.red].sort(compareZoneGroupRowsDesc)
+      : [],
+    yellow: Array.isArray(props.adminGroupZones?.yellow)
+      ? [...props.adminGroupZones.yellow].sort(compareZoneGroupRowsDesc)
+      : [],
+    green: Array.isArray(props.adminGroupZones?.green)
+      ? [...props.adminGroupZones.green].sort(compareZoneGroupRowsDesc)
+      : [],
   } as Record<ZoneKey, Array<Record<string, unknown>>>;
 
   const examLabels = Array.isArray(selectedSubjectRow?.exam_labels)
@@ -1377,7 +1433,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
     rows: Array.from(bucket.classValues.entries())
       .map(([label, values]) => ({ label, average: metricAverage(values) }))
       .filter((row) => row.average != null)
-      .sort((a, b) => (a.average ?? -1) - (b.average ?? -1)),
+      .sort(compareAverageRowsDesc),
   })).sort((a, b) => {
     const ai = EXAM_ORDER.indexOf(a.shortName || "");
     const bi = EXAM_ORDER.indexOf(b.shortName || "");
@@ -1430,7 +1486,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
           (
             a: { label: string; average: number | null },
             b: { label: string; average: number | null },
-          ) => (a.average ?? -1) - (b.average ?? -1),
+          ) => compareAverageRowsDesc(a, b),
         )
     : [];
   const monthlyClassLineData = visibleMonthOptions.map((monthOption: MonthOption) => {
@@ -1478,27 +1534,29 @@ function SchoolOverviewPanel({ state }: { state: any }) {
           };
         })
         .filter((row) => row.label && row.average != null)
-        .sort((a, b) => (a.average ?? -1) - (b.average ?? -1))
+        .sort(compareAverageRowsDesc)
     : [];
   const graphViewValue = graphMetric === "exam" ? examSelectValue : selectedTrendMonth;
-  const graphLineData =
+  const rawGraphLineData =
     graphMetric === "exam"
       ? examClassLineData
       : graphMetric === "attendance"
         ? attendanceClassLineData
         : monthlyClassLineData;
-  const graphLineLabels =
+  const rawGraphLineLabels =
     graphMetric === "exam"
       ? examClassLineLabels
       : graphMetric === "attendance"
         ? attendanceClassLineLabels
         : monthlyClassLineLabels;
+  const graphLineData = [...rawGraphLineData].sort(compareLineRowsDesc(rawGraphLineLabels));
+  const graphLineLabels = [...rawGraphLineLabels].sort(compareLineLabelsDesc(rawGraphLineData));
   const graphBarRows =
     graphMetric === "exam"
-      ? activeExamOption?.rows || []
+      ? [...(activeExamOption?.rows || [])].sort(compareAverageRowsDesc)
       : graphMetric === "attendance"
-        ? attendanceMonthRows
-        : trendMonthRows;
+        ? [...attendanceMonthRows].sort(compareAverageRowsDesc)
+        : [...trendMonthRows].sort(compareAverageRowsDesc);
   const graphIsAll = graphViewValue === "all";
   const graphDomain: [number, number] = graphMetric === "attendance" ? [0, 100] : [0, 9];
   const graphStroke = graphMetric === "exam" ? "#4a5d7e" : graphMetric === "attendance" ? "#059669" : "#1e2d4a";
@@ -1522,20 +1580,10 @@ function SchoolOverviewPanel({ state }: { state: any }) {
     if (!Number.isFinite(numericValue)) return "-";
     return graphMetric === "attendance" ? `${numericValue.toFixed(1)}%` : numericValue.toFixed(1);
   };
-  const criticalRows = monthlyRows
-    .filter((row: MonthlyGroupRow) => row.current != null && row.current < 5)
-    .slice(0, 3);
-  const watchRows = monthlyRows
-    .filter((row: MonthlyGroupRow) => row.current != null && row.current >= 5 && row.current < 7)
-    .slice(0, 3);
-  const attendanceRiskRows = monthlyRows
-    .filter((row: MonthlyGroupRow) => row.display_ar != null && row.display_ar < 70)
-    .sort((left: MonthlyGroupRow, right: MonthlyGroupRow) => (left.display_ar ?? 999) - (right.display_ar ?? 999))
-    .slice(0, 3);
-  const fallingTrendRows = monthlyRows
-    .filter((row: MonthlyGroupRow) => row.delta != null && row.delta < 0)
-    .sort((left: MonthlyGroupRow, right: MonthlyGroupRow) => (left.delta ?? 0) - (right.delta ?? 0))
-    .slice(0, 3);
+  const openZonesDrawer = () => {
+    setZonesTab(zoneRows.red.length ? "red" : zoneRows.yellow.length ? "yellow" : "green");
+    setZonesOpen(true);
+  };
 
   return (
     <div className="space-y-3">
@@ -1547,11 +1595,6 @@ function SchoolOverviewPanel({ state }: { state: any }) {
           onClose={() => setZonesOpen(false)}
         />
       )}
-
-      <div className="flex flex-col gap-0.5 pb-1">
-        <h1 className="text-xl font-bold tracking-tight text-foreground">Academic Analytics Overview</h1>
-        <p className="text-xs text-muted-foreground">Real-time overview of students, schools, performance trends, and attendance risks.</p>
-      </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 shadow-card">
         {[
@@ -1573,6 +1616,14 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         icon={<BarChart3 className="h-4 w-4 text-info" />}
         headerActions={
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={openZonesDrawer}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-surface px-3 text-xs font-bold text-foreground hover:bg-muted"
+            >
+              <AlertCircle className="h-3.5 w-3.5" />
+              Action Queue
+            </button>
             <select
               value={selectedOverviewSchool}
               onChange={(event) => {
@@ -1619,7 +1670,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       >
         {selectedSubjectRow ? (
           <div className="space-y-3">
-            <div className="grid gap-2 md:grid-cols-4">
+            <div className="grid gap-2 md:grid-cols-3">
               <Indicator
                 label="AAP"
                 value={monthAverage == null ? "-" : monthAverage.toFixed(1)}
@@ -1643,12 +1694,6 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                       ? "No previous data"
                       : `${deltaLabel(monthArDelta)} from previous`
                 }
-              />
-              <Indicator
-                label="Groups"
-                value={`${groupsWithData}/${monthlyRows.length}`}
-                tone="info"
-                detail="with data"
               />
               <Indicator
                 label="Needs Attention"
@@ -1761,8 +1806,8 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={graphLineData} margin={{ top: 10, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
-                      <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <YAxis domain={graphDomain} tick={{ fontSize: 10 }} width={36} tickMargin={4} axisLine={false} tickLine={false} />
+                      <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
                         formatter={(value, name) => [formatGraphValue(value), asString(name)]}
@@ -1772,7 +1817,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                             : asString(label)
                         }
                       />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Legend iconSize={13} wrapperStyle={{ fontSize: 13, fontWeight: 700 }} />
                       {graphLineLabels.map((label, index) => {
                         const color = lineColors[index % lineColors.length];
                         return (
@@ -1782,9 +1827,9 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                             dataKey={label}
                             name={label}
                             stroke={color}
-                            strokeWidth={2.5}
-                            dot={{ r: 2.5, fill: color, strokeWidth: 0 }}
-                            activeDot={{ r: 4, strokeWidth: 0 }}
+                            strokeWidth={3}
+                            dot={{ r: 4.5, fill: color, strokeWidth: 0 }}
+                            activeDot={{ r: 7, strokeWidth: 0 }}
                             connectNulls
                           />
                         );
@@ -1797,15 +1842,15 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={graphBarRows} margin={{ top: 18, right: 12, left: -6, bottom: 0 }}>
                       <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false} />
-                      <YAxis domain={graphDomain} tick={{ fontSize: 10 }} width={36} tickMargin={4} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} interval={0} axisLine={false} tickLine={false} />
+                      <YAxis domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
                         formatter={(value) => [formatGraphValue(value), graphValueLabel]}
                         labelFormatter={(label) => asString(label)}
                       />
                       <Bar dataKey="average" name={graphValueLabel} fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48}>
-                        <LabelList dataKey="average" position="top" fontSize={9} fill={graphStroke} formatter={(value: number) => formatGraphValue(value)} />
+                        <LabelList dataKey="average" position="top" fontSize={12} fontWeight={700} fill={graphStroke} formatter={(value: number) => formatGraphValue(value)} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1817,101 +1862,6 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               )}
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-bold">Action Queue</p>
-                  <p className="text-xs text-muted-foreground">A quick read on what needs follow-up.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setZonesTab(zoneRows.red.length ? "red" : zoneRows.yellow.length ? "yellow" : "green");
-                    setZonesOpen(true);
-                  }}
-                  className="h-8 rounded-lg border border-foreground/10 bg-surface px-3 text-xs font-bold text-foreground hover:bg-muted"
-                >
-                  View Zones
-                </button>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg border border-rose-100 bg-rose-50/70 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-rose-700">Critical Performance</p>
-                    <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-rose-700">{zoneRows.red.length}</span>
-                  </div>
-                  {criticalRows.length ? (
-                    <div className="space-y-1.5">
-                      {criticalRows.map((row: MonthlyGroupRow) => (
-                        <div key={row.label} className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
-                          <span className="truncate font-bold">{row.label}</span>
-                          <span className="shrink-0 font-bold text-rose-700">{row.current?.toFixed(1)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs leading-5 text-rose-700/75">No selected groups below 5.0 AAP.</p>
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-amber-100 bg-amber-50/70 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Watchlist</p>
-                    <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-amber-700">{zoneRows.yellow.length}</span>
-                  </div>
-                  {watchRows.length ? (
-                    <div className="space-y-1.5">
-                      {watchRows.map((row: MonthlyGroupRow) => (
-                        <div key={row.label} className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
-                          <span className="truncate font-bold">{row.label}</span>
-                          <span className="shrink-0 font-bold text-amber-700">{row.current?.toFixed(1)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs leading-5 text-amber-700/75">No selected groups in the 5.0-6.9 range.</p>
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-sky-100 bg-sky-50/70 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-sky-700">Attendance Risk</p>
-                    <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-sky-700">{attendanceRiskRows.length}</span>
-                  </div>
-                  {attendanceRiskRows.length ? (
-                    <div className="space-y-1.5">
-                      {attendanceRiskRows.map((row: MonthlyGroupRow) => (
-                        <div key={row.label} className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
-                          <span className="truncate font-bold">{row.label}</span>
-                          <span className="shrink-0 font-bold text-sky-700">{row.display_ar?.toFixed(1)}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs leading-5 text-sky-700/75">No selected groups below 70% attendance.</p>
-                  )}
-                </div>
-
-                <div className="rounded-lg border border-violet-100 bg-violet-50/70 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Falling Trend</p>
-                    <span className="rounded-md bg-white px-2 py-1 text-xs font-bold text-violet-700">{fallingTrendRows.length}</span>
-                  </div>
-                  {fallingTrendRows.length ? (
-                    <div className="space-y-1.5">
-                      {fallingTrendRows.map((row: MonthlyGroupRow) => (
-                        <div key={row.label} className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-xs">
-                          <span className="truncate font-bold">{row.label}</span>
-                          <span className="shrink-0 font-bold text-violet-700">{deltaLabel(row.delta)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs leading-5 text-violet-700/75">No selected groups dropped from the previous month.</p>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No subject statistics available.</p>
