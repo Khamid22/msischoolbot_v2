@@ -63,10 +63,11 @@ def _message_from_row(row):
 def _complaint_base(row):
     parent_login = str(row["parent_login"] or "").strip()
     parent_display_name = _row_value(row, "parent_display_name")
+    parent_id = int(row["parent_admin_id"] or 0)
     return {
         "id": int(row["id"]),
-        "parent_admin_id": int(row["parent_admin_id"]),
-        "parent_id": int(row["parent_admin_id"]),
+        "parent_admin_id": parent_id,
+        "parent_id": parent_id,
         "student_row_id": int(row["student_row_id"] or 0),
         "category": str(row["category"] or "other").strip(),
         "topic": str(row["topic"] or "").strip(),
@@ -90,24 +91,23 @@ def _complaint_base(row):
 
 
 def _build_thread(conn, base):
-    """Full conversation: opening message (parent) + reply rows.
+    """Full conversation for a v2 support ticket.
 
-    The ticket's opening `message` is the first message. Replies live in
-    parent_complaint_messages; a legacy flat `reply` (pre-thread data) is shown
-    as a single admin message when no message rows exist yet.
+    New tickets store the opening parent message and every staff reply in
+    msi_v2.ticket_messages. The legacy flat `message`/`reply` fields are kept
+    only as a fallback for older rows while the UI contract is being retired.
     """
     queries.ensure_complaint_messages_schema(conn)
-    reply_rows = [_message_from_row(r) for r in queries.list_complaint_message_rows(conn, base["id"])]
-    if not reply_rows and base["reply"]:
-        reply_rows = [
-            {
-                "id": 0,
-                "author_role": "admin",
-                "author_login": base["assigned_to"],
-                "body": base["reply"],
-                "created_at": base["updated_at"],
-            }
-        ]
+    message_rows = [_message_from_row(r) for r in queries.list_complaint_message_rows(conn, base["id"])]
+    if message_rows:
+        staff_rows = [m for m in message_rows if m["author_role"] != "parent"]
+        latest = staff_rows[-1] if staff_rows else message_rows[-1]
+        return {
+            "messages": message_rows,
+            "reply_count": len(staff_rows),
+            "latest_reply": latest["body"] if latest else "",
+            "latest_reply_at": latest["created_at"] if latest else "",
+        }
 
     messages = []
     if base["message"]:
@@ -120,12 +120,22 @@ def _build_thread(conn, base):
                 "created_at": base["created_at"],
             }
         )
-    messages.extend(reply_rows)
+    if base["reply"]:
+        messages.append(
+            {
+                "id": 0,
+                "author_role": "admin",
+                "author_login": base["assigned_to"],
+                "body": base["reply"],
+                "created_at": base["updated_at"],
+            }
+        )
 
-    latest = reply_rows[-1] if reply_rows else None
+    staff_rows = [m for m in messages if m["author_role"] != "parent"]
+    latest = staff_rows[-1] if staff_rows else None
     return {
         "messages": messages,
-        "reply_count": len(reply_rows),
+        "reply_count": len(staff_rows),
         "latest_reply": latest["body"] if latest else "",
         "latest_reply_at": latest["created_at"] if latest else "",
     }
@@ -139,7 +149,6 @@ def _complaint_payload(conn, row):
 
 def list_complaints(parent_admin_id=0):
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
         queries.ensure_parent_complaints_schema(conn)
         queries.ensure_complaint_messages_schema(conn)
         rows = queries.list_parent_complaint_rows(conn, int(parent_admin_id or 0))
@@ -151,7 +160,6 @@ def get_complaint(complaint_id):
     if complaint_id <= 0:
         return None
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
         queries.ensure_parent_complaints_schema(conn)
         queries.ensure_complaint_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)
@@ -177,10 +185,16 @@ def create_complaint(parent_admin_id, student_row_id, payload):
     now = _utc_now_iso()
 
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
-        queries.ensure_parent_children_schema(conn)
         queries.ensure_parent_complaints_schema(conn)
-        parent_row = queries.get_parent_admin_row(conn, parent_id)
+        queries.ensure_complaint_messages_schema(conn)
+        parent_row = conn.execute(
+            """
+            SELECT id
+            FROM msi_v2.parents
+            WHERE id = %s AND status = 'active'
+            """,
+            (parent_id,),
+        ).fetchone()
         if not parent_row:
             raise ValueError("Parent account was not found.")
         if student_id > 0:
@@ -214,7 +228,6 @@ def update_complaint(complaint_id, payload):
 
     now = _utc_now_iso()
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
         queries.ensure_parent_complaints_schema(conn)
         queries.ensure_complaint_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)
@@ -261,7 +274,6 @@ def add_complaint_reply(complaint_id, payload, *, author_role="admin", author_lo
 
     now = _utc_now_iso()
     with _connect() as conn:
-        queries.ensure_admins_schema(conn)
         queries.ensure_parent_complaints_schema(conn)
         queries.ensure_complaint_messages_schema(conn)
         row = queries.get_parent_complaint_row(conn, complaint_id)

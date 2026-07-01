@@ -1,50 +1,81 @@
-"""Parent complaint SQL helpers."""
+"""Support ticket SQL helpers against the clean msi_v2 schema.
+
+The public Python function names still say "complaint" because admin routes and
+frontend payloads use that word. The storage model is now:
+
+- msi_v2.support_tickets: ticket metadata
+- msi_v2.ticket_messages: parent/staff conversation thread
+"""
+
+
+def _ticket_row_select():
+    return """
+        SELECT
+            t.id,
+            t.parent_id AS parent_admin_id,
+            COALESCE(st.legacy_student_row_id, 0) AS student_row_id,
+            t.category,
+            t.topic,
+            COALESCE(opening.body, '') AS message,
+            t.status,
+            COALESCE(latest_staff.body, '') AS reply,
+            to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+            to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+            COALESCE(to_char(t.resolved_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS resolved_at,
+            COALESCE(assigned.login, assigned.display_name, '') AS assigned_to,
+            COALESCE(p.display_name, '') AS parent_login,
+            COALESCE(p.display_name, '') AS parent_display_name,
+            COALESCE(p.phone, '') AS parent_phone,
+            '' AS parent_email,
+            COALESCE(p.telegram_username, '') AS parent_telegram_username,
+            COALESCE(st.full_name, '') AS student_name,
+            COALESCE(st.student_code, '') AS student_code,
+            COALESCE(sch.school_name, '') AS school_name
+        FROM msi_v2.support_tickets t
+        LEFT JOIN msi_v2.parents p ON p.id = t.parent_id
+        LEFT JOIN msi_v2.students st ON st.id = t.student_id
+        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
+        LEFT JOIN msi_v2.msi_staff assigned ON assigned.id = t.assigned_to_staff_id
+        LEFT JOIN LATERAL (
+            SELECT body
+            FROM msi_v2.ticket_messages msg
+            WHERE msg.ticket_id = t.id
+              AND msg.author_type = 'parent'
+            ORDER BY msg.created_at ASC, msg.id ASC
+            LIMIT 1
+        ) opening ON true
+        LEFT JOIN LATERAL (
+            SELECT body
+            FROM msi_v2.ticket_messages msg
+            WHERE msg.ticket_id = t.id
+              AND msg.author_type IN ('owner', 'admin', 'staff', 'customer_support', 'ceo', 'system')
+            ORDER BY msg.created_at DESC, msg.id DESC
+            LIMIT 1
+        ) latest_staff ON true
+    """
 
 
 def list_parent_complaint_rows(conn, parent_admin_id=0):
     filters = []
     params = []
     if int(parent_admin_id or 0) > 0:
-        filters.append("pc.parent_admin_id = %s")
+        filters.append("t.parent_id = %s")
         params.append(int(parent_admin_id))
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
     return conn.execute(
         f"""
-        SELECT
-            pc.id,
-            pc.parent_admin_id,
-            pc.student_row_id,
-            pc.category,
-            pc.topic,
-            pc.message,
-            pc.status,
-            pc.reply,
-            pc.created_at,
-            pc.updated_at,
-            pc.resolved_at,
-            pc.assigned_to,
-            a.login AS parent_login,
-            a.display_name AS parent_display_name,
-            a.phone AS parent_phone,
-            a.email AS parent_email,
-            a.telegram_username AS parent_telegram_username,
-            s.full_name AS student_name,
-            s.student_id AS student_code,
-            s.school_name AS school_name
-        FROM parent_complaints pc
-        JOIN admins a ON a.id = pc.parent_admin_id
-        LEFT JOIN students s ON s.id = pc.student_row_id
+        {_ticket_row_select()}
         {where_clause}
         ORDER BY
-            CASE pc.status
+            CASE t.status
                 WHEN 'new' THEN 0
                 WHEN 'escalated' THEN 1
                 WHEN 'in_progress' THEN 2
                 WHEN 'resolved' THEN 3
                 ELSE 4
             END,
-            pc.updated_at DESC,
-            pc.id DESC
+            t.updated_at DESC,
+            t.id DESC
         """,
         tuple(params),
     ).fetchall()
@@ -52,35 +83,22 @@ def list_parent_complaint_rows(conn, parent_admin_id=0):
 
 def get_parent_complaint_row(conn, complaint_id):
     return conn.execute(
-        """
-        SELECT
-            pc.id,
-            pc.parent_admin_id,
-            pc.student_row_id,
-            pc.category,
-            pc.topic,
-            pc.message,
-            pc.status,
-            pc.reply,
-            pc.created_at,
-            pc.updated_at,
-            pc.resolved_at,
-            pc.assigned_to,
-            a.login AS parent_login,
-            a.display_name AS parent_display_name,
-            a.phone AS parent_phone,
-            a.email AS parent_email,
-            a.telegram_username AS parent_telegram_username,
-            s.full_name AS student_name,
-            s.student_id AS student_code,
-            s.school_name AS school_name
-        FROM parent_complaints pc
-        JOIN admins a ON a.id = pc.parent_admin_id
-        LEFT JOIN students s ON s.id = pc.student_row_id
-        WHERE pc.id = %s
+        f"""
+        {_ticket_row_select()}
+        WHERE t.id = %s
         """,
         (int(complaint_id),),
     ).fetchone()
+
+
+def _resolve_student_v2_id(conn, student_row_id):
+    if not int(student_row_id or 0):
+        return None
+    row = conn.execute(
+        "SELECT id FROM msi_v2.students WHERE legacy_student_row_id = %s LIMIT 1",
+        (int(student_row_id),),
+    ).fetchone()
+    return int(row["id"]) if row else None
 
 
 def insert_parent_complaint_row(
@@ -95,33 +113,41 @@ def insert_parent_complaint_row(
     created_at,
     updated_at,
 ):
-    normalized_student_id = int(student_row_id) if int(student_row_id or 0) > 0 else None
-    return conn.execute(
+    student_id = _resolve_student_v2_id(conn, student_row_id)
+    inserted = conn.execute(
         """
-        INSERT INTO parent_complaints (
-            parent_admin_id,
-            student_row_id,
+        INSERT INTO msi_v2.support_tickets (
+            parent_id,
+            student_id,
             category,
             topic,
-            message,
             status,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz)
         RETURNING id
         """,
         (
             int(parent_admin_id),
-            normalized_student_id,
+            student_id,
             str(category or "other").strip(),
             str(topic or "").strip(),
-            str(message or "").strip(),
             str(status or "new").strip().casefold(),
             str(created_at or "").strip(),
             str(updated_at or "").strip(),
         ),
     ).fetchone()
+    if inserted:
+        insert_complaint_message_row(
+            conn,
+            complaint_id=int(inserted["id"]),
+            author_role="parent",
+            author_login="",
+            body=message,
+            created_at=created_at,
+        )
+    return inserted
 
 
 def update_parent_complaint_row(
@@ -136,32 +162,59 @@ def update_parent_complaint_row(
 ):
     conn.execute(
         """
-        UPDATE parent_complaints
+        UPDATE msi_v2.support_tickets
         SET status = %s,
-            reply = %s,
-            updated_at = %s,
-            resolved_at = %s,
-            assigned_to = %s
+            assigned_to_staff_id = COALESCE(
+                (
+                    SELECT id
+                    FROM msi_v2.msi_staff
+                    WHERE lower(login) = lower(%s)
+                       OR lower(display_name) = lower(%s)
+                    ORDER BY id ASC
+                    LIMIT 1
+                ),
+                assigned_to_staff_id
+            ),
+            updated_at = %s::timestamptz,
+            resolved_at = CASE WHEN %s = '' THEN NULL ELSE %s::timestamptz END
         WHERE id = %s
         """,
         (
             str(status or "new").strip().casefold(),
-            str(reply or "").strip(),
+            str(assigned_to or "").strip(),
+            str(assigned_to or "").strip(),
             str(updated_at or "").strip(),
             str(resolved_at or "").strip(),
-            str(assigned_to or "").strip(),
+            str(resolved_at or "").strip(),
             int(complaint_id),
         ),
     )
 
 
+def _author_type(author_role):
+    role = str(author_role or "system").strip().casefold()
+    if role == "parent":
+        return "parent"
+    if role in {"owner", "admin", "staff", "ceo", "customer_support", "academic_director", "hr_manager", "teacher"}:
+        return role
+    return "system"
+
+
 def list_complaint_message_rows(conn, complaint_id):
     return conn.execute(
         """
-        SELECT id, complaint_id, author_role, author_login, body, created_at
-        FROM parent_complaint_messages
-        WHERE complaint_id = %s
-        ORDER BY created_at ASC, id ASC
+        SELECT
+            msg.id,
+            ticket_id AS complaint_id,
+            author_type AS author_role,
+            COALESCE(staff.login, parent.display_name, '') AS author_login,
+            body,
+            to_char(msg.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+        FROM msi_v2.ticket_messages msg
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = msg.author_staff_id
+        LEFT JOIN msi_v2.parents parent ON parent.id = msg.author_parent_id
+        WHERE msg.ticket_id = %s
+        ORDER BY msg.created_at ASC, msg.id ASC
         """,
         (int(complaint_id),),
     ).fetchall()
@@ -176,18 +229,46 @@ def insert_complaint_message_row(
     body,
     created_at,
 ):
+    author_type = _author_type(author_role)
     return conn.execute(
         """
-        INSERT INTO parent_complaint_messages (
-            complaint_id, author_role, author_login, body, created_at
+        INSERT INTO msi_v2.ticket_messages (
+            ticket_id,
+            author_type,
+            author_staff_id,
+            author_parent_id,
+            body,
+            created_at
         )
-        VALUES (%s, %s, %s, %s, %s)
+        SELECT
+            %s,
+            %s,
+            CASE WHEN %s <> 'parent' THEN (
+                SELECT id
+                FROM msi_v2.msi_staff
+                WHERE lower(login) = lower(%s)
+                   OR lower(display_name) = lower(%s)
+                ORDER BY id ASC
+                LIMIT 1
+            ) ELSE NULL END,
+            CASE WHEN %s = 'parent' THEN (
+                SELECT parent_id
+                FROM msi_v2.support_tickets
+                WHERE id = %s
+                LIMIT 1
+            ) ELSE NULL END,
+            %s,
+            %s::timestamptz
         RETURNING id
         """,
         (
             int(complaint_id),
-            str(author_role or "system").strip().casefold(),
+            author_type,
+            author_type,
             str(author_login or "").strip(),
+            str(author_login or "").strip(),
+            author_type,
+            int(complaint_id),
             str(body or "").strip(),
             str(created_at or "").strip(),
         ),
@@ -195,15 +276,16 @@ def insert_complaint_message_row(
 
 
 def count_complaints_by_parent(conn):
-    """Map of parent_admin_id -> {total, open} ticket counts (open = not resolved)."""
+    """Map of parent_id -> {total, open} ticket counts (open = not resolved)."""
     return conn.execute(
         """
         SELECT
-            parent_admin_id,
+            parent_id AS parent_admin_id,
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE lower(status) <> 'resolved') AS open_count
-        FROM parent_complaints
-        GROUP BY parent_admin_id
+        FROM msi_v2.support_tickets
+        WHERE parent_id IS NOT NULL
+        GROUP BY parent_id
         """
     ).fetchall()
 

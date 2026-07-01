@@ -44,19 +44,6 @@ def get_admin_row_by_id(conn, admin_id):
     ).fetchone()
 
 
-def get_parent_admin_row(conn, admin_id):
-    return conn.execute(
-        """
-        SELECT id, login, role, is_owner, telegram_user_id, created_at,
-               display_name, phone, email, telegram_username, notes, disabled
-        FROM admins
-        WHERE id = %s
-          AND lower(role) = 'parent'
-        """,
-        (admin_id,),
-    ).fetchone()
-
-
 def get_admin_by_telegram_id(conn, telegram_user_id):
     return conn.execute(
         """
@@ -108,7 +95,6 @@ __all__ = [
     "insert_owner_admin",
     "get_admin_credentials_row",
     "get_admin_row_by_id",
-    "get_parent_admin_row",
     "get_admin_by_telegram_id",
     "clear_admin_telegram_user_conflicts",
     "update_admin_telegram_user",

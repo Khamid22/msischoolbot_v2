@@ -1,43 +1,82 @@
-"""Subject summary SQL query helpers."""
+"""Read-only subject summary helpers from the msi_v2 academic schema."""
 
 from shared.academics import canonical
 
 
-def replace_subject_summary_rows(conn, rows):
-    conn.execute("DELETE FROM subject_summaries")
-
-    if not rows:
-        return
-
-    payload_rows = []
-    for row in rows:
-        payload_rows.append(
-            (
-                int(row.get("enrollment_id", 0)),
-                str(row.get("full_name", "")),
-                str(row.get("full_name_norm", "")),
-                str(row.get("school_key", "")),
-                str(row.get("school_name", "")),
-                str(row.get("group_name", "")),
-                canonical.canonical_subject_name(row.get("subject_name", ""))
-                or str(row.get("subject_name", "")).strip(),
-                canonical.subject_short_name(row.get("subject_name", "")),
-                float(row.get("aap", 0)),
-                int(row.get("ar", 0)),
-                int(row.get("ep", 0)),
-                int(row.get("total_coins", 0)),
-                int(row.get("rating_rank", 0)),
-                int(row.get("rating_total", 0)),
-                str(row.get("updated_at", "")),
-            )
+def _subject_summary_select(where_clause="", params=()):
+    return (
+        f"""
+        WITH base AS (
+            SELECT
+                gs.legacy_enrollment_id AS enrollment_id,
+                st.full_name,
+                COALESCE(sch.school_key, '') AS school_key,
+                COALESCE(sch.school_name, '') AS school_name,
+                g.group_name,
+                subj.subject_name,
+                COALESCE(subj.subject_short, '') AS subject_short,
+                COALESCE(hw.aap, 0)::double precision AS aap,
+                COALESCE(att.ar, 0)::integer AS ar,
+                COALESCE(ex.ep, 0)::integer AS ep,
+                COALESCE(coins.total_coins, 0)::integer AS total_coins
+            FROM msi_v2.group_students gs
+            JOIN msi_v2.students st ON st.id = gs.student_id
+            JOIN msi_v2.groups g ON g.id = gs.group_id
+            LEFT JOIN msi_v2.schools sch ON sch.id = g.school_id
+            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+            LEFT JOIN (
+                SELECT group_id, student_id, ROUND(AVG(score)::numeric, 1) AS aap
+                FROM msi_v2.homework_scores
+                WHERE score IS NOT NULL
+                GROUP BY group_id, student_id
+            ) hw ON hw.group_id = gs.group_id AND hw.student_id = gs.student_id
+            LEFT JOIN (
+                SELECT
+                    group_id,
+                    student_id,
+                    ROUND(
+                        (
+                            SUM(CASE WHEN lower(attendance_status) IN ('present', 'justified', 'justified absent') THEN 1 ELSE 0 END)::numeric
+                            / NULLIF(COUNT(*), 0)
+                        ) * 100
+                    )::integer AS ar
+                FROM msi_v2.attendance_records
+                WHERE trim(COALESCE(attendance_status, '')) <> ''
+                GROUP BY group_id, student_id
+            ) att ON att.group_id = gs.group_id AND att.student_id = gs.student_id
+            LEFT JOIN (
+                SELECT group_id, student_id, ROUND(AVG(score)::numeric)::integer AS ep
+                FROM msi_v2.exam_results
+                WHERE score IS NOT NULL
+                GROUP BY group_id, student_id
+            ) ex ON ex.group_id = gs.group_id AND ex.student_id = gs.student_id
+            LEFT JOIN (
+                SELECT group_id, student_id, SUM(amount)::integer AS total_coins
+                FROM msi_v2.coin_events
+                GROUP BY group_id, student_id
+            ) coins ON coins.group_id = gs.group_id AND coins.student_id = gs.student_id
+            WHERE gs.enrollment_status = 'active'
+              AND gs.legacy_enrollment_id IS NOT NULL
+              AND lower(g.group_name) <> 'online'
+              {where_clause}
+        ),
+        scored AS (
+            SELECT
+                *,
+                ROUND(((
+                    ep
+                    + aap
+                    + CASE
+                        WHEN ar <= 0 THEN 0
+                        ELSE GREATEST(1, LEAST(9, ROUND((ar::numeric / 100) * 9)))
+                      END
+                ) / 3.0)::numeric, 1) AS composite_score
+            FROM base
         )
-
-    conn.executemany(
-        """
-        INSERT INTO subject_summaries (
-            sheet_student_id,
+        SELECT
+            enrollment_id,
             full_name,
-            full_name_norm,
             school_key,
             school_name,
             group_name,
@@ -47,90 +86,51 @@ def replace_subject_summary_rows(conn, rows):
             ar,
             ep,
             total_coins,
-            rating_rank,
-            rating_total,
-            updated_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RANK() OVER (
+                PARTITION BY subject_name
+                ORDER BY composite_score DESC, ep DESC, aap DESC, ar DESC, lower(full_name) ASC, enrollment_id ASC
+            )::integer AS rating_rank,
+            COUNT(*) OVER (PARTITION BY subject_name)::integer AS rating_total,
+            to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at
+        FROM scored
+        ORDER BY lower(full_name) ASC, lower(subject_name) ASC, enrollment_id ASC
         """,
-        payload_rows,
+        tuple(params),
     )
 
 
+def replace_subject_summary_rows(conn, rows):
+    """Deprecated no-op kept for old call sites.
+
+    Subject summaries are now derived directly from msi_v2 tables, so there is
+    no cache table to clear or repopulate.
+    """
+    _ = conn, rows
+    return None
+
+
 def list_subject_summary_rows_by_full_name_norm(conn, full_name_norm):
-    return conn.execute(
-        """
-        SELECT
-            sheet_student_id AS enrollment_id,
-            full_name,
-            school_key,
-            school_name,
-            group_name,
-            subject_name,
-            subject_short,
-            aap,
-            ar,
-            ep,
-            total_coins,
-            rating_rank,
-            rating_total,
-            updated_at
-        FROM subject_summaries
-        WHERE full_name_norm = %s
-        ORDER BY lower(subject_name) ASC, sheet_student_id ASC
-        """,
-        (canonical.normalize_text(full_name_norm),),
-    ).fetchall()
+    sql, params = _subject_summary_select()
+    rows = conn.execute(sql, params).fetchall()
+    normalized = canonical.normalize_text(full_name_norm)
+    return [
+        row
+        for row in rows
+        if canonical.normalize_text(row["full_name"]) == normalized
+    ]
 
 
 def list_subject_summary_rows(conn, school_key=""):
     normalized_school_key = str(school_key or "").strip().casefold()
     if normalized_school_key and normalized_school_key != "all":
-        return conn.execute(
-            """
-            SELECT
-                sheet_student_id AS enrollment_id,
-                full_name,
-                school_key,
-                school_name,
-                group_name,
-                subject_name,
-                subject_short,
-                aap,
-                ar,
-                ep,
-                total_coins,
-                rating_rank,
-                rating_total,
-                updated_at
-            FROM subject_summaries
-            WHERE school_key = %s
-            ORDER BY lower(full_name) ASC, lower(subject_name) ASC, sheet_student_id ASC
-            """,
+        sql, params = _subject_summary_select(
+            "AND lower(COALESCE(sch.school_key, '')) = lower(%s)",
             (normalized_school_key,),
-        ).fetchall()
+        )
+        return conn.execute(sql, params).fetchall()
 
-    return conn.execute(
-        """
-        SELECT
-            sheet_student_id AS enrollment_id,
-            full_name,
-            school_key,
-            school_name,
-            group_name,
-            subject_name,
-            subject_short,
-            aap,
-            ar,
-            ep,
-            total_coins,
-            rating_rank,
-            rating_total,
-            updated_at
-        FROM subject_summaries
-        ORDER BY lower(full_name) ASC, lower(subject_name) ASC, sheet_student_id ASC
-        """
-    ).fetchall()
+    sql, params = _subject_summary_select()
+    return conn.execute(sql, params).fetchall()
 
 
 __all__ = [

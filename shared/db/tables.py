@@ -101,25 +101,6 @@ def _create_tables_postgres(conn):
         """
     )
 
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parent_children (
-            parent_admin_id BIGINT NOT NULL,
-            student_row_id BIGINT,
-            assigned_at TEXT NOT NULL,
-            PRIMARY KEY (parent_admin_id, student_row_id),
-            FOREIGN KEY(parent_admin_id) REFERENCES admins(id) ON DELETE CASCADE,
-            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_parent_children_student
-        ON parent_children(student_row_id)
-        """
-    )
-
     _create_parent_accounts_tables(conn)
 
     conn.execute(
@@ -153,38 +134,6 @@ def _create_tables_postgres(conn):
         """
         CREATE INDEX IF NOT EXISTS idx_student_payments_status_due
         ON student_payments(status, due_date)
-        """
-    )
-
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parent_complaints (
-            id BIGSERIAL PRIMARY KEY,
-            parent_admin_id BIGINT NOT NULL,
-            student_row_id BIGINT NOT NULL,
-            category TEXT NOT NULL DEFAULT 'other',
-            topic TEXT NOT NULL DEFAULT '',
-            message TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'new',
-            reply TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            resolved_at TEXT NOT NULL DEFAULT '',
-            FOREIGN KEY(parent_admin_id) REFERENCES admins(id) ON DELETE CASCADE,
-            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaints_status_updated
-        ON parent_complaints(status, updated_at)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaints_parent
-        ON parent_complaints(parent_admin_id, created_at)
         """
     )
 
@@ -362,46 +311,6 @@ def _create_tables_postgres(conn):
 
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS subject_summaries (
-            sheet_student_id BIGINT PRIMARY KEY,
-            full_name TEXT NOT NULL,
-            full_name_norm TEXT NOT NULL,
-            school_key TEXT NOT NULL DEFAULT '',
-            school_name TEXT NOT NULL DEFAULT '',
-            group_name TEXT NOT NULL DEFAULT '',
-            subject_name TEXT NOT NULL,
-            subject_short TEXT NOT NULL,
-            aap DOUBLE PRECISION NOT NULL,
-            ar INTEGER NOT NULL,
-            ep INTEGER NOT NULL,
-            total_coins INTEGER NOT NULL,
-            rating_rank INTEGER NOT NULL,
-            rating_total INTEGER NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_name_norm
-        ON subject_summaries(full_name_norm)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_subject_name
-        ON subject_summaries(subject_name)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_school_key
-        ON subject_summaries(school_key)
-        """
-    )
-
-    conn.execute(
-        """
         CREATE TABLE IF NOT EXISTS lesson_catalog (
             id BIGSERIAL PRIMARY KEY,
             subject_name TEXT NOT NULL,
@@ -485,7 +394,6 @@ def _create_tables_postgres(conn):
 def create_tables(conn):
     _create_tables_postgres(conn)
     ensure_academic_reference_schema(conn)
-    ensure_office_hours_schema(conn)
 
 
 def ensure_students_schema(conn):
@@ -651,27 +559,6 @@ def ensure_parent_invites_schema(conn):
     )
 
 
-def ensure_parent_children_schema(conn):
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS parent_children (
-            parent_admin_id BIGINT NOT NULL,
-            student_row_id BIGINT NOT NULL,
-            assigned_at TEXT NOT NULL,
-            PRIMARY KEY (parent_admin_id, student_row_id),
-            FOREIGN KEY(parent_admin_id) REFERENCES admins(id) ON DELETE CASCADE,
-            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_parent_children_student
-        ON parent_children(student_row_id)
-        """
-    )
-
-
 def ensure_student_payments_schema(conn):
     conn.execute(
         """
@@ -720,83 +607,83 @@ def ensure_student_payments_schema(conn):
 
 
 def ensure_parent_complaints_schema(conn):
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS parent_complaints (
+        CREATE TABLE IF NOT EXISTS msi_v2.support_tickets (
             id BIGSERIAL PRIMARY KEY,
-            parent_admin_id BIGINT NOT NULL,
-            student_row_id BIGINT NOT NULL,
+            parent_id BIGINT REFERENCES msi_v2.parents(id) ON DELETE SET NULL,
+            student_id BIGINT REFERENCES msi_v2.students(id) ON DELETE SET NULL,
             category TEXT NOT NULL DEFAULT 'other',
             topic TEXT NOT NULL DEFAULT '',
-            message TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'new',
-            reply TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            resolved_at TEXT NOT NULL DEFAULT '',
-            FOREIGN KEY(parent_admin_id) REFERENCES admins(id) ON DELETE CASCADE,
-            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE CASCADE
+            assigned_to_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            escalated_to_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            legacy_complaint_id BIGINT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            resolved_at TIMESTAMPTZ
         )
         """
     )
-    conn.execute("ALTER TABLE parent_complaints ALTER COLUMN student_row_id DROP NOT NULL")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'other'")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS message TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new'")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS reply TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS created_at TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS resolved_at TEXT NOT NULL DEFAULT ''")
-    # Ticket-style fields. Additive only.
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS assigned_to TEXT NOT NULL DEFAULT ''")
-    # New parent CLIENT anchor (parents table). Additive + nullable: existing
-    # complaints keep resolving via parent_admin_id -> admins; the migration
-    # backfills parent_id from the admin->parent mapping. Read paths still use
-    # parent_admin_id until complaints are re-anchored to parents.
-    conn.execute("ALTER TABLE parent_complaints ADD COLUMN IF NOT EXISTS parent_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS parent_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS student_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'other'")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new'")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS assigned_to_staff_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS escalated_to_staff_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS legacy_complaint_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()")
+    conn.execute("ALTER TABLE msi_v2.support_tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ")
     conn.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaints_parent_id
-        ON parent_complaints(parent_id)
+        CREATE INDEX IF NOT EXISTS idx_support_tickets_parent_id
+        ON msi_v2.support_tickets(parent_id)
         WHERE parent_id IS NOT NULL
         """
     )
     conn.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaints_status_updated
-        ON parent_complaints(status, updated_at)
+        CREATE INDEX IF NOT EXISTS idx_support_tickets_status_updated
+        ON msi_v2.support_tickets(status, updated_at)
         """
     )
     conn.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaints_parent
-        ON parent_complaints(parent_admin_id, created_at)
+        CREATE INDEX IF NOT EXISTS idx_support_tickets_student_id
+        ON msi_v2.support_tickets(student_id)
+        WHERE student_id IS NOT NULL
         """
     )
 
 
 def ensure_complaint_messages_schema(conn):
-    # Conversation thread for a support ticket (parent_complaints row). The
-    # ticket's opening `message` is treated as the first message; every reply
-    # (parent/admin/support/ceo/system) is one row here.
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS parent_complaint_messages (
+        CREATE TABLE IF NOT EXISTS msi_v2.ticket_messages (
             id BIGSERIAL PRIMARY KEY,
-            complaint_id BIGINT NOT NULL,
-            author_role TEXT NOT NULL,
-            author_login TEXT NOT NULL DEFAULT '',
+            ticket_id BIGINT NOT NULL REFERENCES msi_v2.support_tickets(id) ON DELETE CASCADE,
+            author_type TEXT NOT NULL,
+            author_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            author_parent_id BIGINT REFERENCES msi_v2.parents(id) ON DELETE SET NULL,
             body TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(complaint_id) REFERENCES parent_complaints(id) ON DELETE CASCADE
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
         """
     )
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS ticket_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS author_type TEXT NOT NULL DEFAULT 'system'")
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS author_staff_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS author_parent_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE msi_v2.ticket_messages ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()")
     conn.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_parent_complaint_messages_complaint
-        ON parent_complaint_messages(complaint_id, created_at, id)
+        CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket
+        ON msi_v2.ticket_messages(ticket_id, created_at, id)
         """
     )
 
@@ -806,27 +693,6 @@ def ensure_lesson_catalog_schema(conn):
         """
         CREATE INDEX IF NOT EXISTS idx_lesson_catalog_subject_order
         ON lesson_catalog(subject_name, group_name, lesson_order)
-        """
-    )
-
-
-def ensure_subject_summaries_schema(conn):
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_name_norm
-        ON subject_summaries(full_name_norm)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_subject_name
-        ON subject_summaries(subject_name)
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_subject_summaries_school_key
-        ON subject_summaries(school_key)
         """
     )
 
@@ -1076,13 +942,11 @@ __all__ = [
     "ensure_admins_schema",
     "ensure_parent_accounts_schema",
     "ensure_parent_invites_schema",
-    "ensure_parent_children_schema",
     "ensure_parent_complaints_schema",
     "ensure_complaint_messages_schema",
     "ensure_student_payments_schema",
     "ensure_students_schema",
     "ensure_lesson_catalog_schema",
-    "ensure_subject_summaries_schema",
     "ensure_resources_schema",
     "ensure_resource_comments_schema",
     "ensure_chat_schema",

@@ -36,10 +36,10 @@ def init_storage():
         with connect() as conn:
             queries.create_tables(conn)
             ensure_clean_v2_schema(conn)
+            queries.ensure_office_hours_schema(conn)
             queries.ensure_admins_schema(conn)
             queries.ensure_students_schema(conn)
             queries.ensure_lesson_catalog_schema(conn)
-            queries.ensure_subject_summaries_schema(conn)
             queries.ensure_resources_schema(conn)
             queries.ensure_resource_comments_schema(conn)
             queries.ensure_chat_schema(conn)
