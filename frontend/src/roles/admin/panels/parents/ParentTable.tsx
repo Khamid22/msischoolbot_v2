@@ -5,6 +5,7 @@ import {
   type ParentRow,
   isInviteSource,
   openTicketCount,
+  parentAccountId,
   parentChildren,
   parentDisplayName,
   parentInitials,
@@ -129,7 +130,7 @@ function RowActions({ parent, handlers }: { parent: ParentRow; handlers: ParentH
 }
 
 function parentKey(parent: ParentRow) {
-  return asString(parent.id) || asString(parent.parent_id) || parentLogin(parent);
+  return String(parentAccountId(parent) || "") || asString(parent.id) || asString(parent.parent_id) || parentLogin(parent);
 }
 
 export function ParentTable({

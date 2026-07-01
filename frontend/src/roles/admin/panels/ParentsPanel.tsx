@@ -11,6 +11,7 @@ import {
   countActiveFilters,
   defaultParentFilters,
   filterParents,
+  parentAccountId,
   parentChildren,
   parentDisplayName,
 } from "./parents/types";
@@ -100,8 +101,8 @@ export default function ParentsPanel({ state }: { state: any }) {
     currentPage * PARENTS_PAGE_SIZE,
   );
 
-  const drawerParent = drawerParentId != null ? parents.find((p) => asNumber(p.id) === drawerParentId) || null : null;
-  const linkParent = linkParentId != null ? parents.find((p) => asNumber(p.id) === linkParentId) || null : null;
+  const drawerParent = drawerParentId != null ? parents.find((p) => parentAccountId(p) === drawerParentId) || null : null;
+  const linkParent = linkParentId != null ? parents.find((p) => parentAccountId(p) === linkParentId) || null : null;
 
   useEffect(() => {
     setPage(1);
@@ -139,12 +140,13 @@ export default function ParentsPanel({ state }: { state: any }) {
     setLinkSaving(true);
     setLinkError("");
     try {
-      const id = asNumber(parent.id);
+      const id = parentAccountId(parent);
+      if (id <= 0) throw new Error("Parent account is required.");
       const json = await request("POST", routes.adminParentChildrenFor(id), { student_row_id: studentRowId });
       const child = (json.child || {}) as ParentRow;
       setParents((current) =>
         current.map((p) =>
-          asNumber(p.id) === id ? { ...p, children: [...parentChildren(p), child] } : p,
+          parentAccountId(p) === id ? { ...p, children: [...parentChildren(p), child] } : p,
         ),
       );
       setLinkParentId(null);
@@ -157,12 +159,13 @@ export default function ParentsPanel({ state }: { state: any }) {
   }
 
   async function unlinkChild(parent: ParentRow, child: ParentRow) {
-    const id = asNumber(parent.id);
+    const id = parentAccountId(parent);
+    if (id <= 0) throw new Error("Parent account is required.");
     const studentRowId = asNumber(child.student_row_id ?? child.id);
     await request("DELETE", routes.adminParentChildFor(id, studentRowId));
     setParents((current) =>
       current.map((p) =>
-        asNumber(p.id) === id
+        parentAccountId(p) === id
           ? { ...p, children: parentChildren(p).filter((c) => asNumber(c.student_row_id ?? c.id) !== studentRowId) }
           : p,
       ),
@@ -171,8 +174,9 @@ export default function ParentsPanel({ state }: { state: any }) {
   }
 
   function openTickets(parent: ParentRow) {
+    const id = parentAccountId(parent);
     if (typeof state.setActiveParentId === "function") {
-      state.setActiveParentId(asNumber(parent.id));
+      state.setActiveParentId(id);
     }
     if (typeof state.switchAdminTab === "function") {
       state.switchAdminTab("complaints");
@@ -196,17 +200,34 @@ export default function ParentsPanel({ state }: { state: any }) {
   }
 
   const handlers: ParentHandlers = {
-    onView: (parent) => setDrawerParentId(asNumber(parent.id)),
+    onView: (parent) => {
+      const id = parentAccountId(parent);
+      if (id <= 0) {
+        setBanner({ kind: "error", text: "Parent account is required." });
+        return;
+      }
+      setDrawerParentId(id);
+    },
     onLinkStudent: (parent) => {
       setLinkError("");
-      setLinkParentId(asNumber(parent.id));
+      const id = parentAccountId(parent);
+      if (id <= 0) {
+        setBanner({ kind: "error", text: "Parent account is required." });
+        return;
+      }
+      setLinkParentId(id);
     },
     onUnlinkStudent: (parent) => {
       const kids = parentChildren(parent);
       if (kids.length === 1) {
         setConfirm({ kind: "unlink", parent, child: kids[0] });
       } else if (kids.length > 1) {
-        setDrawerParentId(asNumber(parent.id));
+        const id = parentAccountId(parent);
+        if (id <= 0) {
+          setBanner({ kind: "error", text: "Parent account is required." });
+          return;
+        }
+        setDrawerParentId(id);
       }
     },
     onUnlinkChild: (parent, child) => setConfirm({ kind: "unlink", parent, child }),

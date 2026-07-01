@@ -29,6 +29,30 @@ export function parentChildren(parent: ParentRow | undefined): ParentRow[] {
   return Array.isArray(parent?.children) ? (parent!.children as ParentRow[]) : [];
 }
 
+export function parentAccountId(parent: ParentRow | undefined): number {
+  const candidates = [
+    parent?.parent_account_id,
+    parent?.parent_admin_id,
+    parent?.parent_id,
+    parent?.account_id,
+    parent?.id,
+  ];
+
+  for (const value of candidates) {
+    const direct = asNumber(value);
+    if (direct > 0) return direct;
+
+    const text = asString(value);
+    const match = text.match(/(?:^|[-_])(\d+)$/);
+    if (match) {
+      const parsed = Number(match[1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+
+  return 0;
+}
+
 export function isInviteSource(parent: ParentRow): boolean {
   return asString(parent.source) === "invite" || asNumber(parent.id) < 0;
 }
