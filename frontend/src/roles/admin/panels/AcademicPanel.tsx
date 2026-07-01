@@ -2143,7 +2143,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [manageSchoolsOpen, setManageSchoolsOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
-  const [groupSchool, setGroupSchool] = useState<string>(() => asString(schools[0]?.code) || "all");
+  const [groupSchool, setGroupSchool] = useState<string>("all");
   const [groupSubject, setGroupSubject] = useState("all");
   const [groupFiltersOpen, setGroupFiltersOpen] = useState(false);
 
