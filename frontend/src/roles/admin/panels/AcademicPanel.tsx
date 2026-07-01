@@ -119,6 +119,20 @@ const subjectSwatches = [
   "bg-violet-500",
 ] as const;
 
+function preferredSubjectOrder(value: unknown) {
+  const key = normalizeSubjectKey(asString(value));
+  if (key.includes("mathematics") || key.includes("math")) return 0;
+  if (key.includes("chemistry")) return 1;
+  if (key.includes("english")) return 2;
+  return 3;
+}
+
+function compareSubjectsByPreferredOrder(left: unknown, right: unknown) {
+  const orderDiff = preferredSubjectOrder(left) - preferredSubjectOrder(right);
+  if (orderDiff !== 0) return orderDiff;
+  return asString(left).localeCompare(asString(right));
+}
+
 function programInitials(value: unknown) {
   const first = asString(value).trim().split(/\s+/)[0] || "";
   return (first.slice(0, 2) || "—").toUpperCase();
@@ -2183,7 +2197,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       entry.students += asNumber(group.students_count);
       map.set(key, entry);
     });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(map.values()).sort((a, b) => compareSubjectsByPreferredOrder(a.name, b.name));
   }, [groups, groupSchool]);
 
   // Assign each distinct program a stable palette color (index-based, not hashed)
@@ -2248,7 +2262,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       section.groups.push(group);
       sections.set(key, section);
     });
-    return Array.from(sections.values()).sort((left, right) => left.name.localeCompare(right.name));
+    return Array.from(sections.values()).sort((left, right) => compareSubjectsByPreferredOrder(left.name, right.name));
   }, [filteredGroups]);
   const activeGroupFilterCount =
     (groupSchool !== "all" ? 1 : 0) +
