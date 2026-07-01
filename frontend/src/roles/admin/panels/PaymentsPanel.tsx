@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, CreditCard, Plus, Search, Trash2, Undo2, UserRound, X } from "lucide-react";
+import { CreditCard, Plus, Search, UserRound, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
@@ -12,21 +12,6 @@ type FamilyTotals = {
   paid: number;
   currency: string;
 };
-
-// Display labels for every derived state a row can show in the ledger.
-const paymentStatuses = [
-  { value: "paid", label: "Paid" },
-  { value: "due", label: "Due" },
-  { value: "debt", label: "Debt" },
-  { value: "upcoming", label: "Upcoming" },
-];
-
-// At creation Customer Support only records facts: an unpaid charge (its
-// due/debt/upcoming state is derived from the due date) or an already-paid one.
-const creationStatuses = [
-  { value: "due", label: "Unpaid" },
-  { value: "paid", label: "Paid" },
-];
 
 function moneyValue(value: unknown) {
   const parsed = Number(value);
@@ -51,19 +36,6 @@ function formatDate(value: unknown) {
   }).format(new Date(parsed));
 }
 
-function statusLabel(value: unknown) {
-  const status = asString(value).toLowerCase();
-  return paymentStatuses.find((item) => item.value === status)?.label || "Due";
-}
-
-function statusClass(value: unknown) {
-  const status = asString(value).toLowerCase();
-  if (status === "paid") return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  if (status === "debt") return "border-rose-100 bg-rose-50 text-rose-700";
-  if (status === "upcoming") return "border-sky-100 bg-sky-50 text-sky-700";
-  return "border-amber-100 bg-amber-50 text-amber-700";
-}
-
 function initialsFor(value: unknown) {
   const parts = asString(value).split(/\s+/).filter(Boolean);
   return (
@@ -72,6 +44,22 @@ function initialsFor(value: unknown) {
       .map((part) => part[0]?.toUpperCase() || "")
       .join("") || "PA"
   );
+}
+
+function parentDisplayName(parent: Record<string, unknown> | undefined) {
+  return (
+    asString(parent?.full_name) ||
+    asString(parent?.display_name) ||
+    asString(parent?.name) ||
+    asString(parent?.login) ||
+    "Parent"
+  );
+}
+
+function parentPhone(parent: Record<string, unknown> | undefined) {
+  const phone = asString(parent?.phone) || asString(parent?.parent_phone);
+  const login = asString(parent?.login);
+  return phone || (login.startsWith("+") ? login : "");
 }
 
 function parentChildren(parent: Record<string, unknown> | undefined) {
@@ -112,14 +100,6 @@ function subjectsList(child: Record<string, unknown> | undefined) {
   return sortSubjectsMathFirst(unique);
 }
 
-function courseProgress(child: Record<string, unknown> | undefined) {
-  const summary = paymentSummaryFor(child);
-  const rate = Math.max(0, Math.min(100, Math.round(moneyValue(summary.program_completion_rate))));
-  const completed = Math.round(moneyValue(summary.program_completed_lessons));
-  const total = Math.round(moneyValue(summary.program_total_lessons)) || 180;
-  return { rate, completed, total };
-}
-
 // Family-level totals are summed across the parent's children so Customer
 // Support can immediately see whether a family owes anything.
 function familyTotals(parent: Record<string, unknown> | undefined) {
@@ -158,6 +138,31 @@ function mergePaymentSummary(
         current.program_total_lessons ?? summary.program_total_lessons ?? 0,
     },
   };
+}
+
+function rowIsPaid(row: PaymentRow) {
+  return asString(row.state ?? row.status).toLowerCase() === "paid";
+}
+
+function paymentRecordDate(row: PaymentRow) {
+  return formatDate(row.paid_at || row.due_date || row.created_at || row.month);
+}
+
+function paidAmountFor(row: PaymentRow, currency: string) {
+  return rowIsPaid(row) ? formatMoney(row.amount, asString(row.currency) || currency) : "-";
+}
+
+function nextPaymentFor(row: PaymentRow, currency: string) {
+  if (rowIsPaid(row)) return "-";
+  const amount = formatMoney(row.amount, asString(row.currency) || currency);
+  const date = formatDate(row.due_date);
+  return date === "-" ? amount : `${amount} · ${date}`;
+}
+
+function remainingDebtFor(row: PaymentRow, currency: string) {
+  const explicit = moneyValue(row.remaining_debt ?? row.debt_remaining);
+  if (explicit > 0) return formatMoney(explicit, asString(row.currency) || currency);
+  return rowIsPaid(row) ? formatMoney(0, asString(row.currency) || currency) : formatMoney(row.amount, asString(row.currency) || currency);
 }
 
 function SummaryTile({
@@ -201,12 +206,12 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     subject: "",
-    month: "",
-    amount: "",
     currency: "UZS",
-    status: "due",
-    due_date: "",
-    paid_at: "",
+    paid_date: "",
+    paid_amount: "",
+    next_payment_amount: "",
+    next_payment_date: "",
+    remaining_debt: "",
     notes: "",
   });
 
@@ -305,7 +310,17 @@ export default function PaymentsPanel({ state }: { state: any }) {
   }
 
   useEffect(() => {
-    setForm((current) => ({ ...current, subject: "" }));
+    const defaultSubject = subjectsList(selectedChild)[0] || "";
+    setForm((current) => ({
+      ...current,
+      subject: defaultSubject,
+      paid_date: "",
+      paid_amount: "",
+      next_payment_amount: "",
+      next_payment_date: "",
+      remaining_debt: "",
+      notes: "",
+    }));
     void loadPayments(selectedChildResolvedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChildResolvedId]);
@@ -314,6 +329,17 @@ export default function PaymentsPanel({ state }: { state: any }) {
     event.preventDefault();
     const childId = selectedChildResolvedId;
     if (!childId || saving) return;
+    const paidAmount = moneyValue(form.paid_amount);
+    const nextAmount = moneyValue(form.next_payment_amount);
+    const amount = paidAmount > 0 ? paidAmount : nextAmount;
+    if (amount <= 0) {
+      setError("Enter paid amount or next payment amount.");
+      return;
+    }
+    const status = paidAmount > 0 ? "paid" : "due";
+    const notes = [form.notes.trim(), form.remaining_debt.trim() ? `Remaining debt: ${form.remaining_debt.trim()}` : ""]
+      .filter(Boolean)
+      .join(" · ");
     setSaving(true);
     setError("");
     try {
@@ -324,7 +350,16 @@ export default function PaymentsPanel({ state }: { state: any }) {
           "X-CSRFToken": csrf,
           "X-Requested-With": "XMLHttpRequest",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          subject: form.subject,
+          month: form.paid_date || form.next_payment_date || "Payment",
+          amount: String(amount),
+          currency: form.currency,
+          status,
+          due_date: status === "due" ? form.next_payment_date : "",
+          paid_at: status === "paid" ? form.paid_date : "",
+          notes,
+        }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.ok) {
@@ -333,13 +368,13 @@ export default function PaymentsPanel({ state }: { state: any }) {
       }
       applyResult(childId, json);
       setForm({
-        subject: "",
-        month: "",
-        amount: "",
+        subject: subjectsList(selectedChild)[0] || "",
         currency: "UZS",
-        status: "due",
-        due_date: "",
-        paid_at: "",
+        paid_date: "",
+        paid_amount: "",
+        next_payment_amount: "",
+        next_payment_date: "",
+        remaining_debt: "",
         notes: "",
       });
     } catch {
@@ -349,66 +384,6 @@ export default function PaymentsPanel({ state }: { state: any }) {
     }
   }
 
-  async function markPaid(row: PaymentRow, paid: boolean) {
-    const paymentId = asNumber(row.id);
-    if (!paymentId || saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      const response = await fetch(routes.adminStudentPaymentApi(paymentId), {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        body: JSON.stringify({ paid }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update payment.");
-        return;
-      }
-      applyResult(asNumber(json.student_row_id) || selectedChildResolvedId, json);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deletePayment(row: PaymentRow) {
-    const paymentId = asNumber(row.id);
-    if (!paymentId || saving) return;
-    if (!window.confirm("Delete this payment record?")) return;
-    setSaving(true);
-    setError("");
-    try {
-      const response = await fetch(routes.adminStudentPaymentApi(paymentId), {
-        method: "DELETE",
-        headers: {
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to delete payment.");
-        return;
-      }
-      applyResult(asNumber(json.student_row_id) || selectedChildResolvedId, json);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const totals = familyTotals(selectedParent);
-  const familyCurrency = totals.currency || "UZS";
-  const ledgerCurrency = asString(summary.currency) || familyCurrency;
-  const subjects = subjectsList(selectedChild);
-  const progress = courseProgress(selectedChild);
   const overviewTotals = visibleParents.reduce<FamilyTotals>(
     (acc, parent) => {
       const parentTotals = familyTotals(parent);
@@ -422,6 +397,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
     { debt: 0, due: 0, upcoming: 0, paid: 0, currency: "UZS" },
   );
   const overviewCurrency = overviewTotals.currency || "UZS";
+  const ledgerCurrency = asString(summary.currency) || overviewCurrency;
 
   return (
     <div className="space-y-4">
@@ -568,198 +544,131 @@ export default function PaymentsPanel({ state }: { state: any }) {
             className="max-h-[92dvh] w-full max-w-6xl overflow-y-auto rounded-xl bg-background shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <ChartCard
-              title={selectedParent ? asString(selectedParent.login) : "Payments"}
-              subtitle={
-                selectedParent
-                  ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
-                  : "Select a parent"
-              }
-              icon={<CreditCard className="h-4 w-4 text-info" />}
-              headerActions={
+            <div className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-info" />
+                    <h3 className="text-base font-bold">Payment Records</h3>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <p className="min-w-0">
+                      <span className="font-bold text-muted-foreground">Parent: </span>
+                      <span className="font-bold">{parentDisplayName(selectedParent)}</span>
+                    </p>
+                    <p className="min-w-0">
+                      <span className="font-bold text-muted-foreground">Phone Number: </span>
+                      <span className="font-bold">{parentPhone(selectedParent) || "-"}</span>
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setPaymentModalOpen(false)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 bg-background hover:bg-muted"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background hover:bg-muted"
                   aria-label="Close payment details"
                 >
                   <X className="h-4 w-4" />
                 </button>
-              }
-            >
-              <div className="space-y-4">
-          {error ? (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
-              {error}
-            </div>
-          ) : null}
-
-          {!selectedParent ? (
-            <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-10 text-center text-sm font-bold text-muted-foreground">
-              Select a parent to manage payments.
-            </p>
-          ) : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <SummaryTile label="Family Debt" value={formatMoney(totals.debt, familyCurrency)} detail="Across all children" tone="bg-rose-50" />
-                <SummaryTile label="Due" value={formatMoney(totals.due, familyCurrency)} detail="Need payment now" tone="bg-amber-50" />
-                <SummaryTile label="Upcoming" value={formatMoney(totals.upcoming, familyCurrency)} detail="Scheduled ahead" tone="bg-sky-50" />
-                <SummaryTile label="Paid" value={formatMoney(totals.paid, familyCurrency)} detail="Recorded payments" tone="bg-emerald-50" />
               </div>
 
-              {!children.length ? (
+              {error ? (
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
+                  {error}
+                </div>
+              ) : null}
+
+              {!selectedParent ? (
+                <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-10 text-center text-sm font-bold text-muted-foreground">
+                  Select a parent to manage payments.
+                </p>
+              ) : !children.length ? (
                 <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-8 text-center text-sm font-bold text-muted-foreground">
                   No students are linked to this parent yet. Link students in the Parents tab.
                 </p>
               ) : (
                 <>
-                  <div className="flex flex-wrap gap-2">
-                    {children.map((child) => {
-                      const childId = getStudentRowId(child);
-                      const active = childId === selectedChildResolvedId;
-                      const childDebt = moneyValue(paymentSummaryFor(child).debt_total);
-                      return (
-                        <button
-                          key={childId}
-                          type="button"
-                          onClick={() => setSelectedChildId(childId)}
-                          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold transition-colors ${
-                            active
-                              ? "border-foreground/20 bg-foreground text-background"
-                              : "border-foreground/10 bg-background hover:bg-muted"
-                          }`}
-                        >
-                          <span className="truncate">{asString(child.full_name) || "Student"}</span>
-                          {childDebt > 0 ? (
-                            <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] ${
-                                active ? "bg-background/20 text-background" : "bg-rose-50 text-rose-700"
-                              }`}
-                            >
-                              {formatMoney(childDebt, asString(paymentSummaryFor(child).currency) || "UZS")}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="rounded-lg border border-foreground/10 bg-background p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold">
-                          {asString(selectedChild?.full_name) || "Student"}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          Code {getStudentCode(selectedChild) || "-"} ·{" "}
-                          {asString(selectedChild?.school_name) || "School"}
-                        </p>
-                      </div>
-                      <span className="text-xs font-bold text-muted-foreground">
-                        Course {progress.rate}% · {progress.completed}/{progress.total} lessons
-                      </span>
-                    </div>
-                    {subjects.length ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {subjects.map((subject) => (
-                          <span
-                            key={subject}
-                            className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground"
-                          >
-                            {subject}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <SummaryTile label="Paid" value={formatMoney(summary.paid_total, ledgerCurrency)} tone="bg-emerald-50" />
-                    <SummaryTile label="Debt" value={formatMoney(summary.debt_total, ledgerCurrency)} tone="bg-rose-50" />
-                    <SummaryTile label="Due" value={formatMoney(summary.due_total, ledgerCurrency)} tone="bg-amber-50" />
-                    <SummaryTile label="Upcoming" value={formatMoney(summary.upcoming_total, ledgerCurrency)} tone="bg-sky-50" />
-                  </div>
-                  <form onSubmit={savePayment} className="rounded-lg border border-foreground/10 bg-background p-3">
-                    <div className="grid gap-3 md:grid-cols-7">
-                      <label className="md:col-span-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Child
+                    </span>
+                    <select
+                      value={selectedChildResolvedId || ""}
+                      onChange={(event) => setSelectedChildId(Number(event.target.value))}
+                      className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold outline-none focus:border-foreground/30"
+                    >
+                      {children.map((child) => {
+                        const childId = getStudentRowId(child);
+                        return (
+                          <option key={childId} value={childId}>
+                            {asString(child.full_name) || "Student"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+
+                  <form onSubmit={savePayment} className="rounded-lg border border-foreground/10 bg-white p-3">
+                    <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr]">
+                      <label>
                         <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Subject
-                        </span>
-                        <select
-                          value={form.subject}
-                          onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
-                          disabled={!subjects.length}
-                          className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold outline-none focus:border-foreground/30 disabled:opacity-50"
-                        >
-                          <option value="">{subjects.length ? "Select subject" : "No subjects"}</option>
-                          {subjects.map((subject) => (
-                            <option key={subject} value={subject}>
-                              {subject}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="md:col-span-1">
-                        <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Month
+                          Date
                         </span>
                         <input
-                          value={form.month}
-                          onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))}
-                          placeholder="June 2026"
+                          type="date"
+                          value={form.paid_date}
+                          onChange={(event) => setForm((current) => ({ ...current, paid_date: event.target.value }))}
                           className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                         />
                       </label>
-                      <label className="md:col-span-1">
+                      <label>
                         <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Amount
+                          Paid - Amount
                         </span>
                         <input
-                          value={form.amount}
-                          onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
+                          value={form.paid_amount}
+                          onChange={(event) => setForm((current) => ({ ...current, paid_amount: event.target.value }))}
                           inputMode="decimal"
                           placeholder="0"
                           className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                         />
                       </label>
-                      <label className="md:col-span-1">
+                      <label>
                         <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Status
-                        </span>
-                        <select
-                          value={form.status}
-                          onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                          className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold outline-none focus:border-foreground/30"
-                        >
-                          {creationStatuses.map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="md:col-span-1">
-                        <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Due
+                          Next Payment - Amount
                         </span>
                         <input
-                          type="date"
-                          value={form.due_date}
-                          onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))}
+                          value={form.next_payment_amount}
+                          onChange={(event) => setForm((current) => ({ ...current, next_payment_amount: event.target.value }))}
+                          inputMode="decimal"
+                          placeholder="0"
                           className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                         />
                       </label>
-                      <label className="md:col-span-1">
+                      <label>
                         <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Paid
+                          Next Payment - Date
                         </span>
                         <input
                           type="date"
-                          value={form.paid_at}
-                          onChange={(event) => setForm((current) => ({ ...current, paid_at: event.target.value }))}
+                          value={form.next_payment_date}
+                          onChange={(event) => setForm((current) => ({ ...current, next_payment_date: event.target.value }))}
+                          className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
+                        />
+                      </label>
+                      <label>
+                        <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                          Remaining Debt
+                        </span>
+                        <input
+                          value={form.remaining_debt}
+                          onChange={(event) => setForm((current) => ({ ...current, remaining_debt: event.target.value }))}
+                          inputMode="decimal"
+                          placeholder={formatMoney(summary.debt_total, ledgerCurrency)}
                           className="h-10 w-full rounded-lg border border-foreground/10 bg-surface px-3 text-sm outline-none focus:border-foreground/30"
                         />
                       </label>
                     </div>
-
                     <div className="mt-3 flex flex-col gap-3 md:flex-row">
                       <input
                         value={form.notes}
@@ -769,21 +678,28 @@ export default function PaymentsPanel({ state }: { state: any }) {
                       />
                       <button
                         type="submit"
-                        disabled={saving || loading || !selectedChildResolvedId || !form.subject.trim() || !form.amount.trim()}
+                        disabled={
+                          saving ||
+                          loading ||
+                          !selectedChildResolvedId ||
+                          !form.subject.trim() ||
+                          (!form.paid_amount.trim() && !form.next_payment_amount.trim())
+                        }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" />
-                        Add Record
+                        Add Payment
                       </button>
                     </div>
                   </form>
-                  <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
+
+                  <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-white">
                     <table className="w-full min-w-[48rem] text-left">
                       <thead className="bg-muted/60">
                         <tr>
-                          {["Subject", "Month", "Amount", "Status", "Due", "Paid", "Notes", ""].map((heading) => (
+                          {["Date", "Paid - Amount", "Next Payment - Amount and Date", "Remaining Debt"].map((heading) => (
                             <th
-                              key={heading || "actions"}
+                              key={heading}
                               className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
                             >
                               {heading}
@@ -795,60 +711,23 @@ export default function PaymentsPanel({ state }: { state: any }) {
                         {payments.length ? (
                           payments.map((row) => (
                             <tr key={asNumber(row.id)} className="border-t border-foreground/5">
-                              <td className="px-3 py-3 text-xs font-bold">{asString(row.subject) || "-"}</td>
-                              <td className="px-3 py-3 text-xs font-semibold">{asString(row.month) || "Payment"}</td>
-                              <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">
-                                {formatMoney(row.amount, asString(row.currency) || ledgerCurrency)}
+                              <td className="whitespace-nowrap px-3 py-3 text-xs font-semibold">
+                                {paymentRecordDate(row)}
                               </td>
-                              <td className="px-3 py-3">
-                                <span className={`inline-flex rounded-md border px-2 py-1 text-[11px] font-bold ${statusClass(row.state ?? row.status)}`}>
-                                  {statusLabel(row.state ?? row.status)}
-                                </span>
+                              <td className="whitespace-nowrap px-3 py-3 text-xs font-bold text-emerald-700">
+                                {paidAmountFor(row, ledgerCurrency)}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">{formatDate(row.due_date)}</td>
-                              <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">{formatDate(row.paid_at)}</td>
-                              <td className="px-3 py-3 text-xs text-muted-foreground">{asString(row.notes) || "-"}</td>
-                              <td className="px-3 py-3">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {asString(row.state ?? row.status).toLowerCase() === "paid" ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => markPaid(row, false)}
-                                      disabled={saving}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-2.5 text-xs font-bold text-muted-foreground hover:bg-muted disabled:opacity-50"
-                                      aria-label="Mark payment as unpaid"
-                                    >
-                                      <Undo2 className="h-3.5 w-3.5" />
-                                      Unpay
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => markPaid(row, true)}
-                                      disabled={saving}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                                      aria-label="Mark payment as paid"
-                                    >
-                                      <Check className="h-3.5 w-3.5" />
-                                      Mark paid
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => deletePayment(row)}
-                                    disabled={saving}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted disabled:opacity-50"
-                                    aria-label="Delete payment record"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
+                              <td className="whitespace-nowrap px-3 py-3 text-xs font-semibold text-amber-700">
+                                {nextPaymentFor(row, ledgerCurrency)}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-3 text-xs font-bold text-rose-700">
+                                {remainingDebtFor(row, ledgerCurrency)}
                               </td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={8} className="px-3 py-10 text-center text-sm font-bold text-muted-foreground">
+                            <td colSpan={4} className="px-3 py-10 text-center text-sm font-bold text-muted-foreground">
                               {loading ? "Loading payments..." : "No payment records yet."}
                             </td>
                           </tr>
@@ -858,10 +737,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
                   </div>
                 </>
               )}
-            </>
-          )}
-              </div>
-            </ChartCard>
+            </div>
           </div>
         </div>
       ) : null}
