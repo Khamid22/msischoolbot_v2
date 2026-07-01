@@ -607,6 +607,9 @@ CREATE TABLE IF NOT EXISTS msi_v2.app_settings (
 );
 
 ALTER TABLE msi_v2.msi_staff ADD COLUMN IF NOT EXISTS legacy_admin_id BIGINT;
+-- Teacher login rows (role='teacher') point back to their teacher profile so the
+-- teachers<->staff join is by id, not display_name (names are not unique).
+ALTER TABLE msi_v2.msi_staff ADD COLUMN IF NOT EXISTS teacher_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL;
 ALTER TABLE msi_v2.students ADD COLUMN IF NOT EXISTS legacy_student_row_id BIGINT;
 ALTER TABLE msi_v2.parents ADD COLUMN IF NOT EXISTS legacy_parent_id BIGINT;
 ALTER TABLE msi_v2.parents ADD COLUMN IF NOT EXISTS legacy_admin_id BIGINT;

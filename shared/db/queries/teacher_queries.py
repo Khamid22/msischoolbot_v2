@@ -21,16 +21,21 @@ def _teacher_select():
 
 
 def list_teachers_rows(conn):
+    # DISTINCT ON (t.id) collapses the group_teachers/staff joins to one row per
+    # teacher (a teacher can have several groups); the outer query keeps the
+    # name ordering the admin panel expects.
     return conn.execute(
         f"""
-        SELECT {_teacher_select()}
-        FROM msi_v2.teachers t
-        LEFT JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
-        LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
-        ORDER BY lower(t.full_name) ASC, t.id ASC
+        SELECT * FROM (
+            SELECT DISTINCT ON (t.id) {_teacher_select()}
+            FROM msi_v2.teachers t
+            LEFT JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
+            LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
+            LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
+            WHERE t.status <> 'inactive'
+            ORDER BY t.id, g.group_name NULLS LAST
+        ) teacher_rows
+        ORDER BY lower(teacher_rows.full_name) ASC, teacher_rows.id ASC
         """
     ).fetchall()
 
@@ -62,9 +67,7 @@ def get_teacher_auth_row_by_id(conn, teacher_id):
             '' AS password,
             COALESCE(staff.password_hash, '') AS password_hash
         FROM msi_v2.teachers t
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
+        LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
         WHERE t.id = %s
         LIMIT 1
         """,
@@ -77,9 +80,7 @@ def list_teacher_ids_without_auth(conn):
         """
         SELECT t.id
         FROM msi_v2.teachers t
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
+        LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
         WHERE staff.id IS NULL
         ORDER BY t.id ASC
         """
@@ -105,12 +106,12 @@ def insert_teacher_auth(conn, teacher_id, login, password, password_hash, update
     conn.execute(
         """
         INSERT INTO msi_v2.msi_staff (
-            login, password_hash, display_name, role, status, created_at, updated_at
+            login, password_hash, display_name, role, status, teacher_id, created_at, updated_at
         )
-        VALUES (%s, %s, %s, 'teacher', 'active', now(), COALESCE(NULLIF(%s, '')::timestamptz, now()))
+        VALUES (%s, %s, %s, 'teacher', 'active', %s, now(), COALESCE(NULLIF(%s, '')::timestamptz, now()))
         ON CONFLICT DO NOTHING
         """,
-        (login, password_hash, display_name, updated_at),
+        (login, password_hash, display_name, int(teacher_id), updated_at),
     )
 
 
@@ -136,9 +137,7 @@ def get_teacher_by_id_row(conn, teacher_id):
         FROM msi_v2.teachers t
         LEFT JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
         LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
+        LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
         WHERE t.id = %s
         LIMIT 1
         """,
@@ -177,9 +176,7 @@ def get_teacher_by_group_row(conn, group_name):
         FROM msi_v2.teachers t
         JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
         JOIN msi_v2.groups g ON g.id = gt.group_id
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
+        LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
         WHERE lower(g.group_name) = lower(%s)
         ORDER BY t.id ASC
         LIMIT 1
@@ -195,9 +192,7 @@ def get_teacher_by_full_name_row(conn, full_name):
         FROM msi_v2.teachers t
         LEFT JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
         LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
-        LEFT JOIN msi_v2.msi_staff staff
-            ON staff.telegram_user_id = t.telegram_user_id
-            OR lower(staff.display_name) = lower(t.full_name)
+        LEFT JOIN msi_v2.msi_staff staff ON staff.teacher_id = t.id
         WHERE lower(t.full_name) = lower(%s)
         ORDER BY t.id ASC
         LIMIT 1
