@@ -75,7 +75,15 @@ def insert_student_payment_row(
         )
         VALUES (
             %s, %s, %s, %s, %s, NULLIF(%s, '')::date, NULLIF(%s, '')::timestamptz,
-            %s, %s, COALESCE(NULLIF(%s, '')::timestamptz, now()),
+            %s,
+            (
+                SELECT id
+                FROM msi_v2.msi_staff
+                WHERE id = %s OR legacy_admin_id = %s
+                ORDER BY id
+                LIMIT 1
+            ),
+            COALESCE(NULLIF(%s, '')::timestamptz, now()),
             COALESCE(NULLIF(%s, '')::timestamptz, now())
         )
         RETURNING {_payment_select()}
@@ -89,6 +97,7 @@ def insert_student_payment_row(
             str(due_date or "").strip(),
             str(paid_at or "").strip(),
             str(notes or "").strip(),
+            int(created_by_admin_id) if created_by_admin_id else None,
             int(created_by_admin_id) if created_by_admin_id else None,
             str(created_at or "").strip(),
             str(updated_at or "").strip(),

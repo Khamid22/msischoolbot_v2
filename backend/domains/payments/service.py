@@ -41,6 +41,16 @@ def _normalize_amount(value):
     return max(0.0, _safe_float(value))
 
 
+def _normalize_date_input(value, field_name):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    parsed = canonical.parse_date(raw)
+    if not parsed:
+        raise ValueError(f"{field_name} is not a valid date.")
+    return parsed.isoformat()
+
+
 def _date_sort_value(value):
     # Unparseable dates sort last. Canonical date parsing lives in database.academics.canonical.
     return canonical.parse_date(value) or date.max
@@ -177,21 +187,76 @@ def create_student_payment(student_row_id, payload, created_by_admin_id=0):
     if student_id <= 0:
         raise ValueError("Student is required.")
 
-    amount = _normalize_amount(payload.get("amount"))
-    if amount <= 0:
-        raise ValueError("Payment amount must be greater than zero.")
-
     subject = str(payload.get("subject") or "").strip()
     if not subject:
         raise ValueError("Subject is required.")
 
-    month_label = str(payload.get("month") or payload.get("month_label") or "").strip()
-    status = _normalize_status(payload.get("status"))
-    due_date = str(payload.get("due_date") or "").strip()
-    paid_at = str(payload.get("paid_at") or "").strip()
     currency = str(payload.get("currency") or "UZS").strip().upper() or "UZS"
-    notes = str(payload.get("notes") or "").strip()
     now = _utc_now_iso()
+
+    paid_amount = _normalize_amount(payload.get("paid_amount"))
+    next_payment_amount = _normalize_amount(payload.get("next_payment_amount"))
+    remaining_debt = _normalize_amount(payload.get("remaining_debt"))
+
+    if not paid_amount and not next_payment_amount and "amount" in payload:
+        amount = _normalize_amount(payload.get("amount"))
+        if amount <= 0:
+            raise ValueError("Payment amount must be greater than zero.")
+        records_to_insert = [
+            {
+                "month_label": str(payload.get("month") or payload.get("month_label") or "").strip(),
+                "amount": amount,
+                "status": _normalize_status(payload.get("status")),
+                "due_date": _normalize_date_input(payload.get("due_date"), "Due date"),
+                "paid_at": _normalize_date_input(payload.get("paid_at"), "Paid date"),
+                "notes": str(payload.get("notes") or "").strip(),
+            }
+        ]
+    else:
+        records_to_insert = []
+        paid_date = _normalize_date_input(payload.get("paid_date") or payload.get("paid_at"), "Payment date")
+        next_payment_date = _normalize_date_input(payload.get("next_payment_date") or payload.get("due_date"), "Next payment date")
+        notes = str(payload.get("notes") or "").strip()
+
+        if paid_amount > 0:
+            records_to_insert.append(
+                {
+                    "month_label": paid_date or str(payload.get("month") or "Paid payment").strip(),
+                    "amount": paid_amount,
+                    "status": "paid",
+                    "due_date": paid_date,
+                    "paid_at": paid_date or date.today().isoformat(),
+                    "notes": notes,
+                }
+            )
+
+        if next_payment_amount > 0:
+            records_to_insert.append(
+                {
+                    "month_label": next_payment_date or str(payload.get("month") or "Next payment").strip(),
+                    "amount": next_payment_amount,
+                    "status": "due",
+                    "due_date": next_payment_date,
+                    "paid_at": "",
+                    "notes": notes,
+                }
+            )
+
+        if remaining_debt > 0:
+            debt_note = "Remaining debt"
+            records_to_insert.append(
+                {
+                    "month_label": str(payload.get("month") or debt_note).strip(),
+                    "amount": remaining_debt,
+                    "status": "debt",
+                    "due_date": next_payment_date,
+                    "paid_at": "",
+                    "notes": " · ".join(part for part in (notes, debt_note) if part),
+                }
+            )
+
+        if not records_to_insert:
+            raise ValueError("Payment amount must be greater than zero.")
 
     with _connect() as conn:
         queries.ensure_students_schema(conn)
@@ -199,26 +264,30 @@ def create_student_payment(student_row_id, payload, created_by_admin_id=0):
         student_row = queries.get_student_admin_row(conn, student_id)
         if not student_row:
             raise ValueError("Student was not found.")
-        row = queries.insert_student_payment_row(
-            conn,
-            student_row_id=student_id,
-            subject=subject,
-            month_label=month_label,
-            amount=amount,
-            currency=currency,
-            status=status,
-            due_date=due_date,
-            paid_at=paid_at,
-            notes=notes,
-            created_by_admin_id=int(created_by_admin_id or 0),
-            created_at=now,
-            updated_at=now,
-        )
+        inserted_rows = []
+        for record in records_to_insert:
+            inserted_rows.append(
+                queries.insert_student_payment_row(
+                    conn,
+                    student_row_id=student_id,
+                    subject=subject,
+                    month_label=record["month_label"],
+                    amount=record["amount"],
+                    currency=currency,
+                    status=record["status"],
+                    due_date=record["due_date"],
+                    paid_at=record["paid_at"],
+                    notes=record["notes"],
+                    created_by_admin_id=int(created_by_admin_id or 0),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         conn.commit()
         rows = queries.list_student_payment_rows(conn, student_id)
 
     return {
-        "payment": _payment_record_from_row(row),
+        "payment": _payment_record_from_row(inserted_rows[0]),
         "payments": [_payment_record_from_row(payment_row) for payment_row in rows],
     }
 

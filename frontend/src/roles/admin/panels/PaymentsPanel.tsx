@@ -331,15 +331,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
     if (!childId || saving) return;
     const paidAmount = moneyValue(form.paid_amount);
     const nextAmount = moneyValue(form.next_payment_amount);
-    const amount = paidAmount > 0 ? paidAmount : nextAmount;
-    if (amount <= 0) {
-      setError("Enter paid amount or next payment amount.");
+    const debtAmount = moneyValue(form.remaining_debt);
+    if (paidAmount <= 0 && nextAmount <= 0 && debtAmount <= 0) {
+      setError("Enter paid amount, next payment amount, or remaining debt.");
       return;
     }
-    const status = paidAmount > 0 ? "paid" : "due";
-    const notes = [form.notes.trim(), form.remaining_debt.trim() ? `Remaining debt: ${form.remaining_debt.trim()}` : ""]
-      .filter(Boolean)
-      .join(" · ");
     setSaving(true);
     setError("");
     try {
@@ -352,13 +348,13 @@ export default function PaymentsPanel({ state }: { state: any }) {
         },
         body: JSON.stringify({
           subject: form.subject,
-          month: form.paid_date || form.next_payment_date || "Payment",
-          amount: String(amount),
           currency: form.currency,
-          status,
-          due_date: status === "due" ? form.next_payment_date : "",
-          paid_at: status === "paid" ? form.paid_date : "",
-          notes,
+          paid_date: form.paid_date,
+          paid_amount: form.paid_amount,
+          next_payment_amount: form.next_payment_amount,
+          next_payment_date: form.next_payment_date,
+          remaining_debt: form.remaining_debt,
+          notes: form.notes.trim(),
         }),
       });
       const json = await response.json().catch(() => ({}));
@@ -683,7 +679,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
                           loading ||
                           !selectedChildResolvedId ||
                           !form.subject.trim() ||
-                          (!form.paid_amount.trim() && !form.next_payment_amount.trim())
+                          (!form.paid_amount.trim() && !form.next_payment_amount.trim() && !form.remaining_debt.trim())
                         }
                         className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
                       >
