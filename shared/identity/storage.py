@@ -33,10 +33,10 @@ def init_storage():
     with DB_LOCK:
         if _STORAGE_READY:
             return
+        # The msi_v2 schema is owned by Alembic migrations (applied on deploy via
+        # `alembic upgrade head`; run it manually for local dev). Startup only
+        # seeds bootstrap data (default resource types + owner account).
         with connect() as conn:
-            ensure_clean_v2_schema(conn)
-            queries.ensure_office_hours_schema(conn)
-            queries.ensure_announcements_schema(conn)
             queries.ensure_default_resource_types(conn, utc_now_iso())
             ensure_owner_admin(conn)
             conn.commit()
