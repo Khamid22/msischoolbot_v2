@@ -2127,7 +2127,7 @@ export default function TeachersPanel({
   }, [teachers.length]);
 
   return (
-    <div className="flex min-h-[calc(var(--tg-app-height)-7rem)] flex-col gap-3 lg:h-full lg:min-h-0">
+    <div className="workspace-fit flex flex-col gap-3 lg:h-full lg:min-h-0">
       {toast ? (
         <div
           className={`fixed right-4 top-[calc(var(--app-top-inset)+4rem)] lg:top-4 z-[60] flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover ${

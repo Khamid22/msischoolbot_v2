@@ -52,11 +52,6 @@ export const routes = {
     `/admin/api/academic/enrollments/${enrollmentId}/group`,
   adminAnnouncementsApi: "/admin/api/announcements",
   adminAnnouncementApi: (announcementId: number | string) => `/admin/api/announcements/${announcementId}`,
-  adminParents: "/admin/parents",
-  adminParent: (parentAdminId: number | string) => `/admin/parents/${parentAdminId}`,
-  adminParentResetPassword: (parentAdminId: number | string) =>
-    `/admin/parents/${parentAdminId}/reset-password`,
-  adminParentStatus: (parentAdminId: number | string) => `/admin/parents/${parentAdminId}/status`,
   adminParentInvite: (studentRowId: number | string) =>
     `/admin/api/students/${studentRowId}/parent-invite`,
   adminParentChildrenFor: (parentAdminId: number | string) => `/admin/parents/${parentAdminId}/children`,

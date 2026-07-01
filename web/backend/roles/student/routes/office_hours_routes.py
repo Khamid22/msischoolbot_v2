@@ -17,12 +17,16 @@ def _list_enrolled_subject_options(student_id, school_code, fallback_subject_nam
         with connect_auth_db() as conn:
             current = conn.execute(
                 """
-                SELECT e.student_row_id, e.full_name_norm, e.full_name, e.school_id
-                FROM academic_enrollments e
-                JOIN academic_schools s ON s.id = e.school_id
-                WHERE e.public_dashboard_id = %s
-                  AND (%s = '' OR s.code = %s)
-                ORDER BY e.active DESC, e.id DESC
+                SELECT
+                    st.id AS internal_student_id,
+                    st.legacy_student_row_id,
+                    st.full_name,
+                    sch.school_key
+                FROM msi_v2.students st
+                LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
+                LEFT JOIN msi_v2.group_students gs ON gs.student_id = st.id
+                WHERE COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
+                  AND (%s = '' OR lower(sch.school_key) = lower(%s))
                 LIMIT 1
                 """,
                 (student_id, school_code, school_code),
@@ -30,40 +34,21 @@ def _list_enrolled_subject_options(student_id, school_code, fallback_subject_nam
             if not current:
                 return fallback
 
-            student_row_id = current.get("student_row_id")
-            full_name_norm = str(current.get("full_name_norm") or "").strip()
-            full_name = str(current.get("full_name") or "").strip()
-            school_id = current.get("school_id")
-
-            if student_row_id:
-                rows = conn.execute(
-                    """
-                    SELECT DISTINCT sub.id, sub.name
-                    FROM academic_enrollments e
-                    JOIN academic_subjects sub ON sub.id = e.subject_id
-                    WHERE e.student_row_id = %s
-                      AND e.school_id = %s
-                      AND e.active = 1
-                    ORDER BY sub.name
-                    """,
-                    (student_row_id, school_id),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    """
-                    SELECT DISTINCT sub.id, sub.name
-                    FROM academic_enrollments e
-                    JOIN academic_subjects sub ON sub.id = e.subject_id
-                    WHERE e.school_id = %s
-                      AND e.active = 1
-                      AND (
-                        (%s <> '' AND e.full_name_norm = %s)
-                        OR (%s <> '' AND lower(trim(e.full_name)) = lower(trim(%s)))
-                      )
-                    ORDER BY sub.name
-                    """,
-                    (school_id, full_name_norm, full_name_norm, full_name, full_name),
-                ).fetchall()
+            internal_student_id = current.get("internal_student_id")
+            rows = conn.execute(
+                """
+                SELECT DISTINCT subj.id, subj.subject_name AS name
+                FROM msi_v2.group_students gs
+                JOIN msi_v2.groups g ON g.id = gs.group_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE gs.student_id = %s
+                  AND gs.enrollment_status = 'active'
+                  AND subj.status = 'active'
+                ORDER BY subj.subject_name
+                """,
+                (internal_student_id,),
+            ).fetchall()
     except Exception:
         return fallback
 

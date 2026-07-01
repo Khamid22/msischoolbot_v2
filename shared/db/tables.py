@@ -1001,64 +1001,72 @@ def ensure_academic_reference_schema(conn):
 def ensure_office_hours_schema(conn):
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS office_hour_availability (
+        CREATE SCHEMA IF NOT EXISTS msi_v2
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.office_hour_slots (
             id BIGSERIAL PRIMARY KEY,
-            teacher_id BIGINT NOT NULL,
-            subject_id BIGINT,
-            planned_topic TEXT NOT NULL DEFAULT '',
-            starts_at TEXT NOT NULL,
-            ends_at TEXT NOT NULL,
+            teacher_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE CASCADE,
+            subject_id BIGINT REFERENCES msi_v2.subjects(id) ON DELETE SET NULL,
+            starts_at TIMESTAMPTZ NOT NULL,
+            ends_at TIMESTAMPTZ NOT NULL,
             slot_minutes INTEGER NOT NULL DEFAULT 30,
-            room TEXT NOT NULL DEFAULT '',
             capacity INTEGER NOT NULL DEFAULT 1,
-            status TEXT NOT NULL DEFAULT 'active',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
-            FOREIGN KEY(subject_id) REFERENCES academic_subjects(id) ON DELETE SET NULL
+            room TEXT NOT NULL DEFAULT '',
+            planned_topic TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'open',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            legacy_slot_id BIGINT
         )
         """
     )
     conn.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_office_hour_availability_starts
-        ON office_hour_availability(starts_at, status)
+        CREATE INDEX IF NOT EXISTS idx_office_hour_slots_starts
+        ON msi_v2.office_hour_slots(starts_at, status)
         """
     )
     conn.execute(
         """
-        CREATE TABLE IF NOT EXISTS office_hour_bookings (
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_office_hour_slots_legacy_id
+        ON msi_v2.office_hour_slots(legacy_slot_id)
+        WHERE legacy_slot_id IS NOT NULL
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.office_hour_bookings (
             id BIGSERIAL PRIMARY KEY,
-            availability_id BIGINT NOT NULL,
-            teacher_id BIGINT NOT NULL,
-            student_row_id BIGINT NOT NULL,
-            subject_id BIGINT,
-            starts_at TEXT NOT NULL,
-            ends_at TEXT NOT NULL,
+            slot_id BIGINT NOT NULL REFERENCES msi_v2.office_hour_slots(id) ON DELETE CASCADE,
+            student_id BIGINT NOT NULL REFERENCES msi_v2.students(id) ON DELETE CASCADE,
+            subject_id BIGINT REFERENCES msi_v2.subjects(id) ON DELETE SET NULL,
             status TEXT NOT NULL DEFAULT 'booked',
-            student_topic_request TEXT NOT NULL DEFAULT '',
             student_note TEXT NOT NULL DEFAULT '',
+            student_topic_request TEXT NOT NULL DEFAULT '',
             teacher_note TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY(availability_id) REFERENCES office_hour_availability(id) ON DELETE RESTRICT,
-            FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE RESTRICT,
-            FOREIGN KEY(student_row_id) REFERENCES students(id) ON DELETE RESTRICT,
-            FOREIGN KEY(subject_id) REFERENCES academic_subjects(id) ON DELETE SET NULL
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            canceled_at TIMESTAMPTZ,
+            legacy_booking_id BIGINT
         )
         """
     )
-    conn.execute("ALTER TABLE office_hour_availability ADD COLUMN IF NOT EXISTS planned_topic TEXT NOT NULL DEFAULT ''")
-    conn.execute("ALTER TABLE office_hour_bookings ADD COLUMN IF NOT EXISTS student_topic_request TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE msi_v2.office_hour_slots ADD COLUMN IF NOT EXISTS planned_topic TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE msi_v2.office_hour_slots ADD COLUMN IF NOT EXISTS legacy_slot_id BIGINT")
+    conn.execute("ALTER TABLE msi_v2.office_hour_bookings ADD COLUMN IF NOT EXISTS student_topic_request TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE msi_v2.office_hour_bookings ADD COLUMN IF NOT EXISTS legacy_booking_id BIGINT")
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_office_hour_bookings_student
-        ON office_hour_bookings(student_row_id, starts_at)
+        ON msi_v2.office_hour_bookings(student_id, status)
         """
     )
     conn.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_office_hour_bookings_teacher
-        ON office_hour_bookings(teacher_id, starts_at)
+        ON msi_v2.office_hour_slots(teacher_id, starts_at)
         """
     )
 

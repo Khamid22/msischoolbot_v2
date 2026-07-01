@@ -197,11 +197,12 @@ Create the exact SQL file:
 scripts/rebuild_database_v2.sql
 ```
 
-Then create importer scripts:
+Current reusable importer script:
 
 ```text
 scripts/import_subject_programs_v2.py
-scripts/migrate_database_v2.py
-scripts/drop_old_database_tables_v2.sql
 ```
 
+The old one-time public-table migration and destructive drop scripts were
+removed after the `msi_v2` cutover. Do not recreate them unless there is a new
+approved migration plan with a backup and exact SQL review.

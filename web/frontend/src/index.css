@@ -155,6 +155,12 @@
   .miniapp-table-scroll table {
     max-width: none;
   }
+  .workspace-fit {
+    min-height: calc(var(--tg-app-height) - var(--app-top-inset) - var(--app-bottom-inset) - 1rem);
+  }
+  .workspace-card {
+    @apply rounded-lg border border-foreground/10 bg-surface shadow-card;
+  }
   .miniapp-touch-target {
     min-height: 2.5rem;
   }
@@ -176,7 +182,7 @@
     }
 
     html.tg-miniapp table {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
     }
 
     html.tg-miniapp th,
@@ -188,6 +194,18 @@
     html.tg-miniapp .recharts-wrapper,
     html.tg-miniapp .recharts-surface {
       max-width: 100%;
+    }
+
+    html.tg-miniapp .recharts-cartesian-axis-tick text {
+      font-size: 0.68rem;
+    }
+
+    html.tg-miniapp .recharts-legend-item-text {
+      font-size: 0.72rem;
+    }
+
+    html.tg-miniapp .workspace-card {
+      border-radius: 0.75rem;
     }
 
     html.tg-miniapp .overflow-auto,

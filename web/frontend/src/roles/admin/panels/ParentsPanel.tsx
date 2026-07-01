@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertCircle, CheckCircle2, Plus, UserRound, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, UserRound, X } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Pagination } from "@/shared/ui/Pagination";
@@ -11,7 +11,6 @@ import {
   countActiveFilters,
   defaultParentFilters,
   filterParents,
-  isDisabled,
   parentChildren,
   parentDisplayName,
 } from "./parents/types";
@@ -20,18 +19,17 @@ import { ParentSummaryCards } from "./parents/ParentSummaryCards";
 import { ParentToolbar } from "./parents/ParentToolbar";
 import { ParentTable } from "./parents/ParentTable";
 import { ParentDrawer } from "./parents/ParentDrawer";
-import { ParentFormModal, type ParentProfilePayload } from "./parents/ParentFormModal";
 import { LinkStudentModal } from "./parents/LinkStudentModal";
 
 type Banner = { kind: "error" | "success"; text: string } | null;
 
-type ConfirmKind = "unlink" | "disable" | "delete" | "reset";
+type ConfirmKind = "unlink";
 type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
 
 const PAGE_DESCRIPTION = "Manage parent accounts, contact details, linked students, and support tickets.";
 const PARENTS_PAGE_SIZE = 9;
 
-function HeaderBar({ onAdd }: { onAdd: () => void }) {
+function HeaderBar() {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 items-start gap-2.5">
@@ -84,16 +82,12 @@ export default function ParentsPanel({ state }: { state: any }) {
 
   const [filters, setFilters] = useState<ParentFilters>(defaultParentFilters);
   const [drawerParentId, setDrawerParentId] = useState<number | null>(null);
-  const [form, setForm] = useState<{ mode: "create" | "edit"; parent: ParentRow | null } | null>(null);
-  const [formSaving, setFormSaving] = useState(false);
-  const [formError, setFormError] = useState("");
   const [linkParentId, setLinkParentId] = useState<number | null>(null);
   const [linkSaving, setLinkSaving] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [banner, setBanner] = useState<Banner>(null);
-  const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => filterParents(parents, filters), [parents, filters]);
@@ -119,10 +113,6 @@ export default function ParentsPanel({ state }: { state: any }) {
     }
   }
 
-  function patchParent(id: number, next: ParentRow) {
-    setParents((current) => current.map((p) => (asNumber(p.id) === id ? next : p)));
-  }
-
   function applyFilters(patch: Partial<ParentFilters>) {
     setFilters((current) => ({ ...current, ...patch }));
   }
@@ -144,34 +134,6 @@ export default function ParentsPanel({ state }: { state: any }) {
     return json as Record<string, unknown>;
   }
 
-  // ── Create / edit ──────────────────────────────────────────────────────────
-  async function submitForm(payload: ParentProfilePayload) {
-    if (!form || formSaving) return;
-    setFormSaving(true);
-    setFormError("");
-    try {
-      if (form.mode === "create") {
-        const json = await request("POST", routes.adminParents, payload);
-        const parent = (json.parent || {}) as ParentRow;
-        setParents((current) =>
-          [...current, parent].sort((a, b) => asString(a.login).localeCompare(asString(b.login))),
-        );
-        setBanner({ kind: "success", text: `Added ${parentDisplayName(parent)}.` });
-      } else if (form.parent) {
-        const id = asNumber(form.parent.id);
-        const json = await request("PATCH", routes.adminParent(id), payload);
-        patchParent(id, (json.parent || {}) as ParentRow);
-        setBanner({ kind: "success", text: "Parent profile updated." });
-      }
-      setForm(null);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to save.");
-    } finally {
-      setFormSaving(false);
-    }
-  }
-
-  // ── Link / unlink ──────────────────────────────────────────────────────────
   async function linkStudent(parent: ParentRow, studentRowId: number) {
     if (linkSaving) return;
     setLinkSaving(true);
@@ -208,29 +170,6 @@ export default function ParentsPanel({ state }: { state: any }) {
     setBanner({ kind: "success", text: "Student unlinked." });
   }
 
-  // ── Account actions ────────────────────────────────────────────────────────
-  async function resetPassword(parent: ParentRow) {
-    const id = asNumber(parent.id);
-    const json = await request("POST", routes.adminParentResetPassword(id), {});
-    patchParent(id, (json.parent || parent) as ParentRow);
-    setResetResult({ name: parentDisplayName(parent), password: asString(json.temporary_password) });
-  }
-
-  async function toggleDisabled(parent: ParentRow, disabled: boolean) {
-    const id = asNumber(parent.id);
-    const json = await request("POST", routes.adminParentStatus(id), { disabled });
-    patchParent(id, (json.parent || parent) as ParentRow);
-    setBanner({ kind: "success", text: disabled ? "Account disabled." : "Account enabled." });
-  }
-
-  async function deleteParent(parent: ParentRow) {
-    const id = asNumber(parent.id);
-    await request("DELETE", routes.adminParent(id));
-    setParents((current) => current.filter((p) => asNumber(p.id) !== id));
-    if (drawerParentId === id) setDrawerParentId(null);
-    setBanner({ kind: "success", text: `Deleted ${parentDisplayName(parent)}.` });
-  }
-
   function openTickets(parent: ParentRow) {
     if (typeof state.setActiveParentId === "function") {
       state.setActiveParentId(asNumber(parent.id));
@@ -240,19 +179,12 @@ export default function ParentsPanel({ state }: { state: any }) {
     }
   }
 
-  // ── Confirm-gated dispatch ──────────────────────────────────────────────────
   async function runConfirm() {
     if (!confirm || confirmBusy) return;
     setConfirmBusy(true);
     try {
       if (confirm.kind === "unlink" && confirm.child) {
         await unlinkChild(confirm.parent, confirm.child);
-      } else if (confirm.kind === "disable") {
-        await toggleDisabled(confirm.parent, true);
-      } else if (confirm.kind === "delete") {
-        await deleteParent(confirm.parent);
-      } else if (confirm.kind === "reset") {
-        await resetPassword(confirm.parent);
       }
       setConfirm(null);
     } catch (error) {
@@ -265,7 +197,6 @@ export default function ParentsPanel({ state }: { state: any }) {
 
   const handlers: ParentHandlers = {
     onView: (parent) => setDrawerParentId(asNumber(parent.id)),
-    onEdit: (parent) => setForm({ mode: "edit", parent }),
     onLinkStudent: (parent) => {
       setLinkError("");
       setLinkParentId(asNumber(parent.id));
@@ -279,17 +210,6 @@ export default function ParentsPanel({ state }: { state: any }) {
       }
     },
     onUnlinkChild: (parent, child) => setConfirm({ kind: "unlink", parent, child }),
-    onResetPassword: (parent) => setConfirm({ kind: "reset", parent }),
-    onToggleDisabled: (parent) => {
-      if (isDisabled(parent)) {
-        void toggleDisabled(parent, false).catch((error) =>
-          setBanner({ kind: "error", text: error instanceof Error ? error.message : "Action failed." }),
-        );
-      } else {
-        setConfirm({ kind: "disable", parent });
-      }
-    },
-    onDelete: (parent) => setConfirm({ kind: "delete", parent }),
     onOpenTickets: openTickets,
   };
 
@@ -302,31 +222,13 @@ export default function ParentsPanel({ state }: { state: any }) {
       confirmLabel: "Unlink",
       danger: true,
     },
-    disable: {
-      title: "Disable account",
-      message: confirm ? `${parentDisplayName(confirm.parent)} will be blocked from signing in until re-enabled. Their data is kept.` : "",
-      confirmLabel: "Disable",
-      danger: true,
-    },
-    delete: {
-      title: "Delete account",
-      message: confirm ? `Permanently delete ${parentDisplayName(confirm.parent)} and all student links. This cannot be undone.` : "",
-      confirmLabel: "Delete",
-      danger: true,
-    },
-    reset: {
-      title: "Reset password",
-      message: confirm ? `Generate a new temporary password for ${parentDisplayName(confirm.parent)}? Their current password will stop working.` : "",
-      confirmLabel: "Reset password",
-      danger: false,
-    },
   };
 
   const onlySearch = filters.search.trim() && activeCount === 1;
 
   return (
-    <div className="flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-1rem)] flex-col gap-3 sm:gap-4 lg:h-full lg:min-h-0">
-      <HeaderBar onAdd={() => { setFormError(""); setForm({ mode: "create", parent: null }); }} />
+    <div className="workspace-fit flex flex-col gap-3 sm:gap-3 lg:h-full lg:min-h-0">
+      <HeaderBar />
 
       {banner ? (
         <div
@@ -400,17 +302,6 @@ export default function ParentsPanel({ state }: { state: any }) {
         onClose={() => setDrawerParentId(null)}
       />
 
-      {form ? (
-        <ParentFormModal
-          mode={form.mode}
-          parent={form.parent}
-          saving={formSaving}
-          error={formError}
-          onClose={() => setForm(null)}
-          onSubmit={submitForm}
-        />
-      ) : null}
-
       {linkParent ? (
         <LinkStudentModal
           parent={linkParent}
@@ -432,54 +323,6 @@ export default function ParentsPanel({ state }: { state: any }) {
         onConfirm={runConfirm}
         onCancel={() => setConfirm(null)}
       />
-
-      {resetResult ? (
-        <ResetPasswordDialog
-          name={resetResult.name}
-          password={resetResult.password}
-          onClose={() => setResetResult(null)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function ResetPasswordDialog({ name, password, onClose }: { name: string; password: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-surface shadow-card-hover" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 pt-5">
-          <h3 className="text-sm font-bold">Temporary password</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Share this password with {name}. It only shows once — they should change it after signing in.
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <code className="flex-1 truncate rounded-lg border border-foreground/10 bg-background px-3 py-2 font-mono text-sm font-bold">
-              {password || "—"}
-            </code>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(password);
-                  setCopied(true);
-                } catch {
-                  setCopied(false);
-                }
-              }}
-              className="h-9 shrink-0 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted"
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-        </div>
-        <div className="mt-5 px-5 pb-5">
-          <button type="button" onClick={onClose} className="h-10 w-full rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            Done
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

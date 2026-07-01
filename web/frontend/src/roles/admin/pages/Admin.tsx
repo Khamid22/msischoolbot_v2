@@ -797,7 +797,7 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className="flex app-min-height w-full flex-col px-3 pb-[calc(var(--app-bottom-inset)+1rem)] pt-[calc(var(--app-top-inset)+4.5rem)] sm:px-4 md:px-6 lg:ml-64 lg:app-height lg:w-[calc(100%-16rem)] lg:min-h-0 lg:overflow-hidden lg:pt-4"
+        className="flex app-min-height w-full flex-col px-2.5 pb-[calc(var(--app-bottom-inset)+0.75rem)] pt-[calc(var(--app-top-inset)+4rem)] sm:px-3 md:px-4 lg:ml-64 lg:app-height lg:w-[calc(100%-16rem)] lg:min-h-0 lg:overflow-hidden lg:pt-3"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
@@ -843,7 +843,7 @@ export default function AdminPage(props: AdminPageProps) {
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:[&_.miniapp-table-scroll]:max-h-[calc(var(--tg-app-height)-12rem)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <Suspense fallback={<PanelFallback />}>
             <ActivePanel state={panelState} />
           </Suspense>

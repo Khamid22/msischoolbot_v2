@@ -6,12 +6,9 @@ import {
   Link2,
   Link2Off,
   Mail,
-  Pencil,
   Phone,
   Power,
-  PowerOff,
   Ticket,
-  Trash2,
 } from "lucide-react";
 import { Drawer } from "@/shared/ui/Drawer";
 import { Badge } from "@/shared/ui/Badge";
@@ -20,7 +17,6 @@ import {
   type ParentRow,
   childGroupLabel,
   isDisabled,
-  isInviteSource,
   openTicketCount,
   parentChildren,
   parentDisplayName,
@@ -110,7 +106,6 @@ export function ParentDrawer({
     return <Drawer open={false} onClose={onClose} title="" children={null} />;
   }
 
-  const invite = isInviteSource(parent);
   const disabled = isDisabled(parent);
   const name = parentDisplayName(parent);
   const phone = parentPhone(parent);
@@ -136,17 +131,13 @@ export function ParentDrawer({
           <span className="truncate">{name}</span>
         </span>
       }
-      description={shouldShowLogin(parent) ? `Login: ${parentLogin(parent)}` : invite ? "Registered from student link" : undefined}
+      description={shouldShowLogin(parent) ? `Login: ${parentLogin(parent)}` : "Registered from student link"}
       headerExtra={<div className="hidden sm:block"><ParentStatusBadges parent={parent} /></div>}
       widthClass="sm:max-w-xl lg:max-w-2xl"
       footer={
         <div className="flex flex-col gap-2 sm:flex-row">
-          {!invite ? (
-            <>
-              <ActionButton icon={<Pencil className="h-3.5 w-3.5" />} label="Edit" onClick={() => handlers.onEdit(parent)} />
-              <ActionButton icon={<Link2 className="h-3.5 w-3.5" />} label="Link student" onClick={() => handlers.onLinkStudent(parent)} />
-            </>
-          ) : null}
+          <ActionButton icon={<Link2 className="h-3.5 w-3.5" />} label="Link student" onClick={() => handlers.onLinkStudent(parent)} />
+          <ActionButton icon={<Ticket className="h-3.5 w-3.5" />} label="Open support" onClick={() => handlers.onOpenTickets(parent)} />
         </div>
       }
     >
@@ -161,7 +152,7 @@ export function ParentDrawer({
             <InfoRow
               icon={<Power className="h-4 w-4" />}
               label="Status"
-              value={disabled ? "Disabled" : invite ? "Registered from student link" : "Active"}
+              value={disabled ? "Disabled" : "Registered from student link"}
             />
             {createdAt ? (
               <InfoRow icon={<Ticket className="h-4 w-4" />} label="Added" value={createdAt.slice(0, 10)} />
@@ -221,16 +212,14 @@ export function ParentDrawer({
                         </span>
                       </span>
                     </a>
-                    {!invite ? (
-                      <button
-                        type="button"
-                        onClick={() => handlers.onUnlinkChild(parent, child)}
-                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-2.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <Link2Off className="h-3.5 w-3.5" />
-                        Unlink
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => handlers.onUnlinkChild(parent, child)}
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-foreground/10 bg-background px-2.5 text-xs font-bold text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <Link2Off className="h-3.5 w-3.5" />
+                      Unlink
+                    </button>
                   </div>
                 );
               })}
@@ -301,29 +290,6 @@ export function ParentDrawer({
             ) : null}
           </div>
         </Section>
-
-        {!invite ? (
-          <Section title="Account actions">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <ActionButton
-                icon={<KeyRound className="h-3.5 w-3.5" />}
-                label="Reset password"
-                onClick={() => handlers.onResetPassword(parent)}
-              />
-              <ActionButton
-                icon={disabled ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
-                label={disabled ? "Enable account" : "Disable account"}
-                onClick={() => handlers.onToggleDisabled(parent)}
-              />
-              <ActionButton
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-                label="Delete account"
-                onClick={() => handlers.onDelete(parent)}
-                danger
-              />
-            </div>
-          </Section>
-        ) : null}
       </div>
     </Drawer>
   );

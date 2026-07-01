@@ -1,100 +1,212 @@
-def create_availability_row(conn, teacher_id, subject_id, starts_at, ends_at, slot_minutes, room, capacity, status='active', planned_topic=''):
+def _slot_status_for_db(status):
+    value = str(status or "").strip().lower()
+    if value == "active":
+        return "open"
+    return value or None
+
+
+def create_availability_row(
+    conn,
+    teacher_id,
+    subject_id,
+    starts_at,
+    ends_at,
+    slot_minutes,
+    room,
+    capacity,
+    status="active",
+    planned_topic="",
+):
     result = conn.execute(
         """
-        INSERT INTO office_hour_availability (
-            teacher_id, subject_id, planned_topic, starts_at, ends_at, slot_minutes, room, capacity, status, created_at
+        INSERT INTO msi_v2.office_hour_slots (
+            teacher_id, subject_id, planned_topic, starts_at, ends_at,
+            slot_minutes, room, capacity, status
         ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP::text
-        ) RETURNING id
+            %s, %s, %s, %s::timestamptz, %s::timestamptz,
+            %s, %s, %s, %s
+        )
+        RETURNING id
         """,
-        (teacher_id, subject_id, planned_topic, starts_at, ends_at, slot_minutes, room, capacity, status)
+        (
+            teacher_id,
+            subject_id,
+            planned_topic,
+            starts_at,
+            ends_at,
+            slot_minutes,
+            room,
+            capacity,
+            _slot_status_for_db(status) or "open",
+        ),
     )
     row = result.fetchone()
     return row["id"] if row else None
 
 
+def _availability_select_sql(*, for_update=False):
+    lock = " FOR UPDATE" if for_update else ""
+    return f"""
+        SELECT
+            s.id,
+            s.teacher_id,
+            s.subject_id,
+            s.planned_topic,
+            to_char(s.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
+            to_char(s.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS ends_at,
+            s.slot_minutes,
+            s.room,
+            s.capacity,
+            CASE WHEN s.status = 'open' THEN 'active' ELSE s.status END AS status,
+            to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+        FROM msi_v2.office_hour_slots s
+        WHERE s.id = %s
+        {lock}
+    """
+
+
 def get_availability_row(conn, availability_id):
     return conn.execute(
-        """
-        SELECT id, teacher_id, subject_id, planned_topic, starts_at, ends_at, slot_minutes, room, capacity, status, created_at
-        FROM office_hour_availability
-        WHERE id = %s
-        FOR UPDATE
-        """,
-        (availability_id,)
+        _availability_select_sql(for_update=True),
+        (availability_id,),
     ).fetchone()
 
 
 def update_availability_status_row(conn, availability_id, status):
     conn.execute(
         """
-        UPDATE office_hour_availability
+        UPDATE msi_v2.office_hour_slots
         SET status = %s
         WHERE id = %s
         """,
-        (status, availability_id)
+        (_slot_status_for_db(status) or status, availability_id),
     )
     return True
 
 
 def list_availabilities_rows(conn, teacher_id=None, subject_id=None, status=None, starts_at_from=None):
     sql = """
-        SELECT a.id, a.teacher_id, t.full_name AS teacher_name,
-               a.subject_id, s.name AS subject_name,
-               a.planned_topic, a.starts_at, a.ends_at, a.slot_minutes, a.room, a.capacity, a.status, a.created_at,
-               (SELECT COUNT(*) FROM office_hour_bookings b WHERE b.availability_id = a.id AND b.status = 'booked') AS booked_count
-        FROM office_hour_availability a
-        JOIN teachers t ON t.id = a.teacher_id
-        LEFT JOIN academic_subjects s ON s.id = a.subject_id
+        SELECT
+            s.id,
+            s.teacher_id,
+            t.full_name AS teacher_name,
+            s.subject_id,
+            subj.subject_name,
+            s.planned_topic,
+            to_char(s.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
+            to_char(s.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS ends_at,
+            s.slot_minutes,
+            s.room,
+            s.capacity,
+            CASE WHEN s.status = 'open' THEN 'active' ELSE s.status END AS status,
+            to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+            (
+                SELECT COUNT(*)
+                FROM msi_v2.office_hour_bookings b
+                WHERE b.slot_id = s.id
+                  AND b.status = 'booked'
+            ) AS booked_count
+        FROM msi_v2.office_hour_slots s
+        JOIN msi_v2.teachers t ON t.id = s.teacher_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = s.subject_id
         WHERE 1 = 1
     """
     params = []
     if teacher_id is not None:
-        sql += " AND a.teacher_id = %s"
+        sql += " AND s.teacher_id = %s"
         params.append(teacher_id)
     if subject_id is not None:
-        sql += " AND a.subject_id = %s"
+        sql += " AND s.subject_id = %s"
         params.append(subject_id)
     if status is not None:
-        sql += " AND a.status = %s"
-        params.append(status)
+        sql += " AND s.status = %s"
+        params.append(_slot_status_for_db(status) or status)
     if starts_at_from is not None:
-        sql += " AND a.starts_at >= %s"
+        sql += " AND s.starts_at >= %s::timestamptz"
         params.append(starts_at_from)
-    sql += " ORDER BY a.starts_at ASC"
+    sql += " ORDER BY s.starts_at ASC"
     return conn.execute(sql, params).fetchall()
 
 
-def create_booking_row(conn, availability_id, teacher_id, student_row_id, subject_id, starts_at, ends_at, status='booked', student_note='', teacher_note='', student_topic_request=''):
+def create_booking_row(
+    conn,
+    availability_id,
+    teacher_id,
+    student_row_id,
+    subject_id,
+    starts_at,
+    ends_at,
+    status="booked",
+    student_note="",
+    teacher_note="",
+    student_topic_request="",
+):
     result = conn.execute(
         """
-        INSERT INTO office_hour_bookings (
-            availability_id, teacher_id, student_row_id, subject_id, starts_at, ends_at, status, student_topic_request, student_note, teacher_note, created_at, updated_at
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP::text, CURRENT_TIMESTAMP::text
-        ) RETURNING id
+        INSERT INTO msi_v2.office_hour_bookings (
+            slot_id, student_id, subject_id, status,
+            student_topic_request, student_note, teacher_note
+        )
+        SELECT
+            %s,
+            st.id,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
+        FROM msi_v2.students st
+        WHERE st.legacy_student_row_id = %s
+        LIMIT 1
+        RETURNING id
         """,
-        (availability_id, teacher_id, student_row_id, subject_id, starts_at, ends_at, status, student_topic_request, student_note, teacher_note)
+        (
+            availability_id,
+            subject_id,
+            status,
+            student_topic_request,
+            student_note,
+            teacher_note,
+            student_row_id,
+        ),
     )
     row = result.fetchone()
     return row["id"] if row else None
 
 
+def _booking_select_sql():
+    return """
+        SELECT
+            b.id,
+            b.slot_id AS availability_id,
+            slot.teacher_id,
+            t.full_name AS teacher_name,
+            st.legacy_student_row_id AS student_row_id,
+            st.full_name AS student_name,
+            COALESCE(b.subject_id, slot.subject_id) AS subject_id,
+            subj.subject_name,
+            to_char(slot.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS starts_at,
+            to_char(slot.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS ends_at,
+            b.status,
+            b.student_topic_request,
+            b.student_note,
+            b.teacher_note,
+            to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+            to_char(b.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS updated_at,
+            slot.room,
+            slot.planned_topic
+        FROM msi_v2.office_hour_bookings b
+        JOIN msi_v2.office_hour_slots slot ON slot.id = b.slot_id
+        JOIN msi_v2.teachers t ON t.id = slot.teacher_id
+        JOIN msi_v2.students st ON st.id = b.student_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = COALESCE(b.subject_id, slot.subject_id)
+    """
+
+
 def get_booking_row(conn, booking_id):
     return conn.execute(
-        """
-        SELECT b.id, b.availability_id, b.teacher_id, t.full_name AS teacher_name,
-               b.student_row_id, st.full_name AS student_name, b.subject_id, s.name AS subject_name,
-               b.starts_at, b.ends_at, b.status, b.student_topic_request, b.student_note, b.teacher_note, b.created_at, b.updated_at,
-               a.room, a.planned_topic
-        FROM office_hour_bookings b
-        JOIN office_hour_availability a ON a.id = b.availability_id
-        JOIN teachers t ON t.id = b.teacher_id
-        JOIN students st ON st.id = b.student_row_id
-        LEFT JOIN academic_subjects s ON s.id = b.subject_id
-        WHERE b.id = %s
-        """,
-        (booking_id,)
+        _booking_select_sql() + " WHERE b.id = %s",
+        (booking_id,),
     ).fetchone()
 
 
@@ -102,55 +214,49 @@ def update_booking_status_row(conn, booking_id, status, teacher_note=None):
     if teacher_note is not None:
         conn.execute(
             """
-            UPDATE office_hour_bookings
-            SET status = %s, teacher_note = %s, updated_at = CURRENT_TIMESTAMP::text
+            UPDATE msi_v2.office_hour_bookings
+            SET status = %s,
+                teacher_note = %s,
+                updated_at = now(),
+                canceled_at = CASE WHEN %s = 'cancelled' THEN now() ELSE canceled_at END
             WHERE id = %s
             """,
-            (status, teacher_note, booking_id)
+            (status, teacher_note, status, booking_id),
         )
     else:
         conn.execute(
             """
-            UPDATE office_hour_bookings
-            SET status = %s, updated_at = CURRENT_TIMESTAMP::text
+            UPDATE msi_v2.office_hour_bookings
+            SET status = %s,
+                updated_at = now(),
+                canceled_at = CASE WHEN %s = 'cancelled' THEN now() ELSE canceled_at END
             WHERE id = %s
             """,
-            (status, booking_id)
+            (status, status, booking_id),
         )
     return True
 
 
 def list_bookings_rows(conn, availability_id=None, teacher_id=None, student_row_id=None, subject_id=None, status=None, starts_at_from=None):
-    sql = """
-        SELECT b.id, b.availability_id, b.teacher_id, t.full_name AS teacher_name,
-               b.student_row_id, st.full_name AS student_name, b.subject_id, s.name AS subject_name,
-               b.starts_at, b.ends_at, b.status, b.student_topic_request, b.student_note, b.teacher_note, b.created_at, b.updated_at,
-               a.room, a.planned_topic
-        FROM office_hour_bookings b
-        JOIN office_hour_availability a ON a.id = b.availability_id
-        JOIN teachers t ON t.id = b.teacher_id
-        JOIN students st ON st.id = b.student_row_id
-        LEFT JOIN academic_subjects s ON s.id = b.subject_id
-        WHERE 1 = 1
-    """
+    sql = _booking_select_sql() + " WHERE 1 = 1"
     params = []
     if availability_id is not None:
-        sql += " AND b.availability_id = %s"
+        sql += " AND b.slot_id = %s"
         params.append(availability_id)
     if teacher_id is not None:
-        sql += " AND b.teacher_id = %s"
+        sql += " AND slot.teacher_id = %s"
         params.append(teacher_id)
     if student_row_id is not None:
-        sql += " AND b.student_row_id = %s"
+        sql += " AND st.legacy_student_row_id = %s"
         params.append(student_row_id)
     if subject_id is not None:
-        sql += " AND b.subject_id = %s"
+        sql += " AND COALESCE(b.subject_id, slot.subject_id) = %s"
         params.append(subject_id)
     if status is not None:
         sql += " AND b.status = %s"
         params.append(status)
     if starts_at_from is not None:
-        sql += " AND b.starts_at >= %s"
+        sql += " AND slot.starts_at >= %s::timestamptz"
         params.append(starts_at_from)
-    sql += " ORDER BY b.starts_at ASC"
+    sql += " ORDER BY slot.starts_at ASC, b.created_at ASC"
     return conn.execute(sql, params).fetchall()

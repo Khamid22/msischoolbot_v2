@@ -27,9 +27,11 @@ def group_belongs_to_school(group_name, school_code, load_dataset=None):
         with queries.connect_auth_db() as conn:
             row = conn.execute(
                 """
-                SELECT 1 FROM academic_groups g
-                JOIN academic_schools s ON s.id = g.school_id
-                WHERE g.name = %s AND s.code = %s
+                SELECT 1
+                FROM msi_v2.groups g
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                WHERE g.group_name = %s
+                  AND lower(s.school_key) = lower(%s)
                 LIMIT 1
                 """,
                 (normalized_group, normalized_school),
@@ -53,15 +55,23 @@ def resolve_sheet_student_for_admin(student_row_id, get_admin_student_profile, l
         with queries.connect_auth_db() as conn:
             rows = conn.execute(
                 """
-                SELECT e.public_dashboard_id, sub.name AS subject_name, g.name AS group_name
-                FROM academic_enrollments e
-                JOIN academic_subjects sub ON sub.id = e.subject_id
-                JOIN academic_groups   g   ON g.id   = e.group_id
-                WHERE lower(trim(e.full_name)) = lower(trim(%s))
-                  AND e.active = 1
-                ORDER BY g.name, sub.name
+                SELECT
+                    COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
+                    sub.subject_name,
+                    g.group_name,
+                    s.school_key
+                FROM msi_v2.students st
+                JOIN msi_v2.group_students gs ON gs.student_id = st.id
+                JOIN msi_v2.groups g ON g.id = gs.group_id
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+                JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
+                WHERE st.legacy_student_row_id = %s
+                  AND gs.enrollment_status = 'active'
+                  AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
+                ORDER BY g.group_name, sub.subject_name
                 """,
-                (full_name,),
+                (student_row_id,),
             ).fetchall()
     except Exception:
         rows = []
@@ -77,7 +87,7 @@ def resolve_sheet_student_for_admin(student_row_id, get_admin_student_profile, l
                 "student_id": int(row["public_dashboard_id"]),
                 "subject": str(row["subject_name"] or "").strip(),
                 "group": group_name_row,
-                "school": school_code,
+                "school": str(row.get("school_key") or school_code).strip() or school_code,
                 "group_match": bool(preferred_group and group_name_row == preferred_group),
             }
         )

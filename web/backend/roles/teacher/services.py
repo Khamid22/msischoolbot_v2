@@ -41,8 +41,9 @@ def build_teacher_workspace(teacher_id):
             group_rows = conn.execute(
                 """
                 SELECT id
-                FROM academic_groups
-                WHERE lower(name) = lower(%s)
+                FROM msi_v2.groups
+                WHERE lower(group_name) = lower(%s)
+                  AND status = 'active'
                 ORDER BY id
                 """,
                 (group_name,),
@@ -78,4 +79,3 @@ __all__ = [
     "update_teacher_candidate_status",
     "upsert_teacher",
 ]
-

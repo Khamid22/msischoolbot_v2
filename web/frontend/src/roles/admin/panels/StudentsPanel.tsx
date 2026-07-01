@@ -354,7 +354,7 @@ export default function StudentsPanel({ state }: { state: any }) {
   }, [activityFilter, searchQuery, subjectFilter, currentSchool]);
 
   return (
-    <div className="flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-1rem)] flex-col gap-3 lg:h-full lg:min-h-0">
+    <div className="workspace-fit flex flex-col gap-3 lg:h-full lg:min-h-0">
       {addOpen && !isTeacherMode ? (
         <AddStudentModal
           schools={academicSchools}

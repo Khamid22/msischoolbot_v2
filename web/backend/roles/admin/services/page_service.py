@@ -119,11 +119,16 @@ def _set_cached_admin_page_context(cache_key, context):
 
 
 def _get_schools_from_db():
-    """Return list of (code, name) from academic_schools, ordered by display preference."""
+    """Return list of (code, name) from active client schools."""
     try:
         with queries.connect_auth_db() as conn:
             rows = conn.execute(
-                "SELECT code, name FROM academic_schools ORDER BY name"
+                """
+                SELECT school_key AS code, school_name AS name
+                FROM msi_v2.schools
+                WHERE status = 'active'
+                ORDER BY school_name
+                """
             ).fetchall()
         return [(str(r["code"]), str(r["name"])) for r in rows]
     except Exception:
@@ -136,17 +141,25 @@ def _get_groups_from_db(school_filter="all"):
             if school_filter and school_filter != "all":
                 rows = conn.execute(
                     """
-                    SELECT DISTINCT g.name AS name FROM academic_groups g
-                    JOIN academic_schools s ON s.id = g.school_id
-                    WHERE s.code = %s
-                      AND lower(g.name) <> 'online'
-                    ORDER BY g.name
+                    SELECT DISTINCT g.group_name AS name
+                    FROM msi_v2.groups g
+                    JOIN msi_v2.schools s ON s.id = g.school_id
+                    WHERE lower(s.school_key) = lower(%s)
+                      AND lower(g.group_name) <> 'online'
+                      AND g.status = 'active'
+                    ORDER BY g.group_name
                     """,
                     (school_filter,),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT DISTINCT name AS name FROM academic_groups WHERE lower(name) <> 'online' ORDER BY name"
+                    """
+                    SELECT DISTINCT group_name AS name
+                    FROM msi_v2.groups
+                    WHERE lower(group_name) <> 'online'
+                      AND status = 'active'
+                    ORDER BY group_name
+                    """
                 ).fetchall()
         return [str(row["name"]) for row in rows]
     except Exception:
@@ -159,9 +172,11 @@ def _get_group_school_sets_from_db():
         with queries.connect_auth_db() as conn:
             rows = conn.execute(
                 """
-                SELECT g.name AS group_name, s.code AS school_code FROM academic_groups g
-                JOIN academic_schools s ON s.id = g.school_id
-                WHERE lower(g.name) <> 'online'
+                SELECT g.group_name, s.school_key AS school_code
+                FROM msi_v2.groups g
+                JOIN msi_v2.schools s ON s.id = g.school_id
+                WHERE lower(g.group_name) <> 'online'
+                  AND g.status = 'active'
                 """
             ).fetchall()
         result = {}
