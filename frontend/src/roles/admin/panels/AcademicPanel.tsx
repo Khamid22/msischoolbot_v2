@@ -2580,7 +2580,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
             ) : null}
 
-            <section className="sticky top-[calc(var(--app-top-inset)+4rem)] z-30 rounded-lg border border-foreground/10 bg-surface/95 p-3 shadow-card backdrop-blur lg:top-3">
+            <section className="rounded-lg border border-foreground/10 bg-surface p-3 shadow-card">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -2588,7 +2588,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                     <h3 className="text-sm font-bold">Client Schools & Groups</h3>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown
+                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown · open a group to manage its gradebook
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2709,14 +2709,9 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   ))}
                 </div>
               </div>
-            </section>
 
-            <ChartCard
-              title={selectedSchool ? `${asString(selectedSchool.name)} Groups` : "Groups"}
-              subtitle="Open a group to manage its gradebook"
-              icon={<Layers className="h-4 w-4 text-info" />}
-            >
-              {filteredGroups.length === 0 ? (
+              <div className="mt-3 border-t border-foreground/8 pt-3">
+                {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -2789,8 +2784,9 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                     })}
                   </div>
                 </div>
-              )}
-            </ChartCard>
+                )}
+              </div>
+            </section>
         </>
       ) : null}
 
