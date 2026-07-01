@@ -4,7 +4,7 @@ import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } fr
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { Pagination } from "@/shared/ui/Pagination";
 import { routes } from "@/shared/lib/routes";
-import { adminStickyTop, asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
+import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
 const STUDENTS_PAGE_SIZE = 10;
@@ -370,10 +370,7 @@ export default function StudentsPanel({ state }: { state: any }) {
         <MetricCard label="Never Seen" value={stats.never} hint="No activity recorded" />
       </div>
 
-      <div
-        className="sticky z-30 shrink-0 rounded-lg bg-background/95 pb-2 pt-1 backdrop-blur"
-        style={{ top: adminStickyTop }}
-      >
+      <div className="shrink-0 rounded-lg bg-background/95 pb-2 pt-1">
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(200px,1fr)_170px_170px_190px]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -523,7 +520,7 @@ export default function StudentsPanel({ state }: { state: any }) {
 
         <div className="hidden min-h-0 flex-1 overflow-hidden rounded-lg border border-foreground/8 sm:block">
           <table className="h-full w-full table-fixed text-left">
-            <thead className="static lg:sticky lg:top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+            <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
                 {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
                   <th
