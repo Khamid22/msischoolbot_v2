@@ -57,10 +57,16 @@ def create_parent_invite_code(token, student_row_id, issued_by=0, *, expires_day
             try:
                 conn.execute(
                     """
-                    INSERT INTO parent_invites (
-                        code, token, student_row_id, issued_by, created_at, expires_at
+                    INSERT INTO msi_v2.account_invites (
+                        invite_type,
+                        token_hash,
+                        token,
+                        student_id,
+                        issued_by_staff_id,
+                        created_at,
+                        expires_at
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES ('parent', %s, %s, %s, %s, %s::timestamptz, %s::timestamptz)
                     """,
                     (
                         code,
@@ -86,8 +92,10 @@ def get_parent_invite_token(code):
         row = conn.execute(
             """
             SELECT token
-            FROM parent_invites
-            WHERE code = %s
+            FROM msi_v2.account_invites
+            WHERE invite_type = 'parent'
+              AND token_hash = %s
+              AND status = 'pending'
             LIMIT 1
             """,
             (code,),

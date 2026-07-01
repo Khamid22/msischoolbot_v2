@@ -1,28 +1,31 @@
-"""Student payment ledger SQL helpers."""
+"""Student payment ledger SQL helpers backed by msi_v2.payments."""
+
+
+def _payment_select():
+    return """
+        id,
+        student_id AS student_row_id,
+        '' AS subject,
+        month_label,
+        amount::float AS amount,
+        currency,
+        status,
+        COALESCE(due_date::text, '') AS due_date,
+        COALESCE(paid_at::text, '') AS paid_at,
+        notes,
+        created_by_staff_id AS created_by_admin_id,
+        created_at::text AS created_at,
+        updated_at::text AS updated_at
+    """
 
 
 def list_student_payment_rows(conn, student_row_id):
     return conn.execute(
-        """
-        SELECT
-            id,
-            student_row_id,
-            subject,
-            month_label,
-            amount,
-            currency,
-            status,
-            due_date,
-            paid_at,
-            notes,
-            created_by_admin_id,
-            created_at,
-            updated_at
-        FROM student_payments
-        WHERE student_row_id = %s
-        ORDER BY
-            CASE WHEN trim(COALESCE(due_date, '')) = '' THEN '9999-12-31' ELSE due_date END ASC,
-            id ASC
+        f"""
+        SELECT {_payment_select()}
+        FROM msi_v2.payments
+        WHERE student_id = %s
+        ORDER BY COALESCE(due_date, DATE '9999-12-31') ASC, id ASC
         """,
         (int(student_row_id),),
     ).fetchall()
@@ -30,22 +33,9 @@ def list_student_payment_rows(conn, student_row_id):
 
 def get_student_payment_row(conn, payment_id):
     return conn.execute(
-        """
-        SELECT
-            id,
-            student_row_id,
-            subject,
-            month_label,
-            amount,
-            currency,
-            status,
-            due_date,
-            paid_at,
-            notes,
-            created_by_admin_id,
-            created_at,
-            updated_at
-        FROM student_payments
+        f"""
+        SELECT {_payment_select()}
+        FROM msi_v2.payments
         WHERE id = %s
         """,
         (int(payment_id),),
@@ -69,10 +59,9 @@ def insert_student_payment_row(
     updated_at,
 ):
     row = conn.execute(
-        """
-        INSERT INTO student_payments (
-            student_row_id,
-            subject,
+        f"""
+        INSERT INTO msi_v2.payments (
+            student_id,
             month_label,
             amount,
             currency,
@@ -80,29 +69,19 @@ def insert_student_payment_row(
             due_date,
             paid_at,
             notes,
-            created_by_admin_id,
+            created_by_staff_id,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING
-            id,
-            student_row_id,
-            subject,
-            month_label,
-            amount,
-            currency,
-            status,
-            due_date,
-            paid_at,
-            notes,
-            created_by_admin_id,
-            created_at,
-            updated_at
+        VALUES (
+            %s, %s, %s, %s, %s, NULLIF(%s, '')::date, NULLIF(%s, '')::timestamptz,
+            %s, %s, COALESCE(NULLIF(%s, '')::timestamptz, now()),
+            COALESCE(NULLIF(%s, '')::timestamptz, now())
+        )
+        RETURNING {_payment_select()}
         """,
         (
             int(student_row_id),
-            str(subject or "").strip(),
             str(month_label or "").strip(),
             float(amount or 0),
             str(currency or "UZS").strip() or "UZS",
@@ -121,10 +100,10 @@ def insert_student_payment_row(
 def update_student_payment_paid_row(conn, payment_id, *, paid_at, status, updated_at):
     conn.execute(
         """
-        UPDATE student_payments
-        SET paid_at = %s,
+        UPDATE msi_v2.payments
+        SET paid_at = NULLIF(%s, '')::timestamptz,
             status = %s,
-            updated_at = %s
+            updated_at = COALESCE(NULLIF(%s, '')::timestamptz, now())
         WHERE id = %s
         """,
         (
@@ -139,7 +118,7 @@ def update_student_payment_paid_row(conn, payment_id, *, paid_at, status, update
 def delete_student_payment_row(conn, payment_id):
     deleted = conn.execute(
         """
-        DELETE FROM student_payments
+        DELETE FROM msi_v2.payments
         WHERE id = %s
         """,
         (int(payment_id),),

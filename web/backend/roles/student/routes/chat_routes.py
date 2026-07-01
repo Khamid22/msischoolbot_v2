@@ -22,6 +22,7 @@ from web.backend.utils.session import (
     current_auth_role,
     current_student_full_name,
 )
+from shared.db import queries
 
 _PAGE_SIZE = 40
 _MAX_BODY = 800
@@ -34,8 +35,9 @@ def _validate_room(room: str) -> bool:
 
 
 def _is_blocked(conn, student_login: str) -> bool:
+    queries.ensure_chat_schema(conn)
     row = conn.execute(
-        "SELECT 1 FROM chat_blocked_users WHERE student_id = %s",
+        "SELECT 1 FROM msi_v2.chat_blocked_users WHERE student_id = %s",
         (student_login.strip().lower(),),
     ).fetchone()
     return row is not None
@@ -74,13 +76,14 @@ def register_chat_routes(students):
             after_id = 0
 
         with connect_chat_db() as conn:
+            queries.ensure_chat_schema(conn)
             if after_id > 0:
                 rows = conn.execute(
                     """
                     SELECT id, room, author_name, author_student_id, body,
                            edited_at, created_at
-                    FROM chat_messages
-                    WHERE room = %s AND is_deleted = 0 AND id > %s
+                    FROM msi_v2.chat_messages
+                    WHERE room = %s AND is_deleted IS FALSE AND id > %s
                     ORDER BY id ASC
                     LIMIT %s
                     """,
@@ -94,8 +97,8 @@ def register_chat_routes(students):
                     """
                     SELECT id, room, author_name, author_student_id, body,
                            edited_at, created_at
-                    FROM chat_messages
-                    WHERE room = %s AND is_deleted = 0 AND id < %s
+                    FROM msi_v2.chat_messages
+                    WHERE room = %s AND is_deleted IS FALSE AND id < %s
                     ORDER BY id DESC
                     LIMIT %s
                     """,
@@ -106,8 +109,8 @@ def register_chat_routes(students):
                     """
                     SELECT id, room, author_name, author_student_id, body,
                            edited_at, created_at
-                    FROM chat_messages
-                    WHERE room = %s AND is_deleted = 0
+                    FROM msi_v2.chat_messages
+                    WHERE room = %s AND is_deleted IS FALSE
                     ORDER BY id DESC
                     LIMIT %s
                     """,
@@ -144,14 +147,15 @@ def register_chat_routes(students):
         now = utc_now_iso()
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 if _is_blocked(conn, student_login):
                     return jsonify({"error": "You have been blocked from the chat."}), 403
 
                 inserted = conn.execute(
                     """
-                    INSERT INTO chat_messages
+                    INSERT INTO msi_v2.chat_messages
                         (room, author_name, author_student_id, body, created_at)
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s::timestamptz)
                     RETURNING id
                     """,
                     (room, author_name, student_login, body, now),
@@ -192,8 +196,9 @@ def register_chat_routes(students):
         now = utc_now_iso()
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 row = conn.execute(
-                    "SELECT author_student_id FROM chat_messages WHERE id = %s AND is_deleted = 0",
+                    "SELECT author_student_id FROM msi_v2.chat_messages WHERE id = %s AND is_deleted IS FALSE",
                     (msg_id,),
                 ).fetchone()
                 if not row:
@@ -202,7 +207,7 @@ def register_chat_routes(students):
                     return jsonify({"error": "You can only edit your own messages."}), 403
 
                 conn.execute(
-                    "UPDATE chat_messages SET body = %s, edited_at = %s WHERE id = %s",
+                    "UPDATE msi_v2.chat_messages SET body = %s, edited_at = %s::timestamptz WHERE id = %s",
                     (body, now, msg_id),
                 )
                 conn.commit()
@@ -220,8 +225,9 @@ def register_chat_routes(students):
 
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 row = conn.execute(
-                    "SELECT author_student_id FROM chat_messages WHERE id = %s AND is_deleted = 0",
+                    "SELECT author_student_id FROM msi_v2.chat_messages WHERE id = %s AND is_deleted IS FALSE",
                     (msg_id,),
                 ).fetchone()
                 if not row:
@@ -230,7 +236,7 @@ def register_chat_routes(students):
                     return jsonify({"error": "You can only delete your own messages."}), 403
 
                 conn.execute(
-                    "UPDATE chat_messages SET is_deleted = 1 WHERE id = %s",
+                    "UPDATE msi_v2.chat_messages SET is_deleted = true WHERE id = %s",
                     (msg_id,),
                 )
                 conn.commit()

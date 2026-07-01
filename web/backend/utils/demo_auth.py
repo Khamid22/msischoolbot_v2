@@ -76,10 +76,15 @@ def _set_demo_admin_session(session):
         else:
             row = conn.execute(
                 """
-                SELECT id, login, password_hash, role, is_owner
-                FROM admins
+                SELECT
+                    id,
+                    login,
+                    password_hash,
+                    role,
+                    (lower(role) = 'owner') AS is_owner
+                FROM msi_v2.msi_staff
                 WHERE lower(role) IN ('owner', 'admin', 'ceo', 'academic_director', 'customer_support', 'hr')
-                ORDER BY is_owner DESC, id ASC
+                ORDER BY (lower(role) = 'owner') DESC, id ASC
                 LIMIT 1
                 """
             ).fetchone()
@@ -103,9 +108,17 @@ def _set_demo_teacher_session(session):
         queries.create_tables(conn)
         row = conn.execute(
             """
-            SELECT t.id, t.full_name, t.assigned_group, a.login
-            FROM teachers t
-            LEFT JOIN teacher_auth a ON a.teacher_id = t.id
+            SELECT
+                t.id,
+                t.full_name,
+                COALESCE(g.group_name, '') AS assigned_group,
+                COALESCE(staff.login, '') AS login
+            FROM msi_v2.teachers t
+            LEFT JOIN msi_v2.group_teachers gt ON gt.teacher_id = t.id AND gt.status = 'active'
+            LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
+            LEFT JOIN msi_v2.msi_staff staff
+                ON staff.telegram_user_id = t.telegram_user_id
+                OR lower(staff.display_name) = lower(t.full_name)
             ORDER BY t.id ASC
             LIMIT 1
             """

@@ -1,9 +1,9 @@
 def upsert_meta(conn, key, value):
     conn.execute(
         """
-        INSERT INTO app_meta (key, value)
+        INSERT INTO msi_v2.app_settings (key, value)
         VALUES (%s, %s)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = now()
         """,
         (key, value),
     )
@@ -11,7 +11,7 @@ def upsert_meta(conn, key, value):
 
 def get_meta(conn, key):
     row = conn.execute(
-        "SELECT value FROM app_meta WHERE key = %s",
+        "SELECT value FROM msi_v2.app_settings WHERE key = %s",
         (key,),
     ).fetchone()
     if not row:

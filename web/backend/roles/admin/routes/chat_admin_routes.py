@@ -16,6 +16,7 @@ from web.backend.utils.session import (
     current_auth_login,
     current_auth_role,
 )
+from shared.db import queries
 
 _PAGE_SIZE = 60
 
@@ -56,12 +57,13 @@ def register_admin_chat_routes(router):
             before_id = 0
 
         with connect_chat_db() as conn:
+            queries.ensure_chat_schema(conn)
             if before_id > 0:
                 rows = conn.execute(
                     """
                     SELECT id, room, author_name, author_student_id, body,
                            is_deleted, edited_at, created_at
-                    FROM chat_messages
+                    FROM msi_v2.chat_messages
                     WHERE room = %s AND id < %s
                     ORDER BY id DESC LIMIT %s
                     """,
@@ -72,7 +74,7 @@ def register_admin_chat_routes(router):
                     """
                     SELECT id, room, author_name, author_student_id, body,
                            is_deleted, edited_at, created_at
-                    FROM chat_messages
+                    FROM msi_v2.chat_messages
                     WHERE room = %s
                     ORDER BY id DESC LIMIT %s
                     """,
@@ -92,13 +94,14 @@ def register_admin_chat_routes(router):
 
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 row = conn.execute(
-                    "SELECT id FROM chat_messages WHERE id = %s", (msg_id,)
+                    "SELECT id FROM msi_v2.chat_messages WHERE id = %s", (msg_id,)
                 ).fetchone()
                 if not row:
                     return jsonify({"error": "Message not found."}), 404
                 conn.execute(
-                    "UPDATE chat_messages SET is_deleted = 1 WHERE id = %s", (msg_id,)
+                    "UPDATE msi_v2.chat_messages SET is_deleted = true WHERE id = %s", (msg_id,)
                 )
                 conn.commit()
 
@@ -123,12 +126,13 @@ def register_admin_chat_routes(router):
         admin_login = current_auth_login()
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 conn.execute(
                     """
-                    INSERT INTO chat_blocked_users (student_id, blocked_by_admin, blocked_at, reason)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO msi_v2.chat_blocked_users (student_id, blocked_by_staff_login, blocked_at, reason)
+                    VALUES (%s, %s, %s::timestamptz, %s)
                     ON CONFLICT(student_id) DO UPDATE SET
-                        blocked_by_admin = excluded.blocked_by_admin,
+                        blocked_by_staff_login = excluded.blocked_by_staff_login,
                         blocked_at = excluded.blocked_at,
                         reason = excluded.reason
                     """,
@@ -148,8 +152,9 @@ def register_admin_chat_routes(router):
 
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                queries.ensure_chat_schema(conn)
                 conn.execute(
-                    "DELETE FROM chat_blocked_users WHERE student_id = %s",
+                    "DELETE FROM msi_v2.chat_blocked_users WHERE student_id = %s",
                     (student_id.strip().lower(),),
                 )
                 conn.commit()
@@ -165,10 +170,11 @@ def register_admin_chat_routes(router):
             return err
 
         with connect_chat_db() as conn:
+            queries.ensure_chat_schema(conn)
             rows = conn.execute(
                 """
-                SELECT student_id, blocked_by_admin, blocked_at, reason
-                FROM chat_blocked_users
+                SELECT student_id, blocked_by_staff_login AS blocked_by_admin, blocked_at, reason
+                FROM msi_v2.chat_blocked_users
                 ORDER BY blocked_at DESC
                 """
             ).fetchall()
@@ -193,11 +199,12 @@ def register_admin_chat_routes(router):
             return err
 
         with connect_chat_db() as conn:
+            queries.ensure_chat_schema(conn)
             rows = conn.execute(
                 """
                 SELECT room, COUNT(*) as total,
-                       SUM(CASE WHEN is_deleted = 0 THEN 1 ELSE 0 END) as active
-                FROM chat_messages
+                       SUM(CASE WHEN is_deleted IS FALSE THEN 1 ELSE 0 END) as active
+                FROM msi_v2.chat_messages
                 GROUP BY room
                 ORDER BY MAX(id) DESC
                 """

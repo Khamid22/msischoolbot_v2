@@ -15,10 +15,12 @@ def register_comment_routes(students):
     @csrf.exempt
     def api_list_comments(resource_id):
         with connect_chat_db() as conn:
+            from shared.db import queries
+            queries.ensure_resource_comments_schema(conn)
             rows = conn.execute(
                 """
                 SELECT id, author_name, body, created_at
-                FROM resource_comments
+                FROM msi_v2.resource_comments
                 WHERE resource_id = %s
                 ORDER BY created_at ASC
                 LIMIT %s
@@ -56,6 +58,8 @@ def register_comment_routes(students):
         now = utc_now_iso()
         with _DB_LOCK:
             with connect_chat_db() as conn:
+                from shared.db import queries
+                queries.ensure_resource_comments_schema(conn)
                 exists = conn.execute(
                     "SELECT 1 FROM msi_v2.resources WHERE id = %s AND is_active IS TRUE",
                     (resource_id,),
@@ -65,8 +69,8 @@ def register_comment_routes(students):
 
                 inserted = conn.execute(
                     """
-                    INSERT INTO resource_comments (resource_id, author_name, body, created_at)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO msi_v2.resource_comments (resource_id, author_name, body, created_at)
+                    VALUES (%s, %s, %s, %s::timestamptz)
                     RETURNING id
                     """,
                     (resource_id, author_name, body, now),

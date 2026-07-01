@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS msi_v2.account_invites (
     id BIGSERIAL PRIMARY KEY,
     invite_type TEXT NOT NULL,
     token_hash TEXT NOT NULL,
+    token TEXT NOT NULL DEFAULT '',
     student_id BIGINT REFERENCES msi_v2.students(id) ON DELETE CASCADE,
     issued_by_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
     expires_at TIMESTAMPTZ,
@@ -426,6 +427,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_resources_legacy_id
 ON msi_v2.resources (legacy_resource_id)
 WHERE legacy_resource_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS msi_v2.resource_comments (
+    id BIGSERIAL PRIMARY KEY,
+    resource_id BIGINT NOT NULL REFERENCES msi_v2.resources(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_resource_comments_resource_id
+ON msi_v2.resource_comments (resource_id, created_at);
+
 CREATE TABLE IF NOT EXISTS msi_v2.announcements (
     id BIGSERIAL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -498,6 +510,28 @@ CREATE TABLE IF NOT EXISTS msi_v2.payments (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_legacy_id
 ON msi_v2.payments (legacy_payment_id)
 WHERE legacy_payment_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS msi_v2.chat_messages (
+    id BIGSERIAL PRIMARY KEY,
+    room TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    author_student_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT false,
+    edited_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_room_id
+ON msi_v2.chat_messages (room, id)
+WHERE is_deleted IS FALSE;
+
+CREATE TABLE IF NOT EXISTS msi_v2.chat_blocked_users (
+    student_id TEXT PRIMARY KEY,
+    blocked_by_staff_login TEXT NOT NULL DEFAULT '',
+    blocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    reason TEXT NOT NULL DEFAULT ''
+);
 
 CREATE TABLE IF NOT EXISTS msi_v2.office_hour_slots (
     id BIGSERIAL PRIMARY KEY,
@@ -587,6 +621,7 @@ ALTER TABLE msi_v2.office_hour_slots ADD COLUMN IF NOT EXISTS legacy_slot_id BIG
 ALTER TABLE msi_v2.office_hour_bookings ADD COLUMN IF NOT EXISTS legacy_booking_id BIGINT;
 ALTER TABLE msi_v2.office_hour_bookings ADD COLUMN IF NOT EXISTS student_topic_request TEXT NOT NULL DEFAULT '';
 ALTER TABLE msi_v2.teacher_candidates ADD COLUMN IF NOT EXISTS legacy_candidate_id BIGINT;
+ALTER TABLE msi_v2.account_invites ADD COLUMN IF NOT EXISTS token TEXT NOT NULL DEFAULT '';
 
 -- Enrollment lifecycle metadata (disqualification reason/timestamp) so the admin
 -- gradebook keeps the same behaviour it had on the old academic_enrollments table.
