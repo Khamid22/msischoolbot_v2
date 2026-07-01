@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Check, CreditCard, Plus, Search, Trash2, Undo2, UserRound } from "lucide-react";
+import { Check, CreditCard, Plus, Search, Trash2, Undo2, UserRound, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
@@ -195,6 +195,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const [query, setQuery] = useState("");
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [summary, setSummary] = useState<Record<string, unknown>>({});
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -237,6 +238,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
     if (typeof state.setActiveParentId === "function") {
       state.setActiveParentId(parentId);
     }
+  }
+
+  function openParentPayments(parentId: number) {
+    selectParent(parentId);
+    setPaymentModalOpen(true);
   }
 
   // Keep the focused child's refreshed money buckets in the shared parent
@@ -403,6 +409,19 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const ledgerCurrency = asString(summary.currency) || familyCurrency;
   const subjects = subjectsList(selectedChild);
   const progress = courseProgress(selectedChild);
+  const overviewTotals = visibleParents.reduce<FamilyTotals>(
+    (acc, parent) => {
+      const parentTotals = familyTotals(parent);
+      acc.debt += parentTotals.debt;
+      acc.due += parentTotals.due;
+      acc.upcoming += parentTotals.upcoming;
+      acc.paid += parentTotals.paid;
+      if (parentTotals.currency) acc.currency = parentTotals.currency;
+      return acc;
+    },
+    { debt: 0, due: 0, upcoming: 0, paid: 0, currency: "UZS" },
+  );
+  const overviewCurrency = overviewTotals.currency || "UZS";
 
   return (
     <div className="space-y-4">
@@ -426,6 +445,33 @@ export default function PaymentsPanel({ state }: { state: any }) {
             className="h-10 w-full rounded-lg border border-foreground/10 bg-surface pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
           />
         </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryTile
+          label="Total Debt"
+          value={formatMoney(overviewTotals.debt, overviewCurrency)}
+          detail="Across visible parents"
+          tone="bg-rose-50"
+        />
+        <SummaryTile
+          label="Due Now"
+          value={formatMoney(overviewTotals.due, overviewCurrency)}
+          detail="Needs follow-up"
+          tone="bg-amber-50"
+        />
+        <SummaryTile
+          label="Upcoming"
+          value={formatMoney(overviewTotals.upcoming, overviewCurrency)}
+          detail="Scheduled ahead"
+          tone="bg-sky-50"
+        />
+        <SummaryTile
+          label="Paid"
+          value={formatMoney(overviewTotals.paid, overviewCurrency)}
+          detail="Recorded payments"
+          tone="bg-emerald-50"
+        />
       </div>
 
       <ChartCard
@@ -488,14 +534,14 @@ export default function PaymentsPanel({ state }: { state: any }) {
                       <td className="px-3 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => selectParent(parentId)}
+                          onClick={() => openParentPayments(parentId)}
                           className={`inline-flex h-8 items-center rounded-lg px-3 text-xs font-bold ${
                             active
                               ? "bg-primary text-primary-foreground"
                               : "border border-foreground/10 bg-background text-foreground hover:bg-muted"
                           }`}
                         >
-                          {active ? "Selected" : "View"}
+                          View
                         </button>
                       </td>
                     </tr>
@@ -513,16 +559,35 @@ export default function PaymentsPanel({ state }: { state: any }) {
         </div>
       </ChartCard>
 
-      <ChartCard
-        title={selectedParent ? asString(selectedParent.login) : "Payments"}
-        subtitle={
-          selectedParent
-            ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
-            : "Select a parent"
-        }
-        icon={<CreditCard className="h-4 w-4 text-info" />}
-      >
-        <div className="space-y-4">
+      {paymentModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-3"
+          onClick={() => setPaymentModalOpen(false)}
+        >
+          <div
+            className="max-h-[92dvh] w-full max-w-6xl overflow-y-auto rounded-xl bg-background shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <ChartCard
+              title={selectedParent ? asString(selectedParent.login) : "Payments"}
+              subtitle={
+                selectedParent
+                  ? `${children.length} linked ${children.length === 1 ? "student" : "students"}`
+                  : "Select a parent"
+              }
+              icon={<CreditCard className="h-4 w-4 text-info" />}
+              headerActions={
+                <button
+                  type="button"
+                  onClick={() => setPaymentModalOpen(false)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 bg-background hover:bg-muted"
+                  aria-label="Close payment details"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              }
+            >
+              <div className="space-y-4">
           {error ? (
             <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm font-semibold text-destructive">
               {error}
@@ -795,8 +860,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
               )}
             </>
           )}
+              </div>
+            </ChartCard>
+          </div>
         </div>
-      </ChartCard>
+      ) : null}
     </div>
   );
 }
