@@ -14,13 +14,13 @@ import {
   X,
 } from "lucide-react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   LabelList,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -50,9 +50,8 @@ type GraphLineSeries = {
   key: string;
   dataKey: string;
   name: string;
-  yAxisId: "aap" | "ar" | "score";
+  yAxisId: "aap" | "score";
   color: string;
-  strokeDasharray?: string;
 };
 type AcademicBarRow = {
   label: string;
@@ -89,6 +88,10 @@ const candidateStatusLabels: Record<string, string> = {
 
 const lineColors = ["#8b5cf6", "#2563eb", "#10b981", "#f59e0b", "#ef4444", "#14b8a6", "#ec4899", "#64748b"];
 const groupNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function safeSvgId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
 
 function numericGraphValue(value: unknown): number | null {
   const numericValue = Number(value);
@@ -262,11 +265,13 @@ function Indicator({
   value,
   detail,
   tone = "neutral",
+  onClick,
 }: {
   label: string;
   value: ReactNode;
   detail?: ReactNode;
   tone?: "neutral" | "good" | "warn" | "bad" | "info";
+  onClick?: () => void;
 }) {
   const toneClass = {
     neutral: "border-border bg-surface text-foreground",
@@ -275,11 +280,28 @@ function Indicator({
     warn: "border-amber-200 bg-surface text-amber-800",
     bad: "border-rose-200 bg-surface text-rose-800",
   }[tone];
+  const className = `min-w-0 rounded-lg border px-2 py-1.5 text-left sm:px-3 sm:py-2 ${toneClass}`;
+  const content = (
+    <>
+      <p className="truncate text-[9px] font-bold uppercase leading-tight tracking-wide opacity-70 sm:text-[10px]">{label}</p>
+      <p className="mt-1 truncate text-base font-bold leading-none text-current sm:text-xl">{value}</p>
+      {detail ? <p className="mt-1 hidden truncate text-[11px] font-semibold text-muted-foreground sm:block">{detail}</p> : null}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${className} w-full cursor-pointer transition-colors hover:bg-muted/60 focus:outline-none focus:ring-2 focus:ring-foreground/20`}
+      >
+        {content}
+      </button>
+    );
+  }
   return (
-    <div className={`min-w-0 rounded-lg border px-3 py-2 ${toneClass}`}>
-      <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</p>
-      <p className="mt-1 truncate text-xl font-bold leading-none text-current">{value}</p>
-      {detail ? <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">{detail}</p> : null}
+    <div className={className}>
+      {content}
     </div>
   );
 }
@@ -1529,12 +1551,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   const monthlyClassLineLabels = (monthlySeries as Array<Record<string, unknown>>)
     .map((seriesRow) => asString(seriesRow.label))
     .filter(Boolean);
-  const attendanceClassLineLabels = (filteredMonthlyArSeries as Array<Record<string, unknown>>)
-    .map((seriesRow) => asString(seriesRow.label))
-    .filter(Boolean);
-  const academicClassLabels = Array.from(new Set([...monthlyClassLineLabels, ...attendanceClassLineLabels]));
   const academicAapKey = (label: string) => `${label} AAP`;
-  const academicArKey = (label: string) => `${label} AR`;
   const academicClassLineData = visibleMonthOptions.map((monthOption: MonthOption) => {
     const point: Record<string, string | number | null> = {
       label: monthOption.label,
@@ -1547,61 +1564,27 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         point[academicAapKey(classLabel)] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
       }
     });
-    (filteredMonthlyArSeries as Array<Record<string, unknown>>).forEach((seriesRow) => {
-      const classLabel = asString(seriesRow.label);
-      const rawValues = Array.isArray(seriesRow.values) ? (seriesRow.values as unknown[]) : [];
-      const value = rawValues[monthOption.index];
-      if (classLabel) {
-        point[academicArKey(classLabel)] = value == null || !Number.isFinite(Number(value)) ? null : Number(value);
-      }
-    });
     return point;
   });
-  const academicClassLineLabels = [...academicClassLabels].sort((left, right) => {
-    const leftAverage =
-      normalizedAcademicAverage(
-        academicClassLineData.map((row) => row[academicAapKey(left)]),
-        academicClassLineData.map((row) => row[academicArKey(left)]),
-      ) ?? Number.NEGATIVE_INFINITY;
-    const rightAverage =
-      normalizedAcademicAverage(
-        academicClassLineData.map((row) => row[academicAapKey(right)]),
-        academicClassLineData.map((row) => row[academicArKey(right)]),
-      ) ?? Number.NEGATIVE_INFINITY;
+  const academicClassLineLabels = [...monthlyClassLineLabels].sort((left, right) => {
+    const leftAverage = averageGraphValue(academicClassLineData.map((row) => row[academicAapKey(left)])) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage = averageGraphValue(academicClassLineData.map((row) => row[academicAapKey(right)])) ?? Number.NEGATIVE_INFINITY;
     if (leftAverage !== rightAverage) return rightAverage - leftAverage;
     return groupNameCollator.compare(right, left);
   });
-  const academicClassLineSeries = academicClassLineLabels.flatMap((label, index): GraphLineSeries[] => {
+  const academicClassLineSeries = academicClassLineLabels.map((label, index): GraphLineSeries => {
     const color = lineColors[index % lineColors.length];
-    return [
-      {
-        key: `aap-${label}`,
-        dataKey: academicAapKey(label),
-        name: `${label} AAP`,
-        yAxisId: "aap",
-        color,
-      },
-      {
-        key: `ar-${label}`,
-        dataKey: academicArKey(label),
-        name: `${label} AR`,
-        yAxisId: "ar",
-        color,
-        strokeDasharray: "5 4",
-      },
-    ];
+    return {
+      key: `aap-${label}`,
+      dataKey: academicAapKey(label),
+      name: `${label} AAP`,
+      yAxisId: "aap",
+      color,
+    };
   });
   const sortedAcademicClassLineData = [...academicClassLineData].sort((left, right) => {
-    const leftAverage =
-      normalizedAcademicAverage(
-        academicClassLineLabels.map((label) => left[academicAapKey(label)]),
-        academicClassLineLabels.map((label) => left[academicArKey(label)]),
-      ) ?? Number.NEGATIVE_INFINITY;
-    const rightAverage =
-      normalizedAcademicAverage(
-        academicClassLineLabels.map((label) => right[academicAapKey(label)]),
-        academicClassLineLabels.map((label) => right[academicArKey(label)]),
-      ) ?? Number.NEGATIVE_INFINITY;
+    const leftAverage = averageGraphValue(academicClassLineLabels.map((label) => left[academicAapKey(label)])) ?? Number.NEGATIVE_INFINITY;
+    const rightAverage = averageGraphValue(academicClassLineLabels.map((label) => right[academicAapKey(label)])) ?? Number.NEGATIVE_INFINITY;
     if (leftAverage !== rightAverage) return rightAverage - leftAverage;
     return groupNameCollator.compare(asString(right.label), asString(left.label));
   });
@@ -1650,6 +1633,12 @@ function SchoolOverviewPanel({ state }: { state: any }) {
       ? [...(activeExamOption?.rows || [])].sort(compareAverageRowsDesc)
       : academicBarRows;
   const graphIsAll = graphViewValue === "all";
+  const graphLineMinWidth = Math.max(
+    360,
+    graphLineData.length * (graphMetric === "exam" ? 88 : 72),
+    graphLineSeries.length * 70,
+  );
+  const graphBarMinWidth = Math.max(360, graphBarRows.length * (graphMetric === "academic" ? 96 : 76));
   const graphDomain: [number, number] = [0, 9];
   const graphStroke = graphMetric === "exam" ? "#4a5d7e" : "#1e2d4a";
   const graphGridStroke = "#e2e8f0";
@@ -1660,7 +1649,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         ? "Class scores across all exams."
         : "Class averages for the selected exam."
       : graphIsAll
-        ? "Class AAP and AR across all months."
+        ? "Class AAP across all months."
         : "Class AAP and AR for the selected month.";
   const formatAapValue = (value: unknown) => {
     const numericValue = Number(value);
@@ -1712,16 +1701,6 @@ function SchoolOverviewPanel({ state }: { state: any }) {
         icon={<BarChart3 className="h-4 w-4 text-info" />}
         className="flex min-h-0 flex-1 flex-col"
         bodyClassName="flex min-h-0 flex-1 flex-col"
-        headerActions={
-          <button
-            type="button"
-            onClick={openZonesDrawer}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-foreground/10 bg-surface px-3 text-xs font-bold text-foreground hover:bg-muted"
-          >
-            <AlertCircle className="h-3.5 w-3.5" />
-            Action Queue
-          </button>
-        }
       >
         {selectedSubjectRow ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -1808,7 +1787,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               ) : null}
             </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <Indicator
                 label="AAP"
                 value={monthAverage == null ? "-" : monthAverage.toFixed(1)}
@@ -1822,12 +1801,12 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                 }
               />
               <Indicator
-                label="Attendance"
+                label="AR"
                 value={monthArAverage == null ? "-" : `${monthArAverage.toFixed(1)}%`}
                 tone={monthArAverage == null ? "neutral" : monthArAverage >= 85 ? "good" : monthArAverage >= 70 ? "warn" : "bad"}
                 detail={
                   monthArAverage == null
-                    ? "No attendance data"
+                    ? "No AR data"
                     : monthArDelta == null
                       ? "No previous data"
                       : `${deltaLabel(monthArDelta)} from previous`
@@ -1838,17 +1817,18 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                 value={zoneRows.red.length + zoneRows.yellow.length}
                 tone={zoneRows.red.length ? "bad" : zoneRows.yellow.length ? "warn" : "good"}
                 detail={weakestRows.length ? `${weakestRows[0].label} lowest` : "No flagged groups"}
+                onClick={openZonesDrawer}
               />
             </div>
 
-            <div className={`flex min-h-[34rem] flex-1 flex-col rounded-xl border p-3 ${graphBorderClass}`}>
-              <div className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-3">
+            <div className={`flex min-h-[25rem] flex-1 flex-col rounded-xl border p-2 sm:min-h-[34rem] sm:p-3 ${graphBorderClass}`}>
+              <div className="mb-2 flex shrink-0 flex-col gap-2 sm:mb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div>
                   <p className="text-sm font-bold">Performance Graph</p>
                   <p className="text-xs text-muted-foreground">{graphTitle}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+                  <div className="inline-flex max-w-full items-center overflow-x-auto rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
                     {([
                       { key: "academic", label: "Academic Indicators" },
                       { key: "exam", label: "Exam Performance" },
@@ -1866,7 +1846,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                               setSelectedTrendMonth("all");
                             }
                           }}
-                          className={`rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+                          className={`whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold transition-colors sm:px-2.5 sm:text-xs ${
                             active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
@@ -1879,7 +1859,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                     <select
                       value={examSelectValue}
                       onChange={(event) => setSelectedExam(event.target.value)}
-                      className="h-8 rounded-md border border-violet-200 bg-white/85 px-2 text-xs font-bold text-violet-700 outline-none"
+                      className="h-8 min-w-0 flex-1 rounded-md border border-violet-200 bg-white/85 px-2 text-xs font-bold text-violet-700 outline-none sm:flex-none"
                     >
                       <option value="all">All</option>
                       {examClassOptions.map((option) => (
@@ -1897,7 +1877,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                           : "all"
                       }
                       onChange={(event) => setSelectedTrendMonth(event.target.value)}
-                      className="h-8 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none"
+                      className="h-8 min-w-0 flex-1 rounded-md border border-sky-200 bg-white/85 px-2 text-xs font-bold text-sky-700 outline-none sm:flex-none"
                       aria-label="Month"
                     >
                       <option value="all">All {selectedAcademicYearLabel}</option>
@@ -1912,101 +1892,101 @@ function SchoolOverviewPanel({ state }: { state: any }) {
               </div>
 
               {graphIsAll && graphLineSeries.length ? (
-                <div className="min-h-[28rem] flex-1">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={graphLineData} margin={{ top: 10, right: graphMetric === "academic" ? 4 : 12, left: -6, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
-                      <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
-                      {graphMetric === "academic" ? (
-                        <YAxis
-                          yAxisId="ar"
-                          orientation="right"
-                          domain={[0, 100]}
-                          tick={{ fontSize: 12 }}
-                          width={46}
-                          tickMargin={4}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(value) => `${value}%`}
+                <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
+                  <div className="h-72 sm:h-[28rem] lg:h-[30rem]" style={{ minWidth: graphLineMinWidth }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={graphLineData} margin={{ top: 10, right: 12, left: -6, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
+                        <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={8} />
+                        <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 11 }} width={34} tickMargin={4} axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
+                          formatter={(value, name) => [formatGraphValue(value, name), asString(name)]}
+                          labelFormatter={(label) =>
+                            graphMetric === "exam"
+                              ? examClassOptions.find((point) => point.shortName === label)?.label || asString(label)
+                              : asString(label)
+                          }
                         />
-                      ) : null}
-                      <Tooltip
-                        contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
-                        formatter={(value, name) => [formatGraphValue(value, name), asString(name)]}
-                        labelFormatter={(label) =>
-                          graphMetric === "exam"
-                            ? examClassOptions.find((point) => point.shortName === label)?.label || asString(label)
-                            : asString(label)
-                        }
-                      />
-                      <Legend iconSize={13} wrapperStyle={{ fontSize: 13, fontWeight: 700 }} />
-                      {graphLineSeries.map((series) => (
-                        <Line
-                          key={series.key}
-                          yAxisId={series.yAxisId}
-                          type="monotone"
-                          dataKey={series.dataKey}
-                          name={series.name}
-                          stroke={series.color}
-                          strokeWidth={3}
-                          strokeDasharray={series.strokeDasharray}
-                          dot={{ r: 4.5, fill: series.color, strokeWidth: 0 }}
-                          activeDot={{ r: 7, strokeWidth: 0 }}
-                          connectNulls
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                        <Legend iconSize={12} wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />
+                        <defs>
+                          {graphLineSeries.map((series) => (
+                            <linearGradient key={series.key} id={`overviewArea-${safeSvgId(series.key)}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={series.color} stopOpacity={0.28} />
+                              <stop offset="100%" stopColor={series.color} stopOpacity={0.04} />
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        {graphLineSeries.map((series) => (
+                          <Area
+                            key={series.key}
+                            yAxisId={series.yAxisId}
+                            type="monotone"
+                            dataKey={series.dataKey}
+                            name={series.name}
+                            stroke={series.color}
+                            fill={`url(#overviewArea-${safeSvgId(series.key)})`}
+                            strokeWidth={2.75}
+                            dot={{ r: 3.5, fill: series.color, strokeWidth: 0 }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                            connectNulls
+                            isAnimationActive={false}
+                          />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               ) : graphBarRows.length ? (
-                <div className="min-h-[28rem] flex-1">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={graphBarRows} margin={{ top: 24, right: graphMetric === "academic" ? 4 : 12, left: -6, bottom: 0 }}>
-                      <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} interval={0} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 12 }} width={38} tickMargin={4} axisLine={false} tickLine={false} />
-                      {graphMetric === "academic" ? (
-                        <YAxis
-                          yAxisId="ar"
-                          orientation="right"
-                          domain={[0, 100]}
-                          tick={{ fontSize: 12 }}
-                          width={46}
-                          tickMargin={4}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={(value) => `${value}%`}
+                <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
+                  <div className="h-72 sm:h-[28rem] lg:h-[30rem]" style={{ minWidth: graphBarMinWidth }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={graphBarRows} margin={{ top: 24, right: graphMetric === "academic" ? 8 : 12, left: -6, bottom: 0 }}>
+                        <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
+                        <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} axisLine={false} tickLine={false} minTickGap={6} />
+                        <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} tick={{ fontSize: 11 }} width={34} tickMargin={4} axisLine={false} tickLine={false} />
+                        {graphMetric === "academic" ? (
+                          <YAxis
+                            yAxisId="ar"
+                            orientation="right"
+                            domain={[0, 100]}
+                            tick={{ fontSize: 11 }}
+                            width={42}
+                            tickMargin={4}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(value) => `${value}%`}
+                          />
+                        ) : null}
+                        <Tooltip
+                          contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
+                          formatter={(value, name) => {
+                            const label = asString(name);
+                            return [label === "AR" ? formatArValue(value) : formatAapValue(value), label];
+                          }}
+                          labelFormatter={(label) => asString(label)}
                         />
-                      ) : null}
-                      <Tooltip
-                        contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
-                        formatter={(value, name) => {
-                          const label = asString(name);
-                          return [label === "AR" ? formatArValue(value) : formatAapValue(value), label];
-                        }}
-                        labelFormatter={(label) => asString(label)}
-                      />
-                      {graphMetric === "exam" ? (
-                        <Bar yAxisId="score" dataKey="average" name="Exam score" fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48}>
-                          <LabelList dataKey="average" position="top" fontSize={12} fontWeight={700} fill={graphStroke} formatter={(value: number) => formatAapValue(value)} />
-                        </Bar>
-                      ) : (
-                        <>
-                          <Legend iconSize={13} wrapperStyle={{ fontSize: 13, fontWeight: 700 }} />
-                          <Bar yAxisId="aap" dataKey="aapAverage" name="AAP" fill="#1e2d4a" radius={[6, 6, 0, 0]} maxBarSize={38}>
-                            <LabelList dataKey="aapAverage" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={(value: number) => formatAapValue(value)} />
+                        {graphMetric === "exam" ? (
+                          <Bar yAxisId="score" dataKey="average" name="Exam score" fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive={false}>
+                            <LabelList dataKey="average" position="top" fontSize={12} fontWeight={700} fill={graphStroke} formatter={(value: number) => formatAapValue(value)} />
                           </Bar>
-                          <Bar yAxisId="ar" dataKey="arAverage" name="AR" fill="#059669" radius={[6, 6, 0, 0]} maxBarSize={38}>
-                            <LabelList dataKey="arAverage" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={(value: number) => formatArValue(value)} />
-                          </Bar>
-                        </>
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
+                        ) : (
+                          <>
+                            <Legend iconSize={12} wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />
+                            <Bar yAxisId="aap" dataKey="aapAverage" name="AAP" fill="#1e2d4a" radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={false}>
+                              <LabelList dataKey="aapAverage" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={(value: number) => formatAapValue(value)} />
+                            </Bar>
+                            <Bar yAxisId="ar" dataKey="arAverage" name="AR" fill="#059669" radius={[6, 6, 0, 0]} maxBarSize={38} isAnimationActive={false}>
+                              <LabelList dataKey="arAverage" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={(value: number) => formatArValue(value)} />
+                            </Bar>
+                          </>
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               ) : (
-                <div className="flex min-h-[28rem] flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground">
+                <div className="flex h-72 flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground sm:h-[28rem] lg:h-[30rem]">
                   No graph data for this selection yet.
                 </div>
               )}
