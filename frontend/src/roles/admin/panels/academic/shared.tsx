@@ -19,10 +19,10 @@ export const monthLabels = [
   { value: "12", label: "December" },
 ];
 
-export const GRADEBOOK_STUDENT_COL_WIDTH = 180;
-export const GRADEBOOK_AAP_COL_WIDTH = 56;
-export const GRADEBOOK_ATT_COL_WIDTH = 38;
-export const GRADEBOOK_HW_COL_WIDTH = 46;
+export const GRADEBOOK_STUDENT_COL_WIDTH = 200;
+export const GRADEBOOK_AAP_COL_WIDTH = 54;
+export const GRADEBOOK_ATT_COL_WIDTH = 48;
+export const GRADEBOOK_HW_COL_WIDTH = 64;
 export const GRADEBOOK_LESSON_COL_WIDTH = GRADEBOOK_ATT_COL_WIDTH + GRADEBOOK_HW_COL_WIDTH;
 export const EXAM_TABLE_STUDENT_COL_WIDTH = 280;
 export const EXAM_TABLE_SCORE_COL_WIDTH = 176;
@@ -50,11 +50,11 @@ export type ExamTypeOption = {
 export function parsePeriodDate(value: unknown): PeriodParts | null {
   const text = String(value || "").trim();
   if (!text) return null;
-  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
   if (slash) {
     return {
       month: slash[2].padStart(2, "0"),
-      year: slash[3],
+      year: slash[3].length === 2 ? `20${slash[3]}` : slash[3],
     };
   }
   const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);

@@ -241,6 +241,53 @@ def _parse_optional_lesson_time(value):
     return text.zfill(5)
 
 
+def _ensure_group_curriculum_lesson_sessions(conn, group_id):
+    """Materialize missing curriculum lessons so gradebooks show the full program."""
+    conn.execute(
+        """
+        INSERT INTO msi_v2.lesson_sessions (
+            group_id,
+            program_item_id,
+            status,
+            source_key,
+            source_kind,
+            source_label,
+            source_topic,
+            source_order,
+            source_file,
+            source_sheet,
+            created_at,
+            updated_at
+        )
+        SELECT
+            g.id,
+            spi.id,
+            'scheduled',
+            concat('curriculum:', g.id, ':', spi.id),
+            'lesson',
+            spi.lesson_number,
+            spi.title,
+            spi.item_order,
+            spi.source_file,
+            spi.sheet_name,
+            now(),
+            now()
+        FROM msi_v2.groups g
+        JOIN msi_v2.subject_program_items spi ON spi.program_id = g.program_id
+        WHERE g.id = %s
+          AND spi.item_type = 'lesson'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM msi_v2.lesson_sessions existing
+              WHERE existing.group_id = g.id
+                AND existing.program_item_id = spi.id
+          )
+        ON CONFLICT (source_key) WHERE source_key <> '' DO NOTHING
+        """,
+        (int(group_id),),
+    )
+
+
 def get_group_gradebook(group_id):
     group_id = int(group_id or 0)
     if group_id <= 0:
@@ -261,6 +308,9 @@ def get_group_gradebook(group_id):
         ).fetchone()
         if not group_row:
             return None
+
+        _ensure_group_curriculum_lesson_sessions(conn, int(group_row["id"]))
+        conn.commit()
 
         lesson_rows = conn.execute(
             """

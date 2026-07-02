@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, CalendarDays, ChevronLeft, Layers, UserX, Users, X } from "lucide-react";
+import { BookMarked, CalendarDays, ChevronLeft, Layers, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -27,7 +27,6 @@ export function GroupGradebook({
   const [saving, setSaving] = useState(false);
   const [statusSavingId, setStatusSavingId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Enrollment | null>(null);
-  const [riskPanelOpen, setRiskPanelOpen] = useState(false);
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
   const [lessonDateSavingId, setLessonDateSavingId] = useState<number | null>(null);
@@ -47,7 +46,6 @@ export function GroupGradebook({
   useEffect(() => {
     setActiveView("gradebook");
     setSelectedStudent(null);
-    setRiskPanelOpen(false);
     setIndicatorMonth("all");
     setIndicatorYear("all");
     setExamType("all");
@@ -244,6 +242,11 @@ export function GroupGradebook({
 
   function lessonDateToInputValue(value: string) {
     const text = asString(value).trim();
+    const ddmmyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    if (ddmmyy) {
+      const [, day, month, year] = ddmmyy;
+      return `20${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
     const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (ddmmyyyy) {
       const [, day, month, year] = ddmmyyyy;
@@ -255,6 +258,22 @@ export function GroupGradebook({
       return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
     }
     return "";
+  }
+
+  function formatGradebookDate(value: unknown) {
+    const text = asString(value).trim();
+    if (!text) return "";
+    const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (ddmmyyyy) {
+      const [, day, month, year] = ddmmyyyy;
+      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year.slice(-2)}`;
+    }
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) {
+      const [, year, month, day] = iso;
+      return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year.slice(-2)}`;
+    }
+    return text;
   }
 
   async function editLessonDate(lesson: Lesson) {
@@ -329,17 +348,6 @@ export function GroupGradebook({
     EXAM_TABLE_STUDENT_COL_WIDTH + selectedExamLabels.length * EXAM_TABLE_SCORE_COL_WIDTH,
   );
 
-  // 1. AAP Metrics
-  const activeAAPGrades = enrollments.map(en => scoreOutOfNine(en.averageGrade)).filter(g => g > 0);
-  const classAAPAverage = activeAAPGrades.length > 0
-    ? (activeAAPGrades.reduce((sum, g) => sum + g, 0) / activeAAPGrades.length).toFixed(1)
-    : "—";
-
-  // 2. Attendance Metrics
-  const totalPresent = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => v === "present").length, 0);
-  const totalAtt = enrollments.reduce((sum, en) => sum + Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length, 0);
-  const classAttendanceRate = totalAtt > 0 ? Math.round((totalPresent / totalAtt) * 100) : 100;
-
   const academicIndicatorData = enrollments.map(en => {
     const homeworkScores = indicatorLessons
       .map((lesson) => scoreOutOfNine(en.homework[lesson.lessonNumber]))
@@ -370,24 +378,6 @@ export function GroupGradebook({
   const academicAverageAAP = averageScore(academicIndicatorData.map((row) => row.AAP));
   const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
   const academicAveragePerformance = averageScore(academicIndicatorData.map((row) => row.averagePerformance));
-
-  // 3. Exam Metrics
-  let totalExamScoreSum = 0;
-  let totalExamScoreCount = 0;
-  enrollments.forEach(en => {
-    if (en.exams) {
-      Object.values(en.exams).forEach(score => {
-        if (typeof score === "number") {
-          const normalizedScore = scoreOutOfNine(score);
-          if (normalizedScore <= 0) return;
-          totalExamScoreSum += normalizedScore;
-          totalExamScoreCount++;
-        }
-      });
-    }
-  });
-  const classExamAverage = totalExamScoreCount > 0 ? (totalExamScoreSum / totalExamScoreCount).toFixed(1) : "—";
-  const hasExamScores = totalExamScoreCount > 0;
 
   let filteredExamScoreSum = 0;
   let filteredExamScoreCount = 0;
@@ -432,28 +422,6 @@ export function GroupGradebook({
   const hasFilteredExamScores = filteredExamScoreCount > 0;
   const studentsWithMissingExams = selectedExamLabels.length > 0 ? studentExamData.filter(s => !s.hasExams).length : 0;
 
-  // 4. At-Risk Metrics
-  const atRiskStudents = enrollments.map(en => {
-    const present = Object.values(en.attendance).filter(v => v === "present").length;
-    const total = Object.values(en.attendance).filter(v => ["present", "absent", "justified"].includes(v)).length;
-    const attRate = total > 0 ? Math.round((present / total) * 100) : 100;
-    const aap = scoreOutOfNine(en.averageGrade);
-    const isLowAAP = aap > 0 && aap < 5;
-    const isLowAtt = attRate < 80 && total > 0;
-    const reasons = [
-      isLowAAP ? `AAP ${formatScoreOutOfNine(aap)}` : "",
-      isLowAtt ? `AR ${attRate}%` : "",
-    ].filter(Boolean);
-    return {
-      enrollment: en,
-      aap,
-      arRate: attRate,
-      reasons,
-      atRisk: isLowAAP || isLowAtt,
-    };
-  }).filter((row) => row.atRisk);
-  const atRiskCount = atRiskStudents.length;
-
   useEffect(() => {
     setActive(null);
   }, [activeView]);
@@ -464,10 +432,21 @@ export function GroupGradebook({
   const popLeft = active
     ? Math.min(active.anchorRect.left, window.innerWidth - 220)
     : 0;
-  const summaryMetricClass = `rounded-xl border border-foreground/8 bg-surface p-3 shadow-card ${motion.card}`;
   const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
   const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
+  const tooltipContentStyle = {
+    backgroundColor: "hsl(var(--popover))",
+    border: "1px solid hsl(var(--foreground) / 0.12)",
+    borderRadius: 12,
+    boxShadow: "var(--card-shadow-hover)",
+    color: "hsl(var(--popover-foreground))",
+  } as const;
+  const tooltipLabelStyle = {
+    color: "hsl(var(--popover-foreground))",
+    fontSize: 12,
+    fontWeight: 800,
+  } as const;
 
   return (
     <div className={`space-y-3 ${motion.panel}`}>
@@ -515,37 +494,7 @@ export function GroupGradebook({
         <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">Loading…</div>
       ) : null}
 
-      {/* 2. Class Insights Cards */}
-      {data && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className={summaryMetricClass}>
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average AAP</span>
-            <span className="mt-1 block text-lg font-bold">{classAAPAverage} <span className="text-xs font-normal text-muted-foreground">/ 9.0</span></span>
-          </div>
-          <div className={summaryMetricClass}>
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance Rate</span>
-            <span className="mt-1 block text-lg font-bold">{classAttendanceRate}%</span>
-          </div>
-          <div className={summaryMetricClass}>
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exam Avg Score</span>
-            <span className="mt-1 block text-lg font-bold">
-              {classExamAverage}
-              {hasExamScores ? <span className="text-xs font-normal text-muted-foreground"> / 9.0</span> : null}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setRiskPanelOpen(true)}
-            className={`rounded-xl border border-foreground/8 bg-surface p-3 text-left shadow-card transition-colors hover:border-red-200 hover:bg-red-50/30 focus:outline-none focus:ring-2 focus:ring-red-200 ${motion.card}`}
-            aria-label="Show at-risk students"
-          >
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">At-Risk Students</span>
-            <span className={`mt-1 block text-lg font-bold ${atRiskCount > 0 ? "text-red-500" : ""}`}>{atRiskCount}</span>
-          </button>
-        </div>
-      )}
-
-      {/* 3. View Switcher Buttons */}
+      {/* 2. View Switcher Buttons */}
       {data && (
         <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
           {(["gradebook", "academic", "ep"] as const).map((view) => {
@@ -580,12 +529,19 @@ export function GroupGradebook({
             No lessons found for this group.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-foreground/8 bg-surface">
-            <div className="border-b border-foreground/8 px-4 py-3">
+          <div
+            className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
+            style={{
+              height: "calc(var(--tg-app-height) - 11rem)",
+              maxHeight: "78dvh",
+              minHeight: "26rem",
+            }}
+          >
+            <div className="shrink-0 border-b border-foreground/8 px-4 py-3">
               <p className="text-sm font-bold">Gradebook</p>
-              <p className="text-xs text-muted-foreground">Attendance and homework by lesson</p>
+              <p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p>
             </div>
-            <div className="miniapp-table-scroll max-h-[72dvh] pb-3 [scrollbar-gutter:stable]">
+            <div className="miniapp-table-scroll min-h-0 flex-1 pb-8 [scrollbar-gutter:stable]">
               <table
                 className="table-fixed border-collapse text-left text-[11px] sm:text-xs"
                 style={{ width: gradebookTableWidth, minWidth: gradebookTableWidth }}
@@ -602,53 +558,78 @@ export function GroupGradebook({
                 </colgroup>
                 <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr className="bg-surface">
-                    <th rowSpan={2} className="sticky left-0 z-40 w-[180px] min-w-[180px] max-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                    <th
+                      className="sticky left-0 z-40 border-b border-r border-foreground/10 bg-surface px-3 py-3 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
+                      style={{
+                        width: GRADEBOOK_STUDENT_COL_WIDTH,
+                        minWidth: GRADEBOOK_STUDENT_COL_WIDTH,
+                        maxWidth: GRADEBOOK_STUDENT_COL_WIDTH,
+                      }}
+                    >
                       Student
                     </th>
-                    <th rowSpan={2} className="sticky left-[180px] z-40 w-[56px] min-w-[56px] max-w-[56px] border-b border-r border-foreground/10 bg-surface px-2 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                    <th
+                      className="sticky z-40 border-b border-r border-foreground/10 bg-surface px-2 py-3 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
+                      style={{
+                        left: GRADEBOOK_STUDENT_COL_WIDTH,
+                        width: GRADEBOOK_AAP_COL_WIDTH,
+                        minWidth: GRADEBOOK_AAP_COL_WIDTH,
+                        maxWidth: GRADEBOOK_AAP_COL_WIDTH,
+                      }}
+                    >
                       AAP
                     </th>
                     {lessons.map((lesson) => (
-                      <th key={lesson.id} colSpan={2} className={`w-[84px] border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10"}`}>
+                      <th
+                        key={lesson.id}
+                        colSpan={2}
+                        className={`border-b border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10 bg-surface"}`}
+                        style={{
+                          width: GRADEBOOK_LESSON_COL_WIDTH,
+                          minWidth: GRADEBOOK_LESSON_COL_WIDTH,
+                          maxWidth: GRADEBOOK_LESSON_COL_WIDTH,
+                        }}
+                      >
                         <div
                           title={`${lesson.lessonNumber} - ${lesson.topic}`}
-                          className="w-full px-2 py-2"
+                          className="flex min-h-[6.25rem] w-full flex-col items-center justify-start px-2.5 py-2"
                         >
                           <button
                             type="button"
                             disabled={lessonDateSavingId === lesson.id}
                             onClick={() => editLessonDate(lesson)}
-                            className={`mx-auto inline-flex max-w-full items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold leading-tight transition-colors hover:bg-foreground/5 disabled:opacity-60 ${
+                            className={`inline-flex max-w-full items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-0.5 text-[10px] font-bold leading-tight transition-colors hover:border-foreground/10 hover:bg-foreground/5 disabled:opacity-60 ${
                               isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"
                             }`}
                             title="Change conducted lesson date"
                           >
                             <CalendarDays className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate">{lessonDateSavingId === lesson.id ? "Saving..." : lesson.date || "Set date"}</span>
+                            <span className="whitespace-nowrap">
+                              {lessonDateSavingId === lesson.id ? "Saving..." : formatGradebookDate(lesson.date) || "Set date"}
+                            </span>
                           </button>
-                          <span className={`block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/70"}`}>
+                          <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>
                             {lesson.lessonNumber}
                           </span>
-                          <span className={`mt-1 block whitespace-normal break-words text-[9px] font-normal italic leading-tight ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>
+                          <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[9px] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>
                             {lesson.topic || "—"}
                           </span>
                         </div>
                       </th>
                     ))}
                   </tr>
-                  <tr className="bg-surface">
-                    {lessons.map((lesson) => (
-                      <Fragment key={`gradebook-subhead-${lesson.id}`}>
-                        <th className="w-[38px] border-b border-t border-l border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">Att</th>
-                        <th className="w-[46px] border-b border-t border-r border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">HW</th>
-                      </Fragment>
-                    ))}
-                  </tr>
                 </thead>
                 <tbody className="divide-y divide-foreground/5 bg-surface">
                   {enrollments.map((en) => (
-                    <tr key={en.enrollmentId} className="hover:bg-foreground/[0.015]">
-                      <td className="sticky left-0 z-20 w-[180px] min-w-[180px] max-w-[180px] border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                    <tr key={en.enrollmentId} className="transition-colors hover:bg-primary/[0.025]">
+                      <td
+                        className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
+                        style={{
+                          width: GRADEBOOK_STUDENT_COL_WIDTH,
+                          minWidth: GRADEBOOK_STUDENT_COL_WIDTH,
+                          maxWidth: GRADEBOOK_STUDENT_COL_WIDTH,
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => {
@@ -661,7 +642,15 @@ export function GroupGradebook({
                           {en.fullName}
                         </button>
                       </td>
-                      <td className="sticky left-[180px] z-20 w-[56px] min-w-[56px] max-w-[56px] border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      <td
+                        className="sticky z-20 border-r border-foreground/8 bg-surface px-2 py-1.5 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
+                        style={{
+                          left: GRADEBOOK_STUDENT_COL_WIDTH,
+                          width: GRADEBOOK_AAP_COL_WIDTH,
+                          minWidth: GRADEBOOK_AAP_COL_WIDTH,
+                          maxWidth: GRADEBOOK_AAP_COL_WIDTH,
+                        }}
+                      >
                         {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
                       </td>
                       {lessons.map((lesson) => {
@@ -673,8 +662,13 @@ export function GroupGradebook({
                         const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
                         if (cancelled) {
                           return (
-                            <td key={`${en.enrollmentId}-${lesson.id}-cancelled`} colSpan={2} className="w-[84px] border-l border-r border-red-100 bg-red-50/40 px-1 py-1 text-center">
-                              <span className="inline-flex max-w-full rounded-md bg-red-100 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700">
+                            <td
+                              key={`${en.enrollmentId}-${lesson.id}-cancelled`}
+                              colSpan={2}
+                              className="border-l border-r border-red-100 bg-red-50/40 px-1.5 py-1.5 text-center"
+                              style={{ width: GRADEBOOK_LESSON_COL_WIDTH }}
+                            >
+                              <span className="inline-flex max-w-full rounded-md bg-red-100 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700 shadow-sm">
                                 Cancelled
                               </span>
                             </td>
@@ -682,23 +676,23 @@ export function GroupGradebook({
                         }
                         return (
                           <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
-                            <td className="w-[38px] border-l border-foreground/5 p-0 text-center">
+                            <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_ATT_COL_WIDTH }}>
                               <button
                                 type="button"
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                                className={`h-8 w-8 rounded text-[11px] font-bold transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[30px] sm:text-[10px] ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`mx-auto flex h-8 w-9 items-center justify-center rounded-lg text-[11px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-9 sm:text-[10px] ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
                               >
                                 {att ? attLabel(att) : "·"}
                               </button>
                             </td>
-                            <td className="w-[46px] border-r border-foreground/5 p-0 text-center">
+                            <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_HW_COL_WIDTH }}>
                               <button
                                 type="button"
                                 disabled={!canEditHomework}
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40 sm:h-[26px] sm:w-[38px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`mx-auto flex h-8 min-w-10 items-center justify-center rounded-lg px-2 text-[11px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-10 sm:text-[10px] ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
                               >
                                 {canEditHomework && hw !== undefined ? hw : "·"}
                               </button>
@@ -731,7 +725,7 @@ export function GroupGradebook({
               onYearChange={setIndicatorYear}
             />
           </div>
-          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
               <span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span>
@@ -745,10 +739,6 @@ export function GroupGradebook({
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
               <span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
-            </div>
-            <div className={detailMetricClass}>
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Lessons Matched</span>
-              <span className="mt-1 block text-lg font-bold">{indicatorLessons.length}</span>
             </div>
           </div>
           {hasAcademicIndicatorData ? (
@@ -778,8 +768,11 @@ export function GroupGradebook({
                       stroke="hsl(var(--muted-foreground))"
                     />
                     <Tooltip
-                      contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
-                      labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                      cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
+                      wrapperClassName="!outline-none"
+                      contentStyle={tooltipContentStyle}
+                      labelStyle={tooltipLabelStyle}
+                      itemStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 700 }}
                       formatter={(value, name) => {
                         const label = asString(name);
                         return [label === "AR" ? formatPercentLabel(value) : formatBarLabel(value), label];
@@ -904,8 +897,11 @@ export function GroupGradebook({
                             />
                             <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
                             <Tooltip
-                              contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
-                              labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                              cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
+                              wrapperClassName="!outline-none"
+                              contentStyle={tooltipContentStyle}
+                              labelStyle={tooltipLabelStyle}
+                              itemStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 700 }}
                             />
                             <Bar
                               dataKey="chartScore"
@@ -982,69 +978,6 @@ export function GroupGradebook({
           )}
         </div>
       )}
-
-      {riskPanelOpen ? (
-        <div className="fixed inset-0 z-50 bg-foreground/45 animate-in fade-in duration-150 motion-reduce:animate-none" onClick={() => setRiskPanelOpen(false)}>
-          <aside
-            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-card-hover animate-in slide-in-from-right duration-200 motion-reduce:animate-none"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="At-risk students"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-foreground/8 px-5 py-4">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 text-base font-bold">
-                  <UserX className="h-4 w-4 text-red-500" />
-                  At-Risk Students
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Students flagged by low AAP or attendance rate
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRiskPanelOpen(false)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
-                aria-label="Close at-risk students"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {atRiskStudents.length ? (
-                <div className="space-y-2">
-                  {atRiskStudents.map((row) => (
-                    <button
-                      key={row.enrollment.enrollmentId}
-                      type="button"
-                      onClick={() => {
-                        setRiskPanelOpen(false);
-                        setSelectedStudent(row.enrollment);
-                        setMoveGroupId("");
-                      }}
-                      className={`w-full rounded-xl border border-foreground/8 bg-background p-3 text-left hover:border-red-200 hover:bg-red-50/40 focus:outline-none focus:ring-2 focus:ring-red-200 ${motion.card}`}
-                    >
-                      <span className="block break-words text-sm font-bold">{row.enrollment.fullName}</span>
-                      <span className="mt-2 flex flex-wrap gap-1.5">
-                        {row.reasons.map((reason) => (
-                          <span key={reason} className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">
-                            {reason}
-                          </span>
-                        ))}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-foreground/8 bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-                  No students are currently marked at risk.
-                </div>
-              )}
-            </div>
-          </aside>
-        </div>
-      ) : null}
 
       {selectedStudent ? (
         <div className="fixed inset-0 z-50 bg-foreground/45 animate-in fade-in duration-150 motion-reduce:animate-none" onClick={() => setSelectedStudent(null)}>
@@ -1147,7 +1080,7 @@ export function GroupGradebook({
             <div className="min-w-0">
               <p className="truncate text-xs font-bold">{active.lesson.lessonNumber}</p>
               <p className="truncate text-[10px] text-muted-foreground">{active.lesson.topic}</p>
-              {active.lesson.date && <p className="text-[10px] text-muted-foreground">{active.lesson.date}</p>}
+              {active.lesson.date && <p className="text-[10px] text-muted-foreground">{formatGradebookDate(active.lesson.date)}</p>}
             </div>
             <button type="button" onClick={close} className="ml-2 shrink-0 rounded p-0.5 hover:bg-muted">
               <X className="h-3.5 w-3.5 text-muted-foreground" />
