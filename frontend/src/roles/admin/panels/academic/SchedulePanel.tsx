@@ -10,7 +10,7 @@ import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timet
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
-const BASE_HOUR_PX = 54;
+const BASE_HOUR_PX = 70;
 const SNAP_MINUTES = 10;
 const DEFAULT_CLASS_MINUTES = 80;
 const TIME_COLUMN_PX = 60;
@@ -311,7 +311,7 @@ export function SchedulePanel({ state }: { state: any }) {
   const displayEndHour = timetableEndHour;
   const dayStartMin = displayStartHour * 60;
   const dayEndMin = displayEndHour * 60;
-  const hourPx = Math.min(120, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 12 + Math.max(0, Math.min(busiestDayLoad - 7, 8)));
+  const hourPx = Math.min(150, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 12 + Math.max(0, Math.min(busiestDayLoad - 7, 8)));
   const dayMinWidthPx = Math.min(240, Math.max(112, 96 + Math.min(busiestDayLoad, 8) * 6 + Math.max(0, busiestOverlapGrid.columns - 1) * 34));
   const gridTemplateColumns = `${TIME_COLUMN_PX}px repeat(7, minmax(${dayMinWidthPx}px, 1fr))`;
   const gridMinWidthPx = TIME_COLUMN_PX + dayMinWidthPx * 7;
@@ -826,11 +826,9 @@ export function SchedulePanel({ state }: { state: any }) {
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
                                   data-schedule-interactive="true"
-                                  className="absolute left-1/2 top-0 z-30 flex h-4 w-12 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
+                                  className="absolute inset-x-0 -top-1 z-30 h-3 cursor-ns-resize bg-transparent"
                                   aria-label="Adjust class start time"
-                                >
-                                  <span className="h-0.5 w-6 rounded-full bg-sky-500/80" />
-                                </button>
+                                />
                                 <button
                                   type="button"
                                   onPointerDown={(event) => startResizeDrag(event, session, "end")}
@@ -838,11 +836,9 @@ export function SchedulePanel({ state }: { state: any }) {
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
                                   data-schedule-interactive="true"
-                                  className="absolute bottom-0 left-1/2 z-30 flex h-4 w-12 -translate-x-1/2 translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
+                                  className="absolute inset-x-0 -bottom-1 z-30 h-3 cursor-ns-resize bg-transparent"
                                   aria-label="Adjust class end time"
-                                >
-                                  <span className="h-0.5 w-6 rounded-full bg-sky-500/80" />
-                                </button>
+                                />
                               </>
                             ) : null}
                           </div>
