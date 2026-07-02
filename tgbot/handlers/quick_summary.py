@@ -2,7 +2,12 @@ import math
 
 from aiogram import F, Router
 
-from tgbot.helpers import escape, linked_admin_from_user, linked_student_from_user
+from tgbot.helpers import (
+    escape,
+    linked_admin_from_user,
+    linked_student_from_user,
+    run_blocking,
+)
 from database.academics.performance_summary import get_subject_summaries_for_student
 
 router = Router()
@@ -20,14 +25,14 @@ def _round_grade_half_up(value):
 
 @router.callback_query(F.data == "student_quick_summary")
 async def quick_summary_callback(query):
-    if linked_admin_from_user(query.from_user):
+    if await linked_admin_from_user(query.from_user):
         await query.answer(
             "This quick summary is available only for student accounts.",
             show_alert=True,
         )
         return
 
-    linked_student = linked_student_from_user(query.from_user)
+    linked_student = await linked_student_from_user(query.from_user)
     if not linked_student:
         await query.answer(
             "Authentication is only through the mini app. Please sign in there first.",
@@ -37,7 +42,8 @@ async def quick_summary_callback(query):
 
     await query.answer("Preparing summary...")
 
-    summary_rows, summary_error = get_subject_summaries_for_student(
+    summary_rows, summary_error = await run_blocking(
+        get_subject_summaries_for_student,
         full_name=str(linked_student.get("full_name", "")),
     )
     if summary_error:

@@ -8,6 +8,7 @@ from tgbot.keyboards.inline_keyboard import (
 )
 from tgbot.settings import settings
 from backend.identity.account_service import record_bot_user
+from tgbot.helpers import run_blocking
 from backend.identity.parent_accounts import link_parent_via_invite
 from backend.identity.parent_invites import load_parent_invite_code_payload
 
@@ -72,7 +73,9 @@ async def _send_start_payload(message):
         if code:
             parent = None
             try:
-                parent = _connect_parent_from_code(code, message.from_user)
+                parent = await run_blocking(
+                    _connect_parent_from_code, code, message.from_user
+                )
             except Exception:
                 parent = None
 
@@ -108,9 +111,9 @@ async def start_handler(message, state):
 
     # Track unique bot users for admin statistics.
     try:
-        record_bot_user(message.from_user)
+        await run_blocking(record_bot_user, message.from_user)
     except Exception:
-        # Do not fail /start if SQLite write has an issue.
+        # Do not fail /start if the user-stats write has an issue.
         pass
 
     await _send_start_payload(message)

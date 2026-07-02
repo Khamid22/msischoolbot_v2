@@ -6,6 +6,7 @@ from tgbot.helpers import (
     linked_admin_from_user,
     linked_parent_from_user,
     linked_student_from_user,
+    run_blocking,
 )
 from backend.identity.account_service import unlink_telegram_user_links
 
@@ -20,9 +21,9 @@ async def whoami_handler(message):
         await message.answer("Could not read your Telegram user ID.")
         return
 
-    linked_admin = linked_admin_from_user(user)
-    linked_parent = linked_parent_from_user(user)
-    linked_student = linked_student_from_user(user)
+    linked_admin = await linked_admin_from_user(user)
+    linked_parent = await linked_parent_from_user(user)
+    linked_student = await linked_student_from_user(user)
 
     lines = [f"Telegram ID: <code>{telegram_user_id}</code>"]
     if linked_admin:
@@ -63,7 +64,7 @@ async def unlink_me_handler(message):
         await message.answer("Could not read your Telegram user ID.")
         return
 
-    result = unlink_telegram_user_links(telegram_user_id)
+    result = await run_blocking(unlink_telegram_user_links, telegram_user_id)
     if not result.get("success"):
         await message.answer("Failed to unlink this Telegram account.")
         return
