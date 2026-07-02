@@ -25,6 +25,17 @@ from backend.roles.admin.services.academic_service import list_admin_academic_co
 from backend.roles.admin.services.parent_service import list_linked_parents_for_student
 from backend.domains.announcements.service import list_announcements
 
+ADMIN_PANEL_MODES = {
+    "admin",
+    "ceo",
+    "hr",
+    "sales",
+    "teacher",
+    "student",
+    "parent",
+    "academic_director",
+}
+
 
 def register_admin_page_routes(
     app,
@@ -60,10 +71,13 @@ def register_admin_page_routes(
     ):
         requested_panel = str(request.args.get("panel", "") or "").strip()
         requested_school = str(request.args.get("school", "") or "").strip()
+        requested_mode = str(request.args.get("mode", "") or "").strip().lower()
         if requested_panel and str(admin_panel or "overview").strip().lower() == "overview":
             admin_panel = requested_panel
         if requested_school and str(admin_school or "all").strip().lower() == "all":
             admin_school = requested_school
+        if not str(admin_mode or "").strip() and requested_mode in ADMIN_PANEL_MODES:
+            admin_mode = requested_mode
 
         force_refresh = bool(
             str(auth_error or "").strip()

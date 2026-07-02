@@ -59,8 +59,12 @@ export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [adminMode, setAdminModeState] = useState<AdminMode>(() => {
+    const serverMode = asString(props.adminMode);
+    if (serverMode) {
+      return normalizeAdminMode(serverMode);
+    }
     try {
-      return normalizeAdminMode(window.localStorage.getItem("msi_admin_mode") || props.adminMode);
+      return normalizeAdminMode(window.localStorage.getItem("msi_admin_mode"));
     } catch {
       return normalizeAdminMode(props.adminMode);
     }
@@ -401,7 +405,7 @@ export function useAdminState(props: AdminPageProps) {
     }
     const fallbackTab = visibleTabs[0]?.key || "overview";
     setActiveTab(fallbackTab);
-    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool);
+    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, adminMode);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.history.replaceState({}, "", nextUrl);
@@ -613,6 +617,10 @@ export function useAdminState(props: AdminPageProps) {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       setActiveTab(normalizeAdminTab(params.get("panel")));
+      const modeParam = params.get("mode");
+      if (modeParam) {
+        setAdminModeState(normalizeAdminMode(modeParam));
+      }
       setActiveStudentRowId(Math.max(0, Math.floor(Number(params.get("student") || 0))));
       setMobileNavOpen(false);
     };
@@ -649,7 +657,7 @@ export function useAdminState(props: AdminPageProps) {
 
   function switchAdminTab(nextTab: AdminTab) {
     setMobileNavOpen(false);
-    const nextUrl = buildAdminTabUrl(nextTab, currentSchool);
+    const nextUrl = buildAdminTabUrl(nextTab, currentSchool, adminMode);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.location.href = nextUrl;
@@ -667,10 +675,10 @@ export function useAdminState(props: AdminPageProps) {
       window.localStorage.setItem("msi_admin_mode", normalizedMode);
     } catch {
     }
-    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool);
+    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, normalizedMode);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
-      window.history.replaceState({}, "", nextUrl);
+      window.location.href = nextUrl;
     }
   }
 

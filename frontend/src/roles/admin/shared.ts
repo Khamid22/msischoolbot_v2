@@ -542,9 +542,13 @@ export function normalizeAdminTab(value: unknown): AdminTab {
   return adminTabKeys.has(normalized) ? (normalized as AdminTab) : "overview";
 }
 
-export function buildAdminTabUrl(tab: AdminTab, school: string) {
+export function buildAdminTabUrl(tab: AdminTab, school: string, mode?: AdminMode | string) {
   const params = new URLSearchParams();
   params.set("panel", tab);
   params.set("school", school || "all");
+  const normalizedMode = asString(mode).toLowerCase();
+  if (normalizedMode) {
+    params.set("mode", normalizedMode);
+  }
   return `/?${params.toString()}`;
 }
