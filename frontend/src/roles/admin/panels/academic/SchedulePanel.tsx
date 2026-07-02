@@ -6,7 +6,7 @@ import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
-import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, subjectCode, subjectColorClass, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
+import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, subjectColorClass, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
@@ -46,7 +46,6 @@ type PointerDrag = {
   x: number;
   y: number;
   label: string;
-  subject: string;
   moved: boolean;
 };
 
@@ -439,7 +438,7 @@ export function SchedulePanel({ state }: { state: any }) {
     await updatePayloadTime(payload, dayIso, startMin, endMin, `${payload.meta.group_name} placed on ${dayIso} at ${minutesToLabel(startMin)}–${minutesToLabel(endMin)}.`);
   }
 
-  function startPointerDrag(event: ReactPointerEvent<HTMLElement>, payload: DragPayload, label: string, subject: string) {
+  function startPointerDrag(event: ReactPointerEvent<HTMLElement>, payload: DragPayload, label: string) {
     if (!canDrag) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
@@ -452,7 +451,6 @@ export function SchedulePanel({ state }: { state: any }) {
       x: event.clientX,
       y: event.clientY,
       label,
-      subject,
       moved: false,
     };
     pointerDragRef.current = next;
@@ -635,9 +633,6 @@ export function SchedulePanel({ state }: { state: any }) {
         >
           <div className="flex items-center gap-2">
             <span className="max-w-28 truncate">{pointerDrag.label}</span>
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
-              {subjectCode(pointerDrag.subject)}
-            </span>
           </div>
         </div>
       ) : null}
@@ -705,9 +700,13 @@ export function SchedulePanel({ state }: { state: any }) {
           </div>
         </div>
 
-        <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
+        <div
+          ref={timetableScrollRef}
+          className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background [scrollbar-gutter:stable]"
+          style={{ maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 14rem))` }}
+        >
           <div style={{ minWidth: `${gridMinWidthPx}px` }}>
-            <div className="grid border-b border-foreground/10 bg-muted/40" style={{ gridTemplateColumns }}>
+            <div className="sticky top-0 z-40 grid border-b border-foreground/10 bg-muted/50 backdrop-blur" style={{ gridTemplateColumns }}>
               <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
               {weekDays.map((day, index) => (
                 <div key={isoDate(day)} className="border-l border-foreground/10 px-3 py-2">
@@ -716,28 +715,23 @@ export function SchedulePanel({ state }: { state: any }) {
                 </div>
               ))}
             </div>
-            <div
-              ref={timetableScrollRef}
-              className="miniapp-scroll overflow-y-auto"
-              style={{ maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 14rem))` }}
-            >
-              <div className="relative grid" style={{ gridTemplateColumns }}>
-                <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: `${gridHeightPx}px` }}>
-                  {hours.map((hour) => (
-                    <div
-                      key={hour}
-                      className="absolute left-0 right-0 border-t border-foreground/8 px-2 pt-1 text-right text-[11px] font-semibold text-muted-foreground"
-                      style={{
-                        top: `${(hour - displayStartHour) * hourPx}px`,
-                        // Pull the final label above the bottom edge so it isn't clipped.
-                        transform: hour === displayEndHour ? "translateY(-100%)" : undefined,
-                      }}
-                    >
-                      {String(hour).padStart(2, "0")}:00
-                    </div>
-                  ))}
-                </div>
-                {weekDays.map((day) => {
+            <div className="relative grid" style={{ gridTemplateColumns }}>
+              <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: `${gridHeightPx}px` }}>
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="absolute left-0 right-0 border-t border-foreground/8 px-2 pt-1 text-right text-[11px] font-semibold text-muted-foreground"
+                    style={{
+                      top: `${(hour - displayStartHour) * hourPx}px`,
+                      // Pull the final label above the bottom edge so it isn't clipped.
+                      transform: hour === displayEndHour ? "translateY(-100%)" : undefined,
+                    }}
+                  >
+                    {String(hour).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
+              {weekDays.map((day) => {
                   const dayIso = isoDate(day);
                   const daySessions = dayTimetableBlocks[dayIso] || [];
                   const hint = dropHint && dropHint.day === dayIso ? dropHint : null;
@@ -782,7 +776,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         return (
                           <div
                             key={session.id}
-                            onPointerDown={canDrag ? (event) => startPointerDrag(event, blockDragPayload(session), asString(session.group_name), asString(session.subject_name)) : undefined}
+                            onPointerDown={canDrag ? (event) => startPointerDrag(event, blockDragPayload(session), asString(session.group_name)) : undefined}
                             onPointerMove={canDrag ? movePointerDrag : undefined}
                             onPointerUp={canDrag ? endPointerDrag : undefined}
                             onPointerCancel={canDrag ? cancelPointerDrag : undefined}
@@ -867,10 +861,10 @@ export function SchedulePanel({ state }: { state: any }) {
                       ) : null}
                     </div>
                   );
-                })}
-                {freeformLessons.length ? (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 z-20" style={{ left: `${TIME_COLUMN_PX}px` }}>
-                    {freeformLessons.map((lesson, index) => {
+              })}
+              {freeformLessons.length ? (
+                <div className="pointer-events-none absolute inset-y-0 right-0 z-20" style={{ left: `${TIME_COLUMN_PX}px` }}>
+                  {freeformLessons.map((lesson, index) => {
                       const status = lessonStatus(lesson);
                       const statusClass = status === "cancelled"
                         ? "border-red-500/20 bg-red-50 text-red-800 shadow-red-900/5"
@@ -879,7 +873,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         <button
                           key={`schedule-loose-${lesson.id}`}
                           type="button"
-                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), lessonNumberText(lesson.lesson_number, lesson.id), asString(lesson.subject_name)) : undefined}
+                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), lessonNumberText(lesson.lesson_number, lesson.id)) : undefined}
                           onPointerMove={canDrag ? movePointerDrag : undefined}
                           onPointerUp={canDrag ? endPointerDrag : undefined}
                           onPointerCancel={canDrag ? cancelPointerDrag : undefined}
@@ -890,10 +884,9 @@ export function SchedulePanel({ state }: { state: any }) {
                           {lessonNumberText(lesson.lesson_number, lesson.id)}
                         </button>
                       );
-                    })}
-                  </div>
-                ) : null}
-              </div>
+                  })}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
