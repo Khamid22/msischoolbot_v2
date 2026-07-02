@@ -21,8 +21,8 @@ export function AdminEmbedLayout({
   const normalizedBackUrl = withEmbedMode(backUrl);
 
   return (
-    <div className="bg-background px-3 py-3 sm:px-4">
-      <div className="w-full space-y-3">
+    <div className="flex app-height min-h-0 flex-col overflow-y-auto bg-background px-3 py-3 sm:px-4">
+      <div className="w-full space-y-3 pb-[calc(var(--app-bottom-inset)+1rem)]">
         <section className="flex flex-col gap-3 rounded-xl border border-foreground/10 bg-surface p-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {normalizedBackUrl ? (

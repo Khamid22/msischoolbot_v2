@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   Activity,
   AlertCircle,
@@ -160,7 +160,10 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
   const studentId = asNumber(student?.id);
   const frameUrl = studentId ? withEmbedMode(config.href(studentId, currentSchool)) : "";
   const scrollableFrameTabs = new Set<StudentActionTab>([
+    "student_dashboard",
+    "student_profile",
     "student_resources",
+    "student_chat",
     "student_rating",
     "student_aap",
     "student_ar",
@@ -168,6 +171,14 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
   ]);
   const usesInternalFrameScroll = scrollableFrameTabs.has(tab);
   const [frameHeight, setFrameHeight] = useState(tab === "student_chat" ? 720 : 420);
+  const frameResizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(() => {
+    return () => {
+      frameResizeObserverRef.current?.disconnect();
+      frameResizeObserverRef.current = null;
+    };
+  }, [frameUrl]);
 
   function resizeFrame(frame: HTMLIFrameElement | null) {
     if (usesInternalFrameScroll) return;
@@ -180,6 +191,22 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
     const minimumHeight = tab === "student_chat" ? 640 : 0;
     const nextHeight = Math.max(minimumHeight, Math.ceil(measuredHeight) + 2);
     setFrameHeight(nextHeight);
+  }
+
+  function watchFrameResize(frame: HTMLIFrameElement | null) {
+    frameResizeObserverRef.current?.disconnect();
+    frameResizeObserverRef.current = null;
+    if (usesInternalFrameScroll || typeof ResizeObserver === "undefined") return;
+
+    const doc = frame?.contentDocument;
+    if (!doc) return;
+
+    const root = doc.getElementById("root");
+    const target = root || doc.body || doc.documentElement;
+    const observer = new ResizeObserver(() => resizeFrame(frame));
+    observer.observe(target);
+    if (doc.body && doc.body !== target) observer.observe(doc.body);
+    frameResizeObserverRef.current = observer;
   }
 
   if (!student || !studentId) {
@@ -207,8 +234,10 @@ function StudentActionPanel({ state, tab }: { state: any; tab: StudentActionTab 
       onLoad={(event) => {
         const frame = event.currentTarget;
         resizeFrame(frame);
+        watchFrameResize(frame);
         window.setTimeout(() => resizeFrame(frame), 250);
         window.setTimeout(() => resizeFrame(frame), 1000);
+        window.setTimeout(() => resizeFrame(frame), 2000);
       }}
     />
   );
