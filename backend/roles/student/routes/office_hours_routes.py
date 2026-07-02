@@ -60,13 +60,9 @@ def _list_enrolled_subject_options(student_id, school_code, fallback_subject_nam
     return subjects or fallback
 
 
-def register_office_hours_routes(
-    students,
-    *,
-    load_dashboard_payload,
-):
-    @students.get("/dashboard/<int:student_id>/office-hours")
-    def student_office_hours(student_id):
+def register_office_hours_routes(students):
+    @students.get("/dashboard/{student_id}/office-hours")
+    def student_office_hours(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -77,31 +73,22 @@ def register_office_hours_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=False,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message="We could not retrieve data for this student. Please search again.",
             session_invalid_message="Student session is invalid. Please login again.",
             forbidden_message="Access denied: you can open only your own office hours.",
         )
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         student = payload.get("student", {})
         if not isinstance(student, dict):
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": "Student profile is unavailable.", "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                404,
-            )
+                    title="Student Not Found", status_code=404)
 
         subject_name = str(student.get("subject", "")).strip()
         group_name = str(student.get("group", "")).strip()
@@ -151,7 +138,7 @@ def register_office_hours_routes(
             t_id = int(teacher_id) if teacher_id else None
             s_id = int(subject_id) if subject_id else None
         except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}), 400
+            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
 
         # Students only see active availabilities
         availabilities = oh_service.list_availabilities(
@@ -166,7 +153,7 @@ def register_office_hours_routes(
     def student_list_bookings():
         student_row_id = current_student_db_id()
         if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}), 401
+            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
 
         bookings = oh_service.list_bookings(
             student_row_id=student_row_id
@@ -179,14 +166,14 @@ def register_office_hours_routes(
         payload = request_payload()
         student_row_id = current_student_db_id()
         if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}), 401
+            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
 
         try:
             availability_id = int(payload.get("availability_id"))
             student_note = str(payload.get("student_note", ""))
             student_topic_request = str(payload.get("student_topic_request", "") or "").strip()
         except (TypeError, ValueError, KeyError):
-            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}), 400
+            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}, status_code=400)
 
         try:
             booking_id = oh_service.create_booking(
@@ -197,20 +184,20 @@ def register_office_hours_routes(
             )
             return jsonify({"ok": True, "booking_id": booking_id})
         except ValueError as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
-    @students.patch("/api/office-hours/bookings/<int:booking_id>")
-    def student_cancel_booking(booking_id):
+    @students.patch("/api/office-hours/bookings/{booking_id}")
+    def student_cancel_booking(booking_id: int):
         from backend.roles.admin.routes.request_payload import request_payload
         payload = request_payload()
         status = payload.get("status")
         if status != "cancelled":
-            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}), 400
+            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}, status_code=400)
         student_row_id = current_student_db_id()
         if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}), 401
+            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
 
         try:
             oh_service.update_booking_status(
@@ -221,6 +208,6 @@ def register_office_hours_routes(
             )
             return jsonify({"ok": True})
         except PermissionError as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 403
+            return jsonify({"ok": False, "message": str(exc)}, status_code=403)
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)

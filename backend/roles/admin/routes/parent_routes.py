@@ -19,40 +19,40 @@ def _current_parent_admin_id():
 
 
 def register_admin_parent_routes(router):
-    @router.post("/admin/parents/<int:parent_admin_id>/children")
-    def admin_assign_selected_parent_child(parent_admin_id):
+    @router.post("/admin/parents/{parent_admin_id}/children")
+    def admin_assign_selected_parent_child(parent_admin_id: int):
         payload = request_payload()
         student_row_id = payload.get("student_row_id") or payload.get("student_id")
         try:
             child = assign_parent_child(parent_admin_id, student_row_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "child": child})
 
-    @router.delete("/admin/parents/<int:parent_admin_id>/children/<int:student_row_id>")
-    def admin_remove_selected_parent_child(parent_admin_id, student_row_id):
+    @router.delete("/admin/parents/{parent_admin_id}/children/{student_row_id}")
+    def admin_remove_selected_parent_child(parent_admin_id: int, student_row_id: int):
         try:
             removed = remove_parent_child(parent_admin_id, student_row_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if not removed:
-            return jsonify({"ok": False, "message": "Child assignment was not found."}), 404
+            return jsonify({"ok": False, "message": "Child assignment was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True})
 
-    @router.delete("/admin/parents/<int:parent_admin_id>")
-    def admin_delete_parent_account(parent_admin_id):
+    @router.delete("/admin/parents/{parent_admin_id}")
+    def admin_delete_parent_account(parent_admin_id: int):
         try:
             deleted = delete_parent_account(parent_admin_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if not deleted:
-            return jsonify({"ok": False, "message": "Parent account was not found."}), 404
+            return jsonify({"ok": False, "message": "Parent account was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True})
@@ -65,20 +65,20 @@ def register_admin_parent_routes(router):
         try:
             child = assign_parent_child(parent_admin_id, student_row_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "child": child})
 
-    @router.delete("/admin/parent-children/<int:student_row_id>")
-    def admin_remove_parent_child(student_row_id):
+    @router.delete("/admin/parent-children/{student_row_id}")
+    def admin_remove_parent_child(student_row_id: int):
         try:
             removed = remove_parent_child(_current_parent_admin_id(), student_row_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if not removed:
-            return jsonify({"ok": False, "message": "Child assignment was not found."}), 404
+            return jsonify({"ok": False, "message": "Child assignment was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True})

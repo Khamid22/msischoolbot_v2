@@ -14,7 +14,7 @@ Endpoints:
   DELETE /api/chat/messages/<id>                  soft-delete own message
 """
 
-from backend.utils.response_helpers import jsonify, csrf
+from backend.utils.response_helpers import jsonify
 from backend.utils.context import request
 from backend.domains.communication.chat_service import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from backend.utils.session import (
@@ -60,11 +60,10 @@ def register_chat_routes(students):
 
     # ── List messages ──────────────────────────────────────────────────────────
     @students.get("/api/chat/messages")
-    @csrf.exempt
     def api_chat_list():
         room = request.args.get("room", "global").strip()
         if not _validate_room(room):
-            return jsonify({"error": "Invalid room."}), 400
+            return jsonify({"error": "Invalid room."}, status_code=400)
 
         try:
             before_id = int(request.args.get("before_id", 0))
@@ -122,26 +121,25 @@ def register_chat_routes(students):
 
     # ── Send message ───────────────────────────────────────────────────────────
     @students.post("/api/chat/messages")
-    @csrf.exempt
     def api_chat_send():
         role = current_auth_role()
         if role != "student":
-            return jsonify({"error": "Login required."}), 401
+            return jsonify({"error": "Login required."}, status_code=401)
 
         author_name = current_student_full_name()
         if not author_name:
-            return jsonify({"error": "Could not identify your account."}), 401
+            return jsonify({"error": "Could not identify your account."}, status_code=401)
 
         data = request.get_json(silent=True) or {}
         room = str(data.get("room", "global")).strip()
         body = str(data.get("body", "")).strip()
 
         if not _validate_room(room):
-            return jsonify({"error": "Invalid room."}), 400
+            return jsonify({"error": "Invalid room."}, status_code=400)
         if not body:
-            return jsonify({"error": "Message cannot be empty."}), 400
+            return jsonify({"error": "Message cannot be empty."}, status_code=400)
         if len(body) > _MAX_BODY:
-            return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}), 400
+            return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}, status_code=400)
 
         student_login = current_auth_login() or author_name
         now = utc_now_iso()
@@ -149,7 +147,7 @@ def register_chat_routes(students):
             with connect_chat_db() as conn:
                 queries.ensure_chat_schema(conn)
                 if _is_blocked(conn, student_login):
-                    return jsonify({"error": "You have been blocked from the chat."}), 403
+                    return jsonify({"error": "You have been blocked from the chat."}, status_code=403)
 
                 inserted = conn.execute(
                     """
@@ -175,23 +173,22 @@ def register_chat_routes(students):
                 "createdAt": fmt_display(now),
                 "createdAtRaw": now,
             }
-        }), 201
+        }, status_code=201)
 
     # ── Edit own message ───────────────────────────────────────────────────────
-    @students.put("/api/chat/messages/<int:msg_id>")
-    @csrf.exempt
-    def api_chat_edit(msg_id):
+    @students.put("/api/chat/messages/{msg_id}")
+    def api_chat_edit(msg_id: int):
         if current_auth_role() != "student":
-            return jsonify({"error": "Login required."}), 401
+            return jsonify({"error": "Login required."}, status_code=401)
 
         student_login = current_auth_login() or current_student_full_name()
 
         data = request.get_json(silent=True) or {}
         body = str(data.get("body", "")).strip()
         if not body:
-            return jsonify({"error": "Message cannot be empty."}), 400
+            return jsonify({"error": "Message cannot be empty."}, status_code=400)
         if len(body) > _MAX_BODY:
-            return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}), 400
+            return jsonify({"error": f"Message too long (max {_MAX_BODY} chars)."}, status_code=400)
 
         now = utc_now_iso()
         with _DB_LOCK:
@@ -202,9 +199,9 @@ def register_chat_routes(students):
                     (msg_id,),
                 ).fetchone()
                 if not row:
-                    return jsonify({"error": "Message not found."}), 404
+                    return jsonify({"error": "Message not found."}, status_code=404)
                 if str(row["author_student_id"]).strip().lower() != student_login.strip().lower():
-                    return jsonify({"error": "You can only edit your own messages."}), 403
+                    return jsonify({"error": "You can only edit your own messages."}, status_code=403)
 
                 conn.execute(
                     "UPDATE msi_v2.chat_messages SET body = %s, edited_at = %s::timestamptz WHERE id = %s",
@@ -215,11 +212,10 @@ def register_chat_routes(students):
         return jsonify({"id": msg_id, "body": body, "editedAt": fmt_display(now)})
 
     # ── Soft-delete own message ────────────────────────────────────────────────
-    @students.delete("/api/chat/messages/<int:msg_id>")
-    @csrf.exempt
-    def api_chat_delete(msg_id):
+    @students.delete("/api/chat/messages/{msg_id}")
+    def api_chat_delete(msg_id: int):
         if current_auth_role() != "student":
-            return jsonify({"error": "Login required."}), 401
+            return jsonify({"error": "Login required."}, status_code=401)
 
         student_login = current_auth_login() or current_student_full_name()
 
@@ -231,9 +227,9 @@ def register_chat_routes(students):
                     (msg_id,),
                 ).fetchone()
                 if not row:
-                    return jsonify({"error": "Message not found."}), 404
+                    return jsonify({"error": "Message not found."}, status_code=404)
                 if str(row["author_student_id"]).strip().lower() != student_login.strip().lower():
-                    return jsonify({"error": "You can only delete your own messages."}), 403
+                    return jsonify({"error": "You can only delete your own messages."}, status_code=403)
 
                 conn.execute(
                     "UPDATE msi_v2.chat_messages SET is_deleted = true WHERE id = %s",

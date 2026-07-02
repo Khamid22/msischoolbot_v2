@@ -1,6 +1,7 @@
 """Shared payload loading and ownership checks for student-facing pages."""
 
 from .access_service import is_student_owner_of_payload
+from backend.domains.academics.rating_service import load_dashboard_payload
 from backend.utils.session import (
     current_auth_role,
     current_parent_id,
@@ -17,7 +18,6 @@ def load_student_payload_for_view(
     requested_group,
     requested_school,
     force_refresh,
-    load_dashboard_payload,
     missing_message,
     session_invalid_message,
     forbidden_message,

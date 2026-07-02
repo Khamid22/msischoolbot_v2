@@ -54,7 +54,7 @@ def register_academic_admin_routes(
         try:
             result = create_schedule_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         academic_context = list_admin_academic_context()
         return jsonify(
@@ -72,26 +72,26 @@ def register_academic_admin_routes(
         try:
             gradebook = get_group_gradebook(request.args.get("group_id", 0))
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         if not gradebook:
-            return jsonify({"ok": False, "message": "Group not found"}), 404
+            return jsonify({"ok": False, "message": "Group not found"}, status_code=404)
         return jsonify(gradebook)
 
-    @admin_blueprint.patch("/admin/api/academic/enrollments/<int:enrollment_id>/status")
-    def admin_update_academic_enrollment_status(enrollment_id):
+    @admin_blueprint.patch("/admin/api/academic/enrollments/{enrollment_id}/status")
+    def admin_update_academic_enrollment_status(enrollment_id: int):
         try:
             result = update_enrollment_status_from_payload(enrollment_id, request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "enrollment": result})
 
-    @admin_blueprint.patch("/admin/api/academic/enrollments/<int:enrollment_id>/group")
-    def admin_move_academic_enrollment_group(enrollment_id):
+    @admin_blueprint.patch("/admin/api/academic/enrollments/{enrollment_id}/group")
+    def admin_move_academic_enrollment_group(enrollment_id: int):
         try:
             result = move_enrollment_group_from_payload(enrollment_id, request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         academic_context = list_admin_academic_context()
         return jsonify(
@@ -107,7 +107,7 @@ def register_academic_admin_routes(
         try:
             record_id = record_attendance_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         return jsonify({"ok": True, "id": record_id})
 
     @admin_blueprint.post("/admin/api/academic/homework")
@@ -115,7 +115,7 @@ def register_academic_admin_routes(
         try:
             record_id = record_homework_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         return jsonify({"ok": True, "id": record_id})
 
     @admin_blueprint.post("/admin/api/academic/exams")
@@ -123,7 +123,7 @@ def register_academic_admin_routes(
         try:
             record_id = record_exam_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         return jsonify({"ok": True, "id": record_id})
 
     @admin_blueprint.post("/admin/api/academic/coins")
@@ -131,5 +131,5 @@ def register_academic_admin_routes(
         try:
             record_id = record_coin_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         return jsonify({"ok": True, "id": record_id})

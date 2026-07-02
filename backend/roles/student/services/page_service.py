@@ -5,6 +5,11 @@ import threading
 import time
 
 from backend.utils.normalization import normalize_school_code
+from backend.domains.academics.rating_service import (
+    build_students_by_subject_group,
+    load_dataset,
+    seed_group_cache_from_dataset,
+)
 
 _STUDENT_PANEL_CACHE_LOCK = threading.Lock()
 _STUDENT_PANEL_CACHE = {}
@@ -70,25 +75,13 @@ def build_student_panel_context(
     *,
     form_data,
     student_school_code,
-    load_dataset,
-    seed_group_cache_from_dataset,
-    build_students_by_subject_group,
     force_refresh=False,
 ):
     normalized_school_code = _normalize_student_school_code(student_school_code)
-    try:
-        if normalized_school_code:
-            dataset, load_error = load_dataset(
-                school_code=normalized_school_code,
-                force_refresh=force_refresh,
-            )
-        else:
-            dataset, load_error = load_dataset(force_refresh=force_refresh)
-    except TypeError:
-        if normalized_school_code:
-            dataset, load_error = load_dataset(school_code=normalized_school_code)
-        else:
-            dataset, load_error = load_dataset()
+    dataset, load_error = load_dataset(
+        school_code=normalized_school_code or None,
+        force_refresh=force_refresh,
+    )
 
     groups = []
     groups_by_subject = {}

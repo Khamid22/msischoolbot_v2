@@ -6,10 +6,10 @@ from backend.roles.student.services import payload_service
 from backend.utils.session import current_auth_login
 
 
-def register_chat_page_routes(students, *, load_dashboard_payload):
+def register_chat_page_routes(students):
 
-    @students.get("/dashboard/<int:student_id>/chat")
-    def chat_room(student_id):
+    @students.get("/dashboard/{student_id}/chat")
+    def chat_room(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -20,21 +20,16 @@ def register_chat_page_routes(students, *, load_dashboard_payload):
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=False,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message="We could not retrieve data for this student.",
             session_invalid_message="Student session is invalid. Please login again.",
             forbidden_message="Access denied: you can open only your own chat.",
         )
 
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
         current_subject = str(payload_student.get("subject", "")).strip()

@@ -19,6 +19,7 @@ import re
 import threading
 from typing import Any
 
+from fastapi.responses import HTMLResponse
 from markupsafe import escape
 
 ASSET_VERSION = "1"
@@ -239,8 +240,9 @@ def render_react_page(
     telegram: bool = True,
     back_mode: str | None = None,
     back_url: str | None = None,
-) -> str:
-    """Return an HTML string that boots the React app for the given page.
+    status_code: int = 200,
+) -> HTMLResponse:
+    """Return an HTMLResponse that boots the React app for the given page.
 
     Args:
         page_name:   React page key (e.g. "student-dashboard"). Must match a
@@ -251,6 +253,7 @@ def render_react_page(
         telegram:    Whether to load the Telegram WebApp JS bridge.
         back_mode:   Telegram back button mode ("history" or None).
         back_url:    URL the Telegram back button navigates to.
+        status_code: HTTP status for the response (e.g. 404 for not-found pages).
     """
     v = _asset_version()
     props_json = _safe_json(page_name, props)
@@ -283,7 +286,7 @@ def render_react_page(
     if back_url:
         body_attrs += f' data-tg-back-url="{str(escape(back_url))}"'
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -306,9 +309,10 @@ def render_react_page(
     <script type="module" src="{js_url}"></script>
   </body>
 </html>"""
+    return HTMLResponse(html, status_code=status_code)
 
 
-def render_admin_redirect(redirect_url: str) -> str:
+def render_admin_redirect(redirect_url: str) -> HTMLResponse:
     """Return the standalone HTML page shown to admins inside the Telegram mini app.
 
     This page has no React — it simply tells the admin to open the website,
@@ -317,7 +321,7 @@ def render_admin_redirect(redirect_url: str) -> str:
     url_json = json.dumps(str(redirect_url))
     favicon_url = url_for("static", filename="images/favicon.png")
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -412,6 +416,7 @@ def render_admin_redirect(redirect_url: str) -> str:
     </script>
   </body>
 </html>"""
+    return HTMLResponse(html)
 
 
 def generate_csrf() -> str:

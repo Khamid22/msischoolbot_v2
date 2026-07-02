@@ -1,7 +1,7 @@
 import os
 import time
 
-from backend.utils.response_helpers import jsonify, redirect
+from backend.utils.response_helpers import jsonify, redirect, with_status
 from backend.utils.context import current_app, request, session
 from backend.utils.session import url_for
 from werkzeug.utils import secure_filename
@@ -75,15 +75,15 @@ def register_admin_student_routes(
         try:
             result = create_student_with_enrollment_from_payload(request_payload())
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "student": result})
 
-    @router.post("/admin/api/students/<int:student_row_id>/parent-invite")
-    def admin_create_parent_invite(student_row_id):
+    @router.post("/admin/api/students/{student_row_id}/parent-invite")
+    def admin_create_parent_invite(student_row_id: int):
         profile = get_admin_student_profile(student_row_id)
         if not profile:
-            return jsonify({"ok": False, "message": "Selected student was not found."}), 404
+            return jsonify({"ok": False, "message": "Selected student was not found."}, status_code=404)
 
         token = create_parent_invite_token(
             {
@@ -118,30 +118,27 @@ def register_admin_student_routes(
             }
         )
 
-    @router.get("/admin/students/<int:student_row_id>")
-    def admin_student_profile(student_row_id):
+    @router.get("/admin/students/{student_row_id}")
+    def admin_student_profile(student_row_id: int):
         admin_notice = request.args.get("notice", "").strip()
         rendered = render_edit_student_page(
             student_row_id,
             admin_notice=admin_notice,
         )
         if rendered is None:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error="Selected student was not found.",
                     admin_panel="students",
-                ),
-                404,
-            )
+                ), 404)
 
         return rendered
 
-    @router.get("/admin/students/<int:student_row_id>/dashboard")
-    def admin_student_dashboard(student_row_id):
+    @router.get("/admin/students/{student_row_id}/dashboard")
+    def admin_student_dashboard(student_row_id: int):
         return _redirect_admin_student_dashboard(student_row_id, "dashboard")
 
-    @router.get("/admin/students/<int:student_row_id>/dashboard/<target>")
-    def admin_student_dashboard_target(student_row_id, target):
+    @router.get("/admin/students/{student_row_id}/dashboard/{target}")
+    def admin_student_dashboard_target(student_row_id: int, target: str):
         return _redirect_admin_student_dashboard(student_row_id, target)
 
     def _redirect_admin_student_dashboard(student_row_id, target):
@@ -156,26 +153,20 @@ def register_admin_student_routes(
         normalized_target = str(target or "dashboard").strip().lower()
         endpoint = STUDENT_DASHBOARD_TARGET_ENDPOINTS.get(normalized_target)
         if not endpoint:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error="Selected student page is not available.",
                     admin_panel="students",
-                ),
-                404,
-            )
+                ), 404)
 
         resolved, resolve_error, status_code = resolve_sheet_student_for_admin(
             student_row_id,
             get_admin_student_profile,
         )
         if resolve_error:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=resolve_error,
                     admin_panel="students",
-                ),
-                status_code,
-            )
+                ), status_code)
 
         return redirect(
             url_for(
@@ -190,17 +181,14 @@ def register_admin_student_routes(
             )
         )
 
-    @router.post("/admin/students/<int:student_row_id>/profile")
-    def save_admin_student_profile(student_row_id):
+    @router.post("/admin/students/{student_row_id}/profile")
+    def save_admin_student_profile(student_row_id: int):
         current_profile = get_admin_student_profile(student_row_id)
         if not current_profile:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error="Selected student was not found.",
                     admin_panel="students",
-                ),
-                404,
-            )
+                ), 404)
 
         teacher_name_raw = request.form.get("teacher_name")
         normalized_teacher_name = str(teacher_name_raw or "").strip()
@@ -224,7 +212,7 @@ def register_admin_student_routes(
                     auth_error="Photo format is not supported. Use PNG, JPG, JPEG, WEBP, or GIF.",
                 )
                 if rendered is not None:
-                    return rendered, 400
+                    return with_status(rendered, 400)
             else:
                 static_root = current_app.static_folder or os.path.join(
                     current_app.root_path,
@@ -250,7 +238,7 @@ def register_admin_student_routes(
                         auth_error="Photo is too large. Maximum file size is 10 MB.",
                     )
                     if rendered is not None:
-                        return rendered, 413
+                        return with_status(rendered, 413)
                 else:
                     photo_url = url_for(
                         "static",
@@ -274,7 +262,7 @@ def register_admin_student_routes(
                 auth_error="Selected teacher is not available in the database.",
             )
             if rendered is not None:
-                return rendered, 400
+                return with_status(rendered, 400)
 
         assigned_group = str(current_profile.get("group", "")).strip()
         teacher_to_assign = normalized_teacher_name
@@ -289,7 +277,7 @@ def register_admin_student_routes(
                     auth_error="Unable to update teacher assignment for this group.",
                 )
                 if rendered is not None:
-                    return rendered, 400
+                    return with_status(rendered, 400)
 
         saved = update_student_admin_profile(
             student_row_id=student_row_id,
@@ -308,14 +296,11 @@ def register_admin_student_routes(
                 auth_error="Unable to save student profile details.",
             )
             if rendered is not None:
-                return rendered, 400
-            return (
-                render_admin_page(
+                return with_status(rendered, 400)
+            return with_status(render_admin_page(
                     auth_error="Unable to save student profile details.",
                     admin_panel="students",
-                ),
-                400,
-            )
+                ), 400)
 
         return redirect(
             url_for(
@@ -325,8 +310,8 @@ def register_admin_student_routes(
             )
         )
 
-    @router.post("/admin/students/<int:student_row_id>/password")
-    def admin_change_student_password_route(student_row_id):
+    @router.post("/admin/students/{student_row_id}/password")
+    def admin_change_student_password_route(student_row_id: int):
         new_password = request.form.get("new_password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
 
@@ -336,14 +321,11 @@ def register_admin_student_routes(
                 auth_error="Passwords do not match.",
             )
             if rendered is not None:
-                return rendered, 400
-            return (
-                render_admin_page(
+                return with_status(rendered, 400)
+            return with_status(render_admin_page(
                     auth_error="Passwords do not match.",
                     admin_panel="students",
-                ),
-                400,
-            )
+                ), 400)
 
         changed, change_error = admin_change_student_password(student_row_id, new_password)
         if not changed:
@@ -352,14 +334,11 @@ def register_admin_student_routes(
                 auth_error=change_error or "Unable to change password.",
             )
             if rendered is not None:
-                return rendered, 400
-            return (
-                render_admin_page(
+                return with_status(rendered, 400)
+            return with_status(render_admin_page(
                     auth_error=change_error or "Unable to change password.",
                     admin_panel="students",
-                ),
-                400,
-            )
+                ), 400)
 
         return redirect(
             url_for(

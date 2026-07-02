@@ -1,4 +1,4 @@
-from backend.utils.response_helpers import jsonify
+from backend.utils.response_helpers import jsonify, with_status
 from backend.utils.context import request
 
 from backend.identity.account_service import (
@@ -89,15 +89,12 @@ def register_admin_teacher_routes(
 ):
     def _teacher_error(message, *, teacher_edit=None, status=400):
         if _wants_json():
-            return jsonify({"ok": False, "message": message}), status
-        return (
-            render_admin_page(
+            return jsonify({"ok": False, "message": message}, status_code=status)
+        return with_status(render_admin_page(
                 auth_error=message,
                 admin_panel="teachers",
                 admin_teacher_edit=teacher_edit,
-            ),
-            status,
-        )
+            ), status)
 
     def _teacher_success(message):
         invalidate_admin_page_context_cache()
@@ -122,11 +119,8 @@ def register_admin_teacher_routes(
         if not created:
             message = error_message or "Unable to add candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return (
-                render_admin_page(auth_error=message, admin_panel="teachers"),
-                400,
-            )
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
@@ -142,8 +136,8 @@ def register_admin_teacher_routes(
             admin_panel="teachers",
         )
 
-    @router.post("/admin/teacher-candidates/<int:candidate_id>/status")
-    def update_teacher_candidate_status_route(candidate_id):
+    @router.post("/admin/teacher-candidates/{candidate_id}/status")
+    def update_teacher_candidate_status_route(candidate_id: int):
         updated, error_message = update_teacher_candidate_status(
             candidate_id=candidate_id,
             status=request.form.get("candidate_status", ""),
@@ -157,11 +151,8 @@ def register_admin_teacher_routes(
         if not updated:
             message = error_message or "Unable to update candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return (
-                render_admin_page(auth_error=message, admin_panel="teachers"),
-                400,
-            )
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
@@ -177,14 +168,14 @@ def register_admin_teacher_routes(
             admin_panel="teachers",
         )
 
-    @router.post("/admin/teacher-candidates/<int:candidate_id>/promote")
-    def promote_teacher_candidate_route(candidate_id):
+    @router.post("/admin/teacher-candidates/{candidate_id}/promote")
+    def promote_teacher_candidate_route(candidate_id: int):
         candidate = get_teacher_candidate(candidate_id)
         if not candidate:
             message = "Candidate not found."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 404
-            return render_admin_page(auth_error=message, admin_panel="teachers"), 404
+                return jsonify({"ok": False, "message": message}, status_code=404)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 404)
 
         assigned_group = request.form.get("teacher_assigned_group", "").strip()
         assigned_school = normalize_school_code(request.form.get("teacher_assigned_school", ""))
@@ -198,15 +189,15 @@ def register_admin_teacher_routes(
         if not assigned_group:
             message = "Select a group to promote this candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return render_admin_page(auth_error=message, admin_panel="teachers"), 400
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         if assigned_school and assigned_school != "all":
             if not group_belongs_to_school(assigned_group, assigned_school):
                 message = "Selected group does not belong to the selected school."
                 if _wants_json():
-                    return jsonify({"ok": False, "message": message}), 400
-                return render_admin_page(auth_error=message, admin_panel="teachers"), 400
+                    return jsonify({"ok": False, "message": message}, status_code=400)
+                return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         training_summary = get_teacher_candidate_training_summary(candidate_id)
         if performance_score == "":
@@ -228,8 +219,8 @@ def register_admin_teacher_routes(
         if not created:
             message = "Unable to create the teacher record."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return render_admin_page(auth_error=message, admin_panel="teachers"), 400
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         update_teacher_candidate_status(
             candidate_id=candidate_id,
@@ -255,8 +246,8 @@ def register_admin_teacher_routes(
             admin_panel="teachers",
         )
 
-    @router.post("/admin/teacher-candidates/<int:candidate_id>/events/<int:event_id>/edit")
-    def edit_teacher_candidate_event_route(candidate_id, event_id):
+    @router.post("/admin/teacher-candidates/{candidate_id}/events/{event_id}/edit")
+    def edit_teacher_candidate_event_route(candidate_id: int, event_id: int):
         updated, error_message = update_candidate_event(
             candidate_id=candidate_id,
             event_id=event_id,
@@ -268,8 +259,8 @@ def register_admin_teacher_routes(
         if not updated:
             message = error_message or "Unable to edit evaluation."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return render_admin_page(auth_error=message, admin_panel="teachers"), 400
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
@@ -278,8 +269,8 @@ def register_admin_teacher_routes(
             )
         return render_admin_page(admin_notice="Evaluation updated.", admin_panel="teachers")
 
-    @router.post("/admin/teacher-candidates/<int:candidate_id>/events/<int:event_id>/delete")
-    def delete_teacher_candidate_event_route(candidate_id, event_id):
+    @router.post("/admin/teacher-candidates/{candidate_id}/events/{event_id}/delete")
+    def delete_teacher_candidate_event_route(candidate_id: int, event_id: int):
         deleted, error_message = delete_candidate_event(
             candidate_id=candidate_id,
             event_id=event_id,
@@ -287,8 +278,8 @@ def register_admin_teacher_routes(
         if not deleted:
             message = error_message or "Unable to delete evaluation."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}), 400
-            return render_admin_page(auth_error=message, admin_panel="teachers"), 400
+                return jsonify({"ok": False, "message": message}, status_code=400)
+            return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
@@ -326,8 +317,8 @@ def register_admin_teacher_routes(
 
         return _teacher_success("Teacher saved.")
 
-    @router.post("/admin/teachers/<int:teacher_id>")
-    def update_teacher(teacher_id):
+    @router.post("/admin/teachers/{teacher_id}")
+    def update_teacher(teacher_id: int):
         mode = str(request.form.get("teacher_mode", "select")).strip().lower()
         teacher_edit = get_teacher_by_id(teacher_id)
 
@@ -359,8 +350,8 @@ def register_admin_teacher_routes(
 
         return _teacher_success("Teacher updated.")
 
-    @router.post("/admin/teachers/<int:teacher_id>/delete")
-    def delete_teacher(teacher_id):
+    @router.post("/admin/teachers/{teacher_id}/delete")
+    def delete_teacher(teacher_id: int):
         deleted = delete_teacher_by_id(teacher_id)
         if not deleted:
             return _teacher_error("Unable to delete teacher.")

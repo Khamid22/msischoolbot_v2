@@ -14,16 +14,7 @@ from backend.roles.student.services import (
 )
 
 
-def register_dashboard_routes(
-    students,
-    *,
-    load_dashboard_payload,
-    load_dataset,
-    extract_attendance_rate,
-    extract_exam_average_score,
-    round_grade_half_up,
-    compute_subject_rating,
-):
+def register_dashboard_routes(students):
     def _is_refresh_requested():
         refresh_value = str(request.args.get("refresh", "")).strip().casefold()
         return refresh_value in {"1", "true", "yes", "y", "on"}
@@ -87,8 +78,8 @@ def register_dashboard_routes(
                 break
         return visible
 
-    @students.get("/dashboard/<int:student_id>")
-    def dashboard(student_id):
+    @students.get("/dashboard/{student_id}")
+    def dashboard(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -104,7 +95,6 @@ def register_dashboard_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message=(
                 "We could not retrieve data for this student. Please search again."
             ),
@@ -113,14 +103,10 @@ def register_dashboard_routes(
         )
 
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         context = dashboard_service.build_dashboard_page_context(
             student_id=student_id,
@@ -133,11 +119,6 @@ def register_dashboard_routes(
             admin_return_school=admin_return_school,
             profile_notice=profile_notice,
             profile_error=profile_error,
-            load_dataset=load_dataset,
-            extract_attendance_rate=extract_attendance_rate,
-            extract_exam_average_score=extract_exam_average_score,
-            round_grade_half_up=round_grade_half_up,
-            compute_subject_rating=compute_subject_rating,
             force_refresh=force_refresh,
         )
 
@@ -219,8 +200,8 @@ def register_dashboard_routes(
             back_url=context.get("dashboard_back_url"),
         )
 
-    @students.get("/dashboard/<int:student_id>/aap-lessons")
-    def aap_lessons(student_id):
+    @students.get("/dashboard/{student_id}/aap-lessons")
+    def aap_lessons(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -232,7 +213,6 @@ def register_dashboard_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message=(
                 "We could not retrieve data for this student. Please search again."
             ),
@@ -240,14 +220,10 @@ def register_dashboard_routes(
             forbidden_message="Access denied: you can open only your own AAP table.",
         )
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         context, build_error, build_status_code = dashboard_service.build_aap_lessons_page_context(
             student_id=student_id,
@@ -255,19 +231,13 @@ def register_dashboard_routes(
             requested_subject=requested_subject,
             requested_group=requested_group,
             requested_school=requested_school,
-            load_dataset=load_dataset,
-            round_grade_half_up=round_grade_half_up,
             force_refresh=force_refresh,
         )
         if build_error:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": build_error, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                build_status_code,
-            )
+                    title="Student Not Found", status_code=build_status_code)
 
         return render_react_page(
             "student-aap",
@@ -284,8 +254,8 @@ def register_dashboard_routes(
             back_url=context.get("back_url"),
         )
 
-    @students.get("/dashboard/<int:student_id>/ar-lessons")
-    def ar_lessons(student_id):
+    @students.get("/dashboard/{student_id}/ar-lessons")
+    def ar_lessons(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -297,7 +267,6 @@ def register_dashboard_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message=(
                 "We could not retrieve data for this student. Please search again."
             ),
@@ -305,14 +274,10 @@ def register_dashboard_routes(
             forbidden_message="Access denied: you can open only your own AR table.",
         )
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         context, build_error, build_status_code = dashboard_service.build_ar_lessons_page_context(
             student_id=student_id,
@@ -320,18 +285,13 @@ def register_dashboard_routes(
             requested_subject=requested_subject,
             requested_group=requested_group,
             requested_school=requested_school,
-            load_dataset=load_dataset,
             force_refresh=force_refresh,
         )
         if build_error:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": build_error, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                build_status_code,
-            )
+                    title="Student Not Found", status_code=build_status_code)
 
         return render_react_page(
             "student-ar",
@@ -348,8 +308,8 @@ def register_dashboard_routes(
             back_url=context.get("back_url"),
         )
 
-    @students.get("/api/students/<int:student_id>/dashboard")
-    def api_student_dashboard(student_id):
+    @students.get("/api/students/{student_id}/dashboard")
+    def api_student_dashboard(student_id: int):
         requested_school = request.args.get("school", "").strip()
         force_refresh = should_force_refresh()
 
@@ -359,12 +319,11 @@ def register_dashboard_routes(
             requested_group="",
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message="Student not found",
             session_invalid_message="Student session is invalid.",
             forbidden_message="Access denied.",
         )
         if error_message:
-            return jsonify({"message": error_message}), status_code
+            return jsonify({"message": error_message}, status_code=status_code)
 
         return jsonify(payload)

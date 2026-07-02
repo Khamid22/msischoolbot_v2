@@ -2,6 +2,7 @@ import threading
 from datetime import datetime
 
 from database import queries
+from backend.domains.academics.rating_service import load_dataset as _load_academic_dataset
 
 _DB_LOCK = threading.Lock()
 _SYNC_LOCK = threading.Lock()
@@ -26,20 +27,6 @@ def _ensure_storage(conn):
     queries.ensure_curriculum_items_schema(conn)
 
 
-def _load_dataset(load_dataset, force_refresh = False):
-    try:
-        loaded = load_dataset(force_refresh=force_refresh)
-    except Exception as exc:
-        try:
-            loaded = load_dataset()
-        except Exception:
-            return None, str(exc)
-
-    if isinstance(loaded, tuple) and len(loaded) == 2:
-        dataset, load_error = loaded
-        return dataset, str(load_error or "")
-
-    return loaded, ""
 
 
 def _build_catalog_rows(dataset):
@@ -156,16 +143,13 @@ def _build_catalog_rows(dataset):
     return payload_rows
 
 
-def sync_lesson_catalog_if_needed(load_dataset, force_refresh=False):
+def sync_lesson_catalog_if_needed(force_refresh=False):
     _ = force_refresh
     with _SYNC_LOCK:
         with _connect() as conn:
             _ensure_storage(conn)
 
-        dataset, load_error = _load_dataset(
-            load_dataset,
-            force_refresh=True,
-        )
+        dataset, load_error = _load_academic_dataset(force_refresh=True)
         if load_error or not dataset:
             return {
                 "synced": False,
@@ -219,7 +203,6 @@ def list_lessons_by_subject(subject_name, group_name=""):
     return results
 
 
-def get_lessons_for_subject(subject_name, group_name, load_dataset=None):
-    _ = load_dataset
+def get_lessons_for_subject(subject_name, group_name):
     rows = list_lessons_by_subject(subject_name, group_name)
     return rows, ""

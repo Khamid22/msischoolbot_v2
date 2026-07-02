@@ -3,7 +3,9 @@
 from backend.render import generate_csrf, render_react_page
 from backend.roles.teacher.services import build_teacher_workspace
 from backend.utils.response_helpers import redirect, jsonify
-from backend.utils.router import RouteGroup
+from fastapi import APIRouter, Depends, Request
+
+from backend.utils.guards import GuardResponse
 from backend.utils.context import request
 from backend.utils.session import (
     current_auth_login,
@@ -15,16 +17,17 @@ from backend.domains.office_hours import service as oh_service
 
 
 def register_teacher_page_routes(app):
-    teacher = RouteGroup("teacher", __name__)
-
-    @teacher.before_request
-    def ensure_teacher_role():
+    def ensure_teacher_role(request_obj: Request):
         if current_auth_role() == "teacher":
-            return None
-        requested_with = str(request.headers.get("X-Requested-With", "")).strip()
-        if requested_with == "XMLHttpRequest" or request.path.startswith("/teacher/api/"):
-            return jsonify({"ok": False, "message": "Teacher authentication required."}), 401
-        return redirect("/")
+            return
+        requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
+        if requested_with == "XMLHttpRequest" or request_obj.url.path.startswith("/teacher/api/"):
+            raise GuardResponse(
+                jsonify({"ok": False, "message": "Teacher authentication required."}, status_code=401)
+            )
+        raise GuardResponse(redirect("/"))
+
+    teacher = APIRouter(dependencies=[Depends(ensure_teacher_role)])
 
     @teacher.get("/teacher")
     def teacher_home():
@@ -93,7 +96,7 @@ def register_teacher_page_routes(app):
         try:
             s_id = int(subject_id) if subject_id else None
         except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}), 400
+            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
 
         availabilities = oh_service.list_availabilities(
             teacher_id=teacher_id,
@@ -116,7 +119,7 @@ def register_teacher_page_routes(app):
             subject_id = int(payload.get("subject_id")) if payload.get("subject_id") else None
             planned_topic = str(payload.get("planned_topic", "") or "").strip()
         except (TypeError, ValueError, KeyError) as exc:
-            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}), 400
+            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}, status_code=400)
 
         try:
             availability_id = oh_service.create_availability(
@@ -131,22 +134,22 @@ def register_teacher_page_routes(app):
             )
             return jsonify({"ok": True, "availability_id": availability_id})
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
-    @teacher.patch("/teacher/api/office-hours/availability/<int:availability_id>")
-    def teacher_cancel_availability(availability_id):
+    @teacher.patch("/teacher/api/office-hours/availability/{availability_id}")
+    def teacher_cancel_availability(availability_id: int):
         payload = request_payload()
         status = payload.get("status")
         if status != "cancelled":
-            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}), 400
+            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}, status_code=400)
 
         try:
             oh_service.cancel_availability(availability_id, teacher_id=teacher_id)
             return jsonify({"ok": True})
         except PermissionError as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 403
+            return jsonify({"ok": False, "message": str(exc)}, status_code=403)
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
     @teacher.get("/teacher/api/office-hours/bookings")
     def teacher_list_bookings():
@@ -162,7 +165,7 @@ def register_teacher_page_routes(app):
             s_row_id = int(student_row_id) if student_row_id else None
             s_id = int(subject_id) if subject_id else None
         except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}), 400
+            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
 
         bookings = oh_service.list_bookings(
             availability_id=a_id,
@@ -174,21 +177,21 @@ def register_teacher_page_routes(app):
         )
         return jsonify({"ok": True, "bookings": bookings})
 
-    @teacher.patch("/teacher/api/office-hours/bookings/<int:booking_id>")
-    def teacher_update_booking_status(booking_id):
+    @teacher.patch("/teacher/api/office-hours/bookings/{booking_id}")
+    def teacher_update_booking_status(booking_id: int):
         payload = request_payload()
         status = payload.get("status")
         teacher_note = payload.get("teacher_note")
 
         if not status:
-            return jsonify({"ok": False, "message": "Missing status parameter."}), 400
+            return jsonify({"ok": False, "message": "Missing status parameter."}, status_code=400)
 
         try:
             oh_service.update_booking_status(booking_id, status, teacher_note, teacher_id=teacher_id)
             return jsonify({"ok": True})
         except PermissionError as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 403
+            return jsonify({"ok": False, "message": str(exc)}, status_code=403)
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
     app.include_router(teacher)

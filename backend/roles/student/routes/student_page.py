@@ -1,6 +1,7 @@
-from backend.utils.router import RouteGroup
+from fastapi import APIRouter, Depends, Request
+
 from backend.utils.response_helpers import jsonify
-from backend.utils.context import request, session
+from backend.utils.context import session
 from backend.utils.session import url_for
 from backend.render import generate_csrf
 
@@ -30,25 +31,7 @@ from backend.utils.session import (
 from backend.roles.student.routes.students import register_student_routes
 
 
-def register_student_page_routes(
-    app,
-    *,
-    render_admin_page,
-    load_dataset,
-    seed_group_cache_from_dataset,
-    build_students_by_subject_group,
-    is_full_form,
-    get_group_cache_entry,
-    search_student,
-    load_dashboard_payload,
-    collect_subject_dashboards_from_dataset,
-    collect_subject_dashboards_from_cache,
-    extract_attendance_rate,
-    extract_exam_average_score,
-    round_grade_half_up,
-    compute_subject_rating,
-    build_subject_leaderboard,
-):
+def register_student_page_routes(app, *, render_admin_page):
     def should_force_refresh():
         return False
 
@@ -69,9 +52,6 @@ def register_student_page_routes(
         context = build_student_panel_context(
             form_data=form_data,
             student_school_code=current_student_school_code(),
-            load_dataset=load_dataset,
-            seed_group_cache_from_dataset=seed_group_cache_from_dataset,
-            build_students_by_subject_group=build_students_by_subject_group,
             force_refresh=should_force_refresh(),
         )
 
@@ -92,27 +72,26 @@ def register_student_page_routes(
             description="Select stream, group, and student.",
         )
 
-    students = RouteGroup("student", __name__)
-
-    @students.before_request
-    def track_student_activity():
-        if request.endpoint == "student.activity_ping":
-            return None
+    def track_student_activity(request_obj: Request):
+        # activity_ping records activity itself (with session repair); skip here.
+        if request_obj.url.path == "/api/activity/ping":
+            return
         if current_auth_role() != "student":
-            return None
+            return
         student_db_id = current_student_db_id()
         if student_db_id is not None:
             record_student_activity(student_db_id)
-        return None
+
+    students = APIRouter(dependencies=[Depends(track_student_activity)])
 
     @students.get("/api/activity/ping")
     def activity_ping():
         if current_auth_role() != "student":
-            return jsonify({"ok": False, "message": "Student session is missing."}), 401
+            return jsonify({"ok": False, "message": "Student session is missing."}, status_code=401)
 
         student_db_id = current_student_db_id()
         if student_db_id is None:
-            return jsonify({"ok": False, "message": "Student session is missing."}), 401
+            return jsonify({"ok": False, "message": "Student session is missing."}, status_code=401)
 
         result = record_student_activity(student_db_id)
         if result.get("reason") == "student_not_found":
@@ -130,7 +109,7 @@ def register_student_page_routes(
             return jsonify({"ok": True, **result})
 
         status_code = 404 if result.get("reason") == "student_not_found" else 500
-        return jsonify({"ok": False, **result}), status_code
+        return jsonify({"ok": False, **result}, status_code=status_code)
 
     register_user_auth_routes(
         students,
@@ -138,39 +117,12 @@ def register_student_page_routes(
         render_admin_page=render_admin_page,
         render_parent_page=build_render_parent_page(),
     )
-    register_student_routes(
-        students,
-        load_dataset=load_dataset,
-        is_full_form=is_full_form,
-        render_student_panel=render_student_panel,
-        get_group_cache_entry=get_group_cache_entry,
-        build_students_by_subject_group=build_students_by_subject_group,
-        search_student=search_student,
-    )
-    register_dashboard_routes(
-        students,
-        load_dashboard_payload=load_dashboard_payload,
-        load_dataset=load_dataset,
-        extract_attendance_rate=extract_attendance_rate,
-        extract_exam_average_score=extract_exam_average_score,
-        round_grade_half_up=round_grade_half_up,
-        compute_subject_rating=compute_subject_rating,
-    )
-    register_rating_board_routes(
-        students,
-        load_dashboard_payload=load_dashboard_payload,
-        collect_subject_dashboards_from_dataset=collect_subject_dashboards_from_dataset,
-        collect_subject_dashboards_from_cache=collect_subject_dashboards_from_cache,
-        load_dataset=load_dataset,
-        seed_group_cache_from_dataset=seed_group_cache_from_dataset,
-        build_subject_leaderboard=build_subject_leaderboard,
-    )
-    register_resources_routes(
-        students,
-        load_dashboard_payload=load_dashboard_payload,
-    )
+    register_student_routes(students, render_student_panel=render_student_panel)
+    register_dashboard_routes(students)
+    register_rating_board_routes(students)
+    register_resources_routes(students)
     register_comment_routes(students)
-    register_chat_page_routes(students, load_dashboard_payload=load_dashboard_payload)
+    register_chat_page_routes(students)
     register_chat_routes(students)
-    register_office_hours_routes(students, load_dashboard_payload=load_dashboard_payload)
+    register_office_hours_routes(students)
     app.include_router(students)

@@ -21,8 +21,8 @@ def _current_admin_id():
 
 
 def register_admin_payment_routes(router):
-    @router.get("/admin/api/students/<int:student_row_id>/payments")
-    def admin_list_student_payments(student_row_id):
+    @router.get("/admin/api/students/{student_row_id}/payments")
+    def admin_list_student_payments(student_row_id: int):
         payments = list_student_payments(student_row_id)
         return jsonify(
             {
@@ -32,8 +32,8 @@ def register_admin_payment_routes(router):
             }
         )
 
-    @router.post("/admin/api/students/<int:student_row_id>/payments")
-    def admin_create_student_payment(student_row_id):
+    @router.post("/admin/api/students/{student_row_id}/payments")
+    def admin_create_student_payment(student_row_id: int):
         payload = request_payload()
         try:
             result = create_student_payment(
@@ -42,7 +42,7 @@ def register_admin_payment_routes(router):
                 created_by_admin_id=_current_admin_id(),
             )
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         invalidate_admin_page_context_cache()
         return jsonify(
@@ -53,18 +53,18 @@ def register_admin_payment_routes(router):
             }
         )
 
-    @router.patch("/admin/api/student-payments/<int:payment_id>")
-    def admin_mark_student_payment(payment_id):
+    @router.patch("/admin/api/student-payments/{payment_id}")
+    def admin_mark_student_payment(payment_id: int):
         payload = request_payload()
         paid = bool(payload.get("paid", True))
         paid_at = payload.get("paid_at")
         try:
             result = set_student_payment_paid(payment_id, paid=paid, paid_at=paid_at)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if result is None:
-            return jsonify({"ok": False, "message": "Payment record was not found."}), 404
+            return jsonify({"ok": False, "message": "Payment record was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify(
@@ -75,15 +75,15 @@ def register_admin_payment_routes(router):
             }
         )
 
-    @router.delete("/admin/api/student-payments/<int:payment_id>")
-    def admin_delete_student_payment(payment_id):
+    @router.delete("/admin/api/student-payments/{payment_id}")
+    def admin_delete_student_payment(payment_id: int):
         try:
             result = delete_student_payment(payment_id)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if result is None:
-            return jsonify({"ok": False, "message": "Payment record was not found."}), 404
+            return jsonify({"ok": False, "message": "Payment record was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify(

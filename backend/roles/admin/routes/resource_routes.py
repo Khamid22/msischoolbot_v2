@@ -1,4 +1,4 @@
-from backend.utils.response_helpers import jsonify
+from backend.utils.response_helpers import jsonify, with_status
 from backend.utils.context import request, session
 from backend.utils.session import url_for
 
@@ -40,13 +40,13 @@ def register_admin_resource_routes(
         )
 
     def xhr_error(message, status_code=400):
-        return jsonify({"ok": False, "message": message}), status_code
+        return jsonify({"ok": False, "message": message}, status_code=status_code)
 
-    @router.get("/admin/api/resource-upload-progress/<upload_id>")
-    def resource_upload_progress(upload_id):
+    @router.get("/admin/api/resource-upload-progress/{upload_id}")
+    def resource_upload_progress(upload_id: str):
         normalized_upload_id = normalize_upload_id(upload_id)
         if not normalized_upload_id:
-            return jsonify({"ok": False, "message": "Invalid upload id."}), 400
+            return jsonify({"ok": False, "message": "Invalid upload id."}, status_code=400)
 
         try:
             after_seq = int(request.args.get("after_seq", "0") or 0)
@@ -75,13 +75,10 @@ def register_admin_resource_routes(
         resource_type_name = request.form.get("resource_type_name", "").strip()
         created, create_error = svc_create_resource_type(resource_type_name)
         if not created:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=create_error or "Unable to save resource type.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         invalidate_admin_page_context_cache()
         return render_admin_page(
@@ -89,17 +86,14 @@ def register_admin_resource_routes(
             admin_panel="resources",
         )
 
-    @router.post("/admin/resources/types/<int:resource_type_id>/delete")
-    def delete_resource_type(resource_type_id):
+    @router.post("/admin/resources/types/{resource_type_id}/delete")
+    def delete_resource_type(resource_type_id: int):
         deleted, delete_error = svc_delete_resource_type(resource_type_id)
         if not deleted:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=delete_error or "Unable to delete resource type.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         invalidate_admin_page_context_cache()
         return render_admin_page(
@@ -107,18 +101,15 @@ def register_admin_resource_routes(
             admin_panel="resources",
         )
 
-    @router.post("/admin/resources/types/<int:resource_type_id>/rename")
-    def rename_resource_type(resource_type_id):
+    @router.post("/admin/resources/types/{resource_type_id}/rename")
+    def rename_resource_type(resource_type_id: int):
         resource_type_name = request.form.get("resource_type_name", "").strip()
         renamed, rename_error = svc_rename_resource_type(resource_type_id, resource_type_name)
         if not renamed:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=rename_error or "Unable to rename resource type.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         invalidate_admin_page_context_cache()
         return render_admin_page(
@@ -156,13 +147,10 @@ def register_admin_resource_routes(
             fail_upload(upload_id, message="Please upload a resource file or add an external URL.", percent=4.0, stage="upload_error")
             if is_xhr_request():
                 return xhr_error("Please upload a resource file or add an external URL.")
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error="Please upload a resource file or add an external URL.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         uploaded_file_path = ""
         if has_uploaded_resource:
@@ -177,13 +165,10 @@ def register_admin_resource_routes(
                 fail_upload(upload_id, message=upload_error, percent=4.0, stage="upload_error")
                 if is_xhr_request():
                     return xhr_error(upload_error)
-                return (
-                    render_admin_page(
+                return with_status(render_admin_page(
                         auth_error=upload_error,
                         admin_panel="resources",
-                    ),
-                    400,
-                )
+                    ), 400)
 
         uploaded_thumbnail = request.files.get("thumbnail_file")
         uploaded_thumbnail_path = ""
@@ -197,13 +182,10 @@ def register_admin_resource_routes(
                 fail_upload(upload_id, message=thumb_error, percent=90.0, stage="upload_error")
                 if is_xhr_request():
                     return xhr_error(thumb_error)
-                return (
-                    render_admin_page(
+                return with_status(render_admin_page(
                         auth_error=thumb_error,
                         admin_panel="resources",
-                    ),
-                    400,
-                )
+                    ), 400)
 
         publish_progress(percent=98.0, stage="saving", message="Saving resource record...")
         created, create_error = svc_create_resource(
@@ -221,13 +203,10 @@ def register_admin_resource_routes(
             fail_upload(upload_id, message=create_error or "Unable to save resource.", percent=98.0, stage="save_error")
             if is_xhr_request():
                 return xhr_error(create_error or "Unable to save resource.")
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=create_error or "Unable to save resource.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         complete_upload(upload_id, message="Resource saved.")
         invalidate_admin_page_context_cache()
@@ -238,17 +217,14 @@ def register_admin_resource_routes(
             admin_panel="resources",
         )
 
-    @router.post("/admin/resources/<int:resource_id>/delete")
-    def delete_resource(resource_id):
+    @router.post("/admin/resources/{resource_id}/delete")
+    def delete_resource(resource_id: int):
         deleted, delete_error = svc_delete_resource(resource_id)
         if not deleted:
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=delete_error or "Unable to delete resource.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
 
         invalidate_admin_page_context_cache()
         return render_admin_page(
@@ -256,8 +232,8 @@ def register_admin_resource_routes(
             admin_panel="resources",
         )
 
-    @router.post("/admin/resources/<int:resource_id>/edit")
-    def edit_resource(resource_id):
+    @router.post("/admin/resources/{resource_id}/edit")
+    def edit_resource(resource_id: int):
         title = request.form.get("resource_title", "").strip()
         description = request.form.get("resource_description", "").strip()
         resource_type_id = request.form.get("resource_type_id", "").strip() or None
@@ -274,13 +250,10 @@ def register_admin_resource_routes(
         if not updated:
             if is_xhr_request():
                 return xhr_error(update_error or "Unable to update resource.")
-            return (
-                render_admin_page(
+            return with_status(render_admin_page(
                     auth_error=update_error or "Unable to update resource.",
                     admin_panel="resources",
-                ),
-                400,
-            )
+                ), 400)
         invalidate_admin_page_context_cache()
         if is_xhr_request():
             return xhr_success("Resource updated.")

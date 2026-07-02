@@ -2,10 +2,17 @@ import os
 import threading
 import time
 
-from backend.utils.response_helpers import jsonify, redirect
+from backend.utils.response_helpers import jsonify, redirect, with_status
 from backend.utils.context import request, session
 from backend.utils.session import url_for
 from backend.identity.account_service import change_student_password
+from backend.domains.academics.rating_service import (
+    build_students_by_subject_group,
+    get_group_cache_entry,
+    is_full_form,
+    load_dataset,
+    search_student,
+)
 from backend.utils.session import (
     build_dashboard_url,
     current_auth_role,
@@ -15,16 +22,7 @@ from backend.utils.session import (
 )
 
 
-def register_student_routes(
-    students,
-    *,
-    load_dataset,
-    is_full_form,
-    render_student_panel,
-    get_group_cache_entry,
-    build_students_by_subject_group,
-    search_student,
-):
+def register_student_routes(students, *, render_student_panel):
     metadata_cache_lock = threading.Lock()
     metadata_cache = {}
 
@@ -70,22 +68,18 @@ def register_student_routes(
                 for key, _entry in ordered_entries[: len(metadata_cache) - 64]:
                     metadata_cache.pop(key, None)
 
-    student_only_endpoints = {
-        "student.profile_change_password",
-        "student.search_student_form",
-    }
-
-    @students.before_request
-    def ensure_student_role_for_student_actions():
-        endpoint = str(request.endpoint or "").strip()
-        if endpoint not in student_only_endpoints:
-            return None
+    def _require_student_role():
+        """These actions are student-only; other roles bounce to the portal home."""
         if current_auth_role() == "student":
             return None
         return redirect(url_for("student.home"))
 
     @students.post("/profile/password")
     def profile_change_password():
+        denied = _require_student_role()
+        if denied is not None:
+            return denied
+
         student_db_id = current_student_db_id()
         enrollment_id = current_student_enrollment_id()
         if student_db_id is None:
@@ -170,6 +164,10 @@ def register_student_routes(
 
     @students.post("/search")
     def search_student_form():
+        denied = _require_student_role()
+        if denied is not None:
+            return denied
+
         form_data = {
             "student_id": request.form.get("student_id", "").strip(),
             "group": request.form.get("group", "").strip(),
@@ -177,18 +175,18 @@ def register_student_routes(
         }
 
         if not is_full_form(form_data):
-            return render_student_panel(
+            return with_status(render_student_panel(
                 form_data=form_data,
                 panel_error="Please fill all fields.",
-            ), 400
+            ), 400)
 
         try:
             requested_student_id = int(form_data["student_id"])
         except ValueError:
-            return render_student_panel(
+            return with_status(render_student_panel(
                 form_data=form_data,
                 panel_error="Please choose a valid student from the list.",
-            ), 400
+            ), 400)
 
         school_code = current_student_school_code()
         group_cache_entry, cache_error = get_group_cache_entry(
@@ -209,15 +207,15 @@ def register_student_routes(
             return redirect(url_for("student.dashboard", **route_params))
 
         if cache_error:
-            return render_student_panel(
+            return with_status(render_student_panel(
                 form_data=form_data,
                 panel_error=cache_error or "Unable to load internal academic data.",
-            ), 503
+            ), 503)
 
-        return render_student_panel(
+        return with_status(render_student_panel(
             form_data=form_data,
             panel_error="Student not found. Please check your details.",
-        ), 404
+        ), 404)
 
     @students.get("/api/metadata")
     def api_metadata():
@@ -227,9 +225,9 @@ def register_student_routes(
         else:
             dataset, load_error = load_dataset()
         if load_error or not dataset:
-            return jsonify(
+            return with_status(jsonify(
                 {"message": load_error or "Unable to load internal academic data."}
-            ), 503
+            ), 503)
 
         cache_key = _metadata_cache_key(dataset, school_code)
         payload = _get_cached_metadata(cache_key)
@@ -254,7 +252,7 @@ def register_student_routes(
         subject = request.args.get("subject", "").strip()
 
         if not all([surname, name, group, subject]):
-            return jsonify({"message": "All fields are required."}), 400
+            return jsonify({"message": "All fields are required."}, status_code=400)
 
         school_code = current_student_school_code()
         if school_code:
@@ -262,9 +260,9 @@ def register_student_routes(
         else:
             dataset, load_error = load_dataset()
         if load_error or not dataset:
-            return jsonify(
+            return with_status(jsonify(
                 {"message": load_error or "Unable to load internal academic data."}
-            ), 503
+            ), 503)
 
         student = search_student(
             dataset["students"],
@@ -274,6 +272,6 @@ def register_student_routes(
             subject=subject,
         )
         if not student:
-            return jsonify({"message": "Student not found"}), 404
+            return jsonify({"message": "Student not found"}, status_code=404)
 
         return jsonify(student)

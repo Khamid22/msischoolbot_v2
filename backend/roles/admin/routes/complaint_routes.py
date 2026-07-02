@@ -31,34 +31,34 @@ def register_admin_complaint_routes(router):
         try:
             complaint = create_complaint(parent_admin_id, student_row_id, payload)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "complaint": complaint})
 
-    @router.patch("/admin/api/complaints/<int:complaint_id>")
-    def admin_update_complaint(complaint_id):
+    @router.patch("/admin/api/complaints/{complaint_id}")
+    def admin_update_complaint(complaint_id: int):
         payload = request_payload()
         try:
             complaint = update_complaint(complaint_id, payload)
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if complaint is None:
-            return jsonify({"ok": False, "message": "Complaint was not found."}), 404
+            return jsonify({"ok": False, "message": "Complaint was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "complaint": complaint})
 
-    @router.get("/admin/api/complaints/<int:complaint_id>")
-    def admin_get_complaint(complaint_id):
+    @router.get("/admin/api/complaints/{complaint_id}")
+    def admin_get_complaint(complaint_id: int):
         complaint = get_complaint(complaint_id)
         if complaint is None:
-            return jsonify({"ok": False, "message": "Complaint was not found."}), 404
+            return jsonify({"ok": False, "message": "Complaint was not found."}, status_code=404)
         return jsonify({"ok": True, "complaint": complaint})
 
-    @router.post("/admin/api/complaints/<int:complaint_id>/replies")
-    def admin_reply_complaint(complaint_id):
+    @router.post("/admin/api/complaints/{complaint_id}/replies")
+    def admin_reply_complaint(complaint_id: int):
         payload = request_payload()
         author_role = current_admin_role() or "admin"
         author_login = current_auth_login()
@@ -70,10 +70,10 @@ def register_admin_complaint_routes(router):
                 author_login=author_login,
             )
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
 
         if complaint is None:
-            return jsonify({"ok": False, "message": "Complaint was not found."}), 404
+            return jsonify({"ok": False, "message": "Complaint was not found."}, status_code=404)
 
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "complaint": complaint})

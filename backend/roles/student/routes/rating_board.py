@@ -3,19 +3,17 @@ from backend.utils.session import url_for
 
 from backend.render import render_react_page
 
+from backend.domains.academics.rating_service import (
+    build_subject_leaderboard,
+    collect_subject_dashboards_from_cache,
+    collect_subject_dashboards_from_dataset,
+    load_dataset,
+    seed_group_cache_from_dataset,
+)
 from backend.roles.student.services import payload_service
 
 
-def register_rating_board_routes(
-    students,
-    *,
-    load_dashboard_payload,
-    collect_subject_dashboards_from_dataset,
-    collect_subject_dashboards_from_cache,
-    load_dataset,
-    seed_group_cache_from_dataset,
-    build_subject_leaderboard,
-):
+def register_rating_board_routes(students):
     def _should_force_refresh():
         return False
 
@@ -141,8 +139,8 @@ def register_rating_board_routes(
 
         return [], first_load_error or "Unable to load subject rating board."
 
-    @students.get("/dashboard/<int:student_id>/rating-board")
-    def rating_board(student_id):
+    @students.get("/dashboard/{student_id}/rating-board")
+    def rating_board(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -155,7 +153,6 @@ def register_rating_board_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message=(
                 "We could not retrieve data for this student. Please search again."
             ),
@@ -163,25 +160,17 @@ def register_rating_board_routes(
             forbidden_message="Access denied: you can open only your own rating board.",
         )
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         student = payload.get("student", {})
         if not isinstance(student, dict):
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": "Student profile is unavailable.", "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                404,
-            )
+                    title="Student Not Found", status_code=404)
 
         subject_name = str(student.get("subject", "")).strip()
         school_code = str(student.get("schoolCode", "")).strip() or requested_school
@@ -214,14 +203,10 @@ def register_rating_board_routes(
             )
 
         if load_error and not dashboards:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": load_error or "Unable to load subject rating board.", "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                503,
-            )
+                    title="Student Not Found", status_code=503)
 
         leaderboard = build_subject_leaderboard(dashboards)
         back_url = url_for(

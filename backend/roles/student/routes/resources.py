@@ -7,16 +7,12 @@ from backend.domains.resources import service as resources_service
 from backend.roles.student.services import payload_service
 
 
-def register_resources_routes(
-    students,
-    *,
-    load_dashboard_payload,
-):
+def register_resources_routes(students):
     def _should_force_refresh():
         return False
 
-    @students.get("/dashboard/<int:student_id>/resources")
-    def student_resources(student_id):
+    @students.get("/dashboard/{student_id}/resources")
+    def student_resources(student_id: int):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -28,7 +24,6 @@ def register_resources_routes(
             requested_group=requested_group,
             requested_school=requested_school,
             force_refresh=force_refresh,
-            load_dashboard_payload=load_dashboard_payload,
             missing_message=(
                 "We could not retrieve data for this student. Please search again."
             ),
@@ -36,25 +31,17 @@ def register_resources_routes(
             forbidden_message="Access denied: you can open only your own resources.",
         )
         if error_message:
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                status_code,
-            )
+                    title="Student Not Found", status_code=status_code)
 
         student = payload.get("student", {})
         if not isinstance(student, dict):
-            return (
-                render_react_page(
+            return render_react_page(
                     "student-not-found",
                     {"message": "Student profile is unavailable.", "returnUrl": url_for("student.home")},
-                    title="Student Not Found",
-                ),
-                404,
-            )
+                    title="Student Not Found", status_code=404)
 
         subject_name = str(student.get("subject", "")).strip()
         group_name = str(student.get("group", "")).strip()

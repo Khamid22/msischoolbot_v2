@@ -12,6 +12,13 @@ from backend.identity.account_service import (
     get_student_db_id_by_enrollment_id,
 )
 from .lesson_catalog_service import get_lessons_for_subject
+from backend.domains.academics.rating_service import (
+    compute_subject_rating,
+    extract_attendance_rate,
+    extract_exam_average_score,
+    load_dataset,
+    round_grade_half_up,
+)
 from backend.utils.normalization import normalize_text
 from backend.utils.session import current_auth_role, current_student_db_id
 
@@ -298,11 +305,6 @@ def build_dashboard_page_context(
     admin_return_school,
     profile_notice,
     profile_error,
-    load_dataset,
-    extract_attendance_rate,
-    extract_exam_average_score,
-    round_grade_half_up,
-    compute_subject_rating,
     force_refresh=False,
 ):
     payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
@@ -451,8 +453,6 @@ def build_aap_lessons_page_context(
     requested_subject,
     requested_group,
     requested_school,
-    load_dataset,
-    round_grade_half_up,
     force_refresh=False,
 ):
     payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
@@ -462,15 +462,6 @@ def build_aap_lessons_page_context(
     current_school_code = (
         str(payload_student.get("schoolCode", "")).strip() or requested_school
     )
-
-    def load_current_school_dataset(school_code=None, force_refresh_dataset=False):
-        normalized_school = str(school_code or current_school_code).strip()
-        if normalized_school:
-            return load_dataset(
-                school_code=normalized_school,
-                force_refresh=force_refresh_dataset,
-            )
-        return load_dataset(force_refresh=force_refresh_dataset)
 
     homework_grades = payload.get("homeworkGrades", [])
     if not isinstance(homework_grades, list):
@@ -525,7 +516,6 @@ def build_aap_lessons_page_context(
         lesson_catalog, lesson_error = get_lessons_for_subject(
             subject_name,
             group_name,
-            load_current_school_dataset,
         )
         if lesson_error:
             return None, lesson_error, 503
@@ -633,7 +623,6 @@ def build_ar_lessons_page_context(
     requested_subject,
     requested_group,
     requested_school,
-    load_dataset,
     force_refresh=False,
 ):
     payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
@@ -643,15 +632,6 @@ def build_ar_lessons_page_context(
     current_school_code = (
         str(payload_student.get("schoolCode", "")).strip() or requested_school
     )
-
-    def load_current_school_dataset(school_code=None, force_refresh_dataset=False):
-        normalized_school = str(school_code or current_school_code).strip()
-        if normalized_school:
-            return load_dataset(
-                school_code=normalized_school,
-                force_refresh=force_refresh_dataset,
-            )
-        return load_dataset(force_refresh=force_refresh_dataset)
 
     attendance_lessons = payload.get("attendanceLessons", [])
     if not isinstance(attendance_lessons, list):
@@ -722,7 +702,6 @@ def build_ar_lessons_page_context(
         lesson_catalog, lesson_error = get_lessons_for_subject(
             subject_name,
             group_name,
-            load_current_school_dataset,
         )
         if lesson_error:
             return None, lesson_error, 503

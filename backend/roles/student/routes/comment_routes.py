@@ -1,4 +1,4 @@
-from backend.utils.response_helpers import jsonify, csrf
+from backend.utils.response_helpers import jsonify
 from backend.utils.context import request
 from backend.domains.communication.chat_service import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from backend.utils.session import (
@@ -11,9 +11,8 @@ _COMMENTS_PER_PAGE = 50
 
 
 def register_comment_routes(students):
-    @students.get("/api/resources/<int:resource_id>/comments")
-    @csrf.exempt
-    def api_list_comments(resource_id):
+    @students.get("/api/resources/{resource_id}/comments")
+    def api_list_comments(resource_id: int):
         with connect_chat_db() as conn:
             from database import queries
             queries.ensure_resource_comments_schema(conn)
@@ -38,22 +37,21 @@ def register_comment_routes(students):
         ]
         return jsonify({"comments": comments})
 
-    @students.post("/api/resources/<int:resource_id>/comments")
-    @csrf.exempt
-    def api_post_comment(resource_id):
+    @students.post("/api/resources/{resource_id}/comments")
+    def api_post_comment(resource_id: int):
         if current_auth_role() != "student":
-            return jsonify({"error": "Login required to leave a comment."}), 401
+            return jsonify({"error": "Login required to leave a comment."}, status_code=401)
 
         author_name = current_student_full_name()
         if not author_name:
-            return jsonify({"error": "Could not identify your account."}), 401
+            return jsonify({"error": "Could not identify your account."}, status_code=401)
 
         data = request.get_json(silent=True) or {}
         body = str(data.get("body", "")).strip()
         if not body:
-            return jsonify({"error": "Comment cannot be empty."}), 400
+            return jsonify({"error": "Comment cannot be empty."}, status_code=400)
         if len(body) > _COMMENT_MAX_LENGTH:
-            return jsonify({"error": f"Comment is too long (max {_COMMENT_MAX_LENGTH} characters)."}), 400
+            return jsonify({"error": f"Comment is too long (max {_COMMENT_MAX_LENGTH} characters)."}, status_code=400)
 
         now = utc_now_iso()
         with _DB_LOCK:
@@ -65,7 +63,7 @@ def register_comment_routes(students):
                     (resource_id,),
                 ).fetchone()
                 if not exists:
-                    return jsonify({"error": "Resource not found."}), 404
+                    return jsonify({"error": "Resource not found."}, status_code=404)
 
                 inserted = conn.execute(
                     """
@@ -86,4 +84,4 @@ def register_comment_routes(students):
                 "body": body,
                 "createdAt": fmt_display(now),
             }
-        }), 201
+        }, status_code=201)

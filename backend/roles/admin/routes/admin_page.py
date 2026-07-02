@@ -1,6 +1,8 @@
 import os
 
-from backend.utils.router import RouteGroup
+from fastapi import APIRouter, Depends, Request
+
+from backend.utils.guards import GuardResponse
 from backend.utils.response_helpers import jsonify, redirect
 from backend.utils.context import request, session
 from backend.utils.session import url_for
@@ -163,16 +165,17 @@ def register_admin_page_routes(
             back_url=back_url,
         )
 
-    admin_routes = RouteGroup("admin", __name__)
-
-    @admin_routes.before_request
-    def ensure_admin_role():
+    def ensure_admin_role(request_obj: Request):
         if current_auth_role() == "admin":
-            return None
-        requested_with = str(request.headers.get("X-Requested-With", "")).strip()
+            return
+        requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
         if requested_with == "XMLHttpRequest":
-            return jsonify({"ok": False, "message": "Admin authentication required."}), 401
-        return redirect(url_for("student.home"))
+            raise GuardResponse(
+                jsonify({"ok": False, "message": "Admin authentication required."}, status_code=401)
+            )
+        raise GuardResponse(redirect(url_for("student.home")))
+
+    admin_routes = APIRouter(dependencies=[Depends(ensure_admin_role)])
 
     register_academic_admin_routes(
         admin_routes,

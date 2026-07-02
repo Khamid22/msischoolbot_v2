@@ -1,8 +1,8 @@
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi import HTTPException
 
 
-def jsonify(*args, **kwargs):
+def jsonify(*args, status_code: int = 200, **kwargs):
     if args:
         if len(args) == 1:
             # If the user did jsonify({"key": "val"}), content is args[0]
@@ -12,9 +12,13 @@ def jsonify(*args, **kwargs):
     else:
         content = kwargs
 
-    # Starlette JSONResponse expects serializable dict/list/etc. Endpoints that
-    # need a status code can return (jsonify(...), status_code).
-    return JSONResponse(content=content)
+    return JSONResponse(content=content, status_code=status_code)
+
+
+def with_status(response: Response, status_code: int) -> Response:
+    """Return the response with its status code replaced."""
+    response.status_code = status_code
+    return response
 
 
 def redirect(location: str, code: int = 302):
@@ -23,11 +27,3 @@ def redirect(location: str, code: int = 302):
 
 def abort(code: int, description: str = None):
     raise HTTPException(status_code=code, detail=description or "")
-
-
-class DummyCsrf:
-    def exempt(self, f):
-        return f
-
-
-csrf = DummyCsrf()

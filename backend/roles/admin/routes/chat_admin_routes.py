@@ -9,7 +9,7 @@ Admin chat moderation API.
   GET    /admin/api/chat/rooms                             list distinct active rooms
 """
 
-from backend.utils.response_helpers import jsonify, csrf
+from backend.utils.response_helpers import jsonify
 from backend.utils.context import request
 from backend.domains.communication.chat_service import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from backend.utils.session import (
@@ -23,7 +23,7 @@ _PAGE_SIZE = 60
 
 def _require_admin():
     if current_auth_role() != "admin":
-        return jsonify({"error": "Admin access required."}), 403
+        return jsonify({"error": "Admin access required."}, status_code=403)
     return None
 
 
@@ -44,7 +44,6 @@ def register_admin_chat_routes(router):
 
     # ── List messages (admin sees deleted too) ─────────────────────────────────
     @router.get("/admin/api/chat/messages")
-    @csrf.exempt
     def admin_api_chat_list():
         err = _require_admin()
         if err:
@@ -85,9 +84,8 @@ def register_admin_chat_routes(router):
         return jsonify({"messages": messages, "room": room})
 
     # ── Soft-delete any message ────────────────────────────────────────────────
-    @router.delete("/admin/api/chat/messages/<int:msg_id>")
-    @csrf.exempt
-    def admin_api_chat_delete(msg_id):
+    @router.delete("/admin/api/chat/messages/{msg_id}")
+    def admin_api_chat_delete(msg_id: int):
         err = _require_admin()
         if err:
             return err
@@ -99,7 +97,7 @@ def register_admin_chat_routes(router):
                     "SELECT id FROM msi_v2.chat_messages WHERE id = %s", (msg_id,)
                 ).fetchone()
                 if not row:
-                    return jsonify({"error": "Message not found."}), 404
+                    return jsonify({"error": "Message not found."}, status_code=404)
                 conn.execute(
                     "UPDATE msi_v2.chat_messages SET is_deleted = true WHERE id = %s", (msg_id,)
                 )
@@ -109,7 +107,6 @@ def register_admin_chat_routes(router):
 
     # ── Block a student ────────────────────────────────────────────────────────
     @router.post("/admin/api/chat/block")
-    @csrf.exempt
     def admin_api_chat_block():
         err = _require_admin()
         if err:
@@ -120,7 +117,7 @@ def register_admin_chat_routes(router):
         reason = str(data.get("reason", "")).strip()[:300]
 
         if not student_id:
-            return jsonify({"error": "studentId required."}), 400
+            return jsonify({"error": "studentId required."}, status_code=400)
 
         now = utc_now_iso()
         admin_login = current_auth_login()
@@ -140,12 +137,11 @@ def register_admin_chat_routes(router):
                 )
                 conn.commit()
 
-        return jsonify({"blocked": True, "studentId": student_id}), 201
+        return jsonify({"blocked": True, "studentId": student_id}, status_code=201)
 
     # ── Unblock a student ──────────────────────────────────────────────────────
-    @router.delete("/admin/api/chat/block/<student_id>")
-    @csrf.exempt
-    def admin_api_chat_unblock(student_id):
+    @router.delete("/admin/api/chat/block/{student_id}")
+    def admin_api_chat_unblock(student_id: str):
         err = _require_admin()
         if err:
             return err
@@ -163,7 +159,6 @@ def register_admin_chat_routes(router):
 
     # ── List blocked students ──────────────────────────────────────────────────
     @router.get("/admin/api/chat/blocked")
-    @csrf.exempt
     def admin_api_chat_blocked():
         err = _require_admin()
         if err:
@@ -192,7 +187,6 @@ def register_admin_chat_routes(router):
 
     # ── List distinct rooms that have messages ─────────────────────────────────
     @router.get("/admin/api/chat/rooms")
-    @csrf.exempt
     def admin_api_chat_rooms():
         err = _require_admin()
         if err:

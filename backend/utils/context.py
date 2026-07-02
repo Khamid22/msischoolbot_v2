@@ -153,18 +153,6 @@ class RequestProxy:
         return self._get_req().url.path
 
     @property
-    def endpoint(self) -> str:
-        req = self._get_req()
-        route = req.scope.get("route")
-        if route is not None and hasattr(route, "endpoint"):
-            func_name = route.endpoint.__name__
-            if req.url.path.startswith("/admin"):
-                return f"admin.{func_name}"
-            else:
-                return f"student.{func_name}"
-        return ""
-
-    @property
     def headers(self) -> dict:
         return self._get_req().headers
 

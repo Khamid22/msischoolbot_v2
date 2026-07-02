@@ -31,12 +31,12 @@ def register_announcement_admin_routes(admin_blueprint):
                 scheduled_at=payload.get("scheduled_at", ""),
             )
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "announcement": item})
 
-    @admin_blueprint.patch("/admin/api/announcements/<int:announcement_id>")
-    def admin_update_announcement(announcement_id):
+    @admin_blueprint.patch("/admin/api/announcements/{announcement_id}")
+    def admin_update_announcement(announcement_id: int):
         payload = request_payload()
         try:
             item = update_announcement(
@@ -50,14 +50,14 @@ def register_announcement_admin_routes(admin_blueprint):
                 scheduled_at=payload.get("scheduled_at"),
             )
         except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 400
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True, "announcement": item})
 
-    @admin_blueprint.delete("/admin/api/announcements/<int:announcement_id>")
-    def admin_delete_announcement(announcement_id):
+    @admin_blueprint.delete("/admin/api/announcements/{announcement_id}")
+    def admin_delete_announcement(announcement_id: int):
         deleted = delete_announcement(announcement_id)
         if not deleted:
-            return jsonify({"ok": False, "message": "Announcement not found."}), 404
+            return jsonify({"ok": False, "message": "Announcement not found."}, status_code=404)
         invalidate_admin_page_context_cache()
         return jsonify({"ok": True})

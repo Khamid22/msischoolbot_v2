@@ -16,7 +16,7 @@ def register_office_hours_admin_routes(router):
             t_id = int(teacher_id) if teacher_id else None
             s_id = int(subject_id) if subject_id else None
         except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}), 400
+            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
 
         availabilities = oh_service.list_availabilities(
             teacher_id=t_id,
@@ -39,7 +39,7 @@ def register_office_hours_admin_routes(router):
             subject_id = int(payload.get("subject_id")) if payload.get("subject_id") else None
             planned_topic = str(payload.get("planned_topic", "") or "").strip()
         except (TypeError, ValueError, KeyError) as exc:
-            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}), 400
+            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}, status_code=400)
 
         try:
             availability_id = oh_service.create_availability(
@@ -54,20 +54,20 @@ def register_office_hours_admin_routes(router):
             )
             return jsonify({"ok": True, "availability_id": availability_id})
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
-    @router.patch("/admin/api/office-hours/availability/<int:availability_id>")
-    def admin_cancel_availability(availability_id):
+    @router.patch("/admin/api/office-hours/availability/{availability_id}")
+    def admin_cancel_availability(availability_id: int):
         payload = request_payload()
         status = payload.get("status")
         if status != "cancelled":
-            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}), 400
+            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}, status_code=400)
 
         try:
             oh_service.cancel_availability(availability_id)
             return jsonify({"ok": True})
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
 
     @router.get("/admin/api/office-hours/bookings")
     def admin_list_bookings():
@@ -84,7 +84,7 @@ def register_office_hours_admin_routes(router):
             s_row_id = int(student_row_id) if student_row_id else None
             s_id = int(subject_id) if subject_id else None
         except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}), 400
+            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
 
         bookings = oh_service.list_bookings(
             availability_id=a_id,
@@ -96,17 +96,17 @@ def register_office_hours_admin_routes(router):
         )
         return jsonify({"ok": True, "bookings": bookings})
 
-    @router.patch("/admin/api/office-hours/bookings/<int:booking_id>")
-    def admin_update_booking_status(booking_id):
+    @router.patch("/admin/api/office-hours/bookings/{booking_id}")
+    def admin_update_booking_status(booking_id: int):
         payload = request_payload()
         status = payload.get("status")
         teacher_note = payload.get("teacher_note")
 
         if not status:
-            return jsonify({"ok": False, "message": "Missing status parameter."}), 400
+            return jsonify({"ok": False, "message": "Missing status parameter."}, status_code=400)
 
         try:
             oh_service.update_booking_status(booking_id, status, teacher_note)
             return jsonify({"ok": True})
         except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}), 500
+            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
