@@ -1450,19 +1450,20 @@ function SchoolOverviewPanel({ state }: { state: any }) {
     : [];
   const examSeries = filteredExamSeries as Array<Record<string, unknown>>;
   const EXAM_SHORT: Record<string, string> = {
-    "Half-term Test 1": "HFT1",
+    "Half-term Test 1": "HT1",
     "End-of-term Test 1": "ET1",
-    "Half-term Test 2": "HFT2",
+    "Half-term Test 2": "HT2",
     "End-of-term Test 2": "ET2",
-    "Half-term Test 3": "HFT3",
+    "Half-term Test 3": "HT3",
     "End-of-term Test 3": "ET3",
-    "Half-term Test 4": "HFT4",
+    "Half-term Test 4": "HT4",
   };
-  const EXAM_ORDER = ["HFT1", "ET1", "HFT2", "ET2", "HFT3", "ET3", "HFT4"];
+  const EXAM_ORDER = ["HT1", "ET1", "HT2", "ET2", "HT3", "ET3", "HT4"];
   const shortExamName = (label: string) => {
     const normalized = label.replace(/\s+/g, " ").trim();
     const compact = normalized.replace(/[\s_-]+/g, "").toUpperCase();
-    if (/^HFT\d+$/.test(compact) || /^ET\d+$/.test(compact)) return compact;
+    const compactMatch = compact.match(/^(HFT|HT|ET)(\d+)$/);
+    if (compactMatch) return `${compactMatch[1] === "ET" ? "ET" : "HT"}${compactMatch[2]}`;
     return EXAM_SHORT[normalized] ?? normalized;
   };
   const examAverageBuckets = new Map<string, { labels: string[]; values: number[]; classValues: Map<string, number[]> }>();
@@ -1643,7 +1644,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
   const graphDomain: [number, number] = [1, 9];
   const graphStroke = graphMetric === "exam" ? "#4a5d7e" : "#1e2d4a";
   const graphGridStroke = "#e2e8f0";
-  const graphBorderClass = "border-border bg-surface shadow-card relative overflow-hidden w-full";
+  const graphBorderClass = "border-border bg-surface shadow-card relative overflow-visible w-full";
   const graphTitle =
     graphMetric === "exam"
       ? graphIsAll
@@ -1901,6 +1902,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                         <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={8} />
                         <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} ticks={scoreAxisTicks} tick={{ fontSize: 11 }} width={34} tickMargin={4} axisLine={false} tickLine={false} />
                         <Tooltip
+                          allowEscapeViewBox={{ x: true, y: true }}
                           contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
                           formatter={(value, name) => [formatGraphValue(value, name), asString(name)]}
                           labelFormatter={(label) =>
@@ -1908,6 +1910,7 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                               ? examClassOptions.find((point) => point.shortName === label)?.label || asString(label)
                               : asString(label)
                           }
+                          wrapperStyle={{ zIndex: 40 }}
                         />
                         <Legend iconSize={10} height={20} wrapperStyle={{ fontSize: 12, fontWeight: 700, lineHeight: "16px", paddingTop: 0 }} />
                         <defs>
@@ -1963,12 +1966,14 @@ function SchoolOverviewPanel({ state }: { state: any }) {
                           />
                         ) : null}
                         <Tooltip
+                          allowEscapeViewBox={{ x: true, y: true }}
                           contentStyle={{ background: "rgba(255,255,255,0.96)", border: `1px solid ${graphGridStroke}`, borderRadius: 10, boxShadow: "0 10px 24px rgba(15, 23, 42, 0.10)", fontSize: 12 }}
                           formatter={(value, name) => {
                             const label = asString(name);
                             return [label === "AR" ? formatArValue(value) : formatAapValue(value), label];
                           }}
                           labelFormatter={(label) => asString(label)}
+                          wrapperStyle={{ zIndex: 40 }}
                         />
                         {graphMetric === "exam" ? (
                           <Bar yAxisId="score" dataKey="average" name="Exam score" fill={graphStroke} radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive animationDuration={650} animationEasing="ease-out">

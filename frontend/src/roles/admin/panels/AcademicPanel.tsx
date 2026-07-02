@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import {
   ArrowRight,
+  BarChart3 as BarChartIcon,
   BookMarked,
   CalendarDays,
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Table2,
   Users,
   UserX,
   X,
@@ -62,6 +64,12 @@ type AxisTickProps = {
   };
 };
 
+type ExamTypeOption = {
+  key: string;
+  label: string;
+  labels: string[];
+};
+
 function parsePeriodDate(value: unknown): PeriodParts | null {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -102,6 +110,47 @@ function collectPeriodOptions(values: unknown[]) {
     months: [...months].sort((a, b) => Number(a) - Number(b)),
     years: [...years].sort((a, b) => Number(b) - Number(a)),
   };
+}
+
+function examTypeKey(label: unknown) {
+  const text = asString(label).replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const compact = text.replace(/[\s_-]+/g, "").toUpperCase();
+  const compactMatch = compact.match(/^(HFT|HT|ET)(\d+)$/);
+  if (compactMatch) {
+    const prefix = compactMatch[1] === "ET" ? "ET" : "HT";
+    return `${prefix}${compactMatch[2]}`;
+  }
+  const lower = text.toLowerCase();
+  const numberMatch = lower.match(/(?:test|term)\s*(\d+)/i) || lower.match(/(\d+)/);
+  const number = numberMatch?.[1] || "";
+  if (!number) return text;
+  if (lower.includes("end")) return `ET${number}`;
+  if (lower.includes("half") || lower.includes("ht")) return `HT${number}`;
+  return text;
+}
+
+function examTypeOrderValue(key: string) {
+  const match = key.match(/^(HT|ET)(\d+)$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  const number = Number(match[2]);
+  const phase = match[1] === "HT" ? 0 : 1;
+  return number * 10 + phase;
+}
+
+function collectExamTypeOptions(labels: string[]): ExamTypeOption[] {
+  const buckets = new Map<string, ExamTypeOption>();
+  labels.forEach((label) => {
+    const key = examTypeKey(label) || label;
+    const bucket = buckets.get(key) ?? { key, label: key, labels: [] };
+    bucket.labels.push(label);
+    buckets.set(key, bucket);
+  });
+  return Array.from(buckets.values()).sort((left, right) => {
+    const orderDiff = examTypeOrderValue(left.key) - examTypeOrderValue(right.key);
+    if (orderDiff !== 0) return orderDiff;
+    return left.key.localeCompare(right.key);
+  });
 }
 
 function averageScore(values: Array<number | null | undefined>) {
@@ -238,6 +287,69 @@ function PeriodFilter({
           ))}
         </select>
       </div>
+    </div>
+  );
+}
+
+function ExamTypeFilter({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: ExamTypeOption[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
+        <Filter className="h-3.5 w-3.5" />
+        Exam type
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9 w-full min-w-0 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-semibold outline-none focus:border-foreground/30 sm:min-w-[8.5rem]"
+      >
+        <option value="all">All exams</option>
+        {options.map((option) => (
+          <option key={option.key} value={option.key}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function ExamViewSwitcher({
+  value,
+  onChange,
+}: {
+  value: "chart" | "table";
+  onChange: (value: "chart" | "table") => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
+      {([
+        { key: "chart", label: "Chart", icon: <BarChartIcon className="h-3.5 w-3.5" /> },
+        { key: "table", label: "Table", icon: <Table2 className="h-3.5 w-3.5" /> },
+      ] as const).map((option) => {
+        const active = value === option.key;
+        return (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.key)}
+            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-[transform,background-color,color,box-shadow] hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+              active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:bg-surface/70 hover:text-foreground"
+            }`}
+          >
+            {option.icon}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -740,8 +852,8 @@ function GroupGradebook({
   const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep">("gradebook");
   const [indicatorMonth, setIndicatorMonth] = useState("all");
   const [indicatorYear, setIndicatorYear] = useState("all");
-  const [examMonth, setExamMonth] = useState("all");
-  const [examYear, setExamYear] = useState("all");
+  const [examType, setExamType] = useState("all");
+  const [examDisplay, setExamDisplay] = useState<"chart" | "table">("chart");
   const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -756,8 +868,8 @@ function GroupGradebook({
     setRiskPanelOpen(false);
     setIndicatorMonth("all");
     setIndicatorYear("all");
-    setExamMonth("all");
-    setExamYear("all");
+    setExamType("all");
+    setExamDisplay("chart");
   }, [groupId]);
 
   useEffect(() => {
@@ -943,31 +1055,21 @@ function GroupGradebook({
 
   const lessons = data?.lessons ?? [];
   const examLabels = data?.examLabels ?? [];
-  const examDateByLabel = data?.examDates ?? {};
   const enrollments = data?.enrollments ?? [];
   const allEnrollments = data?.allEnrollments ?? enrollments;
+  const gradebookTableMinWidth = Math.max(760, 228 + lessons.length * 104);
   const disqualifiedEnrollments = allEnrollments.filter((en) => en.status === "disqualified");
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
 
   const academicPeriodOptions = collectPeriodOptions(lessons.map((lesson) => lesson.date));
-  const examPeriodOptions = collectPeriodOptions([
-    ...Object.values(examDateByLabel),
-    ...enrollments.flatMap((en) => Object.values(en.examDates || {})),
-  ]);
   const indicatorFilterActive = indicatorMonth !== "all" || indicatorYear !== "all";
-  const examFilterActive = examMonth !== "all" || examYear !== "all";
   const indicatorLessons = indicatorFilterActive
     ? lessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
     : lessons;
-  const examLabelsForPeriod = examFilterActive
-    ? examLabels.filter((label) =>
-        enrollments.some((en) => {
-          const score = en.exams?.[label];
-          if (typeof score !== "number" || scoreOutOfNine(score) <= 0) return false;
-          return matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear);
-        }),
-      )
-    : examLabels;
+  const examTypeOptions = collectExamTypeOptions(examLabels);
+  const selectedExamType = examType === "all" ? null : examTypeOptions.find((option) => option.key === examType) || null;
+  const selectedExamTypeValue = selectedExamType ? selectedExamType.key : "all";
+  const selectedExamLabels = selectedExamType ? selectedExamType.labels : examLabels;
 
   // 1. AAP Metrics
   const activeAAPGrades = enrollments.map(en => scoreOutOfNine(en.averageGrade)).filter(g => g > 0);
@@ -1037,9 +1139,8 @@ function GroupGradebook({
     let maxVal = -1;
     let sumVal = 0;
     let countVal = 0;
-    examLabelsForPeriod.forEach(label => {
+    selectedExamLabels.forEach(label => {
       const val = en.exams?.[label];
-      if (!matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear)) return;
       if (typeof val === 'number') {
         const normalizedVal = scoreOutOfNine(val);
         if (normalizedVal <= 0) return;
@@ -1057,11 +1158,13 @@ function GroupGradebook({
     });
     const avgScore = countVal > 0 ? Math.round((sumVal / countVal) * 10) / 10 : 0;
     const bestScore = maxVal !== -1 ? maxVal : 0;
-    const missing = Math.max(0, examLabelsForPeriod.length - countVal);
+    const chartScore = selectedExamType ? avgScore : bestScore;
+    const missing = Math.max(0, selectedExamLabels.length - countVal);
     return {
       name: en.fullName,
       avgScore,
       bestScore,
+      chartScore,
       missing,
       hasExams: countVal > 0
     };
@@ -1070,7 +1173,7 @@ function GroupGradebook({
   const filteredClassExamAverage = filteredExamScoreCount > 0 ? (filteredExamScoreSum / filteredExamScoreCount).toFixed(1) : "—";
   const filteredMaxScore = filteredHighestExamScore !== -Infinity ? filteredHighestExamScore : "—";
   const hasFilteredExamScores = filteredExamScoreCount > 0;
-  const studentsWithMissingExams = examLabelsForPeriod.length > 0 ? studentExamData.filter(s => s.missing > 0).length : 0;
+  const studentsWithMissingExams = selectedExamLabels.length > 0 ? studentExamData.filter(s => !s.hasExams).length : 0;
 
   // 4. At-Risk Metrics
   const atRiskStudents = enrollments.map(en => {
@@ -1225,8 +1328,11 @@ function GroupGradebook({
               <p className="text-sm font-bold">Gradebook</p>
               <p className="text-xs text-muted-foreground">Attendance and homework by lesson</p>
             </div>
-            <div className="miniapp-table-scroll max-h-[72dvh]">
-              <table className="min-w-[60rem] border-collapse text-left text-[11px] sm:min-w-full sm:text-xs">
+            <div className="miniapp-table-scroll max-h-[72dvh] pb-3 [scrollbar-gutter:stable]">
+              <table
+                className="w-max border-collapse text-left text-[11px] sm:text-xs"
+                style={{ minWidth: gradebookTableMinWidth }}
+              >
                 <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr className="bg-surface">
                     <th rowSpan={2} className="sticky left-0 z-40 min-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
@@ -1431,13 +1537,10 @@ function GroupGradebook({
               <p className="text-sm font-bold">Exam Performance</p>
               <p className="text-xs text-muted-foreground">Student results for taken exams</p>
             </div>
-            <PeriodFilter
-              month={examMonth}
-              year={examYear}
-              months={examPeriodOptions.months}
-              years={examPeriodOptions.years}
-              onMonthChange={setExamMonth}
-              onYearChange={setExamYear}
+            <ExamTypeFilter
+              value={selectedExamTypeValue}
+              options={examTypeOptions}
+              onChange={setExamType}
             />
           </div>
           {examLabels.length === 0 ? (
@@ -1449,7 +1552,7 @@ function GroupGradebook({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Exams Taken</span>
-                  <span className="mt-1 block text-lg font-bold">{examLabelsForPeriod.length}</span>
+                  <span className="mt-1 block text-lg font-bold">{selectedExamLabels.length}</span>
                 </div>
                 <div className={detailMetricClass}>
                   <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Average</span>
@@ -1472,94 +1575,101 @@ function GroupGradebook({
               </div>
 
               <div className={chartPanelClass}>
-                <div className="mb-3">
-                  <h4 className="text-sm font-bold">Student Exam Performance</h4>
-                  <p className="text-xs text-muted-foreground">Best exam score on the 1–9 scale</p>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold">Student Exam Performance</h4>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedExamType ? `${selectedExamType.label} score on the 1-9 scale` : "Best exam score on the 1-9 scale"}
+                    </p>
+                  </div>
+                  <ExamViewSwitcher value={examDisplay} onChange={setExamDisplay} />
                 </div>
-                {hasFilteredExamScores ? (
-                  <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
-                    <div
-                      className="h-[390px] sm:h-[420px] lg:h-[445px]"
-                      style={{ minWidth: chartMinWidth(studentExamData.length) }}
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={studentExamData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
-                          <XAxis
-                            dataKey="name"
-                            interval={0}
-                            height={70}
-                            tick={<StudentNameTick />}
-                            tickLine={false}
-                            stroke="hsl(var(--muted-foreground))"
-                          />
-                          <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
-                            labelStyle={{ fontSize: 11, fontWeight: "bold" }}
-                          />
-                          <Bar
-                            dataKey="bestScore"
-                            fill="#3b82f6"
-                            radius={[5, 5, 0, 0]}
-                            name="Best Score / 9"
-                            maxBarSize={48}
-                            isAnimationActive
-                            animationDuration={650}
-                            animationEasing="ease-out"
-                          >
-                            <LabelList dataKey="bestScore" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                {examDisplay === "chart" ? (
+                  hasFilteredExamScores ? (
+                    <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
+                      <div
+                        className="h-[390px] sm:h-[420px] lg:h-[445px]"
+                        style={{ minWidth: chartMinWidth(studentExamData.length) }}
+                      >
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={studentExamData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                            <XAxis
+                              dataKey="name"
+                              interval={0}
+                              height={70}
+                              tick={<StudentNameTick />}
+                              tickLine={false}
+                              stroke="hsl(var(--muted-foreground))"
+                            />
+                            <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
+                              labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                            />
+                            <Bar
+                              dataKey="chartScore"
+                              fill="#3b82f6"
+                              radius={[5, 5, 0, 0]}
+                              name={selectedExamType ? `${selectedExamType.label} / 9` : "Best Score / 9"}
+                              maxBarSize={48}
+                              isAnimationActive
+                              animationDuration={650}
+                              animationEasing="ease-out"
+                            >
+                              <LabelList dataKey="chartScore" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="py-16 text-center text-sm text-muted-foreground">
-                    No exam scores match this filter.
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <div className="py-16 text-center text-sm text-muted-foreground">
+                      No exam scores match this filter.
+                    </div>
+                  )
+                ) : null}
 
-              {examLabelsForPeriod.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-foreground/8">
-                <div className="max-h-64 overflow-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                      <tr>
-                        <th className="sticky left-0 z-30 min-w-[180px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
-                        {examLabelsForPeriod.map((label) => (
-                          <th key={label} className="min-w-[80px] border-l border-foreground/8 px-3 py-2 text-center">
-                            {label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-foreground/5 bg-surface">
-                      {enrollments.map((en) => (
-                        <tr key={`${en.enrollmentId}-exams`} className="hover:bg-foreground/[0.015]">
-                          <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
-                            {en.fullName}
-                          </td>
-                          {examLabelsForPeriod.map((label) => {
-                            const score = en.exams?.[label];
-                            const scoreInPeriod = matchesPeriod(en.examDates?.[label] || examDateByLabel[label], examMonth, examYear);
-                            const displayScore = score !== undefined && scoreInPeriod ? formatScoreOutOfNine(score) : "-";
-                            return (
-                              <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
-                                <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined && scoreInPeriod ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
-                                  {displayScore}
-                                </span>
-                              </td>
-                            );
-                          })}
+                {examDisplay === "table" && selectedExamLabels.length > 0 ? (
+                  <div className="miniapp-table-scroll max-h-[28rem] rounded-lg border border-foreground/8 pb-3">
+                    <table
+                      className="w-max border-collapse text-left text-xs"
+                      style={{ minWidth: Math.max(640, 180 + selectedExamLabels.length * 112) }}
+                    >
+                      <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                        <tr>
+                          <th className="sticky left-0 z-30 min-w-[180px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
+                          {selectedExamLabels.map((label) => (
+                            <th key={label} className="min-w-[112px] border-l border-foreground/8 px-3 py-2 text-center">
+                              {label}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-foreground/5 bg-surface">
+                        {enrollments.map((en) => (
+                          <tr key={`${en.enrollmentId}-exams`} className="hover:bg-foreground/[0.015]">
+                            <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
+                              {en.fullName}
+                            </td>
+                            {selectedExamLabels.map((label) => {
+                              const score = en.exams?.[label];
+                              const displayScore = score !== undefined ? formatScoreOutOfNine(score) : "-";
+                              return (
+                                <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
+                                  <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
+                                    {displayScore}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
-              ) : null}
             </div>
           )}
         </div>

@@ -418,6 +418,9 @@ export function availableGradesForRow(
   const monthlySeries = Array.isArray(row?.monthly_series)
     ? (row.monthly_series as Array<Record<string, unknown>>)
     : [];
+  const examSeries = Array.isArray(row?.exam_series)
+    ? (row.exam_series as Array<Record<string, unknown>>)
+    : [];
 
   for (const groupRow of groups) {
     const grade = gradeFromGroupLabel(groupRow?.label);
@@ -427,6 +430,13 @@ export function availableGradesForRow(
   }
 
   for (const seriesRow of monthlySeries) {
+    const grade = gradeFromGroupLabel(seriesRow?.label);
+    if (grade) {
+      grades.add(grade);
+    }
+  }
+
+  for (const seriesRow of examSeries) {
     const grade = gradeFromGroupLabel(seriesRow?.label);
     if (grade) {
       grades.add(grade);
