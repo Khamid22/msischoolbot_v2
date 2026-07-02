@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, ChevronLeft, Layers, UserX, Users, X } from "lucide-react";
+import { BookMarked, CalendarDays, ChevronLeft, Layers, UserX, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -30,6 +30,7 @@ export function GroupGradebook({
   const [riskPanelOpen, setRiskPanelOpen] = useState(false);
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
+  const [lessonDateSavingId, setLessonDateSavingId] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep">("gradebook");
   const [indicatorMonth, setIndicatorMonth] = useState("all");
   const [indicatorYear, setIndicatorYear] = useState("all");
@@ -86,6 +87,8 @@ export function GroupGradebook({
     kind: "att" | "hw",
     currentHw: number | undefined,
   ) {
+    if (isCancelledLesson(lesson)) return;
+    if (kind === "hw" && !lessonCanHaveHomework(lesson)) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setActive({ enrollmentId, lesson, kind, anchorRect: rect });
     setHwInput(currentHw !== undefined ? String(currentHw) : "");
@@ -105,8 +108,9 @@ export function GroupGradebook({
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({
           enrollment_id: active.enrollmentId,
+          lesson_session_id: active.lesson.id,
           lesson_label: active.lesson.lessonNumber,
-          status: status || "present",
+          status,
           topic: active.lesson.topic,
           lesson_date: active.lesson.date,
           attendance_type: "regular",
@@ -130,6 +134,7 @@ export function GroupGradebook({
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({
           enrollment_id: active.enrollmentId,
+          lesson_session_id: active.lesson.id,
           lesson_label: active.lesson.lessonNumber,
           score,
           topic: active.lesson.topic,
@@ -226,6 +231,78 @@ export function GroupGradebook({
     }
   }
 
+  function isCancelledLesson(lesson: Lesson) {
+    const status = asString(lesson.status).toLowerCase();
+    const kind = asString(lesson.sourceKind).toLowerCase();
+    const label = asString(lesson.lessonNumber).toLowerCase();
+    return status === "cancelled" || status === "canceled" || kind === "cancelled" || label.includes("cancelled") || label.includes("canceled");
+  }
+
+  function lessonCanHaveHomework(lesson: Lesson) {
+    return !isCancelledLesson(lesson) && lesson.hasHomework !== false;
+  }
+
+  function lessonDateToInputValue(value: string) {
+    const text = asString(value).trim();
+    const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      const [, day, month, year] = ddmmyyyy;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (iso) {
+      const [, year, month, day] = iso;
+      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+    return "";
+  }
+
+  async function editLessonDate(lesson: Lesson) {
+    if (lessonDateSavingId) return;
+    const current = lessonDateToInputValue(lesson.date);
+    const next = window.prompt("Conducted date (YYYY-MM-DD). Leave empty to clear.", current);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (trimmed && !/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      setError("Use YYYY-MM-DD for lesson dates.");
+      return;
+    }
+    setLessonDateSavingId(lesson.id);
+    setError("");
+    try {
+      const res = await fetch(routes.adminAcademicLessonApi(lesson.id), {
+        method: "PATCH",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify({ lesson_date: trimmed }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(asString(json.message) || "Unable to update lesson date.");
+        return;
+      }
+      const updated = json.lesson as Partial<Lesson>;
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lessons: prev.lessons.map((item) =>
+            item.id === lesson.id
+              ? {
+                  ...item,
+                  date: asString(updated.date),
+                  status: asString(updated.status) || item.status,
+                }
+              : item,
+          ),
+        };
+      });
+    } catch {
+      setError("Network error while updating the lesson date.");
+    } finally {
+      setLessonDateSavingId(null);
+    }
+  }
+
   const lessons = data?.lessons ?? [];
   const examLabels = data?.examLabels ?? [];
   const enrollments = data?.enrollments ?? [];
@@ -239,9 +316,10 @@ export function GroupGradebook({
 
   const academicPeriodOptions = collectPeriodOptions(lessons.map((lesson) => lesson.date));
   const indicatorFilterActive = indicatorMonth !== "all" || indicatorYear !== "all";
+  const metricLessons = lessons.filter((lesson) => !isCancelledLesson(lesson));
   const indicatorLessons = indicatorFilterActive
-    ? lessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
-    : lessons;
+    ? metricLessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
+    : metricLessons;
   const examTypeOptions = collectExamTypeOptions(examLabels);
   const selectedExamType = examType === "all" ? null : examTypeOptions.find((option) => option.key === examType) || null;
   const selectedExamTypeValue = selectedExamType ? selectedExamType.key : "all";
@@ -531,18 +609,27 @@ export function GroupGradebook({
                       AAP
                     </th>
                     {lessons.map((lesson) => (
-                      <th key={lesson.id} colSpan={2} className="w-[84px] border-l border-foreground/10 p-0 text-center align-top">
+                      <th key={lesson.id} colSpan={2} className={`w-[84px] border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10"}`}>
                         <div
                           title={`${lesson.lessonNumber} - ${lesson.topic}`}
                           className="w-full px-2 py-2"
                         >
-                          <span className="block whitespace-nowrap text-[10px] font-semibold leading-tight text-muted-foreground">
-                            {lesson.date || lesson.lessonNumber}
-                          </span>
-                          <span className="block whitespace-nowrap text-[9px] font-semibold text-muted-foreground/70">
+                          <button
+                            type="button"
+                            disabled={lessonDateSavingId === lesson.id}
+                            onClick={() => editLessonDate(lesson)}
+                            className={`mx-auto inline-flex max-w-full items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold leading-tight transition-colors hover:bg-foreground/5 disabled:opacity-60 ${
+                              isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"
+                            }`}
+                            title="Change conducted lesson date"
+                          >
+                            <CalendarDays className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{lessonDateSavingId === lesson.id ? "Saving..." : lesson.date || "Set date"}</span>
+                          </button>
+                          <span className={`block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/70"}`}>
                             {lesson.lessonNumber}
                           </span>
-                          <span className="mt-1 block whitespace-normal break-words text-[9px] font-normal italic leading-tight text-muted-foreground/70">
+                          <span className={`mt-1 block whitespace-normal break-words text-[9px] font-normal italic leading-tight ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>
                             {lesson.topic || "—"}
                           </span>
                         </div>
@@ -580,8 +667,19 @@ export function GroupGradebook({
                       {lessons.map((lesson) => {
                         const att = (en.attendance[lesson.lessonNumber] || "") as AttValue;
                         const hw = en.homework[lesson.lessonNumber];
+                        const cancelled = isCancelledLesson(lesson);
+                        const canEditHomework = lessonCanHaveHomework(lesson);
                         const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
                         const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
+                        if (cancelled) {
+                          return (
+                            <td key={`${en.enrollmentId}-${lesson.id}-cancelled`} colSpan={2} className="w-[84px] border-l border-r border-red-100 bg-red-50/40 px-1 py-1 text-center">
+                              <span className="inline-flex max-w-full rounded-md bg-red-100 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700">
+                                Cancelled
+                              </span>
+                            </td>
+                          );
+                        }
                         return (
                           <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
                             <td className="w-[38px] border-l border-foreground/5 p-0 text-center">
@@ -597,11 +695,12 @@ export function GroupGradebook({
                             <td className="w-[46px] border-r border-foreground/5 p-0 text-center">
                               <button
                                 type="button"
+                                disabled={!canEditHomework}
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[38px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-40 sm:h-[26px] sm:w-[38px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
                               >
-                                {hw !== undefined ? hw : "·"}
+                                {canEditHomework && hw !== undefined ? hw : "·"}
                               </button>
                             </td>
                           </Fragment>
@@ -1091,12 +1190,12 @@ export function GroupGradebook({
                     autoFocus
                     type="number"
                     min="0"
-                    max="100"
+                    max="9"
                     step="0.5"
                     value={hwInput}
                     onChange={(e) => setHwInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && saveHw()}
-                    placeholder="0–100"
+                    placeholder="0–9"
                     className="w-full rounded-lg border border-foreground/10 bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
                   />
                   <button

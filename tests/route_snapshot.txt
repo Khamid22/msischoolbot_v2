@@ -11,6 +11,7 @@
 /admin/api/academic/gradebook | GET
 /admin/api/academic/groups/{group_id} | DELETE
 /admin/api/academic/homework | POST
+/admin/api/academic/lessons/{lesson_session_id} | PATCH
 /admin/api/academic/schedules | POST
 /admin/api/announcements | GET
 /admin/api/announcements | POST

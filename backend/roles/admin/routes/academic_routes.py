@@ -16,6 +16,7 @@ from backend.roles.admin.services.academic_service import (
     record_exam_from_payload,
     record_homework_from_payload,
     move_enrollment_group_from_payload,
+    update_lesson_session_from_payload,
     update_enrollment_status_from_payload,
 )
 
@@ -143,6 +144,15 @@ def register_academic_admin_routes(
         except (TypeError, ValueError) as exc:
             return jsonify({"ok": False, "message": str(exc)}, status_code=400)
         return jsonify({"ok": True, "id": record_id})
+
+    @admin_blueprint.patch("/admin/api/academic/lessons/{lesson_session_id}")
+    def admin_update_academic_lesson(lesson_session_id: int):
+        try:
+            lesson = update_lesson_session_from_payload(lesson_session_id, request_payload())
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
+        invalidate_admin_page_context_cache()
+        return jsonify({"ok": True, "lesson": lesson})
 
     @admin_blueprint.post("/admin/api/academic/exams")
     def admin_record_academic_exam():

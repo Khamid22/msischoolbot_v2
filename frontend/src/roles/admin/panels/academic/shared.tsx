@@ -592,6 +592,9 @@ export type Lesson = {
   topic: string;
   date: string;
   order: number;
+  status?: string;
+  sourceKind?: string;
+  hasHomework?: boolean;
 };
 
 export type Enrollment = {

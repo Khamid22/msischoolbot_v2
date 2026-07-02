@@ -327,6 +327,13 @@ CREATE TABLE IF NOT EXISTS msi_v2.lesson_sessions (
     room TEXT NOT NULL DEFAULT '',
     online_url TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'scheduled',
+    source_key TEXT NOT NULL DEFAULT '',
+    source_kind TEXT NOT NULL DEFAULT '',
+    source_label TEXT NOT NULL DEFAULT '',
+    source_topic TEXT NOT NULL DEFAULT '',
+    source_order INTEGER NOT NULL DEFAULT 0,
+    source_file TEXT NOT NULL DEFAULT '',
+    source_sheet TEXT NOT NULL DEFAULT '',
     legacy_lesson_id BIGINT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -338,6 +345,14 @@ ON msi_v2.lesson_sessions (group_id, session_date);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_sessions_legacy_lesson_id
 ON msi_v2.lesson_sessions (legacy_lesson_id)
 WHERE legacy_lesson_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lesson_sessions_source_key
+ON msi_v2.lesson_sessions (source_key)
+WHERE source_key <> '';
+
+CREATE INDEX IF NOT EXISTS idx_lesson_sessions_group_source_order
+ON msi_v2.lesson_sessions (group_id, source_order)
+WHERE source_order > 0;
 
 CREATE TABLE IF NOT EXISTS msi_v2.attendance_records (
     id BIGSERIAL PRIMARY KEY,
@@ -695,6 +710,13 @@ ALTER TABLE msi_v2.parents ADD COLUMN IF NOT EXISTS legacy_parent_id BIGINT;
 ALTER TABLE msi_v2.parents ADD COLUMN IF NOT EXISTS legacy_admin_id BIGINT;
 ALTER TABLE msi_v2.groups ADD COLUMN IF NOT EXISTS legacy_group_id BIGINT;
 ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS legacy_lesson_id BIGINT;
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_label TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_topic TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_order INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_file TEXT NOT NULL DEFAULT '';
+ALTER TABLE msi_v2.lesson_sessions ADD COLUMN IF NOT EXISTS source_sheet TEXT NOT NULL DEFAULT '';
 ALTER TABLE msi_v2.resource_types ADD COLUMN IF NOT EXISTS legacy_resource_type_id BIGINT;
 ALTER TABLE msi_v2.resources ADD COLUMN IF NOT EXISTS legacy_resource_id BIGINT;
 ALTER TABLE msi_v2.announcements ADD COLUMN IF NOT EXISTS legacy_announcement_id BIGINT;

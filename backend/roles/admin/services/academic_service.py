@@ -4,6 +4,7 @@ import re
 from datetime import UTC, datetime
 
 from database import queries
+from database.academics import canonical
 from backend.domains.academics.postgres_service import (
     create_group_from_program,
     create_schedule,
@@ -167,7 +168,7 @@ def _get_v2_lesson_session(conn, group_id, lesson_label):
         raise ValueError("Lesson label must include a lesson number.")
     row = conn.execute(
         """
-        SELECT ls.id, spi.lesson_number
+        SELECT ls.id, spi.lesson_number, ls.status, ls.source_kind, ls.program_item_id
         FROM msi_v2.lesson_sessions ls
         JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
         WHERE ls.group_id = %s
@@ -181,6 +182,50 @@ def _get_v2_lesson_session(conn, group_id, lesson_label):
     if not row:
         raise ValueError("Lesson not found in the clean subject program.")
     return row
+
+
+def _get_v2_lesson_session_by_id(conn, group_id, lesson_session_id):
+    lesson_session_id = int(lesson_session_id or 0)
+    if lesson_session_id <= 0:
+        raise ValueError("Lesson session id is required.")
+    row = conn.execute(
+        """
+        SELECT ls.id, COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') AS lesson_number,
+               ls.status, ls.source_kind, ls.program_item_id
+        FROM msi_v2.lesson_sessions ls
+        LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+        WHERE ls.group_id = %s AND ls.id = %s
+        LIMIT 1
+        """,
+        (int(group_id), lesson_session_id),
+    ).fetchone()
+    if not row:
+        raise ValueError("Lesson session was not found.")
+    return row
+
+
+def _lesson_session_for_payload(conn, enrollment, payload):
+    lesson_session_id = int(payload.get("lesson_session_id") or payload.get("lesson_id") or 0)
+    if lesson_session_id > 0:
+        return _get_v2_lesson_session_by_id(conn, enrollment["group_id"], lesson_session_id)
+    return _get_v2_lesson_session(conn, enrollment["group_id"], payload.get("lesson_label", ""))
+
+
+def _parse_optional_lesson_date(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parsed = canonical.parse_date(text)
+    if not parsed:
+        raise ValueError("Lesson date must be a valid date.")
+    return parsed
+
+
+def _normalize_lesson_status(value):
+    status = str(value or "").strip().casefold()
+    if status in {"", "scheduled", "completed", "cancelled", "canceled"}:
+        return "cancelled" if status == "canceled" else status
+    raise ValueError("Unsupported lesson status.")
 
 
 def get_group_gradebook(group_id):
@@ -206,13 +251,49 @@ def get_group_gradebook(group_id):
 
         lesson_rows = conn.execute(
             """
-            SELECT ls.id, spi.lesson_number, spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   spi.item_order AS lesson_order
-            FROM msi_v2.lesson_sessions ls
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            WHERE ls.group_id = %s AND spi.item_type = 'lesson'
-            ORDER BY spi.item_order, spi.lesson_number
+            WITH ranked_sessions AS (
+                SELECT ls.id,
+                       ls.program_item_id,
+                       COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
+                       COALESCE(NULLIF(ls.source_topic, ''), spi.title, '') AS topic,
+                       COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
+                       ls.session_date,
+                       COALESCE(NULLIF(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
+                       ls.status,
+                       COALESCE(NULLIF(ls.source_kind, ''), spi.item_type, 'session') AS source_kind,
+                       CASE
+                         WHEN COALESCE(NULLIF(ls.source_kind, ''), spi.item_type, '') = 'lesson' THEN true
+                         WHEN ls.program_item_id IS NOT NULL AND spi.item_type = 'lesson' THEN true
+                         ELSE false
+                       END AS has_homework,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY COALESCE(ls.program_item_id, -ls.id)
+                         ORDER BY CASE WHEN ls.source_key <> '' THEN 0 ELSE 1 END,
+                                  COALESCE(NULLIF(ls.source_order, 0), spi.item_order, 999999),
+                                  ls.session_date NULLS LAST,
+                                  ls.id
+                       ) AS session_rank
+                FROM msi_v2.lesson_sessions ls
+                LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+                WHERE ls.group_id = %s
+                  AND (
+                    spi.item_type = 'lesson'
+                    OR (ls.program_item_id IS NULL AND ls.source_key <> '')
+                  )
+            )
+            SELECT ls.id,
+                   ls.lesson_number,
+                   ls.topic,
+                   ls.lesson_date,
+                   ls.lesson_order,
+                   ls.status,
+                   ls.source_kind,
+                   ls.has_homework
+            FROM ranked_sessions ls
+            WHERE ls.session_rank = 1
+            ORDER BY ls.lesson_order,
+                     ls.session_date NULLS LAST,
+                     ls.id
             """,
             (int(group_row["id"]),),
         ).fetchall()
@@ -267,14 +348,19 @@ def get_group_gradebook(group_id):
             for row in conn.execute(
                 f"""
                 SELECT gs.legacy_enrollment_id AS enrollment_id,
-                       spi.lesson_number AS lesson_label,
+                       COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') AS lesson_label,
                        ar.attendance_status AS status
                 FROM msi_v2.attendance_records ar
                 JOIN msi_v2.group_students gs
                      ON gs.group_id = ar.group_id AND gs.student_id = ar.student_id
                 JOIN msi_v2.lesson_sessions ls ON ls.id = ar.lesson_session_id
-                JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+                LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
                 WHERE gs.legacy_enrollment_id IN ({placeholders})
+                  AND (
+                    spi.item_type = 'lesson'
+                    OR (ls.program_item_id IS NULL AND ls.source_key <> '')
+                  )
+                  AND COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') <> ''
                 """,
                 enrollment_ids,
             ).fetchall():
@@ -284,14 +370,19 @@ def get_group_gradebook(group_id):
             for row in conn.execute(
                 f"""
                 SELECT gs.legacy_enrollment_id AS enrollment_id,
-                       spi.lesson_number AS lesson_label,
+                       COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') AS lesson_label,
                        hw.score
                 FROM msi_v2.homework_scores hw
                 JOIN msi_v2.group_students gs
                      ON gs.group_id = hw.group_id AND gs.student_id = hw.student_id
                 JOIN msi_v2.lesson_sessions ls ON ls.id = hw.lesson_session_id
-                JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+                LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
                 WHERE gs.legacy_enrollment_id IN ({placeholders})
+                  AND (
+                    spi.item_type = 'lesson'
+                    OR (ls.program_item_id IS NULL AND ls.source_key <> '')
+                  )
+                  AND COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') <> ''
                 """,
                 enrollment_ids,
             ).fetchall():
@@ -351,6 +442,9 @@ def get_group_gradebook(group_id):
                 "topic": str(row["topic"] or ""),
                 "date": str(row["lesson_date"] or ""),
                 "order": int(row["lesson_order"] or 0),
+                "status": str(row["status"] or "scheduled"),
+                "sourceKind": str(row["source_kind"] or ""),
+                "hasHomework": bool(row["has_homework"]),
             }
             for row in lesson_rows
         ],
@@ -498,12 +592,41 @@ def move_enrollment_group(enrollment_id, group_id):
 
 def record_attendance_from_payload(payload):
     enrollment_id = int(payload.get("enrollment_id", 0))
-    status = str(payload.get("status", "") or "").strip() or "unknown"
+    status = str(payload.get("status", "") or "").strip().casefold()
+    status_aliases = {
+        "p": "present",
+        "present": "present",
+        "a": "absent",
+        "absent": "absent",
+        "j": "justified",
+        "justified": "justified",
+        "justified absent": "justified",
+        "a(i)": "justified",
+        "ai": "justified",
+        "l": "justified",
+        "late": "justified",
+    }
+    status = status_aliases.get(status, status)
+    if status not in {"", "present", "absent", "justified"}:
+        raise ValueError("Unsupported attendance status.")
     with queries.connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")
-        lesson = _get_v2_lesson_session(conn, enrollment["group_id"], payload.get("lesson_label", ""))
+        lesson = _lesson_session_for_payload(conn, enrollment, payload)
+        if str(lesson["status"] or "").casefold() in {"cancelled", "canceled"}:
+            raise ValueError("Attendance cannot be recorded for a cancelled lesson.")
+        if not status:
+            existing = conn.execute(
+                """
+                DELETE FROM msi_v2.attendance_records
+                WHERE lesson_session_id = %s AND student_id = %s
+                RETURNING id
+                """,
+                (lesson["id"], enrollment["student_id"]),
+            ).fetchone()
+            conn.commit()
+            return int(existing["id"] or 0) if existing else 0
         row = conn.execute(
             """
             INSERT INTO msi_v2.attendance_records (
@@ -528,7 +651,11 @@ def record_homework_from_payload(payload):
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")
-        lesson = _get_v2_lesson_session(conn, enrollment["group_id"], payload.get("lesson_label", ""))
+        lesson = _lesson_session_for_payload(conn, enrollment, payload)
+        if str(lesson["status"] or "").casefold() in {"cancelled", "canceled"}:
+            raise ValueError("Homework cannot be recorded for a cancelled lesson.")
+        if not lesson["program_item_id"] and str(lesson["source_kind"] or "").casefold() != "lesson":
+            raise ValueError("Homework can only be recorded for lesson sessions.")
         row = conn.execute(
             """
             INSERT INTO msi_v2.homework_scores (
@@ -544,6 +671,58 @@ def record_homework_from_payload(payload):
         ).fetchone()
         conn.commit()
         return int(row["id"])
+
+
+def update_lesson_session_from_payload(lesson_session_id, payload):
+    lesson_session_id = int(lesson_session_id or 0)
+    if lesson_session_id <= 0:
+        raise ValueError("Lesson session id is required.")
+    raw_date = payload.get("lesson_date", payload.get("date", None))
+    next_date = _parse_optional_lesson_date(raw_date) if raw_date is not None else None
+    should_update_date = raw_date is not None
+    raw_status = payload.get("status", None)
+    next_status = _normalize_lesson_status(raw_status) if raw_status is not None else None
+
+    with queries.connect_auth_db() as conn:
+        row = conn.execute(
+            """
+            SELECT ls.id, ls.status, ls.session_date,
+                   COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
+                   COALESCE(NULLIF(ls.source_topic, ''), spi.title, '') AS topic
+            FROM msi_v2.lesson_sessions ls
+            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+            WHERE ls.id = %s
+            """,
+            (lesson_session_id,),
+        ).fetchone()
+        if not row:
+            raise ValueError("Lesson session was not found.")
+
+        conn.execute(
+            """
+            UPDATE msi_v2.lesson_sessions
+            SET session_date = CASE WHEN %s THEN %s ELSE session_date END,
+                status = COALESCE(NULLIF(%s, ''), status),
+                updated_at = now()
+            WHERE id = %s
+            """,
+            (
+                bool(should_update_date),
+                next_date,
+                next_status if next_status is not None else "",
+                lesson_session_id,
+            ),
+        )
+        conn.commit()
+
+    display_date = canonical.format_date(next_date if should_update_date else row["session_date"])
+    return {
+        "id": lesson_session_id,
+        "lessonNumber": str(row["lesson_number"] or "Session"),
+        "topic": str(row["topic"] or ""),
+        "date": display_date,
+        "status": next_status or str(row["status"] or "scheduled"),
+    }
 
 
 def record_exam_from_payload(payload):
