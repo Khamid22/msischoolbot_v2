@@ -6,7 +6,7 @@ import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
-import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, subjectColorClass, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
+import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
@@ -82,6 +82,24 @@ function lessonNumberText(value: unknown, fallback?: number | string) {
   if (!source) return "";
   const withoutPrefix = source.replace(/^lesson\s*/i, "").trim();
   return withoutPrefix || source;
+}
+
+function scheduleCardClass(subject: unknown, status: BlockStatus) {
+  if (status === "cancelled") {
+    return "border-red-300/70 bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-red-950/20";
+  }
+  const normalizedSubject = asString(subject).toLowerCase();
+  if (normalizedSubject.includes("english") || normalizedSubject.includes("eng")) {
+    return status === "completed"
+      ? "border-sky-300/70 bg-gradient-to-br from-sky-500 to-cyan-700 text-white shadow-sky-950/20"
+      : "border-amber-300/70 bg-gradient-to-br from-amber-400 to-orange-600 text-white shadow-orange-950/20";
+  }
+  if (normalizedSubject.includes("chem")) {
+    return "border-violet-300/70 bg-gradient-to-br from-violet-500 to-indigo-700 text-white shadow-violet-950/20";
+  }
+  return status === "completed"
+    ? "border-emerald-300/70 bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-950/20"
+    : "border-blue-300/70 bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-blue-950/20";
 }
 
 function overlapGridFor(count: number) {
@@ -771,7 +789,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
                         const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
-                        const badgeText = lessonNumberText(session.lesson_number, lessonId);
+                        const badgeText = lessonNumberText(session.lesson_number);
                         const compactCard = height < 56;
                         return (
                           <div
@@ -789,7 +807,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             tabIndex={0}
                             role="button"
                             aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
-                            className={`absolute rounded-lg border p-2 text-xs shadow-card transition-transform hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-primary ring-offset-2 ring-offset-background" : "overflow-hidden"} ${subjectColorClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            className={`absolute rounded-xl border px-3 py-2 text-xs shadow-xl transition-transform duration-150 hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-2 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
@@ -799,8 +817,8 @@ export function SchedulePanel({ state }: { state: any }) {
                               zIndex: isSelected ? 35 : session.rowCount > 1 ? 12 : 2,
                             }}
                           >
-                            <div className="flex min-w-0 items-start justify-between gap-1">
-                              <p className="truncate text-[clamp(0.68rem,1.1vw,0.82rem)] font-bold leading-tight">{asString(session.group_name)}</p>
+                            <div className="flex min-w-0 items-start justify-between gap-2">
+                              <p className="truncate text-[clamp(0.72rem,1.1vw,0.9rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
                               {badgeText ? (
                                 <button
                                   type="button"
@@ -812,15 +830,15 @@ export function SchedulePanel({ state }: { state: any }) {
                                     event.stopPropagation();
                                     setSelectedLessonId(lessonId);
                                   }}
-                                  className="shrink-0 rounded bg-white/85 px-1.5 py-0.5 text-[10px] font-black leading-none text-foreground/65 shadow-sm"
+                                  className="shrink-0 rounded-md border border-white/50 bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none text-slate-700 shadow-sm backdrop-blur"
                                   aria-label={`Select lesson ${badgeText}`}
                                 >
                                   {badgeText}
                                 </button>
                               ) : null}
                             </div>
-                            <p className="truncate text-[clamp(0.62rem,0.95vw,0.76rem)] font-semibold opacity-90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
-                            {!compactCard ? <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-80">{toneLabel}</p> : null}
+                            <p className="mt-1 truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            {!compactCard ? <p className="mt-1 inline-flex w-fit rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                             {isSelected && canDrag ? (
                               <>
                                 <button
@@ -829,18 +847,22 @@ export function SchedulePanel({ state }: { state: any }) {
                                   onPointerMove={moveResizeDrag}
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
-                                  className="absolute inset-x-3 top-1 z-20 h-2 cursor-ns-resize rounded-full bg-white/80 shadow-sm ring-1 ring-foreground/10"
+                                  className="absolute left-1/2 top-0 z-30 flex h-5 w-16 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
                                   aria-label="Adjust class start time"
-                                />
+                                >
+                                  <span className="h-1 w-8 rounded-full bg-sky-500/80" />
+                                </button>
                                 <button
                                   type="button"
                                   onPointerDown={(event) => startResizeDrag(event, session, "end")}
                                   onPointerMove={moveResizeDrag}
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
-                                  className="absolute inset-x-3 bottom-1 z-20 h-2 cursor-ns-resize rounded-full bg-white/80 shadow-sm ring-1 ring-foreground/10"
+                                  className="absolute bottom-0 left-1/2 z-30 flex h-5 w-16 -translate-x-1/2 translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
                                   aria-label="Adjust class end time"
-                                />
+                                >
+                                  <span className="h-1 w-8 rounded-full bg-sky-500/80" />
+                                </button>
                               </>
                             ) : null}
                           </div>
@@ -865,23 +887,25 @@ export function SchedulePanel({ state }: { state: any }) {
               {freeformLessons.length ? (
                 <div className="pointer-events-none absolute inset-y-0 right-0 z-20" style={{ left: `${TIME_COLUMN_PX}px` }}>
                   {freeformLessons.map((lesson, index) => {
+                      const label = lessonNumberText(lesson.lesson_number);
+                      if (!label) return null;
                       const status = lessonStatus(lesson);
                       const statusClass = status === "cancelled"
-                        ? "border-red-500/20 bg-red-50 text-red-800 shadow-red-900/5"
-                        : "border-emerald-500/20 bg-white text-foreground/75 shadow-emerald-900/5";
+                        ? "border-red-200 bg-red-50/95 text-red-700 shadow-red-900/10"
+                        : "border-emerald-200 bg-white/95 text-slate-700 shadow-emerald-900/10";
                       return (
                         <button
                           key={`schedule-loose-${lesson.id}`}
                           type="button"
-                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), lessonNumberText(lesson.lesson_number, lesson.id)) : undefined}
+                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), label) : undefined}
                           onPointerMove={canDrag ? movePointerDrag : undefined}
                           onPointerUp={canDrag ? endPointerDrag : undefined}
                           onPointerCancel={canDrag ? cancelPointerDrag : undefined}
                           aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
-                          className={`pointer-events-auto absolute touch-none select-none rounded-lg border px-2 py-1 text-center text-[10px] font-black leading-none shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                          className={`pointer-events-auto absolute touch-none select-none rounded-full border px-2.5 py-1 text-center text-[10px] font-black leading-none shadow-lg backdrop-blur transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
                           style={lessonScatterStyle(lesson, index, freeformLessons.length)}
                         >
-                          {lessonNumberText(lesson.lesson_number, lesson.id)}
+                          {label}
                         </button>
                       );
                   })}
