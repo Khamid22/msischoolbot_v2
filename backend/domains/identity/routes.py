@@ -228,11 +228,14 @@ def register_user_auth_routes(
 
             panel_arg = str(request_proxy.args.get("panel", "")).strip().lower()
             school_arg = str(request_proxy.args.get("school", "")).strip().lower()
+            mode_arg = str(request_proxy.args.get("mode", "")).strip().lower()
             saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
             saved_school = str(session.get("admin_last_school", "all")).strip().lower()
+            saved_mode = str(session.get("admin_last_mode", "")).strip().lower()
 
             panel = panel_arg or saved_panel or "overview"
             school_filter = school_arg or saved_school or "all"
+            admin_mode = mode_arg or saved_mode
             edit_teacher_id = request_proxy.args.get("edit_teacher_id", "").strip()
             selected_teacher_edit = None
             if panel == "teachers" and edit_teacher_id:
@@ -246,6 +249,7 @@ def register_user_auth_routes(
                 admin_panel=panel,
                 admin_teacher_edit=selected_teacher_edit,
                 admin_school=school_filter,
+                admin_mode=admin_mode,
             )
 
         if role == "student":

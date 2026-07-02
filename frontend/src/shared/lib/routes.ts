@@ -16,8 +16,10 @@ export const routes = {
   adminTeacherCreate: "/admin/teachers",
   adminTeacherUpdate: (teacherId: number | string) => `/admin/teachers/${teacherId}`,
   adminTeacherDelete: (teacherId: number | string) => `/admin/teachers/${teacherId}/delete`,
-  adminTeacherEdit: (teacherId: number | string, school = "all") =>
-    `/?panel=teachers&school=${encodeURIComponent(String(school || "all"))}&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
+  adminTeacherEdit: (teacherId: number | string, school = "all", mode = "") =>
+    `/?panel=teachers&school=${encodeURIComponent(String(school || "all"))}${
+      mode ? `&mode=${encodeURIComponent(String(mode))}` : ""
+    }&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
   adminTeacherCandidateCreate: "/admin/teacher-candidates",
   adminTeacherCandidateStatus: (candidateId: number | string) => `/admin/teacher-candidates/${candidateId}/status`,
   adminTeacherCandidatePromote: (candidateId: number | string) => `/admin/teacher-candidates/${candidateId}/promote`,

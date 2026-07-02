@@ -78,6 +78,10 @@ def register_admin_page_routes(
             admin_school = requested_school
         if not str(admin_mode or "").strip() and requested_mode in ADMIN_PANEL_MODES:
             admin_mode = requested_mode
+        if not str(admin_mode or "").strip():
+            saved_mode = str(session.get("admin_last_mode", "") or "").strip().lower()
+            if saved_mode in ADMIN_PANEL_MODES:
+                admin_mode = saved_mode
 
         force_refresh = bool(
             str(auth_error or "").strip()
@@ -101,6 +105,10 @@ def register_admin_page_routes(
             session["admin_last_school"] = school_filter
 
         resolved_admin_mode = str(admin_mode or "").strip().lower()
+        if resolved_admin_mode not in ADMIN_PANEL_MODES:
+            resolved_admin_mode = "admin"
+        if current_auth_role() == "admin":
+            session["admin_last_mode"] = resolved_admin_mode
 
         return render_react_page(
             "admin-home",

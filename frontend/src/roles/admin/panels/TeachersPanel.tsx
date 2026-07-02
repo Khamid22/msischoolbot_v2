@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ClipboardCheck, GraduationCap, Info, Pencil, Plus, Trash2, Users, XCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
-import { asNumber, asString } from "../shared";
+import { asNumber, asString, buildAdminTabUrl } from "../shared";
 import { TeacherTab, ToastTone, Candidate, Teacher, TAB_STORAGE_KEY, TRAINING_FILTER_STORAGE_KEY, DETAIL_CANDIDATE_STORAGE_KEY, tabs, hiringStages, TRAINING_TARGET_LESSONS, HIRING_STAGE_PAGE_SIZE, TABLE_PAGE_SIZE, teacherCategoryLabel, postForm, trainingMeta } from "./teachers/shared";
 import { PaginationControls } from "./teachers/controls";
 import { CandidateCard } from "./teachers/CandidateCard";
@@ -156,7 +156,7 @@ export default function TeachersPanel({
       window.history.replaceState(
         {},
         "",
-        `/?panel=teachers&school=${encodeURIComponent(currentSchool)}`,
+        buildAdminTabUrl("teachers", currentSchool, state.adminMode),
       );
     }
   }
@@ -820,7 +820,7 @@ export default function TeachersPanel({
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <a
-                            href={routes.adminTeacherEdit(asNumber(teacher.id), currentSchool)}
+                            href={routes.adminTeacherEdit(asNumber(teacher.id), currentSchool, state.adminMode)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
                             aria-label={`Edit ${asString(teacher.full_name)}`}
                           >

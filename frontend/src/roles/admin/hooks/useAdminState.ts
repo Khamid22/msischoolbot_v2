@@ -64,6 +64,14 @@ export function useAdminState(props: AdminPageProps) {
       return normalizeAdminMode(serverMode);
     }
     try {
+      const params = new URLSearchParams(window.location.search);
+      const urlMode = asString(params.get("mode"));
+      if (urlMode) {
+        return normalizeAdminMode(urlMode);
+      }
+    } catch {
+    }
+    try {
       return normalizeAdminMode(window.localStorage.getItem("msi_admin_mode"));
     } catch {
       return normalizeAdminMode(props.adminMode);
@@ -195,6 +203,17 @@ export function useAdminState(props: AdminPageProps) {
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [blockReason, setBlockReason] = useState("");
   const visibleTabs = tabsForAdminMode(adminMode);
+
+  useEffect(() => {
+    const serverMode = asString(props.adminMode);
+    if (!serverMode) {
+      return;
+    }
+    const normalizedMode = normalizeAdminMode(serverMode);
+    if (normalizedMode !== adminMode) {
+      setAdminModeState(normalizedMode);
+    }
+  }, [adminMode, props.adminMode]);
 
   function clearResourceUploadResetTimer() {
     if (resourceUploadResetTimerRef.current !== null) {
