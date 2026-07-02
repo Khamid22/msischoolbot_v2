@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, Plus, X } from "lucide-react";
+import type { FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Filter, Plus, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
@@ -83,12 +83,40 @@ function scheduleCardClass(subject: unknown, status: BlockStatus) {
       ? "border-sky-300/70 bg-gradient-to-br from-sky-500 to-cyan-700 text-white shadow-sky-950/20"
       : "border-amber-300/70 bg-gradient-to-br from-amber-400 to-orange-600 text-white shadow-orange-950/20";
   }
-  if (normalizedSubject.includes("chem")) {
-    return "border-violet-300/70 bg-gradient-to-br from-violet-500 to-indigo-700 text-white shadow-violet-950/20";
-  }
   return status === "completed"
     ? "border-emerald-300/70 bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-950/20"
     : "border-blue-300/70 bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-blue-950/20";
+}
+
+function isScheduleSubjectOption(value: unknown) {
+  const normalized = asString(value).toLowerCase();
+  return Boolean(normalized) && !normalized.includes("chem");
+}
+
+function ScheduleFilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="relative inline-flex h-7 min-w-[7.5rem] items-center">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-7 w-full appearance-none rounded-md border border-foreground/10 bg-background/90 pl-2 pr-7 text-[11px] font-bold text-foreground shadow-sm outline-none transition focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-muted-foreground" />
+    </label>
+  );
 }
 
 function lessonDurationMinutes(lesson: LessonHistoryRow) {
@@ -289,13 +317,13 @@ export function SchedulePanel({ state }: { state: any }) {
       const groupId = String(block.group_id || "");
       if (groupId) groupMap.set(groupId, asString(block.group_name) || groupId);
       const subjectName = asString(block.subject_name);
-      if (subjectName) subjectSet.add(subjectName);
+      if (isScheduleSubjectOption(subjectName)) subjectSet.add(subjectName);
     });
     untimedLessons.forEach((lesson) => {
       const groupId = String(lesson.group_id || "");
       if (groupId) groupMap.set(groupId, asString(lesson.group_name) || groupId);
       const subjectName = asString(lesson.subject_name);
-      if (subjectName) subjectSet.add(subjectName);
+      if (isScheduleSubjectOption(subjectName)) subjectSet.add(subjectName);
     });
     return {
       groups: Array.from(groupMap.entries())
@@ -341,6 +369,13 @@ export function SchedulePanel({ state }: { state: any }) {
     return next;
   }, [visibleUntimedLessons, weekDays]);
   const activeFilterCount = [scheduleGroupFilter, scheduleSubjectFilter, scheduleStatusFilter].filter((value) => value !== "all").length;
+
+  useEffect(() => {
+    if (scheduleSubjectFilter !== "all" && !filterOptions.subjects.includes(scheduleSubjectFilter)) {
+      setScheduleSubjectFilter("all");
+    }
+  }, [filterOptions.subjects, scheduleSubjectFilter]);
+
   const busiestDayLoad = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
@@ -766,11 +801,12 @@ export function SchedulePanel({ state }: { state: any }) {
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             {formatWeekRange(weekStart)}
           </div>
-          <div className="relative">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setFilterOpen((current) => !current)}
               className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold ${activeFilterCount ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/10 bg-background hover:bg-muted"}`}
+              aria-expanded={filterOpen}
             >
               <Filter className="h-3.5 w-3.5" />
               Filter
@@ -781,54 +817,29 @@ export function SchedulePanel({ state }: { state: any }) {
               ) : null}
             </button>
             {filterOpen ? (
-              <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-64 rounded-lg border border-foreground/10 bg-surface p-2 shadow-card-hover">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Filters</span>
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen(false)}
-                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted"
-                    aria-label="Close filter"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="grid gap-1.5">
-                  <select
-                    value={scheduleGroupFilter}
-                    onChange={(event) => setScheduleGroupFilter(event.target.value)}
-                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
-                  >
-                    <option value="all">All groups</option>
-                    {filterOptions.groups.map((group) => (
-                      <option key={group.value} value={group.value}>
-                        {group.label}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={scheduleSubjectFilter}
-                    onChange={(event) => setScheduleSubjectFilter(event.target.value)}
-                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
-                  >
-                    <option value="all">All subjects</option>
-                    {filterOptions.subjects.map((subject) => (
-                      <option key={subject} value={subject}>
-                        {subject}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={scheduleStatusFilter}
-                    onChange={(event) => setScheduleStatusFilter(event.target.value)}
-                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="completed">Done</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
+              <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg border border-foreground/10 bg-muted/40 p-1 shadow-sm animate-in fade-in slide-in-from-left-1 duration-150 motion-reduce:animate-none">
+                <ScheduleFilterSelect label="Group filter" value={scheduleGroupFilter} onChange={setScheduleGroupFilter}>
+                  <option value="all">All groups</option>
+                  {filterOptions.groups.map((group) => (
+                    <option key={group.value} value={group.value}>
+                      {group.label}
+                    </option>
+                  ))}
+                </ScheduleFilterSelect>
+                <ScheduleFilterSelect label="Subject filter" value={scheduleSubjectFilter} onChange={setScheduleSubjectFilter}>
+                  <option value="all">All subjects</option>
+                  {filterOptions.subjects.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </ScheduleFilterSelect>
+                <ScheduleFilterSelect label="Status filter" value={scheduleStatusFilter} onChange={setScheduleStatusFilter}>
+                  <option value="all">All statuses</option>
+                  <option value="completed">Done</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="cancelled">Cancelled</option>
+                </ScheduleFilterSelect>
                 {activeFilterCount ? (
                   <button
                     type="button"
@@ -837,9 +848,10 @@ export function SchedulePanel({ state }: { state: any }) {
                       setScheduleSubjectFilter("all");
                       setScheduleStatusFilter("all");
                     }}
-                    className="mt-2 h-7 w-full rounded-md bg-muted text-[11px] font-bold hover:bg-foreground/10"
+                    className="inline-flex h-7 items-center gap-1 rounded-md bg-background px-2 text-[11px] font-bold text-muted-foreground shadow-sm hover:bg-foreground/10 hover:text-foreground"
                   >
-                    Clear filters
+                    <X className="h-3 w-3" />
+                    Clear
                   </button>
                 ) : null}
               </div>
