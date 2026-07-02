@@ -690,8 +690,8 @@ export type TimetableLessonBlock = {
   start_time: string;
   end_time: string;
   status: "scheduled" | "completed" | "cancelled";
-  // Stacked-row layout: overlapping classes share a time band and stack as
-  // full-width rows (row index within rowCount) instead of cramped columns.
+  // Overlap index within a shared time band. The UI can flow these into
+  // columns and rows depending on how crowded the band is.
   row: number;
   rowCount: number;
   bandStartMin: number;

@@ -56,6 +56,29 @@ function minutesToLabel(totalMinutes: number) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function overlapGridFor(count: number) {
+  if (count <= 1) return { columns: 1, rows: 1 };
+  const columns = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(count))));
+  return { columns, rows: Math.ceil(count / columns) };
+}
+
+function lessonScatterStyle(lesson: LessonHistoryRow, index: number, count: number) {
+  const columns = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(Math.max(count, 1) * 1.8))));
+  const rows = Math.max(1, Math.ceil(Math.max(count, 1) / columns));
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  const seed = Math.abs(Number(lesson.id) || index + 1);
+  const jitterX = ((seed * 17) % 9) - 4;
+  const jitterY = ((seed * 23) % 9) - 4;
+  const rotation = ((seed * 13) % 9) - 4;
+
+  return {
+    left: `${Math.min(94, Math.max(6, ((column + 0.5) / columns) * 100 + jitterX * 0.8))}%`,
+    top: `${Math.min(88, Math.max(12, ((row + 0.5) / rows) * 100 + jitterY * 1.4))}%`,
+    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+  };
+}
+
 function normalizeBlockStatus(value: unknown): BlockStatus {
   const normalized = asString(value).toLowerCase();
   if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
@@ -221,6 +244,10 @@ export function SchedulePanel({ state }: { state: any }) {
     });
     return next;
   }, [untimedLessons, weekDays]);
+  const freeformLessons = useMemo(
+    () => weekDays.flatMap((day) => dayUntimedLessons[isoDate(day)] || []),
+    [dayUntimedLessons, weekDays],
+  );
   const busiestDayLoad = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
@@ -233,6 +260,7 @@ export function SchedulePanel({ state }: { state: any }) {
       return Math.max(max, ...(dayTimetableBlocks[dayIso] || []).map((session) => session.rowCount));
     }, 1);
   }, [dayTimetableBlocks, weekDays]);
+  const busiestOverlapGrid = overlapGridFor(busiestOverlap);
   const completedLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "completed").length
     + placedTimetableBlocks.filter((block) => block.status === "completed").length;
   const cancelledLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "cancelled").length
@@ -244,13 +272,15 @@ export function SchedulePanel({ state }: { state: any }) {
   const displayEndHour = timetableEndHour;
   const dayStartMin = displayStartHour * 60;
   const dayEndMin = displayEndHour * 60;
-  const hourPx = Math.min(94, BASE_HOUR_PX + Math.max(0, Math.min(busiestOverlap - 1, 4)) * 8 + Math.max(0, Math.min(busiestDayLoad - 7, 8)) * 2);
-  const dayMinWidthPx = Math.min(260, Math.max(132, 118 + Math.min(busiestDayLoad, 8) * 10 + Math.max(0, Math.min(busiestOverlap - 1, 4)) * 16));
+  const hourPx = Math.min(148, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 18 + Math.max(0, Math.min(busiestDayLoad - 7, 8)) * 2);
+  const dayMinWidthPx = Math.min(360, Math.max(140, 118 + Math.min(busiestDayLoad, 8) * 10 + Math.max(0, busiestOverlapGrid.columns - 1) * 58));
   const gridTemplateColumns = `${TIME_COLUMN_PX}px repeat(7, minmax(${dayMinWidthPx}px, 1fr))`;
   const gridMinWidthPx = TIME_COLUMN_PX + dayMinWidthPx * 7;
   const gridViewportMaxPx = Math.min(880, Math.max(620, 560 + Math.min(busiestDayLoad, 10) * 26));
   const gridHeightPx = (displayEndHour - displayStartHour) * hourPx;
   const hours = Array.from({ length: displayEndHour - displayStartHour + 1 }, (_item, index) => displayStartHour + index);
+  const lessonPoolHeightPx = freeformLessons.length ? Math.min(300, Math.max(112, Math.ceil(freeformLessons.length / 6) * 68)) : 0;
+  const lessonPoolMinWidthPx = Math.max(gridMinWidthPx, Math.min(1680, Math.max(720, freeformLessons.length * 82)));
 
   function blockDragPayload(block: RawTimetableBlock): DragPayload {
     const startMin = timeToMinutes(asString(block.start_time));
@@ -562,6 +592,46 @@ export function SchedulePanel({ state }: { state: any }) {
           </div>
         </div>
 
+        {freeformLessons.length ? (
+          <div className="mb-3 rounded-lg border border-foreground/10 bg-muted/20 p-2">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lesson pool</p>
+              <span className="rounded-md border border-foreground/10 bg-background px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                {freeformLessons.length} unplaced
+              </span>
+            </div>
+            <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
+              <div className="relative" style={{ height: `${lessonPoolHeightPx}px`, minWidth: `${lessonPoolMinWidthPx}px` }}>
+                {freeformLessons.map((lesson, index) => {
+                  const status = lessonStatus(lesson);
+                  const statusClass = status === "cancelled"
+                    ? "border-red-500/20 bg-red-50 text-red-800 shadow-red-900/5"
+                    : "border-emerald-500/20 bg-white text-foreground/75 shadow-emerald-900/5";
+                  return (
+                    <button
+                      key={`pool-${lesson.id}`}
+                      type="button"
+                      onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name), asString(lesson.subject_name)) : undefined}
+                      onPointerMove={canDrag ? movePointerDrag : undefined}
+                      onPointerUp={canDrag ? endPointerDrag : undefined}
+                      onPointerCancel={canDrag ? cancelPointerDrag : undefined}
+                      title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`}
+                      aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
+                      className={`absolute flex max-w-[150px] touch-none select-none items-center gap-1 rounded-lg border px-2 py-1 text-left text-[10px] font-bold shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                      style={lessonScatterStyle(lesson, index, freeformLessons.length)}
+                    >
+                      <span className="min-w-0 truncate">{asString(lesson.group_name)}</span>
+                      <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground">
+                        {subjectCode(lesson.subject_name)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
           <div style={{ minWidth: `${gridMinWidthPx}px` }}>
             <div className="grid border-b border-foreground/10 bg-muted/40" style={{ gridTemplateColumns }}>
@@ -572,54 +642,6 @@ export function SchedulePanel({ state }: { state: any }) {
                   <p className="text-lg font-bold leading-none">{day.getDate()}</p>
                 </div>
               ))}
-            </div>
-            <div className="grid border-b border-foreground/10 bg-muted/15" style={{ gridTemplateColumns }}>
-              <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                All-day
-              </div>
-              {weekDays.map((day) => {
-                const dayIso = isoDate(day);
-                const dayLessons = dayUntimedLessons[dayIso] || [];
-                const completedCount = dayLessons.filter((lesson) => lessonStatus(lesson) === "completed").length;
-                const cancelledCount = dayLessons.filter((lesson) => lessonStatus(lesson) === "cancelled").length;
-                return (
-                  <div key={`${dayIso}-classes`} className="min-h-[58px] border-l border-foreground/10 p-1.5">
-                    {dayLessons.length === 0 ? (
-                      <p className="pt-3 text-center text-[10px] font-semibold text-muted-foreground/40">—</p>
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap gap-1">
-                          {completedCount ? (
-                            <span className="rounded-md border border-emerald-500/20 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                              {completedCount} completed
-                            </span>
-                          ) : null}
-                          {cancelledCount ? (
-                            <span className="rounded-md border border-red-500/20 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
-                              {cancelledCount} cancelled
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="miniapp-scroll flex max-h-16 flex-wrap content-start gap-1 overflow-y-auto">
-                          {dayLessons.map((lesson) => (
-                            <span
-                              key={`chip-${lesson.id}`}
-                              onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name), asString(lesson.subject_name)) : undefined}
-                              onPointerMove={canDrag ? movePointerDrag : undefined}
-                              onPointerUp={canDrag ? endPointerDrag : undefined}
-                              onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                              title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`}
-                              className={`touch-none select-none rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-foreground/70 shadow-sm ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
-                            >
-                              {asString(lesson.group_name)} · {subjectCode(lesson.subject_name)}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
             <div
               ref={timetableScrollRef}
@@ -667,9 +689,15 @@ export function SchedulePanel({ state }: { state: any }) {
                         const endMin = timeToMinutes(asString(session.end_time));
                         const bandTop = ((session.bandStartMin - dayStartMin) / 60) * hourPx;
                         const bandHeight = Math.max(34, ((session.bandEndMin - session.bandStartMin) / 60) * hourPx);
-                        const rowHeight = Math.max(34, (bandHeight - 4) / Math.max(1, session.rowCount));
-                        const top = session.rowCount > 1 ? bandTop + session.row * rowHeight : ((startMin - dayStartMin) / 60) * hourPx;
-                        const height = session.rowCount > 1 ? rowHeight - 3 : Math.max(34, ((endMin - startMin) / 60) * hourPx - 2);
+                        const overlapGrid = overlapGridFor(session.rowCount);
+                        const slotColumn = session.row % overlapGrid.columns;
+                        const slotRow = Math.floor(session.row / overlapGrid.columns);
+                        const rowHeight = Math.max(38, (bandHeight - 6) / overlapGrid.rows);
+                        const columnWidth = 100 / overlapGrid.columns;
+                        const top = session.rowCount > 1 ? bandTop + slotRow * rowHeight : ((startMin - dayStartMin) / 60) * hourPx;
+                        const height = session.rowCount > 1 ? rowHeight - 4 : Math.max(34, ((endMin - startMin) / 60) * hourPx - 2);
+                        const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
+                        const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
                         return (
                           <div
@@ -682,8 +710,9 @@ export function SchedulePanel({ state }: { state: any }) {
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
-                              left: "4px",
-                              right: "4px",
+                              left,
+                              width,
+                              right: session.rowCount > 1 ? undefined : "4px",
                             }}
                             title={[
                               asString(session.group_name),
