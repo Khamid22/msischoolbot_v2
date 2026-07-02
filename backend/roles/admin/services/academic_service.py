@@ -228,6 +228,19 @@ def _normalize_lesson_status(value):
     raise ValueError("Unsupported lesson status.")
 
 
+_LESSON_TIME_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+
+
+def _parse_optional_lesson_time(value):
+    """Normalize an HH:MM string; empty string clears the time (returns None)."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if not _LESSON_TIME_RE.match(text):
+        raise ValueError("Lesson time must be in HH:MM format.")
+    return text.zfill(5)
+
+
 def get_group_gradebook(group_id):
     group_id = int(group_id or 0)
     if group_id <= 0:
@@ -682,6 +695,16 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
     should_update_date = raw_date is not None
     raw_status = payload.get("status", None)
     next_status = _normalize_lesson_status(raw_status) if raw_status is not None else None
+    raw_start_time = payload.get("start_time", None)
+    raw_end_time = payload.get("end_time", None)
+    should_update_times = raw_start_time is not None or raw_end_time is not None
+    next_start_time = _parse_optional_lesson_time(raw_start_time)
+    next_end_time = _parse_optional_lesson_time(raw_end_time)
+    if should_update_times:
+        if (next_start_time is None) != (next_end_time is None):
+            raise ValueError("Both start and end times are required (or both empty to clear).")
+        if next_start_time is not None and next_end_time <= next_start_time:
+            raise ValueError("End time must be after the start time.")
 
     with queries.connect_auth_db() as conn:
         row = conn.execute(
@@ -702,6 +725,8 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
             """
             UPDATE msi_v2.lesson_sessions
             SET session_date = CASE WHEN %s THEN %s ELSE session_date END,
+                start_time = CASE WHEN %s THEN %s::time ELSE start_time END,
+                end_time = CASE WHEN %s THEN %s::time ELSE end_time END,
                 status = COALESCE(NULLIF(%s, ''), status),
                 updated_at = now()
             WHERE id = %s
@@ -709,6 +734,10 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
             (
                 bool(should_update_date),
                 next_date,
+                bool(should_update_times),
+                next_start_time,
+                bool(should_update_times),
+                next_end_time,
                 next_status if next_status is not None else "",
                 lesson_session_id,
             ),
@@ -721,6 +750,8 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
         "lessonNumber": str(row["lesson_number"] or "Session"),
         "topic": str(row["topic"] or ""),
         "date": display_date,
+        "startTime": next_start_time or "",
+        "endTime": next_end_time or "",
         "status": next_status or str(row["status"] or "scheduled"),
     }
 

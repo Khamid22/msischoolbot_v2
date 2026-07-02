@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import type { FormEvent } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import type { DragEvent, FormEvent } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
@@ -7,10 +7,53 @@ import { asNumber, asString, normalizeSubjectKey } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, subjectCode, subjectColorClass, scheduleTimeForLesson, sameSubjectName, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, layoutSessionsForDay } from "./shared";
 
+// Fixed pixel height per hour keeps the grid readable at any range and makes
+// drag placement math exact. The grid scrolls vertically inside the card.
+const HOUR_PX = 64;
+const SNAP_MINUTES = 10;
+const DEFAULT_CLASS_MINUTES = 80;
+
+type BlockStatus = "scheduled" | "completed" | "cancelled";
+
+/** A class the admin placed on the grid this session (optimistic, PATCH-backed). */
+type PlacedBlock = {
+  id: number;
+  date: string; // ISO yyyy-mm-dd
+  start: string; // HH:MM
+  end: string; // HH:MM
+  group_id: number;
+  group_name: string;
+  subject_name: string;
+  teacher_name?: string;
+  lesson_number?: string;
+  lesson_topic?: string;
+  status: BlockStatus;
+};
+
+type DragPayload = {
+  id: number;
+  durationMin: number;
+  meta: Omit<PlacedBlock, "id" | "date" | "start" | "end">;
+};
+
+function minutesToLabel(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function normalizeBlockStatus(value: unknown): BlockStatus {
+  const normalized = asString(value).toLowerCase();
+  if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
+  if (["completed", "complete", "done", "accomplished"].includes(normalized)) return "completed";
+  return "scheduled";
+}
+
 export function SchedulePanel({ state }: { state: any }) {
   const props = state.props || {};
   const csrf: string = asString(props.csrfToken);
   const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
+  const canDrag = !isTeacherMode;
   const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
   const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
   const initialSchedules = Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : [];
@@ -19,6 +62,9 @@ export function SchedulePanel({ state }: { state: any }) {
   const [schedules, setSchedules] = useState<ScheduleRow[]>(initialSchedules as ScheduleRow[]);
   const [sessions, setSessions] = useState<SessionRow[]>(initialSessions as SessionRow[]);
   const [lessons, setLessons] = useState<LessonHistoryRow[]>(initialLessons as LessonHistoryRow[]);
+  const [placedBlocks, setPlacedBlocks] = useState<Record<number, PlacedBlock>>({});
+  const [dropHint, setDropHint] = useState<{ day: string; startMin: number; durationMin: number } | null>(null);
+  const dragPayloadRef = useRef<DragPayload | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -59,25 +105,38 @@ export function SchedulePanel({ state }: { state: any }) {
       })
       .sort((left: string, right: string) => left.localeCompare(right));
   }, [groups]);
+
+  // Any lesson session that already carries explicit times (server sessions or
+  // this session's drag placements) must not re-render from lesson history.
+  const timedSessionIds = useMemo(() => {
+    const ids = new Set<number>();
+    sessions.forEach((session) => ids.add(Number(session.id)));
+    Object.keys(placedBlocks).forEach((id) => ids.add(Number(id)));
+    return ids;
+  }, [sessions, placedBlocks]);
+
   const filteredSessions = useMemo(
     () =>
       sessions.filter((session) => {
-        if (!weekDateSet.has(asString(session.session_date))) return false;
+        if (placedBlocks[Number(session.id)]) return false;
+        const sessionIso = lessonDateToIso(asString(session.session_date)) || asString(session.session_date);
+        if (!weekDateSet.has(sessionIso)) return false;
         if (subjectFilter !== "all" && !sameSubjectName(session.subject_name, subjectFilter)) return false;
         return true;
       }),
-    [sessions, weekDateSet, subjectFilter],
+    [sessions, weekDateSet, subjectFilter, placedBlocks],
   );
   const recordedLessons = useMemo(
     () =>
       lessons.filter((lesson) => {
+        if (timedSessionIds.has(Number(lesson.id))) return false;
         const lessonDate = lessonDateToIso(lesson.lesson_date);
         if (!lessonDate || !weekDateSet.has(lessonDate)) return false;
         if (asString(lesson.lesson_number).startsWith("S")) return false;
         if (subjectFilter !== "all" && !sameSubjectName(lesson.subject_name, subjectFilter)) return false;
         return true;
       }),
-    [lessons, weekDateSet, subjectFilter],
+    [lessons, weekDateSet, subjectFilter, timedSessionIds],
   );
   const timedHistoryBlocks = useMemo(
     () =>
@@ -108,55 +167,163 @@ export function SchedulePanel({ state }: { state: any }) {
   );
   const scheduledBlocks = useMemo(
     () =>
-      filteredSessions.map((session): RawTimetableBlock => {
-        const normalizedStatus = asString(session.status).toLowerCase();
-        const status = normalizedStatus === "cancelled" || normalizedStatus === "canceled"
-          ? "cancelled"
-          : normalizedStatus === "completed" || normalizedStatus === "complete" || normalizedStatus === "done" || normalizedStatus === "accomplished"
-            ? "completed"
-            : "scheduled";
-        return {
-          id: `session-${session.id}`,
-          group_id: Number(session.group_id),
-          group_name: asString(session.group_name),
-          subject_name: asString(session.subject_name),
-          teacher_name: asString(session.teacher_name),
-          session_date: asString(session.session_date),
-          start_time: asString(session.start_time),
-          end_time: asString(session.end_time),
-          status,
-        };
-      }),
+      filteredSessions.map((session): RawTimetableBlock => ({
+        id: `session-${session.id}`,
+        group_id: Number(session.group_id),
+        group_name: asString(session.group_name),
+        subject_name: asString(session.subject_name),
+        teacher_name: asString(session.teacher_name),
+        session_date: lessonDateToIso(asString(session.session_date)) || asString(session.session_date),
+        start_time: asString(session.start_time),
+        end_time: asString(session.end_time),
+        status: normalizeBlockStatus(session.status),
+      })),
     [filteredSessions],
   );
-  const timetableBlocks = useMemo(
-    () => [...scheduledBlocks, ...timedHistoryBlocks],
-    [scheduledBlocks, timedHistoryBlocks],
+  const placedTimetableBlocks = useMemo(
+    () =>
+      Object.values(placedBlocks)
+        .filter((block) => weekDateSet.has(block.date))
+        .filter((block) => subjectFilter === "all" || sameSubjectName(block.subject_name, subjectFilter))
+        .map((block): RawTimetableBlock => ({
+          id: `session-${block.id}`,
+          group_id: block.group_id,
+          group_name: block.group_name,
+          subject_name: block.subject_name,
+          teacher_name: block.teacher_name,
+          lesson_number: block.lesson_number,
+          lesson_topic: block.lesson_topic,
+          session_date: block.date,
+          start_time: block.start,
+          end_time: block.end,
+          status: block.status,
+        })),
+    [placedBlocks, weekDateSet, subjectFilter],
   );
-  const completedLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "completed").length;
+  const timetableBlocks = useMemo(
+    () => [...scheduledBlocks, ...placedTimetableBlocks, ...timedHistoryBlocks],
+    [scheduledBlocks, placedTimetableBlocks, timedHistoryBlocks],
+  );
+  const completedLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "completed").length
+    + placedTimetableBlocks.filter((block) => block.status === "completed").length;
   const cancelledLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "cancelled").length
     + filteredSessions.filter((session) => ["cancelled", "canceled"].includes(asString(session.status).toLowerCase())).length;
   const activeSchedules = schedules.filter((schedule) => asString(schedule.status) !== "cancelled");
-  // Fit the visible hour range to the actual lessons so the grid isn't mostly empty.
-  const { displayStartHour, displayEndHour } = useMemo(() => {
-    let earliest = Infinity;
-    let latest = -Infinity;
-    for (const block of timetableBlocks) {
-      const start = timeToMinutes(asString(block.start_time));
-      const end = timeToMinutes(asString(block.end_time));
-      if (Number.isFinite(start)) earliest = Math.min(earliest, start);
-      if (Number.isFinite(end)) latest = Math.max(latest, end);
-    }
-    if (!Number.isFinite(earliest) || !Number.isFinite(latest)) {
-      return { displayStartHour: timetableStartHour, displayEndHour: 18 };
-    }
-    const startHour = Math.max(timetableStartHour, Math.floor(earliest / 60));
-    let endHour = Math.min(timetableEndHour, Math.ceil(latest / 60));
-    // Keep a sensible minimum span so a day with one short class still reads as a calendar.
-    if (endHour - startHour < 6) endHour = Math.min(timetableEndHour, startHour + 6);
-    return { displayStartHour: startHour, displayEndHour: endHour };
-  }, [timetableBlocks]);
+
+  // Full day range with a scrollable grid: nothing is compressed or hidden.
+  const displayStartHour = timetableStartHour;
+  const displayEndHour = timetableEndHour;
+  const dayStartMin = displayStartHour * 60;
+  const dayEndMin = displayEndHour * 60;
+  const gridHeightPx = (displayEndHour - displayStartHour) * HOUR_PX;
   const hours = Array.from({ length: displayEndHour - displayStartHour + 1 }, (_item, index) => displayStartHour + index);
+
+  function blockDragPayload(block: RawTimetableBlock): DragPayload {
+    const startMin = timeToMinutes(asString(block.start_time));
+    const endMin = timeToMinutes(asString(block.end_time));
+    const durationMin = Number.isFinite(startMin) && Number.isFinite(endMin) && endMin > startMin
+      ? endMin - startMin
+      : DEFAULT_CLASS_MINUTES;
+    const rawId = asString(block.id).replace(/^(session|lesson)-/, "");
+    return {
+      id: Number(rawId),
+      durationMin,
+      meta: {
+        group_id: block.group_id,
+        group_name: asString(block.group_name),
+        subject_name: asString(block.subject_name),
+        teacher_name: asString(block.teacher_name),
+        lesson_number: asString(block.lesson_number),
+        lesson_topic: asString(block.lesson_topic),
+        status: block.status,
+      },
+    };
+  }
+
+  function lessonDragPayload(lesson: LessonHistoryRow): DragPayload {
+    return {
+      id: Number(lesson.id),
+      durationMin: DEFAULT_CLASS_MINUTES,
+      meta: {
+        group_id: Number(lesson.group_id),
+        group_name: asString(lesson.group_name),
+        subject_name: asString(lesson.subject_name),
+        lesson_number: asString(lesson.lesson_number),
+        lesson_topic: asString(lesson.lesson_topic),
+        status: lessonStatus(lesson),
+      },
+    };
+  }
+
+  function startDrag(event: DragEvent, payload: DragPayload) {
+    dragPayloadRef.current = payload;
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox requires data for the drag to start.
+    event.dataTransfer.setData("text/plain", String(payload.id));
+  }
+
+  function endDrag() {
+    dragPayloadRef.current = null;
+    setDropHint(null);
+  }
+
+  function snappedStartMinutes(event: DragEvent<HTMLDivElement>, durationMin: number) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const offsetY = event.clientY - rect.top;
+    const rawMinutes = dayStartMin + (offsetY / HOUR_PX) * 60;
+    const snapped = Math.round(rawMinutes / SNAP_MINUTES) * SNAP_MINUTES;
+    return Math.max(dayStartMin, Math.min(snapped, dayEndMin - durationMin));
+  }
+
+  function handleColumnDragOver(event: DragEvent<HTMLDivElement>, dayIso: string) {
+    const payload = dragPayloadRef.current;
+    if (!payload) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const startMin = snappedStartMinutes(event, payload.durationMin);
+    setDropHint((current) =>
+      current && current.day === dayIso && current.startMin === startMin
+        ? current
+        : { day: dayIso, startMin, durationMin: payload.durationMin },
+    );
+  }
+
+  async function handleColumnDrop(event: DragEvent<HTMLDivElement>, dayIso: string) {
+    const payload = dragPayloadRef.current;
+    if (!payload) return;
+    event.preventDefault();
+    const startMin = snappedStartMinutes(event, payload.durationMin);
+    const start = minutesToLabel(startMin);
+    const end = minutesToLabel(startMin + payload.durationMin);
+    endDrag();
+    setError("");
+    setMessage("");
+
+    const previous = placedBlocks[payload.id];
+    const optimistic: PlacedBlock = { id: payload.id, date: dayIso, start, end, ...payload.meta };
+    setPlacedBlocks((current) => ({ ...current, [payload.id]: optimistic }));
+
+    try {
+      const response = await fetch(routes.adminAcademicLessonApi(payload.id), {
+        method: "PATCH",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify({ lesson_date: dayIso, start_time: start, end_time: end }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(asString(data.message) || "Could not move the class.");
+      }
+      setMessage(`${optimistic.group_name} placed on ${dayIso} at ${start}–${end}.`);
+    } catch (dropError) {
+      setPlacedBlocks((current) => {
+        const next = { ...current };
+        if (previous) next[payload.id] = previous;
+        else delete next[payload.id];
+        return next;
+      });
+      setError(dropError instanceof Error ? dropError.message : "Network error. Please try again.");
+    }
+  }
 
   function updateField(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -215,7 +382,7 @@ export function SchedulePanel({ state }: { state: any }) {
     <>
       <ChartCard
         title={isTeacherMode ? "Timetable" : "Academic Timetable"}
-        subtitle={`${filteredSessions.length} upcoming sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
+        subtitle={`${filteredSessions.length + placedTimetableBlocks.length} timed sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
         icon={<CalendarDays className="h-4 w-4 text-info" />}
         headerActions={
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -269,6 +436,11 @@ export function SchedulePanel({ state }: { state: any }) {
             {message}
           </p>
         ) : null}
+        {error ? (
+          <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+            {error}
+          </p>
+        ) : null}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-bold">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -283,6 +455,11 @@ export function SchedulePanel({ state }: { state: any }) {
             ))}
           </Select>
         </div>
+        {canDrag ? (
+          <p className="mb-2 text-[11px] font-semibold text-muted-foreground">
+            Drag any class card — including the unscheduled ones in the All-day row — onto the grid to set its day and time.
+          </p>
+        ) : null}
 
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
           <div className="min-w-[880px]">
@@ -304,37 +481,35 @@ export function SchedulePanel({ state }: { state: any }) {
                 const dayLessons = untimedLessons.filter((lesson) => lessonDateToIso(lesson.lesson_date) === dayIso);
                 const completedCount = dayLessons.filter((lesson) => lessonStatus(lesson) === "completed").length;
                 const cancelledCount = dayLessons.filter((lesson) => lessonStatus(lesson) === "cancelled").length;
-                const subjectCounts = dayLessons.reduce<Record<string, number>>((acc, lesson) => {
-                  const code = subjectCode(lesson.subject_name);
-                  acc[code] = (acc[code] || 0) + 1;
-                  return acc;
-                }, {});
                 return (
                   <div key={`${dayIso}-classes`} className="min-h-[58px] border-l border-foreground/10 p-1.5">
                     {dayLessons.length === 0 ? (
                       <p className="pt-3 text-center text-[10px] font-semibold text-muted-foreground/40">—</p>
                     ) : (
-                      <div
-                        className="space-y-1"
-                        title={dayLessons
-                          .slice(0, 12)
-                          .map((lesson) => `${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`)
-                          .join("\n")}
-                      >
-                        {completedCount ? (
-                          <div className="rounded-md border border-emerald-500/20 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-800">
-                            {completedCount} completed
-                          </div>
-                        ) : null}
-                        {cancelledCount ? (
-                          <div className="rounded-md border border-red-500/20 bg-red-50 px-2 py-1 text-[10px] font-bold text-red-800">
-                            {cancelledCount} cancelled
-                          </div>
-                        ) : null}
+                      <div className="space-y-1">
                         <div className="flex flex-wrap gap-1">
-                          {Object.entries(subjectCounts).slice(0, 3).map(([code, count]) => (
-                            <span key={code} className="rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-foreground/60">
-                              {code} {count}
+                          {completedCount ? (
+                            <span className="rounded-md border border-emerald-500/20 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                              {completedCount} completed
+                            </span>
+                          ) : null}
+                          {cancelledCount ? (
+                            <span className="rounded-md border border-red-500/20 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
+                              {cancelledCount} cancelled
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="miniapp-scroll flex max-h-16 flex-wrap content-start gap-1 overflow-y-auto">
+                          {dayLessons.map((lesson) => (
+                            <span
+                              key={`chip-${lesson.id}`}
+                              draggable={canDrag}
+                              onDragStart={canDrag ? (event) => startDrag(event, lessonDragPayload(lesson)) : undefined}
+                              onDragEnd={canDrag ? endDrag : undefined}
+                              title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}${canDrag ? "\nDrag onto the grid to set a time." : ""}`}
+                              className={`rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-foreground/70 shadow-sm ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            >
+                              {asString(lesson.group_name)} · {subjectCode(lesson.subject_name)}
                             </span>
                           ))}
                         </div>
@@ -344,77 +519,102 @@ export function SchedulePanel({ state }: { state: any }) {
                 );
               })}
             </div>
-            <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]">
-              <div className="relative h-[min(720px,calc(var(--tg-app-height)-9rem))] min-h-[34rem] border-r border-foreground/10 bg-muted/20">
-                {hours.map((hour) => (
-                  <div
-                    key={hour}
-                    className="absolute left-0 right-0 border-t border-foreground/8 px-2 pt-1 text-right text-[11px] font-semibold text-muted-foreground"
-                    style={{
-                      top: `${((hour - displayStartHour) / (displayEndHour - displayStartHour)) * 100}%`,
-                      // Pull the final label above the bottom edge so it isn't clipped.
-                      transform: hour === displayEndHour ? "translateY(-100%)" : undefined,
-                    }}
-                  >
-                    {String(hour).padStart(2, "0")}:00
-                  </div>
-                ))}
-              </div>
-              {weekDays.map((day) => {
-                const dayIso = isoDate(day);
-                const daySessions = layoutSessionsForDay(timetableBlocks.filter((session) => asString(session.session_date) === dayIso));
-                return (
-                  <div key={dayIso} className="relative h-[min(720px,calc(var(--tg-app-height)-9rem))] min-h-[34rem] border-l border-foreground/10">
-                    {hours.map((hour) => (
-                      <div
-                        key={`${dayIso}-${hour}`}
-                        className="absolute left-0 right-0 border-t border-foreground/8"
-                        style={{ top: `${((hour - displayStartHour) / (displayEndHour - displayStartHour)) * 100}%` }}
-                      />
-                    ))}
-                    {daySessions.map((session) => {
-                      const spanMinutes = (displayEndHour - displayStartHour) * 60;
-                      // Overlapping classes share a band and stack as full-width rows.
-                      const bandTop = ((session.bandStartMin - displayStartHour * 60) / spanMinutes) * 100;
-                      const bandHeight = ((session.bandEndMin - session.bandStartMin) / spanMinutes) * 100;
-                      const rowHeight = bandHeight / Math.max(1, session.rowCount);
-                      const top = bandTop + session.row * rowHeight;
-                      // Keep a readable floor for single blocks; stacked rows use their share of the band.
-                      const height = session.rowCount > 1 ? rowHeight : Math.max(7, rowHeight);
-                      const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
-                      return (
+            <div className="miniapp-scroll max-h-[min(640px,calc(var(--tg-app-height)-16rem))] overflow-y-auto">
+              <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]">
+                <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: `${gridHeightPx}px` }}>
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="absolute left-0 right-0 border-t border-foreground/8 px-2 pt-1 text-right text-[11px] font-semibold text-muted-foreground"
+                      style={{
+                        top: `${(hour - displayStartHour) * HOUR_PX}px`,
+                        // Pull the final label above the bottom edge so it isn't clipped.
+                        transform: hour === displayEndHour ? "translateY(-100%)" : undefined,
+                      }}
+                    >
+                      {String(hour).padStart(2, "0")}:00
+                    </div>
+                  ))}
+                </div>
+                {weekDays.map((day) => {
+                  const dayIso = isoDate(day);
+                  const daySessions = layoutSessionsForDay(timetableBlocks.filter((session) => asString(session.session_date) === dayIso));
+                  const hint = dropHint && dropHint.day === dayIso ? dropHint : null;
+                  return (
+                    <div
+                      key={dayIso}
+                      className="relative border-l border-foreground/10"
+                      style={{ height: `${gridHeightPx}px` }}
+                      onDragOver={canDrag ? (event) => handleColumnDragOver(event, dayIso) : undefined}
+                      onDragLeave={canDrag ? () => setDropHint((current) => (current?.day === dayIso ? null : current)) : undefined}
+                      onDrop={canDrag ? (event) => handleColumnDrop(event, dayIso) : undefined}
+                    >
+                      {hours.map((hour) => (
                         <div
-                          key={session.id}
-                          className={`absolute overflow-hidden rounded-lg border p-2 text-xs shadow-card ${subjectColorClass(session.subject_name, session.status)}`}
-                          style={{
-                            top: `${Math.max(0, top)}%`,
-                            height: `calc(${Math.max(0, height)}% - 2px)`,
-                            left: "4px",
-                            right: "4px",
-                          }}
-                          title={[
-                            asString(session.group_name),
-                            asString(session.subject_name),
-                            formatSessionTime(asString(session.start_time), asString(session.end_time)),
-                            asString(session.lesson_number),
-                            asString(session.lesson_topic),
-                            asString(session.teacher_name),
-                          ].filter(Boolean).join(" · ")}
-                        >
-                          <div className="flex min-w-0 items-start justify-between gap-1">
-                            <p className="truncate font-bold leading-tight">{asString(session.group_name)}</p>
-                            <span className="shrink-0 rounded bg-white/80 px-1 text-[9px] font-bold text-foreground/55">
-                              {subjectCode(session.subject_name)}
-                            </span>
+                          key={`${dayIso}-${hour}`}
+                          className="absolute left-0 right-0 border-t border-foreground/8"
+                          style={{ top: `${(hour - displayStartHour) * HOUR_PX}px` }}
+                        />
+                      ))}
+                      {daySessions.map((session) => {
+                        const startMin = timeToMinutes(asString(session.start_time));
+                        const endMin = timeToMinutes(asString(session.end_time));
+                        const top = ((startMin - dayStartMin) / 60) * HOUR_PX;
+                        const height = Math.max(26, ((endMin - startMin) / 60) * HOUR_PX);
+                        // Overlapping classes sit side by side within the shared band.
+                        const laneWidth = 100 / Math.max(1, session.rowCount);
+                        const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
+                        return (
+                          <div
+                            key={session.id}
+                            draggable={canDrag}
+                            onDragStart={canDrag ? (event) => startDrag(event, blockDragPayload(session)) : undefined}
+                            onDragEnd={canDrag ? endDrag : undefined}
+                            className={`absolute overflow-hidden rounded-lg border p-2 text-xs shadow-card ${subjectColorClass(session.subject_name, session.status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            style={{
+                              top: `${Math.max(0, top)}px`,
+                              height: `${height - 2}px`,
+                              left: `calc(${session.row * laneWidth}% + 4px)`,
+                              width: `calc(${laneWidth}% - 8px)`,
+                            }}
+                            title={[
+                              asString(session.group_name),
+                              asString(session.subject_name),
+                              formatSessionTime(asString(session.start_time), asString(session.end_time)),
+                              asString(session.lesson_number),
+                              asString(session.lesson_topic),
+                              asString(session.teacher_name),
+                              canDrag ? "Drag to reschedule." : "",
+                            ].filter(Boolean).join(" · ")}
+                          >
+                            <div className="flex min-w-0 items-start justify-between gap-1">
+                              <p className="truncate font-bold leading-tight">{asString(session.group_name)}</p>
+                              <span className="shrink-0 rounded bg-white/80 px-1 text-[9px] font-bold text-foreground/55">
+                                {subjectCode(session.subject_name)}
+                              </span>
+                            </div>
+                            <p className="truncate text-[11px] font-semibold opacity-90">{formatSessionTime(asString(session.start_time), asString(session.end_time))}</p>
+                            <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-80">{toneLabel}</p>
                           </div>
-                          <p className="truncate text-[11px] font-semibold opacity-90">{formatSessionTime(asString(session.start_time), asString(session.end_time))}</p>
-                          <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-80">{toneLabel}</p>
+                        );
+                      })}
+                      {hint ? (
+                        <div
+                          className="pointer-events-none absolute left-1 right-1 z-10 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 px-2 py-1"
+                          style={{
+                            top: `${((hint.startMin - dayStartMin) / 60) * HOUR_PX}px`,
+                            height: `${(hint.durationMin / 60) * HOUR_PX - 2}px`,
+                          }}
+                        >
+                          <p className="text-[10px] font-bold text-primary">
+                            {minutesToLabel(hint.startMin)}–{minutesToLabel(hint.startMin + hint.durationMin)}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

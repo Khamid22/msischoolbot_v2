@@ -407,7 +407,9 @@ def list_academic_admin_rows():
                 JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
                 JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
                 LEFT JOIN msi_v2.teachers t ON t.id = ls.teacher_id
-                WHERE ls.schedule_rule_id IS NOT NULL AND lower(g.group_name) <> 'online'
+                WHERE (ls.schedule_rule_id IS NOT NULL
+                       OR (ls.start_time IS NOT NULL AND ls.end_time IS NOT NULL))
+                  AND lower(g.group_name) <> 'online'
                 ORDER BY ls.session_date, ls.start_time, s.school_name, g.group_name
                 """
             ).fetchall()
