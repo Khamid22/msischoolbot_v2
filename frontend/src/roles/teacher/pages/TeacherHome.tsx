@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { LogOut, Users, ClipboardList, CalendarDays, Clock, Plus, Trash, Check, X, AlertCircle } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
+import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
 
 // Read-only teacher workspace. All data is server-rendered (scoped to this
 // teacher's assigned group); there are no edit controls or API calls here.
@@ -195,7 +196,7 @@ export default function TeacherHome(props: TeacherPageProps) {
   const fetchAvailabilities = async () => {
     try {
       const res = await fetch("/teacher/api/office-hours/availability", {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -209,7 +210,7 @@ export default function TeacherHome(props: TeacherPageProps) {
   const fetchBookings = async () => {
     try {
       const res = await fetch("/teacher/api/office-hours/bookings", {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -239,10 +240,7 @@ export default function TeacherHome(props: TeacherPageProps) {
     try {
       const res = await fetch("/teacher/api/office-hours/availability", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           subject_id: newSubjectId ? Number(newSubjectId) : null,
           planned_topic: newPlannedTopic,
@@ -279,10 +277,7 @@ export default function TeacherHome(props: TeacherPageProps) {
     try {
       const res = await fetch(`/teacher/api/office-hours/availability/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           status: "cancelled",
           csrf_token: props.csrfToken || ""
@@ -301,10 +296,7 @@ export default function TeacherHome(props: TeacherPageProps) {
     try {
       const res = await fetch(`/teacher/api/office-hours/bookings/${bookingId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           status,
           csrf_token: props.csrfToken || ""

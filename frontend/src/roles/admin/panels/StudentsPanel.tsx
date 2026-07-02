@@ -5,6 +5,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { Pagination } from "@/shared/ui/Pagination";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
+import { jsonCsrfHeaders } from "@/shared/lib/api";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
 const STUDENTS_PAGE_SIZE = 10;
@@ -55,11 +56,7 @@ function AddStudentModal({
     try {
       const res = await fetch(routes.adminStudentsApi, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ full_name: fullName.trim(), group_id: Number(groupId) }),
       });
       const json = await res.json();

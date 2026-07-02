@@ -5,6 +5,7 @@ import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
 import { FormAlert } from "@/shared/ui/PortalCard";
 import { asNumber, getStudentCode, getStudentRowId } from "../shared";
+import { jsonCsrfHeaders } from "@/shared/lib/api";
 
 interface StudentProfile {
   id: number;
@@ -116,11 +117,7 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
       const response = await fetch(props.parentInviteApiUrl, {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": props.csrfToken || "",
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers: jsonCsrfHeaders(props.csrfToken || ""),
         body: JSON.stringify({}),
       });
       const json = await response.json().catch(() => ({}));

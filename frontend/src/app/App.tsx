@@ -125,7 +125,7 @@ const App = () => {
       <Suspense
         fallback={
           <div className="flex min-h-[var(--tg-viewport-height)] items-center justify-center bg-background px-4">
-            <div className="rounded-lg bg-surface px-4 py-3 text-sm font-semibold text-muted-foreground shadow-card">
+            <div className="animate-pulse rounded-lg bg-surface px-4 py-3 text-sm font-semibold text-muted-foreground shadow-card motion-reduce:animate-none">
               Loading...
             </div>
           </div>

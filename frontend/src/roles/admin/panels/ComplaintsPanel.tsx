@@ -23,6 +23,7 @@ import {
   statusLabel,
   type ThreadMessage,
 } from "./complaintFormat";
+import { jsonCsrfHeaders } from "@/shared/lib/api";
 
 // Filter options for the helpdesk queue. "all" / "open" are virtual: "open"
 // keeps every ticket that still needs work (anything not resolved), the rest map
@@ -296,11 +297,7 @@ export default function ComplaintsPanel({ state }: { state: any }) {
     try {
       const response = await fetch(url, {
         method: url.endsWith("/replies") ? "POST" : "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify(payload),
       });
       const json = await response.json().catch(() => ({}));

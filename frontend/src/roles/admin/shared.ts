@@ -189,17 +189,7 @@ export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher"
 
 export function normalizeAdminMode(value: unknown): AdminMode {
   const normalized = asString(value).toLowerCase();
-  if (
-    normalized === "ceo" ||
-    normalized === "hr" ||
-    normalized === "sales" ||
-    normalized === "teacher" ||
-    normalized === "student" ||
-    normalized === "academic_director"
-  ) {
-    return normalized;
-  }
-  return "admin";
+  return normalized in adminModeProfiles ? (normalized as AdminMode) : "admin";
 }
 
 export function tabsForAdminMode(mode: AdminMode) {
@@ -545,38 +535,11 @@ export function buildUploadProgressUrl(uploadId: string, afterSeq = 0) {
   return `/admin/api/resource-upload-progress/${encodeURIComponent(uploadId)}?${params.toString()}`;
 }
 
+const adminTabKeys = new Set<string>(tabs.map((tab) => tab.key));
+
 export function normalizeAdminTab(value: unknown): AdminTab {
   const normalized = asString(value).toLowerCase();
-  if (
-    normalized === "students" ||
-    normalized === "parents" ||
-    normalized === "teachers" ||
-    normalized === "subjects" ||
-    normalized === "groups" ||
-    normalized === "schedule" ||
-    normalized === "announcements" ||
-    normalized === "resources" ||
-    normalized === "payments" ||
-    normalized === "complaints" ||
-    normalized === "career_growth" ||
-    normalized === "candidates" ||
-    normalized === "contact" ||
-    normalized === "chat" ||
-    normalized === "student_dashboard" ||
-    normalized === "student_profile" ||
-    normalized === "student_resources" ||
-    normalized === "student_chat" ||
-    normalized === "student_rating" ||
-    normalized === "student_aap" ||
-    normalized === "student_ar" ||
-    normalized === "student_office_hours" ||
-    normalized === "curriculum" ||
-    normalized === "gradebook" ||
-    normalized === "office_hours"
-  ) {
-    return normalized;
-  }
-  return "overview";
+  return adminTabKeys.has(normalized) ? (normalized as AdminTab) : "overview";
 }
 
 export function buildAdminTabUrl(tab: AdminTab, school: string) {

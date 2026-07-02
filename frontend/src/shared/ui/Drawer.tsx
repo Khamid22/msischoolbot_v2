@@ -66,7 +66,7 @@ export function Drawer({
         type="button"
         aria-label="Close panel"
         onClick={onClose}
-        className="absolute inset-0 h-full w-full cursor-default bg-foreground/50 backdrop-blur-[1px]"
+        className="absolute inset-0 h-full w-full cursor-default bg-foreground/50 backdrop-blur-[1px] animate-in fade-in duration-200 motion-reduce:animate-none"
       />
       <div
         ref={panelRef}

@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode } from "react";
 import { Activity, BookOpen, CreditCard, GraduationCap, LogOut, TrendingUp, UserRound } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
+import { csrfHeaders } from "@/shared/lib/api";
 
 function asArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
@@ -182,10 +183,7 @@ export default function ParentHome(props: Record<string, unknown>) {
     }
     await fetch(logoutUrl, {
       method: "POST",
-      headers: {
-        "X-CSRFToken": csrfToken,
-        "X-Requested-With": "XMLHttpRequest",
-      },
+      headers: csrfHeaders(csrfToken),
       credentials: "same-origin",
     }).catch(() => {});
     window.location.href = "/?logged_out=1";

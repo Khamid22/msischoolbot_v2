@@ -21,6 +21,7 @@ import { ParentToolbar } from "./parents/ParentToolbar";
 import { ParentTable } from "./parents/ParentTable";
 import { ParentDrawer } from "./parents/ParentDrawer";
 import { LinkStudentModal } from "./parents/LinkStudentModal";
+import { jsonCsrfHeaders } from "@/shared/lib/api";
 
 type Banner = { kind: "error" | "success"; text: string } | null;
 
@@ -121,11 +122,7 @@ export default function ParentsPanel({ state }: { state: any }) {
   async function request(method: string, url: string, body?: unknown) {
     const response = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrf,
-        "X-Requested-With": "XMLHttpRequest",
-      },
+      headers: jsonCsrfHeaders(csrf),
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     const json = await response.json().catch(() => ({}));

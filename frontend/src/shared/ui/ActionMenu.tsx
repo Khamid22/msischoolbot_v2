@@ -117,8 +117,8 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
               close();
             }
           }}
-          className={`absolute z-50 mt-1 w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover ${
-            align === "right" ? "right-0" : "left-0"
+          className={`absolute z-50 mt-1 w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-100 motion-reduce:animate-none ${
+            align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left"
           }`}
         >
           {items.map((item, index) => {

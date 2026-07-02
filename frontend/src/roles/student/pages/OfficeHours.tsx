@@ -3,6 +3,7 @@ import { Calendar, Clock, MapPin, User, ChevronDown, Check, X, AlertCircle, Plus
 import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
+import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
 
 type SubjectOption = {
   id: number;
@@ -117,7 +118,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       }
 
       const res = await fetch(`/api/office-hours/availability?${params.toString()}`, {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -131,7 +132,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
   const fetchMyBookings = async () => {
     try {
       const res = await fetch("/api/office-hours/bookings", {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -153,10 +154,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
     try {
       const res = await fetch("/api/office-hours/bookings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           availability_id: bookingSlot.id,
           student_topic_request: studentTopicRequest,
@@ -188,10 +186,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
     try {
       const res = await fetch(`/api/office-hours/bookings/${bookingId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           status: "cancelled",
           csrf_token: props.csrfToken || ""

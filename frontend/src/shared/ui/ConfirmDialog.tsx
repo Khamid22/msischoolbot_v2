@@ -58,7 +58,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4 animate-in fade-in duration-150 motion-reduce:animate-none"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby={headingId}
@@ -70,7 +70,7 @@ export function ConfirmDialog({
         onClick={() => !busy && onCancel()}
         className="absolute inset-0 h-full w-full cursor-default"
       />
-      <div className="relative w-full max-w-sm overflow-hidden rounded-xl bg-surface shadow-card-hover">
+      <div className="relative w-full max-w-sm overflow-hidden rounded-xl bg-surface shadow-card-hover animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none">
         <div className="flex items-start gap-3 px-5 pt-5">
           {danger ? (
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">

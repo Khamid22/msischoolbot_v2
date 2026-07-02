@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { CalendarDays, Clock, Plus, Trash, Check, X, Users, AlertCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
 
 type Availability = {
   id: number;
@@ -131,7 +132,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
   const fetchData = async () => {
     try {
       const res = await fetch("/admin/api/office-hours/availability", {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -153,7 +154,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
   const fetchBookingsForSlot = async (slotId: number) => {
     try {
       const res = await fetch(`/admin/api/office-hours/bookings?availability_id=${slotId}`, {
-        headers: { "X-Requested-With": "XMLHttpRequest" }
+        headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
@@ -184,10 +185,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
     try {
       const res = await fetch("/admin/api/office-hours/availability", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           teacher_id: Number(newTeacherId),
           subject_id: Number(newSubjectId),
@@ -226,10 +224,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
     try {
       const res = await fetch(`/admin/api/office-hours/availability/${id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           status: "cancelled",
           csrf_token: csrfToken
@@ -250,10 +245,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
     try {
       const res = await fetch(`/admin/api/office-hours/bookings/${bookingId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest"
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           status,
           csrf_token: csrfToken

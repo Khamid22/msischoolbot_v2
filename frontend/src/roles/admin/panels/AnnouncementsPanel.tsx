@@ -16,6 +16,7 @@ import {
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../shared";
+import { jsonCsrfHeaders, csrfHeaders } from "@/shared/lib/api";
 
 type Audience =
   | "all"
@@ -286,11 +287,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
         editing ? routes.adminAnnouncementApi(editing.id) : routes.adminAnnouncementsApi,
         {
           method: editing ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrf,
-            "X-Requested-With": "XMLHttpRequest",
-          },
+          headers: jsonCsrfHeaders(csrf),
           body: JSON.stringify({
             title: form.title,
             body: form.body,
@@ -323,11 +320,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   async function patchItem(item: Announcement, values: Partial<Announcement>) {
     const res = await fetch(routes.adminAnnouncementApi(item.id), {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": csrf,
-        "X-Requested-With": "XMLHttpRequest",
-      },
+      headers: jsonCsrfHeaders(csrf),
       body: JSON.stringify({ ...item, ...values }),
     });
     const json = await res.json();
@@ -340,10 +333,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
     if (!window.confirm(`Delete "${item.title}"?`)) return;
     const res = await fetch(routes.adminAnnouncementApi(item.id), {
       method: "DELETE",
-      headers: {
-        "X-CSRFToken": csrf,
-        "X-Requested-With": "XMLHttpRequest",
-      },
+      headers: csrfHeaders(csrf),
     });
     if (res.ok) {
       setItems((prev) => prev.filter((entry) => entry.id !== item.id));

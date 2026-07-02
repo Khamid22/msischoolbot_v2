@@ -26,6 +26,7 @@ import {
   tabsForAdminMode,
   trimEmptyMonthlyMonths,
 } from "../shared";
+import { XHR_HEADERS } from "@/shared/lib/api";
 
 function preferredSchoolCode(schoolCodes: string[]) {
   if (schoolCodes.includes("sehriyo")) {
@@ -258,7 +259,7 @@ export function useAdminState(props: AdminPageProps) {
       const res = await fetch(
         buildUploadProgressUrl(uploadId, resourceUploadLastSeqRef.current),
         {
-          headers: { "X-Requested-With": "XMLHttpRequest" },
+          headers: XHR_HEADERS,
           cache: "no-store",
         }
       );
@@ -715,7 +716,7 @@ export function useAdminState(props: AdminPageProps) {
       if (thumbnailFile) formData.set("thumbnail_file", thumbnailFile);
       const res = await fetch(routes.adminResourceEdit(editingResource.id), {
         method: "POST",
-        headers: { "X-Requested-With": "XMLHttpRequest" },
+        headers: XHR_HEADERS,
         body: formData,
       });
       const data = await res.json();

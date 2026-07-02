@@ -3,6 +3,7 @@ import { CreditCard, Plus, Search, UserRound, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
+import { XHR_HEADERS, jsonCsrfHeaders } from "@/shared/lib/api";
 
 type PaymentRow = Record<string, unknown>;
 type FamilyTotals = {
@@ -294,7 +295,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
     try {
       const response = await fetch(routes.adminStudentPaymentsApi(childId), {
         cache: "no-store",
-        headers: { "X-Requested-With": "XMLHttpRequest" },
+        headers: XHR_HEADERS,
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.ok) {
@@ -341,11 +342,7 @@ export default function PaymentsPanel({ state }: { state: any }) {
     try {
       const response = await fetch(routes.adminStudentPaymentsApi(childId), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": csrf,
-          "X-Requested-With": "XMLHttpRequest",
-        },
+        headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
           subject: form.subject,
           currency: form.currency,
