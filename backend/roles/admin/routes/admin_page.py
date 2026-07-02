@@ -180,6 +180,7 @@ def register_admin_page_routes(
     register_academic_admin_routes(
         admin_routes,
         render_admin_page=render_admin_page,
+        clear_group_cache=clear_group_cache,
     )
     register_announcement_admin_routes(admin_routes)
 

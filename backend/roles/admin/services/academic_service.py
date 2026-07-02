@@ -39,6 +39,60 @@ def create_group_from_payload(payload):
     return {"school_code": school_code}
 
 
+def delete_group(group_id):
+    group_id = int(group_id or 0)
+    if group_id <= 0:
+        raise ValueError("group_id is required.")
+
+    with queries.connect_auth_db() as conn:
+        group_row = conn.execute(
+            """
+            SELECT g.id, coalesce(g.legacy_group_id, g.id) AS public_id,
+                   g.group_name, g.group_code, s.school_key, subj.subject_name
+            FROM msi_v2.groups g
+            JOIN msi_v2.schools s ON s.id = g.school_id
+            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+            WHERE """ + _legacy_or_v2_group_where() + """
+            """,
+            (group_id, group_id),
+        ).fetchone()
+        if not group_row:
+            return None
+
+        group_name = str(group_row["group_name"] or "").strip()
+        if group_name.casefold() == "online":
+            raise ValueError("The Online group cannot be deleted.")
+
+        v2_group_id = int(group_row["id"])
+        counts = {}
+        for key, table in (
+            ("enrollments", "group_students"),
+            ("schedules", "group_schedule_rules"),
+            ("lessons", "lesson_sessions"),
+            ("attendance", "attendance_records"),
+            ("homework", "homework_scores"),
+            ("exams", "exam_results"),
+        ):
+            row = conn.execute(
+                f"SELECT count(*) AS total FROM msi_v2.{table} WHERE group_id = %s",
+                (v2_group_id,),
+            ).fetchone()
+            counts[key] = int(row["total"] or 0) if row else 0
+
+        conn.execute("DELETE FROM msi_v2.groups WHERE id = %s", (v2_group_id,))
+        conn.commit()
+
+    return {
+        "id": int(group_row["public_id"]),
+        "name": group_name,
+        "code": str(group_row["group_code"] or "").strip(),
+        "school_code": str(group_row["school_key"] or "").strip(),
+        "subject_name": str(group_row["subject_name"] or "").strip(),
+        "deleted": counts,
+    }
+
+
 def create_school_from_payload(payload):
     name = str(payload.get("school_name", "") or "").strip()
     code = str(payload.get("school_code", "") or "").strip()

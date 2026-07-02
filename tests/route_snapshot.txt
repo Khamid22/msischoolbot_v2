@@ -9,6 +9,7 @@
 /admin/api/academic/enrollments/{enrollment_id}/status | PATCH
 /admin/api/academic/exams | POST
 /admin/api/academic/gradebook | GET
+/admin/api/academic/groups/{group_id} | DELETE
 /admin/api/academic/homework | POST
 /admin/api/academic/schedules | POST
 /admin/api/announcements | GET

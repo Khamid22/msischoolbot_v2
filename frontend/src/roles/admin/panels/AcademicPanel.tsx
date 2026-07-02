@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Users, X } from "lucide-react";
+import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Trash2, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
+import { csrfHeaders } from "@/shared/lib/api";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, compareSubjectsByPreferredOrder, programInitials, Lesson } from "./academic/shared";
 import { GroupGradebook } from "./academic/GroupGradebook";
@@ -12,7 +13,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
   const schools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
   const subjects = Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [];
-  const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
+  const initialGroups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
   const curriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
     ? props.adminAcademicCurriculumPrograms
     : [];
@@ -31,6 +32,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [groupSchool, setGroupSchool] = useState<string>("all");
   const [groupSubject, setGroupSubject] = useState("all");
   const [groupFiltersOpen, setGroupFiltersOpen] = useState(false);
+  const [groupRowsOverride, setGroupRowsOverride] = useState<Array<Record<string, unknown>> | null>(null);
+  const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
+  const [groupDeleteError, setGroupDeleteError] = useState("");
+  const groups = groupRowsOverride ?? initialGroups;
 
   const schoolNameByCode = useMemo(() => {
     const result = new Map<string, string>();
@@ -139,6 +144,49 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     (groupSchool !== "all" ? 1 : 0) +
     (groupSubject !== "all" ? 1 : 0) +
     (groupSearch.trim() ? 1 : 0);
+
+  async function deleteGroup(group: Record<string, unknown>) {
+    if (isTeacherMode || deletingGroupId !== null) return;
+    const id = asNumber(group.id);
+    const name = asString(group.name) || "this group";
+    if (!id) return;
+
+    const studentsCount = asNumber(group.students_count);
+    const disqualifiedCount = asNumber(group.disqualified_count);
+    const enrollmentSummary = studentsCount + disqualifiedCount > 0
+      ? ` This will remove ${studentsCount} active and ${disqualifiedCount} disqualified enrollment(s) from the group.`
+      : "";
+    const confirmed = window.confirm(
+      `Delete ${name}? This removes the group, schedule, lessons, attendance, homework, exam records, and group enrollments. Student accounts stay in the system.${enrollmentSummary}`,
+    );
+    if (!confirmed) return;
+
+    setDeletingGroupId(id);
+    setGroupDeleteError("");
+    try {
+      const response = await fetch(routes.adminAcademicGroupApi(id), {
+        method: "DELETE",
+        headers: csrfHeaders(csrf),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.ok) {
+        setGroupDeleteError(asString(json.message) || "Unable to delete group.");
+        return;
+      }
+      if (Array.isArray(json.groups)) {
+        setGroupRowsOverride(json.groups);
+      } else {
+        setGroupRowsOverride((current) =>
+          (current ?? groups).filter((row: Record<string, unknown>) => asNumber(row.id) !== id),
+        );
+      }
+      if (openGroupId === id) setOpenGroupId(null);
+    } catch {
+      setGroupDeleteError("Network error while deleting the group.");
+    } finally {
+      setDeletingGroupId(null);
+    }
+  }
 
   const activeProgram =
     curriculumPrograms.find((program: Record<string, unknown>) => asNumber(program.id) === openProgramId) ||
@@ -669,6 +717,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               ) : null}
 
               <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-2">
+                {groupDeleteError ? (
+                  <div className="mb-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+                    {groupDeleteError}
+                  </div>
+                ) : null}
                 {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
@@ -706,13 +759,17 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                               const disqualifiedCount = asNumber(group.disqualified_count);
                               const isActive = studentsCount > 0;
                               const swatch = programColor(subjectName);
+                              const isDeleting = deletingGroupId === id;
                               return (
-                                <button
+                                <div
                                   key={id}
-                                  type="button"
-                                  onClick={() => setOpenGroupId(id)}
-                                  className="group flex flex-col rounded-xl border border-foreground/10 bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                                  className="group relative rounded-xl border border-foreground/10 bg-surface shadow-card transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover"
                                 >
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenGroupId(id)}
+                                    className="flex w-full flex-col p-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                                  >
                                   <div className="flex items-start gap-3">
                                     <span
                                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${swatch}`}
@@ -720,7 +777,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                                     >
                                       {programInitials(subjectName)}
                                     </span>
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 pr-8">
                                       <p className="truncate text-sm font-bold leading-tight">{name}</p>
                                       <p className="truncate text-[11px] text-muted-foreground">
                                         {groupSchool === "all" ? schoolName : asString(group.code) || schoolCode}
@@ -752,7 +809,20 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                                       {isActive ? "Active" : "Empty"}
                                     </span>
                                   </div>
-                                </button>
+                                  </button>
+                                  {!isTeacherMode ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteGroup(group)}
+                                      disabled={isDeleting}
+                                      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-destructive/20 bg-surface text-destructive shadow-sm transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/25 disabled:cursor-not-allowed disabled:opacity-50"
+                                      aria-label={`Delete ${name}`}
+                                      title={`Delete ${name}`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  ) : null}
+                                </div>
                               );
                             })}
                           </div>
@@ -770,4 +840,3 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     </div>
   );
 }
-

@@ -8,6 +8,7 @@ from backend.roles.admin.services.academic_service import (
     create_group_from_payload,
     create_schedule_from_payload,
     create_school_from_payload,
+    delete_group,
     get_group_gradebook,
     list_admin_academic_context,
     record_attendance_from_payload,
@@ -23,6 +24,7 @@ def register_academic_admin_routes(
     admin_blueprint,
     *,
     render_admin_page,
+    clear_group_cache=lambda: None,
 ):
     @admin_blueprint.post("/admin/academic/subjects")
     def admin_create_academic_subject():
@@ -76,6 +78,30 @@ def register_academic_admin_routes(
         if not gradebook:
             return jsonify({"ok": False, "message": "Group not found"}, status_code=404)
         return jsonify(gradebook)
+
+    @admin_blueprint.delete("/admin/api/academic/groups/{group_id}")
+    def admin_delete_academic_group(group_id: int):
+        try:
+            deleted = delete_group(group_id)
+        except (TypeError, ValueError) as exc:
+            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
+        if not deleted:
+            return jsonify({"ok": False, "message": "Group not found"}, status_code=404)
+
+        invalidate_admin_page_context_cache()
+        clear_group_cache()
+        academic_context = list_admin_academic_context()
+        return jsonify(
+            {
+                "ok": True,
+                "group": deleted,
+                "groups": academic_context.get("groups", []),
+                "enrollments": academic_context.get("enrollments", []),
+                "schedules": academic_context.get("schedules", []),
+                "sessions": academic_context.get("sessions", []),
+                "lessons": academic_context.get("lessons", []),
+            }
+        )
 
     @admin_blueprint.patch("/admin/api/academic/enrollments/{enrollment_id}/status")
     def admin_update_academic_enrollment_status(enrollment_id: int):
