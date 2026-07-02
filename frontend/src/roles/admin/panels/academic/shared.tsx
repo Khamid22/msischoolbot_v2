@@ -183,12 +183,12 @@ export function wrapWords(value: unknown, maxChars = 13, maxLines = 3) {
 }
 
 export function StudentNameTick({ x = 0, y = 0, payload }: AxisTickProps) {
-  const lines = wrapWords(payload?.value);
+  const lines = wrapWords(payload?.value, 11, 3);
   return (
     <g transform={`translate(${x},${y})`}>
-      <text textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={11}>
+      <text textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={10}>
         {lines.map((line, index) => (
-          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 14 : 13}>
+          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 12 : 11}>
             {line}
           </tspan>
         ))}

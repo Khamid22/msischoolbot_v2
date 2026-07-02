@@ -6,7 +6,49 @@ import { motion } from "@/shared/lib/motion";
 import { asNumber, asString } from "../../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
-import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, chartMinWidth, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
+import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
+
+type CompactTooltipItem = {
+  value?: unknown;
+  dataKey?: unknown;
+  color?: string;
+};
+
+function CompactChartTooltip({
+  active,
+  label,
+  payload,
+  percentKeys = [],
+}: {
+  active?: boolean;
+  label?: unknown;
+  payload?: CompactTooltipItem[];
+  percentKeys?: string[];
+}) {
+  const visiblePayload = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined && item.value !== "");
+  if (!active || visiblePayload.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-foreground/10 bg-popover px-3 py-2 text-popover-foreground shadow-card-hover">
+      <p className="max-w-48 truncate text-xs font-bold">{asString(label)}</p>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {visiblePayload.map((item, index) => {
+          const key = asString(item.dataKey);
+          const value = percentKeys.includes(key) ? formatPercentLabel(item.value) : formatBarLabel(item.value);
+          if (!value) return null;
+          return (
+            <span key={`${key}-${index}`} className="inline-flex items-center gap-1.5 text-sm font-bold">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: item.color || "hsl(var(--primary))" }}
+              />
+              {value}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function GroupGradebook({
   groupId,
@@ -435,19 +477,6 @@ export function GroupGradebook({
   const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
   const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
-  const tooltipContentStyle = {
-    backgroundColor: "hsl(var(--popover))",
-    border: "1px solid hsl(var(--foreground) / 0.12)",
-    borderRadius: 12,
-    boxShadow: "var(--card-shadow-hover)",
-    color: "hsl(var(--popover-foreground))",
-  } as const;
-  const tooltipLabelStyle = {
-    color: "hsl(var(--popover-foreground))",
-    fontSize: 12,
-    fontWeight: 800,
-  } as const;
-
   return (
     <div className={`space-y-3 ${motion.panel}`}>
       {/* 1. Summary Header */}
@@ -710,8 +739,8 @@ export function GroupGradebook({
       )}
 
       {data && activeView === "academic" && (
-        <div className={`${panelCardClass} p-4`}>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className={`${panelCardClass} flex min-h-[calc(var(--tg-app-height)-13rem)] flex-col p-4`}>
+          <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-bold">Academic Indicators</h4>
               <p className="text-xs text-muted-foreground">AAP score and AR percentage by student</p>
@@ -725,7 +754,7 @@ export function GroupGradebook({
               onYearChange={setIndicatorYear}
             />
           </div>
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
               <span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span>
@@ -742,41 +771,36 @@ export function GroupGradebook({
             </div>
           </div>
           {hasAcademicIndicatorData ? (
-            <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
-              <div
-                className="h-[410px] sm:h-[440px] lg:h-[460px]"
-                style={{ minWidth: chartMinWidth(academicIndicatorData.length) }}
-              >
+            <div className={`min-h-0 flex-1 overflow-hidden pb-1 ${motion.panel}`}>
+              <div className="h-full min-h-[520px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={academicIndicatorData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
+                  <BarChart
+                    data={academicIndicatorData}
+                    barCategoryGap="18%"
+                    barGap={3}
+                    margin={{ top: 30, right: 10, left: 4, bottom: 44 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                     <XAxis
                       dataKey="name"
                       interval={0}
-                      height={70}
+                      height={58}
                       tick={<StudentNameTick />}
                       tickLine={false}
                       stroke="hsl(var(--muted-foreground))"
                     />
-                    <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis domain={[0, 9]} tickCount={10} hide />
                     <YAxis
                       yAxisId="ar"
                       orientation="right"
                       domain={[0, 100]}
                       tickCount={6}
-                      tickFormatter={(value) => `${value}%`}
-                      stroke="hsl(var(--muted-foreground))"
+                      hide
                     />
                     <Tooltip
                       cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
                       wrapperClassName="!outline-none"
-                      contentStyle={tooltipContentStyle}
-                      labelStyle={tooltipLabelStyle}
-                      itemStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 700 }}
-                      formatter={(value, name) => {
-                        const label = asString(name);
-                        return [label === "AR" ? formatPercentLabel(value) : formatBarLabel(value), label];
-                      }}
+                      content={<CompactChartTooltip percentKeys={["AR"]} />}
                     />
                     <Legend verticalAlign="top" height={28} />
                     <Bar
@@ -784,12 +808,12 @@ export function GroupGradebook({
                       name="AAP"
                       fill="#3b82f6"
                       radius={[5, 5, 0, 0]}
-                      maxBarSize={42}
+                      maxBarSize={28}
                       isAnimationActive
                       animationDuration={650}
                       animationEasing="ease-out"
                     >
-                      <LabelList dataKey="AAP" position="top" fontSize={12} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
+                      <LabelList dataKey="AAP" position="top" fontSize={11} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-aap-${index}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />
                       ))}
@@ -800,13 +824,13 @@ export function GroupGradebook({
                       name="AR"
                       fill="#10b981"
                       radius={[5, 5, 0, 0]}
-                      maxBarSize={42}
+                      maxBarSize={28}
                       isAnimationActive
                       animationBegin={90}
                       animationDuration={650}
                       animationEasing="ease-out"
                     >
-                      <LabelList dataKey="AR" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
+                      <LabelList dataKey="AR" position="top" fontSize={11} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-ar-${index}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />
                       ))}
@@ -867,8 +891,8 @@ export function GroupGradebook({
                 </div>
               </div>
 
-              <div className={chartPanelClass}>
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className={`${chartPanelClass} flex min-h-[calc(var(--tg-app-height)-22rem)] flex-col`}>
+                <div className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-bold">Student Exam Performance</h4>
                     <p className="text-xs text-muted-foreground">
@@ -879,41 +903,40 @@ export function GroupGradebook({
                 </div>
                 {examDisplay === "chart" ? (
                   hasFilteredExamScores ? (
-                    <div className={`overflow-x-auto pb-1 ${motion.panel}`}>
-                      <div
-                        className="h-[390px] sm:h-[420px] lg:h-[445px]"
-                        style={{ minWidth: chartMinWidth(studentExamData.length) }}
-                      >
+                    <div className={`min-h-0 flex-1 overflow-hidden pb-1 ${motion.panel}`}>
+                      <div className="h-full min-h-[520px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={studentExamData} margin={{ top: 32, right: 18, left: -10, bottom: 52 }}>
+                          <BarChart
+                            data={studentExamData}
+                            barCategoryGap="34%"
+                            margin={{ top: 30, right: 10, left: 4, bottom: 44 }}
+                          >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                             <XAxis
                               dataKey="name"
                               interval={0}
-                              height={70}
+                              height={58}
                               tick={<StudentNameTick />}
                               tickLine={false}
                               stroke="hsl(var(--muted-foreground))"
                             />
-                            <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                            <YAxis domain={[0, 9]} tickCount={10} hide />
                             <Tooltip
                               cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
                               wrapperClassName="!outline-none"
-                              contentStyle={tooltipContentStyle}
-                              labelStyle={tooltipLabelStyle}
-                              itemStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 700 }}
+                              content={<CompactChartTooltip />}
                             />
                             <Bar
                               dataKey="chartScore"
                               fill="#3b82f6"
                               radius={[5, 5, 0, 0]}
-                              name={selectedExamType ? `${selectedExamType.label} / 9` : "Best Score / 9"}
-                              maxBarSize={48}
+                              name="Score"
+                              maxBarSize={34}
                               isAnimationActive
                               animationDuration={650}
                               animationEasing="ease-out"
                             >
-                              <LabelList dataKey="chartScore" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
+                              <LabelList dataKey="chartScore" position="top" fontSize={11} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
