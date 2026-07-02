@@ -7,12 +7,11 @@ import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
+import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, randomLessonStartMinutesForSeed, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
 const BASE_HOUR_PX = 70;
-const SNAP_MINUTES = 10;
-const DEFAULT_CLASS_MINUTES = 80;
 const TIME_COLUMN_PX = 60;
 
 type BlockStatus = "scheduled" | "completed" | "cancelled";
@@ -47,6 +46,12 @@ type PointerDrag = {
   y: number;
   label: string;
   moved: boolean;
+  grabOffsetX: number;
+  grabOffsetY: number;
+  previewWidth: number;
+  previewHeight: number;
+  subjectName: string;
+  status: BlockStatus;
 };
 
 type ResizeDrag = {
@@ -68,14 +73,6 @@ function minutesToLabel(totalMinutes: number) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(value, max));
-}
-
-function snapMinutes(totalMinutes: number) {
-  return Math.round(totalMinutes / SNAP_MINUTES) * SNAP_MINUTES;
-}
-
 function scheduleCardClass(subject: unknown, status: BlockStatus) {
   if (status === "cancelled") {
     return "border-red-300/70 bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-red-950/20";
@@ -95,17 +92,11 @@ function scheduleCardClass(subject: unknown, status: BlockStatus) {
 }
 
 function lessonDurationMinutes(lesson: LessonHistoryRow) {
-  const schoolCode = asString(lesson.school_code).toLowerCase().replace(/[\s_-]+/g, "");
-  if (schoolCode.includes("sehriyo")) return 40;
-  if (schoolCode.includes("school5") || schoolCode.includes("5")) return 80;
-  return DEFAULT_CLASS_MINUTES;
+  return lessonDurationMinutesForSchoolCode(lesson.school_code);
 }
 
 function randomLessonStartMinutes(lesson: LessonHistoryRow, index: number, startMin: number, endMin: number, durationMin: number) {
-  const available = Math.max(SNAP_MINUTES, endMin - startMin - durationMin);
-  const slots = Math.max(1, Math.floor(available / SNAP_MINUTES));
-  const seed = Math.abs((Number(lesson.id) || index + 1) * 37 + index * 19);
-  return startMin + (seed % slots) * SNAP_MINUTES;
+  return randomLessonStartMinutesForSeed(lesson.id, index, startMin, endMin, durationMin);
 }
 
 function overlapGridFor(count: number) {
@@ -356,14 +347,19 @@ export function SchedulePanel({ state }: { state: any }) {
     };
   }
 
-  function snappedStartMinutesFromRect(clientY: number, rect: DOMRect, durationMin: number) {
-    const offsetY = clientY - rect.top;
-    const rawMinutes = dayStartMin + (offsetY / hourPx) * 60;
-    const snapped = Math.round(rawMinutes / SNAP_MINUTES) * SNAP_MINUTES;
-    return Math.max(dayStartMin, Math.min(snapped, dayEndMin - durationMin));
+  function snappedStartMinutesFromRect(clientY: number, rect: DOMRect, durationMin: number, grabOffsetY = 0) {
+    return snappedStartMinutes({
+      clientY,
+      rectTop: rect.top,
+      dayStartMin,
+      dayEndMin,
+      durationMin,
+      hourPx,
+      grabOffsetY,
+    });
   }
 
-  function dropTargetAtPoint(clientX: number, clientY: number, durationMin: number) {
+  function dropTargetAtPoint(clientX: number, clientY: number, durationMin: number, grabOffsetY = 0) {
     for (const day of weekDays) {
       const dayIso = isoDate(day);
       const node = dayColumnRefs.current[dayIso];
@@ -372,14 +368,14 @@ export function SchedulePanel({ state }: { state: any }) {
       if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) continue;
       return {
         dayIso,
-        startMin: snappedStartMinutesFromRect(clientY, rect, durationMin),
+        startMin: snappedStartMinutesFromRect(clientY, rect, durationMin, grabOffsetY),
       };
     }
     return null;
   }
 
-  function updateDropHint(clientX: number, clientY: number, payload: DragPayload) {
-    const target = dropTargetAtPoint(clientX, clientY, payload.durationMin);
+  function updateDropHint(clientX: number, clientY: number, drag: PointerDrag) {
+    const target = dropTargetAtPoint(clientX, clientY, drag.payload.durationMin, drag.grabOffsetY);
     if (!target) {
       setDropHint(null);
       return;
@@ -387,7 +383,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setDropHint((current) =>
       current && current.day === target.dayIso && current.startMin === target.startMin
         ? current
-        : { day: target.dayIso, startMin: target.startMin, durationMin: payload.durationMin },
+        : { day: target.dayIso, startMin: target.startMin, durationMin: drag.payload.durationMin },
     );
   }
 
@@ -446,6 +442,7 @@ export function SchedulePanel({ state }: { state: any }) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
     const next = {
       pointerId: event.pointerId,
       payload,
@@ -455,6 +452,12 @@ export function SchedulePanel({ state }: { state: any }) {
       y: event.clientY,
       label,
       moved: false,
+      grabOffsetX: event.clientX - rect.left,
+      grabOffsetY: event.clientY - rect.top,
+      previewWidth: rect.width,
+      previewHeight: rect.height,
+      subjectName: payload.meta.subject_name,
+      status: payload.meta.status,
     };
     pointerDragRef.current = next;
     setPointerDrag(next);
@@ -472,7 +475,7 @@ export function SchedulePanel({ state }: { state: any }) {
     pointerDragRef.current = next;
     setPointerDrag(next);
     if (moved) {
-      updateDropHint(event.clientX, event.clientY, current.payload);
+      updateDropHint(event.clientX, event.clientY, next);
     }
   }
 
@@ -481,7 +484,7 @@ export function SchedulePanel({ state }: { state: any }) {
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    const target = dropTargetAtPoint(event.clientX, event.clientY, current.payload.durationMin);
+    const target = dropTargetAtPoint(event.clientX, event.clientY, current.payload.durationMin, current.grabOffsetY);
     pointerDragRef.current = null;
     setPointerDrag(null);
     setDropHint(null);
@@ -532,13 +535,13 @@ export function SchedulePanel({ state }: { state: any }) {
     if (!current || current.pointerId !== event.pointerId) return;
     event.preventDefault();
     maybeScrollGrid(event.clientY);
-    const deltaMinutes = snapMinutes(((event.clientY - current.startY) / hourPx) * 60);
+    const deltaMinutes = snapToMinutes(((event.clientY - current.startY) / hourPx) * 60);
     let previewStartMin = current.originalStartMin;
     let previewEndMin = current.originalEndMin;
     if (current.edge === "start") {
-      previewStartMin = clamp(snapMinutes(current.originalStartMin + deltaMinutes), dayStartMin, current.originalEndMin - SNAP_MINUTES);
+      previewStartMin = clampNumber(snapToMinutes(current.originalStartMin + deltaMinutes), dayStartMin, current.originalEndMin - SCHEDULE_SNAP_MINUTES);
     } else {
-      previewEndMin = clamp(snapMinutes(current.originalEndMin + deltaMinutes), current.originalStartMin + SNAP_MINUTES, dayEndMin);
+      previewEndMin = clampNumber(snapToMinutes(current.originalEndMin + deltaMinutes), current.originalStartMin + SCHEDULE_SNAP_MINUTES, dayEndMin);
     }
     const next = { ...current, previewStartMin, previewEndMin };
     resizeDragRef.current = next;
@@ -627,16 +630,15 @@ export function SchedulePanel({ state }: { state: any }) {
     <>
       {pointerDrag?.moved ? (
         <div
-          className="pointer-events-none fixed z-[80] rounded-lg border border-foreground/10 bg-surface px-3 py-2 text-xs font-bold text-foreground shadow-card-hover animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none"
+          className={`pointer-events-none fixed z-[80] overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-2xl ring-2 ring-white/40 animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none ${scheduleCardClass(pointerDrag.subjectName, pointerDrag.status)}`}
           style={{
-            left: `${pointerDrag.x}px`,
-            top: `${pointerDrag.y}px`,
-            transform: "translate(12px, 12px)",
+            left: `${pointerDrag.x - pointerDrag.grabOffsetX}px`,
+            top: `${pointerDrag.y - pointerDrag.grabOffsetY}px`,
+            width: `${pointerDrag.previewWidth}px`,
+            height: `${pointerDrag.previewHeight}px`,
           }}
         >
-          <div className="flex items-center gap-2">
-            <span className="max-w-28 truncate">{pointerDrag.label}</span>
-          </div>
+          <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{pointerDrag.label}</p>
         </div>
       ) : null}
       <FloatingToast toast={toast} />
@@ -779,8 +781,9 @@ export function SchedulePanel({ state }: { state: any }) {
                         const columnWidth = 100 / overlapGrid.columns;
                         const exactTop = ((startMin - dayStartMin) / 60) * hourPx;
                         const exactHeight = Math.max(34, ((endMin - startMin) / 60) * hourPx - 2);
-                        const top = session.rowCount > 1 && !isSelected ? bandTop + slotRow * rowHeight : exactTop;
-                        const height = session.rowCount > 1 && !isSelected ? rowHeight - 4 : exactHeight;
+                        const useExactLayout = Boolean(activeResize);
+                        const top = session.rowCount > 1 && !useExactLayout ? bandTop + slotRow * rowHeight : exactTop;
+                        const height = session.rowCount > 1 && !useExactLayout ? rowHeight - 4 : exactHeight;
                         const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
                         const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
@@ -802,7 +805,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             tabIndex={0}
                             role="button"
                             aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
-                            className={`absolute rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-transform duration-150 hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            className={`absolute rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-[box-shadow,filter] duration-150 hover:brightness-105 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
@@ -863,7 +866,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             role="button"
                             tabIndex={0}
                             aria-label={`Place ${asString(lesson.group_name)} ${minutesToLabel(startMin)} to ${minutesToLabel(endMin)}`}
-                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-transform hover:-translate-y-0.5 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-[box-shadow,filter] hover:brightness-105 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${height}px`,

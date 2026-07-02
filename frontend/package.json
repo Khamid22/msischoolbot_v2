@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test:schedule": "node --experimental-strip-types --test src/roles/admin/panels/academic/scheduleMath.test.ts",
     "check-types": "tsc -p tsconfig.app.json --noEmit",
     "build": "vite build",
     "preview": "vite preview"
