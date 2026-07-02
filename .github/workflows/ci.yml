@@ -10,6 +10,7 @@ jobs:
     env:
       # Placeholders so import-time config (config.get_settings) and the DB URL
       # check pass. No step here opens a real database connection.
+      APP_ENV: "dev"
       BOT_TOKEN: "123456:ci-placeholder"
       MINI_APP_URL: "https://example.com"
       DATABASE_URL: "postgresql://user:pass@localhost:5432/ci"
@@ -25,26 +26,26 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
       - name: Compile backend sources
         run: |
-          python -m compileall -q config.py main.py web/backend shared tgbot scripts
+          python -m compileall -q config.py main.py backend database tgbot
       - name: Import smoke test (FastAPI app + bot routers)
         run: |
-          python -c "from web.backend.server import app; print('routes:', len(app.routes))"
+          python -c "from backend.server import create_app; create_app(); print('app ok')"
           python -c "from tgbot.handlers import ALL_ROUTERS; print('bot routers:', len(ALL_ROUTERS))"
       - name: Run tests
-        run: pytest
+        run: pytest tests/ -q
 
   frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web/frontend
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: web/frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
       - name: Install frontend deps
         run: npm ci
       - name: Type check
