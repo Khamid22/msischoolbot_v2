@@ -739,8 +739,8 @@ export function GroupGradebook({
       )}
 
       {data && activeView === "academic" && (
-        <div className={`${panelCardClass} flex min-h-[calc(var(--tg-app-height)-13rem)] flex-col p-4`}>
-          <div className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div className={`${panelCardClass} p-4`}>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-bold">Academic Indicators</h4>
               <p className="text-xs text-muted-foreground">AAP score and AR percentage by student</p>
@@ -754,7 +754,7 @@ export function GroupGradebook({
               onYearChange={setIndicatorYear}
             />
           </div>
-          <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
               <span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span>
@@ -771,8 +771,8 @@ export function GroupGradebook({
             </div>
           </div>
           {hasAcademicIndicatorData ? (
-            <div className={`min-h-0 flex-1 overflow-hidden pb-1 ${motion.panel}`}>
-              <div className="h-full min-h-[520px] w-full">
+            <div className={`overflow-hidden pb-1 ${motion.panel}`}>
+              <div className="h-[calc(var(--tg-app-height)-24rem)] min-h-[500px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={academicIndicatorData}
@@ -891,8 +891,8 @@ export function GroupGradebook({
                 </div>
               </div>
 
-              <div className={`${chartPanelClass} flex min-h-[calc(var(--tg-app-height)-22rem)] flex-col`}>
-                <div className="mb-3 flex shrink-0 flex-wrap items-start justify-between gap-3">
+              <div className={chartPanelClass}>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-bold">Student Exam Performance</h4>
                     <p className="text-xs text-muted-foreground">
@@ -903,8 +903,8 @@ export function GroupGradebook({
                 </div>
                 {examDisplay === "chart" ? (
                   hasFilteredExamScores ? (
-                    <div className={`min-h-0 flex-1 overflow-hidden pb-1 ${motion.panel}`}>
-                      <div className="h-full min-h-[520px] w-full">
+                    <div className={`overflow-hidden pb-1 ${motion.panel}`}>
+                      <div className="h-[calc(var(--tg-app-height)-30rem)] min-h-[500px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
                             data={studentExamData}
