@@ -124,6 +124,15 @@ ACADEMY_SECTIONS = (
     "homework",
 )
 
+ACADEMY_CRITERIA_REMARKS = (
+    ("tgc", "teacher_guidance_compliance_score", "teacher_guidance_compliance_remarks"),
+    ("ta", "timing_adherence_score", "timing_adherence_remarks"),
+    ("rf", "resource_familiarity_score", "resource_familiarity_remarks"),
+    ("ef", "english_fluency_score", "english_fluency_remarks"),
+    ("con", "confidence_delivery_score", "confidence_delivery_remarks"),
+    ("se", "engagement_technique_score", "engagement_technique_remarks"),
+)
+
 
 def _assessment_sections_from_form():
     sections = {}
@@ -133,6 +142,13 @@ def _assessment_sections_from_form():
             "time_used": request.form.get(f"{key}_time_used", ""),
             "remarks": request.form.get(f"{key}_remarks", ""),
         }
+    criteria = {}
+    for key, score_key, remarks_key in ACADEMY_CRITERIA_REMARKS:
+        criteria[key] = {
+            "score": request.form.get(score_key, ""),
+            "remarks": request.form.get(remarks_key, ""),
+        }
+    sections["marking_criteria"] = criteria
     return sections
 
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, ClipboardCheck, Eye, GraduationCap, Plus, Trophy, X } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Eye, GraduationCap, Plus, Trophy, X, XCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
@@ -21,23 +21,13 @@ const focusAreas = [
   "Whole-class Example Management",
 ];
 
-const lessonSections = [
-  { key: "starter", label: "Starter", hasTime: true },
-  { key: "warmup", label: "Warm-up", hasTime: true },
-  { key: "teaching_session_1", label: "Teaching Session 1", hasTime: true },
-  { key: "teaching_session_2", label: "Teaching Session 2", hasTime: true },
-  { key: "teaching_session_3", label: "Teaching Session 3", hasTime: true },
-  { key: "end_activity", label: "End-of-Lesson Activity", hasTime: true },
-  { key: "homework", label: "Homework", hasTime: false },
-];
-
 const rubric = [
-  { key: "teacher_guidance_compliance_score", label: "Teacher Guidance Compliance", weight: 0.25 },
-  { key: "timing_adherence_score", label: "Timing Adherence", weight: 0.2 },
-  { key: "resource_familiarity_score", label: "Resource Familiarity", weight: 0.15 },
-  { key: "english_fluency_score", label: "English Fluency", weight: 0.15 },
-  { key: "confidence_delivery_score", label: "Confidence & Delivery", weight: 0.1 },
-  { key: "engagement_technique_score", label: "Engagement Technique", weight: 0.15 },
+  { code: "TGC", key: "teacher_guidance_compliance_score", remarksKey: "teacher_guidance_compliance_remarks", label: "Teacher Guidance Compliance", weight: 0.25 },
+  { code: "TA", key: "timing_adherence_score", remarksKey: "timing_adherence_remarks", label: "Timing Adherence", weight: 0.2 },
+  { code: "RF", key: "resource_familiarity_score", remarksKey: "resource_familiarity_remarks", label: "Resource Familiarity", weight: 0.15 },
+  { code: "EF", key: "english_fluency_score", remarksKey: "english_fluency_remarks", label: "English Fluency", weight: 0.15 },
+  { code: "CON", key: "confidence_delivery_score", remarksKey: "confidence_delivery_remarks", label: "Confidence & Delivery", weight: 0.1 },
+  { code: "SE", key: "engagement_technique_score", remarksKey: "engagement_technique_remarks", label: "Student Engagement", weight: 0.15 },
 ];
 
 function statusLabel(value: unknown) {
@@ -353,142 +343,132 @@ function AssessmentModal({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const decision = submitter?.value === "rejected" ? "rejected" : "passed";
     const fields: Record<string, string> = {};
     data.forEach((value, key) => {
       fields[key] = String(value);
     });
     rubric.forEach((item) => {
       fields[item.key] = scores[item.key] || "0";
+      fields[item.remarksKey] = fields[item.remarksKey] || "";
     });
     fields.lesson_assignment_id = String(asNumber(assignment.id));
+    fields.class_label = "";
+    fields.decision = decision;
     onSubmit(asNumber(teacher.id), fields);
   }
 
   return (
     <ModalShell title="Assessment Report" subtitle={`${asString(teacher.full_name)} · ${asString(assignment.lesson_number)} · score ${weighted.toFixed(2)}`} onClose={onClose} wide>
-      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block">
-            <FieldLabel>Assessment Type</FieldLabel>
-            <select name="assessment_type" defaultValue="academy_practice_lesson" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="demo_lesson">Demo lesson</option>
-              <option value="academy_practice_lesson">Academy practice lesson</option>
-              <option value="final_academy_evaluation">Final academy evaluation</option>
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Session Type</FieldLabel>
-            <select name="session_type" defaultValue="training_simulation" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="training_simulation">Training simulation</option>
-              <option value="practice_with_class">Practice with class</option>
-              <option value="final_evaluation">Final evaluation</option>
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Date/Time</FieldLabel>
-            <input name="assessment_datetime" type="datetime-local" defaultValue={toDateTimeLocal(assignment.session_datetime)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Evaluator</FieldLabel>
-            <select name="evaluator_id" defaultValue={asString(assignment.evaluator_id)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="">Not assigned</option>
-              {teachers.map((item) => (
-                <option key={asNumber(item.id)} value={asNumber(item.id)}>
-                  {asString(item.full_name)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block lg:col-span-4">
-            <FieldLabel>Class / Group</FieldLabel>
-            <input name="class_label" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="Training simulation, or group name if observed with a real class" />
-          </label>
-        </div>
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label className="block">
+              <FieldLabel>Assessment Type</FieldLabel>
+              <select name="assessment_type" defaultValue="academy_practice_lesson" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                <option value="demo_lesson">Demo lesson</option>
+                <option value="academy_practice_lesson">Academy practice lesson</option>
+                <option value="final_academy_evaluation">Final academy evaluation</option>
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel>Session Type</FieldLabel>
+              <select name="session_type" defaultValue="training_simulation" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                <option value="training_simulation">Training simulation</option>
+                <option value="practice_with_class">Practice with class</option>
+                <option value="final_evaluation">Final evaluation</option>
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel>Date/Time</FieldLabel>
+              <input name="assessment_datetime" type="datetime-local" defaultValue={toDateTimeLocal(assignment.session_datetime)} className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            </label>
+            <label className="block">
+              <FieldLabel>Assigned Academic Director</FieldLabel>
+              <select name="evaluator_id" defaultValue={asString(assignment.evaluator_id)} className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                <option value="">Not assigned</option>
+                {teachers.map((item) => (
+                  <option key={asNumber(item.id)} value={asNumber(item.id)}>
+                    {asString(item.full_name)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Lesson Structure</p>
-          <div className="mt-2 grid gap-2">
-            {lessonSections.map((section) => (
-              <div key={section.key} className="rounded-lg border border-foreground/8 bg-background p-2.5">
-                <div className="grid gap-2 sm:grid-cols-[12rem_10rem_1fr]">
-                  <label>
-                    <FieldLabel>{section.label}</FieldLabel>
-                    <select name={`${section.key}_status`} defaultValue="covered" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-                      <option value="covered">Covered</option>
-                      <option value="partially_covered">Partially covered</option>
-                      <option value="skipped">Skipped</option>
-                      <option value="not_applicable">Not applicable</option>
-                    </select>
-                  </label>
-                  <label>
-                    <FieldLabel>{section.hasTime ? "Time Used" : "Time"}</FieldLabel>
-                    <input name={`${section.key}_time_used`} disabled={!section.hasTime} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none disabled:bg-muted" placeholder={section.hasTime ? "17:34" : "N/A"} />
-                  </label>
-                  <label>
-                    <FieldLabel>Remarks</FieldLabel>
-                    <input name={`${section.key}_remarks`} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="Write concise observation notes" />
-                  </label>
-                </div>
+          <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/35 px-4 py-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
+                <p className="text-sm font-semibold text-foreground">{asString(assignment.lesson_topic) || "Training lesson"}</p>
               </div>
-            ))}
-          </div>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                Score {weighted.toFixed(2)}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] table-fixed text-left">
+                <thead>
+                  <tr className="border-b border-foreground/8 bg-surface/80">
+                    <th className="w-[18rem] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Criteria</th>
+                    <th className="w-32 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Score</th>
+                    <th className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rubric.map((item) => (
+                    <tr key={item.key} className="border-b border-foreground/6 last:border-b-0 transition-colors hover:bg-muted/35">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
+                            {item.code}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold">{item.label}</p>
+                            <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          step="0.1"
+                          value={scores[item.key] || ""}
+                          onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
+                          className="h-10 w-full rounded-xl border border-foreground/10 bg-surface px-3 text-center text-sm font-black text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                        />
+                      </td>
+                      <td className="px-3 py-3">
+                        <input
+                          name={item.remarksKey}
+                          className="h-10 w-full rounded-xl border border-foreground/10 bg-surface px-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
+                          placeholder="Remarks"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
         </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Weighted Rubric</p>
-            <span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
-              Weighted score {weighted.toFixed(2)}
-            </span>
-          </div>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {rubric.map((item) => (
-              <label key={item.key} className="rounded-lg border border-foreground/8 bg-background p-2.5">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold">{item.label}</span>
-                  <span className="text-[10px] font-bold text-muted-foreground">{Math.round(item.weight * 100)}%</span>
-                </span>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  step="0.1"
-                  value={scores[item.key] || ""}
-                  onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
-                  className="mt-2 h-9 w-full rounded-lg border border-foreground/10 bg-surface px-2 text-sm font-bold outline-none"
-                />
-              </label>
-            ))}
-          </div>
+        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-foreground/8 bg-surface/95 px-4 py-3 backdrop-blur">
+          <button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-foreground/10 bg-background px-4 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+            Cancel
+          </button>
+          <button type="submit" value="rejected" disabled={submitting} className="inline-flex h-10 items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 text-sm font-bold text-destructive transition hover:bg-destructive/15 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100">
+            <XCircle className="h-4 w-4" />
+            {submitting ? "Saving..." : "Fail"}
+          </button>
+          <button type="submit" value="passed" disabled={submitting} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+            <CheckCircle2 className="h-4 w-4" />
+            {submitting ? "Saving..." : "Success"}
+          </button>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block sm:col-span-2">
-            <FieldLabel>Decision</FieldLabel>
-            <select name="decision" defaultValue="needs_improvement" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="passed">Passed</option>
-              <option value="needs_improvement">Needs Improvement</option>
-              <option value="reassign_lesson">Reassign Lesson</option>
-              <option value="ready_for_final_evaluation">Ready for Final Evaluation</option>
-              <option value="approved_for_active_teacher">Approved for Active Teacher</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Strengths</FieldLabel>
-            <textarea name="strengths" rows={3} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Areas for Improvement</FieldLabel>
-            <textarea name="areas_for_improvement" rows={3} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-          </label>
-          <label className="block sm:col-span-2">
-            <FieldLabel>Final Recommendation</FieldLabel>
-            <textarea name="final_recommendation" rows={2} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-          </label>
-        </div>
-        {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
-        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Save Assessment" />
       </form>
     </ModalShell>
   );
@@ -684,8 +664,8 @@ function ModalShell({
   wide?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-3 sm:p-4">
-      <div className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-xl bg-surface shadow-card-hover ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:p-4">
+      <div className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover animate-in zoom-in-95 slide-in-from-bottom-2 duration-150 motion-reduce:animate-none ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-bold">{title}</h3>
@@ -918,77 +898,118 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-foreground/8 bg-background p-2">
+        <div className="flex min-h-[62dvh] flex-1 flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
-            <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-3">
-              {sortedTeachers.map((teacher) => {
-                const progress = teacherProgress(teacher);
-                const nextAssignment = progress.nextAssignment || academyAssignments(teacher)[0] || null;
-                const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
-                return (
-                  <article key={asNumber(teacher.id)} className="rounded-xl border border-foreground/8 bg-surface p-3 shadow-sm transition hover:border-foreground/15 hover:shadow-card">
-                    <div className="flex items-start justify-between gap-3">
-                      <button type="button" onClick={() => setDetailTeacher(teacher)} className="min-w-0 text-left">
-                        <span className="block truncate text-sm font-bold text-primary">{asString(teacher.full_name)}</span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</span>
-                      </button>
-                      <span className="shrink-0 rounded-full border border-foreground/10 bg-background px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                        {statusLabel(teacher.academy_status)}
-                      </span>
-                    </div>
-
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[11px] font-bold text-muted-foreground">Progress</span>
-                        <span className="text-[11px] font-bold">{progress.assessed}/{progress.target}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="mt-3 rounded-lg border border-foreground/8 bg-background px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Next Lesson</p>
-                      {nextAssignment ? (
-                        <>
-                          <p className="mt-1 truncate text-sm font-bold">{asString(nextAssignment.lesson_number)} · {asString(nextAssignment.lesson_topic)}</p>
-                          <p className="mt-1 truncate text-[11px] text-muted-foreground">{dateLabel(nextAssignment.session_datetime)} · Avg {progress.average == null ? "-" : progress.average.toFixed(2)}</p>
-                        </>
-                      ) : (
-                        <p className="mt-1 text-sm text-muted-foreground">No pending lesson.</p>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10">
-                        <Eye className="h-3.5 w-3.5" />
-                        Preview
-                      </button>
-                      {nextAssignment ? (
-                        <>
-                          <button type="button" onClick={() => setAssignment(nextAssignment)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted">
-                            <CalendarClock className="h-3.5 w-3.5" />
-                            Assign
+            <div className="min-h-0 flex-1 overflow-auto">
+              <table className="h-full w-full min-w-[980px] table-fixed text-left">
+                <thead className="sticky top-0 z-10 bg-surface/95 shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
+                  <tr>
+                    {["Teacher", "Status", "Subject", "Progress", "Next lesson", "Director", "Avg", "Actions"].map((heading) => (
+                      <th
+                        key={heading}
+                        className={`px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground ${
+                          heading === "Teacher" ? "w-[15rem]" : heading === "Actions" ? "w-[21rem]" : heading === "Progress" ? "w-[12rem]" : ""
+                        }`}
+                      >
+                        {heading}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTeachers.map((teacher, index) => {
+                    const progress = teacherProgress(teacher);
+                    const nextAssignment = progress.nextAssignment || academyAssignments(teacher)[0] || null;
+                    const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
+                    const status = asString(teacher.academy_status);
+                    return (
+                      <tr
+                        key={asNumber(teacher.id)}
+                        className="group border-b border-foreground/6 animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-muted/35 motion-reduce:animate-none"
+                        style={{ animationDelay: `${index * 35}ms` }}
+                      >
+                        <td className="px-3 py-2.5 align-middle">
+                          <button type="button" onClick={() => setDetailTeacher(teacher)} className="min-w-0 text-left">
+                            <span className="block truncate text-sm font-black text-primary group-hover:underline">{asString(teacher.full_name)}</span>
+                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-muted-foreground">Academy trainee</span>
                           </button>
-                          <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background">
-                            <ClipboardCheck className="h-3.5 w-3.5" />
-                            Assess
-                          </button>
-                        </>
-                      ) : null}
-                      {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
-                        <button type="button" onClick={() => setPromoteTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11px] font-bold text-primary-foreground">
-                          <Trophy className="h-3.5 w-3.5" />
-                          Promote
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
+                            status === "ready_for_active_teacher"
+                              ? "bg-success/10 text-success"
+                              : status === "needs_improvement"
+                                ? "bg-warning/15 text-warning"
+                                : status === "rejected"
+                                  ? "bg-destructive/10 text-destructive"
+                                  : "bg-info/10 text-info"
+                          }`}>
+                            {statusLabel(teacher.academy_status)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <p className="truncate text-xs font-bold">{asString(teacher.subject) || "Subject not set"}</p>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                              <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
+                            </div>
+                            <span className="text-[11px] font-black">{progress.assessed}/{progress.target}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          {nextAssignment ? (
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-black">{asString(nextAssignment.lesson_number)}</p>
+                              <p className="truncate text-[11px] text-muted-foreground">{asString(nextAssignment.lesson_topic)}</p>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-semibold text-muted-foreground">No pending lesson</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <p className="truncate text-xs font-semibold text-muted-foreground">
+                            {asString(nextAssignment?.evaluator_name) || "Not assigned"}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <span className="text-sm font-black">{progress.average == null ? "-" : progress.average.toFixed(2)}</span>
+                        </td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+                              <Eye className="h-3.5 w-3.5" />
+                              Preview
+                            </button>
+                            {nextAssignment ? (
+                              <>
+                                <button type="button" onClick={() => setAssignment(nextAssignment)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+                                  <CalendarClock className="h-3.5 w-3.5" />
+                                  Assign
+                                </button>
+                                <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                  <ClipboardCheck className="h-3.5 w-3.5" />
+                                  Assess
+                                </button>
+                              </>
+                            ) : null}
+                            {status === "ready_for_active_teacher" ? (
+                              <button type="button" onClick={() => setPromoteTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11px] font-bold text-primary-foreground transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                <Trophy className="h-3.5 w-3.5" />
+                                Promote
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div className="px-3 py-10 text-center">
+            <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center px-3 py-10 text-center">
               <BookOpenCheck className="mx-auto h-5 w-5 text-muted-foreground" />
               <p className="mt-2 text-sm font-bold">No academy teachers yet.</p>
               <p className="mt-1 text-xs text-muted-foreground">Create a trainee to assign 12 curriculum lessons automatically.</p>
