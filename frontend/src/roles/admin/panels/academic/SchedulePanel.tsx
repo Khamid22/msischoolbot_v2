@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Filter, Plus, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
@@ -137,6 +137,10 @@ export function SchedulePanel({ state }: { state: any }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [createOpen, setCreateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [scheduleGroupFilter, setScheduleGroupFilter] = useState("all");
+  const [scheduleSubjectFilter, setScheduleSubjectFilter] = useState("all");
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState("all");
   const { toast, showToast, clearToast } = useFloatingToast();
   const [error, setError] = useState("");
   const today = isoDate(new Date());
@@ -262,7 +266,7 @@ export function SchedulePanel({ state }: { state: any }) {
     () => [...scheduledBlocks, ...placedTimetableBlocks, ...timedHistoryBlocks],
     [scheduledBlocks, placedTimetableBlocks, timedHistoryBlocks],
   );
-  const dayTimetableBlocks = useMemo(() => {
+  const allDayTimetableBlocks = useMemo(() => {
     const next: Record<string, TimetableLessonBlock[]> = {};
     weekDays.forEach((day) => {
       const dayIso = isoDate(day);
@@ -270,7 +274,7 @@ export function SchedulePanel({ state }: { state: any }) {
     });
     return next;
   }, [timetableBlocks, weekDays]);
-  const dayUntimedLessons = useMemo(() => {
+  const allDayUntimedLessons = useMemo(() => {
     const next: Record<string, LessonHistoryRow[]> = {};
     weekDays.forEach((day) => {
       const dayIso = isoDate(day);
@@ -278,18 +282,77 @@ export function SchedulePanel({ state }: { state: any }) {
     });
     return next;
   }, [untimedLessons, weekDays]);
+  const filterOptions = useMemo(() => {
+    const groupMap = new Map<string, string>();
+    const subjectSet = new Set<string>();
+    timetableBlocks.forEach((block) => {
+      const groupId = String(block.group_id || "");
+      if (groupId) groupMap.set(groupId, asString(block.group_name) || groupId);
+      const subjectName = asString(block.subject_name);
+      if (subjectName) subjectSet.add(subjectName);
+    });
+    untimedLessons.forEach((lesson) => {
+      const groupId = String(lesson.group_id || "");
+      if (groupId) groupMap.set(groupId, asString(lesson.group_name) || groupId);
+      const subjectName = asString(lesson.subject_name);
+      if (subjectName) subjectSet.add(subjectName);
+    });
+    return {
+      groups: Array.from(groupMap.entries())
+        .map(([value, label]) => ({ value, label }))
+        .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true })),
+      subjects: Array.from(subjectSet).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
+    };
+  }, [timetableBlocks, untimedLessons]);
+  const visibleTimetableBlocks = useMemo(
+    () =>
+      timetableBlocks.filter((block) => {
+        if (scheduleGroupFilter !== "all" && String(block.group_id) !== scheduleGroupFilter) return false;
+        if (scheduleSubjectFilter !== "all" && asString(block.subject_name) !== scheduleSubjectFilter) return false;
+        if (scheduleStatusFilter !== "all" && block.status !== scheduleStatusFilter) return false;
+        return true;
+      }),
+    [scheduleGroupFilter, scheduleStatusFilter, scheduleSubjectFilter, timetableBlocks],
+  );
+  const visibleUntimedLessons = useMemo(
+    () =>
+      untimedLessons.filter((lesson) => {
+        if (scheduleGroupFilter !== "all" && String(lesson.group_id) !== scheduleGroupFilter) return false;
+        if (scheduleSubjectFilter !== "all" && asString(lesson.subject_name) !== scheduleSubjectFilter) return false;
+        if (scheduleStatusFilter !== "all" && lessonStatus(lesson) !== scheduleStatusFilter) return false;
+        return true;
+      }),
+    [scheduleGroupFilter, scheduleStatusFilter, scheduleSubjectFilter, untimedLessons],
+  );
+  const dayTimetableBlocks = useMemo(() => {
+    const next: Record<string, TimetableLessonBlock[]> = {};
+    weekDays.forEach((day) => {
+      const dayIso = isoDate(day);
+      next[dayIso] = layoutSessionsForDay(visibleTimetableBlocks.filter((session) => asString(session.session_date) === dayIso));
+    });
+    return next;
+  }, [visibleTimetableBlocks, weekDays]);
+  const dayUntimedLessons = useMemo(() => {
+    const next: Record<string, LessonHistoryRow[]> = {};
+    weekDays.forEach((day) => {
+      const dayIso = isoDate(day);
+      next[dayIso] = visibleUntimedLessons.filter((lesson) => lessonDateToIso(lesson.lesson_date) === dayIso);
+    });
+    return next;
+  }, [visibleUntimedLessons, weekDays]);
+  const activeFilterCount = [scheduleGroupFilter, scheduleSubjectFilter, scheduleStatusFilter].filter((value) => value !== "all").length;
   const busiestDayLoad = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
-      return Math.max(max, (dayTimetableBlocks[dayIso] || []).length + (dayUntimedLessons[dayIso] || []).length);
+      return Math.max(max, (allDayTimetableBlocks[dayIso] || []).length + (allDayUntimedLessons[dayIso] || []).length);
     }, 0);
-  }, [dayTimetableBlocks, dayUntimedLessons, weekDays]);
+  }, [allDayTimetableBlocks, allDayUntimedLessons, weekDays]);
   const busiestOverlap = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
-      return Math.max(max, ...(dayTimetableBlocks[dayIso] || []).map((session) => session.rowCount));
+      return Math.max(max, ...(allDayTimetableBlocks[dayIso] || []).map((session) => session.rowCount));
     }, 1);
-  }, [dayTimetableBlocks, weekDays]);
+  }, [allDayTimetableBlocks, weekDays]);
   const busiestOverlapGrid = overlapGridFor(busiestOverlap);
   const completedLessonCount = recordedLessons.filter((lesson) => lessonStatus(lesson) === "completed").length
     + placedTimetableBlocks.filter((block) => block.status === "completed").length;
@@ -630,7 +693,7 @@ export function SchedulePanel({ state }: { state: any }) {
     <>
       {pointerDrag?.moved ? (
         <div
-          className={`pointer-events-none fixed z-[80] overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-2xl ring-2 ring-white/40 animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none ${scheduleCardClass(pointerDrag.subjectName, pointerDrag.status)}`}
+          className={`pointer-events-none fixed z-[80] overflow-hidden rounded-md border px-1.5 py-1 text-[10px] shadow-2xl ring-2 ring-white/40 animate-in fade-in zoom-in-95 duration-100 motion-reduce:animate-none ${scheduleCardClass(pointerDrag.subjectName, pointerDrag.status)}`}
           style={{
             left: `${pointerDrag.x - pointerDrag.grabOffsetX}px`,
             top: `${pointerDrag.y - pointerDrag.grabOffsetY}px`,
@@ -638,7 +701,7 @@ export function SchedulePanel({ state }: { state: any }) {
             height: `${pointerDrag.previewHeight}px`,
           }}
         >
-          <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{pointerDrag.label}</p>
+          <p className="truncate text-[0.62rem] font-black leading-tight tracking-wide">{pointerDrag.label}</p>
         </div>
       ) : null}
       <FloatingToast toast={toast} />
@@ -647,7 +710,7 @@ export function SchedulePanel({ state }: { state: any }) {
         subtitle={`${filteredSessions.length + placedTimetableBlocks.length} timed sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
         icon={<CalendarDays className="h-4 w-4 text-info" />}
         headerActions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {!isTeacherMode ? (
               <button
                 type="button"
@@ -661,47 +724,126 @@ export function SchedulePanel({ state }: { state: any }) {
                   }));
                   setCreateOpen(true);
                 }}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[11px] font-bold text-primary-foreground"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
                 Assign Time
               </button>
             ) : null}
             <button
               type="button"
               onClick={() => setWeekStart((current) => addDays(current, -7))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-foreground/10 hover:bg-muted"
               aria-label="Previous week"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="h-8 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted"
+              className="h-7 rounded-md border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted"
             >
               This Week
             </button>
             <button
               type="button"
               onClick={() => setWeekStart((current) => addDays(current, 7))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-foreground/10 hover:bg-muted"
               aria-label="Next week"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         }
       >
         {error ? (
-          <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+          <p className="mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] font-semibold text-destructive">
             {error}
           </p>
         ) : null}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm font-bold">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-bold">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             {formatWeekRange(weekStart)}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setFilterOpen((current) => !current)}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-bold ${activeFilterCount ? "border-primary/40 bg-primary/10 text-primary" : "border-foreground/10 bg-background hover:bg-muted"}`}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filter
+              {activeFilterCount ? (
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] leading-none text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+            {filterOpen ? (
+              <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-64 rounded-lg border border-foreground/10 bg-surface p-2 shadow-card-hover">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Filters</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen(false)}
+                    className="flex h-6 w-6 items-center justify-center rounded-md hover:bg-muted"
+                    aria-label="Close filter"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="grid gap-1.5">
+                  <select
+                    value={scheduleGroupFilter}
+                    onChange={(event) => setScheduleGroupFilter(event.target.value)}
+                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
+                  >
+                    <option value="all">All groups</option>
+                    {filterOptions.groups.map((group) => (
+                      <option key={group.value} value={group.value}>
+                        {group.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={scheduleSubjectFilter}
+                    onChange={(event) => setScheduleSubjectFilter(event.target.value)}
+                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
+                  >
+                    <option value="all">All subjects</option>
+                    {filterOptions.subjects.map((subject) => (
+                      <option key={subject} value={subject}>
+                        {subject}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={scheduleStatusFilter}
+                    onChange={(event) => setScheduleStatusFilter(event.target.value)}
+                    className="h-7 rounded-md border border-foreground/10 bg-background px-2 text-[11px] font-semibold outline-none focus:border-foreground/30"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="completed">Done</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                {activeFilterCount ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScheduleGroupFilter("all");
+                      setScheduleSubjectFilter("all");
+                      setScheduleStatusFilter("all");
+                    }}
+                    className="mt-2 h-7 w-full rounded-md bg-muted text-[11px] font-bold hover:bg-foreground/10"
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -721,11 +863,11 @@ export function SchedulePanel({ state }: { state: any }) {
         >
           <div style={{ minWidth: `${gridMinWidthPx}px` }}>
             <div className="sticky top-0 z-40 grid border-b border-foreground/10 bg-muted/50 backdrop-blur" style={{ gridTemplateColumns }}>
-              <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
+              <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
               {weekDays.map((day, index) => (
-                <div key={isoDate(day)} className="border-l border-foreground/10 px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{weekdayLabels[index]}</p>
-                  <p className="text-lg font-bold leading-none">{day.getDate()}</p>
+                <div key={isoDate(day)} className="border-l border-foreground/10 px-2 py-1.5">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{weekdayLabels[index]}</p>
+                  <p className="text-base font-bold leading-none">{day.getDate()}</p>
                 </div>
               ))}
             </div>
@@ -734,7 +876,7 @@ export function SchedulePanel({ state }: { state: any }) {
                 {hours.map((hour) => (
                   <div
                     key={hour}
-                    className="absolute left-0 right-0 border-t border-foreground/8 px-2 pt-1 text-right text-[11px] font-semibold text-muted-foreground"
+                    className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[10px] font-semibold text-muted-foreground"
                     style={{
                       top: `${(hour - displayStartHour) * hourPx}px`,
                       // Pull the final label above the bottom edge so it isn't clipped.
@@ -787,7 +929,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
                         const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
-                        const compactCard = height < 56;
+                        const compactCard = height < 52;
                         return (
                           <div
                             key={session.id}
@@ -805,7 +947,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             tabIndex={0}
                             role="button"
                             aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
-                            className={`absolute rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-[box-shadow,filter] duration-150 hover:brightness-105 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            className={`absolute rounded-md border px-1.5 py-1 text-[10px] shadow-md transition-[box-shadow,filter] duration-150 hover:brightness-105 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
@@ -815,11 +957,11 @@ export function SchedulePanel({ state }: { state: any }) {
                               zIndex: isSelected ? 35 : session.rowCount > 1 ? 12 : 2,
                             }}
                           >
-                            <div className="flex min-w-0 items-start justify-between gap-2">
-                              <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
+                            <div className="flex min-w-0 items-start justify-between gap-1">
+                              <p className="truncate text-[clamp(0.56rem,0.8vw,0.68rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
                             </div>
-                            <p className="mt-0.5 truncate text-[clamp(0.58rem,0.85vw,0.7rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
-                            {!compactCard ? <p className="mt-1 inline-flex w-fit rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
+                            <p className="truncate text-[clamp(0.52rem,0.74vw,0.62rem)] font-semibold leading-tight text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            {!compactCard ? <p className="mt-0.5 inline-flex w-fit rounded-full bg-white/15 px-1 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                             {isSelected && canDrag ? (
                               <>
                                 <button
@@ -855,6 +997,7 @@ export function SchedulePanel({ state }: { state: any }) {
                         const height = Math.max(34, (durationMin / 60) * hourPx - 2);
                         const status = lessonStatus(lesson);
                         const toneLabel = status === "cancelled" ? "Cancelled" : "Unplaced";
+                        const compactCard = height < 52;
                         return (
                           <div
                             key={`schedule-loose-${lesson.id}`}
@@ -866,28 +1009,28 @@ export function SchedulePanel({ state }: { state: any }) {
                             role="button"
                             tabIndex={0}
                             aria-label={`Place ${asString(lesson.group_name)} ${minutesToLabel(startMin)} to ${minutesToLabel(endMin)}`}
-                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-[box-shadow,filter] hover:brightness-105 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-md border px-1.5 py-1 text-[10px] shadow-md transition-[box-shadow,filter] hover:brightness-105 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${height}px`,
                               zIndex: 18,
                             }}
                           >
-                            <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{asString(lesson.group_name)}</p>
-                            <p className="mt-0.5 truncate text-[clamp(0.58rem,0.85vw,0.7rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
-                            {height >= 48 ? <p className="mt-1 inline-flex w-fit rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
+                            <p className="truncate text-[clamp(0.56rem,0.8vw,0.68rem)] font-black leading-tight tracking-wide">{asString(lesson.group_name)}</p>
+                            <p className="truncate text-[clamp(0.52rem,0.74vw,0.62rem)] font-semibold leading-tight text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            {!compactCard ? <p className="mt-0.5 inline-flex w-fit rounded-full bg-white/15 px-1 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                           </div>
                         );
                       })}
                       {hint ? (
                         <div
-                          className="pointer-events-none absolute left-1 right-1 z-10 rounded-lg border-2 border-dashed border-primary/60 bg-primary/5 px-2 py-1"
+                          className="pointer-events-none absolute left-1 right-1 z-10 rounded-md border border-dashed border-primary/60 bg-primary/5 px-1.5 py-1"
                           style={{
                             top: `${((hint.startMin - dayStartMin) / 60) * hourPx}px`,
                             height: `${(hint.durationMin / 60) * hourPx - 2}px`,
                           }}
                         >
-                          <p className="text-[10px] font-bold text-primary">
+                          <p className="text-[9px] font-bold text-primary">
                             {minutesToLabel(hint.startMin)}–{minutesToLabel(hint.startMin + hint.durationMin)}
                           </p>
                         </div>
