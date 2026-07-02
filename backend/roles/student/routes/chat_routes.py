@@ -23,9 +23,19 @@ from backend.utils.session import (
     current_student_full_name,
 )
 from database import queries
+from pydantic import BaseModel
 
 _PAGE_SIZE = 40
 _MAX_BODY = 800
+
+
+class ChatMessageCreatePayload(BaseModel):
+    room: str = "global"
+    body: str = ""
+
+
+class ChatMessageEditPayload(BaseModel):
+    body: str = ""
 
 
 def _validate_room(room: str) -> bool:
@@ -121,7 +131,7 @@ def register_chat_routes(students):
 
     # ── Send message ───────────────────────────────────────────────────────────
     @students.post("/api/chat/messages")
-    def api_chat_send():
+    def api_chat_send(payload: ChatMessageCreatePayload):
         role = current_auth_role()
         if role != "student":
             return jsonify({"error": "Login required."}, status_code=401)
@@ -130,9 +140,8 @@ def register_chat_routes(students):
         if not author_name:
             return jsonify({"error": "Could not identify your account."}, status_code=401)
 
-        data = request.get_json(silent=True) or {}
-        room = str(data.get("room", "global")).strip()
-        body = str(data.get("body", "")).strip()
+        room = payload.room.strip()
+        body = payload.body.strip()
 
         if not _validate_room(room):
             return jsonify({"error": "Invalid room."}, status_code=400)
@@ -177,14 +186,13 @@ def register_chat_routes(students):
 
     # ── Edit own message ───────────────────────────────────────────────────────
     @students.put("/api/chat/messages/{msg_id}")
-    def api_chat_edit(msg_id: int):
+    def api_chat_edit(msg_id: int, payload: ChatMessageEditPayload):
         if current_auth_role() != "student":
             return jsonify({"error": "Login required."}, status_code=401)
 
         student_login = current_auth_login() or current_student_full_name()
 
-        data = request.get_json(silent=True) or {}
-        body = str(data.get("body", "")).strip()
+        body = payload.body.strip()
         if not body:
             return jsonify({"error": "Message cannot be empty."}, status_code=400)
         if len(body) > _MAX_BODY:

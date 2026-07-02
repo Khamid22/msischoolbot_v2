@@ -1,13 +1,17 @@
 from backend.utils.response_helpers import jsonify
-from backend.utils.context import request
 from backend.domains.communication.chat_service import _DB_LOCK, connect_chat_db, fmt_display, utc_now_iso
 from backend.utils.session import (
     current_auth_role,
     current_student_full_name,
 )
+from pydantic import BaseModel
 
 _COMMENT_MAX_LENGTH = 500
 _COMMENTS_PER_PAGE = 50
+
+
+class ResourceCommentPayload(BaseModel):
+    body: str = ""
 
 
 def register_comment_routes(students):
@@ -38,7 +42,7 @@ def register_comment_routes(students):
         return jsonify({"comments": comments})
 
     @students.post("/api/resources/{resource_id}/comments")
-    def api_post_comment(resource_id: int):
+    def api_post_comment(resource_id: int, payload: ResourceCommentPayload):
         if current_auth_role() != "student":
             return jsonify({"error": "Login required to leave a comment."}, status_code=401)
 
@@ -46,8 +50,7 @@ def register_comment_routes(students):
         if not author_name:
             return jsonify({"error": "Could not identify your account."}, status_code=401)
 
-        data = request.get_json(silent=True) or {}
-        body = str(data.get("body", "")).strip()
+        body = payload.body.strip()
         if not body:
             return jsonify({"error": "Comment cannot be empty."}, status_code=400)
         if len(body) > _COMMENT_MAX_LENGTH:

@@ -17,8 +17,14 @@ from backend.utils.session import (
     current_auth_role,
 )
 from database import queries
+from pydantic import BaseModel
 
 _PAGE_SIZE = 60
+
+
+class AdminChatBlockPayload(BaseModel):
+    studentId: str = ""
+    reason: str = ""
 
 
 def _require_admin():
@@ -107,14 +113,13 @@ def register_admin_chat_routes(router):
 
     # ── Block a student ────────────────────────────────────────────────────────
     @router.post("/admin/api/chat/block")
-    def admin_api_chat_block():
+    def admin_api_chat_block(payload: AdminChatBlockPayload):
         err = _require_admin()
         if err:
             return err
 
-        data = request.get_json(silent=True) or {}
-        student_id = str(data.get("studentId", "")).strip().lower()
-        reason = str(data.get("reason", "")).strip()[:300]
+        student_id = payload.studentId.strip().lower()
+        reason = payload.reason.strip()[:300]
 
         if not student_id:
             return jsonify({"error": "studentId required."}, status_code=400)
