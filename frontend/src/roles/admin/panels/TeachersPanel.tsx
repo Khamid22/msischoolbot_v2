@@ -58,7 +58,7 @@ export default function TeachersPanel({
     Array.isArray(props.adminTeacherCandidates) ? props.adminTeacherCandidates : [],
   );
   const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
-    Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : [],
+    Array.isArray(state.academyTeachers) ? state.academyTeachers : Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : [],
   );
 
   const [modalOpen, setModalOpen] = useState(Boolean(teacherEdit));
@@ -98,10 +98,18 @@ export default function TeachersPanel({
   }, [activeTab, defaultTab, visibleTabs]);
 
   useEffect(() => {
-    if (Array.isArray(props.adminTeacherAcademy)) {
+    if (Array.isArray(state.teachers)) {
+      setTeachers(state.teachers as Teacher[]);
+    }
+  }, [state.teachers]);
+
+  useEffect(() => {
+    if (Array.isArray(state.academyTeachers)) {
+      setAcademyTeachers(state.academyTeachers);
+    } else if (Array.isArray(props.adminTeacherAcademy)) {
       setAcademyTeachers(props.adminTeacherAcademy);
     }
-  }, [props.adminTeacherAcademy]);
+  }, [state.academyTeachers, props.adminTeacherAcademy]);
 
   useEffect(() => {
     try {
@@ -132,6 +140,20 @@ export default function TeachersPanel({
         window.sessionStorage.setItem(TAB_STORAGE_KEY, tab);
       } catch {
       }
+    }
+  }
+
+  function syncTeachers(rows: Array<Record<string, unknown>>) {
+    setTeachers(rows as Teacher[]);
+    if (typeof state.setTeachers === "function") {
+      state.setTeachers(rows);
+    }
+  }
+
+  function syncAcademyTeachers(rows: Array<Record<string, unknown>>) {
+    setAcademyTeachers(rows);
+    if (typeof state.setAcademyTeachers === "function") {
+      state.setAcademyTeachers(rows);
     }
   }
 
@@ -583,8 +605,8 @@ export default function TeachersPanel({
         <TeacherAcademyPanel
           state={state}
           academyTeachers={academyTeachers}
-          onAcademyChange={setAcademyTeachers}
-          onTeachersChange={(rows) => setTeachers(rows as Teacher[])}
+          onAcademyChange={syncAcademyTeachers}
+          onTeachersChange={syncTeachers}
           showToast={showToast}
         />
       ) : null}

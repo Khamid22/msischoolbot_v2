@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, ClipboardCheck, GraduationCap, Plus, Trophy, X } from "lucide-react";
+import { BookOpenCheck, CalendarClock, ClipboardCheck, Eye, GraduationCap, Plus, Trophy, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
@@ -152,7 +152,7 @@ function NewAcademyTeacherModal({
 
   return (
     <ModalShell title="New Academy Teacher" subtitle="Create a trainee and assign 12 curriculum lessons." onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
+      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>Full Name</FieldLabel>
@@ -160,7 +160,7 @@ function NewAcademyTeacherModal({
           </label>
           <label className="block">
             <FieldLabel>Subject Curriculum</FieldLabel>
-            <select name="academy_subject_program_id" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+            <select name="academy_subject_program_id" required defaultValue="" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
               <option value="" disabled>Select curriculum</option>
               {programs.map((program) => (
                 <option key={asNumber(program.id)} value={asNumber(program.id)}>
@@ -214,7 +214,7 @@ function NewAcademyTeacherModal({
             <textarea name="academy_notes" rows={3} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
           </label>
         </div>
-        {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
         <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Training Pack" />
       </form>
     </ModalShell>
@@ -260,7 +260,7 @@ function AssignmentModal({
 
   return (
     <ModalShell title="Schedule Training Lesson" subtitle={`${asString(assignment.lesson_number)} · ${asString(assignment.lesson_topic)}`} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
+      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <FieldLabel>Assignment Type</FieldLabel>
@@ -317,7 +317,7 @@ function AssignmentModal({
           <FieldLabel>Notes to Trainee</FieldLabel>
           <textarea name="notes_to_trainee" rows={3} defaultValue={asString(assignment.notes_to_trainee)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
         </label>
-        {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
         <ModalActions onClose={onClose} submitting={submitting} submitLabel="Save Lesson" />
       </form>
     </ModalShell>
@@ -366,7 +366,7 @@ function AssessmentModal({
 
   return (
     <ModalShell title="Assessment Report" subtitle={`${asString(teacher.full_name)} · ${asString(assignment.lesson_number)} · score ${weighted.toFixed(2)}`} onClose={onClose} wide>
-      <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4">
+      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <FieldLabel>Assessment Type</FieldLabel>
@@ -530,7 +530,7 @@ function PromoteModal({
 
   return (
     <ModalShell title="Promote to Active Teacher" subtitle={asString(teacher.full_name)} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
+      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <label className="block">
           <FieldLabel>Assign Real Group</FieldLabel>
           <select name="teacher_assigned_group" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
@@ -579,12 +579,14 @@ function PromoteModal({
 function AcademyDetailModal({
   teacher,
   onClose,
+  onPreview,
   onSchedule,
   onAssess,
   onPromote,
 }: {
   teacher: AcademyTeacher;
   onClose: () => void;
+  onPreview: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
@@ -594,7 +596,7 @@ function AcademyDetailModal({
   const progress = teacherProgress(teacher);
   return (
     <ModalShell title={asString(teacher.full_name)} subtitle={`${asString(teacher.subject)} · ${statusLabel(teacher.academy_status)}`} onClose={onClose} wide>
-      <div className="min-h-0 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div className="grid gap-2 sm:grid-cols-4">
           {metric("Progress", `${progress.assessed}/${progress.target}`, "assessed lessons")}
           {metric("Passed", progress.passed, "lessons accepted")}
@@ -605,12 +607,18 @@ function AcademyDetailModal({
           <section>
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">12-Lesson Training Pack</p>
-              {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
-                <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
-                  <Trophy className="h-3.5 w-3.5" />
-                  Promote
+              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
+                  <Eye className="h-3.5 w-3.5" />
+                  Preview as Teacher
                 </button>
-              ) : null}
+                {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
+                  <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
+                    <Trophy className="h-3.5 w-3.5" />
+                    Promote
+                  </button>
+                ) : null}
+              </div>
             </div>
             <div className="max-h-[52dvh] overflow-auto rounded-lg border border-foreground/8">
               {assignments.map((assignment) => (
@@ -676,8 +684,8 @@ function ModalShell({
   wide?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4">
-      <div className={`flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover ${wide ? "max-w-5xl" : "max-w-2xl"}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-3 sm:p-4">
+      <div className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-xl bg-surface shadow-card-hover ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-bold">{title}</h3>
@@ -699,7 +707,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function ModalActions({ onClose, submitting, submitLabel }: { onClose: () => void; submitting: boolean; submitLabel: string }) {
   return (
-    <div className="flex justify-end gap-2 border-t border-foreground/8 pt-3">
+    <div className="sticky bottom-0 -mx-4 mt-2 flex justify-end gap-2 border-t border-foreground/8 bg-surface px-4 py-3">
       <button type="button" onClick={onClose} className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted">
         Cancel
       </button>
@@ -782,6 +790,17 @@ export function TeacherAcademyPanel({
     return asString(right.updated_at).localeCompare(asString(left.updated_at));
   });
 
+  function previewAsTeacher(teacher: AcademyTeacher) {
+    try {
+      window.localStorage.setItem("msi_teacher_preview_key", `academy:${asNumber(teacher.id)}`);
+      window.localStorage.removeItem("msi_teacher_preview_id");
+    } catch {
+    }
+    if (typeof state.switchAdminMode === "function") {
+      state.switchAdminMode("teacher");
+    }
+  }
+
   return (
     <>
       {createOpen ? (
@@ -857,6 +876,7 @@ export function TeacherAcademyPanel({
         <AcademyDetailModal
           teacher={detailTeacher}
           onClose={() => setDetailTeacher(null)}
+          onPreview={() => previewAsTeacher(detailTeacher)}
           onSchedule={(nextAssignment) => {
             setError("");
             setAssignment(nextAssignment);
@@ -898,83 +918,82 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
-        <div className="min-h-0 flex-1 overflow-x-auto rounded-lg border border-foreground/8">
-          <table className="w-full min-w-[960px] table-fixed text-left">
-            <thead className="bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-              <tr className="border-b border-foreground/5">
-                {["Trainee", "Status", "Progress", "Next Lesson", "Next Session", "Average", "Next Action"].map((heading) => (
-                  <th key={heading} className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTeachers.length ? sortedTeachers.map((teacher) => {
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-foreground/8 bg-background p-2">
+          {sortedTeachers.length ? (
+            <div className="grid gap-2 xl:grid-cols-2 2xl:grid-cols-3">
+              {sortedTeachers.map((teacher) => {
                 const progress = teacherProgress(teacher);
                 const nextAssignment = progress.nextAssignment || academyAssignments(teacher)[0] || null;
+                const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
                 return (
-                  <tr key={asNumber(teacher.id)} className="border-b border-foreground/5 hover:bg-muted/50">
-                    <td className="px-3 py-2.5">
-                      <button type="button" onClick={() => setDetailTeacher(teacher)} className="block max-w-full text-left">
+                  <article key={asNumber(teacher.id)} className="rounded-xl border border-foreground/8 bg-surface p-3 shadow-sm transition hover:border-foreground/15 hover:shadow-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <button type="button" onClick={() => setDetailTeacher(teacher)} className="min-w-0 text-left">
                         <span className="block truncate text-sm font-bold text-primary">{asString(teacher.full_name)}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</span>
                       </button>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="rounded-md border border-foreground/10 bg-background px-2 py-1 text-[11px] font-bold">{statusLabel(teacher.academy_status)}</span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.round((progress.assessed / progress.target) * 100))}%` }} />
-                        </div>
-                        <span className="text-[11px] font-semibold text-muted-foreground">{progress.assessed}/{progress.target}</span>
+                      <span className="shrink-0 rounded-full border border-foreground/10 bg-background px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {statusLabel(teacher.academy_status)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[11px] font-bold text-muted-foreground">Progress</span>
+                        <span className="text-[11px] font-bold">{progress.assessed}/{progress.target}</span>
                       </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-foreground/8 bg-background px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Next Lesson</p>
                       {nextAssignment ? (
                         <>
-                          <span className="block font-bold">{asString(nextAssignment.lesson_number)}</span>
-                          <span className="line-clamp-1 text-muted-foreground">{asString(nextAssignment.lesson_topic)}</span>
+                          <p className="mt-1 truncate text-sm font-bold">{asString(nextAssignment.lesson_number)} · {asString(nextAssignment.lesson_topic)}</p>
+                          <p className="mt-1 truncate text-[11px] text-muted-foreground">{dateLabel(nextAssignment.session_datetime)} · Avg {progress.average == null ? "-" : progress.average.toFixed(2)}</p>
                         </>
-                      ) : "-"}
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{nextAssignment ? dateLabel(nextAssignment.session_datetime) : "-"}</td>
-                    <td className="px-3 py-2.5 text-xs font-bold">{progress.average == null ? "-" : progress.average.toFixed(2)}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex flex-wrap gap-1.5">
-                        {nextAssignment ? (
-                          <>
-                            <button type="button" onClick={() => setAssignment(nextAssignment)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 px-2 text-[11px] font-bold hover:bg-muted">
-                              <CalendarClock className="h-3.5 w-3.5" />
-                              Assign
-                            </button>
-                            <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2 text-[11px] font-bold text-background">
-                              <ClipboardCheck className="h-3.5 w-3.5" />
-                              Assess
-                            </button>
-                          </>
-                        ) : null}
-                        {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
-                          <button type="button" onClick={() => setPromoteTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2 text-[11px] font-bold text-primary-foreground">
-                            <Trophy className="h-3.5 w-3.5" />
-                            Promote
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">No pending lesson.</p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10">
+                        <Eye className="h-3.5 w-3.5" />
+                        Preview
+                      </button>
+                      {nextAssignment ? (
+                        <>
+                          <button type="button" onClick={() => setAssignment(nextAssignment)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted">
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            Assign
                           </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
+                          <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background">
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            Assess
+                          </button>
+                        </>
+                      ) : null}
+                      {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
+                        <button type="button" onClick={() => setPromoteTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11px] font-bold text-primary-foreground">
+                          <Trophy className="h-3.5 w-3.5" />
+                          Promote
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
                 );
-              }) : (
-                <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center">
-                    <BookOpenCheck className="mx-auto h-5 w-5 text-muted-foreground" />
-                    <p className="mt-2 text-sm font-bold">No academy teachers yet.</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Create a trainee to assign 12 curriculum lessons automatically.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              })}
+            </div>
+          ) : (
+            <div className="px-3 py-10 text-center">
+              <BookOpenCheck className="mx-auto h-5 w-5 text-muted-foreground" />
+              <p className="mt-2 text-sm font-bold">No academy teachers yet.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Create a trainee to assign 12 curriculum lessons automatically.</p>
+            </div>
+          )}
         </div>
       </ChartCard>
     </>

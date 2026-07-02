@@ -4,6 +4,203 @@ import { asNumber, asString } from "../../shared";
 import { Candidate, candidateEvents, parseIsoMillis, candidateLastTouchedAt, candidateAgeDays, relativeDaysLabel, openTeacherCandidateView, roleStudentRows, supportComplaintRows, supportComplaintStatus, supportComplaintCategory, supportComplaintTitle, formatMoney, supportPaymentFollowUps, studentDashboardCards } from "./shared";
 import { ClosedCandidatesOverviewCard, HrAttentionCard, RoleMetric } from "./cards";
 
+function academyStatusLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    new_academy_teacher: "New Academy Teacher",
+    in_training: "In Training",
+    ready_for_evaluation: "Ready for Evaluation",
+    needs_improvement: "Needs Improvement",
+    ready_for_active_teacher: "Ready for Active Teacher",
+    approved: "Approved",
+    rejected: "Rejected",
+    on_hold: "On Hold",
+  };
+  return labels[asString(value)] || asString(value) || "In Training";
+}
+
+function formatDateTime(value: unknown) {
+  const raw = asString(value);
+  if (!raw) return "-";
+  const parsed = Date.parse(raw);
+  if (!Number.isFinite(parsed)) return raw.replace("T", " ").slice(0, 16);
+  return new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(parsed));
+}
+
+function academyAssignments(teacher: Record<string, unknown>) {
+  return Array.isArray(teacher.assignments) ? (teacher.assignments as Array<Record<string, unknown>>) : [];
+}
+
+function academyAssessments(teacher: Record<string, unknown>) {
+  return Array.isArray(teacher.assessments) ? (teacher.assessments as Array<Record<string, unknown>>) : [];
+}
+
+function academyProgress(teacher: Record<string, unknown>) {
+  const progress = teacher.progress && typeof teacher.progress === "object"
+    ? (teacher.progress as Record<string, unknown>)
+    : {};
+  const assigned = asNumber(progress.assigned_count);
+  const assessed = asNumber(progress.assessed_count);
+  const passed = asNumber(progress.passed_count);
+  const target = asNumber(progress.target_lessons) || 12;
+  const average = Number(progress.average_score);
+  const latest = Number(progress.latest_score);
+  return {
+    assigned,
+    assessed,
+    passed,
+    target,
+    average: Number.isFinite(average) ? average : null,
+    latest: Number.isFinite(latest) ? latest : null,
+    nextAssignment: progress.next_assignment && typeof progress.next_assignment === "object"
+      ? (progress.next_assignment as Record<string, unknown>)
+      : null,
+  };
+}
+
+function TeacherIdentityCard({ teacher }: { teacher: Record<string, unknown> | null }) {
+  if (!teacher) return null;
+  const score = asNumber(teacher.performance_score);
+  return (
+    <ChartCard title="Teacher Profile" subtitle="Previewing this teacher workspace" icon={<Users className="h-4 w-4 text-info" />}>
+      <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-xl border border-foreground/8 bg-background p-4">
+          <p className="text-lg font-bold">{asString(teacher.full_name) || "Teacher"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {asString(teacher.assigned_group) || "No group assigned"} · {asString(teacher.login) || "No login"}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <div className="rounded-lg bg-surface px-3 py-2">
+              <p className="font-bold uppercase tracking-wide text-muted-foreground">Rank</p>
+              <p className="mt-1 font-bold capitalize text-foreground">{asString(teacher.category).replace(/_/g, " ") || "-"}</p>
+            </div>
+            <div className="rounded-lg bg-surface px-3 py-2">
+              <p className="font-bold uppercase tracking-wide text-muted-foreground">Semester</p>
+              <p className="mt-1 font-bold text-foreground">{asString(teacher.semester_stage) || "-"}</p>
+            </div>
+            <div className="rounded-lg bg-surface px-3 py-2">
+              <p className="font-bold uppercase tracking-wide text-muted-foreground">Score</p>
+              <p className="mt-1 font-bold text-primary">{score ? score.toFixed(1) : "-"}</p>
+            </div>
+            <div className="rounded-lg bg-surface px-3 py-2">
+              <p className="font-bold uppercase tracking-wide text-muted-foreground">Lessons</p>
+              <p className="mt-1 font-bold text-foreground">{asNumber(teacher.supervised_lessons)}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-900">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Active Teacher</p>
+          <p className="mt-2 text-sm leading-6">
+            This preview uses the selected teacher's assigned group, students, timetable, resources, and announcements.
+          </p>
+        </div>
+      </div>
+    </ChartCard>
+  );
+}
+
+function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }) {
+  const assignments = academyAssignments(teacher);
+  const assessments = academyAssessments(teacher).slice().reverse();
+  const progress = academyProgress(teacher);
+  const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
+
+  return (
+    <div className="space-y-3">
+      <ChartCard title="Training Teacher Profile" subtitle="Teacher role preview for Academy trainees" icon={<GraduationCap className="h-4 w-4 text-info" />}>
+        <div className="grid gap-3 xl:grid-cols-[1fr_0.8fr]">
+          <div className="rounded-xl border border-foreground/8 bg-background p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-xl font-bold">{asString(teacher.full_name) || "Academy Teacher"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {asString(teacher.subject) || "Subject"} · {academyStatusLabel(teacher.academy_status)}
+                </p>
+              </div>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">
+                Training
+              </span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <RoleMetric label="Assigned" value={progress.assigned} detail="lessons" icon={<BookOpen className="h-4 w-4" />} tone="bg-sky-50" />
+              <RoleMetric label="Assessed" value={progress.assessed} detail={`of ${progress.target}`} icon={<Clock3 className="h-4 w-4" />} tone="bg-violet-50" />
+              <RoleMetric label="Passed" value={progress.passed} detail="accepted" icon={<Trophy className="h-4 w-4" />} tone="bg-emerald-50" />
+              <RoleMetric label="Average" value={progress.average == null ? "-" : progress.average.toFixed(1)} detail="weighted" icon={<BarChart3 className="h-4 w-4" />} tone="bg-amber-50" />
+            </div>
+          </div>
+          <div className="rounded-xl border border-foreground/8 bg-background p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Next Training Lesson</p>
+            {progress.nextAssignment ? (
+              <div className="mt-3">
+                <p className="text-base font-bold">{asString(progress.nextAssignment.lesson_number)}</p>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">{asString(progress.nextAssignment.lesson_topic)}</p>
+                <p className="mt-3 text-xs font-semibold text-muted-foreground">
+                  {formatDateTime(progress.nextAssignment.session_datetime)} · {asString(progress.nextAssignment.evaluator_name) || "No evaluator"}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">No remaining lesson is waiting for assessment.</p>
+            )}
+          </div>
+        </div>
+      </ChartCard>
+
+      <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+        <ChartCard title="12-Lesson Training Pack" subtitle={`${assignments.length} curriculum lessons`} icon={<BookOpen className="h-4 w-4 text-info" />}>
+          <div className="miniapp-table-scroll max-h-[28rem] rounded-lg border border-foreground/8">
+            <div className="grid gap-0 divide-y divide-foreground/5 bg-background">
+              {assignments.map((assignment) => (
+                <div key={asNumber(assignment.id)} className="grid gap-2 px-3 py-2.5 sm:grid-cols-[3rem_1fr_auto]">
+                  <span className="text-xs font-bold text-muted-foreground">{asNumber(assignment.sequence_no)}</span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{asString(assignment.lesson_number)} · {asString(assignment.lesson_topic)}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{asString(assignment.specification_points) || "Guided lesson practice"}</p>
+                  </div>
+                  <span className="h-fit rounded-md bg-muted px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">
+                    {asString(assignment.status) || "assigned"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Assessment Reports" subtitle={`${assessments.length} saved`} icon={<Trophy className="h-4 w-4 text-info" />}>
+          <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+            {assessments.length ? assessments.map((assessment) => (
+              <div key={asNumber(assessment.id)} className="rounded-lg border border-foreground/8 bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{asString(assessment.lesson_number)} · {asString(assessment.lesson_topic)}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDateTime(assessment.assessment_datetime)}</p>
+                  </div>
+                  <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+                    {Number(assessment.weighted_overall_score || 0).toFixed(1)}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                  {asString(assessment.areas_for_improvement) || asString(assessment.final_recommendation) || asString(assessment.strengths) || "No notes."}
+                </p>
+              </div>
+            )) : (
+              <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
+                <p className="text-sm font-bold text-muted-foreground">No assessment reports yet.</p>
+              </div>
+            )}
+          </div>
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
 export function RoleOverviewPanel({ state }: { state: any }) {
   const mode = asString(state.adminMode).toLowerCase();
   const students = roleStudentRows(state);
@@ -181,6 +378,10 @@ export function RoleOverviewPanel({ state }: { state: any }) {
         })}
       </div>
     );
+  }
+
+  if (mode === "teacher" && state.academyTeacherPreview) {
+    return <AcademyTeacherPreview teacher={state.academyTeacherPreview as Record<string, unknown>} />;
   }
 
   if (mode === "hr") {
@@ -485,8 +686,11 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     );
   }
 
+  const activeTeacher = teachers[0] || null;
+
   return (
     <div className="space-y-3">
+      <TeacherIdentityCard teacher={activeTeacher} />
       <div className="grid gap-2 md:grid-cols-4">
         <RoleMetric label="My Students" value={students.length} detail="visible student records" icon={<Users className="h-4 w-4" />} tone="bg-sky-50" />
         <RoleMetric label="Groups" value={groups.length} detail="class groups" icon={<School className="h-4 w-4" />} tone="bg-emerald-50" />
@@ -502,4 +706,3 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     </div>
   );
 }
-

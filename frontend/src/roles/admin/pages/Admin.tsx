@@ -263,8 +263,11 @@ function rowsFrom(value: unknown) {
 }
 
 function activeTeacherRowsFor(state: any) {
-  const teachers = rowsFrom(state.teachers?.length ? state.teachers : state.props?.adminTeachers);
-  const selectedTeacherId = asNumber(state.teacherPreviewId);
+  const teachers = rowsFrom(Array.isArray(state.teachers) ? state.teachers : state.props?.adminTeachers);
+  const selectedKey = asString(state.teacherPreviewKey);
+  const selectedTeacherId = selectedKey.startsWith("active:")
+    ? asNumber(selectedKey.replace("active:", ""))
+    : asNumber(state.teacherPreviewId);
   if (selectedTeacherId > 0) {
     return teachers.filter((teacher) => asNumber(teacher.id) === selectedTeacherId);
   }
@@ -275,6 +278,15 @@ function activeTeacherRowsFor(state: any) {
     const name = normalizeMatch(teacher.full_name);
     return Boolean(name && (name === login || name.includes(login) || login.includes(name)));
   });
+}
+
+function academyTeacherPreviewFor(state: any) {
+  const selectedKey = asString(state.teacherPreviewKey);
+  if (!selectedKey.startsWith("academy:")) return null;
+  const academyTeacherId = asNumber(selectedKey.replace("academy:", ""));
+  if (!academyTeacherId) return null;
+  const teachers = rowsFrom(Array.isArray(state.academyTeachers) ? state.academyTeachers : state.props?.adminTeacherAcademy);
+  return teachers.find((teacher) => asNumber(teacher.id) === academyTeacherId) || null;
 }
 
 function emptyTeacherScopedState(state: any) {
@@ -306,54 +318,100 @@ function initialsForName(name: unknown) {
   );
 }
 
-function teacherPreviewFallbackId(teachers: Array<Record<string, unknown>>, authLogin: unknown) {
+function previewKeyFor(row: Record<string, unknown>, fallbackKind = "active") {
+  const explicitKey = asString(row.__previewKey);
+  if (explicitKey) return explicitKey;
+  const kind = asString(row.__previewKind) || fallbackKind;
+  return `${kind}:${asNumber(row.id)}`;
+}
+
+function teacherPreviewRows(
+  activeTeachers: Array<Record<string, unknown>>,
+  academyTeachers: Array<Record<string, unknown>>,
+) {
+  return [
+    ...activeTeachers.map((teacher) => ({
+      ...teacher,
+      __previewKey: `active:${asNumber(teacher.id)}`,
+      __previewKind: "active",
+    })),
+    ...academyTeachers
+      .filter((teacher) => !["approved", "rejected"].includes(asString(teacher.academy_status)))
+      .map((teacher) => ({
+        ...teacher,
+        __previewKey: `academy:${asNumber(teacher.id)}`,
+        __previewKind: "academy",
+      })),
+  ];
+}
+
+function teacherPreviewFallbackKey(
+  teachers: Array<Record<string, unknown>>,
+  authLogin: unknown,
+) {
+  if (!teachers.length) return "";
   const login = normalizeMatch(authLogin);
   if (login) {
     const matchedTeacher = teachers.find((teacher) => {
       const name = normalizeMatch(teacher.full_name);
       return Boolean(name && (name === login || name.includes(login) || login.includes(name)));
     });
-    const matchedTeacherId = asNumber(matchedTeacher?.id);
-    if (matchedTeacherId) return matchedTeacherId;
+    const matchedKey = matchedTeacher ? previewKeyFor(matchedTeacher) : "";
+    if (matchedKey) return matchedKey;
   }
-  return asNumber(teachers[0]?.id);
+  return previewKeyFor(teachers[0]);
 }
 
-function resolveTeacherPreviewId(
+function resolveTeacherPreviewKey(
   teachers: Array<Record<string, unknown>>,
-  selectedTeacherId: number,
+  selectedTeacherKey: string,
   authLogin: unknown,
 ) {
-  if (!teachers.length) return 0;
-  if (selectedTeacherId && teachers.some((teacher) => asNumber(teacher.id) === selectedTeacherId)) {
-    return selectedTeacherId;
+  if (!teachers.length) return "";
+  if (selectedTeacherKey && teachers.some((teacher) => previewKeyFor(teacher) === selectedTeacherKey)) {
+    return selectedTeacherKey;
   }
-  return teacherPreviewFallbackId(teachers, authLogin);
+  const migratedId = asNumber(selectedTeacherKey);
+  if (migratedId && teachers.some((teacher) => previewKeyFor(teacher) === `active:${migratedId}`)) {
+    return `active:${migratedId}`;
+  }
+  return teacherPreviewFallbackKey(teachers, authLogin);
 }
 
 function TeacherPreviewSelector({
   teachers,
-  selectedTeacherId,
+  selectedTeacherKey,
   onSelect,
 }: {
   teachers: Array<Record<string, unknown>>;
-  selectedTeacherId: number;
-  onSelect: (teacherId: number) => void;
+  selectedTeacherKey: string;
+  onSelect: (teacherKey: string) => void;
 }) {
   if (!teachers.length) return null;
 
   return (
-    <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+    <div className="mb-3 rounded-xl border border-foreground/8 bg-surface p-2 shadow-card">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Teacher profile preview</p>
+          <p className="truncate text-[11px] text-muted-foreground">Active teachers and Teacher Academy trainees</p>
+        </div>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
       {teachers.map((teacher) => {
-        const teacherId = asNumber(teacher.id);
-        const isSelected = teacherId === selectedTeacherId;
-        const assignedGroup = asString(teacher.assigned_group) || "No group";
+        const teacherKey = previewKeyFor(teacher);
+        const kind = asString(teacher.__previewKind);
+        const isAcademy = kind === "academy";
+        const isSelected = teacherKey === selectedTeacherKey;
+        const assignedGroup = isAcademy
+          ? asString(teacher.subject) || "Training"
+          : asString(teacher.assigned_group) || "No group";
         return (
           <button
-            key={teacherId || asString(teacher.full_name)}
+            key={teacherKey || asString(teacher.full_name)}
             type="button"
-            onClick={() => onSelect(teacherId)}
-            className={`flex min-w-[15rem] items-center gap-3 rounded-lg border px-3 py-2.5 text-left shadow-card transition-colors ${
+            onClick={() => onSelect(teacherKey)}
+            className={`flex min-w-[13.5rem] items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors ${
               isSelected
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-foreground/10 bg-surface text-foreground hover:bg-muted"
@@ -367,16 +425,26 @@ function TeacherPreviewSelector({
               {initialsForName(teacher.full_name)}
             </span>
             <span className="min-w-0">
-              <span className="block truncate text-sm font-bold">
-                {asString(teacher.full_name) || "Teacher"}
-              </span>
+              <span className="block truncate text-[13px] font-bold">{asString(teacher.full_name) || "Teacher"}</span>
               <span className={`block truncate text-xs ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                 {assignedGroup}
+              </span>
+              <span
+                className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                  isSelected
+                    ? "bg-primary-foreground/15 text-primary-foreground"
+                    : isAcademy
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {isAcademy ? "Training" : "Active"}
               </span>
             </span>
           </button>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -384,6 +452,24 @@ function TeacherPreviewSelector({
 function scopeTeacherState(state: any) {
   if (asString(state.adminMode).toLowerCase() !== "teacher") {
     return state;
+  }
+  const academyPreview = academyTeacherPreviewFor(state);
+  if (academyPreview) {
+    const props = { ...(state.props || {}) };
+    props.adminTeachers = [];
+    props.adminStudents = [];
+    props.adminAcademicGroups = [];
+    props.adminAcademicEnrollments = [];
+    props.adminAcademicSchedules = [];
+    props.adminAcademicSessions = [];
+    props.adminAcademicLessons = [];
+    return {
+      ...state,
+      props,
+      teachers: [],
+      filteredStudents: [],
+      academyTeacherPreview: academyPreview,
+    };
   }
   const teacherRows = activeTeacherRowsFor(state);
   if (!teacherRows.length) {
@@ -693,29 +779,35 @@ function AdminSidebar({
 
 export default function AdminPage(props: AdminPageProps) {
   const state = useAdminState(props);
-  const allTeacherRows = rowsFrom(props.adminTeachers);
-  const [teacherPreviewId, setTeacherPreviewId] = useState(() => {
+  const allTeacherRows = rowsFrom(Array.isArray(state.teachers) ? state.teachers : state.props.adminTeachers);
+  const allAcademyTeacherRows = rowsFrom(Array.isArray(state.academyTeachers) ? state.academyTeachers : state.props.adminTeacherAcademy);
+  const allTeacherPreviewRows = teacherPreviewRows(allTeacherRows, allAcademyTeacherRows);
+  const [teacherPreviewKey, setTeacherPreviewKey] = useState(() => {
     try {
-      const stored = Number(window.localStorage.getItem("msi_teacher_preview_id") || 0);
-      return Number.isFinite(stored) && stored > 0 ? stored : 0;
+      const storedKey = asString(window.localStorage.getItem("msi_teacher_preview_key"));
+      if (storedKey) return storedKey;
+      const storedId = Number(window.localStorage.getItem("msi_teacher_preview_id") || 0);
+      return Number.isFinite(storedId) && storedId > 0 ? `active:${storedId}` : "";
     } catch {
-      return 0;
+      return "";
     }
   });
   const isTeacherWorkspace = asString(state.adminMode).toLowerCase() === "teacher";
-  const selectedTeacherPreviewId = isTeacherWorkspace
-    ? resolveTeacherPreviewId(allTeacherRows, teacherPreviewId, props.authLogin)
-    : 0;
+  const selectedTeacherPreviewKey = isTeacherWorkspace
+    ? resolveTeacherPreviewKey(allTeacherPreviewRows, teacherPreviewKey, props.authLogin)
+    : "";
   const panelState = isTeacherWorkspace
-    ? { ...state, teacherPreviewId: selectedTeacherPreviewId }
+    ? { ...state, teacherPreviewKey: selectedTeacherPreviewKey }
     : state;
 
-  function selectTeacherPreview(teacherId: number) {
-    setTeacherPreviewId(teacherId);
+  function selectTeacherPreview(nextTeacherKey: string) {
+    setTeacherPreviewKey(nextTeacherKey);
     try {
-      if (teacherId > 0) {
-        window.localStorage.setItem("msi_teacher_preview_id", String(teacherId));
+      if (nextTeacherKey) {
+        window.localStorage.setItem("msi_teacher_preview_key", nextTeacherKey);
+        window.localStorage.removeItem("msi_teacher_preview_id");
       } else {
+        window.localStorage.removeItem("msi_teacher_preview_key");
         window.localStorage.removeItem("msi_teacher_preview_id");
       }
     } catch {
@@ -826,8 +918,8 @@ export default function AdminPage(props: AdminPageProps) {
 
         {isTeacherWorkspace ? (
           <TeacherPreviewSelector
-            teachers={allTeacherRows}
-            selectedTeacherId={selectedTeacherPreviewId}
+            teachers={allTeacherPreviewRows}
+            selectedTeacherKey={selectedTeacherPreviewKey}
             onSelect={selectTeacherPreview}
           />
         ) : null}

@@ -115,7 +115,12 @@ export function useAdminState(props: AdminPageProps) {
   const [complaints, setComplaints] = useState<Array<Record<string, unknown>>>(() =>
     Array.isArray(props.adminComplaints) ? props.adminComplaints : []
   );
-  const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
+  const [teachers, setTeachers] = useState<Array<Record<string, unknown>>>(
+    Array.isArray(props.adminTeachers) ? props.adminTeachers : []
+  );
+  const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
+    Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : []
+  );
   const resourceTypes = Array.isArray(props.adminResourceTypes) ? props.adminResourceTypes : [];
   const activeResourceTypes = Array.isArray(props.adminResourceActiveTypes)
     ? props.adminResourceActiveTypes
@@ -436,6 +441,18 @@ export function useAdminState(props: AdminPageProps) {
       setResourcesList(props.adminResources);
     }
   }, [props.adminResources]);
+
+  useEffect(() => {
+    if (Array.isArray(props.adminTeachers)) {
+      setTeachers(props.adminTeachers);
+    }
+  }, [props.adminTeachers]);
+
+  useEffect(() => {
+    if (Array.isArray(props.adminTeacherAcademy)) {
+      setAcademyTeachers(props.adminTeacherAcademy);
+    }
+  }, [props.adminTeacherAcademy]);
 
   useEffect(() => {
     if (!parentAccounts.length) {
@@ -912,7 +929,11 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   return {
-    props,
+    props: {
+      ...props,
+      adminTeachers: teachers,
+      adminTeacherAcademy: academyTeachers,
+    },
     adminMode,
     visibleTabs,
     activeTab,
@@ -933,6 +954,9 @@ export function useAdminState(props: AdminPageProps) {
     complaints,
     setComplaints,
     teachers,
+    setTeachers,
+    academyTeachers,
+    setAcademyTeachers,
     resourceTypes,
     activeResourceTypes,
     resourcesList,

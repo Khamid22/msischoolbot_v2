@@ -257,6 +257,7 @@ def ensure_teacher_candidates_schema(conn):
 
 
 def ensure_teacher_academy_schema(conn):
+    conn.execute("SELECT pg_advisory_xact_lock(hashtext('msi_v2.teacher_academy_schema'))")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS msi_v2.academy_teachers (

@@ -138,6 +138,7 @@ def register_teacher_page_routes(app):
 
     @teacher.patch("/teacher/api/office-hours/availability/{availability_id}")
     def teacher_cancel_availability(availability_id: int):
+        teacher_id = current_teacher_id()
         payload = request_payload()
         status = payload.get("status")
         if status != "cancelled":
@@ -179,6 +180,7 @@ def register_teacher_page_routes(app):
 
     @teacher.patch("/teacher/api/office-hours/bookings/{booking_id}")
     def teacher_update_booking_status(booking_id: int):
+        teacher_id = current_teacher_id()
         payload = request_payload()
         status = payload.get("status")
         teacher_note = payload.get("teacher_note")
