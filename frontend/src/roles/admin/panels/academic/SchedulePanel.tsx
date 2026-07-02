@@ -63,8 +63,8 @@ function overlapGridFor(count: number) {
 }
 
 function lessonScatterStyle(lesson: LessonHistoryRow, index: number, count: number) {
-  const columns = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(Math.max(count, 1) * 1.8))));
-  const rows = Math.max(1, Math.ceil(Math.max(count, 1) / columns));
+  const columns = 7;
+  const rows = Math.max(4, Math.ceil(Math.max(count, 1) / columns));
   const column = index % columns;
   const row = Math.floor(index / columns);
   const seed = Math.abs(Number(lesson.id) || index + 1);
@@ -73,8 +73,8 @@ function lessonScatterStyle(lesson: LessonHistoryRow, index: number, count: numb
   const rotation = ((seed * 13) % 9) - 4;
 
   return {
-    left: `${Math.min(94, Math.max(6, ((column + 0.5) / columns) * 100 + jitterX * 0.8))}%`,
-    top: `${Math.min(88, Math.max(12, ((row + 0.5) / rows) * 100 + jitterY * 1.4))}%`,
+    left: `${Math.min(96, Math.max(4, ((column + 0.5) / columns) * 100 + jitterX * 0.55))}%`,
+    top: `${Math.min(92, Math.max(8, ((row + 0.5) / rows) * 100 + jitterY * 1.1))}%`,
     transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
   };
 }
@@ -279,8 +279,6 @@ export function SchedulePanel({ state }: { state: any }) {
   const gridViewportMaxPx = Math.min(880, Math.max(620, 560 + Math.min(busiestDayLoad, 10) * 26));
   const gridHeightPx = (displayEndHour - displayStartHour) * hourPx;
   const hours = Array.from({ length: displayEndHour - displayStartHour + 1 }, (_item, index) => displayStartHour + index);
-  const lessonPoolHeightPx = freeformLessons.length ? Math.min(300, Math.max(112, Math.ceil(freeformLessons.length / 6) * 68)) : 0;
-  const lessonPoolMinWidthPx = Math.max(gridMinWidthPx, Math.min(1680, Math.max(720, freeformLessons.length * 82)));
 
   function blockDragPayload(block: RawTimetableBlock): DragPayload {
     const startMin = timeToMinutes(asString(block.start_time));
@@ -592,46 +590,6 @@ export function SchedulePanel({ state }: { state: any }) {
           </div>
         </div>
 
-        {freeformLessons.length ? (
-          <div className="mb-3 rounded-lg border border-foreground/10 bg-muted/20 p-2">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lesson pool</p>
-              <span className="rounded-md border border-foreground/10 bg-background px-2 py-1 text-[10px] font-bold text-muted-foreground">
-                {freeformLessons.length} unplaced
-              </span>
-            </div>
-            <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
-              <div className="relative" style={{ height: `${lessonPoolHeightPx}px`, minWidth: `${lessonPoolMinWidthPx}px` }}>
-                {freeformLessons.map((lesson, index) => {
-                  const status = lessonStatus(lesson);
-                  const statusClass = status === "cancelled"
-                    ? "border-red-500/20 bg-red-50 text-red-800 shadow-red-900/5"
-                    : "border-emerald-500/20 bg-white text-foreground/75 shadow-emerald-900/5";
-                  return (
-                    <button
-                      key={`pool-${lesson.id}`}
-                      type="button"
-                      onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name), asString(lesson.subject_name)) : undefined}
-                      onPointerMove={canDrag ? movePointerDrag : undefined}
-                      onPointerUp={canDrag ? endPointerDrag : undefined}
-                      onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                      title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`}
-                      aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
-                      className={`absolute flex max-w-[150px] touch-none select-none items-center gap-1 rounded-lg border px-2 py-1 text-left text-[10px] font-bold shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
-                      style={lessonScatterStyle(lesson, index, freeformLessons.length)}
-                    >
-                      <span className="min-w-0 truncate">{asString(lesson.group_name)}</span>
-                      <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground">
-                        {subjectCode(lesson.subject_name)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background">
           <div style={{ minWidth: `${gridMinWidthPx}px` }}>
             <div className="grid border-b border-foreground/10 bg-muted/40" style={{ gridTemplateColumns }}>
@@ -648,7 +606,7 @@ export function SchedulePanel({ state }: { state: any }) {
               className="miniapp-scroll overflow-y-auto"
               style={{ maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 14rem))` }}
             >
-              <div className="grid" style={{ gridTemplateColumns }}>
+              <div className="relative grid" style={{ gridTemplateColumns }}>
                 <div className="relative border-r border-foreground/10 bg-muted/20" style={{ height: `${gridHeightPx}px` }}>
                   {hours.map((hour) => (
                     <div
@@ -750,6 +708,35 @@ export function SchedulePanel({ state }: { state: any }) {
                     </div>
                   );
                 })}
+                {freeformLessons.length ? (
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-20" style={{ left: `${TIME_COLUMN_PX}px` }}>
+                    {freeformLessons.map((lesson, index) => {
+                      const status = lessonStatus(lesson);
+                      const statusClass = status === "cancelled"
+                        ? "border-red-500/20 bg-red-50 text-red-800 shadow-red-900/5"
+                        : "border-emerald-500/20 bg-white text-foreground/75 shadow-emerald-900/5";
+                      return (
+                        <button
+                          key={`schedule-loose-${lesson.id}`}
+                          type="button"
+                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name), asString(lesson.subject_name)) : undefined}
+                          onPointerMove={canDrag ? movePointerDrag : undefined}
+                          onPointerUp={canDrag ? endPointerDrag : undefined}
+                          onPointerCancel={canDrag ? cancelPointerDrag : undefined}
+                          title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`}
+                          aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
+                          className={`pointer-events-auto absolute flex max-w-[150px] touch-none select-none items-center gap-1 rounded-lg border px-2 py-1 text-left text-[10px] font-bold shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                          style={lessonScatterStyle(lesson, index, freeformLessons.length)}
+                        >
+                          <span className="min-w-0 truncate">{asString(lesson.group_name)}</span>
+                          <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground">
+                            {subjectCode(lesson.subject_name)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
