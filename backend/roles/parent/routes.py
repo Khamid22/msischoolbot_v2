@@ -471,7 +471,7 @@ def register_parent_invite_routes(app):
             )
 
         set_parent_session(parent)
-        return _confirmation_page(student_name, student_code, parent, lang=values["lang"])
+        return redirect("/")
 
     @app.get("/parent/dashboard/{student_row_id}")
     def parent_child_dashboard(student_row_id: int):

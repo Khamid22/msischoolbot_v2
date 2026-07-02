@@ -1,5 +1,5 @@
-import { FormEvent, useEffect } from "react";
-import { ArrowRight, LogOut, UserRound } from "lucide-react";
+import { FormEvent, ReactNode } from "react";
+import { Activity, BookOpen, CreditCard, GraduationCap, LogOut, TrendingUp, UserRound } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 
 function asArray(value: unknown): Array<Record<string, unknown>> {
@@ -13,6 +13,10 @@ function asString(value: unknown): string {
 function asNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 function childName(child: Record<string, unknown>): string {
@@ -32,9 +36,135 @@ function childRowId(child: Record<string, unknown>): number {
   return asNumber(child.student_row_id) || asNumber(child.id);
 }
 
-function childDashboardUrl(child: Record<string, unknown>): string {
-  const rowId = childRowId(child);
-  return rowId > 0 ? `/parent/dashboard/${rowId}` : "/";
+function childIndicators(child: Record<string, unknown>) {
+  return asArray(child.academic_indicators);
+}
+
+function childRecentLessons(child: Record<string, unknown>) {
+  return asArray(child.recent_lessons).slice(0, 4);
+}
+
+function averageMetric(rows: Array<Record<string, unknown>>, key: string) {
+  const values = rows.map((row) => asNumber(row[key])).filter((value) => value > 0);
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatScore(value: number, digits = 1) {
+  if (!Number.isFinite(value) || value <= 0) return "-";
+  return Number.isInteger(value) ? String(value) : value.toFixed(digits);
+}
+
+function paymentSummary(child: Record<string, unknown>) {
+  return asObject(child.payment_summary);
+}
+
+function money(value: unknown, currency: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return `0 ${currency}`;
+  return `${Math.round(parsed).toLocaleString()} ${currency}`;
+}
+
+function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
+  const indicators = childIndicators(child);
+  const lessons = childRecentLessons(child);
+  const summary = paymentSummary(child);
+  const currency = asString(summary.currency) || "UZS";
+  const aap = averageMetric(indicators, "aap");
+  const ar = averageMetric(indicators, "ar");
+  const ep = averageMetric(indicators, "ep");
+  const progress = asNumber(summary.program_completion_rate) || averageMetric(indicators, "program_completion_rate");
+  const debt = Number(summary.debt_total || 0);
+  const due = Number(summary.due_total || 0);
+  const subjects = indicators.map((indicator) => asString(indicator.subject_display_name) || asString(indicator.subject_name)).filter(Boolean);
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-foreground/10 bg-surface shadow-card">
+      <div className="border-b border-foreground/8 px-4 py-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+            {childName(child).slice(0, 2).toUpperCase()}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="break-words font-display text-base font-bold leading-tight">{childName(child)}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {childCode(child) ? `Code ${childCode(child)} · ` : ""}
+              {asString(child.school_name) || "MSI School"}
+            </p>
+            {subjects.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {subjects.slice(0, 3).map((subject) => (
+                  <span key={subject} className="rounded-md bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                    {subject}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+        <Metric icon={<GraduationCap className="h-4 w-4" />} label="AAP" value={`${formatScore(aap)} / 9`} />
+        <Metric icon={<Activity className="h-4 w-4" />} label="Attendance" value={ar > 0 ? `${Math.round(ar)}%` : "-"} />
+        <Metric icon={<TrendingUp className="h-4 w-4" />} label="Exam" value={`${formatScore(ep, 0)} / 9`} />
+        <Metric icon={<BookOpen className="h-4 w-4" />} label="Progress" value={progress > 0 ? `${Math.round(progress)}%` : "-"} />
+      </div>
+
+      <div className="grid gap-3 border-t border-foreground/8 p-4 lg:grid-cols-[minmax(0,1fr),minmax(16rem,0.55fr)]">
+        <div>
+          <h3 className="text-sm font-bold">Recent lessons</h3>
+          {lessons.length ? (
+            <div className="mt-2 space-y-2">
+              {lessons.map((lesson, index) => (
+                <div key={`${asString(lesson.date)}-${asString(lesson.lesson_number)}-${index}`} className="rounded-lg border border-foreground/8 bg-background px-3 py-2">
+                  <p className="break-words text-xs font-bold">{asString(lesson.lesson_number) || "Lesson"} · {asString(lesson.subject_display_name) || asString(lesson.subject_name)}</p>
+                  <p className="mt-0.5 break-words text-xs text-muted-foreground">{asString(lesson.topic) || asString(lesson.group_name) || "-"}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 rounded-lg border border-dashed border-foreground/10 bg-background px-3 py-6 text-center text-xs text-muted-foreground">
+              No recent lesson records yet.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-foreground/8 bg-background p-3">
+          <h3 className="flex items-center gap-2 text-sm font-bold">
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            Payments
+          </h3>
+          <div className="mt-3 grid gap-2">
+            <PaymentLine label="Debt" value={money(debt, currency)} tone={debt > 0 ? "text-red-600" : "text-foreground"} />
+            <PaymentLine label="Due" value={money(due, currency)} tone={due > 0 ? "text-amber-700" : "text-foreground"} />
+            <PaymentLine label="Paid" value={money(summary.paid_total, currency)} tone="text-emerald-700" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-foreground/8 bg-background p-3">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-2 text-lg font-bold leading-none">{value}</p>
+    </div>
+  );
+}
+
+function PaymentLine({ label, value, tone }: { label: string; value: string; tone: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2 text-xs">
+      <span className="font-semibold text-muted-foreground">{label}</span>
+      <span className={`text-right font-bold ${tone}`}>{value}</span>
+    </div>
+  );
 }
 
 export default function ParentHome(props: Record<string, unknown>) {
@@ -42,17 +172,6 @@ export default function ParentHome(props: Record<string, unknown>) {
   const logoutUrl = asString(props.logoutUrl) || "/logout";
   const csrfToken = asString(props.csrfToken);
   const children = asArray(props.parentChildren);
-  const hasSingleChild = children.length === 1;
-
-  useEffect(() => {
-    if (!hasSingleChild) {
-      return;
-    }
-    const url = childDashboardUrl(children[0]);
-    if (url !== "/") {
-      window.location.replace(url);
-    }
-  }, [children, hasSingleChild]);
 
   async function handleLogout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -98,48 +217,21 @@ export default function ParentHome(props: Record<string, unknown>) {
 
   return (
     <TelegramLayout topbar={topbar}>
-      <div className="mx-auto flex min-h-[calc(var(--tg-app-height)-var(--app-top-inset)-var(--app-bottom-inset)-7.5rem)] w-full max-w-4xl flex-col justify-center py-4">
-        {hasSingleChild ? (
-          <section className="rounded-xl border border-foreground/10 bg-surface p-5 text-center shadow-card">
-            <p className="text-sm font-bold text-foreground">Kabinet ochilmoqda… / Открываем кабинет…</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Farzandingiz natijalariga yo'naltiryapmiz.
-            </p>
-          </section>
-        ) : children.length > 1 ? (
-          <section className="rounded-xl border border-foreground/10 bg-surface p-4 shadow-card">
+      <div className="mx-auto w-full max-w-5xl py-4">
+        {children.length ? (
+          <div className="space-y-4">
             <div className="mb-4">
-              <h1 className="font-display text-lg font-bold">Farzandni tanlang / Выберите ребёнка</h1>
+              <h1 className="font-display text-lg font-bold">Farzandlar statistikasi / Статистика детей</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Natijalarni ko'rish uchun kabinetni oching.
+                AAP, attendance, exams, lessons, and payments are shown from the parent account.
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {children.map((child) => {
-                const url = childDashboardUrl(child);
-                const code = childCode(child);
-                return (
-                  <a
-                    key={`${childRowId(child)}-${code}`}
-                    href={url}
-                    className="group flex items-center justify-between gap-3 rounded-lg border border-foreground/10 bg-background px-3 py-3 hover:border-primary/40 hover:bg-muted/70"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold">{childName(child)}</span>
-                      {code ? (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                          Code {code}
-                        </span>
-                      ) : null}
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-                  </a>
-                );
-              })}
-            </div>
-          </section>
+            {children.map((child) => (
+              <ChildStatsCard key={`${childRowId(child)}-${childCode(child)}`} child={child} />
+            ))}
+          </div>
         ) : (
-          <section className="rounded-xl border border-foreground/10 bg-surface p-5 text-center shadow-card">
+          <section className="mt-12 rounded-xl border border-foreground/10 bg-surface p-5 text-center shadow-card">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
               <UserRound className="h-5 w-5 text-muted-foreground" />
             </span>
