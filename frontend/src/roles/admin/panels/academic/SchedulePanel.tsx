@@ -50,10 +50,39 @@ type PointerDrag = {
   moved: boolean;
 };
 
+type ResizeDrag = {
+  pointerId: number;
+  payload: DragPayload;
+  dayIso: string;
+  edge: "start" | "end";
+  startY: number;
+  originalStartMin: number;
+  originalEndMin: number;
+  previewStartMin: number;
+  previewEndMin: number;
+  label: string;
+};
+
 function minutesToLabel(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function snapMinutes(totalMinutes: number) {
+  return Math.round(totalMinutes / SNAP_MINUTES) * SNAP_MINUTES;
+}
+
+function lessonNumberText(value: unknown, fallback?: number | string) {
+  const raw = asString(value).trim();
+  const source = raw || asString(fallback).trim();
+  if (!source) return "";
+  const withoutPrefix = source.replace(/^lesson\s*/i, "").trim();
+  return withoutPrefix || source;
 }
 
 function overlapGridFor(count: number) {
@@ -103,6 +132,9 @@ export function SchedulePanel({ state }: { state: any }) {
   const [dropHint, setDropHint] = useState<{ day: string; startMin: number; durationMin: number } | null>(null);
   const [pointerDrag, setPointerDrag] = useState<PointerDrag | null>(null);
   const pointerDragRef = useRef<PointerDrag | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<number | null>(null);
+  const [resizeDrag, setResizeDrag] = useState<ResizeDrag | null>(null);
+  const resizeDragRef = useRef<ResizeDrag | null>(null);
   const dayColumnRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const timetableScrollRef = useRef<HTMLDivElement | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
@@ -192,17 +224,22 @@ export function SchedulePanel({ state }: { state: any }) {
   );
   const scheduledBlocks = useMemo(
     () =>
-      filteredSessions.map((session): RawTimetableBlock => ({
-        id: `session-${session.id}`,
-        group_id: Number(session.group_id),
-        group_name: asString(session.group_name),
-        subject_name: asString(session.subject_name),
-        teacher_name: asString(session.teacher_name),
-        session_date: lessonDateToIso(asString(session.session_date)) || asString(session.session_date),
-        start_time: asString(session.start_time),
-        end_time: asString(session.end_time),
-        status: normalizeBlockStatus(session.status),
-      })),
+      filteredSessions.map((session): RawTimetableBlock => {
+        const sessionRecord = session as Record<string, unknown>;
+        return {
+          id: `session-${session.id}`,
+          group_id: Number(session.group_id),
+          group_name: asString(session.group_name),
+          subject_name: asString(session.subject_name),
+          teacher_name: asString(session.teacher_name),
+          lesson_number: asString(sessionRecord.lesson_number || sessionRecord.source_label),
+          lesson_topic: asString(sessionRecord.lesson_topic || sessionRecord.source_topic),
+          session_date: lessonDateToIso(asString(session.session_date)) || asString(session.session_date),
+          start_time: asString(session.start_time),
+          end_time: asString(session.end_time),
+          status: normalizeBlockStatus(session.status),
+        };
+      }),
     [filteredSessions],
   );
   const placedTimetableBlocks = useMemo(
@@ -364,15 +401,16 @@ export function SchedulePanel({ state }: { state: any }) {
     }
   }
 
-  async function placePayload(payload: DragPayload, dayIso: string, startMin: number) {
+  async function updatePayloadTime(payload: DragPayload, dayIso: string, startMin: number, endMin: number, message: string) {
     const start = minutesToLabel(startMin);
-    const end = minutesToLabel(startMin + payload.durationMin);
+    const end = minutesToLabel(endMin);
     setError("");
     clearToast();
 
     const previous = placedBlocks[payload.id];
     const optimistic: PlacedBlock = { id: payload.id, date: dayIso, start, end, ...payload.meta };
     setPlacedBlocks((current) => ({ ...current, [payload.id]: optimistic }));
+    setSelectedLessonId(payload.id);
 
     try {
       const response = await fetch(routes.adminAcademicLessonApi(payload.id), {
@@ -384,7 +422,7 @@ export function SchedulePanel({ state }: { state: any }) {
       if (!response.ok || !data.ok) {
         throw new Error(asString(data.message) || "Could not move the class.");
       }
-      showToast(`${optimistic.group_name} placed on ${dayIso} at ${start}–${end}.`);
+      showToast(message);
     } catch (dropError) {
       setPlacedBlocks((current) => {
         const next = { ...current };
@@ -394,6 +432,11 @@ export function SchedulePanel({ state }: { state: any }) {
       });
       setError(dropError instanceof Error ? dropError.message : "Network error. Please try again.");
     }
+  }
+
+  async function placePayload(payload: DragPayload, dayIso: string, startMin: number) {
+    const endMin = startMin + payload.durationMin;
+    await updatePayloadTime(payload, dayIso, startMin, endMin, `${payload.meta.group_name} placed on ${dayIso} at ${minutesToLabel(startMin)}–${minutesToLabel(endMin)}.`);
   }
 
   function startPointerDrag(event: ReactPointerEvent<HTMLElement>, payload: DragPayload, label: string, subject: string) {
@@ -443,6 +486,8 @@ export function SchedulePanel({ state }: { state: any }) {
     setDropHint(null);
     if (current.moved && target) {
       void placePayload(current.payload, target.dayIso, target.startMin);
+    } else if (!current.moved) {
+      setSelectedLessonId(current.payload.id);
     }
   }
 
@@ -452,6 +497,76 @@ export function SchedulePanel({ state }: { state: any }) {
     pointerDragRef.current = null;
     setPointerDrag(null);
     setDropHint(null);
+  }
+
+  function startResizeDrag(event: ReactPointerEvent<HTMLElement>, session: TimetableLessonBlock, edge: "start" | "end") {
+    if (!canDrag) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const payload = blockDragPayload(session);
+    const startMin = timeToMinutes(asString(session.start_time));
+    const endMin = timeToMinutes(asString(session.end_time));
+    if (!Number.isFinite(startMin) || !Number.isFinite(endMin) || endMin <= startMin) return;
+    const next: ResizeDrag = {
+      pointerId: event.pointerId,
+      payload,
+      dayIso: asString(session.session_date),
+      edge,
+      startY: event.clientY,
+      originalStartMin: startMin,
+      originalEndMin: endMin,
+      previewStartMin: startMin,
+      previewEndMin: endMin,
+      label: asString(session.group_name),
+    };
+    resizeDragRef.current = next;
+    setResizeDrag(next);
+    setSelectedLessonId(payload.id);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveResizeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const current = resizeDragRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    maybeScrollGrid(event.clientY);
+    const deltaMinutes = snapMinutes(((event.clientY - current.startY) / hourPx) * 60);
+    let previewStartMin = current.originalStartMin;
+    let previewEndMin = current.originalEndMin;
+    if (current.edge === "start") {
+      previewStartMin = clamp(snapMinutes(current.originalStartMin + deltaMinutes), dayStartMin, current.originalEndMin - SNAP_MINUTES);
+    } else {
+      previewEndMin = clamp(snapMinutes(current.originalEndMin + deltaMinutes), current.originalStartMin + SNAP_MINUTES, dayEndMin);
+    }
+    const next = { ...current, previewStartMin, previewEndMin };
+    resizeDragRef.current = next;
+    setResizeDrag(next);
+  }
+
+  function endResizeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const current = resizeDragRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    resizeDragRef.current = null;
+    setResizeDrag(null);
+    if (current.previewStartMin !== current.originalStartMin || current.previewEndMin !== current.originalEndMin) {
+      void updatePayloadTime(
+        current.payload,
+        current.dayIso,
+        current.previewStartMin,
+        current.previewEndMin,
+        `${current.label} updated to ${minutesToLabel(current.previewStartMin)}–${minutesToLabel(current.previewEndMin)}.`,
+      );
+    }
+  }
+
+  function cancelResizeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const current = resizeDragRef.current;
+    if (!current || current.pointerId !== event.pointerId) return;
+    resizeDragRef.current = null;
+    setResizeDrag(null);
   }
 
   function updateField(key: keyof typeof form, value: string) {
@@ -643,8 +758,11 @@ export function SchedulePanel({ state }: { state: any }) {
                         />
                       ))}
                       {daySessions.map((session) => {
-                        const startMin = timeToMinutes(asString(session.start_time));
-                        const endMin = timeToMinutes(asString(session.end_time));
+                        const lessonId = Number(asString(session.id).replace(/^(session|lesson)-/, ""));
+                        const isSelected = selectedLessonId === lessonId;
+                        const activeResize = resizeDrag?.payload.id === lessonId ? resizeDrag : null;
+                        const startMin = activeResize ? activeResize.previewStartMin : timeToMinutes(asString(session.start_time));
+                        const endMin = activeResize ? activeResize.previewEndMin : timeToMinutes(asString(session.end_time));
                         const bandTop = ((session.bandStartMin - dayStartMin) / 60) * hourPx;
                         const bandHeight = Math.max(34, ((session.bandEndMin - session.bandStartMin) / 60) * hourPx);
                         const overlapGrid = overlapGridFor(session.rowCount);
@@ -652,11 +770,15 @@ export function SchedulePanel({ state }: { state: any }) {
                         const slotRow = Math.floor(session.row / overlapGrid.columns);
                         const rowHeight = Math.max(38, (bandHeight - 6) / overlapGrid.rows);
                         const columnWidth = 100 / overlapGrid.columns;
-                        const top = session.rowCount > 1 ? bandTop + slotRow * rowHeight : ((startMin - dayStartMin) / 60) * hourPx;
-                        const height = session.rowCount > 1 ? rowHeight - 4 : Math.max(34, ((endMin - startMin) / 60) * hourPx - 2);
+                        const exactTop = ((startMin - dayStartMin) / 60) * hourPx;
+                        const exactHeight = Math.max(34, ((endMin - startMin) / 60) * hourPx - 2);
+                        const top = session.rowCount > 1 && !isSelected ? bandTop + slotRow * rowHeight : exactTop;
+                        const height = session.rowCount > 1 && !isSelected ? rowHeight - 4 : exactHeight;
                         const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
                         const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
+                        const badgeText = lessonNumberText(session.lesson_number, lessonId);
+                        const compactCard = height < 56;
                         return (
                           <div
                             key={session.id}
@@ -664,31 +786,69 @@ export function SchedulePanel({ state }: { state: any }) {
                             onPointerMove={canDrag ? movePointerDrag : undefined}
                             onPointerUp={canDrag ? endPointerDrag : undefined}
                             onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                            className={`absolute overflow-hidden rounded-lg border p-2 text-xs shadow-card transition-transform hover:-translate-y-0.5 ${subjectColorClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setSelectedLessonId(lessonId);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
+                            className={`absolute rounded-lg border p-2 text-xs shadow-card transition-transform hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-primary ring-offset-2 ring-offset-background" : "overflow-hidden"} ${subjectColorClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
                               left,
                               width,
                               right: session.rowCount > 1 ? undefined : "4px",
+                              zIndex: isSelected ? 35 : session.rowCount > 1 ? 12 : 2,
                             }}
-                            title={[
-                              asString(session.group_name),
-                              asString(session.subject_name),
-                              formatSessionTime(asString(session.start_time), asString(session.end_time)),
-                              asString(session.lesson_number),
-                              asString(session.lesson_topic),
-                              asString(session.teacher_name),
-                            ].filter(Boolean).join(" · ")}
                           >
                             <div className="flex min-w-0 items-start justify-between gap-1">
-                              <p className="truncate font-bold leading-tight">{asString(session.group_name)}</p>
-                              <span className="shrink-0 rounded bg-white/80 px-1 text-[9px] font-bold text-foreground/55">
-                                {subjectCode(session.subject_name)}
-                              </span>
+                              <p className="truncate text-[clamp(0.68rem,1.1vw,0.82rem)] font-bold leading-tight">{asString(session.group_name)}</p>
+                              {badgeText ? (
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                  }}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedLessonId(lessonId);
+                                  }}
+                                  className="shrink-0 rounded bg-white/85 px-1.5 py-0.5 text-[10px] font-black leading-none text-foreground/65 shadow-sm"
+                                  aria-label={`Select lesson ${badgeText}`}
+                                >
+                                  {badgeText}
+                                </button>
+                              ) : null}
                             </div>
-                            <p className="truncate text-[11px] font-semibold opacity-90">{formatSessionTime(asString(session.start_time), asString(session.end_time))}</p>
-                            <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-80">{toneLabel}</p>
+                            <p className="truncate text-[clamp(0.62rem,0.95vw,0.76rem)] font-semibold opacity-90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            {!compactCard ? <p className="truncate text-[10px] font-bold uppercase tracking-wide opacity-80">{toneLabel}</p> : null}
+                            {isSelected && canDrag ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => startResizeDrag(event, session, "start")}
+                                  onPointerMove={moveResizeDrag}
+                                  onPointerUp={endResizeDrag}
+                                  onPointerCancel={cancelResizeDrag}
+                                  className="absolute inset-x-3 top-1 z-20 h-2 cursor-ns-resize rounded-full bg-white/80 shadow-sm ring-1 ring-foreground/10"
+                                  aria-label="Adjust class start time"
+                                />
+                                <button
+                                  type="button"
+                                  onPointerDown={(event) => startResizeDrag(event, session, "end")}
+                                  onPointerMove={moveResizeDrag}
+                                  onPointerUp={endResizeDrag}
+                                  onPointerCancel={cancelResizeDrag}
+                                  className="absolute inset-x-3 bottom-1 z-20 h-2 cursor-ns-resize rounded-full bg-white/80 shadow-sm ring-1 ring-foreground/10"
+                                  aria-label="Adjust class end time"
+                                />
+                              </>
+                            ) : null}
                           </div>
                         );
                       })}
@@ -719,19 +879,15 @@ export function SchedulePanel({ state }: { state: any }) {
                         <button
                           key={`schedule-loose-${lesson.id}`}
                           type="button"
-                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name), asString(lesson.subject_name)) : undefined}
+                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), lessonNumberText(lesson.lesson_number, lesson.id), asString(lesson.subject_name)) : undefined}
                           onPointerMove={canDrag ? movePointerDrag : undefined}
                           onPointerUp={canDrag ? endPointerDrag : undefined}
                           onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                          title={`${asString(lesson.group_name)} · ${asString(lesson.lesson_number)} · ${asString(lesson.lesson_topic)}`}
                           aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
-                          className={`pointer-events-auto absolute flex max-w-[150px] touch-none select-none items-center gap-1 rounded-lg border px-2 py-1 text-left text-[10px] font-bold shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                          className={`pointer-events-auto absolute touch-none select-none rounded-lg border px-2 py-1 text-center text-[10px] font-black leading-none shadow-card transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
                           style={lessonScatterStyle(lesson, index, freeformLessons.length)}
                         >
-                          <span className="min-w-0 truncate">{asString(lesson.group_name)}</span>
-                          <span className="shrink-0 rounded bg-muted px-1 text-[9px] text-muted-foreground">
-                            {subjectCode(lesson.subject_name)}
-                          </span>
+                          {lessonNumberText(lesson.lesson_number, lesson.id)}
                         </button>
                       );
                     })}
