@@ -24,9 +24,9 @@ export const GRADEBOOK_AAP_COL_WIDTH = 54;
 export const GRADEBOOK_ATT_COL_WIDTH = 48;
 export const GRADEBOOK_HW_COL_WIDTH = 64;
 export const GRADEBOOK_LESSON_COL_WIDTH = GRADEBOOK_ATT_COL_WIDTH + GRADEBOOK_HW_COL_WIDTH;
-export const EXAM_TABLE_STUDENT_COL_WIDTH = 280;
-export const EXAM_TABLE_SCORE_COL_WIDTH = 176;
-export const EXAM_TABLE_MIN_WIDTH = 920;
+export const EXAM_TABLE_STUDENT_COL_WIDTH = 220;
+export const EXAM_TABLE_SCORE_COL_WIDTH = 126;
+export const EXAM_TABLE_MIN_WIDTH = 720;
 
 export type PeriodParts = {
   month: string;
@@ -610,6 +610,7 @@ export type Enrollment = {
   attendance: Record<string, string>;
   homework: Record<string, number>;
   exams?: Record<string, number>;
+  examAttempts?: Record<string, string>;
   examDates?: Record<string, string>;
 };
 

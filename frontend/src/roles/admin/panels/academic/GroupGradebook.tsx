@@ -14,6 +14,12 @@ type CompactTooltipItem = {
   color?: string;
 };
 
+type ActiveExamCell = {
+  enrollmentId: number;
+  examLabel: string;
+  attempt: string;
+};
+
 function CompactChartTooltip({
   active,
   label,
@@ -72,6 +78,9 @@ export function GroupGradebook({
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
   const [lessonDateSavingId, setLessonDateSavingId] = useState<number | null>(null);
+  const [activeExam, setActiveExam] = useState<ActiveExamCell | null>(null);
+  const [examInput, setExamInput] = useState("");
+  const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep">("gradebook");
   const [indicatorMonth, setIndicatorMonth] = useState("all");
   const [indicatorYear, setIndicatorYear] = useState("all");
@@ -92,6 +101,8 @@ export function GroupGradebook({
     setIndicatorYear("all");
     setExamType("all");
     setExamDisplay("chart");
+    setActiveExam(null);
+    setExamInput("");
   }, [groupId]);
 
   useEffect(() => {
@@ -130,6 +141,7 @@ export function GroupGradebook({
     if (isCancelledLesson(lesson)) return;
     if (kind === "hw" && !lessonCanHaveHomework(lesson)) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setActiveExam(null);
     setActive({ enrollmentId, lesson, kind, anchorRect: rect });
     setHwInput(currentHw !== undefined ? String(currentHw) : "");
   }
@@ -167,9 +179,14 @@ export function GroupGradebook({
     if (!active || saving || hwInput === "") return;
     const score = parseFloat(hwInput);
     if (isNaN(score)) return;
+    if (score < 1 || score > 9) {
+      setError("Homework score must be between 1 and 9.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
-      await fetch(routes.adminAcademicHomeworkApi, {
+      const res = await fetch(routes.adminAcademicHomeworkApi, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({
@@ -182,6 +199,11 @@ export function GroupGradebook({
           score_type: "Homework",
         }),
       });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(asString(json.message) || "Unable to update homework score.");
+        return;
+      }
       patchHw(active.enrollmentId, active.lesson.lessonNumber, score);
       close();
     } finally {
@@ -217,6 +239,80 @@ export function GroupGradebook({
         ),
       };
     });
+  }
+
+  function patchExam(enrollmentId: number, examLabel: string, score: number) {
+    setData((prev) => {
+      if (!prev) return prev;
+      const update = (en: Enrollment) =>
+        en.enrollmentId !== enrollmentId
+          ? en
+          : { ...en, exams: { ...(en.exams || {}), [examLabel]: score } };
+      return {
+        ...prev,
+        enrollments: prev.enrollments.map(update),
+        allEnrollments: prev.allEnrollments?.map(update) ?? prev.allEnrollments,
+      };
+    });
+  }
+
+  function openExamEditor(enrollment: Enrollment, examLabel: string) {
+    if (examSavingKey) return;
+    const current = enrollment.exams?.[examLabel];
+    setActive(null);
+    setActiveExam({
+      enrollmentId: enrollment.enrollmentId,
+      examLabel,
+      attempt: enrollment.examAttempts?.[examLabel] || "",
+    });
+    setExamInput(current !== undefined ? formatScoreOutOfNine(current) : "");
+  }
+
+  function cancelExamEdit() {
+    if (examSavingKey) return;
+    setActiveExam(null);
+    setExamInput("");
+  }
+
+  async function saveExamScore() {
+    if (!activeExam || examSavingKey) return;
+    const trimmed = examInput.trim();
+    if (!trimmed) {
+      cancelExamEdit();
+      return;
+    }
+    const score = Number(trimmed);
+    if (!Number.isFinite(score) || score < 1 || score > 9) {
+      setError("Exam score must be between 1 and 9.");
+      return;
+    }
+    const key = `${activeExam.enrollmentId}:${activeExam.examLabel}`;
+    setExamSavingKey(key);
+    setError("");
+    try {
+      const res = await fetch(routes.adminAcademicExamApi, {
+        method: "POST",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify({
+          enrollment_id: activeExam.enrollmentId,
+          exam_name: activeExam.examLabel,
+          attempt: activeExam.attempt,
+          score,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(asString(json.message) || "Unable to update exam score.");
+        return;
+      }
+      patchExam(activeExam.enrollmentId, activeExam.examLabel, score);
+      setActiveExam(null);
+      setExamInput("");
+    } catch {
+      setError("Network error while updating the exam score.");
+    } finally {
+      setExamSavingKey(null);
+    }
   }
 
   async function updateEnrollmentStatus(enrollmentId: number, status: "active" | "disqualified" | "banned") {
@@ -951,10 +1047,10 @@ export function GroupGradebook({
 
                 {examDisplay === "table" && selectedExamLabels.length > 0 ? (
                   <div
-                    className="miniapp-table-scroll max-h-[min(64dvh,42rem)] min-h-0 w-full rounded-lg border border-foreground/8 [scrollbar-gutter:stable]"
+                    className="miniapp-table-scroll max-h-[min(76dvh,48rem)] min-h-0 w-full rounded-lg border border-foreground/8 [scrollbar-gutter:stable]"
                   >
                     <table
-                      className="w-full table-fixed border-collapse text-left text-xs"
+                      className="w-full table-fixed border-collapse text-left text-[11px]"
                       style={{ minWidth: examTableMinWidth }}
                     >
                       <colgroup>
@@ -965,9 +1061,25 @@ export function GroupGradebook({
                       </colgroup>
                       <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                         <tr>
-                          <th className="sticky left-0 z-30 w-[280px] min-w-[280px] max-w-[280px] border-r border-foreground/8 bg-muted/40 px-4 py-3">Student</th>
+                          <th
+                            className="sticky left-0 z-30 border-r border-foreground/8 bg-muted/40 px-3 py-2"
+                            style={{
+                              width: EXAM_TABLE_STUDENT_COL_WIDTH,
+                              minWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                              maxWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                            }}
+                          >
+                            Student
+                          </th>
                           {selectedExamLabels.map((label) => (
-                            <th key={label} className="w-[176px] min-w-[176px] border-l border-foreground/8 px-4 py-3 text-center">
+                            <th
+                              key={label}
+                              className="border-l border-foreground/8 px-2 py-2 text-center leading-tight"
+                              style={{
+                                width: EXAM_TABLE_SCORE_COL_WIDTH,
+                                minWidth: EXAM_TABLE_SCORE_COL_WIDTH,
+                              }}
+                            >
                               {label}
                             </th>
                           ))}
@@ -975,18 +1087,65 @@ export function GroupGradebook({
                       </thead>
                       <tbody className="divide-y divide-foreground/5 bg-surface">
                         {enrollments.map((en) => (
-                          <tr key={`${en.enrollmentId}-exams`} className="hover:bg-foreground/[0.015]">
-                            <td className="sticky left-0 z-10 w-[280px] min-w-[280px] max-w-[280px] border-r border-foreground/8 bg-surface px-4 py-3 font-semibold">
+                          <tr key={`${en.enrollmentId}-exams`} className="transition-colors hover:bg-primary/[0.025]">
+                            <td
+                              className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-1.5 text-[12px] font-semibold leading-tight"
+                              style={{
+                                width: EXAM_TABLE_STUDENT_COL_WIDTH,
+                                minWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                                maxWidth: EXAM_TABLE_STUDENT_COL_WIDTH,
+                              }}
+                            >
                               {en.fullName}
                             </td>
                             {selectedExamLabels.map((label) => {
                               const score = en.exams?.[label];
                               const displayScore = score !== undefined ? formatScoreOutOfNine(score) : "-";
+                              const savingThisExam = examSavingKey === `${en.enrollmentId}:${label}`;
+                              const editingThisExam =
+                                activeExam?.enrollmentId === en.enrollmentId && activeExam.examLabel === label;
                               return (
-                                <td key={`${en.enrollmentId}-${label}`} className="w-[176px] border-l border-foreground/5 px-4 py-3 text-center">
-                                  <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
-                                    {displayScore}
-                                  </span>
+                                <td
+                                  key={`${en.enrollmentId}-${label}`}
+                                  className="border-l border-foreground/5 px-2 py-1.5 text-center"
+                                  style={{ width: EXAM_TABLE_SCORE_COL_WIDTH }}
+                                >
+                                  {editingThisExam ? (
+                                    <input
+                                      autoFocus
+                                      type="number"
+                                      min="1"
+                                      max="9"
+                                      step="0.5"
+                                      value={examInput}
+                                      onChange={(event) => setExamInput(event.target.value)}
+                                      onBlur={() => void saveExamScore()}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.currentTarget.blur();
+                                        }
+                                        if (event.key === "Escape") {
+                                          cancelExamEdit();
+                                        }
+                                      }}
+                                      className="h-7 w-14 rounded-lg border border-blue-200 bg-background px-2 text-center text-[11px] font-bold text-blue-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                      aria-label={`Edit ${en.fullName} ${label} score`}
+                                    />
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={Boolean(examSavingKey)}
+                                      onClick={() => openExamEditor(en, label)}
+                                      className={`inline-flex h-7 min-w-8 items-center justify-center rounded-lg px-2 text-[11px] font-bold transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-wait disabled:opacity-60 ${
+                                        score !== undefined
+                                          ? "bg-blue-50 text-blue-700 shadow-sm"
+                                          : "text-foreground/25 hover:bg-muted"
+                                      }`}
+                                      title={`Edit ${en.fullName} · ${label}`}
+                                    >
+                                      {savingThisExam ? "..." : displayScore}
+                                    </button>
+                                  )}
                                 </td>
                               );
                             })}
@@ -1145,13 +1304,13 @@ export function GroupGradebook({
                   <input
                     autoFocus
                     type="number"
-                    min="0"
+                    min="1"
                     max="9"
                     step="0.5"
                     value={hwInput}
                     onChange={(e) => setHwInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && saveHw()}
-                    placeholder="0–9"
+                    placeholder="1–9"
                     className="w-full rounded-lg border border-foreground/10 bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
                   />
                   <button

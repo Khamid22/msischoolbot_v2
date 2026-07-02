@@ -58,6 +58,7 @@ export const routes = {
   adminAcademicGradebookApi: (groupId: number | string) => `/admin/api/academic/gradebook?group_id=${groupId}`,
   adminAcademicAttendanceApi: "/admin/api/academic/attendance",
   adminAcademicHomeworkApi: "/admin/api/academic/homework",
+  adminAcademicExamApi: "/admin/api/academic/exams",
   adminAcademicLessonApi: (lessonSessionId: number | string) => `/admin/api/academic/lessons/${lessonSessionId}`,
   adminAcademicEnrollmentStatusApi: (enrollmentId: number | string) =>
     `/admin/api/academic/enrollments/${enrollmentId}/status`,

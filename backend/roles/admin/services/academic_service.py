@@ -403,6 +403,7 @@ def get_group_gradebook(group_id):
         attendance_by_enrollment = {}
         homework_by_enrollment = {}
         exams_by_enrollment = {}
+        exam_attempts_by_enrollment = {}
         exam_dates_by_enrollment = {}
         exam_dates_by_label = {}
         exam_labels = []
@@ -481,8 +482,10 @@ def get_group_gradebook(group_id):
                 if not label:
                     continue
                 score = float(row["score"])
+                attempt = str(row["attempt"] or "").strip()
                 exam_date = str(row["exam_date"] or "").strip()
                 exams_by_enrollment.setdefault(int(row["enrollment_id"]), {})[label] = score
+                exam_attempts_by_enrollment.setdefault(int(row["enrollment_id"]), {})[label] = attempt
                 exam_dates_by_enrollment.setdefault(int(row["enrollment_id"]), {})[label] = exam_date
                 if label not in exam_dates_by_label or not exam_dates_by_label[label]:
                     exam_dates_by_label[label] = exam_date
@@ -522,6 +525,7 @@ def get_group_gradebook(group_id):
                 "attendance": attendance_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "homework": homework_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "exams": exams_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "examAttempts": exam_attempts_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "examDates": exam_dates_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
             }
             for row in active_enrollment_rows
@@ -539,6 +543,7 @@ def get_group_gradebook(group_id):
                 "disqualificationReason": str(row["disqualification_reason"] or ""),
                 "disqualifiedAt": str(row["disqualified_at"] or ""),
                 "exams": exams_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "examAttempts": exam_attempts_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "examDates": exam_dates_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
             }
             for row in enrollment_rows
@@ -709,7 +714,9 @@ def record_attendance_from_payload(payload):
 
 def record_homework_from_payload(payload):
     enrollment_id = int(payload.get("enrollment_id", 0))
-    score = max(0.0, min(9.0, float(payload.get("score", 0))))
+    score = float(payload.get("score", 0))
+    if score < 1 or score > 9:
+        raise ValueError("Homework score must be between 1 and 9.")
     with queries.connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
@@ -812,7 +819,9 @@ def record_exam_from_payload(payload):
     if not exam_name:
         raise ValueError("Exam name is required.")
     attempt = str(payload.get("attempt", "") or "").strip()
-    score = max(0.0, min(9.0, float(payload.get("score", 0))))
+    score = float(payload.get("score", 0))
+    if score < 1 or score > 9:
+        raise ValueError("Exam score must be between 1 and 9.")
     with queries.connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
