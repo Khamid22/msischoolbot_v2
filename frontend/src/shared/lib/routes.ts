@@ -25,6 +25,15 @@ export const routes = {
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/edit`,
   adminTeacherCandidateEventDelete: (candidateId: number | string, eventId: number | string) =>
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/delete`,
+  adminTeacherAcademyCreate: "/admin/teacher-academy",
+  adminTeacherAcademyAssignment: (assignmentId: number | string) =>
+    `/admin/teacher-academy/assignments/${assignmentId}`,
+  adminTeacherAcademyAssessment: (academyTeacherId: number | string) =>
+    `/admin/teacher-academy/${academyTeacherId}/assessments`,
+  adminTeacherAcademyStatus: (academyTeacherId: number | string) =>
+    `/admin/teacher-academy/${academyTeacherId}/status`,
+  adminTeacherAcademyPromote: (academyTeacherId: number | string) =>
+    `/admin/teacher-academy/${academyTeacherId}/promote`,
   adminResourceTypeAdd: "/admin/resources/types/add",
   adminResourceTypeDelete: (typeId: number | string) => `/admin/resources/types/${typeId}/delete`,
   adminResourceTypeRename: (typeId: number | string) => `/admin/resources/types/${typeId}/rename`,

@@ -10,6 +10,7 @@ from backend.identity.account_service import (
     list_teachers,
 )
 from .teacher_candidate_service import list_teacher_candidates
+from .teacher_academy_service import list_academy_teachers
 from backend.domains.complaints.service import list_complaints
 from backend.utils.normalization import normalize_text
 from .parent_service import list_parent_accounts, list_parent_children
@@ -324,6 +325,7 @@ def build_admin_page_context(
 
     admin_teachers = list_teachers()
     admin_teacher_candidates = list_teacher_candidates()
+    admin_teacher_academy = list_academy_teachers()
     admin_complaints = list_complaints()
     admin_parents = list_parent_accounts()
     admin_parent_children = list_parent_children(parent_admin_id)
@@ -464,6 +466,7 @@ def build_admin_page_context(
         "admin_students": admin_students,
         "admin_teachers": admin_teachers,
         "admin_teacher_candidates": admin_teacher_candidates,
+        "admin_teacher_academy": admin_teacher_academy,
         "admin_complaints": admin_complaints,
         "admin_parents": admin_parents,
         "admin_parent_children": admin_parent_children,

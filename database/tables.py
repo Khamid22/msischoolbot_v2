@@ -256,6 +256,107 @@ def ensure_teacher_candidates_schema(conn):
     )
 
 
+def ensure_teacher_academy_schema(conn):
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.academy_teachers (
+            id BIGSERIAL PRIMARY KEY,
+            user_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            full_name TEXT NOT NULL,
+            subject_id BIGINT REFERENCES msi_v2.subjects(id) ON DELETE SET NULL,
+            subject_program_id BIGINT REFERENCES msi_v2.subject_programs(id) ON DELETE SET NULL,
+            position TEXT NOT NULL DEFAULT 'Trainee Teacher',
+            employment_type TEXT NOT NULL DEFAULT 'academy',
+            telegram_username TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            academy_status TEXT NOT NULL DEFAULT 'in_training',
+            academy_start_date DATE,
+            mentor_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL,
+            department_head_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_by TEXT NOT NULL DEFAULT '',
+            promoted_teacher_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.academy_lesson_assignments (
+            id BIGSERIAL PRIMARY KEY,
+            academy_teacher_id BIGINT NOT NULL REFERENCES msi_v2.academy_teachers(id) ON DELETE CASCADE,
+            subject_id BIGINT REFERENCES msi_v2.subjects(id) ON DELETE SET NULL,
+            subject_program_id BIGINT REFERENCES msi_v2.subject_programs(id) ON DELETE SET NULL,
+            curriculum_item_id BIGINT REFERENCES msi_v2.subject_program_items(id) ON DELETE SET NULL,
+            sequence_no INTEGER NOT NULL DEFAULT 0,
+            lesson_number TEXT NOT NULL DEFAULT '',
+            lesson_topic TEXT NOT NULL DEFAULT '',
+            assignment_type TEXT NOT NULL DEFAULT 'full_practice_lesson',
+            deadline_date DATE,
+            session_datetime TIMESTAMPTZ,
+            evaluator_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL,
+            focus_areas JSONB NOT NULL DEFAULT '[]'::jsonb,
+            notes_to_trainee TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'assigned',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.academy_assessments (
+            id BIGSERIAL PRIMARY KEY,
+            academy_teacher_id BIGINT NOT NULL REFERENCES msi_v2.academy_teachers(id) ON DELETE CASCADE,
+            lesson_assignment_id BIGINT REFERENCES msi_v2.academy_lesson_assignments(id) ON DELETE SET NULL,
+            assessment_type TEXT NOT NULL DEFAULT 'academy_practice_lesson',
+            lesson_number TEXT NOT NULL DEFAULT '',
+            lesson_topic TEXT NOT NULL DEFAULT '',
+            evaluator_id BIGINT REFERENCES msi_v2.teachers(id) ON DELETE SET NULL,
+            assessment_datetime TIMESTAMPTZ,
+            session_type TEXT NOT NULL DEFAULT 'training_simulation',
+            class_label TEXT NOT NULL DEFAULT '',
+            section_feedback JSONB NOT NULL DEFAULT '{}'::jsonb,
+            teacher_guidance_compliance_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            timing_adherence_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            resource_familiarity_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            english_fluency_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            confidence_delivery_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            engagement_technique_score NUMERIC(4, 2) NOT NULL DEFAULT 0,
+            weighted_overall_score NUMERIC(5, 2) NOT NULL DEFAULT 0,
+            strengths TEXT NOT NULL DEFAULT '',
+            areas_for_improvement TEXT NOT NULL DEFAULT '',
+            final_recommendation TEXT NOT NULL DEFAULT '',
+            decision TEXT NOT NULL DEFAULT 'needs_improvement',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_academy_teachers_status_updated
+        ON msi_v2.academy_teachers(academy_status, updated_at)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_academy_assignments_teacher_sequence
+        ON msi_v2.academy_lesson_assignments(academy_teacher_id, sequence_no)
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_academy_assessments_teacher_created
+        ON msi_v2.academy_assessments(academy_teacher_id, created_at)
+        """
+    )
+
+
 def ensure_office_hours_schema(conn):
     conn.execute(
         """
@@ -308,5 +409,6 @@ __all__ = [
     "ensure_resource_comments_schema",
     "ensure_chat_schema",
     "ensure_teacher_candidates_schema",
+    "ensure_teacher_academy_schema",
     "ensure_office_hours_schema",
 ]

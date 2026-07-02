@@ -49,6 +49,7 @@ export interface AdminPageProps {
   adminParentChildren?: Array<Record<string, unknown>>;
   adminTeachers?: Array<Record<string, unknown>>;
   adminTeacherCandidates?: Array<Record<string, unknown>>;
+  adminTeacherAcademy?: Array<Record<string, unknown>>;
   adminComplaints?: Array<Record<string, unknown>>;
   adminTeacherOptions?: Array<{ name: string; school_codes: string[] }>;
   adminGroupOptions?: Array<{ name: string; school_codes: string[] }>;

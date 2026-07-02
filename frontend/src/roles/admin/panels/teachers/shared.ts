@@ -2,7 +2,7 @@
 import { asString } from "../../shared";
 import { csrfHeaders } from "@/shared/lib/api";
 
-export type TeacherTab = "hiring" | "training" | "active";
+export type TeacherTab = "hiring" | "training" | "academy" | "active";
 export type ToastTone = "success" | "danger";
 export type Candidate = Record<string, unknown>;
 export type Teacher = Record<string, unknown>;
@@ -14,6 +14,7 @@ export const DETAIL_CANDIDATE_STORAGE_KEY = "msi.admin.teacherDetailCandidateId"
 export const tabs: Array<{ key: TeacherTab; label: string; hint: string }> = [
   { key: "hiring", label: "Hiring Pipeline", hint: "Interview and test stages" },
   { key: "training", label: "Training", hint: "Lesson evaluation" },
+  { key: "academy", label: "Teacher Academy", hint: "New teachers training" },
   { key: "active", label: "Active Teachers", hint: "Assigned staff" },
 ];
 
@@ -270,4 +271,3 @@ export function criterionAverages(history: Array<Record<string, unknown>>) {
     };
   });
 }
-

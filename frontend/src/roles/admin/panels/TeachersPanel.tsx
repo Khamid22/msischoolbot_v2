@@ -10,6 +10,7 @@ import { CandidateDetailModal } from "./teachers/CandidateDetailModal";
 import { CandidateModal } from "./teachers/CandidateModal";
 import { PromoteModal } from "./teachers/PromoteModal";
 import { TeacherAssignmentModal } from "./teachers/TeacherAssignmentModal";
+import { TeacherAcademyPanel } from "./teachers/TeacherAcademyPanel";
 import { RubricModal, TrainingEvaluationModal } from "./teachers/TrainingEvaluationModal";
 
 export default function TeachersPanel({
@@ -22,15 +23,18 @@ export default function TeachersPanel({
   const { teacherEdit, props, currentSchool } = state;
   const csrf: string = props.csrfToken || "";
 
-  const defaultTab: TeacherTab = view === "teachers" ? "active" : "hiring";
+  const isAcademicDirector = asString(state.adminMode).toLowerCase() === "academic_director";
+  const defaultTab: TeacherTab = isAcademicDirector ? "academy" : view === "teachers" ? "active" : "hiring";
   const visibleTabs = useMemo(
     () =>
-      view === "candidates"
-        ? tabs.filter((tab) => tab.key !== "active")
+      isAcademicDirector
+        ? tabs.filter((tab) => tab.key === "academy" || tab.key === "active")
+        : view === "candidates"
+        ? tabs.filter((tab) => tab.key === "hiring" || tab.key === "training")
         : view === "teachers"
           ? tabs.filter((tab) => tab.key === "active")
           : tabs,
-    [view],
+    [isAcademicDirector, view],
   );
 
   const [activeTab, setActiveTab] = useState<TeacherTab>(() => {
@@ -39,7 +43,7 @@ export default function TeachersPanel({
     }
     if (typeof window !== "undefined") {
       const saved = window.sessionStorage.getItem(TAB_STORAGE_KEY);
-      if (saved === "hiring" || saved === "training" || saved === "active") {
+      if (saved === "hiring" || saved === "training" || saved === "academy" || saved === "active") {
         return saved;
       }
     }
@@ -51,6 +55,9 @@ export default function TeachersPanel({
   );
   const [candidates, setCandidates] = useState<Candidate[]>(
     Array.isArray(props.adminTeacherCandidates) ? props.adminTeacherCandidates : [],
+  );
+  const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
+    Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : [],
   );
 
   const [modalOpen, setModalOpen] = useState(Boolean(teacherEdit));
@@ -97,6 +104,12 @@ export default function TeachersPanel({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (Array.isArray(props.adminTeacherAcademy)) {
+      setAcademyTeachers(props.adminTeacherAcademy);
+    }
+  }, [props.adminTeacherAcademy]);
 
   useEffect(() => {
     try {
@@ -592,6 +605,16 @@ export default function TeachersPanel({
         </ChartCard>
       ) : null}
 
+      {activeTab === "academy" ? (
+        <TeacherAcademyPanel
+          state={state}
+          academyTeachers={academyTeachers}
+          onAcademyChange={setAcademyTeachers}
+          onTeachersChange={(rows) => setTeachers(rows as Teacher[])}
+          showToast={showToast}
+        />
+      ) : null}
+
       {activeTab === "training" ? (
         <ChartCard
           title="Training"
@@ -836,4 +859,3 @@ export default function TeachersPanel({
     </div>
   );
 }
-

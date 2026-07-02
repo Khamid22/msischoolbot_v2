@@ -114,6 +114,7 @@ def register_admin_page_routes(
                 "adminStudents": page_context["admin_students"],
                 "adminTeachers": page_context["admin_teachers"],
                 "adminTeacherCandidates": page_context["admin_teacher_candidates"],
+                "adminTeacherAcademy": page_context["admin_teacher_academy"],
                 "adminComplaints": page_context["admin_complaints"],
                 "adminParents": page_context["admin_parents"],
                 "adminParentChildren": page_context["admin_parent_children"],
