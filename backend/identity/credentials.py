@@ -1,6 +1,7 @@
 """Login role detection and credential verification."""
 
 import logging
+import re
 
 from werkzeug.security import check_password_hash
 
@@ -22,7 +23,7 @@ def detect_login_role(login):
     normalized = (login or "").strip().casefold()
     if normalized == "admin" or normalized.startswith("staff"):
         return "admin"
-    if normalized.startswith("tch"):
+    if normalized.startswith("tch") or re.match(r"^[a-z][a-z0-9]{1,11}t\d{1,6}$", normalized):
         return "teacher"
     if normalized.startswith("msi"):
         return "student"
@@ -106,6 +107,7 @@ def verify_teacher_credentials(login, password):
 
     return {
         "id": int(row["id"]),
+        "staff_id": int(row["staff_id"] or 0),
         "full_name": str(row["full_name"]),
         "login": str(row["login"]),
         "assigned_group": str(row["assigned_group"] or "").strip(),
@@ -118,4 +120,3 @@ __all__ = [
     "verify_student_credentials",
     "verify_teacher_credentials",
 ]
-

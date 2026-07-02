@@ -11,6 +11,7 @@ from backend.utils.session import (
     current_auth_login,
     current_auth_role,
     current_teacher_id,
+    current_teacher_staff_id,
 )
 from backend.roles.admin.routes.request_payload import request_payload
 from backend.domains.office_hours import service as oh_service
@@ -32,7 +33,8 @@ def register_teacher_page_routes(app):
     @teacher.get("/teacher")
     def teacher_home():
         teacher_id = current_teacher_id()
-        workspace = build_teacher_workspace(teacher_id)
+        teacher_staff_id = current_teacher_staff_id()
+        workspace = build_teacher_workspace(teacher_id, teacher_staff_id)
         if not workspace:
             return redirect("/")
 
@@ -82,6 +84,10 @@ def register_teacher_page_routes(app):
                     "performance_score": teacher_db.get("performance_score", 7.0) if teacher_db else 7.0,
                 },
                 "groups": workspace["groups"],
+                "academy": workspace.get("academy"),
+                "journey": workspace.get("journey", []),
+                "lessonReports": workspace.get("lesson_reports", []),
+                "trainingTimetable": workspace.get("training_timetable", []),
                 "subjectsOptions": subjects_options,
             },
         )

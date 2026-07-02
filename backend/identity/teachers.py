@@ -1,5 +1,7 @@
 """Teacher identity/profile helpers."""
 
+import re
+
 from werkzeug.security import generate_password_hash
 
 from database import queries
@@ -10,9 +12,10 @@ from backend.identity.storage import init_storage
 def backfill_teacher_auth(conn):
     """Provision teacher_auth (login + default password) for any teacher missing it.
 
-    Auto-provisioning, like students: the login is ``TCH00N`` and the default
-    password equals the login (admins can reset). Idempotent — safe to call on
-    every teacher-list load and right after a teacher is created.
+    Auto-provisioning, like students: the login is subject-aware
+    (``matht001``, ``engt001``, ``biot001``...) and the default password equals
+    the login (admins can reset). Idempotent — safe to call on every
+    teacher-list load and right after a teacher is created.
     """
     missing = queries.list_teacher_ids_without_auth(conn)
     if not missing:
@@ -20,13 +23,36 @@ def backfill_teacher_auth(conn):
     now = utc_now_iso()
     for row in missing:
         teacher_id = int(row["id"])
-        login = queries.get_next_teacher_code(conn)
+        login = queries.get_next_teacher_login(
+            conn,
+            subject_teacher_login_prefix(
+                row_get(row, "subject_name") or row_get(row, "assigned_group") or ""
+            ),
+        )
         queries.insert_teacher_auth(
             conn, teacher_id, login, login, generate_password_hash(login), now
         )
 
 TEACHER_CATEGORIES = {"junior", "trained", "experienced_igcse"}
 TEACHER_SEMESTER_STAGES = {"1-2", "3-4", "5-6"}
+
+
+def subject_teacher_login_prefix(subject_name):
+    """Return the short subject prefix used for teacher logins."""
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(subject_name or "").strip().lower())
+    compact = normalized.replace(" ", "")
+    if "math" in compact:
+        return "math"
+    if "english" in compact or compact in {"eng", "esl", "efl"}:
+        return "eng"
+    if "biology" in compact or compact.startswith("bio"):
+        return "bio"
+    if "physics" in compact or compact.startswith("phys"):
+        return "phys"
+    if "chemistry" in compact or compact.startswith("chem"):
+        return "chem"
+    letters = re.sub(r"[^a-z0-9]+", "", compact)
+    return (letters[:6] or "tch").lower()
 
 
 def normalize_teacher_category(value):
@@ -155,6 +181,9 @@ def upsert_teacher(
                 now,
                 now,
             )
+            new_teacher = queries.get_teacher_by_full_name_row(conn, normalized_name)
+            if new_teacher:
+                queries.set_teacher_group_assignment(conn, int(new_teacher["id"]), normalized_group)
             # Auto-provision login credentials for the newly created teacher.
             backfill_teacher_auth(conn)
             conn.commit()
@@ -306,6 +335,7 @@ __all__ = [
     "get_teacher_by_id",
     "get_teacher_name_by_group",
     "list_teachers",
+    "subject_teacher_login_prefix",
     "update_teacher_by_id",
     "upsert_teacher",
 ]

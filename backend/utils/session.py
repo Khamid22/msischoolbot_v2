@@ -21,6 +21,16 @@ def current_teacher_id():
     return parsed_value if parsed_value > 0 else None
 
 
+def current_teacher_staff_id():
+    if current_auth_role() != "teacher":
+        return None
+    try:
+        parsed_value = int(session.get("teacher_staff_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
+
+
 def current_teacher_full_name():
     if current_auth_role() != "teacher":
         return ""
@@ -177,6 +187,12 @@ def set_teacher_session(teacher):
     session["auth_role"] = "teacher"
     session["auth_login"] = str(teacher.get("login", "")).strip()
     session["teacher_id"] = teacher_id
+    try:
+        teacher_staff_id = int(teacher.get("staff_id") or 0)
+    except (TypeError, ValueError):
+        teacher_staff_id = 0
+    if teacher_staff_id > 0:
+        session["teacher_staff_id"] = teacher_staff_id
     session["teacher_full_name"] = str(teacher.get("full_name", "")).strip()
     session["teacher_group"] = str(teacher.get("assigned_group", "")).strip()
     session.permanent = True
@@ -326,6 +342,10 @@ __all__ = [
     "current_auth_role",
     "current_admin_role",
     "current_auth_login",
+    "current_teacher_id",
+    "current_teacher_staff_id",
+    "current_teacher_full_name",
+    "current_teacher_group",
     "current_parent_id",
     "current_student_enrollment_id",
     "current_student_db_id",

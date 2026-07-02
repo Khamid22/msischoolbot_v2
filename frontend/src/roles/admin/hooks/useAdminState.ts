@@ -55,27 +55,27 @@ function preferredSubjectName(rows: Array<Record<string, unknown>>) {
   return findPreferredMathSubject(rows.map((row) => asString(row.subject_name)));
 }
 
+function urlAdminMode() {
+  try {
+    return asString(new URLSearchParams(window.location.search).get("mode"));
+  } catch {
+    return "";
+  }
+}
+
+function storedAdminMode() {
+  try {
+    return asString(window.localStorage.getItem("msi_admin_mode"));
+  } catch {
+    return "";
+  }
+}
+
 export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [adminMode, setAdminModeState] = useState<AdminMode>(() => {
-    const serverMode = asString(props.adminMode);
-    if (serverMode) {
-      return normalizeAdminMode(serverMode);
-    }
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const urlMode = asString(params.get("mode"));
-      if (urlMode) {
-        return normalizeAdminMode(urlMode);
-      }
-    } catch {
-    }
-    try {
-      return normalizeAdminMode(window.localStorage.getItem("msi_admin_mode"));
-    } catch {
-      return normalizeAdminMode(props.adminMode);
-    }
+    return normalizeAdminMode(urlAdminMode() || storedAdminMode() || props.adminMode);
   });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeStudentRowId, setActiveStudentRowId] = useState(() => {
@@ -211,6 +211,14 @@ export function useAdminState(props: AdminPageProps) {
 
   useEffect(() => {
     const serverMode = asString(props.adminMode);
+    const clientMode = urlAdminMode() || storedAdminMode();
+    if (clientMode) {
+      const normalizedClientMode = normalizeAdminMode(clientMode);
+      if (normalizedClientMode !== adminMode) {
+        setAdminModeState(normalizedClientMode);
+      }
+      return;
+    }
     if (!serverMode) {
       return;
     }

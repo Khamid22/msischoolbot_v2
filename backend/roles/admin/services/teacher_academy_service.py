@@ -2,8 +2,10 @@ import json
 import random
 from datetime import datetime
 
+from werkzeug.security import generate_password_hash
+
 from database import queries
-from backend.identity.teachers import list_teachers, upsert_teacher
+from backend.identity.teachers import list_teachers, subject_teacher_login_prefix, upsert_teacher
 
 
 ACADEMY_TARGET_LESSONS = 12
@@ -252,8 +254,11 @@ def list_academy_teachers():
                    at.mentor_id, COALESCE(mentor.full_name, '') AS mentor_name,
                    at.department_head_id, COALESCE(head.full_name, '') AS department_head_name,
                    at.notes, at.promoted_teacher_id,
+                   COALESCE(staff.login, '') AS login,
+                   COALESCE(staff.teacher_id, 0) AS account_teacher_id,
                    at.created_at::text AS created_at, at.updated_at::text AS updated_at
             FROM msi_v2.academy_teachers at
+            LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
             LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
             LEFT JOIN msi_v2.subject_programs sp ON sp.id = at.subject_program_id
             LEFT JOIN msi_v2.teachers mentor ON mentor.id = at.mentor_id
@@ -338,6 +343,8 @@ def list_academy_teachers():
                 "department_head_id": int(row["department_head_id"] or 0),
                 "department_head_name": str(row["department_head_name"] or ""),
                 "notes": str(row["notes"] or ""),
+                "login": str(row["login"] or ""),
+                "account_teacher_id": int(row["account_teacher_id"] or 0),
                 "promoted_teacher_id": int(row["promoted_teacher_id"] or 0),
                 "created_at": str(row["created_at"] or ""),
                 "updated_at": str(row["updated_at"] or ""),
@@ -377,22 +384,47 @@ def create_academy_teacher(
         lessons = _balanced_random_lessons(_curriculum_lessons(conn, program["id"]))
         if not lessons:
             return False, "No curriculum lessons found for this subject."
+        subject_name = str(program["subject_name"] or "")
+        profile_teacher_id = queries.insert_teacher_profile_row(
+            conn,
+            normalized_name,
+            notes=str(notes or "").strip(),
+            status="academy",
+            subject_id=int(program["subject_id"]),
+            created_at=now,
+            updated_at=now,
+        )
+        if not profile_teacher_id:
+            return False, "Unable to create the teacher profile."
+        login = queries.get_next_teacher_login(
+            conn,
+            subject_teacher_login_prefix(subject_name or program["subject_key"]),
+        )
+        staff_id = queries.insert_teacher_auth(
+            conn,
+            profile_teacher_id,
+            login,
+            login,
+            generate_password_hash(login),
+            now,
+        )
 
         row = conn.execute(
             """
             INSERT INTO msi_v2.academy_teachers (
-                full_name, subject_id, subject_program_id, position, employment_type,
+                user_id, full_name, subject_id, subject_program_id, position, employment_type,
                 telegram_username, phone, email, academy_status, academy_start_date,
                 mentor_id, department_head_id, notes, created_by, created_at, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s,
+                NULLIF(%s::bigint, 0), %s, %s, %s, %s, %s,
                 %s, %s, %s, 'in_training', NULLIF(%s, '')::date,
                 NULLIF(%s::bigint, 0), NULLIF(%s::bigint, 0), %s, %s, %s::timestamptz, %s::timestamptz
             )
             RETURNING id
             """,
             (
+                staff_id,
                 normalized_name,
                 int(program["subject_id"]),
                 int(program["id"]),
@@ -691,30 +723,40 @@ def promote_academy_teacher(
     progress = teacher.get("progress") if isinstance(teacher.get("progress"), dict) else {}
     average_score = progress.get("average_score") or 7
     supervised_lessons = progress.get("assessed_count") or 0
-    created = upsert_teacher(
-        full_name=teacher["full_name"],
-        pay_rate=pay_rate,
-        assigned_group=normalized_group,
-        category=category,
-        semester_stage=semester_stage,
-        performance_score=average_score,
-        supervised_lessons=supervised_lessons,
-        igcse_evidence=f"Teacher Academy: {supervised_lessons}/{ACADEMY_TARGET_LESSONS} assessed lessons.",
-        promotion_notes=promotion_notes or "Promoted from Teacher Academy.",
-    )
-    if not created:
-        return False, "Unable to promote teacher. Check group and pay rate."
-
-    promoted_teacher_id = 0
-    for row in list_teachers():
-        if (
-            str(row.get("full_name", "")).strip().casefold() == str(teacher["full_name"]).strip().casefold()
-            and str(row.get("assigned_group", "")).strip().casefold() == normalized_group.casefold()
-        ):
-            promoted_teacher_id = int(row.get("id") or 0)
     now = _utc_now_iso()
+    promoted_teacher_id = _as_int(teacher.get("account_teacher_id"))
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
+        if promoted_teacher_id:
+            queries.activate_teacher_profile(
+                conn,
+                promoted_teacher_id,
+                promotion_notes or "Promoted from Teacher Academy.",
+                now,
+            )
+            assigned = queries.set_teacher_group_assignment(conn, promoted_teacher_id, normalized_group)
+            if not assigned:
+                return False, "Unable to promote teacher. Check the selected group."
+        else:
+            created = upsert_teacher(
+                full_name=teacher["full_name"],
+                pay_rate=pay_rate,
+                assigned_group=normalized_group,
+                category=category,
+                semester_stage=semester_stage,
+                performance_score=average_score,
+                supervised_lessons=supervised_lessons,
+                igcse_evidence=f"Teacher Academy: {supervised_lessons}/{ACADEMY_TARGET_LESSONS} assessed lessons.",
+                promotion_notes=promotion_notes or "Promoted from Teacher Academy.",
+            )
+            if not created:
+                return False, "Unable to promote teacher. Check group and pay rate."
+            for row in list_teachers():
+                if (
+                    str(row.get("full_name", "")).strip().casefold() == str(teacher["full_name"]).strip().casefold()
+                    and str(row.get("assigned_group", "")).strip().casefold() == normalized_group.casefold()
+                ):
+                    promoted_teacher_id = int(row.get("id") or 0)
         conn.execute(
             """
             UPDATE msi_v2.academy_teachers
