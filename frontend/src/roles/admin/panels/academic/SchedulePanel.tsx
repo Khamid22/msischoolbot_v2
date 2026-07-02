@@ -10,10 +10,10 @@ import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timet
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
-const BASE_HOUR_PX = 64;
+const BASE_HOUR_PX = 54;
 const SNAP_MINUTES = 10;
 const DEFAULT_CLASS_MINUTES = 80;
-const TIME_COLUMN_PX = 72;
+const TIME_COLUMN_PX = 60;
 
 type BlockStatus = "scheduled" | "completed" | "cancelled";
 
@@ -76,14 +76,6 @@ function snapMinutes(totalMinutes: number) {
   return Math.round(totalMinutes / SNAP_MINUTES) * SNAP_MINUTES;
 }
 
-function lessonNumberText(value: unknown, fallback?: number | string) {
-  const raw = asString(value).trim();
-  const source = raw || asString(fallback).trim();
-  if (!source) return "";
-  const withoutPrefix = source.replace(/^lesson\s*/i, "").trim();
-  return withoutPrefix || source;
-}
-
 function scheduleCardClass(subject: unknown, status: BlockStatus) {
   if (status === "cancelled") {
     return "border-red-300/70 bg-gradient-to-br from-red-500 to-rose-700 text-white shadow-red-950/20";
@@ -102,27 +94,24 @@ function scheduleCardClass(subject: unknown, status: BlockStatus) {
     : "border-blue-300/70 bg-gradient-to-br from-blue-500 to-indigo-700 text-white shadow-blue-950/20";
 }
 
+function lessonDurationMinutes(lesson: LessonHistoryRow) {
+  const schoolCode = asString(lesson.school_code).toLowerCase().replace(/[\s_-]+/g, "");
+  if (schoolCode.includes("sehriyo")) return 40;
+  if (schoolCode.includes("school5") || schoolCode.includes("5")) return 80;
+  return DEFAULT_CLASS_MINUTES;
+}
+
+function randomLessonStartMinutes(lesson: LessonHistoryRow, index: number, startMin: number, endMin: number, durationMin: number) {
+  const available = Math.max(SNAP_MINUTES, endMin - startMin - durationMin);
+  const slots = Math.max(1, Math.floor(available / SNAP_MINUTES));
+  const seed = Math.abs((Number(lesson.id) || index + 1) * 37 + index * 19);
+  return startMin + (seed % slots) * SNAP_MINUTES;
+}
+
 function overlapGridFor(count: number) {
   if (count <= 1) return { columns: 1, rows: 1 };
   const columns = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(count))));
   return { columns, rows: Math.ceil(count / columns) };
-}
-
-function lessonScatterStyle(lesson: LessonHistoryRow, index: number, count: number) {
-  const columns = 7;
-  const rows = Math.max(4, Math.ceil(Math.max(count, 1) / columns));
-  const column = index % columns;
-  const row = Math.floor(index / columns);
-  const seed = Math.abs(Number(lesson.id) || index + 1);
-  const jitterX = ((seed * 17) % 9) - 4;
-  const jitterY = ((seed * 23) % 9) - 4;
-  const rotation = ((seed * 13) % 9) - 4;
-
-  return {
-    left: `${Math.min(96, Math.max(4, ((column + 0.5) / columns) * 100 + jitterX * 0.55))}%`,
-    top: `${Math.min(92, Math.max(8, ((row + 0.5) / rows) * 100 + jitterY * 1.1))}%`,
-    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-  };
 }
 
 function normalizeBlockStatus(value: unknown): BlockStatus {
@@ -298,10 +287,6 @@ export function SchedulePanel({ state }: { state: any }) {
     });
     return next;
   }, [untimedLessons, weekDays]);
-  const freeformLessons = useMemo(
-    () => weekDays.flatMap((day) => dayUntimedLessons[isoDate(day)] || []),
-    [dayUntimedLessons, weekDays],
-  );
   const busiestDayLoad = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
@@ -326,11 +311,11 @@ export function SchedulePanel({ state }: { state: any }) {
   const displayEndHour = timetableEndHour;
   const dayStartMin = displayStartHour * 60;
   const dayEndMin = displayEndHour * 60;
-  const hourPx = Math.min(148, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 18 + Math.max(0, Math.min(busiestDayLoad - 7, 8)) * 2);
-  const dayMinWidthPx = Math.min(360, Math.max(140, 118 + Math.min(busiestDayLoad, 8) * 10 + Math.max(0, busiestOverlapGrid.columns - 1) * 58));
+  const hourPx = Math.min(120, BASE_HOUR_PX + Math.max(0, busiestOverlapGrid.rows - 1) * 12 + Math.max(0, Math.min(busiestDayLoad - 7, 8)));
+  const dayMinWidthPx = Math.min(240, Math.max(112, 96 + Math.min(busiestDayLoad, 8) * 6 + Math.max(0, busiestOverlapGrid.columns - 1) * 34));
   const gridTemplateColumns = `${TIME_COLUMN_PX}px repeat(7, minmax(${dayMinWidthPx}px, 1fr))`;
   const gridMinWidthPx = TIME_COLUMN_PX + dayMinWidthPx * 7;
-  const gridViewportMaxPx = Math.min(880, Math.max(620, 560 + Math.min(busiestDayLoad, 10) * 26));
+  const gridViewportMaxPx = Math.min(1240, Math.max(760, 720 + Math.min(busiestDayLoad, 10) * 28));
   const gridHeightPx = (displayEndHour - displayStartHour) * hourPx;
   const hours = Array.from({ length: displayEndHour - displayStartHour + 1 }, (_item, index) => displayStartHour + index);
 
@@ -359,7 +344,7 @@ export function SchedulePanel({ state }: { state: any }) {
   function lessonDragPayload(lesson: LessonHistoryRow): DragPayload {
     return {
       id: Number(lesson.id),
-      durationMin: DEFAULT_CLASS_MINUTES,
+      durationMin: lessonDurationMinutes(lesson),
       meta: {
         group_id: Number(lesson.group_id),
         group_name: asString(lesson.group_name),
@@ -721,7 +706,16 @@ export function SchedulePanel({ state }: { state: any }) {
         <div
           ref={timetableScrollRef}
           className="miniapp-table-scroll rounded-lg border border-foreground/10 bg-background [scrollbar-gutter:stable]"
-          style={{ maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 14rem))` }}
+          onPointerDown={(event) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest("[data-schedule-interactive='true']")) {
+              setSelectedLessonId(null);
+            }
+          }}
+          style={{
+            height: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 8rem))`,
+            maxHeight: `min(${gridViewportMaxPx}px, calc(var(--tg-app-height) - 8rem))`,
+          }}
         >
           <div style={{ minWidth: `${gridMinWidthPx}px` }}>
             <div className="sticky top-0 z-40 grid border-b border-foreground/10 bg-muted/50 backdrop-blur" style={{ gridTemplateColumns }}>
@@ -752,6 +746,7 @@ export function SchedulePanel({ state }: { state: any }) {
               {weekDays.map((day) => {
                   const dayIso = isoDate(day);
                   const daySessions = dayTimetableBlocks[dayIso] || [];
+                  const looseLessons = dayUntimedLessons[dayIso] || [];
                   const hint = dropHint && dropHint.day === dayIso ? dropHint : null;
                   return (
                     <div
@@ -789,7 +784,6 @@ export function SchedulePanel({ state }: { state: any }) {
                         const left = session.rowCount > 1 ? `calc(${slotColumn * columnWidth}% + 4px)` : "4px";
                         const width = session.rowCount > 1 ? `calc(${columnWidth}% - 8px)` : undefined;
                         const toneLabel = session.status === "cancelled" ? "Cancelled" : session.status === "completed" ? "Done" : "Scheduled";
-                        const badgeText = lessonNumberText(session.lesson_number);
                         const compactCard = height < 56;
                         return (
                           <div
@@ -798,6 +792,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             onPointerMove={canDrag ? movePointerDrag : undefined}
                             onPointerUp={canDrag ? endPointerDrag : undefined}
                             onPointerCancel={canDrag ? cancelPointerDrag : undefined}
+                            data-schedule-interactive="true"
                             onKeyDown={(event) => {
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
@@ -807,7 +802,7 @@ export function SchedulePanel({ state }: { state: any }) {
                             tabIndex={0}
                             role="button"
                             aria-label={`${asString(session.group_name)} ${formatSessionTime(asString(session.start_time), asString(session.end_time))}`}
-                            className={`absolute rounded-xl border px-3 py-2 text-xs shadow-xl transition-transform duration-150 hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-2 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
+                            className={`absolute rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-transform duration-150 hover:-translate-y-0.5 focus:outline-none ${isSelected ? "overflow-visible ring-2 ring-sky-300 ring-offset-1 ring-offset-background" : "overflow-hidden"} ${scheduleCardClass(session.subject_name, session.status)} ${canDrag ? "touch-none cursor-grab select-none active:cursor-grabbing" : ""}`}
                             style={{
                               top: `${Math.max(0, top)}px`,
                               height: `${Math.max(30, height)}px`,
@@ -818,26 +813,9 @@ export function SchedulePanel({ state }: { state: any }) {
                             }}
                           >
                             <div className="flex min-w-0 items-start justify-between gap-2">
-                              <p className="truncate text-[clamp(0.72rem,1.1vw,0.9rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
-                              {badgeText ? (
-                                <button
-                                  type="button"
-                                  onPointerDown={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                  }}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setSelectedLessonId(lessonId);
-                                  }}
-                                  className="shrink-0 rounded-md border border-white/50 bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none text-slate-700 shadow-sm backdrop-blur"
-                                  aria-label={`Select lesson ${badgeText}`}
-                                >
-                                  {badgeText}
-                                </button>
-                              ) : null}
+                              <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{asString(session.group_name)}</p>
                             </div>
-                            <p className="mt-1 truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            <p className="mt-0.5 truncate text-[clamp(0.58rem,0.85vw,0.7rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
                             {!compactCard ? <p className="mt-1 inline-flex w-fit rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                             {isSelected && canDrag ? (
                               <>
@@ -847,10 +825,11 @@ export function SchedulePanel({ state }: { state: any }) {
                                   onPointerMove={moveResizeDrag}
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
-                                  className="absolute left-1/2 top-0 z-30 flex h-5 w-16 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
+                                  data-schedule-interactive="true"
+                                  className="absolute left-1/2 top-0 z-30 flex h-4 w-12 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
                                   aria-label="Adjust class start time"
                                 >
-                                  <span className="h-1 w-8 rounded-full bg-sky-500/80" />
+                                  <span className="h-0.5 w-6 rounded-full bg-sky-500/80" />
                                 </button>
                                 <button
                                   type="button"
@@ -858,13 +837,46 @@ export function SchedulePanel({ state }: { state: any }) {
                                   onPointerMove={moveResizeDrag}
                                   onPointerUp={endResizeDrag}
                                   onPointerCancel={cancelResizeDrag}
-                                  className="absolute bottom-0 left-1/2 z-30 flex h-5 w-16 -translate-x-1/2 translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
+                                  data-schedule-interactive="true"
+                                  className="absolute bottom-0 left-1/2 z-30 flex h-4 w-12 -translate-x-1/2 translate-y-1/2 cursor-ns-resize items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg shadow-slate-950/20 backdrop-blur"
                                   aria-label="Adjust class end time"
                                 >
-                                  <span className="h-1 w-8 rounded-full bg-sky-500/80" />
+                                  <span className="h-0.5 w-6 rounded-full bg-sky-500/80" />
                                 </button>
                               </>
                             ) : null}
+                          </div>
+                        );
+                      })}
+                      {looseLessons.map((lesson, index) => {
+                        const durationMin = lessonDurationMinutes(lesson);
+                        const startMin = randomLessonStartMinutes(lesson, index, dayStartMin, dayEndMin, durationMin);
+                        const endMin = startMin + durationMin;
+                        const top = ((startMin - dayStartMin) / 60) * hourPx;
+                        const height = Math.max(34, (durationMin / 60) * hourPx - 2);
+                        const status = lessonStatus(lesson);
+                        const toneLabel = status === "cancelled" ? "Cancelled" : "Unplaced";
+                        return (
+                          <div
+                            key={`schedule-loose-${lesson.id}`}
+                            onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name)) : undefined}
+                            onPointerMove={canDrag ? movePointerDrag : undefined}
+                            onPointerUp={canDrag ? endPointerDrag : undefined}
+                            onPointerCancel={canDrag ? cancelPointerDrag : undefined}
+                            data-schedule-interactive="true"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Place ${asString(lesson.group_name)} ${minutesToLabel(startMin)} to ${minutesToLabel(endMin)}`}
+                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-lg border px-2 py-1.5 text-[11px] shadow-lg transition-transform hover:-translate-y-0.5 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            style={{
+                              top: `${Math.max(0, top)}px`,
+                              height: `${height}px`,
+                              zIndex: 18,
+                            }}
+                          >
+                            <p className="truncate text-[clamp(0.64rem,0.95vw,0.78rem)] font-black leading-tight tracking-wide">{asString(lesson.group_name)}</p>
+                            <p className="mt-0.5 truncate text-[clamp(0.58rem,0.85vw,0.7rem)] font-semibold text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
+                            {height >= 48 ? <p className="mt-1 inline-flex w-fit rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
                           </div>
                         );
                       })}
@@ -884,33 +896,6 @@ export function SchedulePanel({ state }: { state: any }) {
                     </div>
                   );
               })}
-              {freeformLessons.length ? (
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-20" style={{ left: `${TIME_COLUMN_PX}px` }}>
-                  {freeformLessons.map((lesson, index) => {
-                      const label = lessonNumberText(lesson.lesson_number);
-                      if (!label) return null;
-                      const status = lessonStatus(lesson);
-                      const statusClass = status === "cancelled"
-                        ? "border-red-200 bg-red-50/95 text-red-700 shadow-red-900/10"
-                        : "border-emerald-200 bg-white/95 text-slate-700 shadow-emerald-900/10";
-                      return (
-                        <button
-                          key={`schedule-loose-${lesson.id}`}
-                          type="button"
-                          onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), label) : undefined}
-                          onPointerMove={canDrag ? movePointerDrag : undefined}
-                          onPointerUp={canDrag ? endPointerDrag : undefined}
-                          onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                          aria-label={`Place ${asString(lesson.group_name)} ${asString(lesson.lesson_number)}`}
-                          className={`pointer-events-auto absolute touch-none select-none rounded-full border px-2.5 py-1 text-center text-[10px] font-black leading-none shadow-lg backdrop-blur transition-transform hover:-translate-y-0.5 ${statusClass} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
-                          style={lessonScatterStyle(lesson, index, freeformLessons.length)}
-                        >
-                          {label}
-                        </button>
-                      );
-                  })}
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
