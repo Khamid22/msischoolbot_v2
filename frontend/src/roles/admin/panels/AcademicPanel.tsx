@@ -56,6 +56,9 @@ const GRADEBOOK_AAP_COL_WIDTH = 56;
 const GRADEBOOK_ATT_COL_WIDTH = 38;
 const GRADEBOOK_HW_COL_WIDTH = 46;
 const GRADEBOOK_LESSON_COL_WIDTH = GRADEBOOK_ATT_COL_WIDTH + GRADEBOOK_HW_COL_WIDTH;
+const EXAM_TABLE_STUDENT_COL_WIDTH = 280;
+const EXAM_TABLE_SCORE_COL_WIDTH = 176;
+const EXAM_TABLE_MIN_WIDTH = 920;
 
 type PeriodParts = {
   month: string;
@@ -1085,6 +1088,10 @@ function GroupGradebook({
   const selectedExamType = examType === "all" ? null : examTypeOptions.find((option) => option.key === examType) || null;
   const selectedExamTypeValue = selectedExamType ? selectedExamType.key : "all";
   const selectedExamLabels = selectedExamType ? selectedExamType.labels : examLabels;
+  const examTableMinWidth = Math.max(
+    EXAM_TABLE_MIN_WIDTH,
+    EXAM_TABLE_STUDENT_COL_WIDTH + selectedExamLabels.length * EXAM_TABLE_SCORE_COL_WIDTH,
+  );
 
   // 1. AAP Metrics
   const activeAAPGrades = enrollments.map(en => scoreOutOfNine(en.averageGrade)).filter(g => g > 0);
@@ -1667,16 +1674,24 @@ function GroupGradebook({
                 ) : null}
 
                 {examDisplay === "table" && selectedExamLabels.length > 0 ? (
-                  <div className="miniapp-table-scroll max-h-[28rem] rounded-lg border border-foreground/8 pb-3">
+                  <div
+                    className="miniapp-table-scroll max-h-[min(64dvh,42rem)] min-h-0 w-full rounded-lg border border-foreground/8 [scrollbar-gutter:stable]"
+                  >
                     <table
-                      className="w-max border-collapse text-left text-xs"
-                      style={{ minWidth: Math.max(640, 180 + selectedExamLabels.length * 112) }}
+                      className="w-full table-fixed border-collapse text-left text-xs"
+                      style={{ minWidth: examTableMinWidth }}
                     >
+                      <colgroup>
+                        <col style={{ width: EXAM_TABLE_STUDENT_COL_WIDTH }} />
+                        {selectedExamLabels.map((label) => (
+                          <col key={`exam-col-${label}`} style={{ width: EXAM_TABLE_SCORE_COL_WIDTH }} />
+                        ))}
+                      </colgroup>
                       <thead className="sticky top-0 z-20 bg-muted/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                         <tr>
-                          <th className="sticky left-0 z-30 min-w-[180px] border-r border-foreground/8 bg-muted/40 px-3 py-2">Student</th>
+                          <th className="sticky left-0 z-30 w-[280px] min-w-[280px] max-w-[280px] border-r border-foreground/8 bg-muted/40 px-4 py-3">Student</th>
                           {selectedExamLabels.map((label) => (
-                            <th key={label} className="min-w-[112px] border-l border-foreground/8 px-3 py-2 text-center">
+                            <th key={label} className="w-[176px] min-w-[176px] border-l border-foreground/8 px-4 py-3 text-center">
                               {label}
                             </th>
                           ))}
@@ -1685,14 +1700,14 @@ function GroupGradebook({
                       <tbody className="divide-y divide-foreground/5 bg-surface">
                         {enrollments.map((en) => (
                           <tr key={`${en.enrollmentId}-exams`} className="hover:bg-foreground/[0.015]">
-                            <td className="sticky left-0 z-10 border-r border-foreground/8 bg-surface px-3 py-2 font-semibold">
+                            <td className="sticky left-0 z-10 w-[280px] min-w-[280px] max-w-[280px] border-r border-foreground/8 bg-surface px-4 py-3 font-semibold">
                               {en.fullName}
                             </td>
                             {selectedExamLabels.map((label) => {
                               const score = en.exams?.[label];
                               const displayScore = score !== undefined ? formatScoreOutOfNine(score) : "-";
                               return (
-                                <td key={`${en.enrollmentId}-${label}`} className="border-l border-foreground/5 px-3 py-2 text-center">
+                                <td key={`${en.enrollmentId}-${label}`} className="w-[176px] border-l border-foreground/5 px-4 py-3 text-center">
                                   <span className={`inline-flex min-w-8 justify-center rounded-md px-2 py-1 font-bold ${score !== undefined ? "bg-blue-50 text-blue-700" : "text-foreground/25"}`}>
                                     {displayScore}
                                   </span>
