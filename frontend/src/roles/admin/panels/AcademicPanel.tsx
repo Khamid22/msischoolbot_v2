@@ -169,6 +169,12 @@ function formatBarLabel(value: unknown) {
   return Number.isInteger(parsed) ? String(parsed) : parsed.toFixed(1);
 }
 
+function formatPercentLabel(value: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return "";
+  return `${Math.round(parsed)}%`;
+}
+
 function wrapWords(value: unknown, maxChars = 13, maxLines = 3) {
   const text = String(value || "").trim();
   if (!text) return ["—"];
@@ -1099,8 +1105,8 @@ function GroupGradebook({
     return {
       name: en.fullName,
       AAP: aap,
-      AR: arScore,
-      arRate,
+      AR: arRate,
+      arScore,
       averagePerformance,
       isLowAAP: aap !== null && aap < 5,
       isLowAR: arRate !== null && arRate < 80,
@@ -1111,7 +1117,6 @@ function GroupGradebook({
   const hasAcademicIndicatorData = academicIndicatorData.some((row) => row.AAP !== null || row.AR !== null);
   const academicAverageAAP = averageScore(academicIndicatorData.map((row) => row.AAP));
   const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
-  const academicAverageARRate = averageScore(academicIndicatorData.map((row) => row.arRate));
   const academicAveragePerformance = averageScore(academicIndicatorData.map((row) => row.averagePerformance));
 
   // 3. Exam Metrics
@@ -1184,7 +1189,7 @@ function GroupGradebook({
     const isLowAAP = aap > 0 && aap < 5;
     const isLowAtt = attRate < 80 && total > 0;
     const reasons = [
-      isLowAAP ? `AAP ${formatScoreOutOfNine(aap)} / 9` : "",
+      isLowAAP ? `AAP ${formatScoreOutOfNine(aap)}` : "",
       isLowAtt ? `AR ${attRate}%` : "",
     ].filter(Boolean);
     return {
@@ -1432,7 +1437,7 @@ function GroupGradebook({
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="text-sm font-bold">Academic Indicators</h4>
-              <p className="text-xs text-muted-foreground">AAP and AR score are shown on the 1-9 scale</p>
+              <p className="text-xs text-muted-foreground">AAP score and AR percentage by student</p>
             </div>
             <PeriodFilter
               month={indicatorMonth}
@@ -1446,15 +1451,12 @@ function GroupGradebook({
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
-              <span className="mt-1 block text-lg font-bold">{academicAverageAAP ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
+              <span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span>
             </div>
             <div className={detailMetricClass}>
               <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
-              <span className="mt-1 block text-lg font-bold">
-                {academicAverageARRate ?? "—"}<span className="text-xs font-normal text-muted-foreground">%</span>
-              </span>
-              <span className="mt-0.5 block text-[11px] font-semibold text-muted-foreground">
-                {academicAverageAR ?? "—"} / 9 score
+              <span className="mt-1 block text-lg font-bold text-emerald-600">
+                {academicAverageAR ?? "—"}<span className="text-xs font-normal text-muted-foreground">%</span>
               </span>
             </div>
             <div className={detailMetricClass}>
@@ -1484,28 +1486,43 @@ function GroupGradebook({
                       stroke="hsl(var(--muted-foreground))"
                     />
                     <YAxis domain={[0, 9]} tickCount={10} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis
+                      yAxisId="ar"
+                      orientation="right"
+                      domain={[0, 100]}
+                      tickCount={6}
+                      tickFormatter={(value) => `${value}%`}
+                      stroke="hsl(var(--muted-foreground))"
+                    />
                     <Tooltip
                       contentStyle={{ backgroundColor: "var(--background)", borderColor: "hsl(var(--foreground)/0.08)", color: "hsl(var(--foreground))" }}
                       labelStyle={{ fontSize: 11, fontWeight: "bold" }}
+                      formatter={(value, name) => {
+                        const label = asString(name);
+                        return [label === "AR" ? formatPercentLabel(value) : formatBarLabel(value), label];
+                      }}
                     />
                     <Legend verticalAlign="top" height={28} />
                     <Bar
                       dataKey="AAP"
-                      name="AAP / 9"
+                      name="AAP"
+                      fill="#3b82f6"
                       radius={[5, 5, 0, 0]}
                       maxBarSize={42}
                       isAnimationActive
                       animationDuration={650}
                       animationEasing="ease-out"
                     >
-                      <LabelList dataKey="AAP" position="top" fontSize={12} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />
+                      <LabelList dataKey="AAP" position="top" fontSize={12} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-aap-${index}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />
                       ))}
                     </Bar>
                     <Bar
+                      yAxisId="ar"
                       dataKey="AR"
-                      name="AR score / 9"
+                      name="AR"
+                      fill="#10b981"
                       radius={[5, 5, 0, 0]}
                       maxBarSize={42}
                       isAnimationActive
@@ -1513,7 +1530,7 @@ function GroupGradebook({
                       animationDuration={650}
                       animationEasing="ease-out"
                     >
-                      <LabelList dataKey="AR" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={formatBarLabel} />
+                      <LabelList dataKey="AR" position="top" fontSize={12} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
                       {academicIndicatorData.map((entry, index) => (
                         <Cell key={`academic-ar-${index}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />
                       ))}
