@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import {
   ArrowRight,
@@ -50,6 +50,12 @@ const monthLabels = [
   { value: "11", label: "November" },
   { value: "12", label: "December" },
 ];
+
+const GRADEBOOK_STUDENT_COL_WIDTH = 180;
+const GRADEBOOK_AAP_COL_WIDTH = 56;
+const GRADEBOOK_ATT_COL_WIDTH = 38;
+const GRADEBOOK_HW_COL_WIDTH = 46;
+const GRADEBOOK_LESSON_COL_WIDTH = GRADEBOOK_ATT_COL_WIDTH + GRADEBOOK_HW_COL_WIDTH;
 
 type PeriodParts = {
   month: string;
@@ -1063,7 +1069,10 @@ function GroupGradebook({
   const examLabels = data?.examLabels ?? [];
   const enrollments = data?.enrollments ?? [];
   const allEnrollments = data?.allEnrollments ?? enrollments;
-  const gradebookTableMinWidth = Math.max(760, 228 + lessons.length * 104);
+  const gradebookTableWidth =
+    GRADEBOOK_STUDENT_COL_WIDTH +
+    GRADEBOOK_AAP_COL_WIDTH +
+    lessons.length * GRADEBOOK_LESSON_COL_WIDTH;
   const disqualifiedEnrollments = allEnrollments.filter((en) => en.status === "disqualified");
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
 
@@ -1335,19 +1344,29 @@ function GroupGradebook({
             </div>
             <div className="miniapp-table-scroll max-h-[72dvh] pb-3 [scrollbar-gutter:stable]">
               <table
-                className="w-max border-collapse text-left text-[11px] sm:text-xs"
-                style={{ minWidth: gradebookTableMinWidth }}
+                className="table-fixed border-collapse text-left text-[11px] sm:text-xs"
+                style={{ width: gradebookTableWidth, minWidth: gradebookTableWidth }}
               >
+                <colgroup>
+                  <col style={{ width: GRADEBOOK_STUDENT_COL_WIDTH }} />
+                  <col style={{ width: GRADEBOOK_AAP_COL_WIDTH }} />
+                  {lessons.map((lesson) => (
+                    <Fragment key={`gradebook-cols-${lesson.id}`}>
+                      <col style={{ width: GRADEBOOK_ATT_COL_WIDTH }} />
+                      <col style={{ width: GRADEBOOK_HW_COL_WIDTH }} />
+                    </Fragment>
+                  ))}
+                </colgroup>
                 <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
                   <tr className="bg-surface">
-                    <th rowSpan={2} className="sticky left-0 z-40 min-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                    <th rowSpan={2} className="sticky left-0 z-40 w-[180px] min-w-[180px] max-w-[180px] border-b border-r border-foreground/10 bg-surface px-3 py-2 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
                       Student
                     </th>
-                    <th rowSpan={2} className="sticky left-[180px] z-40 min-w-[48px] border-b border-r border-foreground/10 bg-surface px-2 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                    <th rowSpan={2} className="sticky left-[180px] z-40 w-[56px] min-w-[56px] max-w-[56px] border-b border-r border-foreground/10 bg-surface px-2 py-2 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
                       AAP
                     </th>
                     {lessons.map((lesson) => (
-                      <th key={lesson.id} colSpan={2} className="min-w-[104px] border-l border-foreground/10 p-0 text-center align-top">
+                      <th key={lesson.id} colSpan={2} className="w-[84px] border-l border-foreground/10 p-0 text-center align-top">
                         <div
                           title={`${lesson.lessonNumber} - ${lesson.topic}`}
                           className="w-full px-2 py-2"
@@ -1367,30 +1386,30 @@ function GroupGradebook({
                   </tr>
                   <tr className="bg-surface">
                     {lessons.map((lesson) => (
-                      <>
-                        <th key={`${lesson.id}-att`} className="w-[28px] border-b border-t border-l border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">Att</th>
-                        <th key={`${lesson.id}-hw`} className="w-[36px] border-b border-t border-r border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">HW</th>
-                      </>
+                      <Fragment key={`gradebook-subhead-${lesson.id}`}>
+                        <th className="w-[38px] border-b border-t border-l border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">Att</th>
+                        <th className="w-[46px] border-b border-t border-r border-foreground/10 px-0.5 py-1 text-center font-normal text-muted-foreground/70">HW</th>
+                      </Fragment>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-foreground/5 bg-surface">
                   {enrollments.map((en) => (
                     <tr key={en.enrollmentId} className="hover:bg-foreground/[0.015]">
-                      <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      <td className="sticky left-0 z-20 w-[180px] min-w-[180px] max-w-[180px] border-r border-foreground/8 bg-surface px-3 py-1 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedStudent(en);
                             setMoveGroupId("");
                           }}
-                          className="max-w-[11rem] break-words text-left font-semibold text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full break-words text-left font-semibold text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20"
                           title={`Manage ${en.fullName}`}
                         >
                           {en.fullName}
                         </button>
                       </td>
-                      <td className="sticky left-[180px] z-20 border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                      <td className="sticky left-[180px] z-20 w-[56px] min-w-[56px] max-w-[56px] border-r border-foreground/8 bg-surface px-2 py-1 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
                         {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
                       </td>
                       {lessons.map((lesson) => {
@@ -1399,28 +1418,28 @@ function GroupGradebook({
                         const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
                         const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
                         return (
-                          <>
-                            <td key={`${lesson.id}-att`} className="border-l border-foreground/5 p-0 text-center">
+                          <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
+                            <td className="w-[38px] border-l border-foreground/5 p-0 text-center">
                               <button
                                 type="button"
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                                className={`h-8 w-8 rounded text-[11px] font-bold transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[28px] sm:text-[10px] ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`h-8 w-8 rounded text-[11px] font-bold transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[30px] sm:text-[10px] ${att ? attCls(att) : "text-foreground/20"} ${isActiveAtt ? "ring-1 ring-foreground/40" : ""}`}
                               >
                                 {att ? attLabel(att) : "·"}
                               </button>
                             </td>
-                            <td key={`${lesson.id}-hw`} className="border-r border-foreground/5 p-0 text-center">
+                            <td className="w-[46px] border-r border-foreground/5 p-0 text-center">
                               <button
                                 type="button"
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[36px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
+                                className={`h-8 w-10 rounded text-[11px] transition-opacity hover:opacity-75 sm:h-[26px] sm:w-[38px] sm:text-[10px] ${hw !== undefined ? "font-bold text-blue-600" : "text-foreground/20"} ${isActiveHw ? "ring-1 ring-foreground/40" : ""}`}
                               >
                                 {hw !== undefined ? hw : "·"}
                               </button>
                             </td>
-                          </>
+                          </Fragment>
                         );
                       })}
                     </tr>
