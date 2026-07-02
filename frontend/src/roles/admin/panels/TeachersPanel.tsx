@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ClipboardCheck, GraduationCap, Info, Pencil, Plus, Trash2, Users, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ClipboardCheck, GraduationCap, Info, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, buildAdminTabUrl } from "../shared";
-import { TeacherTab, ToastTone, Candidate, Teacher, TAB_STORAGE_KEY, TRAINING_FILTER_STORAGE_KEY, DETAIL_CANDIDATE_STORAGE_KEY, tabs, hiringStages, TRAINING_TARGET_LESSONS, HIRING_STAGE_PAGE_SIZE, TABLE_PAGE_SIZE, teacherCategoryLabel, postForm, trainingMeta } from "./teachers/shared";
+import { TeacherTab, Candidate, Teacher, TAB_STORAGE_KEY, TRAINING_FILTER_STORAGE_KEY, DETAIL_CANDIDATE_STORAGE_KEY, tabs, hiringStages, TRAINING_TARGET_LESSONS, HIRING_STAGE_PAGE_SIZE, TABLE_PAGE_SIZE, teacherCategoryLabel, postForm, trainingMeta } from "./teachers/shared";
 import { PaginationControls } from "./teachers/controls";
 import { CandidateCard } from "./teachers/CandidateCard";
 import { CandidateDetailModal } from "./teachers/CandidateDetailModal";
@@ -85,25 +86,16 @@ export default function TeachersPanel({
   });
   const [trainingSearch, setTrainingSearch] = useState("");
   const [trainingSort, setTrainingSort] = useState<"recent" | "progress" | "average" | "name">("recent");
-  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const { toast, showToast } = useFloatingToast();
   const [stagePages, setStagePages] = useState<Record<string, number>>({});
   const [trainingPage, setTrainingPage] = useState(1);
   const [teacherPage, setTeacherPage] = useState(1);
-  const toastTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!visibleTabs.some((tab) => tab.key === activeTab)) {
       setActiveTab(defaultTab);
     }
   }, [activeTab, defaultTab, visibleTabs]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) {
-        window.clearTimeout(toastTimer.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (Array.isArray(props.adminTeacherAcademy)) {
@@ -132,14 +124,6 @@ export default function TeachersPanel({
     } catch {
     }
   }, [trainingFilter]);
-
-  function showToast(message: string, tone: ToastTone = "success") {
-    setToast({ message, tone });
-    if (toastTimer.current) {
-      window.clearTimeout(toastTimer.current);
-    }
-    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
-  }
 
   function selectTab(tab: TeacherTab) {
     setActiveTab(tab);
@@ -394,17 +378,7 @@ export default function TeachersPanel({
 
   return (
     <div className="workspace-fit flex flex-col gap-3 lg:h-full lg:min-h-0">
-      {toast ? (
-        <div
-          className={`fixed right-4 top-[calc(var(--app-top-inset)+4rem)] lg:top-4 z-[60] flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover ${
-            toast.tone === "danger" ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"
-          }`}
-          role="status"
-        >
-          {toast.tone === "danger" ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-          {toast.message}
-        </div>
-      ) : null}
+      <FloatingToast toast={toast} />
 
       {modalOpen ? (
         <TeacherAssignmentModal

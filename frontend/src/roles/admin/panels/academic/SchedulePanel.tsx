@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, PointerEvent as ReactPointerEvent } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
@@ -84,7 +85,7 @@ export function SchedulePanel({ state }: { state: any }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [createOpen, setCreateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const { toast, showToast, clearToast } = useFloatingToast();
   const [error, setError] = useState("");
   const today = isoDate(new Date());
   const [form, setForm] = useState({
@@ -105,12 +106,6 @@ export function SchedulePanel({ state }: { state: any }) {
     setSessions(initialSessions as SessionRow[]);
     setLessons(initialLessons as LessonHistoryRow[]);
   }, [props.adminAcademicSchedules, props.adminAcademicSessions, props.adminAcademicLessons]);
-
-  useEffect(() => {
-    if (!message) return undefined;
-    const timer = window.setTimeout(() => setMessage(""), 2600);
-    return () => window.clearTimeout(timer);
-  }, [message]);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_item, index) => addDays(weekStart, index)), [weekStart]);
   const weekDateSet = useMemo(() => new Set(weekDays.map(isoDate)), [weekDays]);
@@ -345,7 +340,7 @@ export function SchedulePanel({ state }: { state: any }) {
     const start = minutesToLabel(startMin);
     const end = minutesToLabel(startMin + payload.durationMin);
     setError("");
-    setMessage("");
+    clearToast();
 
     const previous = placedBlocks[payload.id];
     const optimistic: PlacedBlock = { id: payload.id, date: dayIso, start, end, ...payload.meta };
@@ -361,7 +356,7 @@ export function SchedulePanel({ state }: { state: any }) {
       if (!response.ok || !data.ok) {
         throw new Error(asString(data.message) || "Could not move the class.");
       }
-      setMessage(`${optimistic.group_name} placed on ${dayIso} at ${start}–${end}.`);
+      showToast(`${optimistic.group_name} placed on ${dayIso} at ${start}–${end}.`);
     } catch (dropError) {
       setPlacedBlocks((current) => {
         const next = { ...current };
@@ -449,7 +444,7 @@ export function SchedulePanel({ state }: { state: any }) {
     if (submitting) return;
     setSubmitting(true);
     setError("");
-    setMessage("");
+    clearToast();
     try {
       const response = await fetch(routes.adminAcademicScheduleCreate, {
         method: "POST",
@@ -475,7 +470,7 @@ export function SchedulePanel({ state }: { state: any }) {
       setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
       setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       if (Array.isArray(data.lessons)) setLessons(data.lessons);
-      setMessage(`Schedule created. ${asNumber(data.schedule?.sessionCount)} lesson sessions generated.`);
+      showToast(`Schedule created. ${asNumber(data.schedule?.sessionCount)} lesson sessions generated.`);
       setCreateOpen(false);
     } catch {
       setError("Network error. Please try again.");
@@ -503,6 +498,7 @@ export function SchedulePanel({ state }: { state: any }) {
           </div>
         </div>
       ) : null}
+      <FloatingToast toast={toast} />
       <ChartCard
         title={isTeacherMode ? "Timetable" : "Academic Timetable"}
         subtitle={`${filteredSessions.length + placedTimetableBlocks.length} timed sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
@@ -514,7 +510,7 @@ export function SchedulePanel({ state }: { state: any }) {
                 type="button"
                 onClick={() => {
                   setError("");
-                  setMessage("");
+                  clearToast();
                   setForm((current) => ({
                     ...current,
                     startDate: isoDate(weekStart),
@@ -554,14 +550,6 @@ export function SchedulePanel({ state }: { state: any }) {
           </div>
         }
       >
-        {message ? (
-          <div
-            className="fixed right-4 top-[calc(var(--app-top-inset)+4rem)] z-[70] max-w-[min(22rem,calc(100vw-2rem))] rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white shadow-card-hover animate-in fade-in slide-in-from-top-2 duration-150 motion-reduce:animate-none lg:top-4"
-            role="status"
-          >
-            {message}
-          </div>
-        ) : null}
         {error ? (
           <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
             {error}

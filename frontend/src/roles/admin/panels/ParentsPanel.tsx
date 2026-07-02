@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertCircle, CheckCircle2, UserRound, X } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { Pagination } from "@/shared/ui/Pagination";
 import { asNumber, asString } from "../shared";
 import {
@@ -22,8 +23,6 @@ import { ParentTable } from "./parents/ParentTable";
 import { ParentDrawer } from "./parents/ParentDrawer";
 import { LinkStudentModal } from "./parents/LinkStudentModal";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
-
-type Banner = { kind: "error" | "success"; text: string } | null;
 
 type ConfirmKind = "unlink" | "delete";
 type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
@@ -89,7 +88,7 @@ export default function ParentsPanel({ state }: { state: any }) {
   const [linkError, setLinkError] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-  const [banner, setBanner] = useState<Banner>(null);
+  const { toast, showToast } = useFloatingToast();
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => filterParents(parents, filters), [parents, filters]);
@@ -147,7 +146,7 @@ export default function ParentsPanel({ state }: { state: any }) {
         ),
       );
       setLinkParentId(null);
-      setBanner({ kind: "success", text: "Student linked." });
+      showToast("Student linked.");
     } catch (error) {
       setLinkError(error instanceof Error ? error.message : "Unable to link student.");
     } finally {
@@ -167,7 +166,7 @@ export default function ParentsPanel({ state }: { state: any }) {
           : p,
       ),
     );
-    setBanner({ kind: "success", text: "Student unlinked." });
+    showToast("Student unlinked.");
   }
 
   async function deleteParent(parent: ParentRow) {
@@ -177,7 +176,7 @@ export default function ParentsPanel({ state }: { state: any }) {
     setParents((current) => current.filter((p) => parentAccountId(p) !== id));
     if (drawerParentId === id) setDrawerParentId(null);
     if (linkParentId === id) setLinkParentId(null);
-    setBanner({ kind: "success", text: "Parent deleted." });
+    showToast("Parent deleted.");
   }
 
   function openTickets(parent: ParentRow) {
@@ -201,7 +200,7 @@ export default function ParentsPanel({ state }: { state: any }) {
       }
       setConfirm(null);
     } catch (error) {
-      setBanner({ kind: "error", text: error instanceof Error ? error.message : "Action failed." });
+      showToast(error instanceof Error ? error.message : "Action failed.", "danger");
       setConfirm(null);
     } finally {
       setConfirmBusy(false);
@@ -212,7 +211,7 @@ export default function ParentsPanel({ state }: { state: any }) {
     onView: (parent) => {
       const id = parentAccountId(parent);
       if (id <= 0) {
-        setBanner({ kind: "error", text: "Parent account is required." });
+        showToast("Parent account is required.", "danger");
         return;
       }
       setDrawerParentId(id);
@@ -221,7 +220,7 @@ export default function ParentsPanel({ state }: { state: any }) {
       setLinkError("");
       const id = parentAccountId(parent);
       if (id <= 0) {
-        setBanner({ kind: "error", text: "Parent account is required." });
+        showToast("Parent account is required.", "danger");
         return;
       }
       setLinkParentId(id);
@@ -233,7 +232,7 @@ export default function ParentsPanel({ state }: { state: any }) {
       } else if (kids.length > 1) {
         const id = parentAccountId(parent);
         if (id <= 0) {
-          setBanner({ kind: "error", text: "Parent account is required." });
+          showToast("Parent account is required.", "danger");
           return;
         }
         setDrawerParentId(id);
@@ -267,24 +266,8 @@ export default function ParentsPanel({ state }: { state: any }) {
 
   return (
     <div className="workspace-fit flex flex-col gap-3 sm:gap-3 lg:h-full lg:min-h-0">
+      <FloatingToast toast={toast} />
       <HeaderBar />
-
-      {banner ? (
-        <div
-          role="status"
-          className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${
-            banner.kind === "error"
-              ? "border-destructive/20 bg-destructive/10 text-destructive"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {banner.kind === "error" ? <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />}
-          <span className="min-w-0 flex-1 break-words">{banner.text}</span>
-          <button type="button" onClick={() => setBanner(null)} aria-label="Dismiss" className="shrink-0 rounded p-0.5 hover:bg-foreground/10">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      ) : null}
 
       <ParentSummaryCards parents={parents} filters={filters} onApply={applyFilters} />
 

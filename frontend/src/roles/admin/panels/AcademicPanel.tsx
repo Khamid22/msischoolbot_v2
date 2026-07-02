@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Trash2, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { csrfHeaders } from "@/shared/lib/api";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
@@ -34,7 +35,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [groupFiltersOpen, setGroupFiltersOpen] = useState(false);
   const [groupRowsOverride, setGroupRowsOverride] = useState<Array<Record<string, unknown>> | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
-  const [groupDeleteError, setGroupDeleteError] = useState("");
+  const { toast: groupToast, showToast: showGroupToast, clearToast: clearGroupToast } = useFloatingToast();
   const groups = groupRowsOverride ?? initialGroups;
 
   const schoolNameByCode = useMemo(() => {
@@ -162,7 +163,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     if (!confirmed) return;
 
     setDeletingGroupId(id);
-    setGroupDeleteError("");
+    clearGroupToast();
     try {
       const response = await fetch(routes.adminAcademicGroupApi(id), {
         method: "DELETE",
@@ -170,7 +171,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       });
       const json = await response.json();
       if (!response.ok || !json.ok) {
-        setGroupDeleteError(asString(json.message) || "Unable to delete group.");
+        showGroupToast(asString(json.message) || "Unable to delete group.", "danger");
         return;
       }
       if (Array.isArray(json.groups)) {
@@ -181,8 +182,9 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         );
       }
       if (openGroupId === id) setOpenGroupId(null);
+      showGroupToast(`${name} deleted.`);
     } catch {
-      setGroupDeleteError("Network error while deleting the group.");
+      showGroupToast("Network error while deleting the group.", "danger");
     } finally {
       setDeletingGroupId(null);
     }
@@ -234,6 +236,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
 
   return (
     <div className={kind === "groups" ? "flex flex-col gap-4 lg:h-full lg:min-h-0" : "space-y-4"}>
+      <FloatingToast toast={groupToast} />
       {kind === "subjects" ? (
         <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -717,11 +720,6 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               ) : null}
 
               <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-2">
-                {groupDeleteError ? (
-                  <div className="mb-2 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
-                    {groupDeleteError}
-                  </div>
-                ) : null}
                 {filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
