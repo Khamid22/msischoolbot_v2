@@ -62,8 +62,8 @@ import type { ComponentType } from "react";
 
 const modePanelsByAdminMode: Record<string, Record<string, ComponentType<{ state: any }>>> = {
   ceo: ceoPanels,
-  sales: supportPanels,
-  hr: hrPanels,
+  customer_support: supportPanels,
+  hr_manager: hrPanels,
 };
 
 type StudentActionTab =
@@ -642,6 +642,8 @@ function AdminSidebar({
       ? (state.adminMode as AdminMode)
       : "admin";
   const activeAdminProfile = adminModeProfiles[activeAdminMode];
+  const canPreviewRoles = Boolean(state.props?.devPreviewEnabled);
+  const realRole = String(state.props?.authRole || "admin");
 
   return (
     <aside
@@ -677,26 +679,37 @@ function AdminSidebar({
             </button>
           ) : null}
         </div>
-        <label className="mt-3 block">
+        <div className="mt-3 block">
           <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Workspace
+            {canPreviewRoles ? "Workspace Preview" : "Workspace"}
           </span>
-          <select
-            value={state.adminMode}
-            onChange={(event) => state.switchAdminMode(event.target.value)}
-            className="h-9 w-full rounded-lg border border-white/12 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-white/30"
-            aria-label="Workspace mode"
-          >
-            {adminModes.map((mode) => (
-              <option key={mode} value={mode}>
-                {adminModeProfiles[mode].label}
-              </option>
-            ))}
-          </select>
+          {canPreviewRoles ? (
+            <select
+              value={state.adminMode}
+              onChange={(event) => state.switchAdminMode(event.target.value)}
+              className="h-9 w-full rounded-lg border border-white/12 bg-white px-2 text-xs font-bold text-slate-900 outline-none focus:border-white/30"
+              aria-label="Workspace preview mode"
+            >
+              {adminModes.map((mode) => (
+                <option key={mode} value={mode}>
+                  {adminModeProfiles[mode].label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex h-9 items-center rounded-lg border border-white/12 bg-white/10 px-2 text-xs font-bold text-white">
+              {activeAdminProfile.label}
+            </div>
+          )}
           <span className="mt-1 block text-[11px] leading-4 text-slate-400">
             {activeAdminProfile.description}
           </span>
-        </label>
+          {canPreviewRoles ? (
+            <span className="mt-1 block text-[10px] leading-4 text-slate-500">
+              UI preview only. Real role: {adminModeProfiles[realRole as AdminMode]?.label || realRole}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">

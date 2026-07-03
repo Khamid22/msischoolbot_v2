@@ -72,6 +72,36 @@ def get_teacher_login_row(conn, login):
     ).fetchone()
 
 
+def get_teacher_by_telegram_id(conn, telegram_user_id):
+    return conn.execute(
+        """
+        SELECT
+            COALESCE(staff.teacher_id, name_match.id, 0) AS id,
+            staff.id AS staff_id,
+            COALESCE(NULLIF(t.full_name, ''), NULLIF(name_match.full_name, ''), NULLIF(staff.display_name, ''), staff.login) AS full_name,
+            COALESCE(g.group_name, '') AS assigned_group,
+            staff.login,
+            staff.password_hash
+        FROM msi_v2.msi_staff staff
+        LEFT JOIN msi_v2.teachers t ON t.id = staff.teacher_id
+        LEFT JOIN msi_v2.teachers name_match
+          ON staff.teacher_id IS NULL
+         AND lower(name_match.full_name) = lower(COALESCE(NULLIF(staff.display_name, ''), staff.login))
+         AND name_match.status <> 'inactive'
+        LEFT JOIN msi_v2.group_teachers gt
+          ON gt.teacher_id = COALESCE(t.id, name_match.id)
+         AND gt.status = 'active'
+         AND gt.role = 'main'
+        LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
+        WHERE staff.telegram_user_id = %s
+          AND lower(staff.role) = 'teacher'
+          AND lower(staff.status) = 'active'
+        LIMIT 1
+        """,
+        (telegram_user_id,),
+    ).fetchone()
+
+
 def get_teacher_auth_row_by_id(conn, teacher_id):
     return conn.execute(
         """
@@ -405,6 +435,7 @@ def delete_teacher_row_by_id(conn, teacher_id):
 __all__ = [
     "list_teachers_rows",
     "get_teacher_login_row",
+    "get_teacher_by_telegram_id",
     "get_teacher_auth_row_by_id",
     "list_teacher_ids_without_auth",
     "get_next_teacher_code",

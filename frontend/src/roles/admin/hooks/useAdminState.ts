@@ -63,9 +63,15 @@ function urlAdminMode() {
   }
 }
 
+const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
+const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
+
 function storedAdminMode() {
   try {
-    return asString(window.localStorage.getItem("msi_admin_mode"));
+    return (
+      asString(window.localStorage.getItem(DEV_PREVIEW_ROLE_KEY)) ||
+      asString(window.localStorage.getItem(LEGACY_ADMIN_MODE_KEY))
+    );
   } catch {
     return "";
   }
@@ -74,9 +80,10 @@ function storedAdminMode() {
 export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
-  const [adminMode, setAdminModeState] = useState<AdminMode>(() => {
-    return normalizeAdminMode(urlAdminMode() || storedAdminMode() || props.adminMode);
+  const [previewRole, setPreviewRoleState] = useState<AdminMode>(() => {
+    return normalizeAdminMode(urlAdminMode() || storedAdminMode() || props.previewRole || props.adminMode);
   });
+  const adminMode = previewRole;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeStudentRowId, setActiveStudentRowId] = useState(() => {
     try {
@@ -210,12 +217,12 @@ export function useAdminState(props: AdminPageProps) {
   const visibleTabs = tabsForAdminMode(adminMode);
 
   useEffect(() => {
-    const serverMode = asString(props.adminMode);
+    const serverMode = asString(props.previewRole || props.adminMode);
     const clientMode = urlAdminMode() || storedAdminMode();
     if (clientMode) {
       const normalizedClientMode = normalizeAdminMode(clientMode);
       if (normalizedClientMode !== adminMode) {
-        setAdminModeState(normalizedClientMode);
+        setPreviewRoleState(normalizedClientMode);
       }
       return;
     }
@@ -224,9 +231,9 @@ export function useAdminState(props: AdminPageProps) {
     }
     const normalizedMode = normalizeAdminMode(serverMode);
     if (normalizedMode !== adminMode) {
-      setAdminModeState(normalizedMode);
+      setPreviewRoleState(normalizedMode);
     }
-  }, [adminMode, props.adminMode]);
+  }, [adminMode, props.adminMode, props.previewRole]);
 
   function clearResourceUploadResetTimer() {
     if (resourceUploadResetTimerRef.current !== null) {
@@ -663,7 +670,7 @@ export function useAdminState(props: AdminPageProps) {
       setActiveTab(normalizeAdminTab(params.get("panel")));
       const modeParam = params.get("mode");
       if (modeParam) {
-        setAdminModeState(normalizeAdminMode(modeParam));
+        setPreviewRoleState(normalizeAdminMode(modeParam));
       }
       setActiveStudentRowId(Math.max(0, Math.floor(Number(params.get("student") || 0))));
       setMobileNavOpen(false);
@@ -700,11 +707,12 @@ export function useAdminState(props: AdminPageProps) {
   }, []);
 
   function switchAdminTab(nextTab: AdminTab) {
+    setActiveTab(nextTab);
     setMobileNavOpen(false);
     const nextUrl = buildAdminTabUrl(nextTab, currentSchool, adminMode);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
-      window.location.href = nextUrl;
+      window.history.pushState({}, "", nextUrl);
     }
   }
 
@@ -712,17 +720,18 @@ export function useAdminState(props: AdminPageProps) {
     const normalizedMode = normalizeAdminMode(nextMode);
     const nextTabs = tabsForAdminMode(normalizedMode);
     const fallbackTab = nextTabs[0]?.key || "overview";
-    setAdminModeState(normalizedMode);
+    setPreviewRoleState(normalizedMode);
     setActiveTab(fallbackTab);
     setMobileNavOpen(false);
     try {
-      window.localStorage.setItem("msi_admin_mode", normalizedMode);
+      window.localStorage.setItem(DEV_PREVIEW_ROLE_KEY, normalizedMode);
+      window.localStorage.removeItem(LEGACY_ADMIN_MODE_KEY);
     } catch {
     }
     const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, normalizedMode);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
-      window.location.href = nextUrl;
+      window.history.pushState({}, "", nextUrl);
     }
   }
 
@@ -939,9 +948,12 @@ export function useAdminState(props: AdminPageProps) {
   return {
     props: {
       ...props,
+      previewRole,
+      adminMode,
       adminTeachers: teachers,
       adminTeacherAcademy: academyTeachers,
     },
+    previewRole,
     adminMode,
     visibleTabs,
     activeTab,

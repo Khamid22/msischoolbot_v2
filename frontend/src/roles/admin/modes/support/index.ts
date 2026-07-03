@@ -6,7 +6,7 @@ const SupportParents = lazy(() => import("./SupportParents"));
 const SupportPayments = lazy(() => import("./SupportPayments"));
 const SupportComplaints = lazy(() => import("./SupportComplaints"));
 
-// Tab key → Customer Support component (admin mode key "sales"). The support
+// Tab key → Customer Support component (admin mode key "customer_support"). The support
 // sidebar is intentionally limited to tickets, lookup, parent contact, and payments.
 export const supportPanels: Record<string, ComponentType<{ state: any }>> = {
   students: SupportStudents,

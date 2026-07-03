@@ -1,0 +1,120 @@
+"""Canonical role helpers and role route guards."""
+
+import json
+import os
+from base64 import b64encode
+
+import pytest
+from itsdangerous import TimestampSigner
+
+from backend.identity.permissions import has_permission
+from backend.identity.roles import (
+    dashboard_path_for_role,
+    normalize_role,
+    role_display_name,
+)
+
+XHR = {"X-Requested-With": "XMLHttpRequest"}
+
+
+def _session_secret():
+    return (
+        os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+        or "dev-only-insecure-key-do-not-use-in-prod"
+    )
+
+
+def _signed_session(data):
+    encoded = b64encode(json.dumps(data).encode("utf-8"))
+    return TimestampSigner(_session_secret()).sign(encoded).decode("utf-8")
+
+
+def _set_session(client, data):
+    client.cookies.set("session", _signed_session(data))
+
+
+@pytest.mark.parametrize(
+    ("raw_role", "normalized", "path", "label"),
+    [
+        ("owner", "admin", "/admin", "Admin"),
+        ("hr", "hr_manager", "/hr", "HR Manager"),
+        ("sales", "customer_support", "/support", "Customer Support"),
+        ("academic-director", "academic_director", "/academic-director", "Academic Director"),
+        ("teacher", "teacher", "/teacher", "Teacher"),
+        ("parent", "parent", "/parent", "Parent"),
+    ],
+)
+def test_role_aliases_normalize_to_dashboard_paths(raw_role, normalized, path, label):
+    assert normalize_role(raw_role) == normalized
+    assert dashboard_path_for_role(raw_role) == path
+    assert role_display_name(raw_role) == label
+
+
+def test_admin_has_all_permissions():
+    assert has_permission("admin", "view_global_reports") is True
+    assert has_permission("admin", "delete_the_moon") is True
+
+
+def test_customer_support_permission_alias():
+    assert has_permission("sales", "view_tickets") is True
+    assert has_permission("sales", "manage_curriculum_progress") is False
+
+
+@pytest.mark.parametrize(
+    ("role", "path", "page"),
+    [
+        ("ceo", "/ceo", "ceo-home"),
+        ("hr_manager", "/hr", "hr-home"),
+        ("customer_support", "/support", "support-home"),
+        ("academic_director", "/academic-director", "academic-director-home"),
+        ("parent", "/parent", "parent-home"),
+    ],
+)
+def test_role_home_routes_render_for_matching_role(client, role, path, page):
+    payload = {
+        "auth_role": role,
+        "auth_login": f"{role}@test",
+        "parent_id": 1 if role == "parent" else 0,
+    }
+    _set_session(client, payload)
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert f'data-react-page="{page}"' in response.text
+
+
+def test_student_role_entry_redirects_to_own_dashboard(client):
+    _set_session(
+        client,
+        {
+            "auth_role": "student",
+            "auth_login": "MSI0001",
+            "student_db_id": 1,
+            "student_enrollment_id": 321,
+            "student_school_code": "sehriyo",
+        },
+    )
+
+    response = client.get("/student")
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/dashboard/321?school=sehriyo"
+
+
+def test_wrong_role_route_returns_403_json(client):
+    _set_session(client, {"auth_role": "ceo", "auth_login": "ceo@test"})
+
+    response = client.get("/hr", headers=XHR)
+
+    assert response.status_code == 403
+    assert response.json()["message"] == "This page requires HR Manager access."
+
+
+def test_invalid_session_role_fails_closed(client):
+    _set_session(client, {"auth_role": "ghost", "auth_login": "ghost@test"})
+
+    response = client.get("/ceo", headers=XHR)
+
+    assert response.status_code == 403
+    assert response.json() == {"message": "Invalid session role."}

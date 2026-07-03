@@ -396,7 +396,7 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     return <AcademyTeacherPreview teacher={state.academyTeacherPreview as Record<string, unknown>} />;
   }
 
-  if (mode === "hr") {
+  if (mode === "hr_manager") {
     return (
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
@@ -612,7 +612,7 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     );
   }
 
-  if (mode === "sales") {
+  if (mode === "customer_support") {
     const complaints = supportComplaintRows(state);
     const newComplaints = complaints.filter((item) => supportComplaintStatus(item.status) === "new");
     const escalatedComplaints = complaints.filter((item) => supportComplaintStatus(item.status) === "escalated");

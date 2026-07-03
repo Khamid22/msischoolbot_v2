@@ -15,10 +15,10 @@ def test_home_renders_login_page(client):
     assert "msi-react-bootstrap" in response.text
 
 
-def test_admin_page_renders_login_when_logged_out(client):
+def test_admin_page_redirects_when_logged_out(client):
     response = client.get("/admin")
-    assert response.status_code == 200
-    assert 'data-react-page="login"' in response.text
+    assert response.status_code == 302
+    assert response.headers["location"] == "/"
 
 
 def test_openapi_schema_available(client):

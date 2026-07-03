@@ -182,7 +182,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   const props = state.props || {};
   const csrf = asString(props.csrfToken);
   const adminMode = asString(state.adminMode).toLowerCase();
-  const isHrMode = adminMode === "hr";
+  const isHrMode = adminMode === "hr_manager";
   const isTeacherMode = adminMode === "teacher";
   const audienceOptions = isHrMode ? hrAudienceOptions : defaultAudienceOptions;
   const defaultAudience: Audience = isHrMode ? "trainees" : "all";

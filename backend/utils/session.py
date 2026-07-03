@@ -1,12 +1,13 @@
 """Centralized session/auth state helpers used by route modules."""
 
+from backend.identity.roles import dashboard_path_for_role, is_valid_role, normalize_role
 from backend.utils.context import session
 from backend.utils.normalization import normalize_school_code
 
 
 def current_auth_role():
-    role = str(session.get("auth_role", "")).strip().lower()
-    if role in {"admin", "student", "teacher", "parent"}:
+    role = normalize_role(session.get("auth_role", ""))
+    if is_valid_role(role):
         return role
     return ""
 
@@ -116,19 +117,46 @@ def current_admin_role():
     return str(session.get("admin_role", "admin")).strip().lower()
 
 
+def current_staff_id():
+    try:
+        parsed_value = int(session.get("staff_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
+
+
 def set_admin_session(admin):
     if not isinstance(admin, dict) or not admin.get("id"):
         return False
 
-    admin_role = str(admin.get("role", "admin")).strip().lower() or "admin"
+    raw_admin_role = str(admin.get("role", "admin")).strip() or "admin"
+    portal_role = normalize_role(raw_admin_role) or "admin"
+    if portal_role not in {
+        "admin",
+        "ceo",
+        "hr_manager",
+        "customer_support",
+        "parent",
+        "academic_director",
+    }:
+        portal_role = "admin"
+    admin_role = "owner" if raw_admin_role.strip().casefold() == "owner" else portal_role
+
     session.clear()
-    session["auth_role"] = "admin"
+    session["auth_role"] = portal_role
     session["auth_login"] = str(admin.get("login", "")).strip()
-    session["admin_id"] = int(admin["id"])
-    session["admin_role"] = admin_role
-    session["admin_is_owner"] = bool(admin.get("is_owner"))
-    session["admin_last_panel"] = "overview"
-    session["admin_last_school"] = "all"
+    session["staff_id"] = int(admin["id"])
+    session["staff_role"] = portal_role
+    if portal_role == "admin":
+        session["admin_id"] = int(admin["id"])
+        session["admin_role"] = admin_role
+        session["admin_is_owner"] = admin_role == "owner" or bool(admin.get("is_owner"))
+        session["admin_last_panel"] = "overview"
+        session["admin_last_school"] = "all"
+    elif portal_role == "parent":
+        # Legacy parent-client accounts can live in msi_staff. Keep admin_id so
+        # the existing parent page can resolve linked children during cutover.
+        session["admin_id"] = int(admin["id"])
     session.permanent = True
     return True
 
@@ -258,6 +286,15 @@ def build_dashboard_url(enrollment_id, subject="", group="", **extra_params):
     return url
 
 
+def dashboard_url_for_current_session():
+    role = current_auth_role()
+    if role == "student":
+        enrollment_id = current_student_enrollment_id()
+        if enrollment_id is not None:
+            return build_dashboard_url(enrollment_id)
+    return dashboard_path_for_role(role)
+
+
 def url_for(endpoint: str, **kwargs) -> str:
     endpoint_clean = endpoint.split(".")[-1] if "." in endpoint else endpoint
 
@@ -342,6 +379,7 @@ __all__ = [
     "current_auth_role",
     "current_admin_role",
     "current_auth_login",
+    "current_staff_id",
     "current_teacher_id",
     "current_teacher_staff_id",
     "current_teacher_full_name",
@@ -357,6 +395,7 @@ __all__ = [
     "set_student_session",
     "try_auto_login_student_by_telegram",
     "build_dashboard_url",
+    "dashboard_url_for_current_session",
     "url_for",
     "logout_portal_session",
 ]

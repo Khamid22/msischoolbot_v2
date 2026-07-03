@@ -2,8 +2,10 @@
 
 import html
 
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
+from backend.utils.guards import require_role
 from backend.utils.response_helpers import redirect
 from backend.utils.context import session, request as ctx_request
 from backend.render import generate_csrf
@@ -526,9 +528,13 @@ def build_render_parent_page():
             parent_id = 0
             admin_id = 0
 
-        children = list_parent_client_children(parent_id) if parent_id else []
-        if not children and admin_id:
-            children = list_parent_children(admin_id)
+        children = []
+        try:
+            children = list_parent_client_children(parent_id) if parent_id else []
+            if not children and admin_id:
+                children = list_parent_children(admin_id)
+        except Exception:
+            children = []
 
         resources = []
         try:
@@ -564,4 +570,19 @@ def build_render_parent_page():
     return render_parent_page
 
 
-__all__ = ["build_render_parent_page", "register_parent_invite_routes"]
+def register_parent_page_routes(app):
+    router = APIRouter(dependencies=[Depends(require_role("parent"))])
+    render_parent_page = build_render_parent_page()
+
+    @router.get("/parent")
+    def parent_home():
+        return render_parent_page()
+
+    app.include_router(router)
+
+
+__all__ = [
+    "build_render_parent_page",
+    "register_parent_invite_routes",
+    "register_parent_page_routes",
+]

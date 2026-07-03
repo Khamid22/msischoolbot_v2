@@ -28,7 +28,15 @@ export type AdminTab =
   | "gradebook"
   | "office_hours";
 export type OverviewGrade = "7" | "8";
-export type AdminMode = "admin" | "ceo" | "hr" | "sales" | "teacher" | "student" | "parent" | "academic_director";
+export type AdminMode =
+  | "admin"
+  | "ceo"
+  | "hr_manager"
+  | "customer_support"
+  | "teacher"
+  | "student"
+  | "parent"
+  | "academic_director";
 
 export interface ResourceUploadState {
   active: boolean;
@@ -39,8 +47,11 @@ export interface ResourceUploadState {
 
 export interface AdminPageProps {
   authLogin?: string;
+  authRole?: string;
   authError?: string;
   adminMode?: AdminMode;
+  previewRole?: AdminMode;
+  devPreviewEnabled?: boolean;
   adminNotice?: string;
   adminPanel?: AdminTab;
   adminSchool?: string;
@@ -148,13 +159,13 @@ export const adminModeProfiles: Record<
     description: "Performance, schools, staff, and decisions.",
     tabs: ["overview", "groups", "payments", "complaints"],
   },
-  hr: {
+  hr_manager: {
     label: "HR Manager",
     shortLabel: "HR",
     description: "Hiring pipeline and teacher records.",
     tabs: ["candidates", "teachers"],
   },
-  sales: {
+  customer_support: {
     label: "Customer Support",
     shortLabel: "Support",
     description: "Students, parent communication, payments, and follow-up.",
@@ -186,11 +197,30 @@ export const adminModeProfiles: Record<
   },
 };
 
-export const adminModes: AdminMode[] = ["admin", "ceo", "hr", "sales", "teacher", "student", "academic_director"];
+export const adminModes: AdminMode[] = [
+  "admin",
+  "ceo",
+  "hr_manager",
+  "customer_support",
+  "teacher",
+  "student",
+  "parent",
+  "academic_director",
+];
 
 export function normalizeAdminMode(value: unknown): AdminMode {
-  const normalized = asString(value).toLowerCase();
-  return normalized in adminModeProfiles ? (normalized as AdminMode) : "admin";
+  const normalized = asString(value).toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
+  const aliases: Record<string, AdminMode> = {
+    hr: "hr_manager",
+    sales: "customer_support",
+    support: "customer_support",
+    customer: "customer_support",
+    customer_support: "customer_support",
+    customer_support_manager: "customer_support",
+    academicdirector: "academic_director",
+  };
+  const aliased = aliases[normalized] || aliases[normalized.replace(/_/g, "")] || normalized;
+  return aliased in adminModeProfiles ? (aliased as AdminMode) : "admin";
 }
 
 export function tabsForAdminMode(mode: AdminMode) {
@@ -198,7 +228,7 @@ export function tabsForAdminMode(mode: AdminMode) {
   return tabs
     .filter((tab) => allowedTabs.has(tab.key))
     .map((tab) => {
-      if (mode === "hr" && tab.key === "announcements") {
+      if (mode === "hr_manager" && tab.key === "announcements") {
         return { ...tab, label: "Broadcasts" };
       }
       if (mode === "parent") {
@@ -547,9 +577,9 @@ export function buildAdminTabUrl(tab: AdminTab, school: string, mode?: AdminMode
   const params = new URLSearchParams();
   params.set("panel", tab);
   params.set("school", school || "all");
-  const normalizedMode = asString(mode).toLowerCase();
-  if (normalizedMode) {
-    params.set("mode", normalizedMode);
+  const rawMode = asString(mode);
+  if (rawMode) {
+    params.set("mode", normalizeAdminMode(rawMode));
   }
   return `/?${params.toString()}`;
 }

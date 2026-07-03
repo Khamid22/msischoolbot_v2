@@ -104,6 +104,31 @@ def get_admin_by_telegram_user_id(telegram_user_id):
     }
 
 
+def get_teacher_by_telegram_user_id(telegram_user_id):
+    if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
+        return None
+
+    init_storage()
+    with connect() as conn:
+        row = queries.get_teacher_by_telegram_id(conn, telegram_user_id)
+
+    if not row:
+        return None
+    try:
+        teacher_id = int(row["id"])
+    except (TypeError, ValueError):
+        teacher_id = 0
+    if teacher_id <= 0:
+        return None
+    return {
+        "id": teacher_id,
+        "staff_id": int(row["staff_id"] or 0),
+        "full_name": str(row["full_name"]),
+        "login": str(row["login"]),
+        "assigned_group": str(row["assigned_group"] or "").strip(),
+    }
+
+
 def unlink_telegram_user_links(telegram_user_id):
     if not isinstance(telegram_user_id, int) or telegram_user_id <= 0:
         return {
@@ -173,6 +198,7 @@ __all__ = [
     "get_admin_by_telegram_user_id",
     "get_bot_users_count",
     "get_student_by_telegram_user_id",
+    "get_teacher_by_telegram_user_id",
     "link_admin_telegram_user",
     "link_student_telegram_user",
     "record_bot_user",

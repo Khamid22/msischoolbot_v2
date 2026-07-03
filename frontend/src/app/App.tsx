@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect } from "react";
+import { Component, Suspense, lazy, useEffect, type ComponentType } from "react";
 import { readBootstrap } from "@/shared/lib/bootstrap";
 import { getTelegramStartParam, initTelegramViewport } from "@/shared/lib/telegram";
 
@@ -15,13 +15,20 @@ const pageMap = {
   "admin-home": lazy(() => import("@/roles/admin/pages/Admin")),
   "teacher-home": lazy(() => import("@/roles/teacher/pages/TeacherHome")),
   "parent-home": lazy(() => import("@/roles/parent/pages/ParentHome")),
+  "ceo-home": lazy(() => import("@/roles/common/pages/RoleHome")),
+  "hr-home": lazy(() => import("@/roles/common/pages/RoleHome")),
+  "support-home": lazy(() => import("@/roles/common/pages/RoleHome")),
+  "academic-director-home": lazy(() => import("@/roles/common/pages/RoleHome")),
+  unauthorized: lazy(() => import("@/roles/common/pages/Unauthorized")),
   "admin-edit-student": lazy(() => import("@/roles/admin/pages/EditStudentProfile")),
   "student-chat": lazy(() => import("@/roles/student/pages/Chat")),
   "student-office-hours": lazy(() => import("@/roles/student/pages/OfficeHours")),
   "student-not-found": lazy(() => import("@/roles/student/pages/StudentNotFound")),
 } as const;
 
-const ResolvedPage = pageMap[bootstrap.page] || pageMap["student-not-found"];
+const ResolvedPage = (pageMap[bootstrap.page] || pageMap["student-not-found"]) as ComponentType<
+  Record<string, unknown>
+>;
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };

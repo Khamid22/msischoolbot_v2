@@ -7,6 +7,7 @@ from backend.utils.response_helpers import jsonify, redirect
 from backend.utils.context import request, session
 from backend.utils.session import url_for
 from backend.render import generate_csrf, render_react_page
+from backend.identity.roles import normalize_role
 
 from backend.roles.admin.routes.academic_routes import register_academic_admin_routes
 from backend.roles.admin.routes.admins import register_admin_routes
@@ -28,13 +29,28 @@ from backend.domains.announcements.service import list_announcements
 ADMIN_PANEL_MODES = {
     "admin",
     "ceo",
-    "hr",
-    "sales",
+    "hr_manager",
+    "customer_support",
     "teacher",
     "student",
     "parent",
     "academic_director",
 }
+
+
+def _dev_preview_enabled():
+    forced = os.environ.get("ADMIN_PREVIEW_ROLES", "").strip().lower()
+    if forced in {"1", "true", "yes", "on"}:
+        return True
+    if forced in {"0", "false", "no", "off"}:
+        return False
+    app_env = os.environ.get("APP_ENV", "").strip().lower()
+    return app_env not in {"prod", "production"}
+
+
+def _normalize_admin_panel_mode(value):
+    normalized = normalize_role(value)
+    return normalized if normalized in ADMIN_PANEL_MODES else ""
 
 
 def register_admin_page_routes(
@@ -76,12 +92,8 @@ def register_admin_page_routes(
             admin_panel = requested_panel
         if requested_school and str(admin_school or "all").strip().lower() == "all":
             admin_school = requested_school
-        if not str(admin_mode or "").strip() and requested_mode in ADMIN_PANEL_MODES:
-            admin_mode = requested_mode
         if not str(admin_mode or "").strip():
-            saved_mode = str(session.get("admin_last_mode", "") or "").strip().lower()
-            if saved_mode in ADMIN_PANEL_MODES:
-                admin_mode = saved_mode
+            admin_mode = requested_mode
 
         force_refresh = bool(
             str(auth_error or "").strip()
@@ -105,19 +117,25 @@ def register_admin_page_routes(
             session["admin_last_school"] = school_filter
 
         resolved_admin_mode = str(admin_mode or "").strip().lower()
+        preview_enabled = _dev_preview_enabled()
+        if preview_enabled:
+            resolved_admin_mode = _normalize_admin_panel_mode(resolved_admin_mode)
+        else:
+            resolved_admin_mode = current_auth_role()
         if resolved_admin_mode not in ADMIN_PANEL_MODES:
             resolved_admin_mode = "admin"
-        if current_auth_role() == "admin":
-            session["admin_last_mode"] = resolved_admin_mode
 
         return render_react_page(
             "admin-home",
             {
                 "authLogin": current_auth_login(),
+                "authRole": current_auth_role(),
                 "authError": auth_error or (page_context["sync_errors"][0] if page_context["sync_errors"] else ""),
                 "adminNotice": admin_notice or page_context["load_error"] or "",
                 "adminPanel": panel,
                 "adminMode": resolved_admin_mode,
+                "previewRole": resolved_admin_mode,
+                "devPreviewEnabled": preview_enabled,
                 "adminSchool": school_filter,
                 "adminStudents": page_context["admin_students"],
                 "adminTeachers": page_context["admin_teachers"],

@@ -1,4 +1,6 @@
 / | GET
+/academic-director | GET
+/academic_director | GET
 /admin | GET
 /admin/academic/groups | POST
 /admin/academic/schools | POST
@@ -89,6 +91,8 @@
 /api/v1/auth/me | GET
 /api/v1/system/status | GET
 /auth/telegram | POST
+/ceo | GET
+/customer-support | GET
 /dashboard/{student_id} | GET
 /dashboard/{student_id}/aap-lessons | GET
 /dashboard/{student_id}/ar-lessons | GET
@@ -98,10 +102,13 @@
 /dashboard/{student_id}/resources | GET
 /docs | GET,HEAD
 /docs/oauth2-redirect | GET,HEAD
+/hr | GET
+/hr-manager | GET
 /login | POST
 /logout | POST
 /manifest.webmanifest | GET
 /openapi.json | GET,HEAD
+/parent | GET
 /parent/dashboard/{student_row_id} | GET
 /parent/invite/{code} | GET
 /parent/link/{token} | GET
@@ -110,6 +117,8 @@
 /redoc | GET,HEAD
 /search | POST
 /static | -
+/student | GET
+/support | GET
 /sw.js | GET
 /teacher | GET
 /teacher/api/office-hours/availability | GET
@@ -117,3 +126,4 @@
 /teacher/api/office-hours/availability/{availability_id} | PATCH
 /teacher/api/office-hours/bookings | GET
 /teacher/api/office-hours/bookings/{booking_id} | PATCH
+/unauthorized | GET

@@ -9,20 +9,25 @@ from backend.utils.telegram_auth import telegram_user_id_from_init_data, verify_
 from backend.identity.parent_invites import load_parent_invite_code_payload
 from backend.identity.account_service import (
     detect_login_role,
+    get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
     get_teacher_by_id,
+    get_teacher_by_telegram_user_id,
     link_student_telegram_user,
     record_student_activity,
     verify_admin_credentials,
     verify_student_credentials,
     verify_teacher_credentials,
 )
+from backend.identity.roles import dashboard_path_for_role
+from backend.utils.guards import unauthorized_response
 from backend.roles.parent.services import link_parent_via_invite, parent_from_telegram_user_id
 from backend.utils.session import (
     build_dashboard_url,
     current_admin_role,
     current_auth_role,
     current_student_enrollment_id,
+    dashboard_url_for_current_session,
     logout_portal_session,
     set_admin_session,
     set_parent_session,
@@ -192,13 +197,19 @@ def register_user_auth_routes(
         return render_admin_redirect(redirect_url)
 
     @students.get("/admin")
-    def admin_entry():
+    def admin_entry(request_obj: Request):
         if current_auth_role() == "admin":
-            if current_admin_role() == "parent":
-                return redirect(url_for("student.home"))
-            return redirect(url_for("student.home", panel="overview", school="all"))
-        if current_auth_role() == "student":
-            return redirect(url_for("student.home"))
+            return render_admin_page(
+                admin_panel=str(request_proxy.args.get("panel") or "overview"),
+                admin_school=str(request_proxy.args.get("school") or "all"),
+                admin_mode=str(request_proxy.args.get("mode") or ""),
+            )
+        if current_auth_role():
+            return unauthorized_response(
+                request_obj,
+                message="This workspace requires Admin access.",
+                status_code=403,
+            )
         return render_login_page()
 
     @students.get("/admin/continue")
@@ -214,9 +225,7 @@ def register_user_auth_routes(
                 auth_error="Unable to initialize admin session. Please sign in again.",
             ), 500)
 
-        if current_admin_role() == "parent":
-            return redirect(url_for("student.home"))
-        return redirect(url_for("student.home", panel="overview", school="all"))
+        return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("admin"))
 
     @students.get("/")
     def home():
@@ -231,11 +240,10 @@ def register_user_auth_routes(
             mode_arg = str(request_proxy.args.get("mode", "")).strip().lower()
             saved_panel = str(session.get("admin_last_panel", "overview")).strip().lower()
             saved_school = str(session.get("admin_last_school", "all")).strip().lower()
-            saved_mode = str(session.get("admin_last_mode", "")).strip().lower()
 
             panel = panel_arg or saved_panel or "overview"
             school_filter = school_arg or saved_school or "all"
-            admin_mode = mode_arg or saved_mode
+            admin_mode = mode_arg
             edit_teacher_id = request_proxy.args.get("edit_teacher_id", "").strip()
             selected_teacher_edit = None
             if panel == "teachers" and edit_teacher_id:
@@ -259,10 +267,13 @@ def register_user_auth_routes(
             return redirect(url_for("student.home"))
 
         if role == "teacher":
-            return redirect("/teacher")
+            return redirect(dashboard_path_for_role("teacher"))
 
         if role == "parent":
-            return render_parent_page()
+            return redirect(dashboard_path_for_role("parent"))
+
+        if role in {"ceo", "hr_manager", "customer_support", "academic_director"}:
+            return redirect(dashboard_path_for_role(role))
 
         # Telegram auto-login happens via POST /auth/telegram, which verifies the
         # signed initData HMAC. The login page's JS calls it on Mini App startup.
@@ -284,16 +295,49 @@ def register_user_auth_routes(
         if invite_parent:
             if not set_parent_session(invite_parent, telegram_user_id):
                 return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-            return jsonify({"ok": True, "linked": True, "role": "parent", "redirect": "/"})
+            return jsonify({
+                "ok": True,
+                "linked": True,
+                "role": "parent",
+                "redirect": dashboard_path_for_role("parent"),
+            })
+
+        teacher = get_teacher_by_telegram_user_id(telegram_user_id)
+        if teacher:
+            if not set_teacher_session(teacher):
+                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
+            return jsonify({
+                "ok": True,
+                "linked": True,
+                "role": "teacher",
+                "redirect": dashboard_path_for_role("teacher"),
+            })
+
+        staff_user = get_admin_by_telegram_user_id(telegram_user_id)
+        if staff_user:
+            if not set_admin_session(staff_user):
+                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
+            role = current_auth_role()
+            return jsonify({
+                "ok": True,
+                "linked": True,
+                "role": role,
+                "redirect": dashboard_path_for_role(role),
+            })
+
+        parent = parent_from_telegram_user_id(telegram_user_id)
+        if parent:
+            if not set_parent_session(parent, telegram_user_id):
+                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
+            return jsonify({
+                "ok": True,
+                "linked": True,
+                "role": "parent",
+                "redirect": dashboard_path_for_role("parent"),
+            })
 
         student = get_student_by_telegram_user_id(telegram_user_id)
         if not student:
-            parent = parent_from_telegram_user_id(telegram_user_id)
-            if parent:
-                if not set_parent_session(parent, telegram_user_id):
-                    return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-                return jsonify({"ok": True, "linked": True, "role": "parent", "redirect": "/"})
-
             # Signature is valid but this Telegram account is not linked yet.
             return jsonify({"ok": True, "linked": False})
 
@@ -310,7 +354,12 @@ def register_user_auth_routes(
             if enrollment_id
             else url_for("student.home")
         )
-        return jsonify({"ok": True, "linked": True, "redirect": redirect_url})
+        return jsonify({
+            "ok": True,
+            "linked": True,
+            "role": "student",
+            "redirect": redirect_url,
+        })
 
     @students.post("/login")
     @limiter.limit("10 per minute; 50 per hour")
@@ -344,8 +393,12 @@ def register_user_auth_routes(
                     auth_login_input=login_value,
                 ), 401)
 
-            set_admin_session(admin)
-            return redirect(url_for("student.home", panel="overview", school="all"))
+            if not set_admin_session(admin):
+                return with_status(render_login_page(
+                    auth_error="Unable to initialize account session.",
+                    auth_login_input=login_value,
+                ), 500)
+            return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("admin"))
 
         if role_hint == "student":
             student = verify_student_credentials(login_value, password_value)
@@ -395,13 +448,17 @@ def register_user_auth_routes(
                     auth_error="Unable to initialize teacher session.",
                     auth_login_input=login_value,
                 ), 500)
-            return redirect("/teacher")
+            return redirect(dashboard_path_for_role("teacher"))
 
         # No role prefix matched — try parent credentials (free-form logins).
         admin = verify_admin_credentials(login_value, password_value)
         if admin and str(admin.get("role", "")).strip().lower() == "parent":
-            set_admin_session(admin)
-            return redirect(url_for("student.home"))
+            if not set_admin_session(admin):
+                return with_status(render_login_page(
+                    auth_error="Unable to initialize parent session.",
+                    auth_login_input=login_value,
+                ), 500)
+            return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("parent"))
 
         return with_status(render_login_page(
             auth_error="Invalid login or password.",

@@ -13,10 +13,16 @@ from backend.utils.limiter import limiter
 from backend.utils.context import RequestContextMiddleware
 from backend.utils.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from backend.utils.guards import install_guard_handler
+from backend.identity.roles import is_valid_role, normalize_role, role_display_name
 from config import get_web_settings
 from backend.domains.academics.rating_service import clear_group_cache
 from backend.roles.admin.routes import register_admin_page_routes
+from backend.roles.academic_director.routes import register_academic_director_page_routes
+from backend.roles.ceo.routes import register_ceo_page_routes
+from backend.roles.customer_support.routes import register_customer_support_page_routes
+from backend.roles.hr_manager.routes import register_hr_manager_page_routes
 from backend.roles.parent.routes import register_parent_invite_routes
+from backend.roles.parent.routes import register_parent_page_routes
 from backend.roles.student.routes import register_student_page_routes
 from backend.roles.teacher.routes import register_teacher_page_routes
 
@@ -64,12 +70,9 @@ PUBLIC_PATHS = {
     "/",
     "/login",
     "/auth/telegram",
-    "/admin",
+    # Signed handoff token, not ambient-cookie auth.
     "/admin/continue",
-    # /teacher self-gates to the teacher role (see roles/teacher/routes.py). Listing
-    # it public keeps the teacher role OUT of the {admin, student} auth gate above,
-    # so a teacher session can reach ONLY /teacher + login/logout/static.
-    "/teacher",
+    "/unauthorized",
     "/manifest.webmanifest",
     "/sw.js",
     "/docs",
@@ -137,8 +140,19 @@ class AuthAndSecurityMiddleware:
         )
 
         if not is_public:
-            auth_role = request_obj.session.get("auth_role")
-            if not auth_role or auth_role not in {"admin", "student", "parent"}:
+            raw_auth_role = request_obj.session.get("auth_role")
+            auth_role = normalize_role(raw_auth_role)
+            if not auth_role:
+                if raw_auth_role:
+                    requested_with = request_obj.headers.get("X-Requested-With") or ""
+                    is_xhr = requested_with == "XMLHttpRequest"
+                    if path.startswith("/api/") or is_xhr:
+                        response = JSONResponse({"message": "Invalid session role."}, status_code=403)
+                        await response(scope, receive, send)
+                        return
+                    response = RedirectResponse(url="/unauthorized", status_code=302)
+                    await response(scope, receive, send)
+                    return
                 requested_with = request_obj.headers.get("X-Requested-With") or ""
                 is_xhr = requested_with == "XMLHttpRequest"
                 if path.startswith("/api/") or is_xhr:
@@ -146,6 +160,16 @@ class AuthAndSecurityMiddleware:
                     await response(scope, receive, send)
                     return
                 response = RedirectResponse(url="/", status_code=302)
+                await response(scope, receive, send)
+                return
+            if not is_valid_role(auth_role):
+                requested_with = request_obj.headers.get("X-Requested-With") or ""
+                is_xhr = requested_with == "XMLHttpRequest"
+                if path.startswith("/api/") or is_xhr:
+                    response = JSONResponse({"message": "Invalid session role."}, status_code=403)
+                    await response(scope, receive, send)
+                    return
+                response = RedirectResponse(url="/unauthorized", status_code=302)
                 await response(scope, receive, send)
                 return
 
@@ -270,6 +294,28 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
     return RedirectResponse(url="/", status_code=302)
 
 
+@app.get("/unauthorized")
+def unauthorized_page(request_obj: Request):
+    from backend.render import render_react_page
+
+    auth_role = normalize_role(request_obj.session.get("auth_role"))
+    return render_react_page(
+        "unauthorized",
+        {
+            "authRole": auth_role,
+            "roleDisplayName": role_display_name(auth_role) if auth_role else "",
+            "message": (
+                "You are signed in, but this workspace is not available for your role."
+                if auth_role
+                else "Please sign in with an account that has access to this workspace."
+            ),
+        },
+        title="Unauthorized",
+        description="This workspace is not available for your role.",
+        status_code=403,
+    )
+
+
 def _build_default_asset_version():
     candidate_paths = [
         os.path.join(_BACKEND_DIR, "js_bundles.py"),
@@ -366,6 +412,11 @@ def _bootstrap_app(app_instance):
     )
     register_student_page_routes(app_instance, render_admin_page=render_admin_page)
     register_teacher_page_routes(app_instance)
+    register_parent_page_routes(app_instance)
+    register_ceo_page_routes(app_instance)
+    register_hr_manager_page_routes(app_instance)
+    register_customer_support_page_routes(app_instance)
+    register_academic_director_page_routes(app_instance)
     register_parent_invite_routes(app_instance)
 
     _APP_BOOTSTRAPPED = True

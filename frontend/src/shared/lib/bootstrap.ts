@@ -10,7 +10,13 @@ export type ReactPageName =
   | "student-office-hours"
   | "admin-home"
   | "admin-edit-student"
+  | "teacher-home"
   | "parent-home"
+  | "ceo-home"
+  | "hr-home"
+  | "support-home"
+  | "academic-director-home"
+  | "unauthorized"
   | "student-not-found";
 
 export interface ReactBootstrap {
@@ -30,7 +36,13 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-office-hours",
   "admin-home",
   "admin-edit-student",
+  "teacher-home",
   "parent-home",
+  "ceo-home",
+  "hr-home",
+  "support-home",
+  "academic-director-home",
+  "unauthorized",
   "student-not-found",
 ]);
 

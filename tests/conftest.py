@@ -22,6 +22,6 @@ def app():
     return create_app()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def client(app):
     return TestClient(app, follow_redirects=False)

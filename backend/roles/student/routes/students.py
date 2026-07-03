@@ -74,6 +74,17 @@ def register_student_routes(students, *, render_student_panel):
             return None
         return redirect(url_for("student.home"))
 
+    @students.get("/student")
+    def student_home_entry():
+        denied = _require_student_role()
+        if denied is not None:
+            return denied
+
+        enrollment_id = current_student_enrollment_id()
+        if enrollment_id is not None:
+            return redirect(build_dashboard_url(enrollment_id))
+        return render_student_panel(form_data={})
+
     @students.post("/profile/password")
     def profile_change_password():
         denied = _require_student_role()
