@@ -796,9 +796,11 @@ export default function AdminPage(props: AdminPageProps) {
   const selectedTeacherPreviewKey = isTeacherWorkspace
     ? resolveTeacherPreviewKey(allTeacherPreviewRows, teacherPreviewKey, props.authLogin)
     : "";
-  const panelState = isTeacherWorkspace
-    ? { ...state, teacherPreviewKey: selectedTeacherPreviewKey }
-    : state;
+  const panelState = {
+    ...state,
+    teacherPreviewKey: isTeacherWorkspace ? selectedTeacherPreviewKey : teacherPreviewKey,
+    selectTeacherPreview,
+  };
 
   function selectTeacherPreview(nextTeacherKey: string) {
     setTeacherPreviewKey(nextTeacherKey);

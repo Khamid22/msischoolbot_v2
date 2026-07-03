@@ -771,10 +771,15 @@ export function TeacherAcademyPanel({
   });
 
   function previewAsTeacher(teacher: AcademyTeacher) {
-    try {
-      window.localStorage.setItem("msi_teacher_preview_key", `academy:${asNumber(teacher.id)}`);
-      window.localStorage.removeItem("msi_teacher_preview_id");
-    } catch {
+    const previewKey = `academy:${asNumber(teacher.id)}`;
+    if (typeof state.selectTeacherPreview === "function") {
+      state.selectTeacherPreview(previewKey);
+    } else {
+      try {
+        window.localStorage.setItem("msi_teacher_preview_key", previewKey);
+        window.localStorage.removeItem("msi_teacher_preview_id");
+      } catch {
+      }
     }
     if (typeof state.switchAdminMode === "function") {
       state.switchAdminMode("teacher");
@@ -898,25 +903,33 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
-        <div className="flex min-h-[62dvh] flex-1 flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+        <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
-            <div className="min-h-0 flex-1 overflow-auto">
-              <table className="h-full w-full min-w-[980px] table-fixed text-left">
+            <div className="max-h-[calc(100dvh-20rem)] overflow-auto">
+              <table className="w-full min-w-[1020px] table-fixed border-collapse text-left">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[6%]" />
+                  <col className="w-[18rem]" />
+                </colgroup>
                 <thead className="sticky top-0 z-10 bg-surface/95 shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
                   <tr>
                     {["Teacher", "Status", "Subject", "Progress", "Next lesson", "Director", "Avg", "Actions"].map((heading) => (
                       <th
                         key={heading}
-                        className={`px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground ${
-                          heading === "Teacher" ? "w-[15rem]" : heading === "Actions" ? "w-[21rem]" : heading === "Progress" ? "w-[12rem]" : ""
-                        }`}
+                        className="px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground"
                       >
                         {heading}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-foreground/6 bg-background">
                   {sortedTeachers.map((teacher, index) => {
                     const progress = teacherProgress(teacher);
                     const nextAssignment = progress.nextAssignment || academyAssignments(teacher)[0] || null;
@@ -925,16 +938,21 @@ export function TeacherAcademyPanel({
                     return (
                       <tr
                         key={asNumber(teacher.id)}
-                        className="group border-b border-foreground/6 animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-muted/35 motion-reduce:animate-none"
+                        className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-muted/35 motion-reduce:animate-none"
                         style={{ animationDelay: `${index * 35}ms` }}
                       >
-                        <td className="px-3 py-2.5 align-middle">
-                          <button type="button" onClick={() => setDetailTeacher(teacher)} className="min-w-0 text-left">
-                            <span className="block truncate text-sm font-black text-primary group-hover:underline">{asString(teacher.full_name)}</span>
-                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-muted-foreground">Academy trainee</span>
+                        <td className="px-3 py-3 align-middle">
+                          <button type="button" onClick={() => setDetailTeacher(teacher)} className="flex min-w-0 items-center gap-2 text-left">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
+                              {asString(teacher.full_name).slice(0, 1).toUpperCase() || "T"}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-black text-primary group-hover:underline">{asString(teacher.full_name)}</span>
+                              <span className="mt-0.5 block truncate text-[11px] font-semibold text-muted-foreground">{asString(teacher.login) || "Academy trainee"}</span>
+                            </span>
                           </button>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
+                        <td className="px-3 py-3 align-middle">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
                             status === "ready_for_active_teacher"
                               ? "bg-success/10 text-success"
@@ -947,36 +965,39 @@ export function TeacherAcademyPanel({
                             {statusLabel(teacher.academy_status)}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
-                          <p className="truncate text-xs font-bold">{asString(teacher.subject) || "Subject not set"}</p>
+                        <td className="px-3 py-3 align-middle">
+                          <p className="line-clamp-2 text-xs font-bold leading-snug">{asString(teacher.subject) || "Subject not set"}</p>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                        <td className="px-3 py-3 align-middle">
+                          <div className="min-w-0">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-black">{progress.assessed}/{progress.target}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground">{percent}%</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                               <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
                             </div>
-                            <span className="text-[11px] font-black">{progress.assessed}/{progress.target}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
+                        <td className="px-3 py-3 align-middle">
                           {nextAssignment ? (
                             <div className="min-w-0">
-                              <p className="truncate text-xs font-black">{asString(nextAssignment.lesson_number)}</p>
-                              <p className="truncate text-[11px] text-muted-foreground">{asString(nextAssignment.lesson_topic)}</p>
+                              <p className="truncate text-xs font-black">{asString(nextAssignment.lesson_number) || `Lesson ${asNumber(nextAssignment.sequence_no)}`}</p>
+                              <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{asString(nextAssignment.lesson_topic)}</p>
                             </div>
                           ) : (
                             <span className="text-xs font-semibold text-muted-foreground">No pending lesson</span>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
-                          <p className="truncate text-xs font-semibold text-muted-foreground">
+                        <td className="px-3 py-3 align-middle">
+                          <p className="line-clamp-2 text-xs font-semibold leading-snug text-muted-foreground">
                             {asString(nextAssignment?.evaluator_name) || "Not assigned"}
                           </p>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
+                        <td className="px-3 py-3 align-middle">
                           <span className="text-sm font-black">{progress.average == null ? "-" : progress.average.toFixed(2)}</span>
                         </td>
-                        <td className="px-3 py-2.5 align-middle">
+                        <td className="px-3 py-3 align-middle">
                           <div className="flex flex-wrap justify-end gap-1.5">
                             <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
                               <Eye className="h-3.5 w-3.5" />
