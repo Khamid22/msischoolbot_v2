@@ -124,6 +124,82 @@ def _curriculum_lessons(conn, program_id):
     ).fetchall()
 
 
+def _backfill_academy_teacher_accounts(conn):
+    """Ensure older academy teacher rows have a linked teacher login."""
+    now = _utc_now_iso()
+    rows = conn.execute(
+        """
+        SELECT
+            at.id,
+            at.user_id,
+            at.full_name,
+            at.subject_id,
+            at.notes,
+            COALESCE(staff.login, '') AS staff_login,
+            COALESCE(subj.subject_name, '') AS subject_name,
+            COALESCE(subj.subject_key, '') AS subject_key
+        FROM msi_v2.academy_teachers at
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
+        WHERE COALESCE(at.full_name, '') <> ''
+          AND COALESCE(at.academy_status, '') NOT IN ('rejected')
+          AND (
+            at.user_id IS NULL
+            OR staff.id IS NULL
+            OR COALESCE(staff.login, '') = ''
+            OR staff.teacher_id IS NULL
+          )
+        ORDER BY at.id ASC
+        """
+    ).fetchall()
+    for row in rows:
+        full_name = str(row["full_name"] or "").strip()
+        if not full_name:
+            continue
+        existing_teacher = queries.get_teacher_by_full_name_row(conn, full_name)
+        teacher_id = int(existing_teacher["id"] or 0) if existing_teacher else 0
+        subject_id = _as_int(row["subject_id"])
+        if not teacher_id:
+            teacher_id = queries.insert_teacher_profile_row(
+                conn,
+                full_name,
+                notes=str(row["notes"] or "").strip(),
+                status="academy",
+                subject_id=subject_id,
+                created_at=now,
+                updated_at=now,
+            )
+        elif subject_id:
+            queries.upsert_teacher_subject(conn, teacher_id, subject_id)
+        if not teacher_id:
+            continue
+
+        existing_login = str(row["staff_login"] or "").strip()
+        auth = queries.get_teacher_auth_row_by_id(conn, teacher_id)
+        auth_login = str(auth["login"] or "").strip() if auth else ""
+        login = existing_login or auth_login or queries.get_next_teacher_login(
+            conn,
+            subject_teacher_login_prefix(row["subject_name"] or row["subject_key"]),
+        )
+        staff_id = queries.insert_teacher_auth(
+            conn,
+            teacher_id,
+            login,
+            login,
+            generate_password_hash(login),
+            now,
+        )
+        if staff_id:
+            conn.execute(
+                """
+                UPDATE msi_v2.academy_teachers
+                SET user_id = %s, updated_at = %s::timestamptz
+                WHERE id = %s
+                """,
+                (staff_id, now, int(row["id"])),
+            )
+
+
 def _balanced_random_lessons(rows, count=ACADEMY_TARGET_LESSONS):
     rows = list(rows)
     if len(rows) <= count:
@@ -244,6 +320,8 @@ def _progress_for(assignments, assessments):
 def list_academy_teachers():
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
+        _backfill_academy_teacher_accounts(conn)
+        conn.commit()
         teacher_rows = conn.execute(
             """
             SELECT at.id, at.user_id, at.full_name, at.subject_id, at.subject_program_id,

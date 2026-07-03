@@ -574,6 +574,7 @@ function AcademyDetailModal({
   const assignments = academyAssignments(teacher);
   const assessments = academyAssessments(teacher);
   const progress = teacherProgress(teacher);
+  const login = asString(teacher.login);
   return (
     <ModalShell title={asString(teacher.full_name)} subtitle={`${asString(teacher.subject)} · ${statusLabel(teacher.academy_status)}`} onClose={onClose} wide>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -582,6 +583,19 @@ function AcademyDetailModal({
           {metric("Passed", progress.passed, "lessons accepted")}
           {metric("Average", progress.average == null ? "-" : progress.average.toFixed(2), "weighted score")}
           {metric("Latest", progress.latest == null ? "-" : progress.latest.toFixed(2), "last report")}
+        </div>
+        <div className="mt-3 grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-[1fr_1fr_auto]">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher account login</p>
+            <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created yet"}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Default password</p>
+            <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created yet"}</p>
+          </div>
+          <div className="flex items-center rounded-lg bg-background px-3 py-2 text-[11px] font-bold text-muted-foreground">
+            Default password equals login.
+          </div>
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <section>
@@ -908,9 +922,9 @@ export function TeacherAcademyPanel({
             <div className="max-h-[calc(100dvh-20rem)] overflow-auto">
               <table className="w-full min-w-[1020px] table-fixed border-collapse text-left">
                 <colgroup>
-                  <col className="w-[22%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[15%]" />
                   <col className="w-[12%]" />
-                  <col className="w-[14%]" />
                   <col className="w-[13%]" />
                   <col className="w-[16%]" />
                   <col className="w-[11%]" />
@@ -919,7 +933,7 @@ export function TeacherAcademyPanel({
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-surface/95 shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
                   <tr>
-                    {["Teacher", "Status", "Subject", "Progress", "Next lesson", "Director", "Avg", "Actions"].map((heading) => (
+                    {["Teacher", "Account", "Subject", "Progress", "Next lesson", "Director", "Avg", "Actions"].map((heading) => (
                       <th
                         key={heading}
                         className="px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground"
@@ -935,6 +949,7 @@ export function TeacherAcademyPanel({
                     const nextAssignment = progress.nextAssignment || academyAssignments(teacher)[0] || null;
                     const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
                     const status = asString(teacher.academy_status);
+                    const login = asString(teacher.login);
                     return (
                       <tr
                         key={asNumber(teacher.id)}
@@ -948,22 +963,28 @@ export function TeacherAcademyPanel({
                             </span>
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-black text-primary group-hover:underline">{asString(teacher.full_name)}</span>
-                              <span className="mt-0.5 block truncate text-[11px] font-semibold text-muted-foreground">{asString(teacher.login) || "Academy trainee"}</span>
+                              <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                                status === "ready_for_active_teacher"
+                                  ? "bg-success/10 text-success"
+                                  : status === "needs_improvement"
+                                    ? "bg-warning/15 text-warning"
+                                    : status === "rejected"
+                                      ? "bg-destructive/10 text-destructive"
+                                      : "bg-info/10 text-info"
+                              }`}>
+                                {statusLabel(teacher.academy_status)}
+                              </span>
                             </span>
                           </button>
                         </td>
                         <td className="px-3 py-3 align-middle">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
-                            status === "ready_for_active_teacher"
-                              ? "bg-success/10 text-success"
-                              : status === "needs_improvement"
-                                ? "bg-warning/15 text-warning"
-                                : status === "rejected"
-                                  ? "bg-destructive/10 text-destructive"
-                                  : "bg-info/10 text-info"
-                          }`}>
-                            {statusLabel(teacher.academy_status)}
-                          </span>
+                          <div className="min-w-0 rounded-lg border border-foreground/8 bg-surface px-2.5 py-1.5">
+                            <p className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">Login</p>
+                            <p className="truncate font-mono text-[12px] font-black text-foreground">{login || "Creating..."}</p>
+                            <p className="mt-1 truncate text-[10px] font-bold text-muted-foreground">
+                              Password: <span className="font-mono text-foreground">{login || "-"}</span>
+                            </p>
+                          </div>
                         </td>
                         <td className="px-3 py-3 align-middle">
                           <p className="line-clamp-2 text-xs font-bold leading-snug">{asString(teacher.subject) || "Subject not set"}</p>

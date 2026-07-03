@@ -308,16 +308,6 @@ function emptyTeacherScopedState(state: any) {
   };
 }
 
-function initialsForName(name: unknown) {
-  const parts = asString(name).split(/\s+/).filter(Boolean);
-  return (
-    parts
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() || "")
-      .join("") || "T"
-  );
-}
-
 function previewKeyFor(row: Record<string, unknown>, fallbackKind = "active") {
   const explicitKey = asString(row.__previewKey);
   if (explicitKey) return explicitKey;
@@ -388,62 +378,53 @@ function TeacherPreviewSelector({
   onSelect: (teacherKey: string) => void;
 }) {
   if (!teachers.length) return null;
+  const selectedTeacher = teachers.find((teacher) => previewKeyFor(teacher) === selectedTeacherKey) || teachers[0];
+  const selectedLogin = asString(selectedTeacher?.login);
+  const selectedKind = asString(selectedTeacher?.__previewKind);
+  const selectedStatus = selectedKind === "academy" ? "Training teacher" : "Active teacher";
 
   return (
-    <div className="mb-3 rounded-xl border border-foreground/8 bg-surface p-2 shadow-card">
-      <div className="mb-2 flex items-center justify-between gap-3 px-1">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Teacher profile preview</p>
-          <p className="truncate text-[11px] text-muted-foreground">Active teachers and Teacher Academy trainees</p>
+    <div className="mb-3 rounded-xl border border-foreground/8 bg-surface px-3 py-2 shadow-card animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-[10rem] flex-1">
+          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Teacher preview</p>
+          <p className="truncate text-sm font-black text-foreground">{asString(selectedTeacher?.full_name) || "Teacher"}</p>
         </div>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-      {teachers.map((teacher) => {
-        const teacherKey = previewKeyFor(teacher);
-        const kind = asString(teacher.__previewKind);
-        const isAcademy = kind === "academy";
-        const isSelected = teacherKey === selectedTeacherKey;
-        const assignedGroup = isAcademy
-          ? asString(teacher.subject) || "Training"
-          : asString(teacher.assigned_group) || "No group";
-        return (
-          <button
-            key={teacherKey || asString(teacher.full_name)}
-            type="button"
-            onClick={() => onSelect(teacherKey)}
-            className={`flex min-w-[13.5rem] items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors ${
-              isSelected
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-foreground/10 bg-surface text-foreground hover:bg-muted"
-            }`}
-          >
-            <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                isSelected ? "bg-primary-foreground/15 text-primary-foreground" : "bg-muted text-foreground"
-              }`}
-            >
-              {initialsForName(teacher.full_name)}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[13px] font-bold">{asString(teacher.full_name) || "Teacher"}</span>
-              <span className={`block truncate text-xs ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                {assignedGroup}
-              </span>
-              <span
-                className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                  isSelected
-                    ? "bg-primary-foreground/15 text-primary-foreground"
-                    : isAcademy
-                      ? "bg-amber-50 text-amber-700"
-                      : "bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                {isAcademy ? "Training" : "Active"}
-              </span>
-            </span>
-          </button>
-        );
-      })}
+        <select
+          value={selectedTeacherKey}
+          onChange={(event) => onSelect(event.target.value)}
+          className="h-10 min-w-[13rem] rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
+          aria-label="Preview teacher account"
+        >
+          {teachers.map((teacher) => {
+            const teacherKey = previewKeyFor(teacher);
+            const kind = asString(teacher.__previewKind);
+            const isAcademy = kind === "academy";
+            const assignedGroup = isAcademy
+              ? asString(teacher.subject) || "Training"
+              : asString(teacher.assigned_group) || "No group";
+            return (
+              <option key={teacherKey || asString(teacher.full_name)} value={teacherKey}>
+                {asString(teacher.full_name) || "Teacher"} - {assignedGroup}
+              </option>
+            );
+          })}
+        </select>
+        <span className={`inline-flex h-10 items-center rounded-lg px-3 text-[11px] font-black uppercase tracking-wide ${
+          selectedKind === "academy" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+        }`}>
+          {selectedStatus}
+        </span>
+        <div className="grid min-w-[13rem] grid-cols-2 overflow-hidden rounded-lg border border-foreground/8 bg-background text-[11px]">
+          <div className="border-r border-foreground/8 px-3 py-1.5">
+            <p className="font-black uppercase tracking-wide text-muted-foreground">Login</p>
+            <p className="mt-0.5 truncate font-mono font-black text-foreground">{selectedLogin || "No account"}</p>
+          </div>
+          <div className="px-3 py-1.5">
+            <p className="font-black uppercase tracking-wide text-muted-foreground">Default password</p>
+            <p className="mt-0.5 truncate font-mono font-black text-foreground">{selectedLogin || "No account"}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

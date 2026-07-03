@@ -108,6 +108,7 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
   const assessments = academyAssessments(teacher).slice().reverse();
   const progress = academyProgress(teacher);
   const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
+  const login = asString(teacher.login);
 
   return (
     <div className="space-y-3">
@@ -127,6 +128,17 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
               <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-primary/10 bg-primary/5 px-3 py-2">
+                <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher account login</p>
+                <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created"}</p>
+              </div>
+              <div className="rounded-xl border border-primary/10 bg-primary/5 px-3 py-2">
+                <p className="text-[10px] font-black uppercase tracking-wide text-primary">Default password</p>
+                <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created"}</p>
+                <p className="mt-1 text-[10px] font-bold text-muted-foreground">Default password equals login.</p>
+              </div>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <RoleMetric label="Assigned" value={progress.assigned} detail="lessons" icon={<BookOpen className="h-4 w-4" />} tone="bg-sky-50" />
