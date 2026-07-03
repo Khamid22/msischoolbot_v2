@@ -274,6 +274,9 @@ def build_subject_switch_options(
             }
         ]
 
+    current_subject_norm = normalize_text(current_subject_name)
+    current_group_norm = normalize_text(current_group_name)
+
     for option in options:
         option_student_id = int(option.get("student_id", current_student_id))
         option_subject = str(option.get("subject", "")).strip()
@@ -287,7 +290,17 @@ def build_subject_switch_options(
         if current_school_code:
             route_params["school"] = current_school_code
 
-        option["is_current"] = option_student_id == int(current_student_id)
+        option["is_current"] = (
+            option_student_id == int(current_student_id)
+            and (
+                not current_subject_norm
+                or normalize_text(option_subject) == current_subject_norm
+            )
+            and (
+                not current_group_norm
+                or normalize_text(option_group) == current_group_norm
+            )
+        )
         option["url"] = url_for("student.dashboard", **route_params)
 
     return options

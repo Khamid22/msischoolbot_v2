@@ -29,6 +29,10 @@ def _split_full_name(full_name):
     return {"surname": surname, "name": name, "initials": initials, "fullName": str(full_name or "").strip()}
 
 
+def _filter_text(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
 def _average_homework_grade(homework_grades):
     scores = []
     for item in homework_grades or []:
@@ -690,7 +694,7 @@ def get_student_subject_enrollments(public_dashboard_id):
     ]
 
 
-def get_enrollment_dashboard(public_dashboard_id, school_code=""):
+def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="", group_name=""):
     """Return a dashboard payload dict from internal DB, or None if not found."""
     try:
         student_id = int(public_dashboard_id)
@@ -698,6 +702,8 @@ def get_enrollment_dashboard(public_dashboard_id, school_code=""):
         return None
 
     normalized_school = str(school_code or "").strip().casefold()
+    normalized_subject = _filter_text(subject_name)
+    normalized_group = _filter_text(group_name)
 
     with queries.connect_auth_db() as conn:
         if not _academic_tables_exist(conn):
@@ -740,9 +746,19 @@ def get_enrollment_dashboard(public_dashboard_id, school_code=""):
               AND gs.legacy_enrollment_id IS NOT NULL
               AND lower(g.group_name) <> 'online'
               AND (%s = '' OR s.school_key = %s)
+              AND (%s = '' OR lower(trim(regexp_replace(sub.subject_name, '[[:space:]]+', ' ', 'g'))) = %s)
+              AND (%s = '' OR lower(trim(regexp_replace(g.group_name, '[[:space:]]+', ' ', 'g'))) = %s)
             LIMIT 1
             """,
-            (student_id, normalized_school, normalized_school),
+            (
+                student_id,
+                normalized_school,
+                normalized_school,
+                normalized_subject,
+                normalized_subject,
+                normalized_group,
+                normalized_group,
+            ),
         ).fetchone()
 
         if not enrollment:

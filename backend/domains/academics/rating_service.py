@@ -638,7 +638,14 @@ def load_dashboard_payload(
 ):
     normalized_requested_school = _normalize_school_code(requested_school)
     from backend.domains.academics.internal_dashboard_service import get_enrollment_dashboard
-    db_payload = get_enrollment_dashboard(student_id, normalized_requested_school)
+    db_payload = get_enrollment_dashboard(
+        student_id,
+        normalized_requested_school,
+        subject_name=requested_subject,
+        group_name=requested_group,
+    )
+    if db_payload is None and (requested_subject or requested_group):
+        db_payload = get_enrollment_dashboard(student_id, normalized_requested_school)
     if db_payload is not None:
         return db_payload, None, None
 
