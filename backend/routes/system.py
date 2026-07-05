@@ -1,13 +1,19 @@
 import os
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from backend.security import get_current_user_role, role_has_permission
-from backend.security.permissions import ALL_PERMISSIONS
-from backend.api import api_success, api_message, ApiMessage, ApiSuccess
-from backend.utils import session as session_utils
+from backend.api.v1.auth.routes import (
+    get_current_user,
+    router as auth_api_router,
+)
+from backend.api.v1.system.routes import (
+    router as system_api_router,
+    system_status,
+)
 
 router = APIRouter()
+router.include_router(system_api_router)
+router.include_router(auth_api_router)
 
 # Set at startup in server.py
 STATIC_FOLDER = ""
@@ -35,31 +41,3 @@ def service_worker():
         media_type="application/javascript",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
-
-
-@router.get("/api/v1/system/status", response_model=ApiMessage, tags=["system"])
-def system_status():
-    """Returns the status of the MSI School backend API."""
-    return api_message("MSI School Backend API is running and operational.")
-
-
-@router.get("/api/v1/auth/me", response_model=ApiSuccess, tags=["identity"])
-def get_current_user(role: str = Depends(get_current_user_role)):
-    """
-    Returns the authenticated user's profile metadata and resolved permissions.
-    """
-    login = session_utils.current_auth_login()
-
-    # Compile a dictionary of permissions that this user has
-    user_permissions = {
-        perm: role_has_permission(role, perm)
-        for perm in ALL_PERMISSIONS
-    }
-
-    data = {
-        "login": login,
-        "role": role,
-        "permissions": user_permissions,
-    }
-    return api_success(data)
-

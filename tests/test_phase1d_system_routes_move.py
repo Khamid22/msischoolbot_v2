@@ -1,0 +1,96 @@
+import json
+import os
+from base64 import b64encode
+
+from fastapi import FastAPI
+from itsdangerous import TimestampSigner
+
+
+def _session_secret():
+    return (
+        os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+        or "dev-only-insecure-key-do-not-use-in-prod"
+    )
+
+
+def _signed_session(data):
+    encoded = b64encode(json.dumps(data).encode("utf-8"))
+    return TimestampSigner(_session_secret()).sign(encoded).decode("utf-8")
+
+
+def _route_methods(app):
+    routes = {}
+
+    def walk(route_list):
+        for route in route_list:
+            if type(route).__name__ == "_IncludedRouter":
+                walk(route.original_router.routes)
+                continue
+            path = getattr(route, "path", None)
+            methods = getattr(route, "methods", None)
+            if path is not None and methods:
+                routes.setdefault(path, set()).update(methods)
+            nested = getattr(route, "routes", None)
+            if nested:
+                walk(nested)
+
+    walk(app.routes)
+    return routes
+
+
+def test_backend_server_app_still_starts():
+    from backend.server import create_app
+
+    app = create_app()
+
+    assert isinstance(app, FastAPI)
+    assert app.title == "MSI School API"
+
+
+def test_system_routes_remain_registered(app):
+    routes = _route_methods(app)
+
+    assert "GET" in routes["/manifest.webmanifest"]
+    assert "GET" in routes["/sw.js"]
+    assert "GET" in routes["/api/v1/system/status"]
+    assert "GET" in routes["/api/v1/auth/me"]
+
+
+def test_old_and_new_system_route_import_paths_work():
+    import backend.routes.system as legacy_system_routes
+    from backend.api.v1.auth import routes as auth_routes
+    from backend.api.v1.system import routes as system_routes
+
+    assert legacy_system_routes.router is not None
+    assert auth_routes.router is not None
+    assert system_routes.router is not None
+    assert legacy_system_routes.get_current_user is auth_routes.get_current_user
+    assert legacy_system_routes.system_status is system_routes.system_status
+
+
+def test_system_status_response_is_unchanged(client):
+    response = client.get("/api/v1/system/status")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "success",
+        "message": "MSI School Backend API is running and operational.",
+    }
+
+
+def test_auth_me_response_shape_is_unchanged(client):
+    client.cookies.set(
+        "session",
+        _signed_session({"auth_role": "student", "auth_login": "MSI00001"}),
+    )
+
+    response = client.get("/api/v1/auth/me")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert set(payload.keys()) == {"status", "data"}
+    assert payload["status"] == "success"
+    assert set(payload["data"].keys()) == {"login", "role", "permissions"}
+    assert payload["data"]["login"] == "MSI00001"
+    assert payload["data"]["role"] == "student"
+    assert isinstance(payload["data"]["permissions"], dict)
