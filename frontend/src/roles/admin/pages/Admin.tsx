@@ -28,7 +28,6 @@ import { FormAlert } from "@/shared/ui/PortalCard";
 import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
-import { AcademicDirectorMobileNav } from "@/roles/common/components/AcademicDirectorShell";
 import {
   AdminMode,
   AdminPageProps,
@@ -847,7 +846,6 @@ export default function AdminPage(props: AdminPageProps) {
     }
   });
   const isTeacherWorkspace = asString(state.adminMode).toLowerCase() === "teacher";
-  const isAcademicDirectorWorkspace = asString(state.adminMode).toLowerCase() === "academic_director";
   const selectedTeacherPreviewKey = isTeacherWorkspace
     ? resolveTeacherPreviewKey(allTeacherPreviewRows, teacherPreviewKey, props.authLogin)
     : "";
@@ -973,11 +971,7 @@ export default function AdminPage(props: AdminPageProps) {
       ) : null}
 
       <main
-        className={`flex app-min-height w-full flex-col px-2.5 ${
-          isAcademicDirectorWorkspace
-            ? "pb-[calc(var(--app-bottom-inset)+5.75rem)]"
-            : "pb-[calc(var(--app-bottom-inset)+0.75rem)]"
-        } pt-[calc(var(--app-top-inset)+4rem)] sm:px-3 md:px-4 lg:ml-64 lg:app-height lg:w-[calc(100%-16rem)] lg:min-h-0 lg:overflow-hidden lg:pt-3`}
+        className="flex app-min-height w-full flex-col px-2.5 pb-[calc(var(--app-bottom-inset)+0.75rem)] pt-[calc(var(--app-top-inset)+4rem)] sm:px-3 md:px-4 lg:ml-64 lg:app-height lg:w-[calc(100%-16rem)] lg:min-h-0 lg:overflow-hidden lg:pt-3"
       >
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
@@ -1031,8 +1025,6 @@ export default function AdminPage(props: AdminPageProps) {
           </Suspense>
         </div>
       </main>
-
-      {isAcademicDirectorWorkspace ? <AcademicDirectorMobileNav active="academy" /> : null}
 
       {state.editingResource ? (
         <div

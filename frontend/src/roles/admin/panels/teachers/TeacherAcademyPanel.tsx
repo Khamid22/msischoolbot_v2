@@ -206,20 +206,82 @@ function NewAcademyTeacherModal({
   const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
     ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
     : [];
+  const curriculumItems = Array.isArray(state.props?.adminAcademicCurriculumItems)
+    ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+    : [];
   const teachers = Array.isArray(state.teachers) ? state.teachers as Array<Record<string, unknown>> : [];
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
+  const [lessonSearch, setLessonSearch] = useState("");
+  const [localError, setLocalError] = useState("");
+
+  const selectedProgramLessons = useMemo(
+    () =>
+      curriculumItems
+        .filter((item) => {
+          const itemProgramId = asNumber(item.program_id || item.programId);
+          const itemType = asString(item.item_type || item.itemType).toLowerCase();
+          return itemProgramId === asNumber(selectedProgramId) && itemType === "lesson";
+        })
+        .sort((left, right) => asNumber(left.item_order || left.itemOrder) - asNumber(right.item_order || right.itemOrder)),
+    [curriculumItems, selectedProgramId],
+  );
+  const filteredProgramLessons = useMemo(() => {
+    const query = lessonSearch.trim().toLowerCase();
+    if (!query) return selectedProgramLessons;
+    return selectedProgramLessons.filter((lesson) =>
+      [
+        lesson.lesson_number,
+        lesson.lessonNumber,
+        lesson.title,
+        lesson.specification_points,
+        lesson.book_pages,
+      ]
+        .map(asString)
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [lessonSearch, selectedProgramLessons]);
+
+  function handleProgramChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    setSelectedProgramId(event.target.value);
+    setSelectedLessonIds([]);
+    setLessonSearch("");
+    setLocalError("");
+  }
+
+  function toggleLesson(lessonId: number) {
+    setLocalError("");
+    setSelectedLessonIds((current) =>
+      current.includes(lessonId)
+        ? current.filter((selectedId) => selectedId !== lessonId)
+        : [...current, lessonId],
+    );
+  }
+
+  function selectFirstTwelveLessons() {
+    setLocalError("");
+    setSelectedLessonIds(selectedProgramLessons.slice(0, TARGET_LESSONS).map((lesson) => asNumber(lesson.id)).filter(Boolean));
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selectedLessonIds.length) {
+      setLocalError("Select at least 1 Teacher Academy lesson.");
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const fields: Record<string, string> = {};
     data.forEach((value, key) => {
       fields[key] = String(value);
     });
+    fields.academy_curriculum_item_ids = selectedLessonIds.join(",");
     onSubmit(fields);
   }
 
   return (
-    <ModalShell title="New Academy Teacher" subtitle="Create a trainee and assign 12 curriculum lessons." onClose={onClose}>
+    <ModalShell title="New Academy Teacher" subtitle="Create a trainee and assign selected curriculum lessons." onClose={onClose}>
       <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -228,7 +290,7 @@ function NewAcademyTeacherModal({
           </label>
           <label className="block">
             <FieldLabel>Subject Curriculum</FieldLabel>
-            <select name="academy_subject_program_id" required defaultValue="" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+            <select name="academy_subject_program_id" required value={selectedProgramId} onChange={handleProgramChange} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
               <option value="" disabled>Select curriculum</option>
               {programs.map((program) => (
                 <option key={asNumber(program.id)} value={asNumber(program.id)}>
@@ -282,8 +344,86 @@ function NewAcademyTeacherModal({
             <textarea name="academy_notes" rows={3} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
           </label>
         </div>
-        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
-        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Training Pack" />
+        <section className="rounded-xl border border-foreground/10 bg-background p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-foreground">Select Teacher Academy lessons</p>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">Selected {selectedLessonIds.length} lessons</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={selectFirstTwelveLessons}
+                disabled={!selectedProgramLessons.length}
+                className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50"
+              >
+                Select first 12
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLessonIds([]);
+                  setLocalError("");
+                }}
+                className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted"
+              >
+                Clear selection
+              </button>
+            </div>
+          </div>
+          <input type="hidden" name="academy_curriculum_item_ids" value={selectedLessonIds.join(",")} />
+          <input
+            type="search"
+            value={lessonSearch}
+            onChange={(event) => setLessonSearch(event.target.value)}
+            className="mt-3 w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-sm outline-none"
+            placeholder="Search lessons or topics"
+            disabled={!selectedProgramId}
+          />
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {!selectedProgramId ? (
+              <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
+                Select a subject curriculum to choose lessons.
+              </p>
+            ) : filteredProgramLessons.length ? (
+              filteredProgramLessons.map((lesson) => {
+                const lessonId = asNumber(lesson.id);
+                const checked = selectedLessonIds.includes(lessonId);
+                return (
+                  <label
+                    key={lessonId}
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+                      checked ? "border-primary/30 bg-primary/5" : "border-foreground/10 bg-surface hover:bg-muted"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      name="academy_curriculum_item_ids"
+                      value={lessonId}
+                      checked={checked}
+                      onChange={() => toggleLesson(lessonId)}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-foreground/20"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black text-foreground">
+                        {asString(lesson.lesson_number) || `Lesson ${asNumber(lesson.item_order)}`} · {asString(lesson.title) || "Untitled lesson"}
+                      </span>
+                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted-foreground">
+                        {asString(lesson.specification_points) || asString(lesson.book_pages) || "No lesson details yet."}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })
+            ) : (
+              <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
+                No lesson topics found for this curriculum.
+              </p>
+            )}
+          </div>
+        </section>
+        {localError || error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{localError || error}</p> : null}
+        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Training Pack" disabled={!selectedLessonIds.length} />
       </form>
     </ModalShell>
   );
@@ -641,6 +781,7 @@ function AcademyDetailModal({
   onSchedule,
   onAssess,
   onPromote,
+  allowTeacherPreview,
 }: {
   teacher: AcademyTeacher;
   onClose: () => void;
@@ -648,6 +789,7 @@ function AcademyDetailModal({
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
+  allowTeacherPreview: boolean;
 }) {
   const assignments = academyAssignments(teacher);
   const assessments = academyAssessments(teacher);
@@ -680,10 +822,12 @@ function AcademyDetailModal({
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">12-Lesson Training Pack</p>
               <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
-                  <Eye className="h-3.5 w-3.5" />
-                  Preview as Teacher
-                </button>
+                {allowTeacherPreview ? (
+                  <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
+                    <Eye className="h-3.5 w-3.5" />
+                    Preview as Teacher
+                  </button>
+                ) : null}
                 {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
                   <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
                     <Trophy className="h-3.5 w-3.5" />
@@ -789,13 +933,23 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   return <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</span>;
 }
 
-function ModalActions({ onClose, submitting, submitLabel }: { onClose: () => void; submitting: boolean; submitLabel: string }) {
+function ModalActions({
+  onClose,
+  submitting,
+  submitLabel,
+  disabled = false,
+}: {
+  onClose: () => void;
+  submitting: boolean;
+  submitLabel: string;
+  disabled?: boolean;
+}) {
   return (
     <div className="sticky bottom-0 -mx-4 mt-2 flex justify-end gap-2 border-t border-foreground/8 bg-surface px-4 py-3">
       <button type="button" onClick={onClose} className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted">
         Cancel
       </button>
-      <button type="submit" disabled={submitting} className="rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">
+      <button type="submit" disabled={submitting || disabled} className="rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">
         {submitting ? "Saving..." : submitLabel}
       </button>
     </div>
@@ -808,12 +962,14 @@ export function TeacherAcademyPanel({
   onAcademyChange,
   onTeachersChange,
   showToast,
+  allowTeacherPreview = true,
 }: {
   state: any;
   academyTeachers: AcademyTeacher[];
   onAcademyChange: (rows: AcademyTeacher[]) => void;
   onTeachersChange: (rows: Array<Record<string, unknown>>) => void;
   showToast: (message: string, tone?: ToastTone) => void;
+  allowTeacherPreview?: boolean;
 }) {
   const csrf = asString(state.props?.csrfToken);
   const [createOpen, setCreateOpen] = useState(false);
@@ -880,6 +1036,9 @@ export function TeacherAcademyPanel({
   });
 
   function previewAsTeacher(teacher: AcademyTeacher) {
+    if (!allowTeacherPreview) {
+      return;
+    }
     const previewKey = `academy:${asNumber(teacher.id)}`;
     if (typeof state.selectTeacherPreview === "function") {
       state.selectTeacherPreview(previewKey);
@@ -995,6 +1154,7 @@ export function TeacherAcademyPanel({
           teacher={detailTeacher}
           onClose={() => setDetailTeacher(null)}
           onPreview={() => previewAsTeacher(detailTeacher)}
+          allowTeacherPreview={allowTeacherPreview}
           onSchedule={(nextAssignment) => {
             setError("");
             setAssignment(nextAssignment);
@@ -1177,10 +1337,12 @@ export function TeacherAcademyPanel({
                         </td>
                         <td className="px-3 py-3 align-middle">
                           <div className="flex flex-wrap justify-end gap-1.5">
-                            <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
-                              <Eye className="h-3.5 w-3.5" />
-                              Preview
-                            </button>
+                            {allowTeacherPreview ? (
+                              <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+                                <Eye className="h-3.5 w-3.5" />
+                                Preview
+                              </button>
+                            ) : null}
                             {nextAssignment ? (
                               <>
                                 <button type="button" onClick={() => setAssignment(nextAssignment)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
@@ -1211,7 +1373,7 @@ export function TeacherAcademyPanel({
             <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center px-3 py-10 text-center">
               <BookOpenCheck className="mx-auto h-5 w-5 text-muted-foreground" />
               <p className="mt-2 text-sm font-bold">No academy teachers yet.</p>
-              <p className="mt-1 text-xs text-muted-foreground">Create a trainee to assign 12 curriculum lessons automatically.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Create a trainee and choose the curriculum lessons for their training pack.</p>
             </div>
           )}
         </div>

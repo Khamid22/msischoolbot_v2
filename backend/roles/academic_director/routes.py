@@ -2,14 +2,17 @@
 
 from fastapi import APIRouter, Depends
 
+from backend.render import generate_csrf, render_react_page
 from backend.roles.role_home import render_role_home
 from backend.roles.workspace_counts import academic_director_workspace_cards
 from backend.roles.academic_director.staff_registration import create_head_of_department_account
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
+from backend.roles.admin.services.page_service import build_admin_page_context
+from backend.roles.admin.services.academic_service import list_admin_academic_context
 from backend.utils.context import request
 from backend.utils.guards import require_role
 from backend.utils.response_helpers import jsonify
-from backend.utils.session import current_auth_login
+from backend.utils.session import current_auth_login, current_auth_role
 
 
 def register_academic_director_page_routes(app, *, render_admin_page=None):
@@ -28,14 +31,30 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
 
     @router.get("/academic-director/teacher-academy", operation_id="academic_director_teacher_academy")
     def academic_director_teacher_academy():
-        if callable(render_admin_page):
-            return render_admin_page(admin_panel="teachers", admin_mode="academic_director")
-        return render_role_home(
-            "academic-director-home",
-            "academic_director",
-            title="Teacher Academy",
-            description="Teacher Academy management is temporarily unavailable.",
-            cards=academic_director_workspace_cards(),
+        page_context = build_admin_page_context(
+            admin_panel="teachers",
+            admin_school="all",
+            force_refresh=False,
+        )
+        academic_context = list_admin_academic_context()
+        return render_react_page(
+            "academic-director-academy",
+            {
+                "authLogin": current_auth_login(),
+                "authRole": current_auth_role(),
+                "adminMode": "academic_director",
+                "adminSchool": "all",
+                "adminTeachers": page_context["admin_teachers"],
+                "adminTeacherAcademy": page_context["admin_teacher_academy"],
+                "adminGroupOptions": page_context["admin_group_options"],
+                "adminAcademicSubjects": academic_context["subjects"],
+                "adminAcademicCurriculumPrograms": academic_context.get("curriculum_programs", []),
+                "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
+                "csrfToken": generate_csrf(),
+            },
+            title="Academic Director Teacher Academy",
+            description="Academic Director Teacher Academy management.",
+            telegram=True,
         )
 
     @router.post("/academic-director/api/head-of-departments", operation_id="academic_director_create_hod")

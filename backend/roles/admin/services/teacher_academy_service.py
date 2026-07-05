@@ -131,6 +131,66 @@ def _curriculum_lessons(conn, program_id):
     ).fetchall()
 
 
+def _normalize_selected_curriculum_item_ids(value):
+    if value in (None, ""):
+        return [], []
+    if isinstance(value, str):
+        raw_values = [value]
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    selected_ids = []
+    invalid_values = []
+    seen = set()
+    for raw_value in raw_values:
+        if isinstance(raw_value, (list, tuple, set)):
+            tokens = raw_value
+        else:
+            raw_text = str(raw_value or "").strip()
+            if not raw_text:
+                continue
+            if raw_text.startswith("["):
+                try:
+                    parsed = json.loads(raw_text)
+                except (TypeError, ValueError):
+                    parsed = None
+                tokens = parsed if isinstance(parsed, list) else [raw_text]
+            else:
+                tokens = raw_text.split(",")
+        for token in tokens:
+            raw_token = str(token or "").strip()
+            if not raw_token:
+                continue
+            parsed_id = _as_int(raw_token)
+            if not parsed_id:
+                invalid_values.append(raw_token)
+                continue
+            if parsed_id in seen:
+                continue
+            seen.add(parsed_id)
+            selected_ids.append(parsed_id)
+    return selected_ids, invalid_values
+
+
+def _selected_curriculum_lessons(conn, program_id, selected_curriculum_item_ids):
+    selected_ids, invalid_values = _normalize_selected_curriculum_item_ids(selected_curriculum_item_ids)
+    if invalid_values:
+        return [], "Select valid Teacher Academy lessons."
+    if not selected_ids:
+        return [], "Select at least 1 Teacher Academy lesson."
+
+    lessons_by_id = {
+        int(row["id"]): row
+        for row in _curriculum_lessons(conn, program_id)
+    }
+    missing_ids = [item_id for item_id in selected_ids if item_id not in lessons_by_id]
+    if missing_ids:
+        return [], "Selected Teacher Academy lessons must be lesson items from the selected subject curriculum."
+    return [lessons_by_id[item_id] for item_id in selected_ids], ""
+
+
 def _backfill_academy_teacher_accounts(conn):
     """Ensure older academy teacher rows have a linked teacher login."""
     now = _utc_now_iso()
@@ -571,6 +631,7 @@ def create_academy_teacher(
     *,
     full_name,
     subject_program_id,
+    selected_curriculum_item_ids=None,
     position="Trainee Teacher",
     employment_type="academy",
     telegram_username="",
@@ -593,9 +654,13 @@ def create_academy_teacher(
         program = _program_row(conn, subject_program_id)
         if not program:
             return _create_result(False, "Select a subject curriculum program.", return_credentials=return_credentials)
-        lessons = _balanced_random_lessons(_curriculum_lessons(conn, program["id"]))
-        if not lessons:
-            return _create_result(False, "No curriculum lessons found for this subject.", return_credentials=return_credentials)
+        lessons, lesson_error = _selected_curriculum_lessons(
+            conn,
+            program["id"],
+            selected_curriculum_item_ids,
+        )
+        if lesson_error:
+            return _create_result(False, lesson_error, return_credentials=return_credentials)
         subject_name = str(program["subject_name"] or "")
         profile_teacher_id = queries.insert_teacher_profile_row(
             conn,
@@ -694,7 +759,7 @@ def create_academy_teacher(
         academy_teacher={"telegram_username": str(telegram_username or "").strip()},
         event_type="lesson_assigned",
         title="Teacher Academy lessons assigned",
-        body=f"{ACADEMY_TARGET_LESSONS} academy lessons are ready.",
+        body=f"{len(lessons)} academy lessons are ready.",
         source="Academic Department",
     )
     credentials = {

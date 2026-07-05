@@ -228,11 +228,14 @@ def _minimal_academic_context():
 
 def _patch_admin_page_context(monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
+    import backend.roles.academic_director.routes as academic_director_routes
 
     monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
+    monkeypatch.setattr(academic_director_routes, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
+    monkeypatch.setattr(academic_director_routes, "list_admin_academic_context", _minimal_academic_context)
 
 
 def test_academy_teacher_source_limits_tabs_to_required_set():
@@ -328,9 +331,10 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
     response = client.get("/academic-director/teacher-academy")
 
     assert response.status_code == 200
-    assert 'data-react-page="admin-home"' in response.text
+    assert 'data-react-page="academic-director-academy"' in response.text
     assert "academic_director" in response.text
     assert "adminTeacherAcademy" in response.text
+    assert 'data-react-page="admin-home"' not in response.text
 
 
 def test_academic_director_can_create_academy_teacher_through_existing_route(client, monkeypatch):
@@ -351,6 +355,7 @@ def test_academic_director_can_create_academy_teacher_through_existing_route(cli
         data={
             "academy_full_name": "Example Teacher",
             "academy_subject_program_id": "5",
+            "academy_curriculum_item_ids": "101,102",
             "academy_start_date": "2026-07-06",
         },
         headers=XHR,
@@ -360,6 +365,7 @@ def test_academic_director_can_create_academy_teacher_through_existing_route(cli
     assert response.json()["ok"] is True
     assert calls
     assert calls[0]["full_name"] == "Example Teacher"
+    assert calls[0]["selected_curriculum_item_ids"] == ["101", "102"]
 
 
 def test_next_teacher_code_uses_four_digit_tch_format():

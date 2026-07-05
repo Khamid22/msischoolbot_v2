@@ -53,6 +53,8 @@ Expected categories:
 - bot token.
 - Mini App URL.
 - web host/port.
+- account auth feature flag.
+- admin preview feature flag.
 - optional storage settings.
 - optional Redis/rate-limit/cache settings.
 
@@ -64,6 +66,17 @@ Never commit:
 - private keys.
 - dumps.
 - backups.
+
+## Production Auth And Preview Flags
+
+For real LMS usage:
+
+```bash
+ACCOUNT_AUTH_V2_ENABLED=1
+ADMIN_PREVIEW_ROLES=0
+```
+
+`ADMIN_PREVIEW_ROLES` is a development/admin preview helper only. It should stay disabled in real usage so CEO, Academic Director, Customer Support, teacher, parent, and student sessions use their server-provided roles and cannot inherit stale browser preview state.
 
 ## Current Startup
 

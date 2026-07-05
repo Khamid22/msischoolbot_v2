@@ -1,5 +1,6 @@
 import { Component, Suspense, lazy, useEffect, type ComponentType } from "react";
 import { readBootstrap } from "@/shared/lib/bootstrap";
+import { clearStaleRolePreviewStorage } from "@/shared/lib/staleUiState";
 import { getTelegramStartParam, initTelegramViewport } from "@/shared/lib/telegram";
 
 const bootstrap = readBootstrap();
@@ -19,6 +20,7 @@ const pageMap = {
   "hr-home": lazy(() => import("@/roles/common/pages/RoleHome")),
   "support-home": lazy(() => import("@/roles/common/pages/RoleHome")),
   "academic-director-home": lazy(() => import("@/roles/common/pages/RoleHome")),
+  "academic-director-academy": lazy(() => import("@/roles/academic_director/pages/TeacherAcademy")),
   unauthorized: lazy(() => import("@/roles/common/pages/Unauthorized")),
   "admin-edit-student": lazy(() => import("@/roles/admin/pages/EditStudentProfile")),
   "student-chat": lazy(() => import("@/roles/student/pages/Chat")),
@@ -100,6 +102,9 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
 const App = () => {
   useEffect(() => {
     initTelegramViewport();
+    clearStaleRolePreviewStorage(
+      bootstrap.props.authRole || bootstrap.props.role || bootstrap.props.adminMode,
+    );
     // Send the parent to the invite-link page ONCE per launch. Telegram keeps
     // initDataUnsafe.start_param for the whole mini-app session, so without this
     // guard every reload — including after a parent logs out to sign in as an

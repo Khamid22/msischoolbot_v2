@@ -205,6 +205,7 @@ def register_admin_teacher_routes(
         create_result = create_academy_teacher(
             full_name=request.form.get("academy_full_name", ""),
             subject_program_id=request.form.get("academy_subject_program_id", ""),
+            selected_curriculum_item_ids=_form_list("academy_curriculum_item_ids"),
             position=request.form.get("academy_position", "Trainee Teacher"),
             employment_type=request.form.get("academy_employment_type", "academy"),
             telegram_username=request.form.get("academy_telegram_username", ""),
@@ -233,7 +234,7 @@ def register_admin_teacher_routes(
                 "display_name": credentials.get("display_name", ""),
                 "subject_name": credentials.get("subject_name", ""),
             }
-            return _academy_payload("Academy teacher created with 12 training lessons.", credentials=safe_credentials)
+            return _academy_payload("Academy teacher created with selected training lessons.", credentials=safe_credentials)
         return render_admin_page(admin_notice="Academy teacher created.", admin_panel="teachers")
 
     @router.post("/admin/teacher-academy/assignments/{assignment_id}")

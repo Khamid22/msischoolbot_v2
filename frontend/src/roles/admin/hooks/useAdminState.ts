@@ -27,6 +27,10 @@ import {
   trimEmptyMonthlyMonths,
 } from "../shared";
 import { XHR_HEADERS } from "@/shared/lib/api";
+import {
+  canUseAdminPreviewForRole,
+  clearStaleRolePreviewStorage,
+} from "@/shared/lib/staleUiState";
 
 function preferredSchoolCode(schoolCodes: string[]) {
   if (schoolCodes.includes("sehriyo")) {
@@ -66,6 +70,10 @@ function urlAdminMode() {
 const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
 const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
 
+function serverAdminMode(props: AdminPageProps) {
+  return normalizeAdminMode(props.previewRole || props.adminMode || props.authRole || "admin");
+}
+
 function storedAdminMode() {
   try {
     return (
@@ -79,8 +87,14 @@ function storedAdminMode() {
 
 export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
+  const realRole = asString(props.authRole || props.adminMode || props.previewRole);
+  const serverMode = serverAdminMode(props);
+  const allowPreviewMode = canUseAdminPreviewForRole(realRole);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [previewRole, setPreviewRoleState] = useState<AdminMode>(() => {
+    if (!allowPreviewMode) {
+      return serverMode;
+    }
     return normalizeAdminMode(urlAdminMode() || storedAdminMode() || props.previewRole || props.adminMode);
   });
   const adminMode = previewRole;
@@ -217,7 +231,14 @@ export function useAdminState(props: AdminPageProps) {
   const visibleTabs = tabsForAdminMode(adminMode);
 
   useEffect(() => {
-    const serverMode = asString(props.previewRole || props.adminMode);
+    if (!allowPreviewMode) {
+      clearStaleRolePreviewStorage(realRole);
+      if (serverMode !== adminMode) {
+        setPreviewRoleState(serverMode);
+      }
+      return;
+    }
+    const serverPreviewMode = asString(props.previewRole || props.adminMode);
     const clientMode = urlAdminMode() || storedAdminMode();
     if (clientMode) {
       const normalizedClientMode = normalizeAdminMode(clientMode);
@@ -226,14 +247,14 @@ export function useAdminState(props: AdminPageProps) {
       }
       return;
     }
-    if (!serverMode) {
+    if (!serverPreviewMode) {
       return;
     }
-    const normalizedMode = normalizeAdminMode(serverMode);
+    const normalizedMode = normalizeAdminMode(serverPreviewMode);
     if (normalizedMode !== adminMode) {
       setPreviewRoleState(normalizedMode);
     }
-  }, [adminMode, props.adminMode, props.previewRole]);
+  }, [adminMode, allowPreviewMode, props.adminMode, props.previewRole, realRole, serverMode]);
 
   function clearResourceUploadResetTimer() {
     if (resourceUploadResetTimerRef.current !== null) {
@@ -669,8 +690,10 @@ export function useAdminState(props: AdminPageProps) {
       const params = new URLSearchParams(window.location.search);
       setActiveTab(normalizeAdminTab(params.get("panel")));
       const modeParam = params.get("mode");
-      if (modeParam) {
+      if (modeParam && allowPreviewMode) {
         setPreviewRoleState(normalizeAdminMode(modeParam));
+      } else if (!allowPreviewMode) {
+        setPreviewRoleState(serverMode);
       }
       setActiveStudentRowId(Math.max(0, Math.floor(Number(params.get("student") || 0))));
       setMobileNavOpen(false);
@@ -679,7 +702,7 @@ export function useAdminState(props: AdminPageProps) {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, []);
+  }, [allowPreviewMode, serverMode]);
 
   useEffect(() => {
     if (!isSubmittingResource) {
@@ -717,6 +740,13 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function switchAdminMode(nextMode: AdminMode | string) {
+    if (!allowPreviewMode) {
+      setPreviewRoleState(serverMode);
+      setActiveTab(tabsForAdminMode(serverMode)[0]?.key || "overview");
+      setMobileNavOpen(false);
+      clearStaleRolePreviewStorage(realRole);
+      return;
+    }
     const normalizedMode = normalizeAdminMode(nextMode);
     const nextTabs = tabsForAdminMode(normalizedMode);
     const fallbackTab = nextTabs[0]?.key || "overview";
