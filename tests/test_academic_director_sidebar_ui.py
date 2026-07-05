@@ -109,11 +109,26 @@ def _patch_admin_page_context(monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
     import backend.roles.academic_director.routes as academic_director_routes
 
-    monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
+    def fake_build_admin_page_context(
+        *,
+        admin_panel,
+        admin_school,
+        admin_teacher_edit,
+        parent_admin_id=0,
+        force_refresh=False,
+    ):
+        assert admin_panel == "teachers"
+        assert admin_school == "all"
+        assert admin_teacher_edit is None
+        assert parent_admin_id == 0
+        assert force_refresh is False
+        return _minimal_admin_page_context()
+
+    monkeypatch.setattr(admin_page, "build_admin_page_context", fake_build_admin_page_context)
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
-    monkeypatch.setattr(academic_director_routes, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
+    monkeypatch.setattr(academic_director_routes, "build_admin_page_context", fake_build_admin_page_context)
     monkeypatch.setattr(academic_director_routes, "list_admin_academic_context", _minimal_academic_context)
 
 

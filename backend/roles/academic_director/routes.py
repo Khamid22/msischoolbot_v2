@@ -34,6 +34,7 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
         page_context = build_admin_page_context(
             admin_panel="teachers",
             admin_school="all",
+            admin_teacher_edit=None,
             force_refresh=False,
         )
         academic_context = list_admin_academic_context()
