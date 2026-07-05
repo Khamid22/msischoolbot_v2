@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from werkzeug.security import check_password_hash
-
 from backend.core.config import account_auth_v2_enabled
+from backend.core.security import verify_password_hash
 from backend.identity.common import connect
 from backend.identity.roles import normalize_role
 from backend.utils.normalization import normalize_school_code
@@ -114,13 +113,7 @@ def get_account_by_login(login: Any, conn: Any | None = None) -> dict[str, Any] 
 def verify_account_password(account: dict[str, Any] | None, password: Any) -> bool:
     if not account:
         return False
-    password_hash = _text(account.get("password_hash"))
-    if not password_hash:
-        return False
-    try:
-        return bool(check_password_hash(password_hash, str(password or "")))
-    except (TypeError, ValueError):
-        return False
+    return verify_password_hash(account.get("password_hash"), password)
 
 
 def _student_profile(conn: Any, account_id: int) -> dict[str, Any] | None:
