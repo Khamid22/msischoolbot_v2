@@ -655,6 +655,152 @@ function Timetable({ lessons }: { lessons: AcademyAssignment[] }) {
   );
 }
 
+function nextScheduledLesson(lessons: AcademyAssignment[]) {
+  if (!lessons.length) return null;
+  const now = Date.now();
+  const futureLessons = lessons
+    .filter((lesson) => {
+      const date = new Date(lesson.session_datetime || lesson.deadline_date || "");
+      return !Number.isNaN(date.getTime()) && date.getTime() >= now;
+    })
+    .sort((first, second) => {
+      const firstDate = new Date(first.session_datetime || first.deadline_date || "").getTime();
+      const secondDate = new Date(second.session_datetime || second.deadline_date || "").getTime();
+      return firstDate - secondDate;
+    });
+  return futureLessons[0] || lessons[0];
+}
+
+function NextLessonPreview({ lessons }: { lessons: AcademyAssignment[] }) {
+  const lesson = nextScheduledLesson(lessons);
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">Next scheduled lesson</p>
+          <p className="text-xs text-slate-500">Timetable preview</p>
+        </div>
+        <CalendarDays className="h-4 w-4 text-blue-600" />
+      </div>
+      {lesson ? (
+        <div className="rounded-xl bg-slate-50 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-slate-900">
+                {lesson.lesson_number || "Training lesson"}
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
+                {lesson.lesson_topic || "Curriculum lesson"}
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(lesson.status)}`}>
+              {statusLabel(lesson.status)}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div className="rounded-lg bg-white px-2 py-2">
+              <p className="font-bold">Date</p>
+              <p className="mt-1">{displayDateOnly(lesson.session_datetime || lesson.deadline_date)}</p>
+            </div>
+            <div className="rounded-lg bg-white px-2 py-2">
+              <p className="font-bold">Time</p>
+              <p className="mt-1">{displayTimeOnly(lesson.start_time || lesson.session_datetime)}</p>
+            </div>
+          </div>
+          <p className="mt-3 truncate text-xs font-semibold text-slate-500">
+            Evaluator: {lesson.evaluator_name || "Academic Director"}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm font-semibold text-slate-500">
+          No academy lesson is scheduled yet.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function LatestUpdatePreview({ updates }: { updates: AcademyUpdate[] }) {
+  const latest = updates[0];
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">Latest update</p>
+          <p className="text-xs text-slate-500">Academy announcements</p>
+        </div>
+        <Bell className="h-4 w-4 text-blue-600" />
+      </div>
+      {latest ? (
+        <article className="rounded-xl bg-slate-50 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <p className="line-clamp-2 text-sm font-black text-slate-900">{latest.title || "Academy update"}</p>
+            <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(latest.priority || "info")}`}>
+              {latest.kind || latest.priority || "update"}
+            </span>
+          </div>
+          {latest.body ? <p className="mt-2 line-clamp-3 text-xs font-medium leading-5 text-slate-500">{latest.body}</p> : null}
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
+            <span>{latest.source || "Academic Department"}</span>
+            {latest.created_at ? <span>{displayDate(latest.created_at)}</span> : null}
+          </div>
+        </article>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm font-semibold text-slate-500">
+          No academy updates yet.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AcademyScoreSnapshot({ rows }: { rows: Array<{ name: string; score: number }> }) {
+  if (!rows.length) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+          <LineChartIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+          <div>
+            <p className="text-sm font-black text-slate-900">Performance Snapshot</p>
+            <p className="mt-1 text-sm leading-5 text-slate-500">
+              Assessment chart will appear after the first report.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">Performance Snapshot</p>
+          <p className="text-xs text-slate-500">Assessment score trend</p>
+        </div>
+        <LineChartIcon className="h-4 w-4 text-blue-600" />
+      </div>
+      <div className="h-48 sm:h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={rows} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+            <defs>
+              <linearGradient id="teacherScore" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.28} />
+                <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, 10]} hide />
+            <Tooltip />
+            <Area dataKey="score" type="monotone" stroke="#2563eb" strokeWidth={3} fill="url(#teacherScore)" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
+
 export default function TeacherHome(props: TeacherPageProps) {
   const teacher = props.teacher;
   const groups = Array.isArray(props.groups) ? props.groups : [];
@@ -780,7 +926,10 @@ export default function TeacherHome(props: TeacherPageProps) {
           </div>
         </section>
 
-        <nav className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Teacher cabinet">
+        <nav
+          className={`${isTraining ? "hidden sm:flex" : "flex"} gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm`}
+          aria-label="Teacher cabinet"
+        >
           {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
@@ -815,65 +964,50 @@ export default function TeacherHome(props: TeacherPageProps) {
               ))}
             </div>
 
-            {isTraining ? <AcademyProfileSummary academy={academy} summary={academySummary} /> : null}
-
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-slate-900">Performance Snapshot</p>
-                    <p className="text-xs text-slate-500">{isTraining ? "Assessment score trend" : "Group average by class"}</p>
+            {isTraining ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                <NextLessonPreview lessons={trainingTimetable.length ? trainingTimetable : journey} />
+                <LatestUpdatePreview updates={academyUpdates} />
+              </div>
+            ) : (
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-900">Performance Snapshot</p>
+                      <p className="text-xs text-slate-500">Group average by class</p>
+                    </div>
+                    <LineChartIcon className="h-4 w-4 text-blue-600" />
                   </div>
-                  <LineChartIcon className="h-4 w-4 text-blue-600" />
-                </div>
-                <div className="h-56">
-                  {isTraining ? (
-                    reportChartRows.length ? (
+                  <div className="h-56">
+                    {groupRows.length ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={reportChartRows} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="teacherScore" x1="0" x2="0" y1="0" y2="1">
-                              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.28} />
-                              <stop offset="95%" stopColor="#2563eb" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
+                        <BarChart data={groupRows} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
                           <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical={false} />
                           <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                          <YAxis domain={[0, 10]} hide />
+                          <YAxis domain={[0, 9]} hide />
                           <Tooltip />
-                          <Area dataKey="score" type="monotone" stroke="#2563eb" strokeWidth={3} fill="url(#teacherScore)" />
-                        </AreaChart>
+                          <Bar dataKey="avg" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                        </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <EmptyState icon={<LineChartIcon className="h-5 w-5" />} title="No scores yet" detail="The chart fills after the first assessment." />
-                    )
-                  ) : groupRows.length ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={groupRows} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
-                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" vertical={false} />
-                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, 9]} hide />
-                        <Tooltip />
-                        <Bar dataKey="avg" fill="#2563eb" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <EmptyState icon={<LineChartIcon className="h-5 w-5" />} title="No group data yet" detail="Group performance appears after assignment." />
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-black text-slate-900">{isTraining ? "Roadmap" : "My Groups"}</p>
-                    <p className="text-xs text-slate-500">{isTraining ? "Curriculum-guided training lessons" : "Current teaching assignments"}</p>
+                      <EmptyState icon={<LineChartIcon className="h-5 w-5" />} title="No group data yet" detail="Group performance appears after assignment." />
+                    )}
                   </div>
-                  <GraduationCap className="h-4 w-4 text-blue-600" />
                 </div>
-                {isTraining ? <Roadmap assignments={journey} reports={reports} /> : <CompactGradebook groups={groups} />}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-black text-slate-900">My Groups</p>
+                      <p className="text-xs text-slate-500">Current teaching assignments</p>
+                    </div>
+                    <GraduationCap className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <CompactGradebook groups={groups} />
+                </div>
               </div>
-            </div>
+            )}
           </section>
         ) : null}
 
@@ -911,7 +1045,7 @@ export default function TeacherHome(props: TeacherPageProps) {
                 <button
                   type="button"
                   onClick={() => setActiveTab("timetable")}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] motion-reduce:active:scale-100"
+                  className={`${isTraining ? "hidden sm:inline-flex" : "inline-flex"} h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] motion-reduce:active:scale-100`}
                 >
                   <CalendarDays className="h-4 w-4" />
                   Timetable
@@ -929,10 +1063,11 @@ export default function TeacherHome(props: TeacherPageProps) {
               </div>
             </div>
             {isTraining ? <AcademyProfileSummary academy={academy} summary={academySummary} /> : null}
+            {isTraining ? <AcademyScoreSnapshot rows={reportChartRows} /> : null}
           </section>
         ) : null}
 
-        {activeTab === "career" || activeTab === "profile" ? (
+        {activeTab === "career" || (!isTraining && activeTab === "profile") ? (
           <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr] animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-sm font-black text-slate-900">{activeTab === "profile" ? "Teacher Profile" : "Career Position"}</p>

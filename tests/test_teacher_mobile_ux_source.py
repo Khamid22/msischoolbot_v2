@@ -45,6 +45,7 @@ def test_teacher_mobile_bottom_nav_contract():
     assert "Teacher mobile navigation" in source
     assert "var(--app-bottom-inset)" in source
     assert 'aria-current={isActive ? "page" : undefined}' in source
+    assert '${isTraining ? "hidden sm:flex" : "flex"}' in source
 
 
 def test_teacher_mobile_tables_and_cards_are_compact():
@@ -54,6 +55,22 @@ def test_teacher_mobile_tables_and_cards_are_compact():
     assert "miniapp-table-scroll" in source
     assert "pb-[calc(var(--app-bottom-inset)+6.5rem)]" in source
     assert "text-xl font-black" in source
+
+
+def test_teacher_academy_mobile_home_is_compact_and_profile_is_separate():
+    source = _read("roles/teacher/pages/TeacherHome.tsx")
+    home_block = source.split('{activeTab === "home"', 1)[1].split('{activeTab === "reports"', 1)[0]
+    profile_block = source.split('{activeTab === "profile"', 1)[1].split('{activeTab === "career"', 1)[0]
+
+    assert "NextLessonPreview" in home_block
+    assert "LatestUpdatePreview" in home_block
+    assert "AcademyProfileSummary" not in home_block
+    assert "Roadmap assignments" not in home_block
+    assert "AcademyProfileSummary" in profile_block
+    assert "AcademyScoreSnapshot" in profile_block
+    assert 'Assessment chart will appear after the first report.' in source
+    assert 'hidden sm:inline-flex' in profile_block
+    assert 'activeTab === "career" || (!isTraining && activeTab === "profile")' in source
 
 
 def test_teacher_academy_and_active_tabs_stay_available():
