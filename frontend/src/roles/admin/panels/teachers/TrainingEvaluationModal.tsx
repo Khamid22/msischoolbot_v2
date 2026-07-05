@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { Candidate, TRAINING_TARGET_LESSONS, trainingRubric, trainingScoreScale, trainingEvaluationEvents } from "./shared";
 
@@ -103,9 +104,11 @@ export function TrainingEvaluationModal({
     onClose();
   }
 
+  const panelRef = useDismissibleLayer<HTMLDivElement>({ onDismiss: onClose });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4">
-      <div className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" role="dialog" aria-modal="true">
+      <div ref={panelRef} className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover">
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div>
             <h3 className="text-sm font-bold">{editingEvent ? "Edit Evaluation" : "Training Evaluation"}</h3>
@@ -222,8 +225,9 @@ export function TrainingEvaluationModal({
 
 
 export function RubricModal({ onClose }: { onClose: () => void }) {
+  useDismissibleLayer({ onDismiss: onClose, dismissOnOutsidePointer: false });
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" onClick={onClose} role="dialog" aria-modal="true">
       <div
         className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover"
         onClick={(event) => event.stopPropagation()}

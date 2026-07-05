@@ -5,7 +5,8 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash
 
 from database import queries
-from backend.identity.teachers import list_teachers, subject_teacher_login_prefix, upsert_teacher
+from backend.identity.teachers import list_teachers, upsert_teacher
+from backend.roles.admin.services.teacher_academy_notifications import notify_academy_teacher_event
 
 
 ACADEMY_TARGET_LESSONS = 12
@@ -96,6 +97,12 @@ def _normalize_status(value, allowed, fallback):
     return normalized if normalized in allowed else fallback
 
 
+def _create_result(ok, message="", credentials=None, *, return_credentials=False):
+    if return_credentials:
+        return ok, message, credentials or {}
+    return ok, message
+
+
 def _program_row(conn, program_id):
     parsed_program_id = _as_int(program_id)
     if not parsed_program_id:
@@ -177,19 +184,26 @@ def _backfill_academy_teacher_accounts(conn):
         existing_login = str(row["staff_login"] or "").strip()
         auth = queries.get_teacher_auth_row_by_id(conn, teacher_id)
         auth_login = str(auth["login"] or "").strip() if auth else ""
-        login = existing_login or auth_login or queries.get_next_teacher_login(
-            conn,
-            subject_teacher_login_prefix(row["subject_name"] or row["subject_key"]),
-        )
+        login = existing_login or auth_login or queries.get_next_teacher_code(conn)
+        password_hash = generate_password_hash(login)
         staff_id = queries.insert_teacher_auth(
             conn,
             teacher_id,
             login,
             login,
-            generate_password_hash(login),
+            password_hash,
             now,
         )
         if staff_id:
+            _provision_teacher_account_v2(
+                conn,
+                teacher_id=teacher_id,
+                staff_id=staff_id,
+                login=login,
+                password_hash=password_hash,
+                full_name=full_name,
+                legacy_login=existing_login or auth_login,
+            )
             conn.execute(
                 """
                 UPDATE msi_v2.academy_teachers
@@ -225,6 +239,125 @@ def _teacher_name(conn, teacher_id):
         (parsed_teacher_id,),
     ).fetchone()
     return str(row["full_name"] or "") if row else ""
+
+
+def _phase1_accounts_available(conn):
+    try:
+        row = conn.execute("SELECT to_regclass('msi_v2.accounts') AS table_name").fetchone()
+    except Exception:
+        return False
+    return bool(row and row["table_name"])
+
+
+def _provision_teacher_account_v2(conn, *, teacher_id, staff_id, login, password_hash, full_name, legacy_login=""):
+    """Best-effort shared account provisioning for new academy teachers."""
+    if not _phase1_accounts_available(conn):
+        return 0
+
+    normalized_login = str(login or "").strip()
+    if not normalized_login:
+        return 0
+
+    now = _utc_now_iso()
+    account = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.accounts
+        WHERE lower(btrim(login)) = lower(btrim(%s))
+           OR (legacy_source_table = 'msi_staff' AND legacy_source_id = %s)
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (normalized_login, _as_int(staff_id)),
+    ).fetchone()
+    if account:
+        account_id = int(account["id"] or 0)
+        conn.execute(
+            """
+            UPDATE msi_v2.accounts
+            SET login = %s,
+                password_hash = %s,
+                role = 'teacher',
+                status = 'active',
+                full_name = %s,
+                legacy_source_table = 'msi_staff',
+                legacy_source_id = %s,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (normalized_login, password_hash, str(full_name or "").strip(), _as_int(staff_id), now, account_id),
+        )
+    else:
+        inserted = conn.execute(
+            """
+            INSERT INTO msi_v2.accounts (
+                login, password_hash, role, status, full_name,
+                legacy_source_table, legacy_source_id, created_at, updated_at
+            )
+            VALUES (%s, %s, 'teacher', 'active', %s, 'msi_staff', %s, %s::timestamptz, %s::timestamptz)
+            RETURNING id
+            """,
+            (normalized_login, password_hash, str(full_name or "").strip(), _as_int(staff_id), now, now),
+        ).fetchone()
+        account_id = int(inserted["id"] or 0) if inserted else 0
+
+    if account_id:
+        profile = conn.execute(
+            """
+            SELECT id
+            FROM msi_v2.teacher_profiles
+            WHERE account_id = %s OR teacher_id = %s OR upper(btrim(teacher_code)) = upper(btrim(%s))
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (account_id, _as_int(teacher_id), normalized_login),
+        ).fetchone()
+        if profile:
+            conn.execute(
+                """
+                UPDATE msi_v2.teacher_profiles
+                SET account_id = %s,
+                    teacher_id = %s,
+                    teacher_code = %s,
+                    legacy_login = %s,
+                    status = 'active',
+                    updated_at = %s::timestamptz
+                WHERE id = %s
+                """,
+                (
+                    account_id,
+                    _as_int(teacher_id),
+                    normalized_login,
+                    str(legacy_login or "").strip(),
+                    now,
+                    int(profile["id"]),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO msi_v2.teacher_profiles (
+                    account_id, teacher_id, teacher_code, legacy_login, status, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, 'active', %s::timestamptz, %s::timestamptz)
+                """,
+                (
+                    account_id,
+                    _as_int(teacher_id),
+                    normalized_login,
+                    str(legacy_login or "").strip(),
+                    now,
+                    now,
+                ),
+            )
+    return account_id
+
+
+def _notify_academy_event_safe(**kwargs):
+    try:
+        return notify_academy_teacher_event(**kwargs)
+    except Exception:
+        return {"ok": False, "telegram_sent": False, "in_app_available": True}
 
 
 def _row_to_assignment(row):
@@ -448,20 +581,21 @@ def create_academy_teacher(
     department_head_id=0,
     notes="",
     created_by="",
+    return_credentials=False,
 ):
     normalized_name = str(full_name or "").strip()
     if not normalized_name:
-        return False, "Trainee name is required."
+        return _create_result(False, "Trainee name is required.", return_credentials=return_credentials)
 
     now = _utc_now_iso()
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
         program = _program_row(conn, subject_program_id)
         if not program:
-            return False, "Select a subject curriculum program."
+            return _create_result(False, "Select a subject curriculum program.", return_credentials=return_credentials)
         lessons = _balanced_random_lessons(_curriculum_lessons(conn, program["id"]))
         if not lessons:
-            return False, "No curriculum lessons found for this subject."
+            return _create_result(False, "No curriculum lessons found for this subject.", return_credentials=return_credentials)
         subject_name = str(program["subject_name"] or "")
         profile_teacher_id = queries.insert_teacher_profile_row(
             conn,
@@ -473,18 +607,24 @@ def create_academy_teacher(
             updated_at=now,
         )
         if not profile_teacher_id:
-            return False, "Unable to create the teacher profile."
-        login = queries.get_next_teacher_login(
-            conn,
-            subject_teacher_login_prefix(subject_name or program["subject_key"]),
-        )
+            return _create_result(False, "Unable to create the teacher profile.", return_credentials=return_credentials)
+        login = queries.get_next_teacher_code(conn)
+        password_hash = generate_password_hash(login)
         staff_id = queries.insert_teacher_auth(
             conn,
             profile_teacher_id,
             login,
             login,
-            generate_password_hash(login),
+            password_hash,
             now,
+        )
+        _provision_teacher_account_v2(
+            conn,
+            teacher_id=profile_teacher_id,
+            staff_id=staff_id,
+            login=login,
+            password_hash=password_hash,
+            full_name=normalized_name,
         )
 
         row = conn.execute(
@@ -550,7 +690,22 @@ def create_academy_teacher(
                 ),
             )
         conn.commit()
-    return True, ""
+    _notify_academy_event_safe(
+        academy_teacher={"telegram_username": str(telegram_username or "").strip()},
+        event_type="lesson_assigned",
+        title="Teacher Academy lessons assigned",
+        body=f"{ACADEMY_TARGET_LESSONS} academy lessons are ready.",
+        source="Academic Department",
+    )
+    credentials = {
+        "role": "teacher",
+        "login": login,
+        "teacher_code": login,
+        "temporary_password": login,
+        "display_name": normalized_name,
+        "subject_name": subject_name,
+    }
+    return _create_result(True, "", credentials, return_credentials=return_credentials)
 
 
 def update_assignment(
@@ -572,11 +727,16 @@ def update_assignment(
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
         existing = conn.execute(
-            "SELECT id FROM msi_v2.academy_lesson_assignments WHERE id = %s",
+            """
+            SELECT id, academy_teacher_id, session_datetime::text AS session_datetime
+            FROM msi_v2.academy_lesson_assignments
+            WHERE id = %s
+            """,
             (parsed_assignment_id,),
         ).fetchone()
         if not existing:
             return False, "Assignment not found."
+        old_session_datetime = str(existing["session_datetime"] or "").strip()
         conn.execute(
             """
             UPDATE msi_v2.academy_lesson_assignments
@@ -603,6 +763,18 @@ def update_assignment(
             ),
         )
         conn.commit()
+    next_session_datetime = str(session_datetime or "").strip()
+    event_type = (
+        "lesson_time_changed"
+        if old_session_datetime and next_session_datetime and old_session_datetime != next_session_datetime
+        else "lesson_assigned"
+    )
+    _notify_academy_event_safe(
+        event_type=event_type,
+        title="Academy lesson schedule updated" if event_type == "lesson_time_changed" else "Academy lesson assigned",
+        body="A Teacher Academy lesson has been updated.",
+        source="Academic Department",
+    )
     return True, ""
 
 
@@ -745,6 +917,12 @@ def add_assessment(
                 (now, parsed_teacher_id),
             )
         conn.commit()
+    _notify_academy_event_safe(
+        event_type="assessment_added",
+        title="Assessment report added",
+        body="An Academic Department assessment report is available.",
+        source="Academic Department",
+    )
     return True, ""
 
 

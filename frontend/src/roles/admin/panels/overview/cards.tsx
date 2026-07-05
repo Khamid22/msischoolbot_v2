@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { AlertCircle, AlertTriangle, Clock3, Trophy, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { ZoneKey, Candidate, closedCandidateStage } from "./shared";
 
@@ -234,6 +235,7 @@ export function ZonesDrawer({
   ];
   const rows = zoneRows[activeTab];
   const activeColor = tabs.find((t) => t.key === activeTab)?.color ?? "";
+  useDismissibleLayer({ onDismiss: onClose, dismissOnOutsidePointer: false });
 
   return (
     <>

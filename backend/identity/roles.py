@@ -10,6 +10,7 @@ VALID_ROLES = {
     "teacher",
     "parent",
     "academic_director",
+    "head_of_department",
 }
 
 ROLE_DASHBOARD_PATHS = {
@@ -22,6 +23,7 @@ ROLE_DASHBOARD_PATHS = {
     "teacher": "/teacher",
     "parent": "/parent",
     "academic_director": "/academic-director",
+    "head_of_department": "/head-of-department",
 }
 
 ROLE_DISPLAY_NAMES = {
@@ -34,6 +36,7 @@ ROLE_DISPLAY_NAMES = {
     "teacher": "Teacher",
     "parent": "Parent",
     "academic_director": "Academic Director",
+    "head_of_department": "Head of Department",
 }
 
 _ROLE_ALIASES = {
@@ -41,6 +44,11 @@ _ROLE_ALIASES = {
     "academic-director": "academic_director",
     "academic_director": "academic_director",
     "academic director": "academic_director",
+    "headofdepartment": "head_of_department",
+    "head-of-department": "head_of_department",
+    "head_of_department": "head_of_department",
+    "head of department": "head_of_department",
+    "hod": "head_of_department",
     "hr": "hr_manager",
     "hr-manager": "hr_manager",
     "hr_manager": "hr_manager",

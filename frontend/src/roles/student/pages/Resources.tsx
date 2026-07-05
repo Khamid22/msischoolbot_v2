@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink, FileText, Link, Loader2, MessageSquare, Play, Send, X, ChevronRight } from "lucide-react";
 import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 interface ResourceRow {
   id: number;
@@ -313,6 +314,11 @@ const fullscreenInsetStyle = {
 export default function ResourcesPage(props: ResourcesPageProps) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [modal, setModal] = useState<ResourceModalState | null>(null);
+  useDismissibleLayer({
+    enabled: Boolean(modal),
+    onDismiss: () => setModal(null),
+    dismissOnOutsidePointer: false,
+  });
 
   const groupedResources = Array.isArray(props.groupedResources) ? props.groupedResources : [];
   const totalCount = groupedResources.reduce((sum, g) => sum + g.resources.length, 0);

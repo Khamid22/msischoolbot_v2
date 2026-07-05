@@ -92,6 +92,17 @@ class _FakeConn:
                 "legacy_source_table": "students",
                 "legacy_source_id": 107,
             },
+            "hod0001": {
+                "id": 8,
+                "login": "HOD0001",
+                "password_hash": password_hash,
+                "role": "head_of_department",
+                "status": "active",
+                "full_name": "Head of Math Department",
+                "phone": None,
+                "legacy_source_table": "msi_staff",
+                "legacy_source_id": 90,
+            },
         }
         self.student_profiles = {
             1: {
@@ -145,7 +156,18 @@ class _FakeConn:
                 "staff_login": "admin",
                 "legacy_staff_role": "owner",
                 "is_owner": 1,
-            }
+            },
+            8: {
+                "profile_id": 18,
+                "account_id": 8,
+                "staff_id": 90,
+                "job_title": "Head of Department",
+                "department": "Mathematics Department",
+                "profile_status": "active",
+                "staff_login": "HOD0001",
+                "legacy_staff_role": "head_of_department",
+                "is_owner": 0,
+            },
         }
 
     def execute(self, sql, params=None):
@@ -221,6 +243,19 @@ def test_system_admin_authenticates_with_legacy_admin_compatibility():
     assert result["session"]["admin_id"] == 1
     assert result["session"]["admin_role"] == "owner"
     assert result["session"]["admin_is_owner"] is True
+
+
+def test_head_of_department_authenticates_as_staff_role():
+    result = _authenticate("HOD0001")
+
+    assert result is not None
+    assert result["account"]["role"] == "head_of_department"
+    assert result["session"]["account_role"] == "head_of_department"
+    assert result["session"]["canonical_role"] == "head_of_department"
+    assert result["session"]["auth_role"] == "head_of_department"
+    assert result["session"]["staff_role"] == "head_of_department"
+    assert result["session"]["staff_id"] == 90
+    assert "admin_id" not in result["session"]
 
 
 def test_parent_pending_cannot_password_login():

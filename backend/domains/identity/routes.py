@@ -336,7 +336,7 @@ def register_user_auth_routes(
         if role == "parent":
             return redirect(dashboard_path_for_role("parent"))
 
-        if role in {"ceo", "hr_manager", "customer_support", "academic_director"}:
+        if role in {"ceo", "hr_manager", "customer_support", "academic_director", "head_of_department"}:
             return redirect(dashboard_path_for_role(role))
 
         # Telegram auto-login happens via POST /auth/telegram, which verifies the

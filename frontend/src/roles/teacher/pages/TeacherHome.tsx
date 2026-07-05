@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Activity,
@@ -14,6 +14,7 @@ import {
   Map as MapIcon,
   Star,
   TrendingUp,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import {
   YAxis,
 } from "recharts";
 import { routes } from "@/shared/lib/routes";
+import { bottomNavActiveKey, type TeacherTabKey } from "@/roles/teacher/teacherNav";
 
 type TeacherInfo = {
   id: number;
@@ -72,6 +74,8 @@ type AcademyAssignment = {
   lesson_topic: string;
   status: string;
   session_datetime: string;
+  start_time?: string;
+  end_time?: string;
   deadline_date: string;
   evaluator_name: string;
   specification_points: string;
@@ -92,6 +96,7 @@ type AcademyAssessment = {
   areas_for_improvement: string;
   final_recommendation: string;
   scores?: Record<string, number>;
+  section_feedback?: Record<string, unknown>;
 };
 
 type AcademyTeacher = {
@@ -100,6 +105,8 @@ type AcademyTeacher = {
   subject: string;
   subject_program_name: string;
   academy_status: string;
+  academy_start_date?: string;
+  training_end_date?: string;
   login?: string;
   progress?: {
     assigned_count: number;
@@ -118,21 +125,50 @@ type WorkspaceCard = {
   tone?: string;
 };
 
+type AcademySummary = {
+  assigned_count?: number;
+  assessed_count?: number;
+  completed_count?: number;
+  remaining_count?: number;
+  target_lessons?: number;
+  progress_percent?: number;
+  rank?: string;
+  status?: string;
+  subject?: string;
+  training_start_date?: string;
+  training_end_date?: string;
+  average_score?: number | null;
+  latest_score?: number | null;
+  score_summary?: string;
+};
+
+type AcademyUpdate = {
+  id: string | number;
+  kind?: string;
+  title: string;
+  body?: string;
+  source?: string;
+  created_at?: string;
+  priority?: string;
+};
+
 type TeacherPageProps = {
   authLogin?: string;
   csrfToken?: string;
   teacher: TeacherInfo;
   groups: GroupGradebook[];
   academy?: AcademyTeacher | null;
+  academySummary?: AcademySummary;
+  academyUpdates?: AcademyUpdate[];
   journey?: AcademyAssignment[];
   lessonReports?: AcademyAssessment[];
   trainingTimetable?: AcademyAssignment[];
   workspaceCards?: WorkspaceCard[];
 };
 
-type TabKey = "home" | "reports" | "timetable" | "career" | "updates";
+type TabKey = TeacherTabKey;
 
-const tabs: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
+const activeTeacherTabs: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
   { key: "home", label: "Home", icon: Home },
   { key: "reports", label: "Lesson Reports", icon: ClipboardList },
   { key: "timetable", label: "Timetable", icon: CalendarDays },
@@ -140,13 +176,27 @@ const tabs: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
   { key: "updates", label: "Updates", icon: Bell },
 ];
 
+const academyTabs: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
+  { key: "home", label: "Overview", icon: Home },
+  { key: "reports", label: "Lessons", icon: ClipboardList },
+  { key: "timetable", label: "Timetable", icon: CalendarDays },
+  { key: "updates", label: "Updates", icon: Bell },
+];
+
+const teacherMobileTabs: Array<{ key: TabKey; label: string; icon: LucideIcon }> = [
+  { key: "home", label: "Home", icon: Home },
+  { key: "reports", label: "Lessons", icon: ClipboardList },
+  { key: "updates", label: "Updates", icon: Bell },
+  { key: "profile", label: "Profile", icon: UserRound },
+];
+
 const scoreLabels: Record<string, string> = {
-  teacher_guidance_compliance_score: "TGC",
-  timing_adherence_score: "TA",
-  resource_familiarity_score: "RF",
-  english_fluency_score: "EF",
-  confidence_delivery_score: "CON",
-  engagement_technique_score: "SE",
+  teacher_guidance_compliance_score: "Teacher guidance compliance",
+  timing_adherence_score: "Timing adherence",
+  resource_familiarity_score: "Resource familiarity",
+  english_fluency_score: "English fluency",
+  confidence_delivery_score: "Confidence and delivery",
+  engagement_technique_score: "Engagement technique",
 };
 
 function asNumber(value: unknown) {
@@ -161,6 +211,28 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
     month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function displayDateOnly(value?: string) {
+  if (!value) return "Not scheduled";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function displayTimeOnly(value?: string) {
+  if (!value) return "Not set";
+  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
@@ -244,14 +316,14 @@ function MetricCard({
   tone?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className={`mt-2 text-2xl font-black ${tone}`}>{value}</p>
-          <p className="mt-1 text-xs font-medium text-slate-500">{detail}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:rounded-2xl sm:p-4">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase leading-4 tracking-wide text-slate-500 sm:text-[11px]">{label}</p>
+          <p className={`mt-1 truncate text-xl font-black leading-7 sm:mt-2 sm:text-2xl ${tone}`}>{value}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-4 text-slate-500 sm:mt-1 sm:text-xs">{detail}</p>
         </div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 sm:h-9 sm:w-9">
           {icon}
         </div>
       </div>
@@ -343,7 +415,7 @@ function CompactGradebook({ groups }: { groups: GroupGradebook[] }) {
               {group.enrollments.length} students
             </span>
           </div>
-          <div className="max-h-80 overflow-auto">
+          <div className="miniapp-table-scroll max-h-80">
             <table className="w-full min-w-[32rem] text-left text-xs">
               <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                 <tr>
@@ -387,7 +459,7 @@ function ReportsTable({ reports }: { reports: AcademyAssessment[] }) {
   }
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="max-h-[68dvh] overflow-auto">
+      <div className="miniapp-table-scroll max-h-[68dvh]">
         <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
           <thead className="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
             <tr>
@@ -403,36 +475,134 @@ function ReportsTable({ reports }: { reports: AcademyAssessment[] }) {
             {reports.map((report) => {
               const scorePairs = Object.entries(report.scores || {}).filter(([, value]) => asNumber(value) > 0);
               return (
-                <tr key={report.id} className="align-top transition-colors hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <p className="font-black text-slate-900">{report.lesson_number || "Lesson"}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">{report.lesson_topic || "Training lesson"}</p>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-600">{displayDate(report.assessment_datetime)}</td>
-                  <td className="px-3 py-3 font-semibold text-slate-600">{report.evaluator_name || "Academic Director"}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {scorePairs.map(([key, value]) => (
-                        <span key={key} className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
-                          {scoreLabels[key] || key}: {asNumber(value).toFixed(1)}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-center text-base font-black text-slate-900">
-                    {asNumber(report.weighted_overall_score).toFixed(1)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusClass(report.decision)}`}>
-                      {statusLabel(report.decision)}
-                    </span>
-                  </td>
-                </tr>
+                <Fragment key={report.id}>
+                  <tr className="align-top transition-colors hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <p className="font-black text-slate-900">{report.lesson_number || "Lesson"}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-slate-500">{report.lesson_topic || "Training lesson"}</p>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 font-semibold text-slate-600">{displayDate(report.assessment_datetime)}</td>
+                    <td className="px-3 py-3 font-semibold text-slate-600">{report.evaluator_name || "Academic Director"}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {scorePairs.map(([key, value]) => (
+                          <span key={key} className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700">
+                            {scoreLabels[key] || key}: {asNumber(value).toFixed(1)}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-center text-base font-black text-slate-900">
+                      {asNumber(report.weighted_overall_score).toFixed(1)}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${statusClass(report.decision)}`}>
+                        {statusLabel(report.decision)}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="bg-slate-50/60">
+                    <td colSpan={6} className="px-4 py-3">
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Written report from Academic Department</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{report.final_recommendation || "No written report yet."}</p>
+                        </div>
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Strengths</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{report.strengths || "Not recorded yet."}</p>
+                        </div>
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Areas for improvement</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{report.areas_for_improvement || "Not recorded yet."}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                        Final recommendation: {report.final_recommendation || statusLabel(report.decision)}
+                      </div>
+                    </td>
+                  </tr>
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function AcademyProfileSummary({
+  academy,
+  summary,
+}: {
+  academy: AcademyTeacher | null;
+  summary: AcademySummary;
+}) {
+  const averageScore = summary.average_score ?? academy?.progress?.average_score ?? null;
+  const latestScore = summary.latest_score ?? academy?.progress?.latest_score ?? null;
+  const items = [
+    ["Rank / Status", `${summary.rank || "Not ranked"} · ${statusLabel(summary.status || academy?.academy_status || "in_training")}`],
+    ["Subject", summary.subject || academy?.subject_program_name || academy?.subject || "Subject not set"],
+    ["Training Start Date", displayDateOnly(summary.training_start_date || academy?.academy_start_date || "")],
+    ["Training End Date", displayDateOnly(summary.training_end_date || academy?.training_end_date || "")],
+    ["Average Score", averageScore === null || averageScore === undefined ? "-" : `${asNumber(averageScore).toFixed(1)}/10`],
+    ["Latest Score", latestScore === null || latestScore === undefined ? "-" : `${asNumber(latestScore).toFixed(1)}/10`],
+  ];
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">Academy Profile</p>
+          <p className="text-xs text-slate-500">Status, subject, dates, and score summary</p>
+        </div>
+        <GraduationCap className="h-4 w-4 text-blue-600" />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {items.map(([label, value]) => (
+          <div key={label} className="rounded-xl bg-slate-50 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-black text-slate-900">{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+        Score summary: {summary.score_summary || "No assessments yet."}
+      </div>
+    </div>
+  );
+}
+
+function AcademyUpdates({ updates }: { updates: AcademyUpdate[] }) {
+  if (!updates.length) {
+    return (
+      <EmptyState
+        icon={<Bell className="h-5 w-5" />}
+        title="No academy updates yet"
+        detail="Announcements from Academic Department and HR Manager will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {updates.map((item) => (
+        <article key={String(item.id)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <Bell className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+            <span className={`rounded-full border px-2 py-1 text-[10px] font-black uppercase ${statusClass(item.priority || "info")}`}>
+              {item.kind || item.priority || "update"}
+            </span>
+          </div>
+          <p className="mt-3 text-sm font-black text-slate-900">{item.title || "Teacher Academy update"}</p>
+          {item.body ? <p className="mt-1 text-sm leading-6 text-slate-500">{item.body}</p> : null}
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
+            <span>{item.source || "Academic Department"}</span>
+            {item.created_at ? <span>{displayDate(item.created_at)}</span> : null}
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
@@ -453,7 +623,7 @@ function Timetable({ lessons }: { lessons: AcademyAssignment[] }) {
         <div key={lesson.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-wide text-blue-600">{displayDate(lesson.session_datetime)}</p>
+              <p className="text-[11px] font-black uppercase tracking-wide text-blue-600">{displayDateOnly(lesson.session_datetime)}</p>
               <h3 className="mt-2 text-base font-black text-slate-900">{lesson.lesson_number || "Training lesson"}</h3>
               <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{lesson.lesson_topic || "Curriculum lesson"}</p>
             </div>
@@ -461,9 +631,23 @@ function Timetable({ lessons }: { lessons: AcademyAssignment[] }) {
               {statusLabel(lesson.status)}
             </span>
           </div>
-          <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-            <p className="font-bold">Evaluator</p>
-            <p className="mt-1">{lesson.evaluator_name || "Academic Director"}</p>
+          <div className="mt-4 grid gap-2 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:grid-cols-2">
+            <div>
+              <p className="font-bold">Start time</p>
+              <p className="mt-1">{displayTimeOnly(lesson.start_time || lesson.session_datetime)}</p>
+            </div>
+            <div>
+              <p className="font-bold">End time</p>
+              <p className="mt-1">{displayTimeOnly(lesson.end_time)}</p>
+            </div>
+            <div>
+              <p className="font-bold">Evaluator / Academic Director</p>
+              <p className="mt-1">{lesson.evaluator_name || "Academic Director"}</p>
+            </div>
+            <div>
+              <p className="font-bold">Status</p>
+              <p className="mt-1">{statusLabel(lesson.status)}</p>
+            </div>
           </div>
         </div>
       ))}
@@ -475,17 +659,19 @@ export default function TeacherHome(props: TeacherPageProps) {
   const teacher = props.teacher;
   const groups = Array.isArray(props.groups) ? props.groups : [];
   const academy = props.academy || null;
+  const academySummary = props.academySummary || {};
+  const academyUpdates = Array.isArray(props.academyUpdates) ? props.academyUpdates : [];
   const journey = Array.isArray(props.journey) ? props.journey : [];
   const reports = Array.isArray(props.lessonReports) ? props.lessonReports : [];
   const trainingTimetable = Array.isArray(props.trainingTimetable) ? props.trainingTimetable : [];
   const [activeTab, setActiveTab] = useState<TabKey>("home");
 
   const progress = academy?.progress || null;
-  const targetLessons = asNumber(progress?.target_lessons) || 12;
-  const assessedCount = asNumber(progress?.assessed_count);
-  const passedCount = asNumber(progress?.passed_count);
-  const assignedCount = asNumber(progress?.assigned_count) || journey.length;
-  const academyProgressPercent = targetLessons ? Math.min(100, Math.round((passedCount / targetLessons) * 100)) : 0;
+  const targetLessons = asNumber(academySummary.target_lessons) || asNumber(progress?.target_lessons) || 12;
+  const assessedCount = asNumber(academySummary.assessed_count ?? academySummary.completed_count ?? progress?.assessed_count);
+  const assignedCount = asNumber(academySummary.assigned_count ?? progress?.assigned_count) || journey.length;
+  const remainingCount = Math.max(asNumber(academySummary.remaining_count) || assignedCount - assessedCount, 0);
+  const academyProgressPercent = asNumber(academySummary.progress_percent) || (targetLessons ? Math.min(100, Math.round((assessedCount / targetLessons) * 100)) : 0);
   const groupRows = useMemo(() => groupPerformanceRows(groups), [groups]);
   const reportChartRows = useMemo(() => reportRows(reports), [reports]);
   const totalStudents = groups.reduce((sum, group) => sum + group.enrollments.length, 0);
@@ -493,29 +679,39 @@ export default function TeacherHome(props: TeacherPageProps) {
   const groupAverage = average(groups.flatMap((group) => group.enrollments.map((enrollment) => enrollment.averageGrade)));
   const attendanceRate = countAttendance(groups);
   const isTraining = Boolean(academy);
+  const visibleTabs = isTraining ? academyTabs : activeTeacherTabs;
   const workspaceCards = Array.isArray(props.workspaceCards) ? props.workspaceCards : [];
   const fallbackCards: WorkspaceCard[] = [
     {
-      label: "Students",
-      value: String(totalStudents || "-"),
-      detail: "active group roster",
+      label: isTraining ? "Assigned Lessons" : "Students",
+      value: String(isTraining ? assignedCount || "-" : totalStudents || "-"),
+      detail: isTraining ? "academy lesson sequence" : "active group roster",
     },
     {
-      label: isTraining ? "Academy Lessons" : "Lessons",
-      value: String(isTraining ? assignedCount || "-" : totalLessons || "-"),
-      detail: isTraining ? `${assessedCount} assessed` : "recorded sessions",
+      label: isTraining ? "Completed/Assessed" : "Lessons",
+      value: String(isTraining ? assessedCount || "0" : totalLessons || "-"),
+      detail: isTraining ? "reports received" : "recorded sessions",
+      tone: "text-emerald-600",
     },
     {
-      label: isTraining ? "Average Score" : "Class AAP",
-      value: isTraining ? (progress?.average_score ? progress.average_score.toFixed(1) : "-") : groupAverage ? groupAverage.toFixed(1) : "-",
-      detail: isTraining ? "academy reports" : "student average",
+      label: isTraining ? "Remaining Lessons" : "Class AAP",
+      value: isTraining ? String(remainingCount) : groupAverage ? groupAverage.toFixed(1) : "-",
+      detail: isTraining ? `${academyProgressPercent}% complete` : "student average",
       tone: "text-blue-600",
     },
     {
-      label: isTraining ? "Passed" : "Attendance",
-      value: isTraining ? `${passedCount}/${targetLessons}` : attendanceRate ? `${attendanceRate}%` : "-",
-      detail: isTraining ? "training lessons" : "recorded attendance",
-      tone: "text-emerald-600",
+      label: isTraining ? "Average Score" : "Attendance",
+      value: isTraining
+        ? academySummary.average_score !== null && academySummary.average_score !== undefined
+          ? asNumber(academySummary.average_score).toFixed(1)
+          : progress?.average_score
+            ? progress.average_score.toFixed(1)
+            : "-"
+        : attendanceRate
+          ? `${attendanceRate}%`
+          : "-",
+      detail: isTraining ? "academy assessment average" : "recorded attendance",
+      tone: isTraining ? "text-slate-900" : "text-emerald-600",
     },
   ];
   const summaryCards = workspaceCards.length ? workspaceCards : fallbackCards;
@@ -556,8 +752,8 @@ export default function TeacherHome(props: TeacherPageProps) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-4 sm:px-6">
-        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <main className="mx-auto w-full max-w-7xl space-y-3 px-3 py-3 pb-[calc(var(--app-bottom-inset)+6.5rem)] sm:space-y-4 sm:px-6 sm:py-4 sm:pb-4">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 sm:rounded-3xl sm:p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-wide text-blue-600">Teacher Cabinet</p>
@@ -574,7 +770,7 @@ export default function TeacherHome(props: TeacherPageProps) {
               <div className="min-w-[14rem] rounded-2xl bg-slate-50 p-3">
                 <div className="flex items-center justify-between text-xs font-black text-slate-600">
                   <span>Academy progress</span>
-                  <span>{passedCount}/{targetLessons}</span>
+                  <span>{assessedCount}/{targetLessons}</span>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-slate-200">
                   <div className="h-2 rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${academyProgressPercent}%` }} />
@@ -585,7 +781,7 @@ export default function TeacherHome(props: TeacherPageProps) {
         </section>
 
         <nav className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Teacher cabinet">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
             return (
@@ -606,7 +802,7 @@ export default function TeacherHome(props: TeacherPageProps) {
 
         {activeTab === "home" ? (
           <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
               {summaryCards.map((card) => (
                 <MetricCard
                   key={`${card.label}-${card.value}`}
@@ -618,6 +814,8 @@ export default function TeacherHome(props: TeacherPageProps) {
                 />
               ))}
             </div>
+
+            {isTraining ? <AcademyProfileSummary academy={academy} summary={academySummary} /> : null}
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
               <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -691,10 +889,53 @@ export default function TeacherHome(props: TeacherPageProps) {
           </section>
         ) : null}
 
-        {activeTab === "career" ? (
+        {activeTab === "profile" ? (
+          <section className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300 sm:space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-lg font-black text-white shadow-sm">
+                  {(teacher.full_name || "T").slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-black text-slate-900">{teacher.full_name || "Teacher"}</p>
+                  <p className="truncate text-xs font-semibold text-slate-500">
+                    {teacher.login}
+                    {academy?.subject ? ` · ${academy.subject}` : teacher.assigned_group ? ` · ${teacher.assigned_group}` : ""}
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${isTraining ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                  {isTraining ? "Training" : "Active"}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("timetable")}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] motion-reduce:active:scale-100"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Timetable
+                </button>
+                <form action={routes.logout} method="post">
+                  <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
+                  <button
+                    type="submit"
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98] motion-reduce:active:scale-100"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Log out
+                  </button>
+                </form>
+              </div>
+            </div>
+            {isTraining ? <AcademyProfileSummary academy={academy} summary={academySummary} /> : null}
+          </section>
+        ) : null}
+
+        {activeTab === "career" || activeTab === "profile" ? (
           <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr] animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-black text-slate-900">Career Position</p>
+              <p className="text-sm font-black text-slate-900">{activeTab === "profile" ? "Teacher Profile" : "Career Position"}</p>
               <div className="mt-4 space-y-3">
                 <MetricCard label="Status" value={isTraining ? statusLabel(academy?.academy_status || "in_training") : "Active"} detail="current stage" icon={<CheckCircle2 className="h-4 w-4" />} />
                 <MetricCard label="Stage" value={teacher.semester_stage || "-"} detail="semester progression" icon={<TrendingUp className="h-4 w-4" />} />
@@ -729,21 +970,54 @@ export default function TeacherHome(props: TeacherPageProps) {
         ) : null}
 
         {activeTab === "updates" ? (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {[
-              ["Teacher Academy", "Follow the assigned lesson sequence and prepare using the guidance notes."],
-              ["Lesson Reports", "Scores and remarks appear after each Academic Director assessment."],
-              ["Timetable", "Scheduled training sessions are controlled by the Academic Director."],
-            ].map(([title, detail]) => (
-              <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <Bell className="h-4 w-4 text-blue-600" />
-                <p className="mt-3 text-sm font-black text-slate-900">{title}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-500">{detail}</p>
+          <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {isTraining ? (
+              <AcademyUpdates updates={academyUpdates} />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {[
+                  ["Teacher Academy", "Follow the assigned lesson sequence and prepare using the guidance notes."],
+                  ["Lesson Reports", "Scores and remarks appear after each Academic Director assessment."],
+                  ["Timetable", "Scheduled training sessions are controlled by the Academic Director."],
+                ].map(([title, detail]) => (
+                  <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <Bell className="h-4 w-4 text-blue-600" />
+                    <p className="mt-3 text-sm font-black text-slate-900">{title}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">{detail}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </section>
         ) : null}
       </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-2 pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:hidden"
+        style={{ paddingBottom: "max(0.5rem, var(--app-bottom-inset))" }}
+        aria-label="Teacher mobile navigation"
+      >
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+          {teacherMobileTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = bottomNavActiveKey(activeTab) === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-2xl px-2 text-[11px] font-black transition-colors ${
+                  isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

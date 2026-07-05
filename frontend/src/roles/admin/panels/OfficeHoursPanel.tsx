@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { CalendarDays, Clock, Plus, Trash, Check, X, Users, AlertCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type Availability = {
   id: number;
@@ -70,6 +71,11 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
 
   // Create availability modal state
   const [createOpen, setCreateOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: createOpen,
+    onDismiss: () => setCreateOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [newTeacherId, setNewTeacherId] = useState("");
   const [newSubjectId, setNewSubjectId] = useState("");
   const [newPlannedTopic, setNewPlannedTopic] = useState("");

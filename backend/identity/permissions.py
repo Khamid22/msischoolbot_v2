@@ -52,6 +52,12 @@ ROLE_PERMISSIONS = {
         "manage_curriculum_progress",
         "review_demo_lessons",
     },
+    "head_of_department": {
+        "view_teacher_performance",
+        "observe_lessons",
+        "manage_teacher_academy",
+        "view_teacher_profiles",
+    },
 }
 
 

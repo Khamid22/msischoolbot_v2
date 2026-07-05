@@ -4,6 +4,7 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Filter, Pl
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
@@ -164,6 +165,11 @@ export function SchedulePanel({ state }: { state: any }) {
   const timetableScrollRef = useRef<HTMLDivElement | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [createOpen, setCreateOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: createOpen,
+    onDismiss: () => setCreateOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [submitting, setSubmitting] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [scheduleGroupFilter, setScheduleGroupFilter] = useState("all");

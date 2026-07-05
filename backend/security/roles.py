@@ -10,6 +10,7 @@ ROLE_HR_MANAGER = "hr_manager"
 ROLE_PARENT = "parent"
 ROLE_STUDENT = "student"
 ROLE_ACADEMIC_DIRECTOR = "academic_director"
+ROLE_HEAD_OF_DEPARTMENT = "head_of_department"
 
 ALL_ROLES = {
     ROLE_OWNER,
@@ -22,6 +23,7 @@ ALL_ROLES = {
     ROLE_PARENT,
     ROLE_STUDENT,
     ROLE_ACADEMIC_DIRECTOR,
+    ROLE_HEAD_OF_DEPARTMENT,
 }
 
 

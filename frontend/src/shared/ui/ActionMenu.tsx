@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { MoreVertical } from "lucide-react";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 export type ActionMenuItem =
   | { separator: true; key: string }
@@ -37,6 +38,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const menuId = useId();
+  const dismissibleRefs = useMemo(() => [containerRef], []);
 
   const actionIndexes = items
     .map((item, index) => (isAction(item) && !item.disabled ? index : -1))
@@ -54,21 +56,20 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
   useEffect(() => {
     if (!open) return;
 
-    function handlePointer(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handlePointer);
     // Focus the first enabled item when the menu opens.
     const timer = window.setTimeout(() => {
       if (actionIndexes.length) focusItem(actionIndexes[0]);
     }, 0);
     return () => {
-      document.removeEventListener("mousedown", handlePointer);
       window.clearTimeout(timer);
     };
   }, [open]);
+
+  useDismissibleLayer({
+    enabled: open,
+    refs: dismissibleRefs,
+    onDismiss: (event) => close(event.type === "keydown"),
+  });
 
   function moveFocus(currentIndex: number, direction: 1 | -1) {
     if (!actionIndexes.length) return;

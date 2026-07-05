@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, sortSubjectsMathFirst, submitConfirm } from "../shared";
 
 type ResourceRow = Record<string, unknown>;
@@ -50,6 +51,16 @@ export default function ResourcesPanel({ state }: { state: any }) {
 
   const [addOpen, setAddOpen] = useState(false);
   const [typeManagerOpen, setTypeManagerOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: addOpen,
+    onDismiss: () => setAddOpen(false),
+    dismissOnOutsidePointer: false,
+  });
+  useDismissibleLayer({
+    enabled: typeManagerOpen,
+    onDismiss: () => setTypeManagerOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [folderFilter, setFolderFilter] = useState("all");

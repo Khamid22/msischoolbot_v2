@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Globe, Layers, Loader2, MessageSquare, Pencil, Send, Trash2, Users, X } from "lucide-react";
 import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 interface ChatMessage {
   id: number;
@@ -121,6 +122,11 @@ export default function ChatPage(props: ChatPageProps) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [editTarget, setEditTarget] = useState<ChatMessage | null>(null);
+  useDismissibleLayer({
+    enabled: Boolean(editTarget),
+    onDismiss: () => setEditTarget(null),
+    dismissOnOutsidePointer: false,
+  });
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
 

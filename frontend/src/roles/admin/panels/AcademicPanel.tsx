@@ -4,6 +4,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { csrfHeaders } from "@/shared/lib/api";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, compareSubjectsByPreferredOrder, programInitials, Lesson } from "./academic/shared";
 import { GroupGradebook } from "./academic/GroupGradebook";
@@ -29,6 +30,16 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [programTypeFilter, setProgramTypeFilter] = useState<"all" | "lesson" | "exam">("all");
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [manageSchoolsOpen, setManageSchoolsOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: addGroupOpen,
+    onDismiss: () => setAddGroupOpen(false),
+    dismissOnOutsidePointer: false,
+  });
+  useDismissibleLayer({
+    enabled: manageSchoolsOpen,
+    onDismiss: () => setManageSchoolsOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [groupSearch, setGroupSearch] = useState("");
   const [groupSchool, setGroupSchool] = useState<string>("all");
   const [groupSubject, setGroupSubject] = useState("all");

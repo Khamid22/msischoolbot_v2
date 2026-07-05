@@ -8,6 +8,7 @@ from backend.security.roles import (
     ROLE_CUSTOMER_SUPPORT,
     ROLE_PARENT,
     ROLE_STUDENT,
+    ROLE_HEAD_OF_DEPARTMENT,
     ALL_ROLES,
     normalize_role,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "ROLE_CUSTOMER_SUPPORT",
     "ROLE_PARENT",
     "ROLE_STUDENT",
+    "ROLE_HEAD_OF_DEPARTMENT",
     "ALL_ROLES",
     "normalize_role",
     "PERMISSION_VIEW_DASHBOARD",

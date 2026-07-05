@@ -4,6 +4,7 @@ import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } fr
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { Pagination } from "@/shared/ui/Pagination";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
 
@@ -78,6 +79,8 @@ function AddStudentModal({
     if (created) window.location.reload();
     else onClose();
   }
+
+  useDismissibleLayer({ onDismiss: handleClose, dismissOnOutsidePointer: false });
 
   async function copyCredentials() {
     if (!created) return;

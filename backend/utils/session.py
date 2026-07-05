@@ -138,6 +138,7 @@ def set_admin_session(admin):
         "customer_support",
         "parent",
         "academic_director",
+        "head_of_department",
     }:
         portal_role = "admin"
     admin_role = "owner" if raw_admin_role.strip().casefold() == "owner" else portal_role

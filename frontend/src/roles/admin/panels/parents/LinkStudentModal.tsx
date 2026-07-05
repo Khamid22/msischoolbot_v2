@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { type ParentRow, parentChildren, parentDisplayName, parentInitials } from "./types";
 import { asNumber, asString, getStudentCode, getStudentRowId } from "../../shared";
 
@@ -20,6 +21,7 @@ export function LinkStudentModal({
 }) {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  useDismissibleLayer({ onDismiss: onClose, dismissOnOutsidePointer: false });
 
   useEffect(() => {
     searchRef.current?.focus();

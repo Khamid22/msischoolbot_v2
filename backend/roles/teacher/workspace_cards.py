@@ -50,6 +50,63 @@ def _placeholder_cards() -> list[dict[str, str]]:
     ]
 
 
+def _academy_cards(workspace: dict[str, Any]) -> list[dict[str, str]]:
+    summary = workspace.get("academy_summary") if isinstance(workspace.get("academy_summary"), dict) else {}
+    progress = workspace.get("academy", {}).get("progress") if isinstance(workspace.get("academy"), dict) else {}
+    if not isinstance(progress, dict):
+        progress = {}
+
+    assigned_count = _as_positive_int(summary.get("assigned_count")) or _as_positive_int(progress.get("assigned_count"))
+    completed_count = (
+        _as_positive_int(summary.get("completed_count"))
+        or _as_positive_int(summary.get("assessed_count"))
+        or _as_positive_int(progress.get("assessed_count"))
+        or 0
+    )
+    remaining_count = summary.get("remaining_count")
+    try:
+        remaining_count = int(remaining_count)
+    except (TypeError, ValueError):
+        remaining_count = max((assigned_count or 0) - completed_count, 0)
+    progress_percent = summary.get("progress_percent")
+    try:
+        progress_percent = max(0, min(100, int(progress_percent)))
+    except (TypeError, ValueError):
+        progress_percent = 0
+    average_score = summary.get("average_score", progress.get("average_score"))
+    try:
+        average_label = f"{float(average_score):.1f}"
+    except (TypeError, ValueError):
+        average_label = "-"
+
+    return [
+        {
+            "label": "Assigned Lessons",
+            "value": _count_label(assigned_count),
+            "detail": "academy lesson sequence",
+            "tone": "text-slate-900",
+        },
+        {
+            "label": "Completed/Assessed",
+            "value": _count_label(completed_count),
+            "detail": "reports received",
+            "tone": "text-emerald-600",
+        },
+        {
+            "label": "Remaining Lessons",
+            "value": _count_label(max(remaining_count, 0)),
+            "detail": f"{progress_percent}% complete",
+            "tone": "text-blue-600",
+        },
+        {
+            "label": "Average Score",
+            "value": average_label,
+            "detail": "academy assessment average",
+            "tone": "text-slate-900",
+        },
+    ]
+
+
 def build_teacher_workspace_cards(
     *,
     teacher_id: Any,
@@ -61,6 +118,8 @@ def build_teacher_workspace_cards(
         return _placeholder_cards()
     if not isinstance(workspace, dict):
         return _placeholder_cards()
+    if isinstance(workspace.get("academy"), dict):
+        return _academy_cards(workspace)
 
     groups = _as_list(workspace.get("groups"))
     group_keys = set()

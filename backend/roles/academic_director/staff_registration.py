@@ -1,0 +1,305 @@
+"""Academic Director staff registration helpers."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from werkzeug.security import generate_password_hash
+
+from database import queries
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _to_int(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed > 0 else 0
+
+
+def _utc_now_iso():
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _phase1_accounts_available(conn: Any) -> bool:
+    try:
+        row = conn.execute("SELECT to_regclass('msi_v2.accounts') AS table_name").fetchone()
+    except Exception:
+        return False
+    return bool(row and row["table_name"])
+
+
+def _subject_row(conn: Any, subject_id: Any) -> dict[str, Any] | None:
+    parsed_subject_id = _to_int(subject_id)
+    if not parsed_subject_id:
+        return None
+    row = conn.execute(
+        """
+        SELECT id, subject_name, subject_key
+        FROM msi_v2.subjects
+        WHERE id = %s AND COALESCE(status, 'active') = 'active'
+        LIMIT 1
+        """,
+        (parsed_subject_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _next_staff_code(conn: Any, prefix: str) -> str:
+    normalized_prefix = _text(prefix).upper() or "HOD"
+    row = conn.execute(
+        """
+        SELECT COALESCE(MAX(NULLIF(regexp_replace(upper(login), %s, ''), '')::integer), 0) AS max_num
+        FROM msi_v2.msi_staff
+        WHERE upper(login) ~ %s
+        """,
+        (f"^{normalized_prefix}", f"^{normalized_prefix}[0-9]+$"),
+    ).fetchone()
+    return f"{normalized_prefix}{int(row['max_num'] or 0) + 1:04d}"
+
+
+def _insert_or_update_hod_staff(
+    conn: Any,
+    *,
+    login: str,
+    password_hash: str,
+    display_name: str,
+    subject_key: str,
+    actor_login: str,
+    now: str,
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO msi_v2.msi_staff (
+            login, password_hash, display_name, role, status, subject_scope,
+            created_at, updated_at
+        )
+        VALUES (%s, %s, %s, 'head_of_department', 'active', %s, %s::timestamptz, %s::timestamptz)
+        ON CONFLICT ((lower(login))) DO UPDATE SET
+            password_hash = excluded.password_hash,
+            display_name = excluded.display_name,
+            role = 'head_of_department',
+            status = 'active',
+            subject_scope = excluded.subject_scope,
+            updated_at = excluded.updated_at
+        RETURNING id
+        """,
+        (
+            login,
+            password_hash,
+            display_name,
+            subject_key,
+            now,
+            now,
+        ),
+    ).fetchone()
+    return _to_int(row["id"]) if row else 0
+
+
+def _upsert_hod_account(conn: Any, *, staff_id: int, login: str, password_hash: str, display_name: str, now: str) -> int:
+    account = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.accounts
+        WHERE lower(btrim(login)) = lower(btrim(%s))
+           OR (legacy_source_table = 'msi_staff' AND legacy_source_id = %s)
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (login, staff_id),
+    ).fetchone()
+    if account:
+        account_id = _to_int(account["id"])
+        conn.execute(
+            """
+            UPDATE msi_v2.accounts
+            SET login = %s,
+                password_hash = %s,
+                role = 'head_of_department',
+                status = 'active',
+                full_name = %s,
+                legacy_source_table = 'msi_staff',
+                legacy_source_id = %s,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (login, password_hash, display_name, staff_id, now, account_id),
+        )
+        return account_id
+
+    inserted = conn.execute(
+        """
+        INSERT INTO msi_v2.accounts (
+            login, password_hash, role, status, full_name,
+            legacy_source_table, legacy_source_id, created_at, updated_at
+        )
+        VALUES (%s, %s, 'head_of_department', 'active', %s, 'msi_staff', %s, %s::timestamptz, %s::timestamptz)
+        RETURNING id
+        """,
+        (login, password_hash, display_name, staff_id, now, now),
+    ).fetchone()
+    return _to_int(inserted["id"]) if inserted else 0
+
+
+def _upsert_hod_profile(
+    conn: Any,
+    *,
+    account_id: int,
+    staff_id: int,
+    department: str,
+    subject_id: int,
+    now: str,
+) -> int:
+    profile = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.staff_profiles
+        WHERE account_id = %s OR staff_id = %s
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (account_id, staff_id),
+    ).fetchone()
+    if profile:
+        profile_id = _to_int(profile["id"])
+        conn.execute(
+            """
+            UPDATE msi_v2.staff_profiles
+            SET account_id = %s,
+                staff_id = %s,
+                job_title = 'Head of Department',
+                department = %s,
+                status = 'active',
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (account_id, staff_id, department, now, profile_id),
+        )
+    else:
+        inserted = conn.execute(
+            """
+            INSERT INTO msi_v2.staff_profiles (
+                account_id, staff_id, job_title, department, status, created_at, updated_at
+            )
+            VALUES (%s, %s, 'Head of Department', %s, 'active', %s::timestamptz, %s::timestamptz)
+            RETURNING id
+            """,
+            (account_id, staff_id, department, now, now),
+        ).fetchone()
+        profile_id = _to_int(inserted["id"]) if inserted else 0
+
+    if profile_id:
+        conn.execute(
+            """
+            INSERT INTO msi_v2.staff_subject_scopes (
+                account_id, staff_profile_id, subject_id, scope_type, status, created_at, updated_at
+            )
+            VALUES (%s, %s, %s, 'head_of_department', 'active', %s::timestamptz, %s::timestamptz)
+            ON CONFLICT (account_id, subject_id, scope_type) WHERE status = 'active'
+            DO UPDATE SET
+                staff_profile_id = excluded.staff_profile_id,
+                updated_at = excluded.updated_at
+            """,
+            (account_id, profile_id, subject_id, now, now),
+        )
+    return profile_id
+
+
+def create_head_of_department_account(
+    *,
+    display_name: str,
+    subject_id: Any,
+    created_by: str = "",
+) -> tuple[bool, str, dict[str, Any]]:
+    with queries.connect_auth_db() as conn:
+        return _create_head_of_department_account(
+            conn,
+            display_name=display_name,
+            subject_id=subject_id,
+            created_by=created_by,
+            commit=True,
+        )
+
+
+def _create_head_of_department_account(
+    conn: Any,
+    *,
+    display_name: str,
+    subject_id: Any,
+    created_by: str = "",
+    commit: bool = False,
+) -> tuple[bool, str, dict[str, Any]]:
+    if not _phase1_accounts_available(conn):
+        return False, "Shared accounts are not available. Apply Phase 1 account schema first.", {}
+
+    subject = _subject_row(conn, subject_id)
+    if not subject:
+        return False, "Select a valid subject scope.", {}
+
+    subject_name = _text(subject.get("subject_name")) or "Department"
+    subject_key = _text(subject.get("subject_key"))
+    normalized_display_name = _text(display_name) or f"Head of {subject_name} Department"
+    now = _utc_now_iso()
+    login = _next_staff_code(conn, "HOD")
+    password_hash = generate_password_hash(login)
+
+    staff_id = _insert_or_update_hod_staff(
+        conn,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        subject_key=subject_key or str(subject["id"]),
+        actor_login=_text(created_by),
+        now=now,
+    )
+    if not staff_id:
+        return False, "Unable to create HOD staff row.", {}
+
+    account_id = _upsert_hod_account(
+        conn,
+        staff_id=staff_id,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        now=now,
+    )
+    if not account_id:
+        return False, "Unable to create HOD account.", {}
+
+    profile_id = _upsert_hod_profile(
+        conn,
+        account_id=account_id,
+        staff_id=staff_id,
+        department=f"{subject_name} Department",
+        subject_id=int(subject["id"]),
+        now=now,
+    )
+    if not profile_id:
+        return False, "Unable to create HOD profile.", {}
+
+    if commit:
+        conn.commit()
+
+    credentials = {
+        "role": "head_of_department",
+        "login": login,
+        "temporary_password": login,
+        "display_name": normalized_display_name,
+        "subject_id": int(subject["id"]),
+        "subject_name": subject_name,
+        "account_id": account_id,
+        "staff_id": staff_id,
+    }
+    return True, "", credentials
+
+
+__all__ = [
+    "create_head_of_department_account",
+    "_create_head_of_department_account",
+]

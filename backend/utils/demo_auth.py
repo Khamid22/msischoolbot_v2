@@ -17,6 +17,7 @@ _ADMIN_ROLE_ALLOWLIST = {
     "admin",
     "ceo",
     "academic_director",
+    "head_of_department",
     "customer_support",
     "hr",
 }
@@ -83,7 +84,7 @@ def _set_demo_admin_session(session):
                     role,
                     (lower(role) = 'owner') AS is_owner
                 FROM msi_v2.msi_staff
-                WHERE lower(role) IN ('owner', 'admin', 'ceo', 'academic_director', 'customer_support', 'hr')
+                WHERE lower(role) IN ('owner', 'admin', 'ceo', 'academic_director', 'head_of_department', 'customer_support', 'hr')
                 ORDER BY (lower(role) = 'owner') DESC, id ASC
                 LIMIT 1
                 """

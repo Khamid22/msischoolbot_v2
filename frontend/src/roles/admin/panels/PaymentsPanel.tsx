@@ -4,6 +4,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
 import { XHR_HEADERS, jsonCsrfHeaders } from "@/shared/lib/api";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type PaymentRow = Record<string, unknown>;
 type FamilyTotals = {
@@ -202,6 +203,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [summary, setSummary] = useState<Record<string, unknown>>({});
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: paymentModalOpen,
+    onDismiss: () => setPaymentModalOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

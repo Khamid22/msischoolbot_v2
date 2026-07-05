@@ -157,7 +157,7 @@ def get_next_teacher_code(conn, prefix="TCH"):
         """,
         (f"^{normalized_prefix}", f"^{normalized_prefix}[0-9]+$"),
     ).fetchone()
-    return f"{normalized_prefix}{int(row['max_num'] or 0) + 1:03d}"
+    return f"{normalized_prefix}{int(row['max_num'] or 0) + 1:04d}"
 
 
 def get_next_teacher_login(conn, subject_prefix="tch"):

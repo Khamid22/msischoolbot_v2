@@ -36,6 +36,7 @@ ADMIN_PANEL_MODES = {
     "student",
     "parent",
     "academic_director",
+    "head_of_department",
 }
 
 
@@ -111,6 +112,10 @@ def register_admin_page_routes(
         academic_context = list_admin_academic_context()
         announcements = list_announcements()
         admin_system_cards = system_admin_workspace_cards()
+        if current_auth_role() == "head_of_department":
+            from backend.roles.head_of_department.academy_scope import filter_admin_context_for_current_hod
+
+            filter_admin_context_for_current_hod(page_context, academic_context)
 
         panel = page_context["panel"]
         school_filter = page_context["school_filter"]
@@ -211,6 +216,8 @@ def register_admin_page_routes(
 
     def ensure_admin_role(request_obj: Request):
         if current_auth_role() == "admin":
+            return
+        if current_auth_role() in {"academic_director", "head_of_department"} and request_obj.url.path.startswith("/admin/teacher-academy"):
             return
         requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
         if requested_with == "XMLHttpRequest":

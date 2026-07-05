@@ -21,6 +21,7 @@ from backend.roles.academic_director.routes import register_academic_director_pa
 from backend.roles.ceo.routes import register_ceo_page_routes
 from backend.roles.customer_support.routes import register_customer_support_page_routes
 from backend.roles.hr_manager.routes import register_hr_manager_page_routes
+from backend.roles.head_of_department.routes import register_head_of_department_page_routes
 from backend.roles.parent.routes import register_parent_invite_routes
 from backend.roles.parent.routes import register_parent_page_routes
 from backend.roles.student.routes import register_student_page_routes
@@ -416,7 +417,8 @@ def _bootstrap_app(app_instance):
     register_ceo_page_routes(app_instance)
     register_hr_manager_page_routes(app_instance)
     register_customer_support_page_routes(app_instance)
-    register_academic_director_page_routes(app_instance)
+    register_academic_director_page_routes(app_instance, render_admin_page=render_admin_page)
+    register_head_of_department_page_routes(app_instance, render_admin_page=render_admin_page)
     register_parent_invite_routes(app_instance)
 
     _APP_BOOTSTRAPPED = True

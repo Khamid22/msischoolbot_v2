@@ -25,6 +25,7 @@ ACCOUNT_AUTH_ROLES = {
     "teacher",
     "parent",
     "academic_director",
+    "head_of_department",
 }
 STAFF_ACCOUNT_ROLES = {
     "system_admin",
@@ -32,6 +33,7 @@ STAFF_ACCOUNT_ROLES = {
     "hr_manager",
     "customer_support",
     "academic_director",
+    "head_of_department",
 }
 
 def normalize_login(value: Any) -> str:

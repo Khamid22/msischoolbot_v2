@@ -1,4 +1,5 @@
 import { Pencil, Trash2, X } from "lucide-react";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { Candidate, Teacher, TRAINING_TARGET_LESSONS, statusLabels, formatCandidateEventNote, trainingMeta, criterionAverages } from "./shared";
 import { StageButton } from "./controls";
@@ -29,6 +30,7 @@ export function CandidateDetailModal({
   const isPassed = meta.status === "training_passed";
   const isRejected = ["rejected", "withdrawn"].includes(meta.status);
   const isHired = meta.status === "hired";
+  useDismissibleLayer({ onDismiss: onClose, dismissOnOutsidePointer: false });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" onClick={onClose}>

@@ -26,6 +26,7 @@ TELEGRAM_AUTH_ROLES = {
     "teacher",
     "parent",
     "academic_director",
+    "head_of_department",
 }
 TELEGRAM_LOGIN_ALLOWED_STATUS = "active"
 TELEGRAM_LINK_ALLOWED_STATUS = "active"

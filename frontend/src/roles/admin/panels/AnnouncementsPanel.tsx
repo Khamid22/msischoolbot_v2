@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../shared";
 import { jsonCsrfHeaders, csrfHeaders } from "@/shared/lib/api";
 
@@ -193,6 +194,10 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   );
   const [tab, setTab] = useState<"all" | Status>("all");
   const [open, setOpen] = useState(false);
+  const composerRef = useDismissibleLayer<HTMLFormElement>({
+    enabled: open,
+    onDismiss: () => setOpen(false),
+  });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState<AnnouncementForm>(() => createEmptyForm(defaultAudience));
   const [saving, setSaving] = useState(false);
@@ -478,8 +483,9 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" role="dialog" aria-modal="true">
           <form
+            ref={composerRef}
             onSubmit={save}
             className="flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover"
           >

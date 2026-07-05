@@ -20,6 +20,7 @@ import { ProgressBar } from "@/shared/ui/ProgressBar";
 import { StatCard } from "@/shared/ui/StatCard";
 import { UserAvatar } from "@/shared/ui/Avatar";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { useLazyVisible } from "@/shared/lib/useLazyVisible";
 import {
   buildAttendanceDonutData,
@@ -112,13 +113,17 @@ function SubjectSwitcher({
 }) {
   const label = currentLabel || "Subject";
   const menuAlignClass = align === "left" ? "left-0" : "right-0";
+  const containerRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: open,
+    onDismiss: () => onClose?.(),
+  });
 
   if (options.length <= 1) {
     return <span className="block max-w-[9rem] truncate rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold sm:max-w-xs">{label}</span>;
   }
 
   return (
-    <div className="relative min-w-0">
+    <div ref={containerRef} className="relative min-w-0">
       <button
         type="button"
         onClick={(event) => {
@@ -175,6 +180,22 @@ export default function DashboardPage(props: DashboardPageProps) {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const announcementsRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: announcementsOpen,
+    onDismiss: () => setAnnouncementsOpen(false),
+  });
+  const profileModalRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: profileModalOpen,
+    onDismiss: () => setProfileModalOpen(false),
+  });
+  const logoutModalRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: logoutOpen,
+    onDismiss: () => setLogoutOpen(false),
+  });
+  const passwordModalRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: passwordOpen,
+    onDismiss: () => setPasswordOpen(false),
+  });
   const { ref: chartsRef, visible: chartsVisible } = useLazyVisible({ rootMargin: "180px" });
 
   const studentName = buildStudentDisplayName(student);
@@ -317,7 +338,7 @@ export default function DashboardPage(props: DashboardPageProps) {
           }
           rightContent={
             <div className="flex min-w-0 items-center gap-2">
-              <div className="relative">
+              <div ref={announcementsRef} className="relative">
                 <button
                   type="button"
                   onClick={() => {
@@ -470,8 +491,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {profileModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle} role="dialog" aria-modal="true">
+          <div ref={profileModalRef} className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Profile</h3>
             <div className="mt-4 space-y-3">
               <div className="flex justify-center">
@@ -528,8 +549,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {logoutOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className={`max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle} role="dialog" aria-modal="true">
+          <div ref={logoutModalRef} className={`max-h-full w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Confirm Logout</h3>
             <p className="mt-2 text-sm text-muted-foreground">Are you sure you want to logout?</p>
             <div className="mt-5 flex justify-end gap-2">
@@ -552,8 +573,8 @@ export default function DashboardPage(props: DashboardPageProps) {
       ) : null}
 
       {passwordOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle}>
-          <div className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle} role="dialog" aria-modal="true">
+          <div ref={passwordModalRef} className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
             <h3 className="font-display text-base font-bold">Change Password</h3>
             <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-4">
               <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />

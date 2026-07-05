@@ -31,6 +31,7 @@ def get_current_user_role() -> str:
         roles.ROLE_CUSTOMER_SUPPORT,
         roles.ROLE_PARENT,
         roles.ROLE_ACADEMIC_DIRECTOR,
+        roles.ROLE_HEAD_OF_DEPARTMENT,
     }:
         return roles.normalize_role(auth_role)
 

@@ -3,6 +3,7 @@ import { BookMarked, CalendarDays, ChevronLeft, Layers, Users, X } from "lucide-
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
@@ -75,6 +76,11 @@ export function GroupGradebook({
   const [saving, setSaving] = useState(false);
   const [statusSavingId, setStatusSavingId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Enrollment | null>(null);
+  useDismissibleLayer({
+    enabled: Boolean(selectedStudent),
+    onDismiss: () => setSelectedStudent(null),
+    dismissOnOutsidePointer: false,
+  });
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
   const [lessonDateSavingId, setLessonDateSavingId] = useState<number | null>(null);

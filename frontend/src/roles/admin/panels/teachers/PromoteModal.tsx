@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { Candidate, Teacher, teacherCategories, semesterStages, suggestedLessonRate, formatUzs, trainingMeta } from "./shared";
 
@@ -46,9 +47,11 @@ export function PromoteModal({
     });
   }
 
+  const panelRef = useDismissibleLayer<HTMLDivElement>({ onDismiss: onClose });
+
   return (
-    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-foreground/60 p-4">
-      <div className="flex w-full max-w-md flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover">
+    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-foreground/60 p-4" role="dialog" aria-modal="true">
+      <div ref={panelRef} className="flex w-full max-w-md flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover">
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div>
             <h3 className="text-sm font-bold">Promote to Active Teacher</h3>

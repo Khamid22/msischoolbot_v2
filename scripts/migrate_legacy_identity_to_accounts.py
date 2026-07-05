@@ -34,6 +34,7 @@ ALLOWED_ACCOUNT_ROLES = {
     "teacher",
     "parent",
     "academic_director",
+    "head_of_department",
 }
 ACCOUNT_STATUSES = {"active", "pending", "disabled", "archived"}
 TEACHER_CODE_RE = re.compile(r"^TCH[0-9]{4}$")
@@ -63,6 +64,10 @@ ROLE_MAP = {
     "academic_director": "academic_director",
     "academic-director": "academic_director",
     "academic director": "academic_director",
+    "head_of_department": "head_of_department",
+    "head-of-department": "head_of_department",
+    "head of department": "head_of_department",
+    "hod": "head_of_department",
     "teacher": "teacher",
     "student": "student",
     "parent": "parent",

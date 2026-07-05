@@ -11,7 +11,12 @@ from backend.identity.account_service import (
 from backend.utils.normalization import normalize_school_code
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.route_service import group_belongs_to_school
-from backend.utils.session import current_auth_login
+from backend.utils.session import current_auth_login, current_auth_role
+from backend.roles.head_of_department.academy_scope import (
+    can_current_user_manage_academy_assignment,
+    can_current_user_manage_academy_teacher,
+    filter_academy_teachers_for_current_scope,
+)
 from backend.roles.admin.services.teacher_candidate_service import (
     create_teacher_candidate,
     delete_candidate_event,
@@ -102,15 +107,18 @@ def _form_list(name):
     return values
 
 
-def _academy_payload(message):
+def _academy_payload(message, *, credentials=None):
     invalidate_admin_page_context_cache()
+    payload = {
+        "ok": True,
+        "message": message,
+        "academy": filter_academy_teachers_for_current_scope(list_academy_teachers()),
+        "teachers": list_teachers(),
+    }
+    if credentials:
+        payload["credentials"] = credentials
     return jsonify(
-        {
-            "ok": True,
-            "message": message,
-            "academy": list_academy_teachers(),
-            "teachers": list_teachers(),
-        }
+        payload
     )
 
 
@@ -192,7 +200,9 @@ def register_admin_teacher_routes(
 
     @router.post("/admin/teacher-academy")
     def create_teacher_academy_route():
-        created, error_message = create_academy_teacher(
+        if current_auth_role() == "head_of_department":
+            return _academy_error("Head of Department cannot create Teacher Academy teacher accounts.", status=403)
+        create_result = create_academy_teacher(
             full_name=request.form.get("academy_full_name", ""),
             subject_program_id=request.form.get("academy_subject_program_id", ""),
             position=request.form.get("academy_position", "Trainee Teacher"),
@@ -205,15 +215,31 @@ def register_admin_teacher_routes(
             department_head_id=request.form.get("academy_department_head_id", "0"),
             notes=request.form.get("academy_notes", ""),
             created_by=current_auth_login() or "Academic Director",
+            return_credentials=True,
         )
+        if isinstance(create_result, tuple) and len(create_result) == 3:
+            created, error_message, credentials = create_result
+        else:
+            created, error_message = create_result
+            credentials = {}
         if not created:
             return _academy_error(error_message or "Unable to create academy teacher.")
         if _wants_json():
-            return _academy_payload("Academy teacher created with 12 training lessons.")
+            safe_credentials = {
+                "role": "teacher",
+                "login": credentials.get("login", ""),
+                "teacher_code": credentials.get("teacher_code", ""),
+                "temporary_password": credentials.get("temporary_password", ""),
+                "display_name": credentials.get("display_name", ""),
+                "subject_name": credentials.get("subject_name", ""),
+            }
+            return _academy_payload("Academy teacher created with 12 training lessons.", credentials=safe_credentials)
         return render_admin_page(admin_notice="Academy teacher created.", admin_panel="teachers")
 
     @router.post("/admin/teacher-academy/assignments/{assignment_id}")
     def update_teacher_academy_assignment_route(assignment_id: int):
+        if not can_current_user_manage_academy_assignment(assignment_id):
+            return _academy_error("This Teacher Academy lesson is outside your subject scope.", status=403)
         updated, error_message = update_assignment(
             assignment_id=assignment_id,
             assignment_type=request.form.get("assignment_type", ""),
@@ -232,6 +258,8 @@ def register_admin_teacher_routes(
 
     @router.post("/admin/teacher-academy/{academy_teacher_id}/assessments")
     def add_teacher_academy_assessment_route(academy_teacher_id: int):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
         saved, error_message = add_assessment(
             academy_teacher_id=academy_teacher_id,
             lesson_assignment_id=request.form.get("lesson_assignment_id", ""),
@@ -256,6 +284,8 @@ def register_admin_teacher_routes(
 
     @router.post("/admin/teacher-academy/{academy_teacher_id}/status")
     def update_teacher_academy_status_route(academy_teacher_id: int):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
         updated, error_message = update_academy_status(
             academy_teacher_id=academy_teacher_id,
             status=request.form.get("academy_status", ""),
@@ -268,6 +298,8 @@ def register_admin_teacher_routes(
 
     @router.post("/admin/teacher-academy/{academy_teacher_id}/promote")
     def promote_teacher_academy_route(academy_teacher_id: int):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
         promoted, error_message = promote_academy_teacher(
             academy_teacher_id=academy_teacher_id,
             assigned_group=request.form.get("teacher_assigned_group", ""),

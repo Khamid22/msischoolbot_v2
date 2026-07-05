@@ -1,5 +1,7 @@
 / | GET
 /academic-director | GET
+/academic-director/api/head-of-departments | POST
+/academic-director/teacher-academy | GET
 /academic_director | GET
 /admin | GET
 /admin/academic/groups | POST
@@ -102,6 +104,8 @@
 /dashboard/{student_id}/resources | GET
 /docs | GET,HEAD
 /docs/oauth2-redirect | GET,HEAD
+/head-of-department | GET
+/head-of-department/teacher-academy | GET
 /hr | GET
 /hr-manager | GET
 /login | POST

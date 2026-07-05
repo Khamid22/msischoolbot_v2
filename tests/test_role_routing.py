@@ -38,6 +38,7 @@ def _patch_workspace_cards(monkeypatch):
     import backend.roles.ceo.routes as ceo_routes
     import backend.roles.customer_support.routes as customer_support_routes
     import backend.roles.hr_manager.routes as hr_manager_routes
+    import backend.roles.head_of_department.routes as head_of_department_routes
 
     monkeypatch.setattr(
         ceo_routes,
@@ -59,6 +60,11 @@ def _patch_workspace_cards(monkeypatch):
         "hr_manager_workspace_cards",
         lambda: [{"label": "Teachers", "value": "3"}],
     )
+    monkeypatch.setattr(
+        head_of_department_routes,
+        "head_of_department_workspace_cards",
+        lambda: [{"label": "Subject Scope", "value": "1"}],
+    )
 
 
 @pytest.mark.parametrize(
@@ -69,6 +75,7 @@ def _patch_workspace_cards(monkeypatch):
         ("hr", "hr_manager", "/hr", "HR Manager"),
         ("sales", "customer_support", "/support", "Customer Support"),
         ("academic-director", "academic_director", "/academic-director", "Academic Director"),
+        ("hod", "head_of_department", "/head-of-department", "Head of Department"),
         ("teacher", "teacher", "/teacher", "Teacher"),
         ("parent", "parent", "/parent", "Parent"),
     ],
@@ -98,6 +105,7 @@ def test_customer_support_permission_alias():
         ("hr_manager", "/hr", "hr-home"),
         ("customer_support", "/support", "support-home"),
         ("academic_director", "/academic-director", "academic-director-home"),
+        ("head_of_department", "/head-of-department", "head-of-department-home"),
         ("parent", "/parent", "parent-home"),
     ],
 )

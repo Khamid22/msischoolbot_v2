@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Eye, GraduationCap, Plus, Trophy, X, XCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCategories, ToastTone } from "./shared";
 
 type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
+type GeneratedCredentials = Record<string, unknown>;
 
 const TARGET_LESSONS = 12;
 
@@ -102,6 +104,29 @@ function academyAssessments(teacher: AcademyTeacher) {
   return Array.isArray(teacher.assessments) ? teacher.assessments as Record<string, unknown>[] : [];
 }
 
+function subjectOptionsFromState(state: any) {
+  const subjects = Array.isArray(state.props?.adminAcademicSubjects)
+    ? state.props.adminAcademicSubjects as Array<Record<string, unknown>>
+    : [];
+  const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
+    ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+    : [];
+  const byId = new Map<number, string>();
+  subjects.forEach((subject) => {
+    const id = asNumber(subject.id || subject.subject_id || subject.subjectId);
+    const label = asString(subject.name || subject.subject_name || subject.subjectName || subject.subject);
+    if (id && label) byId.set(id, label);
+  });
+  programs.forEach((program) => {
+    const id = asNumber(program.subject_id || program.subjectId);
+    const label = asString(program.subject_name || program.subjectName || program.subject);
+    if (id && label && !byId.has(id)) byId.set(id, label);
+  });
+  return Array.from(byId.entries())
+    .map(([id, label]) => ({ id, label }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
 function metric(label: string, value: string | number, detail: string) {
   return (
     <div className="rounded-lg border border-foreground/8 bg-background px-3 py-2.5">
@@ -109,6 +134,59 @@ function metric(label: string, value: string | number, detail: string) {
       <p className="mt-1 text-xl font-bold leading-none">{value}</p>
       <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
     </div>
+  );
+}
+
+function NewHeadOfDepartmentModal({
+  state,
+  submitting,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  state: any;
+  submitting: boolean;
+  error: string;
+  onSubmit: (fields: Record<string, string>) => void;
+  onClose: () => void;
+}) {
+  const subjects = subjectOptionsFromState(state);
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const fields: Record<string, string> = {};
+    data.forEach((value, key) => {
+      fields[key] = String(value);
+    });
+    onSubmit(fields);
+  }
+
+  return (
+    <ModalShell title="New Head of Department" subtitle="Create subject-scoped Teacher Academy access." onClose={onClose}>
+      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <label className="block">
+          <FieldLabel>Display Name</FieldLabel>
+          <input name="hod_display_name" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="Head of Math Department" />
+        </label>
+        <label className="block">
+          <FieldLabel>Subject Scope</FieldLabel>
+          <select name="hod_subject_id" required defaultValue="" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+            <option value="" disabled>Select subject</option>
+            {subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="rounded-lg border border-primary/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+          Login and temporary password will be generated automatically in HOD0001 format.
+        </div>
+        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create HOD" />
+      </form>
+    </ModalShell>
   );
 }
 
@@ -677,9 +755,21 @@ function ModalShell({
   onClose: () => void;
   wide?: boolean;
 }) {
+  const panelRef = useDismissibleLayer<HTMLDivElement>({
+    onDismiss: onClose,
+  });
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:p-4">
-      <div className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover animate-in zoom-in-95 slide-in-from-bottom-2 duration-150 motion-reduce:animate-none ${wide ? "max-w-6xl" : "max-w-2xl"}`}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        ref={panelRef}
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover animate-in zoom-in-95 slide-in-from-bottom-2 duration-150 motion-reduce:animate-none ${wide ? "max-w-6xl" : "max-w-2xl"}`}
+      >
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-bold">{title}</h3>
@@ -727,6 +817,8 @@ export function TeacherAcademyPanel({
 }) {
   const csrf = asString(state.props?.csrfToken);
   const [createOpen, setCreateOpen] = useState(false);
+  const [hodOpen, setHodOpen] = useState(false);
+  const [credentials, setCredentials] = useState<GeneratedCredentials | null>(null);
   const [detailTeacher, setDetailTeacher] = useState<AcademyTeacher | null>(null);
   const [assignment, setAssignment] = useState<AcademyAssignment | null>(null);
   const [assessmentTarget, setAssessmentTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
@@ -774,8 +866,11 @@ export function TeacherAcademyPanel({
     }
     applyPayload(data);
     showToast(asString(data.message) || successMessage);
-    return true;
+    return data;
   }
+
+  const adminMode = asString(state.adminMode || state.props?.adminMode).toLowerCase();
+  const canCreateHeadOfDepartment = adminMode === "academic_director" || asString(state.props?.authRole).toLowerCase() === "academic_director";
 
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
     const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
@@ -808,13 +903,37 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onSubmit={async (fields) => {
-            if (await submit(routes.adminTeacherAcademyCreate, fields, "Academy teacher created.")) {
+            const result = await submit(routes.adminTeacherAcademyCreate, fields, "Academy teacher created.");
+            if (result) {
+              if (typeof result === "object" && result.credentials && typeof result.credentials === "object") {
+                setCredentials(result.credentials as GeneratedCredentials);
+              }
               setCreateOpen(false);
             }
           }}
           onClose={() => {
             setError("");
             setCreateOpen(false);
+          }}
+        />
+      ) : null}
+      {hodOpen ? (
+        <NewHeadOfDepartmentModal
+          state={state}
+          submitting={submitting}
+          error={error}
+          onSubmit={async (fields) => {
+            const result = await submit(routes.academicDirectorHeadOfDepartmentCreate, fields, "Head of Department account created.");
+            if (result) {
+              if (typeof result === "object" && result.credentials && typeof result.credentials === "object") {
+                setCredentials(result.credentials as GeneratedCredentials);
+              }
+              setHodOpen(false);
+            }
+          }}
+          onClose={() => {
+            setError("");
+            setHodOpen(false);
           }}
         />
       ) : null}
@@ -898,19 +1017,57 @@ export function TeacherAcademyPanel({
         className="flex min-h-0 flex-1 flex-col"
         bodyClassName="flex min-h-0 flex-1 flex-col"
         headerActions={
-          <button
-            type="button"
-            onClick={() => {
-              setError("");
-              setCreateOpen(true);
-            }}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"
-          >
-            <Plus className="h-4 w-4" />
-            New Academy Teacher
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {canCreateHeadOfDepartment ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setHodOpen(true);
+                }}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold text-foreground hover:bg-muted"
+              >
+                <Plus className="h-4 w-4" />
+                New HOD
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setCreateOpen(true);
+              }}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"
+            >
+              <Plus className="h-4 w-4" />
+              New Academy Teacher
+            </button>
+          </div>
         }
       >
+        {credentials ? (
+          <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide">Generated credentials</p>
+                <p className="mt-1 text-sm font-bold">{asString(credentials.display_name) || "New account"} · {asString(credentials.subject_name) || asString(credentials.role)}</p>
+              </div>
+              <button type="button" onClick={() => setCredentials(null)} className="rounded-lg px-2 py-1 text-xs font-bold hover:bg-emerald-100">
+                Dismiss
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg bg-white/70 px-3 py-2">
+                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Login</p>
+                <p className="font-mono text-sm font-black">{asString(credentials.login) || asString(credentials.teacher_code)}</p>
+              </div>
+              <div className="rounded-lg bg-white/70 px-3 py-2">
+                <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Temporary password</p>
+                <p className="font-mono text-sm font-black">{asString(credentials.temporary_password)}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div className="mb-3 grid shrink-0 gap-2 sm:grid-cols-4">
           {metric("Academy Teachers", stats.total, "training records")}
           {metric("In Training", stats.inTraining, "active training paths")}

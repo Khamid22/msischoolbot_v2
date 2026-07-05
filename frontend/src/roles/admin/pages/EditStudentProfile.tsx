@@ -6,6 +6,7 @@ import { UserAvatar } from "@/shared/ui/Avatar";
 import { FormAlert } from "@/shared/ui/PortalCard";
 import { asNumber, getStudentCode, getStudentRowId } from "../shared";
 import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 interface StudentProfile {
   id: number;
@@ -60,6 +61,11 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
   const student = props.student || { id: 0 };
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(student.photo_url || "");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  useDismissibleLayer({
+    enabled: passwordModalOpen,
+    onDismiss: () => setPasswordModalOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const [parentInviteUrl, setParentInviteUrl] = useState("");
   const [parentInviteCopied, setParentInviteCopied] = useState(false);
   const [parentInviteError, setParentInviteError] = useState("");

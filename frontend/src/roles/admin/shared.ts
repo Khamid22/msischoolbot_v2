@@ -36,7 +36,8 @@ export type AdminMode =
   | "teacher"
   | "student"
   | "parent"
-  | "academic_director";
+  | "academic_director"
+  | "head_of_department";
 
 export interface ResourceUploadState {
   active: boolean;
@@ -196,6 +197,12 @@ export const adminModeProfiles: Record<
     description: "Teachers, groups, curriculum, timetable, quality, and student risk.",
     tabs: ["teachers", "groups", "schedule", "curriculum", "gradebook", "office_hours", "career_growth"],
   },
+  head_of_department: {
+    label: "Head of Department",
+    shortLabel: "HOD",
+    description: "Subject-scoped Teacher Academy management and teacher journeys.",
+    tabs: ["teachers", "schedule", "curriculum", "career_growth"],
+  },
 };
 
 export const adminModes: AdminMode[] = [
@@ -207,6 +214,7 @@ export const adminModes: AdminMode[] = [
   "student",
   "parent",
   "academic_director",
+  "head_of_department",
 ];
 
 export function normalizeAdminMode(value: unknown): AdminMode {
@@ -219,6 +227,9 @@ export function normalizeAdminMode(value: unknown): AdminMode {
     customer_support: "customer_support",
     customer_support_manager: "customer_support",
     academicdirector: "academic_director",
+    hod: "head_of_department",
+    head: "head_of_department",
+    headofdepartment: "head_of_department",
   };
   const aliased = aliases[normalized] || aliases[normalized.replace(/_/g, "")] || normalized;
   return aliased in adminModeProfiles ? (aliased as AdminMode) : "admin";

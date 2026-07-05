@@ -4,6 +4,7 @@ import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/A
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type SubjectOption = {
   id: number;
@@ -89,6 +90,11 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
 
   // Modal / Booking States
   const [bookingSlot, setBookingSlot] = useState<Availability | null>(null);
+  useDismissibleLayer({
+    enabled: Boolean(bookingSlot),
+    onDismiss: () => setBookingSlot(null),
+    dismissOnOutsidePointer: false,
+  });
   const [studentTopicRequest, setStudentTopicRequest] = useState<string>("");
   const [studentNote, setStudentNote] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");

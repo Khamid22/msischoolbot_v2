@@ -27,6 +27,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { FormAlert } from "@/shared/ui/PortalCard";
 import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import {
   AdminMode,
   AdminPageProps,
@@ -818,6 +819,19 @@ function AdminSidebar({
 
 export default function AdminPage(props: AdminPageProps) {
   const state = useAdminState(props);
+  useDismissibleLayer({
+    enabled: Boolean(state.editingResource),
+    onDismiss: () => {
+      state.setEditingResource(null);
+      state.setEditError("");
+    },
+    dismissOnOutsidePointer: false,
+  });
+  useDismissibleLayer({
+    enabled: Boolean(state.mobileNavOpen),
+    onDismiss: () => state.setMobileNavOpen(false),
+    dismissOnOutsidePointer: false,
+  });
   const allTeacherRows = rowsFrom(Array.isArray(state.teachers) ? state.teachers : state.props.adminTeachers);
   const allAcademyTeacherRows = rowsFrom(Array.isArray(state.academyTeachers) ? state.academyTeachers : state.props.adminTeacherAcademy);
   const allTeacherPreviewRows = teacherPreviewRows(allTeacherRows, allAcademyTeacherRows);

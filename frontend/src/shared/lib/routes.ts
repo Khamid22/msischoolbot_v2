@@ -28,6 +28,7 @@ export const routes = {
   adminTeacherCandidateEventDelete: (candidateId: number | string, eventId: number | string) =>
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/delete`,
   adminTeacherAcademyCreate: "/admin/teacher-academy",
+  academicDirectorHeadOfDepartmentCreate: "/academic-director/api/head-of-departments",
   adminTeacherAcademyAssignment: (assignmentId: number | string) =>
     `/admin/teacher-academy/assignments/${assignmentId}`,
   adminTeacherAcademyAssessment: (academyTeacherId: number | string) =>
