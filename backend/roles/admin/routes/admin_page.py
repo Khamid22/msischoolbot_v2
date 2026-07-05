@@ -18,6 +18,7 @@ from backend.roles.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
 )
+from backend.roles.admin.system_admin_cards import system_admin_workspace_cards
 from backend.utils.session import (
     current_auth_login,
     current_auth_role,
@@ -109,6 +110,7 @@ def register_admin_page_routes(
         )
         academic_context = list_admin_academic_context()
         announcements = list_announcements()
+        admin_system_cards = system_admin_workspace_cards()
 
         panel = page_context["panel"]
         school_filter = page_context["school_filter"]
@@ -169,6 +171,7 @@ def register_admin_page_routes(
                 "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
                 "adminAcademicEnrollmentSummary": academic_context.get("enrollment_summary", {}),
                 "adminAnnouncements": announcements,
+                "systemAdminCards": admin_system_cards,
                 "csrfToken": generate_csrf(),
             },
             title="MSI Admin Panel",

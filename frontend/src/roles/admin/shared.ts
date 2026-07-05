@@ -88,6 +88,7 @@ export interface AdminPageProps {
   adminAcademicSchedules?: Array<Record<string, unknown>>;
   adminAcademicSessions?: Array<Record<string, unknown>>;
   adminAnnouncements?: Array<Record<string, unknown>>;
+  systemAdminCards?: Array<Record<string, unknown>>;
   csrfToken?: string;
 }
 

@@ -262,6 +262,51 @@ function rowsFrom(value: unknown) {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
 }
 
+type SystemAdminCard = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+};
+
+function normalizeSystemAdminCards(value: unknown): SystemAdminCard[] {
+  return rowsFrom(value)
+    .map((card) => ({
+      label: asString(card.label),
+      value: asString(card.value),
+      detail: asString(card.detail),
+      tone: asString(card.tone),
+    }))
+    .filter((card) => card.label && card.value);
+}
+
+function systemAdminCardIcon(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("active")) return <UserRound className="h-4 w-4" />;
+  if (normalized.includes("pending")) return <UserPlus className="h-4 w-4" />;
+  if (normalized.includes("telegram")) return <MessageSquare className="h-4 w-4" />;
+  if (normalized.includes("audit") || normalized.includes("settings")) return <LayoutDashboard className="h-4 w-4" />;
+  return <Users className="h-4 w-4" />;
+}
+
+function SystemAdminCardRow({ cards }: { cards: SystemAdminCard[] }) {
+  if (!cards.length) return null;
+  return (
+    <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      {cards.map((card) => (
+        <div key={`${card.label}-${card.value}`} className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            {systemAdminCardIcon(card.label)}
+            <span className="min-w-0 break-words">{card.label}</span>
+          </div>
+          <p className={`mt-2 break-words text-xl font-black leading-none ${card.tone || "text-foreground"}`}>{card.value}</p>
+          <p className="mt-1 break-words text-xs text-muted-foreground">{card.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function activeTeacherRowsFor(state: any) {
   const teachers = rowsFrom(Array.isArray(state.teachers) ? state.teachers : state.props?.adminTeachers);
   const selectedKey = asString(state.teacherPreviewKey);
@@ -814,6 +859,11 @@ export default function AdminPage(props: AdminPageProps) {
     state.visibleTabs.find((tab: { key: string; label: string }) => tab.key === state.activeTab)?.label ||
     tabs.find((tab) => tab.key === state.activeTab)?.label ||
     "Overview";
+  const systemAdminCards = normalizeSystemAdminCards(props.systemAdminCards);
+  const showSystemAdminCards =
+    systemAdminCards.length > 0 &&
+    state.activeTab === "overview" &&
+    asString(state.adminMode).toLowerCase() === "admin";
 
   useEffect(() => {
     if (!state.mobileNavOpen) {
@@ -919,6 +969,8 @@ export default function AdminPage(props: AdminPageProps) {
             onSelect={selectTeacherPreview}
           />
         ) : null}
+
+        {showSystemAdminCards ? <SystemAdminCardRow cards={systemAdminCards} /> : null}
 
         {state.resourceUploadState.active && state.activeTab !== "resources" ? (
           <div className="mb-4 rounded-lg border border-foreground/10 bg-surface px-4 py-3 shadow-card">
