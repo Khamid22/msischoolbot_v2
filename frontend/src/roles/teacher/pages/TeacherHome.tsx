@@ -111,6 +111,13 @@ type AcademyTeacher = {
   };
 };
 
+type WorkspaceCard = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+};
+
 type TeacherPageProps = {
   authLogin?: string;
   csrfToken?: string;
@@ -120,6 +127,7 @@ type TeacherPageProps = {
   journey?: AcademyAssignment[];
   lessonReports?: AcademyAssessment[];
   trainingTimetable?: AcademyAssignment[];
+  workspaceCards?: WorkspaceCard[];
 };
 
 type TabKey = "home" | "reports" | "timetable" | "career" | "updates";
@@ -212,6 +220,14 @@ function reportRows(reports: AcademyAssessment[]) {
       name: report.lesson_number || `Report ${index + 1}`,
       score: Number(asNumber(report.weighted_overall_score).toFixed(1)),
     }));
+}
+
+function workspaceCardIcon(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("resource")) return <BookOpen className="h-4 w-4" />;
+  if (normalized.includes("attendance") || normalized.includes("homework")) return <Activity className="h-4 w-4" />;
+  if (normalized.includes("group") || normalized.includes("student")) return <Users className="h-4 w-4" />;
+  return <CheckCircle2 className="h-4 w-4" />;
 }
 
 function MetricCard({
@@ -477,6 +493,32 @@ export default function TeacherHome(props: TeacherPageProps) {
   const groupAverage = average(groups.flatMap((group) => group.enrollments.map((enrollment) => enrollment.averageGrade)));
   const attendanceRate = countAttendance(groups);
   const isTraining = Boolean(academy);
+  const workspaceCards = Array.isArray(props.workspaceCards) ? props.workspaceCards : [];
+  const fallbackCards: WorkspaceCard[] = [
+    {
+      label: "Students",
+      value: String(totalStudents || "-"),
+      detail: "active group roster",
+    },
+    {
+      label: isTraining ? "Academy Lessons" : "Lessons",
+      value: String(isTraining ? assignedCount || "-" : totalLessons || "-"),
+      detail: isTraining ? `${assessedCount} assessed` : "recorded sessions",
+    },
+    {
+      label: isTraining ? "Average Score" : "Class AAP",
+      value: isTraining ? (progress?.average_score ? progress.average_score.toFixed(1) : "-") : groupAverage ? groupAverage.toFixed(1) : "-",
+      detail: isTraining ? "academy reports" : "student average",
+      tone: "text-blue-600",
+    },
+    {
+      label: isTraining ? "Passed" : "Attendance",
+      value: isTraining ? `${passedCount}/${targetLessons}` : attendanceRate ? `${attendanceRate}%` : "-",
+      detail: isTraining ? "training lessons" : "recorded attendance",
+      tone: "text-emerald-600",
+    },
+  ];
+  const summaryCards = workspaceCards.length ? workspaceCards : fallbackCards;
 
   return (
     <div className="app-min-height bg-slate-50 text-slate-900">
@@ -565,27 +607,16 @@ export default function TeacherHome(props: TeacherPageProps) {
         {activeTab === "home" ? (
           <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="Students" value={String(totalStudents || "-")} detail="active group roster" icon={<Users className="h-4 w-4" />} />
-              <MetricCard
-                label={isTraining ? "Academy Lessons" : "Lessons"}
-                value={String(isTraining ? assignedCount || "-" : totalLessons || "-")}
-                detail={isTraining ? `${assessedCount} assessed` : "recorded sessions"}
-                icon={<BookOpen className="h-4 w-4" />}
-              />
-              <MetricCard
-                label={isTraining ? "Average Score" : "Class AAP"}
-                value={isTraining ? (progress?.average_score ? progress.average_score.toFixed(1) : "-") : groupAverage ? groupAverage.toFixed(1) : "-"}
-                detail={isTraining ? "academy reports" : "student average"}
-                icon={<Star className="h-4 w-4" />}
-                tone="text-blue-600"
-              />
-              <MetricCard
-                label={isTraining ? "Passed" : "Attendance"}
-                value={isTraining ? `${passedCount}/${targetLessons}` : attendanceRate ? `${attendanceRate}%` : "-"}
-                detail={isTraining ? "training lessons" : "recorded attendance"}
-                icon={<Activity className="h-4 w-4" />}
-                tone="text-emerald-600"
-              />
+              {summaryCards.map((card) => (
+                <MetricCard
+                  key={`${card.label}-${card.value}`}
+                  label={card.label}
+                  value={card.value}
+                  detail={card.detail}
+                  icon={workspaceCardIcon(card.label)}
+                  tone={card.tone}
+                />
+              ))}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

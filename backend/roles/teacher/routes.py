@@ -2,6 +2,7 @@
 
 from backend.render import generate_csrf, render_react_page
 from backend.roles.teacher.services import build_teacher_workspace
+from backend.roles.teacher.workspace_cards import build_teacher_workspace_cards
 from backend.utils.response_helpers import redirect, jsonify
 from fastapi import APIRouter, Depends, Request
 
@@ -34,41 +35,71 @@ def register_teacher_page_routes(app):
     def teacher_home():
         teacher_id = current_teacher_id()
         teacher_staff_id = current_teacher_staff_id()
-        workspace = build_teacher_workspace(teacher_id, teacher_staff_id)
-        if not workspace:
-            return redirect("/")
+        try:
+            workspace = build_teacher_workspace(teacher_id, teacher_staff_id)
+        except Exception:
+            workspace = None
+        if not isinstance(workspace, dict):
+            workspace = {
+                "teacher": {
+                    "id": teacher_id or 0,
+                    "full_name": "",
+                    "login": current_auth_login(),
+                    "assigned_group": "",
+                    "category": "",
+                    "semester_stage": "",
+                    "performance_score": 0,
+                },
+                "groups": [],
+                "academy": None,
+                "journey": [],
+                "lesson_reports": [],
+                "training_timetable": [],
+            }
+        workspace_cards = build_teacher_workspace_cards(
+            teacher_id=teacher_id,
+            teacher_staff_id=teacher_staff_id,
+            workspace=workspace,
+        )
 
         # Get teacher's DB details for academic info (subject, etc.)
         from backend.identity.account_service import get_teacher_by_id
-        teacher_db = get_teacher_by_id(teacher_id)
+        try:
+            teacher_db = get_teacher_by_id(teacher_id) if teacher_id else None
+        except Exception:
+            teacher_db = None
 
         # Get list of subjects for teacher's options
-        from database import connect_auth_db, queries
+        from database import connect_auth_db
         subjects_options = []
-        with connect_auth_db() as conn:
-            rows = conn.execute(
-                """
-                SELECT DISTINCT s.id, s.subject_name AS name
-                FROM msi_v2.subjects s
-                LEFT JOIN msi_v2.teacher_subjects ts
-                  ON ts.subject_id = s.id
-                 AND ts.teacher_id = %s
-                 AND ts.status = 'active'
-                WHERE s.status = 'active'
-                  AND (
-                    EXISTS (
-                        SELECT 1
-                        FROM msi_v2.teacher_subjects assigned
-                        WHERE assigned.teacher_id = %s
-                          AND assigned.status = 'active'
-                    ) = false
-                    OR ts.teacher_id IS NOT NULL
-                  )
-                ORDER BY s.subject_name
-                """,
-                (teacher_id, teacher_id),
-            ).fetchall()
-            subjects_options = [dict(row) for row in rows]
+        try:
+            if teacher_id:
+                with connect_auth_db() as conn:
+                    rows = conn.execute(
+                        """
+                        SELECT DISTINCT s.id, s.subject_name AS name
+                        FROM msi_v2.subjects s
+                        LEFT JOIN msi_v2.teacher_subjects ts
+                          ON ts.subject_id = s.id
+                         AND ts.teacher_id = %s
+                         AND ts.status = 'active'
+                        WHERE s.status = 'active'
+                          AND (
+                            EXISTS (
+                                SELECT 1
+                                FROM msi_v2.teacher_subjects assigned
+                                WHERE assigned.teacher_id = %s
+                                  AND assigned.status = 'active'
+                            ) = false
+                            OR ts.teacher_id IS NOT NULL
+                          )
+                        ORDER BY s.subject_name
+                        """,
+                        (teacher_id, teacher_id),
+                    ).fetchall()
+                    subjects_options = [dict(row) for row in rows]
+        except Exception:
+            subjects_options = []
 
         return render_react_page(
             "teacher-home",
@@ -89,6 +120,7 @@ def register_teacher_page_routes(app):
                 "lessonReports": workspace.get("lesson_reports", []),
                 "trainingTimetable": workspace.get("training_timetable", []),
                 "subjectsOptions": subjects_options,
+                "workspaceCards": workspace_cards,
             },
         )
 
