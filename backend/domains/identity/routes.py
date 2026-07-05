@@ -19,6 +19,10 @@ from backend.identity.account_service import (
     verify_student_credentials,
     verify_teacher_credentials,
 )
+from backend.identity.account_auth_v2 import (
+    account_auth_v2_enabled,
+    authenticate_account_password,
+)
 from backend.identity.roles import dashboard_path_for_role
 from backend.utils.guards import unauthorized_response
 from backend.roles.parent.services import link_parent_via_invite, parent_from_telegram_user_id
@@ -195,6 +199,43 @@ def register_user_auth_routes(
 ):
     def render_admin_redirect_page(redirect_url):
         return render_admin_redirect(redirect_url)
+
+    def set_account_auth_v2_session(auth_result):
+        if not isinstance(auth_result, dict):
+            return False
+        session_payload = auth_result.get("session")
+        if not isinstance(session_payload, dict):
+            return False
+        auth_role = str(session_payload.get("auth_role") or "").strip()
+        if not auth_role:
+            return False
+
+        session.clear()
+        session.update(session_payload)
+        session.permanent = True
+        return True
+
+    def account_auth_v2_redirect_url(auth_result):
+        session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
+        if not isinstance(session_payload, dict):
+            return ""
+        canonical_role = str(
+            session_payload.get("account_role")
+            or session_payload.get("canonical_role")
+            or session_payload.get("auth_role")
+            or ""
+        ).strip()
+
+        if canonical_role == "student":
+            enrollment_id = session_payload.get("student_enrollment_id")
+            if enrollment_id:
+                return build_dashboard_url(
+                    enrollment_id,
+                    school=session_payload.get("student_school_code", ""),
+                )
+            return url_for("student.home")
+
+        return dashboard_path_for_role(canonical_role)
 
     @students.get("/admin")
     def admin_entry(request_obj: Request):
@@ -382,6 +423,21 @@ def register_user_auth_routes(
                 auth_error="Please enter both login and password.",
                 auth_login_input=login_value,
             ), 400)
+
+        if account_auth_v2_enabled():
+            auth_result = authenticate_account_password(login_value, password_value)
+            if not auth_result:
+                return with_status(render_login_page(
+                    auth_error="Invalid login or password.",
+                    auth_login_input=login_value,
+                ), 401)
+            if not set_account_auth_v2_session(auth_result):
+                return with_status(render_login_page(
+                    auth_error="Unable to initialize account session.",
+                    auth_login_input=login_value,
+                ), 500)
+            redirect_url = account_auth_v2_redirect_url(auth_result)
+            return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
 
         role_hint = detect_login_role(login_value)
 
