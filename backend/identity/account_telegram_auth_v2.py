@@ -1,8 +1,8 @@
 """Shared-account Telegram auth helpers for Phase 1C.
 
-This module expects an already HMAC-verified Telegram user id. It is not wired
-into ``/auth/telegram`` yet; it only resolves ``account_telegram_links`` and
-builds the same legacy-compatible session payloads used by password Auth V2.
+This module expects an already HMAC-verified Telegram user id. It resolves
+``account_telegram_links`` and builds the same legacy-compatible session
+payloads used by password Auth V2.
 """
 
 from __future__ import annotations

@@ -23,6 +23,7 @@ from backend.identity.account_auth_v2 import (
     account_auth_v2_enabled,
     authenticate_account_password,
 )
+from backend.identity.account_telegram_auth_v2 import authenticate_account_telegram
 from backend.identity.roles import dashboard_path_for_role
 from backend.utils.guards import unauthorized_response
 from backend.roles.parent.services import link_parent_via_invite, parent_from_telegram_user_id
@@ -237,6 +238,28 @@ def register_user_auth_routes(
 
         return dashboard_path_for_role(canonical_role)
 
+    def account_auth_v2_response_role(auth_result):
+        session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
+        if not isinstance(session_payload, dict):
+            return ""
+        return str(
+            session_payload.get("account_role")
+            or session_payload.get("canonical_role")
+            or session_payload.get("auth_role")
+            or ""
+        ).strip()
+
+    def record_account_auth_v2_student_activity(auth_result):
+        session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
+        if not isinstance(session_payload, dict) or session_payload.get("auth_role") != "student":
+            return
+        try:
+            student_db_id = int(session_payload.get("student_db_id"))
+        except (TypeError, ValueError):
+            student_db_id = 0
+        if student_db_id > 0:
+            record_student_activity(student_db_id)
+
     @students.get("/admin")
     def admin_entry(request_obj: Request):
         if current_auth_role() == "admin":
@@ -343,6 +366,23 @@ def register_user_auth_routes(
                 "redirect": dashboard_path_for_role("parent"),
             })
 
+        if account_auth_v2_enabled():
+            auth_result = authenticate_account_telegram(telegram_user_id)
+            if not auth_result:
+                return jsonify({"ok": True, "linked": False})
+            if not set_account_auth_v2_session(auth_result):
+                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
+
+            record_account_auth_v2_student_activity(auth_result)
+            redirect_url = account_auth_v2_redirect_url(auth_result)
+            response_role = account_auth_v2_response_role(auth_result)
+            return jsonify({
+                "ok": True,
+                "linked": True,
+                "role": response_role or current_auth_role(),
+                "redirect": redirect_url or dashboard_url_for_current_session() or url_for("student.home"),
+            })
+
         teacher = get_teacher_by_telegram_user_id(telegram_user_id)
         if teacher:
             if not set_teacher_session(teacher):
@@ -436,14 +476,7 @@ def register_user_auth_routes(
                     auth_error="Unable to initialize account session.",
                     auth_login_input=login_value,
                 ), 500)
-            session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
-            if isinstance(session_payload, dict) and session_payload.get("auth_role") == "student":
-                try:
-                    student_db_id = int(session_payload.get("student_db_id"))
-                except (TypeError, ValueError):
-                    student_db_id = 0
-                if student_db_id > 0:
-                    record_student_activity(student_db_id)
+            record_account_auth_v2_student_activity(auth_result)
             redirect_url = account_auth_v2_redirect_url(auth_result)
             return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
 
