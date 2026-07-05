@@ -1,4 +1,4 @@
-const CACHE_VERSION = "msi-mobile-v29";
+const CACHE_VERSION = "msi-mobile-v30";
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 
 self.addEventListener("install", (event) => {

@@ -44,6 +44,23 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     if request_path == "/" or request_path.startswith("/dashboard/"):
         return _CACHE_NO_STORE
 
+    role_page_prefixes = (
+        "/academic-director",
+        "/academic_director",
+        "/admin",
+        "/ceo",
+        "/hr",
+        "/support",
+        "/teacher",
+        "/parent",
+        "/student",
+        "/head-of-department",
+    )
+    if request_path in role_page_prefixes or request_path.startswith(
+        tuple(f"{prefix}/" for prefix in role_page_prefixes)
+    ):
+        return _CACHE_NO_STORE
+
     if request_path.startswith("/api/") or request_path.startswith("/admin/api/"):
         return _CACHE_NO_STORE
 

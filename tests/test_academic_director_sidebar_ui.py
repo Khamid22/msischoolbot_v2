@@ -124,6 +124,7 @@ def test_academic_director_home_bootstrap_keeps_cards_and_profile_context(client
     response = client.get("/academic-director")
 
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store, max-age=0"
     assert 'data-react-page="academic-director-home"' in response.text
     assert 'data-react-page="admin-home"' not in response.text
     assert "Academic Director Dashboard" in response.text
@@ -143,6 +144,7 @@ def test_academic_director_teacher_academy_route_still_loads(client, monkeypatch
     response = client.get("/academic-director/teacher-academy")
 
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store, max-age=0"
     assert 'data-react-page="academic-director-academy"' in response.text
     assert "academic_director" in response.text
     assert "Student mode" not in response.text
@@ -168,6 +170,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'label: "Academy"' in source
     assert "Head of Departments" in source
     assert "Open Teacher Academy" in source
+    assert 'const academicDirectorAcademy = "/academic-director/teacher-academy";' in source
+    assert 'const academicDirectorProfile = "/academic-director#academic-director-profile";' in source
     assert "/academic-director/teacher-academy" in source
     assert "academic-director-profile" in source
     assert "action={routes.logout}" in source
