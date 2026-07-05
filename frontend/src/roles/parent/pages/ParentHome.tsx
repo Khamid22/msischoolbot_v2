@@ -20,6 +20,13 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+type WorkspaceCard = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: string;
+};
+
 function childName(child: Record<string, unknown>): string {
   return (
     asString(child.student_full_name) ||
@@ -64,6 +71,27 @@ function money(value: unknown, currency: string) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return `0 ${currency}`;
   return `${Math.round(parsed).toLocaleString()} ${currency}`;
+}
+
+function workspaceCardIcon(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("payment")) return <CreditCard className="h-4 w-4" />;
+  if (normalized.includes("support")) return <UserRound className="h-4 w-4" />;
+  if (normalized.includes("progress") || normalized.includes("attendance")) return <TrendingUp className="h-4 w-4" />;
+  return <GraduationCap className="h-4 w-4" />;
+}
+
+function WorkspaceSummaryCard({ card }: { card: WorkspaceCard }) {
+  return (
+    <div className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {workspaceCardIcon(card.label)}
+        <span className="min-w-0 break-words">{card.label}</span>
+      </div>
+      <p className={`mt-2 break-words text-xl font-bold leading-none ${card.tone || "text-foreground"}`}>{card.value}</p>
+      <p className="mt-1 break-words text-xs text-muted-foreground">{card.detail}</p>
+    </div>
+  );
 }
 
 function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
@@ -173,6 +201,14 @@ export default function ParentHome(props: Record<string, unknown>) {
   const logoutUrl = asString(props.logoutUrl) || "/logout";
   const csrfToken = asString(props.csrfToken);
   const children = asArray(props.parentChildren);
+  const workspaceCards = asArray(props.workspaceCards)
+    .map((card) => ({
+      label: asString(card.label),
+      value: asString(card.value),
+      detail: asString(card.detail),
+      tone: asString(card.tone),
+    }))
+    .filter((card) => card.label && card.value);
 
   async function handleLogout(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -216,6 +252,14 @@ export default function ParentHome(props: Record<string, unknown>) {
   return (
     <TelegramLayout topbar={topbar}>
       <div className="mx-auto w-full max-w-5xl py-4">
+        {workspaceCards.length ? (
+          <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {workspaceCards.map((card) => (
+              <WorkspaceSummaryCard key={`${card.label}-${card.value}`} card={card} />
+            ))}
+          </div>
+        ) : null}
+
         {children.length ? (
           <div className="space-y-4">
             <div className="mb-4">

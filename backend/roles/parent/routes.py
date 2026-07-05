@@ -20,6 +20,7 @@ from backend.roles.parent.services import (
     parent_can_access_student,
     resolve_parent_child_dashboard,
 )
+from backend.roles.parent.workspace_cards import build_parent_workspace_cards
 from backend.utils.telegram_auth import telegram_user_from_init_data
 from backend.utils.session import set_parent_session, url_for
 from backend.identity.parent_invites import get_parent_invite_token, load_parent_invite_payload
@@ -529,12 +530,18 @@ def build_render_parent_page():
             admin_id = 0
 
         children = []
+        children_for_cards = None
         try:
             children = list_parent_client_children(parent_id) if parent_id else []
             if not children and admin_id:
                 children = list_parent_children(admin_id)
+            children_for_cards = children
         except Exception:
             children = []
+        workspace_cards = build_parent_workspace_cards(
+            parent_id=parent_id,
+            children=children_for_cards,
+        )
 
         resources = []
         try:
@@ -557,6 +564,7 @@ def build_render_parent_page():
             {
                 "authLogin": auth_login,
                 "parentChildren": children,
+                "workspaceCards": workspace_cards,
                 "resourcesList": resources,
                 "adminAnnouncements": announcements,
                 "currentSchool": "all",
