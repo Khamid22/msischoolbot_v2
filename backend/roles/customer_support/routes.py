@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from backend.roles.role_home import render_role_home
+from backend.roles.workspace_counts import customer_support_workspace_cards
 from backend.utils.guards import require_role
 
 
@@ -17,11 +18,7 @@ def register_customer_support_page_routes(app):
             "customer_support",
             title="Customer Support Dashboard",
             description="Parent contacts, support tickets, payment follow-up, and student basics.",
-            cards=[
-                {"label": "Parent Search", "value": "Shell"},
-                {"label": "Payment Status", "value": "Placeholder"},
-                {"label": "Parent Invites", "value": "Placeholder"},
-            ],
+            cards=customer_support_workspace_cards(),
         )
 
     app.include_router(router)

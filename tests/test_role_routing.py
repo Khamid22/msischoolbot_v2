@@ -33,6 +33,34 @@ def _set_session(client, data):
     client.cookies.set("session", _signed_session(data))
 
 
+def _patch_workspace_cards(monkeypatch):
+    import backend.roles.academic_director.routes as academic_director_routes
+    import backend.roles.ceo.routes as ceo_routes
+    import backend.roles.customer_support.routes as customer_support_routes
+    import backend.roles.hr_manager.routes as hr_manager_routes
+
+    monkeypatch.setattr(
+        ceo_routes,
+        "ceo_workspace_cards",
+        lambda: [{"label": "Schools", "value": "2"}],
+    )
+    monkeypatch.setattr(
+        academic_director_routes,
+        "academic_director_workspace_cards",
+        lambda: [{"label": "Groups", "value": "8"}],
+    )
+    monkeypatch.setattr(
+        customer_support_routes,
+        "customer_support_workspace_cards",
+        lambda: [{"label": "Parents", "value": "4"}],
+    )
+    monkeypatch.setattr(
+        hr_manager_routes,
+        "hr_manager_workspace_cards",
+        lambda: [{"label": "Teachers", "value": "3"}],
+    )
+
+
 @pytest.mark.parametrize(
     ("raw_role", "normalized", "path", "label"),
     [
@@ -73,7 +101,8 @@ def test_customer_support_permission_alias():
         ("parent", "/parent", "parent-home"),
     ],
 )
-def test_role_home_routes_render_for_matching_role(client, role, path, page):
+def test_role_home_routes_render_for_matching_role(client, monkeypatch, role, path, page):
+    _patch_workspace_cards(monkeypatch)
     payload = {
         "auth_role": role,
         "auth_login": f"{role}@test",

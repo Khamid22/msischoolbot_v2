@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from backend.roles.role_home import render_role_home
+from backend.roles.workspace_counts import ceo_workspace_cards
 from backend.utils.guards import require_role
 
 
@@ -16,11 +17,7 @@ def register_ceo_page_routes(app):
             "ceo",
             title="CEO Dashboard",
             description="School performance, finance, staff health, and strategic decisions.",
-            cards=[
-                {"label": "Company Overview", "value": "Shell"},
-                {"label": "Payments Summary", "value": "Placeholder"},
-                {"label": "Academic Performance", "value": "Placeholder"},
-            ],
+            cards=ceo_workspace_cards(),
         )
 
     app.include_router(router)

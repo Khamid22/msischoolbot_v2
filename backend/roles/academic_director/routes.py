@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from backend.roles.role_home import render_role_home
+from backend.roles.workspace_counts import academic_director_workspace_cards
 from backend.utils.guards import require_role
 
 
@@ -17,11 +18,7 @@ def register_academic_director_page_routes(app):
             "academic_director",
             title="Academic Director Dashboard",
             description="Groups, teachers, subjects, attendance, and academic progress.",
-            cards=[
-                {"label": "Groups and Classes", "value": "Shell"},
-                {"label": "Attendance & AAP", "value": "Placeholder"},
-                {"label": "Exam Progress", "value": "Placeholder"},
-            ],
+            cards=academic_director_workspace_cards(),
         )
 
     app.include_router(router)

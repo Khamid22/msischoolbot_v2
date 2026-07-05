@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from backend.roles.role_home import render_role_home
+from backend.roles.workspace_counts import hr_manager_workspace_cards
 from backend.utils.guards import require_role
 
 
@@ -17,11 +18,7 @@ def register_hr_manager_page_routes(app):
             "hr_manager",
             title="HR Manager Dashboard",
             description="Teacher candidates, interviews, academy records, and staff profiles.",
-            cards=[
-                {"label": "Candidates", "value": "Shell"},
-                {"label": "Hiring Stages", "value": "Placeholder"},
-                {"label": "Teacher Academy", "value": "Placeholder"},
-            ],
+            cards=hr_manager_workspace_cards(),
         )
 
     app.include_router(router)
