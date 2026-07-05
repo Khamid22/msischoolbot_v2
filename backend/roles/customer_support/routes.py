@@ -18,9 +18,9 @@ def register_customer_support_page_routes(app):
             title="Customer Support Dashboard",
             description="Parent contacts, support tickets, payment follow-up, and student basics.",
             cards=[
-                {"label": "Tickets", "value": "Queue"},
-                {"label": "Parents", "value": "Contacts"},
-                {"label": "Payments", "value": "Follow-up"},
+                {"label": "Parent Search", "value": "Shell"},
+                {"label": "Payment Status", "value": "Placeholder"},
+                {"label": "Parent Invites", "value": "Placeholder"},
             ],
         )
 

@@ -16,11 +16,11 @@ def register_academic_director_page_routes(app):
             "academic-director-home",
             "academic_director",
             title="Academic Director Dashboard",
-            description="Teacher Academy, curriculum progress, lesson observations, and quality control.",
+            description="Groups, teachers, subjects, attendance, and academic progress.",
             cards=[
-                {"label": "Teacher Academy", "value": "Training"},
-                {"label": "Curriculum", "value": "Progress"},
-                {"label": "Reviews", "value": "Observations"},
+                {"label": "Groups and Classes", "value": "Shell"},
+                {"label": "Attendance & AAP", "value": "Placeholder"},
+                {"label": "Exam Progress", "value": "Placeholder"},
             ],
         )
 

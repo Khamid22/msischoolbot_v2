@@ -17,9 +17,9 @@ def register_ceo_page_routes(app):
             title="CEO Dashboard",
             description="School performance, finance, staff health, and strategic decisions.",
             cards=[
-                {"label": "Global Reports", "value": "Ready"},
-                {"label": "Finance Summary", "value": "Protected"},
-                {"label": "School Performance", "value": "Live"},
+                {"label": "Company Overview", "value": "Shell"},
+                {"label": "Payments Summary", "value": "Placeholder"},
+                {"label": "Academic Performance", "value": "Placeholder"},
             ],
         )
 

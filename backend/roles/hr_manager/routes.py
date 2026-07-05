@@ -18,9 +18,9 @@ def register_hr_manager_page_routes(app):
             title="HR Manager Dashboard",
             description="Teacher candidates, interviews, academy records, and staff profiles.",
             cards=[
-                {"label": "Candidates", "value": "Pipeline"},
-                {"label": "Teacher Academy", "value": "Training"},
-                {"label": "Profiles", "value": "Protected"},
+                {"label": "Candidates", "value": "Shell"},
+                {"label": "Hiring Stages", "value": "Placeholder"},
+                {"label": "Teacher Academy", "value": "Placeholder"},
             ],
         )
 
