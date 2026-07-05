@@ -436,6 +436,14 @@ def register_user_auth_routes(
                     auth_error="Unable to initialize account session.",
                     auth_login_input=login_value,
                 ), 500)
+            session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
+            if isinstance(session_payload, dict) and session_payload.get("auth_role") == "student":
+                try:
+                    student_db_id = int(session_payload.get("student_db_id"))
+                except (TypeError, ValueError):
+                    student_db_id = 0
+                if student_db_id > 0:
+                    record_student_activity(student_db_id)
             redirect_url = account_auth_v2_redirect_url(auth_result)
             return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
 

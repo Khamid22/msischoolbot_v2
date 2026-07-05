@@ -96,7 +96,7 @@ def test_flag_on_student_login_uses_accounts(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     _set_csrf_session(client)
-    calls = {}
+    calls = {"activity": []}
     monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
 
     def fake_auth(login, password):
@@ -113,12 +113,21 @@ def test_flag_on_student_login_uses_accounts(client, monkeypatch):
         )
 
     monkeypatch.setattr(identity_routes, "authenticate_account_password", fake_auth)
+    monkeypatch.setattr(
+        identity_routes,
+        "record_student_activity",
+        lambda student_id: calls["activity"].append(student_id),
+    )
 
     response = _post_login(client, "MSI00001")
 
     assert response.status_code == 302
     assert response.headers["location"] == "/dashboard/321?school=sehriyo"
-    assert calls == {"login": "MSI00001", "password": "correct-password"}
+    assert calls == {
+        "login": "MSI00001",
+        "password": "correct-password",
+        "activity": [1001],
+    }
 
 
 def test_flag_on_teacher_tch0001_login_uses_accounts(client, monkeypatch):

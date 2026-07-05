@@ -1,8 +1,7 @@
 """Shared-account password auth helpers for Phase 1C.
 
-This module is intentionally not wired into routes yet. It reads the Phase 1
-``msi_v2.accounts`` tables and builds legacy-compatible session payloads so the
-future feature-flagged cutover can keep existing dashboards working.
+This module reads the Phase 1 ``msi_v2.accounts`` tables and builds
+legacy-compatible session payloads for feature-flagged Auth V2 password login.
 """
 
 from __future__ import annotations
