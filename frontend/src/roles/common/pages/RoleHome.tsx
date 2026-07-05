@@ -5,6 +5,13 @@ import {
   LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
+import {
+  AcademicDirectorMobileNav,
+  AcademicDirectorProfileSection,
+  AcademicDirectorSidebar,
+  AcademicDirectorTeacherAcademyCta,
+  type AcademicDirectorNavKey,
+} from "@/roles/common/components/AcademicDirectorShell";
 
 interface RoleHomeCard {
   label?: string;
@@ -14,10 +21,13 @@ interface RoleHomeCard {
 
 interface RoleHomeProps {
   authLogin?: string;
+  authRole?: string;
+  role?: string;
   roleDisplayName?: string;
   title?: string;
   description?: string;
   cards?: RoleHomeCard[];
+  csrfToken?: string;
 }
 
 function MetricCard({ label, value, description }: Required<RoleHomeCard>) {
@@ -34,13 +44,114 @@ function MetricCard({ label, value, description }: Required<RoleHomeCard>) {
   );
 }
 
+function normalizeRoleName(value: string | undefined) {
+  return String(value || "").trim().toLowerCase().replace(/-/g, "_");
+}
+
+function currentAcademicDirectorNav(): AcademicDirectorNavKey {
+  if (typeof window === "undefined") return "home";
+  if (window.location.hash === "#academic-director-profile") return "profile";
+  if (window.location.pathname.includes("/teacher-academy")) return "academy";
+  return "home";
+}
+
+function AcademicDirectorHome({
+  authLogin,
+  roleDisplayName,
+  title,
+  description,
+  cards,
+  csrfToken,
+}: Required<Pick<RoleHomeProps, "roleDisplayName" | "title" | "description" | "cards">> &
+  Pick<RoleHomeProps, "authLogin" | "csrfToken">) {
+  const activeNav = currentAcademicDirectorNav();
+  const normalizedCards = cards.length
+    ? cards
+    : [
+        { label: "Groups", value: "Ready", description: "Academic groups are available." },
+        { label: "Teachers", value: "Ready", description: "Teacher records are available." },
+        { label: "Subjects", value: "Ready", description: "Subject records are available." },
+        { label: "Students", value: "Ready", description: "Student records are available." },
+      ];
+
+  return (
+    <div className="min-h-[var(--tg-viewport-height)] bg-background text-foreground">
+      <AcademicDirectorSidebar authLogin={authLogin} csrfToken={csrfToken} active={activeNav} />
+
+      <main className="min-h-[var(--tg-viewport-height)] px-4 pb-[calc(var(--app-bottom-inset)+5.75rem)] pt-5 sm:px-6 lg:ml-64 lg:px-8 lg:pb-8">
+        <section className="mx-auto flex max-w-6xl flex-col gap-5">
+          <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <LayoutDashboard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    {roleDisplayName}
+                  </p>
+                  <h1 className="mt-1 text-2xl font-black tracking-normal text-foreground">
+                    {title}
+                  </h1>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    {description}
+                  </p>
+                </div>
+              </div>
+              {authLogin ? (
+                <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  {authLogin}
+                </div>
+              ) : null}
+            </div>
+          </header>
+
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+            {normalizedCards.map((card) => (
+              <MetricCard
+                key={`${card.label || "card"}-${card.value || "value"}`}
+                label={card.label || "Status"}
+                value={card.value || "Ready"}
+                description={card.description || ""}
+              />
+            ))}
+          </div>
+
+          <AcademicDirectorTeacherAcademyCta />
+          <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+        </section>
+      </main>
+
+      <AcademicDirectorMobileNav active={activeNav} />
+    </div>
+  );
+}
+
 export function RoleHome({
   authLogin = "",
+  authRole = "",
+  role = "",
   roleDisplayName = "Workspace",
   title = "Workspace Dashboard",
   description = "Your role workspace is ready.",
   cards = [],
+  csrfToken = "",
 }: RoleHomeProps) {
+  const normalizedRole = normalizeRoleName(role || authRole);
+  if (normalizedRole === "academic_director") {
+    return (
+      <AcademicDirectorHome
+        authLogin={authLogin}
+        roleDisplayName={roleDisplayName}
+        title={title}
+        description={description}
+        cards={cards}
+        csrfToken={csrfToken}
+      />
+    );
+  }
+
   const normalizedCards = cards.length
     ? cards
     : [
