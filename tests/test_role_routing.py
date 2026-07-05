@@ -37,6 +37,7 @@ def _set_session(client, data):
     ("raw_role", "normalized", "path", "label"),
     [
         ("owner", "admin", "/admin", "Admin"),
+        ("system_admin", "system_admin", "/admin", "System Admin"),
         ("hr", "hr_manager", "/hr", "HR Manager"),
         ("sales", "customer_support", "/support", "Customer Support"),
         ("academic-director", "academic_director", "/academic-director", "Academic Director"),
@@ -52,7 +53,9 @@ def test_role_aliases_normalize_to_dashboard_paths(raw_role, normalized, path, l
 
 def test_admin_has_all_permissions():
     assert has_permission("admin", "view_global_reports") is True
+    assert has_permission("system_admin", "view_global_reports") is True
     assert has_permission("admin", "delete_the_moon") is True
+    assert has_permission("system_admin", "delete_the_moon") is True
 
 
 def test_customer_support_permission_alias():

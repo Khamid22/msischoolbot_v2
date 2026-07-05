@@ -4,6 +4,7 @@ from backend.identity.roles import normalize_role
 
 ROLE_PERMISSIONS = {
     "admin": {"*"},
+    "system_admin": {"*"},
     "ceo": {
         "view_global_reports",
         "view_finance_summary",

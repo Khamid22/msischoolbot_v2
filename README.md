@@ -48,9 +48,8 @@ web/frontend/src/
 ## Main Docs
 
 - `AGENTS.md` - rules for coding assistants
-- `docs/PROJECT_RULES.md` - human-friendly editing guide
+- `docs/README.md` - MSI LMS Portal documentation index
 - `docs/GLOSSARY.md` - naming rules for confusing concepts
-- `docs/performance.md` - scaling notes
 
 ## Run Locally
 

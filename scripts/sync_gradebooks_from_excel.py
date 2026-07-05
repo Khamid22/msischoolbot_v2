@@ -495,8 +495,10 @@ def sync_source_session(conn, *, group_id: int, source_key: str, session: Source
     return int(row["id"])
 
 
-def upsert_attendance(conn, *, lesson_session_id: int, group_id: int, student_id: int, status: str, apply: bool) -> str:
+def upsert_attendance(conn, *, lesson_session_id: int, group_id: int, student_id: int, status: str, apply: bool, clear_missing: bool = False) -> str:
     if not lesson_session_id:
+        return "skip"
+    if not status and not clear_missing:
         return "skip"
     if not apply:
         return "upsert" if status else "delete"
@@ -521,8 +523,10 @@ def upsert_attendance(conn, *, lesson_session_id: int, group_id: int, student_id
     return "delete"
 
 
-def upsert_homework(conn, *, lesson_session_id: int, group_id: int, student_id: int, score: float | None, apply: bool) -> str:
+def upsert_homework(conn, *, lesson_session_id: int, group_id: int, student_id: int, score: float | None, apply: bool, clear_missing: bool = False) -> str:
     if not lesson_session_id:
+        return "skip"
+    if score is None and not clear_missing:
         return "skip"
     if not apply:
         return "upsert" if score is not None else "delete"
@@ -547,7 +551,9 @@ def upsert_homework(conn, *, lesson_session_id: int, group_id: int, student_id: 
     return "delete"
 
 
-def upsert_exam(conn, *, group_id: int, student_id: int, program_item_id: int | None, exam: SourceExam, score: float | None, apply: bool) -> str:
+def upsert_exam(conn, *, group_id: int, student_id: int, program_item_id: int | None, exam: SourceExam, score: float | None, apply: bool, clear_missing: bool = False) -> str:
+    if score is None and not clear_missing:
+        return "skip"
     if not apply:
         return "upsert" if score is not None else "delete"
     if score is not None:
@@ -610,7 +616,7 @@ def source_key(*parts: Any) -> str:
     return "excel:" + ":".join(re.sub(r"[^a-z0-9]+", "-", normalize_key(part)).strip("-") for part in parts)
 
 
-def sync_sheet(conn, *, path: Path, school_key: str, sheet_name: str, group_name: str, subject_name: str, apply: bool) -> Counter:
+def sync_sheet(conn, *, path: Path, school_key: str, sheet_name: str, group_name: str, subject_name: str, apply: bool, clear_missing: bool = False) -> Counter:
     wb = load_workbook(path, read_only=False, data_only=True)
     try:
         ws = wb[sheet_name]
@@ -691,10 +697,10 @@ def sync_sheet(conn, *, path: Path, school_key: str, sheet_name: str, group_name
             session_id = session_ids.get(session.column, 0)
             for student, enrollment in matched_students:
                 status = normalize_attendance(ws.cell(student.row, session.attendance_col).value)
-                stats[f"attendance_{upsert_attendance(conn, lesson_session_id=session_id, group_id=int(group['id']), student_id=int(enrollment['student_id']), status=status, apply=apply)}"] += 1
+                stats[f"attendance_{upsert_attendance(conn, lesson_session_id=session_id, group_id=int(group['id']), student_id=int(enrollment['student_id']), status=status, apply=apply, clear_missing=clear_missing)}"] += 1
                 if session.homework_col:
                     score = parse_score(ws.cell(student.row, session.homework_col).value)
-                    stats[f"homework_{upsert_homework(conn, lesson_session_id=session_id, group_id=int(group['id']), student_id=int(enrollment['student_id']), score=score, apply=apply)}"] += 1
+                    stats[f"homework_{upsert_homework(conn, lesson_session_id=session_id, group_id=int(group['id']), student_id=int(enrollment['student_id']), score=score, apply=apply, clear_missing=clear_missing)}"] += 1
 
         for exam in exams:
             item = exam_items_by_order.get(exam.lesson_order) or exam_items_by_title.get(normalize_key(exam.label))
@@ -715,7 +721,7 @@ def sync_sheet(conn, *, path: Path, school_key: str, sheet_name: str, group_name
                 stats["exams_unmatched_program_item"] += 1
             for student, enrollment in matched_students:
                 score = parse_score(ws.cell(student.row, exam.column).value)
-                stats[f"exam_{upsert_exam(conn, group_id=int(group['id']), student_id=int(enrollment['student_id']), program_item_id=program_item_id, exam=exam, score=score, apply=apply)}"] += 1
+                stats[f"exam_{upsert_exam(conn, group_id=int(group['id']), student_id=int(enrollment['student_id']), program_item_id=program_item_id, exam=exam, score=score, apply=apply, clear_missing=clear_missing)}"] += 1
 
         print(
             f"{'APPLY' if apply else 'DRY'} {school_key}/{sheet_name}: "
@@ -731,6 +737,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="Write changes to the database.")
     parser.add_argument("--skip-online", action="store_true", help="Skip School 5 online sheet.")
+    parser.add_argument(
+        "--clear-missing",
+        action="store_true",
+        help="Delete existing attendance/homework/exam rows when the matching Excel cell is blank.",
+    )
     args = parser.parse_args()
 
     totals: Counter = Counter()
@@ -752,6 +763,7 @@ def main() -> int:
                         group_name=group_name,
                         subject_name=subject_name,
                         apply=args.apply,
+                        clear_missing=args.clear_missing,
                     )
                 )
         if args.apply:

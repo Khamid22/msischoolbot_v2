@@ -26,3 +26,8 @@ backend/static/js/bundles/
 frontend/dist/
 # Vite output — rebuilt at deploy (Dockerfile/nixpacks/railpack run npm run build)
 backend/static/react/
+
+# Migration reports may include private student, parent, or source-row details.
+migration_reports/*
+!migration_reports/*.redacted.md
+!migration_reports/README.md

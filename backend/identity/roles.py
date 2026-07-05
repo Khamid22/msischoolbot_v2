@@ -2,6 +2,7 @@
 
 VALID_ROLES = {
     "admin",
+    "system_admin",
     "ceo",
     "hr_manager",
     "customer_support",
@@ -13,6 +14,7 @@ VALID_ROLES = {
 
 ROLE_DASHBOARD_PATHS = {
     "admin": "/admin",
+    "system_admin": "/admin",
     "ceo": "/ceo",
     "hr_manager": "/hr",
     "customer_support": "/support",
@@ -24,6 +26,7 @@ ROLE_DASHBOARD_PATHS = {
 
 ROLE_DISPLAY_NAMES = {
     "admin": "Admin",
+    "system_admin": "System Admin",
     "ceo": "CEO",
     "hr_manager": "HR Manager",
     "customer_support": "Customer Support",
@@ -49,6 +52,10 @@ _ROLE_ALIASES = {
     "support": "customer_support",
     "sales": "customer_support",
     "ceo": "ceo",
+    "systemadmin": "system_admin",
+    "system-admin": "system_admin",
+    "system_admin": "system_admin",
+    "system admin": "system_admin",
     "admin": "admin",
     "owner": "admin",
     "student": "student",

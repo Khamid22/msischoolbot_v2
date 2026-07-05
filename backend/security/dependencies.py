@@ -24,6 +24,16 @@ def get_current_user_role() -> str:
     if auth_role == "teacher":
         return roles.ROLE_TEACHER
 
+    if auth_role in {
+        roles.ROLE_SYSTEM_ADMIN,
+        roles.ROLE_CEO,
+        roles.ROLE_HR_MANAGER,
+        roles.ROLE_CUSTOMER_SUPPORT,
+        roles.ROLE_PARENT,
+        roles.ROLE_ACADEMIC_DIRECTOR,
+    }:
+        return roles.normalize_role(auth_role)
+
     if auth_role == "admin":
         admin_role = session_utils.current_admin_role()
         if admin_role:
