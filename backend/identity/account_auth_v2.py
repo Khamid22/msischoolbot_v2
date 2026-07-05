@@ -6,17 +6,16 @@ legacy-compatible session payloads for feature-flagged Auth V2 password login.
 
 from __future__ import annotations
 
-import os
 from typing import Any, Callable
 
 from werkzeug.security import check_password_hash
 
+from backend.core.config import account_auth_v2_enabled
 from backend.identity.common import connect
 from backend.identity.roles import normalize_role
 from backend.utils.normalization import normalize_school_code
 
 
-ACCOUNT_AUTH_V2_TRUE_VALUES = {"1", "true", "yes", "on"}
 PASSWORD_LOGIN_ALLOWED_STATUS = "active"
 ACCOUNT_AUTH_ROLES = {
     "system_admin",
@@ -35,12 +34,6 @@ STAFF_ACCOUNT_ROLES = {
     "customer_support",
     "academic_director",
 }
-
-
-def account_auth_v2_enabled() -> bool:
-    raw_value = str(os.environ.get("ACCOUNT_AUTH_V2_ENABLED", "") or "").strip().casefold()
-    return raw_value in ACCOUNT_AUTH_V2_TRUE_VALUES
-
 
 def normalize_login(value: Any) -> str:
     return str(value or "").strip().casefold()
