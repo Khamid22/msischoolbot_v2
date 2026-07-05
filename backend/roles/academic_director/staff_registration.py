@@ -102,6 +102,148 @@ def _insert_or_update_hod_staff(
     return _to_int(row["id"]) if row else 0
 
 
+def _insert_or_update_staff_role(
+    conn: Any,
+    *,
+    login: str,
+    password_hash: str,
+    display_name: str,
+    role: str,
+    subject_scope: str = "",
+    now: str,
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO msi_v2.msi_staff (
+            login, password_hash, display_name, role, status, subject_scope,
+            created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, 'active', %s, %s::timestamptz, %s::timestamptz)
+        ON CONFLICT ((lower(login))) DO UPDATE SET
+            password_hash = excluded.password_hash,
+            display_name = excluded.display_name,
+            role = excluded.role,
+            status = 'active',
+            subject_scope = excluded.subject_scope,
+            updated_at = excluded.updated_at
+        RETURNING id
+        """,
+        (
+            login,
+            password_hash,
+            display_name,
+            role,
+            subject_scope,
+            now,
+            now,
+        ),
+    ).fetchone()
+    return _to_int(row["id"]) if row else 0
+
+
+def _upsert_staff_account(
+    conn: Any,
+    *,
+    staff_id: int,
+    login: str,
+    password_hash: str,
+    display_name: str,
+    role: str,
+    now: str,
+) -> int:
+    account = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.accounts
+        WHERE lower(btrim(login)) = lower(btrim(%s))
+           OR (legacy_source_table = 'msi_staff' AND legacy_source_id = %s)
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (login, staff_id),
+    ).fetchone()
+    if account:
+        account_id = _to_int(account["id"])
+        conn.execute(
+            """
+            UPDATE msi_v2.accounts
+            SET login = %s,
+                password_hash = %s,
+                role = %s,
+                status = 'active',
+                full_name = %s,
+                legacy_source_table = 'msi_staff',
+                legacy_source_id = %s,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (login, password_hash, role, display_name, staff_id, now, account_id),
+        )
+        return account_id
+
+    inserted = conn.execute(
+        """
+        INSERT INTO msi_v2.accounts (
+            login, password_hash, role, status, full_name,
+            legacy_source_table, legacy_source_id, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, 'active', %s, 'msi_staff', %s, %s::timestamptz, %s::timestamptz)
+        RETURNING id
+        """,
+        (login, password_hash, role, display_name, staff_id, now, now),
+    ).fetchone()
+    return _to_int(inserted["id"]) if inserted else 0
+
+
+def _upsert_staff_profile_role(
+    conn: Any,
+    *,
+    account_id: int,
+    staff_id: int,
+    job_title: str,
+    department: str,
+    now: str,
+) -> int:
+    profile = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.staff_profiles
+        WHERE account_id = %s OR staff_id = %s
+        ORDER BY id ASC
+        LIMIT 1
+        """,
+        (account_id, staff_id),
+    ).fetchone()
+    if profile:
+        profile_id = _to_int(profile["id"])
+        conn.execute(
+            """
+            UPDATE msi_v2.staff_profiles
+            SET account_id = %s,
+                staff_id = %s,
+                job_title = %s,
+                department = %s,
+                status = 'active',
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (account_id, staff_id, job_title, department, now, profile_id),
+        )
+        return profile_id
+
+    inserted = conn.execute(
+        """
+        INSERT INTO msi_v2.staff_profiles (
+            account_id, staff_id, job_title, department, status, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, 'active', %s::timestamptz, %s::timestamptz)
+        RETURNING id
+        """,
+        (account_id, staff_id, job_title, department, now, now),
+    ).fetchone()
+    return _to_int(inserted["id"]) if inserted else 0
+
+
 def _upsert_hod_account(conn: Any, *, staff_id: int, login: str, password_hash: str, display_name: str, now: str) -> int:
     account = conn.execute(
         """
@@ -227,6 +369,90 @@ def create_head_of_department_account(
         )
 
 
+def create_academic_director_account(
+    *,
+    login: str = "AD0001",
+    display_name: str = "Academic Director",
+    temporary_password: str = "",
+    commit: bool = True,
+) -> tuple[bool, str, dict[str, Any]]:
+    with queries.connect_auth_db() as conn:
+        return _create_academic_director_account(
+            conn,
+            login=login,
+            display_name=display_name,
+            temporary_password=temporary_password,
+            commit=commit,
+        )
+
+
+def _create_academic_director_account(
+    conn: Any,
+    *,
+    login: str = "AD0001",
+    display_name: str = "Academic Director",
+    temporary_password: str = "",
+    commit: bool = False,
+) -> tuple[bool, str, dict[str, Any]]:
+    if not _phase1_accounts_available(conn):
+        return False, "Shared accounts are not available. Apply Phase 1 account schema first.", {}
+
+    normalized_login = _text(login).upper() or "AD0001"
+    if not normalized_login.startswith("AD"):
+        return False, "Academic Director login must use AD0001 format.", {}
+    password = _text(temporary_password) or normalized_login
+    normalized_display_name = _text(display_name) or "Academic Director"
+    now = _utc_now_iso()
+    password_hash = generate_password_hash(password)
+
+    staff_id = _insert_or_update_staff_role(
+        conn,
+        login=normalized_login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="academic_director",
+        subject_scope="",
+        now=now,
+    )
+    if not staff_id:
+        return False, "Unable to create Academic Director staff row.", {}
+
+    account_id = _upsert_staff_account(
+        conn,
+        staff_id=staff_id,
+        login=normalized_login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="academic_director",
+        now=now,
+    )
+    if not account_id:
+        return False, "Unable to create Academic Director account.", {}
+
+    profile_id = _upsert_staff_profile_role(
+        conn,
+        account_id=account_id,
+        staff_id=staff_id,
+        job_title="Academic Director",
+        department="Academic Department",
+        now=now,
+    )
+    if not profile_id:
+        return False, "Unable to create Academic Director profile.", {}
+
+    if commit:
+        conn.commit()
+
+    return True, "", {
+        "role": "academic_director",
+        "login": normalized_login,
+        "temporary_password": password,
+        "display_name": normalized_display_name,
+        "account_id": account_id,
+        "staff_id": staff_id,
+    }
+
+
 def _create_head_of_department_account(
     conn: Any,
     *,
@@ -300,6 +526,8 @@ def _create_head_of_department_account(
 
 
 __all__ = [
+    "create_academic_director_account",
     "create_head_of_department_account",
+    "_create_academic_director_account",
     "_create_head_of_department_account",
 ]

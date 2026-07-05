@@ -101,6 +101,41 @@ def test_academic_director_hod_service_generates_hod_login_and_hashes_password()
         assert check_password_hash(password_hash, "HOD0001")
 
 
+def test_academic_director_bootstrap_generates_ad_login_and_hashes_password():
+    conn = _RegistrationConn()
+
+    created, error, credentials = staff_registration._create_academic_director_account(
+        conn,
+        login="AD0001",
+        display_name="Academic Director",
+        commit=True,
+    )
+
+    assert created is True
+    assert error == ""
+    assert credentials["login"] == "AD0001"
+    assert credentials["temporary_password"] == "AD0001"
+    assert credentials["role"] == "academic_director"
+    assert conn.committed is True
+
+    stored_passwords = [
+        params[1]
+        for sql, params in conn.params
+        if "INSERT INTO msi_v2.msi_staff" in sql or "INSERT INTO msi_v2.accounts" in sql
+    ]
+    assert stored_passwords
+    for password_hash in stored_passwords:
+        assert password_hash != "AD0001"
+        assert check_password_hash(password_hash, "AD0001")
+
+
+def test_ad_and_hod_staff_codes_use_staff_login_path():
+    from backend.identity.credentials import detect_login_role
+
+    assert detect_login_role("AD0001") == "admin"
+    assert detect_login_role("HOD0001") == "admin"
+
+
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
     import backend.roles.academic_director.routes as academic_routes
 

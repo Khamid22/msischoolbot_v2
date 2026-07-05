@@ -21,7 +21,11 @@ _ADMIN_PASSWORDLESS_LOGIN = False
 
 def detect_login_role(login):
     normalized = (login or "").strip().casefold()
-    if normalized == "admin" or normalized.startswith("staff"):
+    if (
+        normalized == "admin"
+        or normalized.startswith("staff")
+        or re.match(r"^(ad|hod)\d{4,}$", normalized)
+    ):
         return "admin"
     if normalized.startswith("tch") or re.match(r"^[a-z][a-z0-9]{1,11}t\d{1,6}$", normalized):
         return "teacher"
