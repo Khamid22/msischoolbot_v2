@@ -12,7 +12,7 @@ from backend.identity.account_service import (  # noqa: F401
 from backend.domains.academics.postgres_service import ensure_academic_schema
 from backend.domains.announcements.service import list_announcements
 from backend.roles.admin.services.academic_service import get_group_gradebook
-from backend.roles.admin.services.teacher_academy_service import (
+from backend.domains.teacher_academy.service import (
     get_academy_teacher_for_teacher_account,
 )
 from backend.roles.admin.services.teacher_candidate_service import (  # noqa: F401

@@ -2,6 +2,11 @@
 /academic-director | GET
 /academic-director/announcements | GET
 /academic-director/api/head-of-departments | POST
+/academic-director/api/teacher-academy | POST
+/academic-director/api/teacher-academy/assignments/{assignment_id} | POST
+/academic-director/api/teacher-academy/{academy_teacher_id}/assessments | POST
+/academic-director/api/teacher-academy/{academy_teacher_id}/promote | POST
+/academic-director/api/teacher-academy/{academy_teacher_id}/status | POST
 /academic-director/head-of-departments | GET
 /academic-director/profile | GET
 /academic-director/teacher-academy | GET
@@ -110,6 +115,9 @@
 /docs/oauth2-redirect | GET,HEAD
 /head-of-department | GET
 /head-of-department/announcements | GET
+/head-of-department/api/teacher-academy/assignments/{assignment_id} | POST
+/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments | POST
+/head-of-department/api/teacher-academy/{academy_teacher_id}/status | POST
 /head-of-department/profile | GET
 /head-of-department/teacher-academy | GET
 /head-of-department/timetable | GET

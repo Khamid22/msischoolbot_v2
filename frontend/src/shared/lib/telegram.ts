@@ -42,7 +42,13 @@ declare global {
 /** True only when running inside an actual Telegram client (not a plain browser). */
 function isRealTelegramClient(tg: TelegramWebApp): boolean {
   const platform = String(tg.platform || "unknown").toLowerCase();
-  return platform !== "" && platform !== "unknown";
+  return Boolean(tg.initData) || (platform !== "" && platform !== "unknown");
+}
+
+export function isTelegramMiniApp(): boolean {
+  if (typeof window === "undefined") return false;
+  const tg = window.Telegram?.WebApp;
+  return Boolean(tg && isRealTelegramClient(tg));
 }
 
 function safePixel(value: unknown): string {

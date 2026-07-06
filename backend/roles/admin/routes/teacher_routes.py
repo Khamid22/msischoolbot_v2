@@ -199,6 +199,7 @@ def register_admin_teacher_routes(
             return jsonify({"ok": False, "message": message}, status_code=status)
         return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), status)
 
+    # Compatibility route. Academic Director and HOD use their own API routes.
     @router.post("/admin/teacher-academy")
     def create_teacher_academy_route():
         if current_auth_role() == "head_of_department":
@@ -238,6 +239,7 @@ def register_admin_teacher_routes(
             return _academy_payload("Academy teacher created with selected Teacher Academy lessons.", credentials=safe_credentials)
         return render_admin_page(admin_notice="Academy teacher created.", admin_panel="teachers")
 
+    # Compatibility route. Academic Director and HOD use their own API routes.
     @router.post("/admin/teacher-academy/assignments/{assignment_id}")
     def update_teacher_academy_assignment_route(assignment_id: int):
         if not can_current_user_manage_academy_assignment(assignment_id):
@@ -258,6 +260,7 @@ def register_admin_teacher_routes(
             return _academy_payload("Academy lesson updated.")
         return render_admin_page(admin_notice="Academy lesson updated.", admin_panel="teachers")
 
+    # Compatibility route. Academic Director and HOD use their own API routes.
     @router.post("/admin/teacher-academy/{academy_teacher_id}/assessments")
     def add_teacher_academy_assessment_route(academy_teacher_id: int):
         if not can_current_user_manage_academy_teacher(academy_teacher_id):
@@ -284,6 +287,7 @@ def register_admin_teacher_routes(
             return _academy_payload("Assessment saved.")
         return render_admin_page(admin_notice="Assessment saved.", admin_panel="teachers")
 
+    # Compatibility route. Academic Director and HOD use their own API routes.
     @router.post("/admin/teacher-academy/{academy_teacher_id}/status")
     def update_teacher_academy_status_route(academy_teacher_id: int):
         if not can_current_user_manage_academy_teacher(academy_teacher_id):
@@ -298,6 +302,7 @@ def register_admin_teacher_routes(
             return _academy_payload("Academy status updated.")
         return render_admin_page(admin_notice="Academy status updated.", admin_panel="teachers")
 
+    # Compatibility route. Academic Director uses its own API route.
     @router.post("/admin/teacher-academy/{academy_teacher_id}/promote")
     def promote_teacher_academy_route(academy_teacher_id: int):
         if not can_current_user_manage_academy_teacher(academy_teacher_id):

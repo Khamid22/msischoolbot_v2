@@ -13,7 +13,14 @@ from backend.roles.academic_director.staff_registration import (
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
-from backend.roles.admin.services.teacher_academy_service import list_teacher_academy_page_context
+from backend.domains.teacher_academy.service import list_teacher_academy_page_context
+from backend.roles.common.teacher_academy_api import (
+    add_assessment_response,
+    create_academy_teacher_response,
+    promote_response,
+    update_assignment_response,
+    update_status_response,
+)
 from backend.utils.context import request
 from backend.utils.guards import require_role
 from backend.utils.performance import PagePerformanceTimer, log_page_performance
@@ -239,6 +246,38 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
                 },
             }
         )
+
+    @router.post("/academic-director/api/teacher-academy", operation_id="academic_director_create_academy_teacher")
+    def academic_director_create_academy_teacher_api():
+        return create_academy_teacher_response(created_by_label="Academic Director")
+
+    @router.post(
+        "/academic-director/api/teacher-academy/assignments/{assignment_id}",
+        operation_id="academic_director_update_academy_assignment",
+    )
+    def academic_director_update_academy_assignment_api(assignment_id: int):
+        return update_assignment_response(assignment_id)
+
+    @router.post(
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
+        operation_id="academic_director_add_academy_assessment",
+    )
+    def academic_director_add_academy_assessment_api(academy_teacher_id: int):
+        return add_assessment_response(academy_teacher_id, created_by_label="Academic Director")
+
+    @router.post(
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
+        operation_id="academic_director_update_academy_status",
+    )
+    def academic_director_update_academy_status_api(academy_teacher_id: int):
+        return update_status_response(academy_teacher_id)
+
+    @router.post(
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/promote",
+        operation_id="academic_director_promote_academy_teacher",
+    )
+    def academic_director_promote_academy_teacher_api(academy_teacher_id: int):
+        return promote_response(academy_teacher_id)
 
     app.include_router(router)
 

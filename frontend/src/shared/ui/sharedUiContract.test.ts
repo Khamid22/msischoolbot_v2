@@ -30,6 +30,7 @@ describe("uiLayers z-scale", () => {
 
 describe("RoleWorkspaceShell", () => {
   const src = source("RoleWorkspaceShell.tsx");
+  const telegramSrc = readFileSync(new URL("../lib/telegram.ts", import.meta.url), "utf8");
 
   it("renders sidebar, mobile nav, and a content slot", () => {
     assert.match(src, /<RoleSidebar/);
@@ -39,6 +40,26 @@ describe("RoleWorkspaceShell", () => {
 
   it("reserves bottom padding so the fixed mobile nav never overlaps content", () => {
     assert.match(src, /pb-\[calc\(var\(--app-bottom-inset\)\+/);
+  });
+
+  it("supports Telegram bottom nav and website mobile drawer modes", () => {
+    assert.match(src, /mobileNavigationMode = "auto"/);
+    assert.match(src, /isTelegramMiniApp/);
+    assert.match(src, /shouldUseBottomNav/);
+    assert.match(src, /shouldUseDrawer/);
+    assert.match(src, /<RoleMobileNav/);
+    assert.match(src, /Open .* navigation/);
+    assert.match(src, /role="dialog"/);
+    assert.match(src, /Close navigation drawer/);
+    assert.match(src, /bg-foreground\/60/);
+    assert.match(src, /useBodyScrollLock\(drawerOpen\)/);
+    assert.match(src, /"Escape"/);
+  });
+
+  it("keeps Telegram Mini App detection safe for browser builds", () => {
+    assert.match(telegramSrc, /export function isTelegramMiniApp/);
+    assert.match(telegramSrc, /typeof window === "undefined"/);
+    assert.match(telegramSrc, /window\.Telegram\?\.WebApp/);
   });
 });
 

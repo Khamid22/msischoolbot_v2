@@ -6,7 +6,7 @@ from backend.roles.head_of_department.academy_scope import (
     current_hod_subject_ids,
     filter_rows_by_subject_scope,
 )
-from backend.roles.admin.services.teacher_academy_service import list_academy_teachers
+from backend.domains.teacher_academy.service import list_academy_teachers
 
 
 def _placeholder_cards():

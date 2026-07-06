@@ -17,6 +17,13 @@ import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCatego
 type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
 type GeneratedCredentials = Record<string, unknown>;
+type TeacherAcademyActionRoutes = {
+  create: string;
+  assignmentUpdate: (assignmentId: number | string) => string;
+  assessmentCreate: (academyTeacherId: number | string) => string;
+  statusUpdate: (academyTeacherId: number | string) => string;
+  promote?: (academyTeacherId: number | string) => string;
+};
 
 const focusAreas = [
   "Teacher Guidance",
@@ -173,6 +180,34 @@ function subjectOptionsFromState(state: any) {
 
 function metric(label: string, value: string | number, detail: string) {
   return <MetricCard label={label} value={value} detail={detail} className="bg-background" />;
+}
+
+function teacherAcademyActionRoutes(adminMode: string, authRole: string): TeacherAcademyActionRoutes {
+  const roleMode = authRole || adminMode;
+  if (roleMode === "academic_director" || adminMode === "academic_director") {
+    return {
+      create: routes.academicDirectorTeacherAcademyCreate,
+      assignmentUpdate: routes.academicDirectorTeacherAcademyAssignmentUpdate,
+      assessmentCreate: routes.academicDirectorTeacherAcademyAssessmentCreate,
+      statusUpdate: routes.academicDirectorTeacherAcademyStatusUpdate,
+      promote: routes.academicDirectorTeacherAcademyPromote,
+    };
+  }
+  if (roleMode === "head_of_department" || adminMode === "head_of_department") {
+    return {
+      create: "",
+      assignmentUpdate: routes.headOfDepartmentTeacherAcademyAssignmentUpdate,
+      assessmentCreate: routes.headOfDepartmentTeacherAcademyAssessmentCreate,
+      statusUpdate: routes.headOfDepartmentTeacherAcademyStatusUpdate,
+    };
+  }
+  return {
+    create: routes.adminTeacherAcademyCreate,
+    assignmentUpdate: routes.adminTeacherAcademyAssignment,
+    assessmentCreate: routes.adminTeacherAcademyAssessment,
+    statusUpdate: routes.adminTeacherAcademyStatus,
+    promote: routes.adminTeacherAcademyPromote,
+  };
 }
 
 type AnalyticsRow = {
@@ -1320,6 +1355,7 @@ function AcademyDetailModal({
   onAssess,
   onPromote,
   allowTeacherPreview,
+  canPromote,
 }: {
   teacher: AcademyTeacher;
   onClose: () => void;
@@ -1328,6 +1364,7 @@ function AcademyDetailModal({
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
   allowTeacherPreview: boolean;
+  canPromote: boolean;
 }) {
   const assignments = academyAssignments(teacher);
   const assessments = academyAssessments(teacher);
@@ -1366,7 +1403,7 @@ function AcademyDetailModal({
                     Preview as Teacher
                   </button>
                 ) : null}
-                {asString(teacher.academy_status) === "ready_for_active_teacher" ? (
+                {canPromote && asString(teacher.academy_status) === "ready_for_active_teacher" ? (
                   <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
                     <Trophy className="h-3.5 w-3.5" />
                     Promote
@@ -1427,6 +1464,7 @@ function AcademyDetailModal({
 function AcademyTeacherCard({
   teacher,
   allowTeacherPreview,
+  canPromote,
   onPreview,
   onDetail,
   onSchedule,
@@ -1436,6 +1474,7 @@ function AcademyTeacherCard({
 }: {
   teacher: AcademyTeacher;
   allowTeacherPreview: boolean;
+  canPromote: boolean;
   onPreview: () => void;
   onDetail: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
@@ -1509,7 +1548,7 @@ function AcademyTeacherCard({
       onClick: onPreview,
     });
   }
-  if (status === "ready_for_active_teacher") {
+  if (canPromote && status === "ready_for_active_teacher") {
     secondaryActions.push(
       { separator: true, key: "promote-separator" },
       {
@@ -1724,8 +1763,10 @@ export function TeacherAcademyPanel({
 
   const adminMode = asString(state.adminMode || state.props?.adminMode).toLowerCase();
   const authRole = asString(state.props?.authRole).toLowerCase();
+  const academyApi = useMemo(() => teacherAcademyActionRoutes(adminMode, authRole), [adminMode, authRole]);
   const canCreateHeadOfDepartment = adminMode === "academic_director" || authRole === "academic_director";
   const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
 
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
     const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
@@ -1762,6 +1803,14 @@ export function TeacherAcademyPanel({
     }
   }
 
+  function openPromote(teacher: AcademyTeacher) {
+    if (!canPromoteAcademyTeacher) {
+      showToast("Promotion is available to Academic Director or Admin.", "danger");
+      return;
+    }
+    setPromoteTeacher(teacher);
+  }
+
   return (
     <>
       {createOpen ? (
@@ -1770,7 +1819,7 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onSubmit={async (fields) => {
-            const result = await submit(routes.adminTeacherAcademyCreate, fields, "Academy teacher created.");
+            const result = await submit(academyApi.create, fields, "Academy teacher created.");
             if (result) {
               if (typeof result === "object" && result.credentials && typeof result.credentials === "object") {
                 setCredentials(result.credentials as GeneratedCredentials);
@@ -1820,8 +1869,9 @@ export function TeacherAcademyPanel({
           }}
           onPromote={() => {
             setError("");
-            setPromoteTeacher(detailTeacher);
+            openPromote(detailTeacher);
           }}
+          canPromote={canPromoteAcademyTeacher}
         />
       ) : null}
       {scheduleTarget ? (
@@ -1832,7 +1882,7 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onSubmit={async (assignmentId, fields) => {
-            if (await submit(routes.adminTeacherAcademyAssignment(assignmentId), fields, "Academy lesson updated.")) {
+            if (await submit(academyApi.assignmentUpdate(assignmentId), fields, "Academy lesson updated.")) {
               setScheduleTarget(null);
             }
           }}
@@ -1850,7 +1900,7 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onSubmit={async (teacherId, fields) => {
-            if (await submit(routes.adminTeacherAcademyAssessment(teacherId), fields, "Assessment saved.")) {
+            if (await submit(academyApi.assessmentCreate(teacherId), fields, "Assessment saved.")) {
               setAssessmentTarget(null);
             }
           }}
@@ -1860,14 +1910,14 @@ export function TeacherAcademyPanel({
           }}
         />
       ) : null}
-      {promoteTeacher ? (
+      {promoteTeacher && academyApi.promote ? (
         <PromoteModal
           teacher={promoteTeacher}
           state={state}
           submitting={submitting}
           error={error}
           onSubmit={async (teacherId, fields) => {
-            if (await submit(routes.adminTeacherAcademyPromote(teacherId), fields, "Teacher promoted.")) {
+            if (academyApi.promote && await submit(academyApi.promote(teacherId), fields, "Teacher promoted.")) {
               setPromoteTeacher(null);
               setDetailTeacher(null);
             }
@@ -1985,8 +2035,9 @@ export function TeacherAcademyPanel({
                       onDetail={() => setDetailTeacher(teacher)}
                       onSchedule={(targetAssignment) => setScheduleTarget({ teacher, assignment: targetAssignment })}
                       onAssess={(targetAssignment) => setAssessmentTarget({ teacher, assignment: targetAssignment })}
-                      onPromote={() => setPromoteTeacher(teacher)}
+                      onPromote={() => openPromote(teacher)}
                       onCopyLogin={copyLogin}
+                      canPromote={canPromoteAcademyTeacher}
                     />
                   );
                 })}
@@ -2054,14 +2105,14 @@ export function TeacherAcademyPanel({
                           onClick: () => previewAsTeacher(teacher),
                         });
                       }
-                      if (status === "ready_for_active_teacher") {
+                      if (canPromoteAcademyTeacher && status === "ready_for_active_teacher") {
                         rowActions.push(
                           { separator: true, key: "promote-separator" },
                           {
                             key: "promote",
                             label: "Promote",
                             icon: <Trophy className="h-4 w-4" />,
-                            onClick: () => setPromoteTeacher(teacher),
+                            onClick: () => openPromote(teacher),
                           },
                         );
                       }

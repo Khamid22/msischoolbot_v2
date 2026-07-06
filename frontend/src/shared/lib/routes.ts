@@ -36,12 +36,27 @@ export const routes = {
   academicDirectorProfile: "/academic-director/profile",
   academicDirectorProfileSection: "/academic-director#academic-director-profile",
   academicDirectorHeadOfDepartmentCreate: "/academic-director/api/head-of-departments",
+  academicDirectorTeacherAcademyCreate: "/academic-director/api/teacher-academy",
+  academicDirectorTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
+    `/academic-director/api/teacher-academy/assignments/${assignmentId}`,
+  academicDirectorTeacherAcademyAssessmentCreate: (academyTeacherId: number | string) =>
+    `/academic-director/api/teacher-academy/${academyTeacherId}/assessments`,
+  academicDirectorTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
+    `/academic-director/api/teacher-academy/${academyTeacherId}/status`,
+  academicDirectorTeacherAcademyPromote: (academyTeacherId: number | string) =>
+    `/academic-director/api/teacher-academy/${academyTeacherId}/promote`,
   headOfDepartmentOverview: "/head-of-department",
   headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy",
   headOfDepartmentTimetable: "/head-of-department/timetable",
   headOfDepartmentAnnouncements: "/head-of-department/announcements",
   headOfDepartmentProfile: "/head-of-department/profile",
   headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile",
+  headOfDepartmentTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
+    `/head-of-department/api/teacher-academy/assignments/${assignmentId}`,
+  headOfDepartmentTeacherAcademyAssessmentCreate: (academyTeacherId: number | string) =>
+    `/head-of-department/api/teacher-academy/${academyTeacherId}/assessments`,
+  headOfDepartmentTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
+    `/head-of-department/api/teacher-academy/${academyTeacherId}/status`,
   adminTeacherAcademyAssignment: (assignmentId: number | string) =>
     `/admin/teacher-academy/assignments/${assignmentId}`,
   adminTeacherAcademyAssessment: (academyTeacherId: number | string) =>

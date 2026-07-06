@@ -5,12 +5,20 @@ from fastapi import APIRouter, Depends
 from backend.domains.announcements.service import list_announcements
 from backend.render import generate_csrf, render_react_page
 from backend.roles.admin.services.academic_service import list_admin_academic_context
-from backend.roles.admin.services.teacher_academy_service import list_teacher_academy_page_context
+from backend.domains.teacher_academy.service import list_teacher_academy_page_context
 from backend.roles.head_of_department.academy_scope import (
     current_hod_subject_ids,
+    can_current_user_manage_academy_assignment,
+    can_current_user_manage_academy_teacher,
     filter_rows_by_subject_scope,
 )
 from backend.roles.head_of_department.workspace_cards import head_of_department_workspace_cards
+from backend.roles.common.teacher_academy_api import (
+    academy_error,
+    add_assessment_response,
+    update_assignment_response,
+    update_status_response,
+)
 from backend.roles.role_home import render_role_home
 from backend.utils.guards import require_role
 from backend.utils.session import current_auth_login, current_auth_role
@@ -163,6 +171,33 @@ def register_head_of_department_page_routes(app, *, render_admin_page=None):
             description="Subject-scoped Teacher Academy management.",
             telegram=True,
         )
+
+    @router.post(
+        "/head-of-department/api/teacher-academy/assignments/{assignment_id}",
+        operation_id="head_of_department_update_academy_assignment",
+    )
+    def head_of_department_update_academy_assignment_api(assignment_id: int):
+        if not can_current_user_manage_academy_assignment(assignment_id):
+            return academy_error("This Teacher Academy lesson is outside your subject scope.", status=403)
+        return update_assignment_response(assignment_id)
+
+    @router.post(
+        "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
+        operation_id="head_of_department_add_academy_assessment",
+    )
+    def head_of_department_add_academy_assessment_api(academy_teacher_id: int):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            return academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
+        return add_assessment_response(academy_teacher_id, created_by_label="Head of Department")
+
+    @router.post(
+        "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
+        operation_id="head_of_department_update_academy_status",
+    )
+    def head_of_department_update_academy_status_api(academy_teacher_id: int):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            return academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
+        return update_status_response(academy_teacher_id)
 
     app.include_router(router)
 
