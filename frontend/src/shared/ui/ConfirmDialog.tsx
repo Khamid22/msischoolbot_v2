@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { TriangleAlert } from "lucide-react";
+import { uiLayers } from "@/shared/ui/layers";
+import { useBodyScrollLock } from "@/shared/ui/useBodyScrollLock";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -32,12 +35,10 @@ export function ConfirmDialog({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const headingId = useId();
   const bodyId = useId();
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) {
         event.stopPropagation();
@@ -48,17 +49,16 @@ export function ConfirmDialog({
     const timer = window.setTimeout(() => confirmRef.current?.focus(), 0);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
       window.clearTimeout(timer);
     };
   }, [open, busy, onCancel]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4 animate-in fade-in duration-150 motion-reduce:animate-none"
+      className={`fixed inset-0 ${uiLayers.overlay} flex items-center justify-center bg-foreground/60 p-4 animate-in fade-in duration-150 motion-reduce:animate-none`}
       role="alertdialog"
       aria-modal="true"
       aria-labelledby={headingId}
@@ -109,6 +109,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

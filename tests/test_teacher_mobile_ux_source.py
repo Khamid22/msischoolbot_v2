@@ -28,8 +28,10 @@ def test_action_menu_and_academy_modal_use_shared_dismissible_modal():
 
     assert "useDismissibleLayer" in action_menu
     assert "dismissibleRefs" in action_menu
-    assert 'import { Modal } from "@/shared/ui/Modal";' in academy_panel
+    assert 'import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";' in academy_panel
     assert "<Modal" in academy_panel
+    assert "<ModalBody" in academy_panel
+    assert "<ModalFooter" in academy_panel
     assert "useDismissibleLayer" not in academy_panel
     assert 'role="dialog"' in modal_source
     assert 'aria-modal="true"' in modal_source

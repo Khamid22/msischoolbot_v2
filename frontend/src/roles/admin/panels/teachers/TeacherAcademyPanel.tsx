@@ -5,7 +5,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { IconButton } from "@/shared/ui/IconButton";
 import { MetricCard } from "@/shared/ui/MetricCard";
-import { Modal } from "@/shared/ui/Modal";
+import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { MobileCardList } from "@/shared/ui/MobileCardList";
 import { ProgressBar } from "@/shared/ui/ProgressBar";
 import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
@@ -334,26 +334,28 @@ function NewHeadOfDepartmentModal({
 
   return (
     <ModalShell title="New Head of Department" subtitle="Create subject-scoped Teacher Academy access." onClose={onClose}>
-      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <label className="block">
-          <FieldLabel>Display Name</FieldLabel>
-          <input name="hod_display_name" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="Head of Math Department" />
-        </label>
-        <label className="block">
-          <FieldLabel>Subject Scope</FieldLabel>
-          <select name="hod_subject_id" required defaultValue="" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-            <option value="" disabled>Select subject</option>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="rounded-lg border border-primary/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
-          Login and temporary password will be generated automatically in HOD0001 format.
-        </div>
-        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <ModalBody className="space-y-3">
+          <label className="block">
+            <FieldLabel>Display Name</FieldLabel>
+            <input name="hod_display_name" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="Head of Math Department" />
+          </label>
+          <label className="block">
+            <FieldLabel>Subject Scope</FieldLabel>
+            <select name="hod_subject_id" required defaultValue="" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+              <option value="" disabled>Select subject</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="rounded-lg border border-primary/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+            Login and temporary password will be generated automatically in HOD0001 format.
+          </div>
+          {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        </ModalBody>
         <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create HOD" />
       </form>
     </ModalShell>
@@ -373,6 +375,18 @@ function NewAcademyTeacherModal({
   onSubmit: (fields: Record<string, string>) => void;
   onClose: () => void;
 }) {
+  type WizardStep = 1 | 2 | 3;
+  const initialTeacherFields: Record<string, string> = {
+    academy_full_name: "",
+    academy_subject_program_id: "",
+    academy_telegram_username: "",
+    academy_phone: "",
+    academy_email: "",
+    academy_start_date: "",
+    academy_mentor_id: "",
+    academy_department_head_id: "",
+    academy_notes: "",
+  };
   const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
     ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
     : [];
@@ -380,10 +394,12 @@ function NewAcademyTeacherModal({
     ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
     : [];
   const teachers = Array.isArray(state.teachers) ? state.teachers as Array<Record<string, unknown>> : [];
-  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
+  const [teacherFields, setTeacherFields] = useState<Record<string, string>>(initialTeacherFields);
   const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
   const [lessonSearch, setLessonSearch] = useState("");
   const [localError, setLocalError] = useState("");
+  const selectedProgramId = teacherFields.academy_subject_program_id;
 
   const selectedProgramLessons = useMemo(
     () =>
@@ -395,6 +411,10 @@ function NewAcademyTeacherModal({
         })
         .sort((left, right) => asNumber(left.item_order || left.itemOrder) - asNumber(right.item_order || right.itemOrder)),
     [curriculumItems, selectedProgramId],
+  );
+  const selectedLessons = useMemo(
+    () => selectedProgramLessons.filter((lesson) => selectedLessonIds.includes(asNumber(lesson.id))),
+    [selectedLessonIds, selectedProgramLessons],
   );
   const filteredProgramLessons = useMemo(() => {
     const query = lessonSearch.trim().toLowerCase();
@@ -413,12 +433,17 @@ function NewAcademyTeacherModal({
         .includes(query),
     );
   }, [lessonSearch, selectedProgramLessons]);
+  const selectedProgram = programs.find((program) => asNumber(program.id) === asNumber(selectedProgramId));
+  const selectedMentor = teachers.find((teacher) => asNumber(teacher.id) === asNumber(teacherFields.academy_mentor_id));
+  const selectedDepartmentHead = teachers.find((teacher) => asNumber(teacher.id) === asNumber(teacherFields.academy_department_head_id));
 
-  function handleProgramChange(event: React.ChangeEvent<HTMLSelectElement>) {
-    setSelectedProgramId(event.target.value);
-    setSelectedLessonIds([]);
-    setLessonSearch("");
+  function updateTeacherField(name: string, value: string) {
+    setTeacherFields((current) => ({ ...current, [name]: value }));
     setLocalError("");
+    if (name === "academy_subject_program_id") {
+      setSelectedLessonIds([]);
+      setLessonSearch("");
+    }
   }
 
   function toggleLesson(lessonId: number) {
@@ -430,170 +455,386 @@ function NewAcademyTeacherModal({
     );
   }
 
-  function selectAllVisibleLessons() {
+  function selectFirstLessons(count: number) {
+    setLocalError("");
+    setSelectedLessonIds(selectedProgramLessons.slice(0, count).map((lesson) => asNumber(lesson.id)).filter(Boolean));
+  }
+
+  function selectVisibleLessons() {
     setLocalError("");
     setSelectedLessonIds(filteredProgramLessons.map((lesson) => asNumber(lesson.id)).filter(Boolean));
   }
 
+  function validateStep(step: WizardStep) {
+    if (step === 1) {
+      if (!teacherFields.academy_full_name.trim()) {
+        setLocalError("Full name is required.");
+        return false;
+      }
+      if (!teacherFields.academy_subject_program_id) {
+        setLocalError("Subject curriculum is required.");
+        return false;
+      }
+    }
+    if (step === 2 && !selectedLessonIds.length) {
+      setLocalError("Select at least 1 Teacher Academy lesson.");
+      return false;
+    }
+    setLocalError("");
+    return true;
+  }
+
+  function goNext() {
+    if (!validateStep(wizardStep)) return;
+    setWizardStep((current) => Math.min(3, current + 1) as WizardStep);
+  }
+
+  function goBack() {
+    setLocalError("");
+    setWizardStep((current) => Math.max(1, current - 1) as WizardStep);
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedLessonIds.length) {
-      setLocalError("Select at least 1 Teacher Academy lesson.");
+    if (wizardStep !== 3) {
+      goNext();
       return;
     }
-    const data = new FormData(event.currentTarget);
-    const fields: Record<string, string> = {};
-    data.forEach((value, key) => {
-      fields[key] = String(value);
-    });
-    fields.academy_curriculum_item_ids = selectedLessonIds.join(",");
+    if (!validateStep(1) || !validateStep(2)) {
+      return;
+    }
+    const fields: Record<string, string> = {
+      ...teacherFields,
+      academy_position: "Trainee Teacher",
+      academy_employment_type: "academy",
+      academy_curriculum_item_ids: selectedLessonIds.join(","),
+    };
     onSubmit(fields);
   }
 
+  const inputClass = "w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary/50";
+  const currentError = localError || error;
+  const stepLabels = [
+    { step: 1 as WizardStep, label: "Teacher Info" },
+    { step: 2 as WizardStep, label: "Select Academy Lessons" },
+    { step: 3 as WizardStep, label: "Review & Create" },
+  ];
+  const programLabel = selectedProgram
+    ? `${asString(selectedProgram.subject_name)} · ${asNumber(selectedProgram.lesson_count)} lessons`
+    : "Not selected";
+  const lessonDetail = (lesson: Record<string, unknown>) =>
+    asString(lesson.specification_points) || asString(lesson.book_pages) || "No lesson details yet.";
+  const lessonCode = (lesson: Record<string, unknown>) =>
+    asString(lesson.lesson_number) || asString(lesson.specification_code) || asString(lesson.book_pages) || `Lesson ${asNumber(lesson.item_order)}`;
+
   return (
-    <ModalShell title="New Academy Teacher" subtitle="Create a trainee and assign selected curriculum lessons." onClose={onClose}>
-      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <FieldLabel>Full Name</FieldLabel>
-            <input name="academy_full_name" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Subject Curriculum</FieldLabel>
-            <select name="academy_subject_program_id" required value={selectedProgramId} onChange={handleProgramChange} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="" disabled>Select curriculum</option>
-              {programs.map((program) => (
-                <option key={asNumber(program.id)} value={asNumber(program.id)}>
-                  {asString(program.subject_name)} · {asNumber(program.lesson_count)} lessons
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Telegram</FieldLabel>
-            <input name="academy_telegram_username" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" placeholder="@username" />
-          </label>
-          <label className="block">
-            <FieldLabel>Phone</FieldLabel>
-            <input name="academy_phone" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Email</FieldLabel>
-            <input name="academy_email" type="email" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Start Date</FieldLabel>
-            <input name="academy_start_date" type="date" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Mentor</FieldLabel>
-            <select name="academy_mentor_id" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" defaultValue="">
-              <option value="">Not assigned</option>
-              {teachers.map((teacher) => (
-                <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
-                  {asString(teacher.full_name)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Department Head</FieldLabel>
-            <select name="academy_department_head_id" className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" defaultValue="">
-              <option value="">Not assigned</option>
-              {teachers.map((teacher) => (
-                <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
-                  {asString(teacher.full_name)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <input type="hidden" name="academy_position" value="Trainee Teacher" />
-          <input type="hidden" name="academy_employment_type" value="academy" />
-          <label className="block sm:col-span-2">
-            <FieldLabel>Notes</FieldLabel>
-            <textarea name="academy_notes" rows={3} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-          </label>
-        </div>
-        <section className="rounded-xl border border-foreground/10 bg-background p-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-wide text-foreground">Select Teacher Academy lessons</p>
-              <p className="mt-1 text-xs font-semibold text-muted-foreground">Selected {selectedLessonIds.length} lessons</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={selectAllVisibleLessons}
-                disabled={!filteredProgramLessons.length}
-                className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50"
-              >
-                Select visible
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedLessonIds([]);
-                  setLocalError("");
-                }}
-                className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted"
-              >
-                Clear selection
-              </button>
-            </div>
+    <ModalShell
+      title="New Academy Teacher"
+      subtitle="Create a trainee and choose the curriculum lessons for their Teacher Academy path."
+      onClose={onClose}
+      wide
+      mobileMode="fullscreen"
+    >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <ModalBody className="space-y-4">
+          <div className="grid grid-cols-3 gap-2" aria-label="New Academy Teacher steps">
+            {stepLabels.map((item) => {
+              const active = item.step === wizardStep;
+              const complete = item.step < wizardStep;
+              return (
+                <button
+                  key={item.step}
+                  type="button"
+                  onClick={() => {
+                    if (item.step <= wizardStep) {
+                      setWizardStep(item.step);
+                      return;
+                    }
+                    if (item.step === ((wizardStep + 1) as WizardStep) && validateStep(wizardStep)) {
+                      setWizardStep(item.step);
+                    }
+                  }}
+                  className={`min-h-10 rounded-lg border px-2 text-left text-[11px] font-black transition-colors motion-reduce:transition-none ${
+                    active
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : complete
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-foreground/10 bg-background text-muted-foreground"
+                  }`}
+                  aria-current={active ? "step" : undefined}
+                >
+                  <span className="block text-[10px] uppercase tracking-wide">Step {item.step}</span>
+                  <span className="block leading-tight">{item.label}</span>
+                </button>
+              );
+            })}
           </div>
-          <input type="hidden" name="academy_curriculum_item_ids" value={selectedLessonIds.join(",")} />
-          <input
-            type="search"
-            value={lessonSearch}
-            onChange={(event) => setLessonSearch(event.target.value)}
-            className="mt-3 w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2 text-sm outline-none"
-            placeholder="Search lessons or topics"
-            disabled={!selectedProgramId}
-          />
-          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-            {!selectedProgramId ? (
-              <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
-                Select a subject curriculum to choose lessons.
-              </p>
-            ) : filteredProgramLessons.length ? (
-              filteredProgramLessons.map((lesson) => {
-                const lessonId = asNumber(lesson.id);
-                const checked = selectedLessonIds.includes(lessonId);
-                return (
-                  <label
-                    key={lessonId}
-                    className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
-                      checked ? "border-primary/30 bg-primary/5" : "border-foreground/10 bg-surface hover:bg-muted"
-                    }`}
+
+          {wizardStep === 1 ? (
+            <section className="space-y-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-foreground">Teacher Info</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Full name and subject curriculum are required.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <FieldLabel>Full Name</FieldLabel>
+                  <input
+                    name="academy_full_name"
+                    required
+                    value={teacherFields.academy_full_name}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <FieldLabel>Subject Curriculum</FieldLabel>
+                  <select
+                    name="academy_subject_program_id"
+                    required
+                    value={selectedProgramId}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
                   >
-                    <input
-                      type="checkbox"
-                      name="academy_curriculum_item_ids"
-                      value={lessonId}
-                      checked={checked}
-                      onChange={() => toggleLesson(lessonId)}
-                      className="mt-1 h-4 w-4 shrink-0 rounded border-foreground/20"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-black text-foreground">
-                        {asString(lesson.lesson_number) || `Lesson ${asNumber(lesson.item_order)}`} · {asString(lesson.title) || "Untitled lesson"}
-                      </span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted-foreground">
-                        {asString(lesson.specification_points) || asString(lesson.book_pages) || "No lesson details yet."}
-                      </span>
-                    </span>
-                  </label>
-                );
-              })
-            ) : (
-              <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
-                No lesson topics found for this curriculum.
-              </p>
-            )}
-          </div>
-        </section>
-        {localError || error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{localError || error}</p> : null}
-        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Academy Teacher" disabled={!selectedLessonIds.length} />
+                    <option value="" disabled>Select curriculum</option>
+                    {programs.map((program) => (
+                      <option key={asNumber(program.id)} value={asNumber(program.id)}>
+                        {asString(program.subject_name)} · {asNumber(program.lesson_count)} lessons
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <FieldLabel>Telegram Username</FieldLabel>
+                  <input
+                    name="academy_telegram_username"
+                    value={teacherFields.academy_telegram_username}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                    placeholder="@username"
+                  />
+                </label>
+                <label className="block">
+                  <FieldLabel>Phone</FieldLabel>
+                  <input
+                    name="academy_phone"
+                    value={teacherFields.academy_phone}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <FieldLabel>Email</FieldLabel>
+                  <input
+                    name="academy_email"
+                    type="email"
+                    value={teacherFields.academy_email}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <FieldLabel>Start Date</FieldLabel>
+                  <input
+                    name="academy_start_date"
+                    type="date"
+                    value={teacherFields.academy_start_date}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="block">
+                  <FieldLabel>Mentor</FieldLabel>
+                  <select
+                    name="academy_mentor_id"
+                    value={teacherFields.academy_mentor_id}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Not assigned</option>
+                    {teachers.map((teacher) => (
+                      <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
+                        {asString(teacher.full_name)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <FieldLabel>Department Head</FieldLabel>
+                  <select
+                    name="academy_department_head_id"
+                    value={teacherFields.academy_department_head_id}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Not assigned</option>
+                    {teachers.map((teacher) => (
+                      <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
+                        {asString(teacher.full_name)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block sm:col-span-2">
+                  <FieldLabel>Notes</FieldLabel>
+                  <textarea
+                    name="academy_notes"
+                    rows={3}
+                    value={teacherFields.academy_notes}
+                    onChange={(event) => updateTeacherField(event.target.name, event.target.value)}
+                    className={`${inputClass} resize-none`}
+                  />
+                </label>
+              </div>
+            </section>
+          ) : null}
+
+          {wizardStep === 2 ? (
+            <section className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide text-foreground">Select Academy Lessons</p>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">Selected {selectedLessonIds.length} lessons from {programLabel}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                  <button type="button" onClick={() => selectFirstLessons(6)} disabled={!selectedProgramLessons.length} className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50">
+                    Select first 6
+                  </button>
+                  <button type="button" onClick={() => selectFirstLessons(12)} disabled={!selectedProgramLessons.length} className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50">
+                    Select first 12
+                  </button>
+                  <button type="button" onClick={selectVisibleLessons} disabled={!filteredProgramLessons.length} className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50">
+                    Select visible
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLessonIds([]);
+                      setLocalError("");
+                    }}
+                    className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" name="academy_curriculum_item_ids" value={selectedLessonIds.join(",")} />
+              <input
+                type="search"
+                value={lessonSearch}
+                onChange={(event) => setLessonSearch(event.target.value)}
+                className={inputClass}
+                placeholder="Search lesson, topic, or specification"
+                disabled={!selectedProgramId}
+              />
+              <div className="space-y-2">
+                {!selectedProgramId ? (
+                  <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
+                    Select a subject curriculum to choose lessons.
+                  </p>
+                ) : filteredProgramLessons.length ? (
+                  filteredProgramLessons.map((lesson) => {
+                    const lessonId = asNumber(lesson.id);
+                    const checked = selectedLessonIds.includes(lessonId);
+                    return (
+                      <div
+                        key={lessonId}
+                        className={`rounded-lg border px-3 py-2.5 transition-colors ${
+                          checked ? "border-primary/30 bg-primary/5" : "border-foreground/10 bg-surface"
+                        }`}
+                      >
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            name="academy_curriculum_item_ids"
+                            value={lessonId}
+                            checked={checked}
+                            onChange={() => toggleLesson(lessonId)}
+                            className="mt-1 h-4 w-4 shrink-0 rounded border-foreground/20"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-black text-foreground">
+                              {lessonCode(lesson)} · {asString(lesson.title) || "Untitled lesson"}
+                            </span>
+                            <span className="mt-1 block text-xs font-bold text-muted-foreground">
+                              {asString(lesson.book_pages) || "Specification preview"}
+                            </span>
+                          </span>
+                        </label>
+                        <details className="ml-7 mt-2 text-xs leading-5 text-muted-foreground">
+                          <summary className="cursor-pointer font-bold text-primary">Show details</summary>
+                          <p className="mt-1">{lessonDetail(lesson)}</p>
+                        </details>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-sm font-semibold text-muted-foreground">
+                    No lesson topics found for this curriculum.
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : null}
+
+          {wizardStep === 3 ? (
+            <section className="space-y-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-foreground">Review & Create</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Confirm the account details and selected Teacher Academy lesson plan.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ["Teacher", teacherFields.academy_full_name || "-"],
+                  ["Subject Curriculum", programLabel],
+                  ["Start Date", teacherFields.academy_start_date || "-"],
+                  ["Mentor", asString(selectedMentor?.full_name) || "Not assigned"],
+                  ["Department Head", asString(selectedDepartmentHead?.full_name) || "Not assigned"],
+                  ["Selected Lessons", String(selectedLessonIds.length)],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-foreground/10 bg-background px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">{label}</p>
+                    <p className="mt-1 break-words text-sm font-black text-foreground">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {!teacherFields.academy_mentor_id || !teacherFields.academy_department_head_id ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-800">
+                  Mentor or department head is not assigned yet. Creation is still allowed if the backend accepts it.
+                </p>
+              ) : null}
+              <div className="rounded-xl border border-foreground/10 bg-background p-3">
+                <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">First selected lessons</p>
+                <ul className="mt-2 space-y-1.5 text-sm font-semibold text-foreground">
+                  {selectedLessons.slice(0, 5).map((lesson) => (
+                    <li key={asNumber(lesson.id)} className="rounded-lg bg-surface px-3 py-2">
+                      {lessonCode(lesson)} · {asString(lesson.title) || "Untitled lesson"}
+                    </li>
+                  ))}
+                </ul>
+                {selectedLessons.length > 5 ? (
+                  <p className="mt-2 text-xs font-bold text-muted-foreground">+{selectedLessons.length - 5} more selected lessons</p>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {currentError ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{currentError}</p> : null}
+        </ModalBody>
+        <ModalFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          <button type="button" onClick={wizardStep === 1 ? onClose : goBack} className="min-h-10 w-full rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted sm:w-auto">
+            {wizardStep === 1 ? "Cancel" : "Back"}
+          </button>
+          {wizardStep < 3 ? (
+            <button type="button" onClick={goNext} className="min-h-10 w-full rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60 sm:w-auto">
+              {wizardStep === 1 ? "Next: Select Lessons" : "Next: Review"}
+            </button>
+          ) : (
+            <button type="submit" disabled={submitting || !selectedLessonIds.length} className="min-h-10 w-full rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60 sm:w-auto">
+              {submitting ? "Saving..." : "Create Academy Teacher"}
+            </button>
+          )}
+        </ModalFooter>
       </form>
     </ModalShell>
   );
@@ -623,6 +864,7 @@ function AssignmentModal({
   const [selectedFocus, setSelectedFocus] = useState<string[]>(
     Array.isArray(selectedAssignment?.focus_areas) ? selectedAssignment.focus_areas.map(asString).filter(Boolean) : [],
   );
+  const controlClass = "w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary/50";
 
   function handleAssignmentChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const nextAssignment = assignmentById(assignments, asNumber(event.target.value));
@@ -653,96 +895,119 @@ function AssignmentModal({
   }
 
   return (
-    <ModalShell title="Schedule Academy Lesson" subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
-            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Subject</p>
-            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.subject) || "Subject not set"}</p>
-          </div>
-        </div>
-        <label className="block">
-          <FieldLabel>Lesson Assignment</FieldLabel>
-          <select
-            name="assignment_id"
-            required
-            value={selectedAssignmentId || ""}
-            onChange={handleAssignmentChange}
-            className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm font-semibold outline-none"
-          >
-            <option value="" disabled>Select lesson assignment</option>
-            {assignments.map((item) => (
-              <option key={asNumber(item.id)} value={asNumber(item.id)}>
-                {assignmentTitle(item)}
-              </option>
-            ))}
-          </select>
-          {!assignments.length ? (
-            <span className="mt-2 block rounded-lg border border-dashed border-foreground/15 px-3 py-3 text-sm font-semibold text-muted-foreground">
-              No academy lessons assigned.
-            </span>
-          ) : null}
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <FieldLabel>Lesson Type</FieldLabel>
-            <select key={`type-${selectedAssignmentId}`} name="assignment_type" defaultValue={asString(selectedAssignment?.assignment_type) || "full_practice_lesson"} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="full_practice_lesson">Practice Lesson</option>
-              <option value="demo_lesson">Demo Lesson</option>
-              <option value="observation">Observation</option>
-              <option value="final_evaluation">Final Evaluation</option>
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Status</FieldLabel>
-            <select key={`status-${selectedAssignmentId}`} name="assignment_status" defaultValue={asString(selectedAssignment?.status) || "assigned"} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="assigned">Assigned</option>
-              <option value="ready">Ready</option>
-              <option value="assessed">Assessed</option>
-              <option value="passed">Passed</option>
-              <option value="needs_improvement">Needs improvement</option>
-            </select>
-          </label>
-          <label className="block">
-            <FieldLabel>Deadline</FieldLabel>
-            <input key={`deadline-${selectedAssignmentId}`} name="deadline_date" type="date" defaultValue={asString(selectedAssignment?.deadline_date)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block">
-            <FieldLabel>Session Date/Time</FieldLabel>
-            <input key={`session-${selectedAssignmentId}`} name="session_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          </label>
-          <label className="block sm:col-span-2">
-            <FieldLabel>Evaluator</FieldLabel>
-            <select key={`evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="">Not assigned</option>
-              {teachers.map((teacher) => (
-                <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
-                  {asString(teacher.full_name)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div>
-          <FieldLabel>Focus Areas</FieldLabel>
-          <div className="mt-1 grid gap-1.5 sm:grid-cols-2">
-            {focusAreas.map((area) => (
-              <label key={area} className="flex items-center gap-2 rounded-lg border border-foreground/8 bg-background px-2.5 py-2 text-xs font-semibold">
-                <input type="checkbox" checked={selectedFocus.includes(area)} onChange={() => toggleFocus(area)} />
-                {area}
+    <ModalShell
+      title="Schedule Academy Lesson"
+      subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"}
+      onClose={onClose}
+      mobileMode="fullscreen"
+    >
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <ModalBody className="space-y-4">
+          <section className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher / Lesson Summary</p>
+              <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Selected Lesson</p>
+              <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">
+                {selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"}
+              </p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">
+                {dateLabel(selectedAssignment?.session_datetime)} · {asString(selectedAssignment?.evaluator_name) || "No evaluator"}
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Schedule details</p>
+            <label className="block">
+              <FieldLabel>Lesson Assignment</FieldLabel>
+              <select
+                name="assignment_id"
+                required
+                value={selectedAssignmentId || ""}
+                onChange={handleAssignmentChange}
+                className={`${controlClass} font-semibold`}
+              >
+                <option value="" disabled>Select lesson assignment</option>
+                {assignments.map((item) => (
+                  <option key={asNumber(item.id)} value={asNumber(item.id)}>
+                    {assignmentTitle(item)}
+                  </option>
+                ))}
+              </select>
+              {!assignments.length ? (
+                <span className="mt-2 block rounded-lg border border-dashed border-foreground/15 px-3 py-3 text-sm font-semibold text-muted-foreground">
+                  No academy lessons assigned.
+                </span>
+              ) : null}
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <FieldLabel>Date/Time</FieldLabel>
+                <input key={`session-${selectedAssignmentId}`} name="session_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className={controlClass} />
               </label>
-            ))}
-          </div>
-        </div>
-        <label className="block">
-          <FieldLabel>Notes to Trainee</FieldLabel>
-          <textarea key={`notes-${selectedAssignmentId}`} name="notes_to_trainee" rows={3} defaultValue={asString(selectedAssignment?.notes_to_trainee)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-        </label>
-        {error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+              <label className="block">
+                <FieldLabel>Evaluator</FieldLabel>
+                <select key={`evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className={controlClass}>
+                  <option value="">Not assigned</option>
+                  {teachers.map((teacher) => (
+                    <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
+                      {asString(teacher.full_name)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <FieldLabel>Lesson Type</FieldLabel>
+                <select key={`type-${selectedAssignmentId}`} name="assignment_type" defaultValue={asString(selectedAssignment?.assignment_type) || "full_practice_lesson"} className={controlClass}>
+                  <option value="full_practice_lesson">Practice Lesson</option>
+                  <option value="demo_lesson">Demo Lesson</option>
+                  <option value="observation">Observation</option>
+                  <option value="final_evaluation">Final Evaluation</option>
+                </select>
+              </label>
+              <label className="block">
+                <FieldLabel>Status</FieldLabel>
+                <select key={`status-${selectedAssignmentId}`} name="assignment_status" defaultValue={asString(selectedAssignment?.status) || "assigned"} className={controlClass}>
+                  <option value="assigned">Assigned</option>
+                  <option value="ready">Ready</option>
+                  <option value="assessed">Assessed</option>
+                  <option value="passed">Passed</option>
+                  <option value="needs_improvement">Needs improvement</option>
+                </select>
+              </label>
+              <label className="block sm:col-span-2">
+                <FieldLabel>Deadline</FieldLabel>
+                <input key={`deadline-${selectedAssignmentId}`} name="deadline_date" type="date" defaultValue={asString(selectedAssignment?.deadline_date)} className={controlClass} />
+              </label>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Focus areas</p>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {focusAreas.map((area) => (
+                <label key={area} className="flex items-center gap-2 rounded-lg border border-foreground/8 bg-background px-2.5 py-2 text-xs font-semibold">
+                  <input type="checkbox" checked={selectedFocus.includes(area)} onChange={() => toggleFocus(area)} />
+                  {area}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Notes</p>
+            <label className="block">
+              <FieldLabel>Notes to Trainee</FieldLabel>
+              <textarea key={`notes-${selectedAssignmentId}`} name="notes_to_trainee" rows={3} defaultValue={asString(selectedAssignment?.notes_to_trainee)} className={`${controlClass} resize-none`} />
+            </label>
+          </section>
+
+          {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        </ModalBody>
         <ModalActions onClose={onClose} submitting={submitting} submitLabel="Save Schedule" disabled={!selectedAssignment} />
       </form>
     </ModalShell>
@@ -777,6 +1042,7 @@ function AssessmentModal({
     const value = Number(scores[item.key]);
     return sum + (Number.isFinite(value) ? value : 0) * item.weight;
   }, 0);
+  const controlClass = "h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10";
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -795,17 +1061,24 @@ function AssessmentModal({
   }
 
   return (
-    <ModalShell title="Assessment Report" subtitle={`${asString(teacher.full_name)} · ${selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"} · score ${weighted.toFixed(2)}`} onClose={onClose} wide>
+    <ModalShell
+      title="Assessment Report"
+      subtitle={`${asString(teacher.full_name)} · ${selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"} · score ${weighted.toFixed(2)}`}
+      onClose={onClose}
+      wide
+      mobileMode="fullscreen"
+    >
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <ModalBody className="space-y-4">
           <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Subject</p>
-              <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Selected lesson</p>
+              <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"}</p>
+              <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
             </div>
           </div>
           <label className="block">
@@ -815,7 +1088,7 @@ function AssessmentModal({
               required
               value={selectedAssignmentId || ""}
               onChange={(event) => setSelectedAssignmentId(asNumber(event.target.value))}
-              className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+              className={controlClass}
             >
               <option value="" disabled>Select lesson assignment</option>
               {assignments.map((item) => (
@@ -833,7 +1106,7 @@ function AssessmentModal({
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label className="block">
               <FieldLabel>Assessment Type</FieldLabel>
-              <select name="assessment_type" defaultValue="academy_practice_lesson" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+              <select name="assessment_type" defaultValue="academy_practice_lesson" className={controlClass}>
                 <option value="demo_lesson">Demo lesson</option>
                 <option value="academy_practice_lesson">Academy practice lesson</option>
                 <option value="final_academy_evaluation">Final academy evaluation</option>
@@ -841,7 +1114,7 @@ function AssessmentModal({
             </label>
             <label className="block">
               <FieldLabel>Session Type</FieldLabel>
-              <select name="session_type" defaultValue="training_simulation" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+              <select name="session_type" defaultValue="training_simulation" className={controlClass}>
                 <option value="training_simulation">Academy simulation</option>
                 <option value="practice_with_class">Practice with class</option>
                 <option value="final_evaluation">Final evaluation</option>
@@ -849,11 +1122,11 @@ function AssessmentModal({
             </label>
             <label className="block">
               <FieldLabel>Date/Time</FieldLabel>
-              <input key={`assessment-date-${selectedAssignmentId}`} name="assessment_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10" />
+              <input key={`assessment-date-${selectedAssignmentId}`} name="assessment_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className={controlClass} />
             </label>
             <label className="block">
               <FieldLabel>Assigned Academic Director</FieldLabel>
-              <select key={`assessment-evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+              <select key={`assessment-evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className={controlClass}>
                 <option value="">Not assigned</option>
                 {teachers.map((item) => (
                   <option key={asNumber(item.id)} value={asNumber(item.id)}>
@@ -864,11 +1137,11 @@ function AssessmentModal({
             </label>
             <label className="block">
               <FieldLabel>Class Label</FieldLabel>
-              <input name="class_label" placeholder="Group or demo class" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+              <input name="class_label" placeholder="Group or demo class" className={`${controlClass} placeholder:text-muted-foreground/70`} />
             </label>
             <label className="block">
               <FieldLabel>Decision</FieldLabel>
-              <select name="decision" defaultValue="passed" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+              <select name="decision" defaultValue="passed" className={controlClass}>
                 <option value="needs_improvement">Needs improvement</option>
                 <option value="passed">Passed</option>
                 <option value="ready_for_final_evaluation">Ready for final evaluation</option>
@@ -887,51 +1160,42 @@ function AssessmentModal({
                 Score {weighted.toFixed(2)}
               </span>
             </div>
-            <div className="miniapp-table-scroll">
-              <table className="w-full min-w-[760px] table-fixed text-left">
-                <thead>
-                  <tr className="border-b border-foreground/8 bg-surface/80">
-                    <th className="w-[18rem] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Criteria</th>
-                    <th className="w-32 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Score</th>
-                    <th className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rubric.map((item) => (
-                    <tr key={item.key} className="border-b border-foreground/6 last:border-b-0 transition-colors hover:bg-muted/35">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
-                            {item.code}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold">{item.label}</p>
-                            <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          step="0.1"
-                          value={scores[item.key] || ""}
-                          onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
-                          className="h-10 w-full rounded-xl border border-foreground/10 bg-surface px-3 text-center text-sm font-black text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          name={item.remarksKey}
-                          className="h-10 w-full rounded-xl border border-foreground/10 bg-surface px-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
-                          placeholder="Remarks"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid gap-2 p-3 md:grid-cols-2">
+              {rubric.map((item) => (
+                <div key={item.key} className="rounded-xl border border-foreground/8 bg-surface p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
+                      {item.code}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold">{item.label}</p>
+                      <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[7rem_1fr]">
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Score</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="0.1"
+                        value={scores[item.key] || ""}
+                        onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
+                        className="h-10 w-full rounded-xl border border-foreground/10 bg-background px-3 text-center text-sm font-black text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Remarks</span>
+                      <input
+                        name={item.remarksKey}
+                        className="h-10 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
+                        placeholder="Remarks"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
           <div className="grid gap-3 lg:grid-cols-3">
@@ -949,16 +1213,16 @@ function AssessmentModal({
             </label>
           </div>
           {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
-        </div>
-        <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-foreground/8 bg-surface/95 px-4 py-3 backdrop-blur">
-          <button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-foreground/10 bg-background px-4 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+        </ModalBody>
+        <ModalFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-foreground/10 bg-background px-4 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 sm:w-auto">
             Cancel
           </button>
-          <button type="submit" disabled={submitting || !selectedAssignment} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+          <button type="submit" disabled={submitting || !selectedAssignment} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 sm:w-auto">
             <CheckCircle2 className="h-4 w-4" />
             {submitting ? "Saving..." : "Save assessment"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </ModalShell>
   );
@@ -1000,46 +1264,48 @@ function PromoteModal({
 
   return (
     <ModalShell title="Promote to Active Teacher" subtitle={asString(teacher.full_name)} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <label className="block">
-          <FieldLabel>Active Group</FieldLabel>
-          <select name="teacher_assigned_group" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-            <option value="" disabled>Select group</option>
-            {groups.map((group) => (
-              <option key={group.name} value={group.name}>{group.name}</option>
-            ))}
-          </select>
-        </label>
-        <div className="grid gap-3 sm:grid-cols-3">
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <ModalBody className="space-y-3">
           <label className="block">
-            <FieldLabel>Rank</FieldLabel>
-            <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              {teacherCategories.map((option) => (
-                <option key={option.key} value={option.key}>{option.label}</option>
+            <FieldLabel>Active Group</FieldLabel>
+            <select name="teacher_assigned_group" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+              <option value="" disabled>Select group</option>
+              {groups.map((group) => (
+                <option key={group.name} value={group.name}>{group.name}</option>
               ))}
             </select>
           </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block">
+              <FieldLabel>Rank</FieldLabel>
+              <select value={category} onChange={(event) => setCategory(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+                {teacherCategories.map((option) => (
+                  <option key={option.key} value={option.key}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel>Semester Stage</FieldLabel>
+              <select value={semesterStage} onChange={(event) => setSemesterStage(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
+                {semesterStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel>Score</FieldLabel>
+              <input type="number" min="0" max="10" step="0.1" value={performanceScore} onChange={(event) => setPerformanceScore(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
+            </label>
+          </div>
           <label className="block">
-            <FieldLabel>Semester Stage</FieldLabel>
-            <select value={semesterStage} onChange={(event) => setSemesterStage(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              {semesterStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
-            </select>
+            <FieldLabel>Pay Rate</FieldLabel>
+            <input name="teacher_pay_rate" type="number" min="0" step="0.01" defaultValue={String(suggestedRate || 0)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
+            <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">Suggested: {formatUzs(suggestedRate) || "set manually"}</span>
           </label>
           <label className="block">
-            <FieldLabel>Score</FieldLabel>
-            <input type="number" min="0" max="10" step="0.1" value={performanceScore} onChange={(event) => setPerformanceScore(event.target.value)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
+            <FieldLabel>Promotion Notes</FieldLabel>
+            <textarea name="teacher_promotion_notes" rows={3} defaultValue="Promoted from Teacher Academy." className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
           </label>
-        </div>
-        <label className="block">
-          <FieldLabel>Pay Rate</FieldLabel>
-          <input name="teacher_pay_rate" type="number" min="0" step="0.01" defaultValue={String(suggestedRate || 0)} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none" />
-          <span className="mt-1 block text-[11px] font-semibold text-muted-foreground">Suggested: {formatUzs(suggestedRate) || "set manually"}</span>
-        </label>
-        <label className="block">
-          <FieldLabel>Promotion Notes</FieldLabel>
-          <textarea name="teacher_promotion_notes" rows={3} defaultValue="Promoted from Teacher Academy." className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none resize-none" />
-        </label>
-        {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+          {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+        </ModalBody>
         <ModalActions onClose={onClose} submitting={submitting} submitLabel="Promote" />
       </form>
     </ModalShell>
@@ -1069,7 +1335,7 @@ function AcademyDetailModal({
   const login = asString(teacher.login);
   return (
     <ModalShell title={asString(teacher.full_name)} subtitle={`${asString(teacher.subject)} · ${statusLabel(teacher.academy_status)}`} onClose={onClose} wide>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <ModalBody>
         <div className="grid gap-2 sm:grid-cols-4">
           {metric("Progress", `${progress.assessed}/${progress.target}`, "assessed lessons")}
           {metric("Passed", progress.passed, "lessons accepted")}
@@ -1153,7 +1419,7 @@ function AcademyDetailModal({
             </div>
           </section>
         </div>
-      </div>
+      </ModalBody>
     </ModalShell>
   );
 }
@@ -1337,12 +1603,14 @@ function ModalShell({
   children,
   onClose,
   wide = false,
+  mobileMode = "sheet",
 }: {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   onClose: () => void;
   wide?: boolean;
+  mobileMode?: "sheet" | "fullscreen";
 }) {
   return (
     <Modal
@@ -1350,6 +1618,7 @@ function ModalShell({
       subtitle={subtitle}
       onClose={onClose}
       size={wide ? "wide" : "lg"}
+      mobileMode={mobileMode}
     >
       {children}
     </Modal>
@@ -1372,14 +1641,14 @@ function ModalActions({
   disabled?: boolean;
 }) {
   return (
-    <div className="sticky bottom-0 -mx-4 mt-2 flex flex-col-reverse gap-2 border-t border-foreground/8 bg-surface px-4 py-3 sm:flex-row sm:justify-end">
-      <button type="button" onClick={onClose} className="min-h-10 rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted">
+    <ModalFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button type="button" onClick={onClose} className="min-h-10 w-full rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted sm:w-auto">
         Cancel
       </button>
-      <button type="submit" disabled={submitting || disabled} className="min-h-10 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">
+      <button type="submit" disabled={submitting || disabled} className="min-h-10 w-full rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60 sm:w-auto">
         {submitting ? "Saving..." : submitLabel}
       </button>
-    </div>
+    </ModalFooter>
   );
 }
 

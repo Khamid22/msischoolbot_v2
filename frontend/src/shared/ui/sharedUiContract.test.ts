@@ -15,8 +15,8 @@ function source(name: string): string {
 }
 
 describe("uiLayers z-scale", () => {
-  it("stacks sidebar < mobile nav < overlay < popover < toast", () => {
-    const order: Array<keyof typeof uiLayers> = ["sidebar", "mobileNav", "overlay", "popover", "toast"];
+  it("stacks sidebar < mobile nav < toast < overlay < popover", () => {
+    const order: Array<keyof typeof uiLayers> = ["sidebar", "mobileNav", "toast", "overlay", "popover"];
     const values = order.map((key) => {
       const match = uiLayers[key].match(/z-\[?(\d+)\]?/);
       assert.ok(match, `uiLayers.${key} ("${uiLayers[key]}") is not a z-index class`);
@@ -72,16 +72,20 @@ describe("RoleMobileNav", () => {
 
 describe("Modal / BottomSheet", () => {
   const src = source("Modal.tsx");
+  const hookSrc = source("useBodyScrollLock.ts");
 
   it("renders through a portal on the shared overlay layer with a backdrop", () => {
     assert.match(src, /createPortal/);
     assert.match(src, /document\.body,?\s*\)/);
     assert.match(src, /uiLayers\.overlay/);
     assert.match(src, /bg-foreground\/60/);
+    assert.match(src, /data-modal-backdrop="true"/);
   });
 
   it("locks body scroll while open", () => {
-    assert.match(src, /document\.body\.style\.overflow = "hidden"/);
+    assert.match(hookSrc, /export function useBodyScrollLock/);
+    assert.match(hookSrc, /document\.body\.style\.overflow = "hidden"/);
+    assert.match(hookSrc, /bodyLockCount/);
   });
 
   it("closes on Escape and has a labelled close button", () => {
@@ -92,6 +96,17 @@ describe("Modal / BottomSheet", () => {
   it("is a labelled dialog and exports BottomSheet on the same layer", () => {
     assert.match(src, /aria-modal="true"/);
     assert.match(src, /export function BottomSheet/);
+  });
+
+  it("exposes structured body/footer slots and mobile sheet/fullscreen modes", () => {
+    assert.match(src, /export function ModalHeader/);
+    assert.match(src, /export function ModalBody/);
+    assert.match(src, /export function ModalFooter/);
+    assert.match(src, /mobileMode = "sheet"/);
+    assert.match(src, /mobileMode === "fullscreen"/);
+    assert.match(src, /data-mobile-mode=\{mobileMode\}/);
+    assert.match(src, /var\(--app-bottom-inset\)/);
+    assert.match(src, /motion-reduce:animate-none/);
   });
 });
 

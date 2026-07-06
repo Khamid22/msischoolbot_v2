@@ -19,7 +19,7 @@ import { IconButton } from "@/shared/ui/IconButton";
 import { MetricCard } from "@/shared/ui/MetricCard";
 import { MetricGrid } from "@/shared/ui/MetricGrid";
 import { MobileCardList } from "@/shared/ui/MobileCardList";
-import { BottomSheet } from "@/shared/ui/Modal";
+import { BottomSheet, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -161,7 +161,7 @@ function AccountDetailSheet({
 
   return (
     <BottomSheet title={accountName(account)} subtitle="Head of Department account" onClose={onClose}>
-      <div className="miniapp-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <ModalBody>
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           {fields.map(([label, value]) => (
             <div key={label} className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
@@ -175,7 +175,7 @@ function AccountDetailSheet({
         <p className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-bold leading-5 text-muted-foreground">
           Read-only account record. Access changes are managed by the system administrators.
         </p>
-      </div>
+      </ModalBody>
     </BottomSheet>
   );
 }
@@ -205,56 +205,58 @@ function NewHodSheet({
 
   return (
     <BottomSheet title="New Head of Department" subtitle="Create subject-scoped Teacher Academy access." onClose={onClose}>
-      <form onSubmit={handleSubmit} className="miniapp-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted-foreground">Display Name</span>
-          <input
-            name="hod_display_name"
-            className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus-visible:border-primary/50"
-            placeholder="Head of Math Department"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted-foreground">Subject Scope</span>
-          <select
-            name="hod_subject_id"
-            required
-            defaultValue=""
-            disabled={!subjects.length}
-            className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <option value="" disabled>
-              {subjects.length ? "Select subject" : "No active subjects available"}
-            </option>
-            {subjects.map((subject, index) => (
-              <option key={asText(subject.id) || index} value={asText(subject.id)}>
-                {asText(subject.name) || `Subject ${asText(subject.id)}`}
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <ModalBody className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted-foreground">Display Name</span>
+            <input
+              name="hod_display_name"
+              className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus-visible:border-primary/50"
+              placeholder="Head of Math Department"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-muted-foreground">Subject Scope</span>
+            <select
+              name="hod_subject_id"
+              required
+              defaultValue=""
+              disabled={!subjects.length}
+              className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="" disabled>
+                {subjects.length ? "Select subject" : "No active subjects available"}
               </option>
-            ))}
-          </select>
-        </label>
-        <div className="rounded-lg border border-primary/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
-          Login and temporary password will be generated automatically in HOD0001 format.
-        </div>
-        {error ? (
-          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
-        ) : null}
-        <div className="flex items-center justify-end gap-2 pt-1">
+              {subjects.map((subject, index) => (
+                <option key={asText(subject.id) || index} value={asText(subject.id)}>
+                  {asText(subject.name) || `Subject ${asText(subject.id)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="rounded-lg border border-primary/10 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary">
+            Login and temporary password will be generated automatically in HOD0001 format.
+          </div>
+          {error ? (
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
+          ) : null}
+        </ModalBody>
+        <ModalFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-border bg-background px-4 text-sm font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 sm:w-auto"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting || !subjects.length}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-primary-foreground transition-transform duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100"
+            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-black text-primary-foreground transition-transform duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100 sm:w-auto"
           >
             {submitting ? "Creating..." : "Create HOD"}
           </button>
-        </div>
+        </ModalFooter>
       </form>
     </BottomSheet>
   );
@@ -281,7 +283,7 @@ function CredentialsSheet({
       onClose={onClose}
       closeOnOutsideClick={false}
     >
-      <div className="miniapp-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <ModalBody>
         <p className="text-sm font-semibold leading-6 text-muted-foreground">
           Share these credentials now — the temporary password is only shown once.
         </p>
@@ -298,7 +300,7 @@ function CredentialsSheet({
             </div>
           ))}
         </dl>
-      </div>
+      </ModalBody>
     </BottomSheet>
   );
 }

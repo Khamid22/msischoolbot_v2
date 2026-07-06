@@ -2,9 +2,11 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { uiLayers } from "@/shared/ui/layers";
+import { useBodyScrollLock } from "@/shared/ui/useBodyScrollLock";
 
 type ModalSize = "sm" | "md" | "lg" | "xl" | "wide";
 type ModalDesktopPlacement = "center" | "right";
+type ModalMobileMode = "sheet" | "fullscreen";
 
 interface ModalProps {
   open?: boolean;
@@ -14,30 +16,11 @@ interface ModalProps {
   onClose: () => void;
   size?: ModalSize;
   desktopPlacement?: ModalDesktopPlacement;
+  mobileMode?: ModalMobileMode;
   closeOnOutsideClick?: boolean;
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
   panelClassName?: string;
-}
-
-let bodyLockCount = 0;
-let previousBodyOverflow = "";
-
-function lockBodyScroll() {
-  if (typeof document === "undefined") {
-    return () => {};
-  }
-  if (bodyLockCount === 0) {
-    previousBodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-  }
-  bodyLockCount += 1;
-  return () => {
-    bodyLockCount = Math.max(0, bodyLockCount - 1);
-    if (bodyLockCount === 0) {
-      document.body.style.overflow = previousBodyOverflow;
-    }
-  };
 }
 
 const sizeClass: Record<ModalSize, string> = {
@@ -48,6 +31,59 @@ const sizeClass: Record<ModalSize, string> = {
   wide: "sm:max-w-6xl",
 };
 
+export function ModalHeader({
+  title,
+  subtitle,
+  titleId,
+  onClose,
+  showCloseButton = true,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  titleId?: string;
+  onClose?: () => void;
+  showCloseButton?: boolean;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/8 px-4 py-3">
+      <div className="min-w-0">
+        <h3 id={titleId} className="break-words text-sm font-bold">
+          {title}
+        </h3>
+        {subtitle ? <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p> : null}
+      </div>
+      {showCloseButton && onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function ModalBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`miniapp-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(var(--app-bottom-inset)+1rem)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export function ModalFooter({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={`shrink-0 border-t border-foreground/8 bg-surface/95 px-4 py-3 pb-[calc(var(--app-bottom-inset)+0.75rem)] shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:pb-3 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Modal({
   open = true,
   title,
@@ -56,6 +92,7 @@ export function Modal({
   onClose,
   size = "lg",
   desktopPlacement = "center",
+  mobileMode = "sheet",
   closeOnOutsideClick = true,
   closeOnEscape = true,
   showCloseButton = true,
@@ -69,10 +106,7 @@ export function Modal({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    return lockBodyScroll();
-  }, [open]);
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open || !closeOnEscape) return;
@@ -105,6 +139,10 @@ export function Modal({
     desktopPlacement === "right"
       ? "sm:h-full sm:max-h-none sm:rounded-none sm:rounded-l-2xl"
       : `sm:rounded-2xl ${sizeClass[size]}`;
+  const mobilePanelClass =
+    mobileMode === "fullscreen"
+      ? "h-full rounded-none"
+      : "rounded-t-2xl";
 
   return createPortal(
     <div
@@ -117,6 +155,7 @@ export function Modal({
       }}
       role="presentation"
       data-modal-layer="global"
+      data-modal-backdrop="true"
       onPointerDown={(event) => {
         if (!closeOnOutsideClick || event.target !== event.currentTarget) return;
         onClose();
@@ -125,33 +164,17 @@ export function Modal({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`flex w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${desktopPanelClass} ${panelClassName}`}
+        className={`flex w-full flex-col overflow-hidden bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${mobilePanelClass} ${desktopPanelClass} ${panelClassName}`}
         style={{
           maxHeight: "calc(100dvh - var(--app-top-inset) - var(--app-bottom-inset) - 1rem)",
         }}
+        data-mobile-mode={mobileMode}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/8 px-4 py-3">
-          <div className="min-w-0">
-            <h3 id={titleId} className="break-words text-sm font-bold">
-              {title}
-            </h3>
-            {subtitle ? <p className="line-clamp-2 text-xs text-muted-foreground">{subtitle}</p> : null}
-          </div>
-          {showCloseButton ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
+        <ModalHeader title={title} subtitle={subtitle} titleId={titleId} onClose={onClose} showCloseButton={showCloseButton} />
         {children}
       </div>
     </div>,

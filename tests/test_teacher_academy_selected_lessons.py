@@ -203,11 +203,14 @@ def test_create_academy_teacher_rejects_cross_program_or_non_lesson_ids(monkeypa
 def test_teacher_academy_frontend_source_includes_selected_lesson_ui():
     source = Path("frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx").read_text()
 
-    assert "Select Teacher Academy lessons" in source
+    assert "Select Academy Lessons" in source
     assert "Selected {selectedLessonIds.length} lessons" in source
     assert 'name="academy_curriculum_item_ids"' in source
     assert 'type="checkbox"' in source
+    assert "Select first 6" in source
+    assert "Select first 12" in source
     assert "Select visible" in source
-    assert "Select first 12" not in source
     assert "Clear selection" in source
+    assert "Show details" in source
+    assert "Review & Create" in source
     assert "Select at least 1 Teacher Academy lesson." in source
