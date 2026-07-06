@@ -41,6 +41,11 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     assert "hidden max-h-[calc(100dvh-20rem)] overflow-auto lg:block" in source
     assert "No academy lessons assigned." in source
     assert "TeacherAcademyPanel" in source
+    assert 'const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";' in source
+    assert "Academy status distribution" in source
+    assert "Average score by subject" in source
+    assert "Completion rate by subject" in source
+    assert "Recent assessment trend" in source
 
 
 def test_teacher_academy_actions_use_schedule_not_assign():
@@ -61,6 +66,12 @@ def test_teacher_academy_modals_select_assignment_ids():
     assert 'name="lesson_assignment_id"' in source
     assert "fields.lesson_assignment_id = String(asNumber(selectedAssignment?.id));" in source
     assert "Select lesson assignment" in source
+    assert 'name="class_label"' in source
+    assert 'name="decision"' in source
+    assert 'name="strengths"' in source
+    assert 'name="areas_for_improvement"' in source
+    assert 'name="final_recommendation"' in source
+    assert "Save assessment" in source
 
 
 def test_teacher_mobile_bottom_nav_contract():
@@ -75,7 +86,8 @@ def test_teacher_mobile_bottom_nav_contract():
     assert "Teacher mobile navigation" in source
     assert "var(--app-bottom-inset)" in source
     assert 'aria-current={isActive ? "page" : undefined}' in source
-    assert '${isTraining ? "hidden" : "flex"}' in source
+    assert "const mobileTabs = isTraining ? teacherMobileTabs : activeTeacherMobileTabs;" in source
+    assert 'bottomNavActiveKey(activeTab, cabinetMode)' in source
     assert "function CabinetSidebar" in source
     assert "Teacher cabinet desktop navigation" in source
 
@@ -115,6 +127,15 @@ def test_teacher_cabinet_design_is_applied_to_academy_shell():
     assert "AcademyLessonsScreen" in source
     assert "No academy lessons assigned." in source
     assert "No assessment reports yet." in source
+
+
+def test_active_teacher_charts_include_requested_views():
+    source = _read("roles/teacher/components/ActiveTeacherCharts.tsx")
+
+    assert 'title="Attendance trend"' in source
+    assert 'title="AAP trend"' in source
+    assert 'title="Homework submission"' in source
+    assert 'title="Group comparison"' in source
 
 
 def test_teacher_academy_and_active_tabs_stay_available():

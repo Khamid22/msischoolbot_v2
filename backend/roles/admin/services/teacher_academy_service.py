@@ -1,5 +1,4 @@
 import json
-import random
 from datetime import datetime
 
 from werkzeug.security import generate_password_hash
@@ -7,9 +6,6 @@ from werkzeug.security import generate_password_hash
 from database import queries
 from backend.identity.teachers import list_teachers, upsert_teacher
 from backend.roles.admin.services.teacher_academy_notifications import notify_academy_teacher_event
-
-
-ACADEMY_TARGET_LESSONS = 12
 
 VALID_ACADEMY_STATUSES = {
     "new_academy_teacher",
@@ -282,22 +278,6 @@ def backfill_academy_teacher_accounts():
         conn.commit()
 
 
-def _balanced_random_lessons(rows, count=ACADEMY_TARGET_LESSONS):
-    rows = list(rows)
-    if len(rows) <= count:
-        return rows
-    selected = []
-    for index in range(count):
-        start = round(index * len(rows) / count)
-        end = round((index + 1) * len(rows) / count)
-        bucket = rows[start:end] or rows
-        selected.append(random.choice(bucket))
-    by_id = {}
-    for row in selected:
-        by_id[int(row["id"])] = row
-    return sorted(by_id.values(), key=lambda row: int(row["item_order"] or 0))[:count]
-
-
 def _teacher_name(conn, teacher_id):
     parsed_teacher_id = _as_int(teacher_id)
     if not parsed_teacher_id:
@@ -513,7 +493,9 @@ def _progress_for(assignments, assessments):
         "passed_count": len(passed_assignment_ids),
         "average_score": round(sum(scores) / len(scores), 2) if scores else None,
         "latest_score": round(scores[-1], 2) if scores else None,
-        "target_lessons": ACADEMY_TARGET_LESSONS,
+        # The progress target always equals the number of lessons the Academic
+        # Director actually assigned — never a fixed 12-lesson pack.
+        "target_lessons": len(assignments),
         "next_assignment": next_assignment,
     }
 
@@ -1230,6 +1212,7 @@ def promote_academy_teacher(
     progress = teacher.get("progress") if isinstance(teacher.get("progress"), dict) else {}
     average_score = progress.get("average_score") or 7
     supervised_lessons = progress.get("assessed_count") or 0
+    assigned_lessons = progress.get("target_lessons") or progress.get("assigned_count") or supervised_lessons
     now = _utc_now_iso()
     promoted_teacher_id = _as_int(teacher.get("account_teacher_id"))
     with queries.connect_auth_db() as conn:
@@ -1253,7 +1236,7 @@ def promote_academy_teacher(
                 semester_stage=semester_stage,
                 performance_score=average_score,
                 supervised_lessons=supervised_lessons,
-                igcse_evidence=f"Teacher Academy: {supervised_lessons}/{ACADEMY_TARGET_LESSONS} assessed lessons.",
+                igcse_evidence=f"Teacher Academy: {supervised_lessons}/{assigned_lessons} assessed lessons.",
                 promotion_notes=promotion_notes or "Promoted from Teacher Academy.",
             )
             if not created:
@@ -1279,7 +1262,6 @@ def promote_academy_teacher(
 
 
 __all__ = [
-    "ACADEMY_TARGET_LESSONS",
     "RUBRIC_WEIGHTS",
     "backfill_academy_teacher_accounts",
     "get_academy_teacher_for_teacher_account",

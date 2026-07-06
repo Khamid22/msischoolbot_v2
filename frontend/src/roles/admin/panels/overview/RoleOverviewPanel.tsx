@@ -43,10 +43,10 @@ function academyProgress(teacher: Record<string, unknown>) {
   const progress = teacher.progress && typeof teacher.progress === "object"
     ? (teacher.progress as Record<string, unknown>)
     : {};
-  const assigned = asNumber(progress.assigned_count);
+  const assigned = asNumber(progress.assigned_count) || academyAssignments(teacher).length;
   const assessed = asNumber(progress.assessed_count);
   const passed = asNumber(progress.passed_count);
-  const target = asNumber(progress.target_lessons) || 12;
+  const target = asNumber(progress.target_lessons) || assigned;
   const average = Number(progress.average_score);
   const latest = Number(progress.latest_score);
   return {
@@ -165,7 +165,7 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
       </ChartCard>
 
       <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-        <ChartCard title="12-Lesson Training Pack" subtitle={`${assignments.length} curriculum lessons`} icon={<BookOpen className="h-4 w-4 text-info" />}>
+        <ChartCard title="Selected Academy Lessons" subtitle={`${assignments.length} curriculum lessons`} icon={<BookOpen className="h-4 w-4 text-info" />}>
           <div className="miniapp-table-scroll max-h-[28rem] rounded-lg border border-foreground/8">
             <div className="grid gap-0 divide-y divide-foreground/5 bg-background">
               {assignments.map((assignment) => (

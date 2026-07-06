@@ -71,7 +71,8 @@ def _academy_summary(academy, assignments, assessments):
     assigned_count = _as_int(progress.get("assigned_count")) or len(assignments)
     assessed_count = _as_int(progress.get("assessed_count"))
     remaining_count = max(assigned_count - assessed_count, 0)
-    target_lessons = _as_int(progress.get("target_lessons")) or assigned_count or 12
+    # Progress target equals the number of assigned lessons — no fixed 12 fallback.
+    target_lessons = _as_int(progress.get("target_lessons")) or assigned_count
     progress_percent = round((assessed_count / target_lessons) * 100) if target_lessons else 0
     scores = [_as_score(item.get("weighted_overall_score")) for item in assessments if isinstance(item, dict)]
     scores = [score for score in scores if score > 0]

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trophy, X, XCircle } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trophy, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
@@ -10,17 +10,13 @@ type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
 type GeneratedCredentials = Record<string, unknown>;
 
-const TARGET_LESSONS = 12;
-
 const focusAreas = [
-  "Teacher Guidance Compliance",
-  "Timing Adherence",
+  "Teacher Guidance",
+  "Timing",
   "Resource Familiarity",
   "English Fluency",
-  "Confidence & Delivery",
-  "Engagement Technique",
-  "Questioning Techniques",
-  "Whole-class Example Management",
+  "Confidence",
+  "Student Engagement",
 ];
 
 const rubric = [
@@ -83,11 +79,14 @@ function toDateTimeLocal(value: unknown) {
 
 function teacherProgress(teacher: AcademyTeacher) {
   const progress = teacher.progress && typeof teacher.progress === "object" ? teacher.progress as Record<string, unknown> : {};
+  const assigned = asNumber(progress.assigned_count) || academyAssignments(teacher).length;
   return {
-    assigned: asNumber(progress.assigned_count),
+    assigned,
     assessed: asNumber(progress.assessed_count),
     passed: asNumber(progress.passed_count),
-    target: asNumber(progress.target_lessons) || TARGET_LESSONS,
+    // The progress target always equals the number of selected assigned
+    // lessons — never a fixed 12-lesson pack.
+    target: asNumber(progress.target_lessons) || assigned,
     average: progress.average_score == null ? null : Number(progress.average_score),
     latest: progress.latest_score == null ? null : Number(progress.latest_score),
     nextAssignment: progress.next_assignment && typeof progress.next_assignment === "object"
@@ -118,7 +117,15 @@ function assignmentIsScheduled(assignment: AcademyAssignment | null | undefined)
 function nextAcademyAssignment(teacher: AcademyTeacher) {
   const progress = teacherProgress(teacher);
   const assignments = academyAssignments(teacher);
-  return progress.nextAssignment || assignments[0] || null;
+  const assessedAssignmentIds = new Set(academyAssessments(teacher).map((assessment) => asNumber(assessment.lesson_assignment_id)).filter(Boolean));
+  return (
+    progress.nextAssignment ||
+    assignments.find((assignment) => {
+      const status = asString(assignment.status);
+      return !assessedAssignmentIds.has(asNumber(assignment.id)) && !["assessed", "passed", "cancelled"].includes(status);
+    }) ||
+    null
+  );
 }
 
 function assignmentById(assignments: AcademyAssignment[], assignmentId: number) {
@@ -156,6 +163,140 @@ function metric(label: string, value: string | number, detail: string) {
       <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
     </div>
   );
+}
+
+type AnalyticsRow = {
+  label: string;
+  value: number;
+  detail: string;
+};
+
+function MiniAnalyticsCard({
+  title,
+  subtitle,
+  rows,
+  emptyLabel,
+}: {
+  title: string;
+  subtitle: string;
+  rows: AnalyticsRow[];
+  emptyLabel: string;
+}) {
+  return (
+    <section className="rounded-xl border border-foreground/8 bg-background px-3 py-3">
+      <div className="mb-3">
+        <p className="text-xs font-black text-foreground">{title}</p>
+        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{subtitle}</p>
+      </div>
+      {rows.length ? (
+        <div className="space-y-2.5">
+          {rows.slice(0, 6).map((row) => (
+            <div key={row.label}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="truncate text-[11px] font-bold text-foreground">{row.label}</span>
+                <span className="shrink-0 text-[11px] font-black text-muted-foreground">{row.detail}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, row.value))}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-xs font-semibold text-muted-foreground">
+          {emptyLabel}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function academyAnalyticsRows(academyTeachers: AcademyTeacher[]) {
+  const total = academyTeachers.length;
+  const statusGroups = [
+    {
+      label: "In training",
+      count: academyTeachers.filter((teacher) =>
+        ["new_academy_teacher", "in_training", "ready_for_evaluation"].includes(asString(teacher.academy_status)),
+      ).length,
+    },
+    {
+      label: "Ready",
+      count: academyTeachers.filter((teacher) => asString(teacher.academy_status) === "ready_for_active_teacher").length,
+    },
+    {
+      label: "Completed",
+      count: academyTeachers.filter((teacher) => ["approved", "approved_for_active_teacher"].includes(asString(teacher.academy_status))).length,
+    },
+    {
+      label: "Needs support",
+      count: academyTeachers.filter((teacher) => ["needs_improvement", "rejected", "on_hold"].includes(asString(teacher.academy_status))).length,
+    },
+  ];
+  const statusRows = statusGroups
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      label: item.label,
+      value: total ? Math.round((item.count / total) * 100) : 0,
+      detail: String(item.count),
+    }));
+
+  const scoreBySubject = new Map<string, { sum: number; count: number }>();
+  const completionBySubject = new Map<string, { sum: number; count: number }>();
+  academyTeachers.forEach((teacher) => {
+    const subject = asString(teacher.subject) || "Subject not set";
+    const progress = teacherProgress(teacher);
+    if (progress.average != null && Number.isFinite(progress.average)) {
+      const bucket = scoreBySubject.get(subject) || { sum: 0, count: 0 };
+      bucket.sum += progress.average;
+      bucket.count += 1;
+      scoreBySubject.set(subject, bucket);
+    }
+    if (progress.target > 0) {
+      const bucket = completionBySubject.get(subject) || { sum: 0, count: 0 };
+      bucket.sum += Math.min(100, Math.round((progress.assessed / progress.target) * 100));
+      bucket.count += 1;
+      completionBySubject.set(subject, bucket);
+    }
+  });
+  const subjectScoreRows = Array.from(scoreBySubject.entries())
+    .map(([label, bucket]) => {
+      const score = bucket.sum / bucket.count;
+      return { label, value: score * 10, detail: score.toFixed(1) };
+    })
+    .sort((left, right) => right.value - left.value);
+  const completionRows = Array.from(completionBySubject.entries())
+    .map(([label, bucket]) => {
+      const percent = Math.round(bucket.sum / bucket.count);
+      return { label, value: percent, detail: `${percent}%` };
+    })
+    .sort((left, right) => right.value - left.value);
+
+  const assessmentRows = academyTeachers
+    .flatMap((teacher) =>
+      academyAssessments(teacher).map((assessment) => ({
+        teacherName: asString(teacher.full_name) || "Teacher",
+        lesson: asString(assessment.lesson_number) || "Lesson",
+        score: asNumber(assessment.weighted_overall_score),
+        date: asString(assessment.assessment_datetime || assessment.created_at || assessment.updated_at),
+      })),
+    )
+    .filter((item) => item.score > 0)
+    .sort((left, right) => Date.parse(right.date || "") - Date.parse(left.date || ""))
+    .slice(0, 6)
+    .reverse()
+    .map((item) => ({
+      label: `${item.teacherName} · ${item.lesson}`,
+      value: item.score * 10,
+      detail: item.score.toFixed(1),
+    }));
+
+  return {
+    statusRows,
+    subjectScoreRows,
+    completionRows,
+    assessmentRows,
+  };
 }
 
 function NewHeadOfDepartmentModal({
@@ -281,9 +422,9 @@ function NewAcademyTeacherModal({
     );
   }
 
-  function selectFirstTwelveLessons() {
+  function selectAllVisibleLessons() {
     setLocalError("");
-    setSelectedLessonIds(selectedProgramLessons.slice(0, TARGET_LESSONS).map((lesson) => asNumber(lesson.id)).filter(Boolean));
+    setSelectedLessonIds(filteredProgramLessons.map((lesson) => asNumber(lesson.id)).filter(Boolean));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -374,11 +515,11 @@ function NewAcademyTeacherModal({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={selectFirstTwelveLessons}
-                disabled={!selectedProgramLessons.length}
+                onClick={selectAllVisibleLessons}
+                disabled={!filteredProgramLessons.length}
                 className="rounded-lg border border-foreground/10 px-3 py-1.5 text-xs font-bold hover:bg-muted disabled:opacity-50"
               >
-                Select first 12
+                Select visible
               </button>
               <button
                 type="button"
@@ -444,7 +585,7 @@ function NewAcademyTeacherModal({
           </div>
         </section>
         {localError || error ? <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{localError || error}</p> : null}
-        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Training Pack" disabled={!selectedLessonIds.length} />
+        <ModalActions onClose={onClose} submitting={submitting} submitLabel="Create Academy Teacher" disabled={!selectedLessonIds.length} />
       </form>
     </ModalShell>
   );
@@ -506,6 +647,16 @@ function AssignmentModal({
   return (
     <ModalShell title="Schedule Training Lesson" subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"} onClose={onClose}>
       <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
+            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Subject</p>
+            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+          </div>
+        </div>
         <label className="block">
           <FieldLabel>Lesson Assignment</FieldLabel>
           <select
@@ -530,13 +681,12 @@ function AssignmentModal({
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <FieldLabel>Assignment Type</FieldLabel>
+            <FieldLabel>Lesson Type</FieldLabel>
             <select key={`type-${selectedAssignmentId}`} name="assignment_type" defaultValue={asString(selectedAssignment?.assignment_type) || "full_practice_lesson"} className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
-              <option value="preparation_only">Preparation only</option>
-              <option value="partial_practice">Partial practice</option>
-              <option value="full_practice_lesson">Full practice lesson</option>
-              <option value="final_evaluation">Final evaluation</option>
-              <option value="reteach_after_feedback">Reteach after feedback</option>
+              <option value="full_practice_lesson">Practice Lesson</option>
+              <option value="demo_lesson">Demo Lesson</option>
+              <option value="observation">Observation</option>
+              <option value="final_evaluation">Final Evaluation</option>
             </select>
           </label>
           <label className="block">
@@ -623,8 +773,6 @@ function AssessmentModal({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-    const decision = submitter?.value === "rejected" ? "rejected" : "passed";
     const fields: Record<string, string> = {};
     data.forEach((value, key) => {
       fields[key] = String(value);
@@ -634,8 +782,7 @@ function AssessmentModal({
       fields[item.remarksKey] = fields[item.remarksKey] || "";
     });
     fields.lesson_assignment_id = String(asNumber(selectedAssignment?.id));
-    fields.class_label = "";
-    fields.decision = decision;
+    fields.decision = fields.decision || "passed";
     onSubmit(asNumber(teacher.id), fields);
   }
 
@@ -643,6 +790,16 @@ function AssessmentModal({
     <ModalShell title="Assessment Report" subtitle={`${asString(teacher.full_name)} · ${selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"} · score ${weighted.toFixed(2)}`} onClose={onClose} wide>
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
+              <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Subject</p>
+              <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+            </div>
+          </div>
           <label className="block">
             <FieldLabel>Lesson Assignment</FieldLabel>
             <select
@@ -665,7 +822,7 @@ function AssessmentModal({
               </span>
             ) : null}
           </label>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label className="block">
               <FieldLabel>Assessment Type</FieldLabel>
               <select name="assessment_type" defaultValue="academy_practice_lesson" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
@@ -695,6 +852,19 @@ function AssessmentModal({
                     {asString(item.full_name)}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="block">
+              <FieldLabel>Class Label</FieldLabel>
+              <input name="class_label" placeholder="Group or demo class" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            </label>
+            <label className="block">
+              <FieldLabel>Decision</FieldLabel>
+              <select name="decision" defaultValue="passed" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
+                <option value="needs_improvement">Needs improvement</option>
+                <option value="passed">Passed</option>
+                <option value="ready_for_final_evaluation">Ready for final evaluation</option>
+                <option value="approved_for_active_teacher">Approved for active teacher</option>
               </select>
             </label>
           </div>
@@ -756,19 +926,29 @@ function AssessmentModal({
               </table>
             </div>
           </section>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <label className="block">
+              <FieldLabel>Strengths</FieldLabel>
+              <textarea name="strengths" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="What went well?" />
+            </label>
+            <label className="block">
+              <FieldLabel>Areas for Improvement</FieldLabel>
+              <textarea name="areas_for_improvement" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="What should improve next?" />
+            </label>
+            <label className="block">
+              <FieldLabel>Final Recommendation</FieldLabel>
+              <textarea name="final_recommendation" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="Final academic department note" />
+            </label>
+          </div>
           {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
         </div>
         <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-foreground/8 bg-surface/95 px-4 py-3 backdrop-blur">
           <button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-foreground/10 bg-background px-4 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
             Cancel
           </button>
-          <button type="submit" value="rejected" disabled={submitting || !selectedAssignment} className="inline-flex h-10 items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 text-sm font-bold text-destructive transition hover:bg-destructive/15 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100">
-            <XCircle className="h-4 w-4" />
-            {submitting ? "Saving..." : "Fail"}
-          </button>
-          <button type="submit" value="passed" disabled={submitting || !selectedAssignment} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+          <button type="submit" disabled={submitting || !selectedAssignment} className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
             <CheckCircle2 className="h-4 w-4" />
-            {submitting ? "Saving..." : "Success"}
+            {submitting ? "Saving..." : "Save assessment"}
           </button>
         </div>
       </form>
@@ -904,7 +1084,7 @@ function AcademyDetailModal({
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <section>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">12-Lesson Training Pack</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Selected Academy Lessons</p>
               <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                 {allowTeacherPreview ? (
                   <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
@@ -1095,6 +1275,12 @@ function AcademyTeacherCard({
             </>
           )
         ) : null}
+        {!nextAssignment && assignments.length ? (
+          <button type="button" onClick={onDetail} className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-foreground px-3 text-xs font-black text-background">
+            <Eye className="h-3.5 w-3.5" />
+            Review
+          </button>
+        ) : null}
         <button type="button" onClick={onDetail} className="inline-flex h-9 items-center justify-center rounded-lg border border-foreground/10 px-3 text-xs font-black">
           Details
         </button>
@@ -1134,14 +1320,14 @@ function ModalShell({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/55 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/55 p-0 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
         ref={panelRef}
-        className={`flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover animate-in zoom-in-95 slide-in-from-bottom-2 duration-150 motion-reduce:animate-none ${wide ? "max-w-6xl" : "max-w-2xl"}`}
+        className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover animate-in slide-in-from-bottom-2 duration-150 motion-reduce:animate-none sm:max-h-[calc(100dvh-1.5rem)] sm:rounded-2xl sm:zoom-in-95 ${wide ? "sm:max-w-6xl" : "sm:max-w-2xl"}`}
       >
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div className="min-w-0">
@@ -1224,6 +1410,7 @@ export function TeacherAcademyPanel({
       average: scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null,
     };
   }, [academyTeachers]);
+  const analytics = useMemo(() => academyAnalyticsRows(academyTeachers), [academyTeachers]);
 
   function applyPayload(data: Record<string, unknown>) {
     if (Array.isArray(data.academy)) {
@@ -1255,7 +1442,9 @@ export function TeacherAcademyPanel({
   }
 
   const adminMode = asString(state.adminMode || state.props?.adminMode).toLowerCase();
-  const canCreateHeadOfDepartment = adminMode === "academic_director" || asString(state.props?.authRole).toLowerCase() === "academic_director";
+  const authRole = asString(state.props?.authRole).toLowerCase();
+  const canCreateHeadOfDepartment = adminMode === "academic_director" || authRole === "academic_director";
+  const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";
 
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
     const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
@@ -1411,7 +1600,7 @@ export function TeacherAcademyPanel({
 
       <ChartCard
         title="Teacher Academy"
-        subtitle="New teachers training on 12 curriculum-guided lessons"
+        subtitle="New teachers training on selected curriculum-guided lessons"
         icon={<GraduationCap className="h-4 w-4 text-info" />}
         className="flex min-h-0 flex-1 flex-col"
         bodyClassName="flex min-h-0 flex-1 flex-col"
@@ -1430,17 +1619,19 @@ export function TeacherAcademyPanel({
                 New HOD
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setCreateOpen(true);
-              }}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"
-            >
-              <Plus className="h-4 w-4" />
-              New Academy Teacher
-            </button>
+            {canCreateAcademyTeacher ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setCreateOpen(true);
+                }}
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"
+              >
+                <Plus className="h-4 w-4" />
+                New Academy Teacher
+              </button>
+            ) : null}
           </div>
         }
       >
@@ -1473,6 +1664,32 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
+        <div className="mb-3 grid shrink-0 gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <MiniAnalyticsCard
+            title="Academy status distribution"
+            subtitle="Training, ready, completed, support"
+            rows={analytics.statusRows}
+            emptyLabel="No academy teachers yet."
+          />
+          <MiniAnalyticsCard
+            title="Average score by subject"
+            subtitle="Weighted assessment average"
+            rows={analytics.subjectScoreRows}
+            emptyLabel="No assessment scores yet."
+          />
+          <MiniAnalyticsCard
+            title="Completion rate by subject"
+            subtitle="Assessed lessons over assigned lessons"
+            rows={analytics.completionRows}
+            emptyLabel="No assigned lessons yet."
+          />
+          <MiniAnalyticsCard
+            title="Recent assessment trend"
+            subtitle="Latest reports in sequence"
+            rows={analytics.assessmentRows}
+            emptyLabel="No assessment trend yet."
+          />
+        </div>
         <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
             <>
@@ -1496,16 +1713,17 @@ export function TeacherAcademyPanel({
               <div className="hidden max-h-[calc(100dvh-20rem)] overflow-auto lg:block">
                 <table className="w-full min-w-[860px] table-fixed border-collapse text-left">
                   <colgroup>
-                    <col className="w-[22%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[18%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[13%]" />
                     <col className="w-[14%]" />
+                    <col className="w-[18%]" />
+                    <col className="w-[13%]" />
                     <col className="w-[10%]" />
-                    <col className="w-[24%]" />
+                    <col className="w-[12%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-surface/95 shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
                     <tr>
-                      {["Teacher", "Login", "Progress", "Next lesson", "Avg", "Actions"].map((heading) => (
+                      {["Teacher", "Subject", "Progress", "Next lesson", "Director / Evaluator", "Avg score", "Actions"].map((heading) => (
                         <th
                           key={heading}
                           className="px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground"
@@ -1530,13 +1748,26 @@ export function TeacherAcademyPanel({
                           style={{ animationDelay: `${index * 30}ms` }}
                         >
                           <td className="px-3 py-2.5 align-middle">
-                            <button type="button" onClick={() => setDetailTeacher(teacher)} className="flex min-w-0 items-center gap-2 text-left">
+                            <div className="flex min-w-0 items-center gap-2 text-left">
                               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-black text-primary">
                                 {asString(teacher.full_name).slice(0, 1).toUpperCase() || "T"}
                               </span>
                               <span className="min-w-0">
-                                <span className="block truncate text-sm font-black text-primary group-hover:underline">{asString(teacher.full_name)}</span>
-                                <span className="mt-1 block truncate text-[11px] font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</span>
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="block max-w-full truncate text-left text-sm font-black text-primary group-hover:underline">
+                                  {asString(teacher.full_name)}
+                                </button>
+                                <span className="mt-1 flex min-w-0 items-center gap-1.5">
+                                  <span className="truncate font-mono text-[11px] font-black text-foreground">{login || "Creating..."}</span>
+                                  <button
+                                    type="button"
+                                    disabled={!login}
+                                    onClick={() => copyLogin(login)}
+                                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-foreground/10 bg-surface text-muted-foreground ${login ? "hover:text-foreground" : "opacity-40"}`}
+                                    aria-label="Copy teacher login"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </button>
+                                </span>
                                 <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
                                   status === "ready_for_active_teacher"
                                     ? "bg-success/10 text-success"
@@ -1549,21 +1780,10 @@ export function TeacherAcademyPanel({
                                   {statusLabel(teacher.academy_status)}
                                 </span>
                               </span>
-                            </button>
+                            </div>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <div className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate font-mono text-[12px] font-black text-foreground">{login || "Creating..."}</span>
-                              <button
-                                type="button"
-                                disabled={!login}
-                                onClick={() => copyLogin(login)}
-                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-foreground/10 bg-surface text-muted-foreground hover:text-foreground disabled:opacity-40"
-                                aria-label="Copy teacher login"
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            <span className="line-clamp-2 text-xs font-bold text-foreground">{asString(teacher.subject) || "Subject not set"}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             <div className="min-w-0">
@@ -1581,12 +1801,17 @@ export function TeacherAcademyPanel({
                               <div className="min-w-0">
                                 <p className="truncate text-xs font-black">{assignmentTitle(nextAssignment)}</p>
                                 <p className="mt-0.5 truncate text-[11px] font-semibold text-muted-foreground">
-                                  {dateLabel(nextAssignment.session_datetime)} · {asString(nextAssignment.evaluator_name) || "No evaluator"}
+                                  {dateLabel(nextAssignment.session_datetime)}
                                 </p>
                               </div>
                             ) : (
                               <span className="text-xs font-semibold text-muted-foreground">No academy lessons assigned.</span>
                             )}
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="line-clamp-2 text-xs font-bold text-foreground">
+                              {nextAssignment ? asString(nextAssignment.evaluator_name) || "Not assigned" : "Not assigned"}
+                            </span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             <span className="text-sm font-black">{progress.average == null ? "-" : progress.average.toFixed(2)}</span>
@@ -1617,6 +1842,12 @@ export function TeacherAcademyPanel({
                                     </button>
                                   </>
                                 )
+                              ) : null}
+                              {!nextAssignment && academyAssignments(teacher).length ? (
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Review
+                                </button>
                               ) : null}
                               <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted">
                                 Details

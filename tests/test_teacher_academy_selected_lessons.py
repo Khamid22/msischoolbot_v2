@@ -124,11 +124,7 @@ def _patch_create_dependencies(monkeypatch, curriculum_rows=None):
 
 def test_create_academy_teacher_uses_selected_lesson_ids_in_order(monkeypatch):
     conn = _patch_create_dependencies(monkeypatch)
-
-    def fail_if_random_is_used(rows, count=12):
-        raise AssertionError("random lesson selection should not run for selected lessons")
-
-    monkeypatch.setattr(academy_service, "_balanced_random_lessons", fail_if_random_is_used)
+    assert not hasattr(academy_service, "_balanced_random_lessons")
 
     created, message, credentials = academy_service.create_academy_teacher(
         full_name="Example Teacher",
@@ -211,6 +207,7 @@ def test_teacher_academy_frontend_source_includes_selected_lesson_ui():
     assert "Selected {selectedLessonIds.length} lessons" in source
     assert 'name="academy_curriculum_item_ids"' in source
     assert 'type="checkbox"' in source
-    assert "Select first 12" in source
+    assert "Select visible" in source
+    assert "Select first 12" not in source
     assert "Clear selection" in source
     assert "Select at least 1 Teacher Academy lesson." in source
