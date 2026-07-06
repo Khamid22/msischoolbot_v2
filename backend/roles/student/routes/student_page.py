@@ -29,6 +29,7 @@ from backend.utils.session import (
     current_student_school_code,
 )
 from backend.roles.student.routes.students import register_student_routes
+from backend.utils.performance import PagePerformanceTimer, log_page_performance
 
 
 def register_student_page_routes(app, *, render_admin_page):
@@ -49,13 +50,15 @@ def register_student_page_routes(app, *, render_admin_page):
         )
 
     def render_student_panel(form_data, panel_error=""):
+        timer = PagePerformanceTimer()
         context = build_student_panel_context(
             form_data=form_data,
             student_school_code=current_student_school_code(),
             force_refresh=should_force_refresh(),
         )
+        timer.mark("context_build")
 
-        return render_react_page(
+        response = render_react_page(
             "student-home",
             {
                 "subjects": context["subjects"],
@@ -71,6 +74,18 @@ def register_student_page_routes(app, *, render_admin_page):
             title="MSI School Portal",
             description="Select stream, group, and student.",
         )
+        timer.mark("render")
+        log_page_performance(
+            "student_home",
+            timer,
+            response=response,
+            rows={
+                "subjects": context["subjects"],
+                "groups_by_subject": context["groups_by_subject"],
+                "students_by_subject_group": context["students_by_subject_group"],
+            },
+        )
+        return response
 
     def track_student_activity(request_obj: Request):
         # activity_ping records activity itself (with session repair); skip here.

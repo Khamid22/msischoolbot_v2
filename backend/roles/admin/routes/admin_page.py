@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from backend.utils.guards import GuardResponse
 from backend.utils.response_helpers import jsonify, redirect
 from backend.utils.context import request, session
+from backend.utils.performance import PagePerformanceTimer, log_page_performance
 from backend.utils.session import url_for
 from backend.render import generate_csrf, render_react_page
 from backend.identity.roles import normalize_role
@@ -87,6 +88,7 @@ def register_admin_page_routes(
         admin_school="all",
         admin_mode="",
     ):
+        timer = PagePerformanceTimer()
         requested_panel = str(request.args.get("panel", "") or "").strip()
         requested_school = str(request.args.get("school", "") or "").strip()
         requested_mode = str(request.args.get("mode", "") or "").strip().lower()
@@ -109,13 +111,17 @@ def register_admin_page_routes(
             parent_admin_id=session.get("admin_id", 0),
             force_refresh=force_refresh,
         )
+        timer.mark("admin_context_build")
         academic_context = list_admin_academic_context()
+        timer.mark("academic_context_build")
         announcements = list_announcements()
         admin_system_cards = system_admin_workspace_cards()
+        timer.mark("support_context_build")
         if current_auth_role() == "head_of_department":
             from backend.roles.head_of_department.academy_scope import filter_admin_context_for_current_hod
 
             filter_admin_context_for_current_hod(page_context, academic_context)
+            timer.mark("hod_scope_filter")
 
         panel = page_context["panel"]
         school_filter = page_context["school_filter"]
@@ -132,7 +138,7 @@ def register_admin_page_routes(
         if resolved_admin_mode not in ADMIN_PANEL_MODES:
             resolved_admin_mode = "admin"
 
-        return render_react_page(
+        response = render_react_page(
             "admin-home",
             {
                 "authLogin": current_auth_login(),
@@ -183,6 +189,33 @@ def register_admin_page_routes(
             description="Admin panel for school performance, teachers, students, and resources.",
             telegram=True,
         )
+        timer.mark("render")
+        log_page_performance(
+            "admin_home",
+            timer,
+            response=response,
+            rows={
+                "admin_students": page_context["admin_students"],
+                "admin_teachers": page_context["admin_teachers"],
+                "admin_teacher_candidates": page_context["admin_teacher_candidates"],
+                "admin_teacher_academy": page_context["admin_teacher_academy"],
+                "admin_complaints": page_context["admin_complaints"],
+                "admin_parents": page_context["admin_parents"],
+                "admin_parent_children": page_context["admin_parent_children"],
+                "admin_group_options": page_context["admin_group_options"],
+                "academic_subjects": academic_context["subjects"],
+                "academic_groups": academic_context["groups"],
+                "academic_enrollments": academic_context.get("enrollments", []),
+                "academic_lessons": academic_context.get("lessons", []),
+                "academic_schedules": academic_context.get("schedules", []),
+                "academic_sessions": academic_context.get("sessions", []),
+                "curriculum_programs": academic_context.get("curriculum_programs", []),
+                "curriculum_items": academic_context.get("curriculum_items", []),
+                "announcements": announcements,
+                "system_admin_cards": admin_system_cards,
+            },
+        )
+        return response
 
     def render_edit_student_page(student_row_id, auth_error="", admin_notice=""):
         context = build_edit_student_page_context(student_row_id)

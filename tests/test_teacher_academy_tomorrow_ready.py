@@ -230,12 +230,23 @@ def _patch_admin_page_context(monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
     import backend.roles.academic_director.routes as academic_director_routes
 
+    def fake_teacher_academy_page_context():
+        admin_context = _minimal_admin_page_context()
+        academic_context = _minimal_academic_context()
+        return {
+            "teachers": admin_context["admin_teachers"],
+            "academy_teachers": admin_context["admin_teacher_academy"],
+            "group_options": admin_context["admin_group_options"],
+            "subjects": academic_context["subjects"],
+            "curriculum_programs": academic_context["curriculum_programs"],
+            "curriculum_items": academic_context["curriculum_items"],
+        }
+
     monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
-    monkeypatch.setattr(academic_director_routes, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
-    monkeypatch.setattr(academic_director_routes, "list_admin_academic_context", _minimal_academic_context)
+    monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
 
 
 def test_academy_teacher_source_limits_tabs_to_required_set():

@@ -33,20 +33,18 @@ def test_teacher_workspace_includes_academy_payload(monkeypatch):
     )
     monkeypatch.setattr(
         services,
-        "list_academy_teachers",
-        lambda: [
-            {
-                "id": 3,
-                "user_id": 44,
-                "account_teacher_id": 12,
-                "promoted_teacher_id": 0,
-                "assignments": [
-                    {"id": 8, "session_datetime": "2026-05-01T08:00:00Z"},
-                    {"id": 9, "session_datetime": ""},
-                ],
-                "assessments": [{"id": 11, "lesson_assignment_id": 8}],
-            }
-        ],
+        "get_academy_teacher_for_teacher_account",
+        lambda teacher_id, staff_id=None: {
+            "id": 3,
+            "user_id": staff_id,
+            "account_teacher_id": teacher_id,
+            "promoted_teacher_id": 0,
+            "assignments": [
+                {"id": 8, "session_datetime": "2026-05-01T08:00:00Z"},
+                {"id": 9, "session_datetime": ""},
+            ],
+            "assessments": [{"id": 11, "lesson_assignment_id": 8}],
+        },
     )
 
     workspace = services.build_teacher_workspace(12, staff_id=44)

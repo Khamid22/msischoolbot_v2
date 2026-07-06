@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Request
 
 from backend.utils.guards import GuardResponse
 from backend.utils.context import request
+from backend.utils.performance import PagePerformanceTimer, log_page_performance
 from backend.utils.session import (
     current_auth_login,
     current_auth_role,
@@ -33,12 +34,14 @@ def register_teacher_page_routes(app):
 
     @teacher.get("/teacher")
     def teacher_home():
+        timer = PagePerformanceTimer()
         teacher_id = current_teacher_id()
         teacher_staff_id = current_teacher_staff_id()
         try:
             workspace = build_teacher_workspace(teacher_id, teacher_staff_id)
         except Exception:
             workspace = None
+        timer.mark("workspace_build")
         if not isinstance(workspace, dict):
             workspace = {
                 "teacher": {
@@ -63,6 +66,7 @@ def register_teacher_page_routes(app):
             teacher_staff_id=teacher_staff_id,
             workspace=workspace,
         )
+        timer.mark("card_build")
 
         # Get teacher's DB details for academic info (subject, etc.)
         from backend.identity.account_service import get_teacher_by_id
@@ -70,6 +74,7 @@ def register_teacher_page_routes(app):
             teacher_db = get_teacher_by_id(teacher_id) if teacher_id else None
         except Exception:
             teacher_db = None
+        timer.mark("teacher_lookup")
 
         # Get list of subjects for teacher's options
         from database import connect_auth_db
@@ -102,8 +107,9 @@ def register_teacher_page_routes(app):
                     subjects_options = [dict(row) for row in rows]
         except Exception:
             subjects_options = []
+        timer.mark("subject_options")
 
-        return render_react_page(
+        response = render_react_page(
             "teacher-home",
             {
                 "authLogin": current_auth_login(),
@@ -127,6 +133,23 @@ def register_teacher_page_routes(app):
                 "workspaceCards": workspace_cards,
             },
         )
+        timer.mark("render")
+        log_page_performance(
+            "teacher_home",
+            timer,
+            response=response,
+            rows={
+                "groups": workspace["groups"],
+                "academy": [workspace.get("academy")] if workspace.get("academy") else [],
+                "academy_updates": workspace.get("academy_updates", []),
+                "journey": workspace.get("journey", []),
+                "lesson_reports": workspace.get("lesson_reports", []),
+                "training_timetable": workspace.get("training_timetable", []),
+                "subjects_options": subjects_options,
+                "workspace_cards": workspace_cards,
+            },
+        )
+        return response
 
     @teacher.get("/teacher/api/office-hours/availability")
     def teacher_list_availability():

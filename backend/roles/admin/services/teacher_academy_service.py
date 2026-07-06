@@ -274,6 +274,14 @@ def _backfill_academy_teacher_accounts(conn):
             )
 
 
+def backfill_academy_teacher_accounts():
+    """Explicit maintenance action for older academy rows missing teacher logins."""
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        _backfill_academy_teacher_accounts(conn)
+        conn.commit()
+
+
 def _balanced_random_lessons(rows, count=ACADEMY_TARGET_LESSONS):
     rows = list(rows)
     if len(rows) <= count:
@@ -510,11 +518,42 @@ def _progress_for(assignments, assessments):
     }
 
 
+def _academy_teacher_payload(row, assignments, assessments):
+    teacher_id = int(row["id"])
+    return {
+        "id": teacher_id,
+        "user_id": int(row["user_id"] or 0),
+        "full_name": str(row["full_name"] or ""),
+        "subject_id": int(row["subject_id"] or 0),
+        "subject_program_id": int(row["subject_program_id"] or 0),
+        "subject": str(row["subject"] or ""),
+        "subject_program_name": str(row["subject_program_name"] or ""),
+        "position": str(row["position"] or ""),
+        "employment_type": str(row["employment_type"] or ""),
+        "telegram_username": str(row["telegram_username"] or ""),
+        "phone": str(row["phone"] or ""),
+        "email": str(row["email"] or ""),
+        "academy_status": str(row["academy_status"] or ""),
+        "academy_start_date": str(row["academy_start_date"] or ""),
+        "mentor_id": int(row["mentor_id"] or 0),
+        "mentor_name": str(row["mentor_name"] or ""),
+        "department_head_id": int(row["department_head_id"] or 0),
+        "department_head_name": str(row["department_head_name"] or ""),
+        "notes": str(row["notes"] or ""),
+        "login": str(row["login"] or ""),
+        "account_teacher_id": int(row["account_teacher_id"] or 0),
+        "promoted_teacher_id": int(row["promoted_teacher_id"] or 0),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "assignments": assignments,
+        "assessments": assessments,
+        "progress": _progress_for(assignments, assessments),
+    }
+
+
 def list_academy_teachers():
     with queries.connect_auth_db() as conn:
         _ensure_schema(conn)
-        _backfill_academy_teacher_accounts(conn)
-        conn.commit()
         teacher_rows = conn.execute(
             """
             SELECT at.id, at.user_id, at.full_name, at.subject_id, at.subject_program_id,
@@ -593,38 +632,185 @@ def list_academy_teachers():
         teacher_id = int(row["id"])
         assignments = assignments_by_teacher.get(teacher_id, [])
         assessments = assessments_by_teacher.get(teacher_id, [])
-        teachers.append(
-            {
-                "id": teacher_id,
-                "user_id": int(row["user_id"] or 0),
-                "full_name": str(row["full_name"] or ""),
-                "subject_id": int(row["subject_id"] or 0),
-                "subject_program_id": int(row["subject_program_id"] or 0),
-                "subject": str(row["subject"] or ""),
-                "subject_program_name": str(row["subject_program_name"] or ""),
-                "position": str(row["position"] or ""),
-                "employment_type": str(row["employment_type"] or ""),
-                "telegram_username": str(row["telegram_username"] or ""),
-                "phone": str(row["phone"] or ""),
-                "email": str(row["email"] or ""),
-                "academy_status": str(row["academy_status"] or ""),
-                "academy_start_date": str(row["academy_start_date"] or ""),
-                "mentor_id": int(row["mentor_id"] or 0),
-                "mentor_name": str(row["mentor_name"] or ""),
-                "department_head_id": int(row["department_head_id"] or 0),
-                "department_head_name": str(row["department_head_name"] or ""),
-                "notes": str(row["notes"] or ""),
-                "login": str(row["login"] or ""),
-                "account_teacher_id": int(row["account_teacher_id"] or 0),
-                "promoted_teacher_id": int(row["promoted_teacher_id"] or 0),
-                "created_at": str(row["created_at"] or ""),
-                "updated_at": str(row["updated_at"] or ""),
-                "assignments": assignments,
-                "assessments": assessments,
-                "progress": _progress_for(assignments, assessments),
-            }
-        )
+        teachers.append(_academy_teacher_payload(row, assignments, assessments))
     return teachers
+
+
+def get_academy_teacher_for_teacher_account(teacher_id, staff_id=None):
+    parsed_teacher_id = _as_int(teacher_id)
+    parsed_staff_id = _as_int(staff_id)
+    if not parsed_teacher_id and not parsed_staff_id:
+        return None
+
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        teacher_row = conn.execute(
+            """
+            SELECT at.id, at.user_id, at.full_name, at.subject_id, at.subject_program_id,
+                   COALESCE(subj.subject_name, '') AS subject,
+                   COALESCE(sp.program_name, subj.subject_name, '') AS subject_program_name,
+                   at.position, at.employment_type, at.telegram_username, at.phone, at.email,
+                   at.academy_status, at.academy_start_date::text AS academy_start_date,
+                   at.mentor_id, COALESCE(mentor.full_name, '') AS mentor_name,
+                   at.department_head_id, COALESCE(head.full_name, '') AS department_head_name,
+                   at.notes, at.promoted_teacher_id,
+                   COALESCE(staff.login, '') AS login,
+                   COALESCE(staff.teacher_id, 0) AS account_teacher_id,
+                   at.created_at::text AS created_at, at.updated_at::text AS updated_at
+            FROM msi_v2.academy_teachers at
+            LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+            LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
+            LEFT JOIN msi_v2.subject_programs sp ON sp.id = at.subject_program_id
+            LEFT JOIN msi_v2.teachers mentor ON mentor.id = at.mentor_id
+            LEFT JOIN msi_v2.teachers head ON head.id = at.department_head_id
+            WHERE (%s > 0 AND at.user_id = %s)
+               OR (%s > 0 AND staff.teacher_id = %s)
+               OR (%s > 0 AND at.promoted_teacher_id = %s)
+            ORDER BY
+                CASE
+                    WHEN %s > 0 AND at.user_id = %s THEN 0
+                    WHEN %s > 0 AND staff.teacher_id = %s THEN 1
+                    ELSE 2
+                END,
+                at.updated_at DESC,
+                at.id DESC
+            LIMIT 1
+            """,
+            (
+                parsed_staff_id,
+                parsed_staff_id,
+                parsed_teacher_id,
+                parsed_teacher_id,
+                parsed_teacher_id,
+                parsed_teacher_id,
+                parsed_staff_id,
+                parsed_staff_id,
+                parsed_teacher_id,
+                parsed_teacher_id,
+            ),
+        ).fetchone()
+        if not teacher_row:
+            return None
+        academy_teacher_id = int(teacher_row["id"])
+        assignment_rows = conn.execute(
+            """
+            SELECT ala.id, ala.academy_teacher_id, ala.sequence_no, ala.subject_program_id,
+                   ala.curriculum_item_id, ala.lesson_number, ala.lesson_topic,
+                   ala.assignment_type, ala.deadline_date::text AS deadline_date,
+                   ala.session_datetime::text AS session_datetime,
+                   ala.evaluator_id, COALESCE(eval.full_name, '') AS evaluator_name,
+                   ala.focus_areas::text AS focus_areas_json,
+                   ala.notes_to_trainee, ala.status,
+                   COALESCE(spi.specification_points, '') AS specification_points,
+                   COALESCE(spi.book_pages, '') AS book_pages,
+                   ala.created_at::text AS created_at, ala.updated_at::text AS updated_at
+            FROM msi_v2.academy_lesson_assignments ala
+            LEFT JOIN msi_v2.teachers eval ON eval.id = ala.evaluator_id
+            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ala.curriculum_item_id
+            WHERE ala.academy_teacher_id = %s
+            ORDER BY ala.sequence_no ASC, ala.id ASC
+            """,
+            (academy_teacher_id,),
+        ).fetchall()
+        assessment_rows = conn.execute(
+            """
+            SELECT aa.id, aa.academy_teacher_id, aa.lesson_assignment_id,
+                   aa.assessment_type, aa.lesson_number, aa.lesson_topic,
+                   aa.evaluator_id, COALESCE(eval.full_name, '') AS evaluator_name,
+                   aa.assessment_datetime::text AS assessment_datetime,
+                   aa.session_type, aa.class_label,
+                   aa.section_feedback::text AS section_feedback_json,
+                   aa.teacher_guidance_compliance_score,
+                   aa.timing_adherence_score,
+                   aa.resource_familiarity_score,
+                   aa.english_fluency_score,
+                   aa.confidence_delivery_score,
+                   aa.engagement_technique_score,
+                   aa.weighted_overall_score,
+                   aa.strengths, aa.areas_for_improvement,
+                   aa.final_recommendation, aa.decision,
+                   aa.created_by,
+                   aa.created_at::text AS created_at, aa.updated_at::text AS updated_at
+            FROM msi_v2.academy_assessments aa
+            LEFT JOIN msi_v2.teachers eval ON eval.id = aa.evaluator_id
+            WHERE aa.academy_teacher_id = %s
+            ORDER BY aa.created_at ASC, aa.id ASC
+            """,
+            (academy_teacher_id,),
+        ).fetchall()
+    return _academy_teacher_payload(
+        teacher_row,
+        [_row_to_assignment(row) for row in assignment_rows],
+        [_row_to_assessment(row) for row in assessment_rows],
+    )
+
+
+def list_teacher_academy_page_context():
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        subjects = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT id, subject_name AS name, subject_key AS key,
+                       subject_short AS code, subject_short AS short_name
+                FROM msi_v2.subjects
+                WHERE status = 'active'
+                ORDER BY subject_name
+                """
+            ).fetchall()
+        ]
+        group_options = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT DISTINCT g.group_name AS name
+                FROM msi_v2.groups g
+                WHERE lower(g.group_name) <> 'online'
+                  AND COALESCE(g.status, 'active') = 'active'
+                ORDER BY g.group_name
+                """
+            ).fetchall()
+        ]
+        curriculum_programs = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT sp.id, sp.subject_id, subj.subject_key, subj.subject_name,
+                       subj.subject_short, sp.program_name, sp.lesson_count,
+                       sp.exam_count, sp.updated_at::text AS updated_at
+                FROM msi_v2.subject_programs sp
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE sp.status = 'active'
+                ORDER BY subj.subject_name
+                """
+            ).fetchall()
+        ]
+        curriculum_items = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT spi.id, spi.program_id, subj.subject_key, subj.subject_name,
+                       spi.item_order, spi.lesson_number, spi.item_type, spi.title,
+                       spi.term_label, spi.week_label, spi.specification_points,
+                       spi.book_pages, spi.lesson_count, spi.duration_hours
+                FROM msi_v2.subject_program_items spi
+                JOIN msi_v2.subject_programs sp ON sp.id = spi.program_id
+                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+                WHERE sp.status = 'active'
+                  AND spi.item_type = 'lesson'
+                ORDER BY subj.subject_name, spi.item_order
+                """
+            ).fetchall()
+        ]
+    return {
+        "teachers": list_teachers(),
+        "academy_teachers": list_academy_teachers(),
+        "group_options": group_options,
+        "subjects": subjects,
+        "curriculum_programs": curriculum_programs,
+        "curriculum_items": curriculum_items,
+    }
 
 
 def create_academy_teacher(
@@ -1095,7 +1281,10 @@ def promote_academy_teacher(
 __all__ = [
     "ACADEMY_TARGET_LESSONS",
     "RUBRIC_WEIGHTS",
+    "backfill_academy_teacher_accounts",
+    "get_academy_teacher_for_teacher_account",
     "list_academy_teachers",
+    "list_teacher_academy_page_context",
     "create_academy_teacher",
     "update_assignment",
     "add_assessment",

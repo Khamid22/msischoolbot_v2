@@ -1,11 +1,16 @@
-import { useMemo, useState } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import {
   AcademicDirectorMobileNav,
   AcademicDirectorSidebar,
 } from "@/roles/common/components/AcademicDirectorShell";
-import { TeacherAcademyPanel } from "@/roles/admin/panels/teachers/TeacherAcademyPanel";
 import { asString } from "@/roles/admin/shared";
+
+const TeacherAcademyPanel = lazy(() =>
+  import("@/roles/admin/panels/teachers/TeacherAcademyPanel").then((module) => ({
+    default: module.TeacherAcademyPanel,
+  })),
+);
 
 type AcademicDirectorAcademyProps = {
   authLogin?: string;
@@ -76,14 +81,22 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
             </p>
           </header>
 
-          <TeacherAcademyPanel
-            state={panelState}
-            academyTeachers={academyTeachers}
-            onAcademyChange={setAcademyTeachers}
-            onTeachersChange={setTeachers}
-            showToast={showToast}
-            allowTeacherPreview={false}
-          />
+          <Suspense
+            fallback={
+              <section className="rounded-2xl border border-border bg-surface p-5 text-sm font-bold text-muted-foreground shadow-card">
+                Loading Teacher Academy...
+              </section>
+            }
+          >
+            <TeacherAcademyPanel
+              state={panelState}
+              academyTeachers={academyTeachers}
+              onAcademyChange={setAcademyTeachers}
+              onTeachersChange={setTeachers}
+              showToast={showToast}
+              allowTeacherPreview={false}
+            />
+          </Suspense>
         </section>
       </main>
 

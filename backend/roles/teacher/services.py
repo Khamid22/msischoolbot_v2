@@ -12,7 +12,9 @@ from backend.identity.account_service import (  # noqa: F401
 from backend.domains.academics.postgres_service import ensure_academic_schema
 from backend.domains.announcements.service import list_announcements
 from backend.roles.admin.services.academic_service import get_group_gradebook
-from backend.roles.admin.services.teacher_academy_service import list_academy_teachers
+from backend.roles.admin.services.teacher_academy_service import (
+    get_academy_teacher_for_teacher_account,
+)
 from backend.roles.admin.services.teacher_candidate_service import (  # noqa: F401
     create_teacher_candidate,
     get_teacher_candidate,
@@ -175,19 +177,9 @@ def _academy_updates(assignments, assessments):
 
 
 def _academy_workspace_for(teacher_id, staff_id=None):
-    teachers = list_academy_teachers()
     parsed_teacher_id = _as_int(teacher_id)
     parsed_staff_id = _as_int(staff_id)
-    academy = next(
-        (
-            row
-            for row in teachers
-            if (parsed_staff_id and _as_int(row.get("user_id")) == parsed_staff_id)
-            or (parsed_teacher_id and _as_int(row.get("account_teacher_id")) == parsed_teacher_id)
-            or (parsed_teacher_id and _as_int(row.get("promoted_teacher_id")) == parsed_teacher_id)
-        ),
-        None,
-    )
+    academy = get_academy_teacher_for_teacher_account(parsed_teacher_id, parsed_staff_id)
     if not academy:
         return None
     assignments = list(academy.get("assignments") or [])

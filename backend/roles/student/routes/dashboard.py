@@ -7,6 +7,7 @@ from backend.render import generate_csrf
 
 from backend.render import render_react_page
 from backend.domains.announcements.service import list_announcements
+from backend.utils.performance import PagePerformanceTimer, log_page_performance
 
 from backend.roles.student.services import (
     dashboard_service,
@@ -80,6 +81,7 @@ def register_dashboard_routes(students):
 
     @students.get("/dashboard/{student_id}")
     def dashboard(student_id: int):
+        timer = PagePerformanceTimer()
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
@@ -101,12 +103,21 @@ def register_dashboard_routes(students):
             session_invalid_message="Student session is invalid. Please login again.",
             forbidden_message="Access denied: you can open only your own dashboard.",
         )
+        timer.mark("payload_load")
 
         if error_message:
-            return render_react_page(
+            response = render_react_page(
                     "student-not-found",
                     {"message": error_message, "returnUrl": url_for("student.home")},
                     title="Student Not Found", status_code=status_code)
+            timer.mark("render")
+            log_page_performance(
+                "student_dashboard_error",
+                timer,
+                response=response,
+                rows={},
+            )
+            return response
 
         context = dashboard_service.build_dashboard_page_context(
             student_id=student_id,
@@ -121,6 +132,7 @@ def register_dashboard_routes(students):
             profile_error=profile_error,
             force_refresh=force_refresh,
         )
+        timer.mark("context_build")
 
         payload_student = payload.get("student", {}) if isinstance(payload, dict) else {}
         school_code = str(payload_student.get("schoolCode", "")).strip() or requested_school
@@ -163,7 +175,10 @@ def register_dashboard_routes(students):
             school=school_code,
         )
 
-        return render_react_page(
+        announcements = _student_announcements()
+        timer.mark("announcements")
+
+        response = render_react_page(
             "student-dashboard",
             {
                 "payload": context["payload"],
@@ -188,7 +203,7 @@ def register_dashboard_routes(students):
                 "refreshUrl": context.get("refresh_url", ""),
                 "lastUpdatedLabel": context.get("last_updated_label", ""),
                 "lastUpdatedAt": last_updated_at_value,
-                "announcements": _student_announcements(),
+                "announcements": announcements,
                 "csrfToken": generate_csrf(),
                 "logoutUrl": url_for("student.logout"),
                 "changePasswordUrl": url_for("student.profile_change_password"),
@@ -199,6 +214,18 @@ def register_dashboard_routes(students):
             back_mode="history",
             back_url=context.get("dashboard_back_url"),
         )
+        timer.mark("render")
+        log_page_performance(
+            "student_dashboard",
+            timer,
+            response=response,
+            rows={
+                "subject_switch_options": context["subject_switch_options"],
+                "announcements": announcements,
+                "payload_keys": context["payload"] if isinstance(context["payload"], dict) else {},
+            },
+        )
+        return response
 
     @students.get("/dashboard/{student_id}/aap-lessons")
     def aap_lessons(student_id: int):
