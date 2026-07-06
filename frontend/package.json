@@ -7,6 +7,7 @@
     "dev": "vite",
     "test:schedule": "node --experimental-strip-types --test src/roles/admin/panels/academic/scheduleMath.test.ts",
     "test:teacher-nav": "node --experimental-strip-types --test src/roles/teacher/teacherNav.test.ts",
+    "test:shared-ui": "node --experimental-strip-types --test src/shared/ui/roleNav.test.ts src/shared/ui/statusTones.test.ts src/shared/ui/sharedUiContract.test.ts",
     "check-types": "tsc -p tsconfig.app.json --noEmit",
     "build": "vite build",
     "preview": "vite preview"
