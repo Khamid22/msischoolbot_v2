@@ -13,6 +13,8 @@ import {
 } from "@/roles/common/components/AcademicDirectorShell";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { MetricCard } from "@/shared/ui/MetricCard";
+import { MetricGrid } from "@/shared/ui/MetricGrid";
+import { PageHeader } from "@/shared/ui/PageHeader";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type WorkspaceKind = "timetable" | "announcements";
@@ -88,12 +90,12 @@ function TimetableContent({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <MetricGrid>
         <MetricCard label="Sessions" value={sessions.length} detail="dated lessons" tone="success" />
         <MetricCard label="Schedules" value={schedules.length} detail="recurring rules" tone="info" />
         <MetricCard label="Groups" value={uniqueCount(sourceRows, ["group_id", "group_name"])} detail="visible groups" />
         <MetricCard label="Subjects" value={uniqueCount(sourceRows, ["subject_id", "subject_name"])} detail="visible scopes" />
-      </div>
+      </MetricGrid>
 
       {items.length ? (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -161,12 +163,12 @@ function AnnouncementsContent({ announcements }: { announcements: Row[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <MetricGrid>
         <MetricCard label="Announcements" value={announcements.length} detail="visible records" tone="info" />
         <MetricCard label="Published" value={publishedCount} detail="live updates" tone="success" />
         <MetricCard label="Pinned" value={pinnedCount} detail="highlighted" />
         <MetricCard label="Urgent" value={urgentCount} detail="priority posts" tone={urgentCount ? "warning" : "default"} />
-      </div>
+      </MetricGrid>
 
       {announcements.length ? (
         <section className="space-y-3">
@@ -235,22 +237,19 @@ export default function AcademicDepartmentWorkspace({
   const announcements = rowsFrom(adminAnnouncements);
   const content = (
     <>
-      <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              {isAnnouncements ? <Megaphone className="h-5 w-5" /> : <CalendarDays className="h-5 w-5" />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{roleLabel}</p>
-              <h1 className="mt-1 break-words text-2xl font-black text-foreground">{title}</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 sm:items-end">
+      <PageHeader
+        title={title}
+        subtitle={description}
+        badge={
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+            {roleLabel}
+          </span>
+        }
+        actions={
+          <>
             {authLogin ? (
               <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span className="truncate">{authLogin}</span>
               </div>
             ) : null}
@@ -264,9 +263,9 @@ export default function AcademicDepartmentWorkspace({
                 Coming soon
               </button>
             ) : null}
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {warning ? (
         <section className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">

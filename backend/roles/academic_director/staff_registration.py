@@ -62,6 +62,36 @@ def _subject_row(conn: Any, subject_id: Any) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
+def _list_active_subjects(conn: Any) -> list[dict[str, Any]]:
+    if not _table_available(conn, "msi_v2.subjects"):
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, subject_name
+            FROM msi_v2.subjects
+            WHERE COALESCE(status, 'active') = 'active'
+            ORDER BY subject_name
+            """
+        ).fetchall()
+    except Exception:
+        return []
+    return [{"id": _to_int(row["id"]), "name": _text(row["subject_name"])} for row in rows]
+
+
+def list_active_subjects() -> list[dict[str, Any]]:
+    """Subject options for the Head of Departments page (New HOD form + coverage).
+
+    Best-effort: the page must still render when the subjects table (or the
+    database itself) is unavailable, so failures collapse to an empty list.
+    """
+    try:
+        with queries.connect_auth_db() as conn:
+            return _list_active_subjects(conn)
+    except Exception:
+        return []
+
+
 def _next_staff_code(conn: Any, prefix: str) -> str:
     normalized_prefix = _text(prefix).upper() or "HOD"
     row = conn.execute(

@@ -5,12 +5,16 @@ from pathlib import Path
 
 def test_shared_modal_component_uses_portal_backdrop_scroll_lock_and_top_z_index():
     source = Path("frontend/src/shared/ui/Modal.tsx").read_text()
+    layers_source = Path("frontend/src/shared/ui/layers.ts").read_text()
 
     assert "export function Modal" in source
     assert 'import { createPortal } from "react-dom";' in source
     assert "return createPortal(" in source
     assert "document.body" in source
-    assert "fixed inset-0 z-[100]" in source
+    # z-index comes from the shared layer scale; the overlay layer stays high.
+    assert "fixed inset-0 ${uiLayers.overlay}" in source
+    assert 'overlay: "z-[100]"' in layers_source
+    assert "export function BottomSheet" in source
     assert "bg-foreground/60" in source
     assert "backdrop-blur-[2px]" in source
     assert "document.body.style.overflow = \"hidden\"" in source

@@ -219,6 +219,14 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(head_of_department_routes, "list_announcements", academic_director_routes.list_announcements)
     monkeypatch.setattr(
         academic_director_routes,
+        "list_active_subjects",
+        lambda: [
+            {"id": 5, "name": "Mathematics"},
+            {"id": 7, "name": "English"},
+        ],
+    )
+    monkeypatch.setattr(
+        academic_director_routes,
         "list_head_of_department_accounts",
         lambda: {
             "items": [
@@ -340,6 +348,7 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
 def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobile_nav():
     source = Path("frontend/src/roles/common/components/AcademicDirectorShell.tsx").read_text()
+    nav_source = Path("frontend/src/roles/common/components/academicNav.ts").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     admin_source = Path("frontend/src/roles/admin/pages/Admin.tsx").read_text()
     academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
@@ -354,13 +363,18 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "Academic Director mobile navigation" in source
     assert "Head of Department navigation" in source
     assert "Head of Department mobile navigation" in source
-    assert 'label: "Overview"' in source
-    assert 'label: "Teacher Academy"' in source
-    assert 'label: "Timetable"' in source
-    assert 'label: "Announcements"' in source
-    assert 'label: "Profile"' in source
-    assert 'mobileLabel: "Academy"' in source
-    assert "Head of Departments" in source
+    # Nav item definitions moved to the pure academicNav.ts config so they can
+    # run under node --test; the shell attaches icons and renders them.
+    assert 'label: "Overview"' in nav_source
+    assert 'label: "Teacher Academy"' in nav_source
+    assert 'label: "Timetable"' in nav_source
+    assert 'label: "Announcements"' in nav_source
+    assert 'label: "Profile"' in nav_source
+    assert 'mobileLabel: "Academy"' in nav_source
+    assert 'mobileLabel: "Schedule"' in nav_source
+    assert 'mobileLabel: "News"' in nav_source
+    assert "Head of Departments" in nav_source
+    assert "academicDirectorNavConfig" in source
     assert "Open Teacher Academy" in source
     assert 'academicDirectorOverview: "/academic-director"' in routes_source
     assert 'academicDirectorTeacherAcademy: "/academic-director/teacher-academy"' in routes_source
@@ -375,20 +389,20 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'headOfDepartmentAnnouncements: "/head-of-department/announcements"' in routes_source
     assert 'headOfDepartmentProfile: "/head-of-department/profile"' in routes_source
     assert 'headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile"' in routes_source
-    assert "href: routes.academicDirectorTeacherAcademy" in source
-    assert "href: routes.academicDirectorHeadOfDepartments" in source
-    assert "href: routes.academicDirectorTimetable" in source
-    assert "href: routes.academicDirectorAnnouncements" in source
-    assert "href: routes.academicDirectorProfile" in source
-    assert "href: routes.headOfDepartmentTeacherAcademy" in source
-    assert "href: routes.headOfDepartmentTimetable" in source
-    assert "href: routes.headOfDepartmentAnnouncements" in source
-    assert "href: routes.headOfDepartmentProfile" in source
+    assert "href: routes.academicDirectorTeacherAcademy" in nav_source
+    assert "href: routes.academicDirectorHeadOfDepartments" in nav_source
+    assert "href: routes.academicDirectorTimetable" in nav_source
+    assert "href: routes.academicDirectorAnnouncements" in nav_source
+    assert "href: routes.academicDirectorProfile" in nav_source
+    assert "href: routes.headOfDepartmentTeacherAcademy" in nav_source
+    assert "href: routes.headOfDepartmentTimetable" in nav_source
+    assert "href: routes.headOfDepartmentAnnouncements" in nav_source
+    assert "href: routes.headOfDepartmentProfile" in nav_source
     assert "academic-director-profile" in source
     assert "head-of-department-profile" in source
     assert "academicDirectorActiveNavFromPath" in source
     assert "headOfDepartmentActiveNavFromPath" in source
-    assert "filter((item) => item.key !== \"departments\")" in source
+    assert 'mobileNavItemsFrom(academicDirectorNavConfig, ["departments"])' in nav_source
     assert "pointer-events-none" not in source
     assert "AdminSidebar" not in source
     assert "action={routes.logout}" in source

@@ -100,7 +100,7 @@ def test_phase3_shared_responsive_components_exist_and_are_used():
     assert "export function ResponsiveTable" in responsive_table
     assert "export function ProgressBar" in progress_bar
     assert "createPortal" in action_menu
-    assert "fixed z-[90]" in action_menu
+    assert "uiLayers.popover" in action_menu
     assert "window.addEventListener(\"scroll\", updateMenuPosition, true)" in action_menu
     assert "IconButton" in academy_source
     assert "MetricCard" in academy_source

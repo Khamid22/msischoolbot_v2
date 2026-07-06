@@ -17,6 +17,9 @@ import {
   type AcademicDirectorNavKey,
   type HeadOfDepartmentNavKey,
 } from "@/roles/common/components/AcademicDirectorShell";
+import { MetricCard } from "@/shared/ui/MetricCard";
+import { MetricGrid } from "@/shared/ui/MetricGrid";
+import { PageHeader } from "@/shared/ui/PageHeader";
 
 interface RoleHomeCard {
   label?: string;
@@ -36,18 +39,28 @@ interface RoleHomeProps {
   csrfToken?: string;
 }
 
-function MetricCard({ label, value, description, detail }: Required<RoleHomeCard>) {
-  const supportingText = description || detail;
+function AccountBadge({ authLogin }: { authLogin?: string }) {
+  if (!authLogin) return null;
   return (
-    <section className="rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-black leading-none text-foreground">{value}</p>
-      {supportingText ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{supportingText}</p>
-      ) : null}
-    </section>
+    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
+      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+      <span className="truncate">{authLogin}</span>
+    </div>
+  );
+}
+
+function RoleMetricCards({ cards }: { cards: RoleHomeCard[] }) {
+  return (
+    <MetricGrid>
+      {cards.map((card) => (
+        <MetricCard
+          key={`${card.label || "card"}-${card.value || "value"}`}
+          label={card.label || "Status"}
+          value={card.value || "Ready"}
+          detail={card.description || card.detail || ""}
+        />
+      ))}
+    </MetricGrid>
   );
 }
 
@@ -91,47 +104,21 @@ function AcademicDirectorHome({
       active={activeNav}
       maxWidthClass="max-w-6xl"
     >
-          <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <LayoutDashboard className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    {roleDisplayName}
-                  </p>
-                  <h1 className="mt-1 break-words text-2xl font-black tracking-normal text-foreground">
-                    {title}
-                  </h1>
-                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {description}
-                  </p>
-                </div>
-              </div>
-              {authLogin ? (
-                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span className="truncate">{authLogin}</span>
-                </div>
-              ) : null}
-            </div>
-          </header>
+      <PageHeader
+        title={title}
+        subtitle={description}
+        badge={
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+            {roleDisplayName}
+          </span>
+        }
+        actions={<AccountBadge authLogin={authLogin} />}
+      />
 
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-            {normalizedCards.map((card) => (
-              <MetricCard
-                key={`${card.label || "card"}-${card.value || "value"}`}
-                label={card.label || "Status"}
-                value={card.value || "Ready"}
-                description={card.description || ""}
-                detail={card.detail || ""}
-              />
-            ))}
-          </div>
+      <RoleMetricCards cards={normalizedCards} />
 
-          <AcademicDirectorTeacherAcademyCta />
-          <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      <AcademicDirectorTeacherAcademyCta />
+      <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
     </AcademicDirectorPageShell>
   );
 }
@@ -161,47 +148,21 @@ function HeadOfDepartmentHome({
       active={activeNav}
       maxWidthClass="max-w-6xl"
     >
-          <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <LayoutDashboard className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    {roleDisplayName}
-                  </p>
-                  <h1 className="mt-1 break-words text-2xl font-black tracking-normal text-foreground">
-                    {title}
-                  </h1>
-                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {description}
-                  </p>
-                </div>
-              </div>
-              {authLogin ? (
-                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span className="truncate">{authLogin}</span>
-                </div>
-              ) : null}
-            </div>
-          </header>
+      <PageHeader
+        title={title}
+        subtitle={description}
+        badge={
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+            {roleDisplayName}
+          </span>
+        }
+        actions={<AccountBadge authLogin={authLogin} />}
+      />
 
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-            {normalizedCards.map((card) => (
-              <MetricCard
-                key={`${card.label || "card"}-${card.value || "value"}`}
-                label={card.label || "Status"}
-                value={card.value || "Ready"}
-                description={card.description || ""}
-                detail={card.detail || ""}
-              />
-            ))}
-          </div>
+      <RoleMetricCards cards={normalizedCards} />
 
-          <HeadOfDepartmentTeacherAcademyCta />
-          <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      <HeadOfDepartmentTeacherAcademyCta />
+      <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
     </HeadOfDepartmentPageShell>
   );
 }
@@ -253,44 +214,18 @@ export function RoleHome({
   return (
     <main className="min-h-[var(--tg-viewport-height)] bg-background px-4 py-5 text-foreground sm:px-6 lg:px-8">
       <section className="mx-auto flex max-w-6xl flex-col gap-5">
-        <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <LayoutDashboard className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  {roleDisplayName}
-                </p>
-                <h1 className="mt-1 text-2xl font-black tracking-normal text-foreground">
-                  {title}
-                </h1>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                  {description}
-                </p>
-              </div>
-            </div>
-            {authLogin ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                {authLogin}
-              </div>
-            ) : null}
-          </div>
-        </header>
+        <PageHeader
+          title={title}
+          subtitle={description}
+          badge={
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <LayoutDashboard className="h-4 w-4" />
+            </span>
+          }
+          actions={<AccountBadge authLogin={authLogin} />}
+        />
 
-        <div className="grid gap-3 md:grid-cols-3">
-          {normalizedCards.map((card) => (
-            <MetricCard
-              key={`${card.label || "card"}-${card.value || "value"}`}
-              label={card.label || "Status"}
-              value={card.value || "Ready"}
-              description={card.description || ""}
-              detail={card.detail || ""}
-            />
-          ))}
-        </div>
+        <RoleMetricCards cards={normalizedCards} />
 
         <section className="rounded-2xl border border-border bg-surface p-5 shadow-card">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

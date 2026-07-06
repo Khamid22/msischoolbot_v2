@@ -8,128 +8,63 @@ import {
   ShieldCheck,
   User,
   UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { routes } from "@/shared/lib/routes";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
+import type { RoleNavItem } from "@/shared/ui/roleNav";
 import {
-  activeNavKeyFromPath,
-  mobileNavItemsFrom,
-  normalizeNavPathname,
-  type RoleNavItem,
-} from "@/shared/ui/roleNav";
+  academicDirectorMobileNavConfig,
+  academicDirectorNavConfig,
+  headOfDepartmentMobileNavConfig,
+  headOfDepartmentNavConfig,
+  type AcademicDirectorNavKey,
+  type HeadOfDepartmentNavKey,
+} from "./academicNav";
 
-export type AcademicDirectorNavKey =
-  | "overview"
-  | "academy"
-  | "departments"
-  | "timetable"
-  | "announcements"
-  | "profile";
-export type HeadOfDepartmentNavKey =
-  | "overview"
-  | "academy"
-  | "timetable"
-  | "announcements"
-  | "profile";
+export {
+  academicDirectorActiveNavFromPath,
+  headOfDepartmentActiveNavFromPath,
+  type AcademicDirectorNavKey,
+  type HeadOfDepartmentNavKey,
+} from "./academicNav";
 
-export const academicDirectorDesktopNavItems: ReadonlyArray<RoleNavItem<AcademicDirectorNavKey>> = [
-  {
-    key: "overview",
-    label: "Overview",
-    href: routes.academicDirectorOverview,
-    icon: LayoutDashboard,
-  },
-  {
-    key: "academy",
-    label: "Teacher Academy",
-    mobileLabel: "Academy",
-    href: routes.academicDirectorTeacherAcademy,
-    icon: GraduationCap,
-  },
-  {
-    key: "departments",
-    label: "Head of Departments",
-    href: routes.academicDirectorHeadOfDepartments,
-    icon: UsersRound,
-  },
-  {
-    key: "timetable",
-    label: "Timetable",
-    mobileLabel: "Schedule",
-    href: routes.academicDirectorTimetable,
-    icon: CalendarDays,
-  },
-  {
-    key: "announcements",
-    label: "Announcements",
-    mobileLabel: "News",
-    href: routes.academicDirectorAnnouncements,
-    icon: Megaphone,
-  },
-  {
-    key: "profile",
-    label: "Profile",
-    href: routes.academicDirectorProfile,
-    icon: User,
-  },
-];
+const academicDirectorNavIcons: Record<AcademicDirectorNavKey, LucideIcon> = {
+  overview: LayoutDashboard,
+  academy: GraduationCap,
+  departments: UsersRound,
+  timetable: CalendarDays,
+  announcements: Megaphone,
+  profile: User,
+};
+
+const headOfDepartmentNavIcons: Record<HeadOfDepartmentNavKey, LucideIcon> = {
+  overview: LayoutDashboard,
+  academy: GraduationCap,
+  timetable: CalendarDays,
+  announcements: Megaphone,
+  profile: User,
+};
+
+function withIcons<Key extends string>(
+  config: ReadonlyArray<{ key: Key; label: string; mobileLabel?: string; href: string }>,
+  icons: Record<Key, LucideIcon>,
+): ReadonlyArray<RoleNavItem<Key>> {
+  return config.map((item) => ({ ...item, icon: icons[item.key] }));
+}
+
+export const academicDirectorDesktopNavItems: ReadonlyArray<RoleNavItem<AcademicDirectorNavKey>> =
+  withIcons(academicDirectorNavConfig, academicDirectorNavIcons);
 
 export const academicDirectorMobileNavItems: ReadonlyArray<RoleNavItem<AcademicDirectorNavKey>> =
-  mobileNavItemsFrom(academicDirectorDesktopNavItems, ["departments"]);
+  withIcons(academicDirectorMobileNavConfig, academicDirectorNavIcons);
 
-export const headOfDepartmentDesktopNavItems: ReadonlyArray<RoleNavItem<HeadOfDepartmentNavKey>> = [
-  {
-    key: "overview",
-    label: "Overview",
-    href: routes.headOfDepartmentOverview,
-    icon: LayoutDashboard,
-  },
-  {
-    key: "academy",
-    label: "Teacher Academy",
-    mobileLabel: "Academy",
-    href: routes.headOfDepartmentTeacherAcademy,
-    icon: GraduationCap,
-  },
-  {
-    key: "timetable",
-    label: "Timetable",
-    mobileLabel: "Schedule",
-    href: routes.headOfDepartmentTimetable,
-    icon: CalendarDays,
-  },
-  {
-    key: "announcements",
-    label: "Announcements",
-    mobileLabel: "News",
-    href: routes.headOfDepartmentAnnouncements,
-    icon: Megaphone,
-  },
-  {
-    key: "profile",
-    label: "Profile",
-    href: routes.headOfDepartmentProfile,
-    icon: User,
-  },
-];
+export const headOfDepartmentDesktopNavItems: ReadonlyArray<RoleNavItem<HeadOfDepartmentNavKey>> =
+  withIcons(headOfDepartmentNavConfig, headOfDepartmentNavIcons);
 
 export const headOfDepartmentMobileNavItems: ReadonlyArray<RoleNavItem<HeadOfDepartmentNavKey>> =
-  mobileNavItemsFrom(headOfDepartmentDesktopNavItems);
-
-export function academicDirectorActiveNavFromPath(pathname: string, hash = ""): AcademicDirectorNavKey {
-  if (hash === "#academic-director-profile" || normalizeNavPathname(pathname) === routes.academicDirectorProfile) {
-    return "profile";
-  }
-  return activeNavKeyFromPath(academicDirectorDesktopNavItems, pathname, "overview");
-}
-
-export function headOfDepartmentActiveNavFromPath(pathname: string, hash = ""): HeadOfDepartmentNavKey {
-  if (hash === "#head-of-department-profile" || normalizeNavPathname(pathname) === routes.headOfDepartmentProfile) {
-    return "profile";
-  }
-  return activeNavKeyFromPath(headOfDepartmentDesktopNavItems, pathname, "overview");
-}
+  withIcons(headOfDepartmentMobileNavConfig, headOfDepartmentNavIcons);
 
 export function AcademicDirectorPageShell({
   authLogin,

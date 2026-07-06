@@ -18,11 +18,13 @@ export type RoleNavItem<Key extends string = string> = {
 /**
  * Derive mobile bottom-nav items from the desktop set: swap in the short
  * mobile labels and optionally drop items that don't fit on a phone.
+ * Generic over any item shape with key/label so icon-free nav configs
+ * (testable under node) and full RoleNavItems both work.
  */
-export function mobileNavItemsFrom<Key extends string>(
-  items: ReadonlyArray<RoleNavItem<Key>>,
-  excludeKeys: ReadonlyArray<Key> = [],
-): Array<RoleNavItem<Key>> {
+export function mobileNavItemsFrom<T extends { key: string; label: string; mobileLabel?: string }>(
+  items: ReadonlyArray<T>,
+  excludeKeys: ReadonlyArray<T["key"]> = [],
+): T[] {
   return items
     .filter((item) => !excludeKeys.includes(item.key))
     .map((item) => ({ ...item, label: item.mobileLabel || item.label }));
@@ -38,7 +40,7 @@ export function normalizeNavPathname(pathname: string): string {
  * "/role/sub" matches its own item rather than the "/role" overview.
  */
 export function activeNavKeyFromPath<Key extends string>(
-  items: ReadonlyArray<RoleNavItem<Key>>,
+  items: ReadonlyArray<{ key: Key; href: string }>,
   pathname: string,
   fallback: Key,
 ): Key {

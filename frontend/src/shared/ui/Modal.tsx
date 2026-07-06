@@ -125,7 +125,7 @@ export function Modal({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`flex w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-[250ms] motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${desktopPanelClass} ${panelClassName}`}
+        className={`flex w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-300 motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${desktopPanelClass} ${panelClassName}`}
         style={{
           maxHeight: "calc(100dvh - var(--app-top-inset) - var(--app-bottom-inset) - 1rem)",
         }}

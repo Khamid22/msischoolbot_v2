@@ -29,7 +29,7 @@ export function MetricCard({ label, value, detail, icon, tone = "default", class
         </div>
         {icon ? <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background/70 text-primary">{icon}</span> : null}
       </div>
-      {detail ? <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">{detail}</p> : null}
+      {detail ? <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-muted-foreground">{detail}</p> : null}
     </section>
   );
 }

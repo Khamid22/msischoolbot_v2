@@ -72,7 +72,7 @@ export function Drawer({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`absolute inset-0 flex w-full flex-col bg-surface shadow-card-hover outline-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full ${widthClass} animate-in slide-in-from-right duration-[250ms] motion-reduce:animate-none`}
+        className={`absolute inset-0 flex w-full flex-col bg-surface shadow-card-hover outline-none sm:inset-y-0 sm:right-0 sm:left-auto sm:w-full ${widthClass} animate-in slide-in-from-right duration-300 motion-reduce:animate-none`}
         style={{
           paddingTop: "var(--app-top-inset)",
           paddingRight: "var(--app-right-inset)",

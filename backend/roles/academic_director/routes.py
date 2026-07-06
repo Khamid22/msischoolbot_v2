@@ -8,6 +8,7 @@ from backend.roles.role_home import render_role_home
 from backend.roles.workspace_counts import academic_director_workspace_cards
 from backend.roles.academic_director.staff_registration import (
     create_head_of_department_account,
+    list_active_subjects,
     list_head_of_department_accounts,
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
@@ -188,6 +189,7 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
                 "authLogin": current_auth_login(),
                 "authRole": current_auth_role(),
                 "headOfDepartments": hod_context.get("items", []),
+                "subjectOptions": list_active_subjects(),
                 "warning": hod_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },

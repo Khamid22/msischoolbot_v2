@@ -1,5 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from "react";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
+import { PageHeader } from "@/shared/ui/PageHeader";
 import { HeadOfDepartmentPageShell } from "@/roles/common/components/AcademicDirectorShell";
 import { asString } from "@/roles/admin/shared";
 
@@ -38,7 +39,7 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
   const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
     Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : [],
   );
-  const { toast, showToast } = useFloatingToast();
+  const { toast, showToast, clearToast } = useFloatingToast();
 
   const panelState = useMemo(
     () => ({
@@ -69,15 +70,15 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
       active="academy"
       sectionClassName="gap-4"
     >
-      <header className="rounded-xl border border-border bg-surface p-4 shadow-card">
-        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Head of Department
-        </p>
-        <h1 className="mt-1 break-words text-2xl font-black text-foreground">Teacher Academy</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Schedule lessons, review assessments, and support academy teachers within your subject scope.
-        </p>
-      </header>
+      <PageHeader
+        title="Teacher Academy"
+        subtitle="Schedule lessons, review assessments, and support academy teachers within your subject scope."
+        badge={
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+            Head of Department
+          </span>
+        }
+      />
 
       <Suspense
         fallback={
@@ -96,7 +97,7 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
         />
       </Suspense>
 
-      <FloatingToast toast={toast} />
+      <FloatingToast toast={toast} onClose={clearToast} />
     </HeadOfDepartmentPageShell>
   );
 }
