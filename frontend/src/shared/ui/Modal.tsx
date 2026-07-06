@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { uiLayers } from "@/shared/ui/layers";
 
 type ModalSize = "sm" | "md" | "lg" | "xl" | "wide";
 type ModalDesktopPlacement = "center" | "right";
@@ -107,7 +108,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[100] flex items-end justify-center bg-foreground/60 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none ${desktopPlacementClass}`}
+      className={`fixed inset-0 ${uiLayers.overlay} flex items-end justify-center bg-foreground/60 backdrop-blur-[2px] animate-in fade-in duration-200 motion-reduce:animate-none ${desktopPlacementClass}`}
       style={{
         paddingTop: "calc(var(--app-top-inset) + 0.5rem)",
         paddingRight: "calc(var(--app-right-inset) + 0.5rem)",
@@ -124,7 +125,7 @@ export function Modal({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`flex w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-200 motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${desktopPanelClass} ${panelClassName}`}
+        className={`flex w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover outline-none animate-in fade-in slide-in-from-bottom-4 duration-[250ms] motion-reduce:animate-none sm:fade-in sm:zoom-in-95 ${desktopPanelClass} ${panelClassName}`}
         style={{
           maxHeight: "calc(100dvh - var(--app-top-inset) - var(--app-bottom-inset) - 1rem)",
         }}
@@ -156,4 +157,13 @@ export function Modal({
     </div>,
     document.body,
   );
+}
+
+/**
+ * Mobile-first sheet: same global modal layer as Modal (portal, backdrop,
+ * scroll lock, Escape/outside-click close), rendered as a slide-up bottom
+ * sheet on phones and a centered dialog on larger screens.
+ */
+export function BottomSheet(props: ModalProps) {
+  return <Modal size="md" {...props} desktopPlacement="center" />;
 }

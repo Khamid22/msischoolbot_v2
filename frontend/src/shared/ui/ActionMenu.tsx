@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
+import { uiLayers } from "@/shared/ui/layers";
 
 export type ActionMenuItem =
   | { separator: true; key: string }
@@ -145,7 +146,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
               close();
             }
           }}
-          className={`fixed z-[90] w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-100 motion-reduce:animate-none ${
+          className={`fixed ${uiLayers.popover} w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-150 motion-reduce:animate-none ${
             align === "right" ? "origin-top-right" : "origin-top-left"
           }`}
         >
