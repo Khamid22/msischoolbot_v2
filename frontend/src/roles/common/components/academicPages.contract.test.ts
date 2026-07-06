@@ -78,3 +78,43 @@ describe("KPI grids", () => {
     assert.match(rolePages["AcademicDepartmentWorkspace (timetable/announcements)"], /<MetricGrid>/);
   });
 });
+
+describe("Timetable and Announcements final workspace", () => {
+  const src = rolePages["AcademicDepartmentWorkspace (timetable/announcements)"];
+
+  it("timetable has Today/Week view, filters, quick actions, mobile cards, and a desktop table", () => {
+    for (const token of [
+      "TimetableRange",
+      "today",
+      "week",
+      "Subject filter",
+      "Teacher filter",
+      "Event type",
+      "Schedule Academy Lesson",
+      "Open Teacher Academy",
+      "groupTimetableItems",
+      "<MobileCardList",
+      "<ResponsiveTable",
+    ]) {
+      assert.match(src, new RegExp(token));
+    }
+  });
+
+  it("announcements render cards with KPI, audience, status, priority, and a disabled creation state", () => {
+    for (const token of [
+      "AnnouncementsContent",
+      "Priority:",
+      "Audience:",
+      "Status:",
+      "Pinned",
+      "Coming soon",
+      "No announcements yet",
+    ]) {
+      assert.match(src, new RegExp(token));
+    }
+  });
+
+  it("does not reintroduce truncated announcement labels", () => {
+    assert.doesNotMatch(src, /Announc\.\.\./);
+  });
+});
