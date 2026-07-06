@@ -254,13 +254,14 @@ function displayTimeOnly(value?: string) {
 function statusLabel(value: string) {
   const labels: Record<string, string> = {
     new_academy_teacher: "New Academy Teacher",
-    in_training: "In Training",
+    in_training: "In Academy",
     ready_for_evaluation: "Ready for Evaluation",
     needs_improvement: "Needs Improvement",
     ready_for_active_teacher: "Ready",
     approved: "Completed",
     rejected: "Rejected",
     on_hold: "On Hold",
+    training_simulation: "Academy simulation",
   };
   const raw = String(value || "assigned");
   return labels[raw] || raw.replace(/_/g, " ");
@@ -541,7 +542,7 @@ function AcademyHeroCard({
         <div className="min-w-0">
           <p className="text-sm font-black text-[#12203D]">Teacher Academy</p>
           <p className="mt-0.5 truncate text-xs font-semibold text-[#7A8296]">
-            {academy?.subject_program_name || academy?.subject || "Curriculum"} training path
+            {academy?.subject_program_name || academy?.subject || "Curriculum"} Teacher Academy path
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-[#EFF3FF] px-2.5 py-1 text-[11px] font-black text-[#2F5DE0]">
@@ -587,7 +588,7 @@ function NextLessonPreview({ lessons, onViewLessons }: { lessons: AcademyAssignm
       {lesson ? (
         <>
           <p className="mt-2 line-clamp-2 text-[15px] font-black leading-5 text-[#12203D]">
-            {lesson.lesson_number || "Training lesson"}
+            {lesson.lesson_number || "Academy lesson"}
             {lesson.lesson_topic ? ` — ${lesson.lesson_topic}` : ""}
           </p>
           <p className="mt-1.5 text-sm font-medium text-[#5B6478]">
@@ -718,21 +719,15 @@ function ScoreTrendSvg({ rows }: { rows: Array<{ name: string; score: number }> 
 }
 
 function AcademyScoreSnapshot({ rows }: { rows: Array<{ name: string; score: number }> }) {
+  if (!rows.length) return null;
+
   return (
     <section className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm">
       <p className="text-sm font-black text-[#12203D]">Assessment score trend</p>
-      {rows.length ? (
-        <>
-          <p className="mt-0.5 text-[11.5px] font-semibold text-[#7A8296]">Score out of 10 across assessed lessons</p>
-          <div className="mt-3">
-            <ScoreTrendSvg rows={rows} />
-          </div>
-        </>
-      ) : (
-        <p className="py-6 text-center text-sm font-semibold text-[#9AA1B2]">
-          Assessment chart will appear after the first report.
-        </p>
-      )}
+      <p className="mt-0.5 text-[11.5px] font-semibold text-[#7A8296]">Score out of 10 across assessed lessons</p>
+      <div className="mt-3">
+        <ScoreTrendSvg rows={rows} />
+      </div>
     </section>
   );
 }
@@ -759,28 +754,24 @@ function rubricBreakdownRows(reports: AcademyAssessment[]) {
 
 function RubricBreakdownCard({ reports }: { reports: AcademyAssessment[] }) {
   const rows = useMemo(() => rubricBreakdownRows(reports), [reports]);
+  if (!rows.length) return null;
+
   return (
     <section className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm">
       <p className="text-sm font-black text-[#12203D]">Rubric breakdown</p>
-      {rows.length ? (
-        <div className="mt-3 space-y-2.5">
-          {rows.map((row) => (
-            <div key={row.label}>
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#5B6478]">
-                <span className="truncate">{row.label}</span>
-                <span className="shrink-0 font-black text-[#12203D]">{row.value.toFixed(1)}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#EEF1F6]">
-                <div className="h-full rounded-full bg-[#2F5DE0]" style={{ width: `${Math.min(100, row.value * 10)}%` }} />
-              </div>
+      <div className="mt-3 space-y-2.5">
+        {rows.map((row) => (
+          <div key={row.label}>
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#5B6478]">
+              <span className="truncate">{row.label}</span>
+              <span className="shrink-0 font-black text-[#12203D]">{row.value.toFixed(1)}</span>
             </div>
-          ))}
-        </div>
-      ) : (
-        <p className="py-6 text-center text-sm font-semibold text-[#9AA1B2]">
-          Rubric scores will appear after the first assessed lesson.
-        </p>
-      )}
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#EEF1F6]">
+              <div className="h-full rounded-full bg-[#2F5DE0]" style={{ width: `${Math.min(100, row.value * 10)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -821,7 +812,7 @@ function LessonReportSheet({
               {sequence ? `Lesson ${sequence} report` : "Lesson report"}
             </p>
             <p className="mt-1 line-clamp-2 text-base font-black leading-5 text-[#12203D]">
-              {report.lesson_number || "Training lesson"}
+              {report.lesson_number || "Academy lesson"}
               {report.lesson_topic ? ` — ${report.lesson_topic}` : ""}
             </p>
           </div>
@@ -914,7 +905,7 @@ function AcademyLessonsScreen({
       <EmptyState
         icon={<ClipboardList className="h-5 w-5" />}
         title="No academy lessons assigned."
-        detail="Academic Department will assign lessons before the training sequence begins."
+        detail="Academic Department will assign lessons before the Teacher Academy sequence begins."
       />
     );
   }
@@ -1060,7 +1051,7 @@ function Timetable({ lessons }: { lessons: AcademyAssignment[] }) {
     return (
       <EmptyState
         icon={<CalendarDays className="h-5 w-5" />}
-        title="No training sessions scheduled"
+        title="No Teacher Academy sessions scheduled"
         detail="When the Academic Director schedules academy lessons, the teacher will see them here."
       />
     );
@@ -1074,7 +1065,7 @@ function Timetable({ lessons }: { lessons: AcademyAssignment[] }) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-black uppercase tracking-wide text-[#2F5DE0]">{displayDateOnly(lesson.session_datetime)}</p>
-                <h3 className="mt-1.5 text-base font-black text-[#12203D]">{lesson.lesson_number || "Training lesson"}</h3>
+                <h3 className="mt-1.5 text-base font-black text-[#12203D]">{lesson.lesson_number || "Academy lesson"}</h3>
                 <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#7A8296]">{lesson.lesson_topic || "Curriculum lesson"}</p>
               </div>
               <span className={`shrink-0 rounded-full px-2 py-1 text-[10.5px] font-black ${lessonStatusBadge[lessonDisplayStatus(lesson)]}`}>
@@ -1452,7 +1443,7 @@ function CompactGradebook({ groups }: { groups: GroupGradebook[] }) {
       <EmptyState
         icon={<Users className="h-5 w-5" />}
         title="No active group assigned"
-        detail="Training teachers will see academy lessons first. Active groups appear here after promotion and assignment."
+        detail="Academy teachers will see academy lessons first. Active groups appear here after promotion and assignment."
       />
     );
   }
@@ -1789,10 +1780,10 @@ export default function TeacherHome(props: TeacherPageProps) {
           </section>
         ) : null}
 
-        {activeTab === "career" || (!isTraining && activeTab === "profile") ? (
+        {activeTab === "career" ? (
           <section className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr] animate-in fade-in slide-in-from-bottom-2 duration-300 sm:gap-4">
             <div className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm sm:p-5">
-              <p className="text-sm font-black text-[#12203D]">{activeTab === "profile" ? "Teacher Snapshot" : "Career Position"}</p>
+              <p className="text-sm font-black text-[#12203D]">Career Position</p>
               <div className="mt-4 space-y-3">
                 <MetricCard label="Status" value={isTraining ? statusLabel(academy?.academy_status || "in_training") : "Active"} detail="current stage" icon={<CheckCircle2 className="h-4 w-4" />} />
                 <MetricCard label="Stage" value={teacher.semester_stage || "-"} detail="semester progression" icon={<TrendingUp className="h-4 w-4" />} />
@@ -1802,7 +1793,7 @@ export default function TeacherHome(props: TeacherPageProps) {
             <div className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm sm:p-5">
               <p className="text-sm font-black text-[#12203D]">Growth Path</p>
               <div className="mt-5 space-y-4">
-                {["Training lessons", "Assessment reports", "Promotion review", "Active teacher"].map((label, index) => {
+                {["Academy lessons", "Assessment reports", "Promotion review", "Active teacher"].map((label, index) => {
                   const completed =
                     !isTraining ||
                     (index === 0 && assignedCount > 0) ||
@@ -1835,7 +1826,7 @@ export default function TeacherHome(props: TeacherPageProps) {
                 {[
                   ["Teacher Academy", "Follow the assigned lesson sequence and prepare using the guidance notes."],
                   ["Lesson Reports", "Scores and remarks appear after each Academic Director assessment."],
-                  ["Timetable", "Scheduled training sessions are controlled by the Academic Director."],
+                  ["Timetable", "Scheduled Teacher Academy sessions are controlled by the Academic Director."],
                 ].map(([title, detail]) => (
                   <div key={title} className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm sm:p-5">
                     <Bell className="h-4 w-4 text-[#2F5DE0]" />

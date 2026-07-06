@@ -13,8 +13,8 @@ export const DETAIL_CANDIDATE_STORAGE_KEY = "msi.admin.teacherDetailCandidateId"
 
 export const tabs: Array<{ key: TeacherTab; label: string; hint: string }> = [
   { key: "hiring", label: "Hiring Pipeline", hint: "Interview and test stages" },
-  { key: "training", label: "Training", hint: "Lesson evaluation" },
-  { key: "academy", label: "Teacher Academy", hint: "New teachers training" },
+  { key: "training", label: "Lesson Practice", hint: "Lesson evaluation" },
+  { key: "academy", label: "Teacher Academy", hint: "New Academy teachers" },
   { key: "active", label: "Active Teachers", hint: "Assigned staff" },
 ];
 
@@ -22,7 +22,7 @@ export const hiringStages = [
   { key: "new", title: "New", detail: "Fresh applications to screen." },
   { key: "interview", title: "Interview", detail: "Fluency, mindset, professionalism." },
   { key: "math_test", title: "Math Test", detail: "Subject knowledge and accuracy." },
-  { key: "training_ready", title: "Training", detail: "Passed hiring, ready for practice." },
+  { key: "training_ready", title: "Practice", detail: "Passed hiring, ready for lesson review." },
 ];
 
 export const TRAINING_TARGET_LESSONS = 12;
@@ -72,7 +72,7 @@ export const statusLabels: Record<string, string> = {
   new: "New",
   interview: "Interview",
   math_test: "Math Test",
-  training_ready: "Training Ready",
+  training_ready: "Practice Ready",
   training_passed: "Awaiting Decision",
   hired: "Hired",
   rejected: "Rejected",
@@ -191,18 +191,18 @@ export function formatCandidateEvent(value: unknown) {
     rejected: "Rejected",
     manual_correction: "Stage corrected",
     stage_corrected: "Stage corrected",
-    training_evaluation: "Training evaluated",
+    training_evaluation: "Practice evaluated",
     training_passed: "Awaiting decision",
     awaiting_decision: "Awaiting decision",
-    training_complete: "Training complete",
+    training_complete: "Practice complete",
     final_decision: "Final decision",
-    returned_to_training: "Returned to training",
+    returned_to_training: "Returned to practice",
     hired: "Hired",
-    training_repeat: "Repeat training",
-    training_hold: "Training on hold",
-    training_rejected: "Rejected after training",
+    training_repeat: "Repeat practice",
+    training_hold: "Practice on hold",
+    training_rejected: "Rejected after practice",
     reopened: "Reopened",
-    training_ready: "Ready for training",
+    training_ready: "Ready for practice",
     withdrawn: "Withdrawn",
   };
   return labels[normalized] || asString(value) || "Updated";

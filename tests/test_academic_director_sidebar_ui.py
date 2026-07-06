@@ -108,6 +108,7 @@ def _patch_academic_director_cards(monkeypatch):
 def _patch_admin_page_context(monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
     import backend.roles.academic_director.routes as academic_director_routes
+    import backend.roles.head_of_department.routes as head_of_department_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -125,7 +126,118 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
+    monkeypatch.setattr(
+        academic_director_routes,
+        "academic_director_workspace_cards",
+        lambda: [
+            {"label": "Groups", "value": "8"},
+            {"label": "Teachers", "value": "3"},
+            {"label": "Subjects", "value": "5"},
+            {"label": "Students", "value": "177"},
+        ],
+    )
+    monkeypatch.setattr(head_of_department_routes, "head_of_department_workspace_cards", lambda: [])
     monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
+    monkeypatch.setattr(
+        academic_director_routes,
+        "list_admin_academic_context",
+        lambda: {
+            "schedules": [
+                {
+                    "id": 10,
+                    "subject_id": 5,
+                    "subject_name": "Mathematics",
+                    "group_name": "Math 10A",
+                    "teacher_name": "Ada Teacher",
+                    "title": "Math morning rule",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "weekdays": "Mon, Wed",
+                    "room": "A1",
+                    "status": "active",
+                },
+                {
+                    "id": 11,
+                    "subject_id": 7,
+                    "subject_name": "English",
+                    "group_name": "English 9B",
+                    "teacher_name": "Grace Teacher",
+                    "title": "English rule",
+                    "start_time": "11:00",
+                    "end_time": "12:00",
+                    "weekdays": "Tue",
+                    "room": "B2",
+                    "status": "active",
+                },
+            ],
+            "sessions": [
+                {
+                    "id": 20,
+                    "subject_id": 5,
+                    "subject_name": "Mathematics",
+                    "group_name": "Math 10A",
+                    "teacher_name": "Ada Teacher",
+                    "session_date": "06/07/2026",
+                    "start_time": "09:00",
+                    "end_time": "10:00",
+                    "room": "A1",
+                    "status": "scheduled",
+                },
+                {
+                    "id": 21,
+                    "subject_id": 7,
+                    "subject_name": "English",
+                    "group_name": "English 9B",
+                    "teacher_name": "Grace Teacher",
+                    "session_date": "06/07/2026",
+                    "start_time": "11:00",
+                    "end_time": "12:00",
+                    "room": "B2",
+                    "status": "scheduled",
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        academic_director_routes,
+        "list_announcements",
+        lambda include_drafts=True: [
+            {
+                "id": 30,
+                "title": "Term Update",
+                "body": "Academic Department update.",
+                "audience": "teachers",
+                "priority": "info",
+                "status": "published",
+                "pinned": False,
+            }
+        ],
+    )
+    monkeypatch.setattr(head_of_department_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
+    monkeypatch.setattr(head_of_department_routes, "current_hod_subject_ids", lambda: {5})
+    monkeypatch.setattr(head_of_department_routes, "list_admin_academic_context", academic_director_routes.list_admin_academic_context)
+    monkeypatch.setattr(head_of_department_routes, "list_announcements", academic_director_routes.list_announcements)
+    monkeypatch.setattr(
+        academic_director_routes,
+        "list_head_of_department_accounts",
+        lambda: {
+            "items": [
+                {
+                    "account_id": 80,
+                    "login": "HOD0001",
+                    "display_name": "Head of Math Department",
+                    "role": "head_of_department",
+                    "status": "active",
+                    "subject_id": 5,
+                    "subject_name": "Mathematics",
+                    "scope_type": "head_of_department",
+                    "created_at": "2026-07-06T10:00:00Z",
+                    "updated_at": "2026-07-06T10:00:00Z",
+                }
+            ],
+            "warning": "",
+        },
+    )
 
 
 def test_academic_director_home_bootstrap_keeps_cards_and_profile_context(client, monkeypatch):
@@ -162,10 +274,76 @@ def test_academic_director_teacher_academy_route_still_loads(client, monkeypatch
     assert 'data-react-page="admin-home"' not in response.text
 
 
+def test_academic_director_head_of_departments_route_loads_safe_page(client, monkeypatch):
+    _patch_admin_page_context(monkeypatch)
+    _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
+
+    response = client.get("/academic-director/head-of-departments")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store, max-age=0"
+    assert 'data-react-page="academic-director-head-of-departments"' in response.text
+    assert "Head of Departments" in response.text
+    assert "Head of Math Department" in response.text
+    assert "Mathematics" in response.text
+    assert "password_hash" not in response.text
+    assert "Student mode" not in response.text
+    assert 'data-react-page="admin-home"' not in response.text
+
+
+def test_academic_department_timetable_announcements_and_profile_routes_load(client, monkeypatch):
+    _patch_admin_page_context(monkeypatch)
+    workspace_source = Path("frontend/src/roles/common/pages/AcademicDepartmentWorkspace.tsx").read_text()
+
+    _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
+    ad_timetable = client.get("/academic-director/timetable")
+    ad_announcements = client.get("/academic-director/announcements")
+    ad_profile = client.get("/academic-director/profile")
+
+    assert ad_timetable.status_code == 200
+    assert 'data-react-page="academic-director-timetable"' in ad_timetable.text
+    assert "Math 10A" in ad_timetable.text
+    assert "English 9B" in ad_timetable.text
+    assert "AdminSidebar" not in ad_timetable.text
+    assert "Student mode" not in ad_timetable.text
+    assert ad_announcements.status_code == 200
+    assert 'data-react-page="academic-director-announcements"' in ad_announcements.text
+    assert "Term Update" in ad_announcements.text
+    assert "Coming soon" in workspace_source
+    assert "disabled" in workspace_source
+    assert 'data-react-page="admin-home"' not in ad_announcements.text
+    assert ad_profile.status_code == 200
+    assert 'data-react-page="academic-director-home"' in ad_profile.text
+    assert "Academic Director Profile" in ad_profile.text
+
+    client.cookies.clear()
+    _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80})
+    hod_timetable = client.get("/head-of-department/timetable")
+    hod_announcements = client.get("/head-of-department/announcements")
+    hod_profile = client.get("/head-of-department/profile")
+
+    assert hod_timetable.status_code == 200
+    assert 'data-react-page="head-of-department-timetable"' in hod_timetable.text
+    assert "Math 10A" in hod_timetable.text
+    assert "English 9B" not in hod_timetable.text
+    assert "password_hash" not in hod_timetable.text
+    assert "AdminSidebar" not in hod_timetable.text
+    assert "Student mode" not in hod_timetable.text
+    assert hod_announcements.status_code == 200
+    assert 'data-react-page="head-of-department-announcements"' in hod_announcements.text
+    assert "Term Update" in hod_announcements.text
+    assert "Coming soon" in workspace_source
+    assert hod_profile.status_code == 200
+    assert 'data-react-page="head-of-department-home"' in hod_profile.text
+    assert "Head of Department Profile" in hod_profile.text
+
+
 def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobile_nav():
     source = Path("frontend/src/roles/common/components/AcademicDirectorShell.tsx").read_text()
+    routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     admin_source = Path("frontend/src/roles/admin/pages/Admin.tsx").read_text()
     academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
+    hod_academy_source = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
     app_source = Path("frontend/src/app/App.tsx").read_text()
     bootstrap_source = Path("frontend/src/shared/lib/bootstrap.ts").read_text()
     stale_state_source = Path("frontend/src/shared/lib/staleUiState.ts").read_text()
@@ -174,29 +352,73 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
 
     assert "Academic Director navigation" in source
     assert "Academic Director mobile navigation" in source
-    assert 'label: "Dashboard"' in source
+    assert "Head of Department navigation" in source
+    assert "Head of Department mobile navigation" in source
+    assert 'label: "Overview"' in source
     assert 'label: "Teacher Academy"' in source
+    assert 'label: "Timetable"' in source
+    assert 'label: "Announcements"' in source
     assert 'label: "Profile"' in source
-    assert 'label: "Home"' in source
-    assert 'label: "Academy"' in source
+    assert 'mobileLabel: "Academy"' in source
     assert "Head of Departments" in source
     assert "Open Teacher Academy" in source
-    assert 'const academicDirectorAcademy = "/academic-director/teacher-academy";' in source
-    assert 'const academicDirectorProfile = "/academic-director#academic-director-profile";' in source
-    assert "/academic-director/teacher-academy" in source
+    assert 'academicDirectorOverview: "/academic-director"' in routes_source
+    assert 'academicDirectorTeacherAcademy: "/academic-director/teacher-academy"' in routes_source
+    assert 'academicDirectorHeadOfDepartments: "/academic-director/head-of-departments"' in routes_source
+    assert 'academicDirectorTimetable: "/academic-director/timetable"' in routes_source
+    assert 'academicDirectorAnnouncements: "/academic-director/announcements"' in routes_source
+    assert 'academicDirectorProfile: "/academic-director/profile"' in routes_source
+    assert 'academicDirectorProfileSection: "/academic-director#academic-director-profile"' in routes_source
+    assert 'headOfDepartmentOverview: "/head-of-department"' in routes_source
+    assert 'headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy"' in routes_source
+    assert 'headOfDepartmentTimetable: "/head-of-department/timetable"' in routes_source
+    assert 'headOfDepartmentAnnouncements: "/head-of-department/announcements"' in routes_source
+    assert 'headOfDepartmentProfile: "/head-of-department/profile"' in routes_source
+    assert 'headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile"' in routes_source
+    assert "href: routes.academicDirectorTeacherAcademy" in source
+    assert "href: routes.academicDirectorHeadOfDepartments" in source
+    assert "href: routes.academicDirectorTimetable" in source
+    assert "href: routes.academicDirectorAnnouncements" in source
+    assert "href: routes.academicDirectorProfile" in source
+    assert "href: routes.headOfDepartmentTeacherAcademy" in source
+    assert "href: routes.headOfDepartmentTimetable" in source
+    assert "href: routes.headOfDepartmentAnnouncements" in source
+    assert "href: routes.headOfDepartmentProfile" in source
     assert "academic-director-profile" in source
+    assert "head-of-department-profile" in source
+    assert "academicDirectorActiveNavFromPath" in source
+    assert "headOfDepartmentActiveNavFromPath" in source
+    assert "filter((item) => item.key !== \"departments\")" in source
+    assert "pointer-events-none" not in source
+    assert "AdminSidebar" not in source
     assert "action={routes.logout}" in source
     assert 'name="csrf_token"' in source
     assert "AcademicDirectorMobileNav active=\"academy\"" not in admin_source
     assert "AdminSidebar" not in academy_source
-    assert "AcademicDirectorSidebar" in academy_source
-    assert "AcademicDirectorMobileNav active=\"academy\"" in academy_source
+    assert "AcademicDirectorPageShell" in academy_source
+    assert 'active="academy"' in academy_source
+    assert "HeadOfDepartmentPageShell" in hod_academy_source
+    assert 'active="academy"' in hod_academy_source
     assert "allowTeacherPreview={false}" in academy_source
     assert "if (!allowTeacherPreview)" in Path(
         "frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx"
     ).read_text()
     assert '"academic-director-academy"' in app_source
+    assert '"academic-director-head-of-departments"' in app_source
+    assert '"academic-director-timetable"' in app_source
+    assert '"academic-director-announcements"' in app_source
+    assert '"head-of-department-home"' in app_source
+    assert '"head-of-department-academy"' in app_source
+    assert '"head-of-department-timetable"' in app_source
+    assert '"head-of-department-announcements"' in app_source
     assert '"academic-director-academy"' in bootstrap_source
+    assert '"academic-director-head-of-departments"' in bootstrap_source
+    assert '"academic-director-timetable"' in bootstrap_source
+    assert '"academic-director-announcements"' in bootstrap_source
+    assert '"head-of-department-home"' in bootstrap_source
+    assert '"head-of-department-academy"' in bootstrap_source
+    assert '"head-of-department-timetable"' in bootstrap_source
+    assert '"head-of-department-announcements"' in bootstrap_source
     assert "clearStaleRolePreviewStorage(" in app_source
     assert "bootstrap.props.authRole || bootstrap.props.role || bootstrap.props.adminMode" in app_source
     for key in [
@@ -210,20 +432,28 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "clearStaleRolePreviewStorage(realRole)" in admin_state_source
     assert "modeParam && allowPreviewMode" in admin_state_source
     assert "urlAdminMode() || storedAdminMode()" in admin_state_source
-    assert "ACCOUNT_AUTH_V2_ENABLED=1" in deployment_doc
+    assert "Account/profile auth is always active." in deployment_doc
     assert "ADMIN_PREVIEW_ROLES=0" in deployment_doc
 
 
 def test_academic_director_academy_uses_single_shell_source():
     route_source = Path("backend/roles/academic_director/routes.py").read_text()
     academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
+    hod_academy_source = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
 
     assert '"academic-director-academy"' in route_source
     assert '"admin-home"' not in route_source
     assert "render_admin_page(" not in route_source
-    assert academy_source.count("AcademicDirectorSidebar") >= 1
+    assert academy_source.count("AcademicDirectorPageShell") >= 1
     assert "AdminSidebar" not in academy_source
+    assert "AcademicDirectorSidebar" not in academy_source
+    assert "AcademicDirectorMobileNav" not in academy_source
     assert "TeacherAcademyPanel" in academy_source
+    assert "HeadOfDepartmentPageShell" in hod_academy_source
+    assert "AdminSidebar" not in hod_academy_source
+    assert "HeadOfDepartmentSidebar" not in hod_academy_source
+    assert "HeadOfDepartmentMobileNav" not in hod_academy_source
+    assert "TeacherAcademyPanel" in hod_academy_source
 
 
 def test_academic_director_critical_routes_remain_registered(app):
@@ -235,6 +465,15 @@ def test_academic_director_critical_routes_remain_registered(app):
         ("POST", "/auth/telegram"),
         ("GET", "/academic-director"),
         ("GET", "/academic-director/teacher-academy"),
+        ("GET", "/academic-director/head-of-departments"),
+        ("GET", "/academic-director/timetable"),
+        ("GET", "/academic-director/announcements"),
+        ("GET", "/academic-director/profile"),
+        ("GET", "/head-of-department"),
+        ("GET", "/head-of-department/teacher-academy"),
+        ("GET", "/head-of-department/timetable"),
+        ("GET", "/head-of-department/announcements"),
+        ("GET", "/head-of-department/profile"),
         ("POST", "/logout"),
         ("GET", "/admin"),
         ("GET", "/teacher"),

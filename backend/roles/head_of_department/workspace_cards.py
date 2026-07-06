@@ -14,7 +14,7 @@ def _placeholder_cards():
         {"label": "Subject Scope", "value": "0", "detail": "assigned subjects"},
         {"label": "Academy Teachers", "value": "0", "detail": "visible trainees"},
         {"label": "Ready for Review", "value": "0", "detail": "subject scoped"},
-        {"label": "Reports", "value": "Placeholder", "detail": "teacher journeys"},
+        {"label": "Reports", "value": "0", "detail": "teacher journeys"},
     ]
 
 

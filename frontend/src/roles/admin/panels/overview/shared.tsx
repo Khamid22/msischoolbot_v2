@@ -53,7 +53,7 @@ export const candidateStatusLabels: Record<string, string> = {
   new: "New",
   interview: "Interview",
   math_test: "Math Test",
-  training_ready: "Training",
+  training_ready: "Practice",
   training_passed: "Review",
   hired: "Hired",
   rejected: "Rejected",
@@ -305,11 +305,11 @@ export function candidateEventLabel(event: Record<string, unknown>) {
   if (result === "rejected") return "Rejected";
   if (result === "awaiting_decision") return "Sent for final decision";
   if (result === "hired") return "Hired";
-  if (result === "training_rejected") return "Rejected after training";
-  if (result === "returned_to_training") return "Returned to training";
+  if (result === "training_rejected") return "Rejected after practice";
+  if (result === "returned_to_training") return "Returned to practice";
   if (result === "reopened") return "Reopened";
   if (result === "withdrawn") return "Withdrawn";
-  if (eventType === "training_evaluation") return "Training evaluated";
+  if (eventType === "training_evaluation") return "Practice evaluated";
   if (eventType === "created") return "Candidate added";
   return asString(event.result) || asString(event.event_type) || "Updated";
 }
@@ -471,4 +471,3 @@ export function studentDashboardCards({
     </ChartCard>
   );
 }
-

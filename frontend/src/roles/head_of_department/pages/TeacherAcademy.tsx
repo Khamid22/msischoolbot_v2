@@ -1,6 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from "react";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
-import { AcademicDirectorPageShell } from "@/roles/common/components/AcademicDirectorShell";
+import { HeadOfDepartmentPageShell } from "@/roles/common/components/AcademicDirectorShell";
 import { asString } from "@/roles/admin/shared";
 
 const TeacherAcademyPanel = lazy(() =>
@@ -9,7 +9,7 @@ const TeacherAcademyPanel = lazy(() =>
   })),
 );
 
-type AcademicDirectorAcademyProps = {
+type HeadOfDepartmentAcademyProps = {
   authLogin?: string;
   authRole?: string;
   csrfToken?: string;
@@ -31,7 +31,7 @@ function normalizeGroupOptions(groups: Array<Record<string, unknown>>) {
     .filter((group) => group.name);
 }
 
-export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirectorAcademyProps) {
+export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartmentAcademyProps) {
   const [teachers, setTeachers] = useState<Array<Record<string, unknown>>>(
     Array.isArray(props.adminTeachers) ? props.adminTeachers : [],
   );
@@ -42,7 +42,7 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
 
   const panelState = useMemo(
     () => ({
-      adminMode: props.adminMode || "academic_director",
+      adminMode: "head_of_department",
       currentSchool: props.adminSchool || "all",
       teachers,
       setTeachers,
@@ -53,8 +53,8 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
       ),
       props: {
         ...props,
-        adminMode: props.adminMode || "academic_director",
-        authRole: props.authRole || "academic_director",
+        adminMode: "head_of_department",
+        authRole: props.authRole || "head_of_department",
         adminTeachers: teachers,
         adminTeacherAcademy: academyTeachers,
       },
@@ -63,25 +63,25 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
   );
 
   return (
-    <AcademicDirectorPageShell
+    <HeadOfDepartmentPageShell
       authLogin={props.authLogin}
       csrfToken={props.csrfToken}
       active="academy"
       sectionClassName="gap-4"
     >
-      <header className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+      <header className="rounded-xl border border-border bg-surface p-4 shadow-card">
         <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-          Academic Director
+          Head of Department
         </p>
         <h1 className="mt-1 break-words text-2xl font-black text-foreground">Teacher Academy</h1>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Register academy teachers, schedule lessons, write assessments, and review teacher journeys.
+          Schedule lessons, review assessments, and support academy teachers within your subject scope.
         </p>
       </header>
 
       <Suspense
         fallback={
-          <section className="rounded-2xl border border-border bg-surface p-5 text-sm font-bold text-muted-foreground shadow-card">
+          <section className="rounded-xl border border-border bg-surface p-5 text-sm font-bold text-muted-foreground shadow-card">
             Loading Teacher Academy...
           </section>
         }
@@ -97,6 +97,6 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
       </Suspense>
 
       <FloatingToast toast={toast} />
-    </AcademicDirectorPageShell>
+    </HeadOfDepartmentPageShell>
   );
 }

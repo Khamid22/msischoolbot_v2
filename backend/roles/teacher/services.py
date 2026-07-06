@@ -154,7 +154,7 @@ def _academy_updates(assignments, assessments):
                     ]
                     if part
                 )
-                or "Training lesson",
+                or "Academy lesson",
                 "source": str(assignment.get("evaluator_name") or "Academic Department"),
                 "created_at": str(assignment.get("updated_at") or assignment.get("created_at") or ""),
                 "priority": "info",

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
@@ -34,11 +35,13 @@ function isAction(item: ActionMenuItem): item is Extract<ActionMenuItem, { onCli
  */
 export function ActionMenu({ items, label = "More actions", trigger, align = "right" }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const menuId = useId();
-  const dismissibleRefs = useMemo(() => [containerRef], []);
+  const dismissibleRefs = useMemo(() => [containerRef, menuRef], []);
 
   const actionIndexes = items
     .map((item, index) => (isAction(item) && !item.disabled ? index : -1))
@@ -53,8 +56,27 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
     itemRefs.current[index]?.focus();
   }
 
+  function updateMenuPosition() {
+    const triggerRect = triggerRef.current?.getBoundingClientRect();
+    if (!triggerRect) return;
+
+    const menuWidth = 208;
+    const gutter = 8;
+    const preferredLeft = align === "right" ? triggerRect.right - menuWidth : triggerRect.left;
+    const maxLeft = Math.max(gutter, window.innerWidth - menuWidth - gutter);
+
+    setMenuPosition({
+      top: triggerRect.bottom + 6,
+      left: Math.min(Math.max(gutter, preferredLeft), maxLeft),
+    });
+  }
+
   useEffect(() => {
     if (!open) return;
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
 
     // Focus the first enabled item when the menu opens.
     const timer = window.setTimeout(() => {
@@ -62,6 +84,8 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
     }, 0);
     return () => {
       window.clearTimeout(timer);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
     };
   }, [open]);
 
@@ -94,6 +118,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
         aria-controls={open ? menuId : undefined}
         onClick={(event) => {
           event.stopPropagation();
+          if (!open) updateMenuPosition();
           setOpen((value) => !value);
         }}
         onKeyDown={(event) => {
@@ -107,19 +132,21 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
         {trigger ?? <MoreVertical className="h-4 w-4" />}
       </button>
 
-      {open ? (
+      {open && typeof document !== "undefined" ? createPortal(
         <div
+          ref={menuRef}
           id={menuId}
           role="menu"
           aria-label={label}
+          style={{ top: menuPosition.top, left: menuPosition.left }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
               close();
             }
           }}
-          className={`absolute z-50 mt-1 w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-100 motion-reduce:animate-none ${
-            align === "right" ? "right-0 origin-top-right" : "left-0 origin-top-left"
+          className={`fixed z-[90] w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-100 motion-reduce:animate-none ${
+            align === "right" ? "origin-top-right" : "origin-top-left"
           }`}
         >
           {items.map((item, index) => {
@@ -164,7 +191,8 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

@@ -111,7 +111,7 @@ export function TrainingEvaluationModal({
       <div ref={panelRef} className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover">
         <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
           <div>
-            <h3 className="text-sm font-bold">{editingEvent ? "Edit Evaluation" : "Training Evaluation"}</h3>
+            <h3 className="text-sm font-bold">{editingEvent ? "Edit Evaluation" : "Practice Evaluation"}</h3>
             <p className="text-xs text-muted-foreground">
               {asString(candidate.full_name)} · lesson {lessonNumber}/{TRAINING_TARGET_LESSONS} · average {average.toFixed(1)}/10
             </p>
@@ -273,4 +273,3 @@ export function RubricModal({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-

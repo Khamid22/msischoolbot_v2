@@ -342,7 +342,7 @@ export default function TeachersPanel({
     label: string;
     tone: string;
   }> = [
-    { key: "in_training", label: "In training", tone: "" },
+    { key: "in_training", label: "In practice", tone: "" },
     { key: "passed", label: "Awaiting decision", tone: "text-emerald-700" },
     { key: "rejected", label: "Rejected", tone: "text-destructive" },
   ];
@@ -503,7 +503,7 @@ export default function TeachersPanel({
               HR Manager / {activeTab === "active" ? "Teachers" : "Candidates"}
             </p>
             <h2 className="text-2xl font-bold">
-              {activeTab === "active" ? "Teachers" : activeTab === "training" ? "Training" : "Candidates"}
+              {activeTab === "active" ? "Teachers" : activeTab === "training" ? "Lesson Practice" : "Candidates"}
             </h2>
           </div>
         )}
@@ -613,8 +613,8 @@ export default function TeachersPanel({
 
       {activeTab === "training" ? (
         <ChartCard
-          title="Training"
-          subtitle={`${inTrainingCount} in training · ${trainingPassedCount} awaiting decision`}
+          title="Lesson Practice"
+          subtitle={`${inTrainingCount} in practice · ${trainingPassedCount} awaiting decision`}
           icon={<GraduationCap className="h-4 w-4 text-info" />}
           className="flex min-h-0 flex-1 flex-col"
           bodyClassName="flex min-h-0 flex-1 flex-col"
@@ -734,7 +734,7 @@ export default function TeachersPanel({
                           ? "No rejected candidates"
                           : trainingFilter === "passed"
                             ? "No candidates awaiting decision yet"
-                            : "No candidates in training"}
+                            : "No candidates in practice"}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
                         {trainingFilter === "in_training"

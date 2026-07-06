@@ -8,7 +8,7 @@ from backend.identity.account_service import (
     update_teacher_by_id,
     upsert_teacher,
 )
-from backend.utils.normalization import normalize_school_code
+from database.academics.canonical import normalize_school_code
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.route_service import group_belongs_to_school
 from backend.utils.session import current_auth_login, current_auth_role
@@ -49,7 +49,8 @@ def _resolve_teacher_fields(mode):
     """
     assigned_group = request.form.get("teacher_assigned_group", "").strip()
     assigned_school = normalize_school_code(
-        request.form.get("teacher_assigned_school", "")
+        request.form.get("teacher_assigned_school", ""),
+        default="",
     )
 
     if not assigned_group:
@@ -234,7 +235,7 @@ def register_admin_teacher_routes(
                 "display_name": credentials.get("display_name", ""),
                 "subject_name": credentials.get("subject_name", ""),
             }
-            return _academy_payload("Academy teacher created with selected training lessons.", credentials=safe_credentials)
+            return _academy_payload("Academy teacher created with selected Teacher Academy lessons.", credentials=safe_credentials)
         return render_admin_page(admin_notice="Academy teacher created.", admin_panel="teachers")
 
     @router.post("/admin/teacher-academy/assignments/{assignment_id}")
@@ -254,8 +255,8 @@ def register_admin_teacher_routes(
         if not updated:
             return _academy_error(error_message or "Unable to update assignment.")
         if _wants_json():
-            return _academy_payload("Training lesson updated.")
-        return render_admin_page(admin_notice="Training lesson updated.", admin_panel="teachers")
+            return _academy_payload("Academy lesson updated.")
+        return render_admin_page(admin_notice="Academy lesson updated.", admin_panel="teachers")
 
     @router.post("/admin/teacher-academy/{academy_teacher_id}/assessments")
     def add_teacher_academy_assessment_route(academy_teacher_id: int):
@@ -389,7 +390,10 @@ def register_admin_teacher_routes(
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 404)
 
         assigned_group = request.form.get("teacher_assigned_group", "").strip()
-        assigned_school = normalize_school_code(request.form.get("teacher_assigned_school", ""))
+        assigned_school = normalize_school_code(
+            request.form.get("teacher_assigned_school", ""),
+            default="",
+        )
         pay_rate = request.form.get("teacher_pay_rate", "").strip()
         category = request.form.get("teacher_category", "junior")
         semester_stage = request.form.get("teacher_semester_stage", "1-2")

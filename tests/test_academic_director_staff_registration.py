@@ -48,6 +48,8 @@ class _RegistrationConn:
 
     def execute(self, sql, params=None):
         self.params.append((sql, tuple(params or ())))
+        if "SELECT to_regclass(%s)" in sql:
+            return _Result({"table_name": (params or ("",))[0]})
         if "to_regclass('msi_v2.accounts')" in sql:
             return _Result({"table_name": "msi_v2.accounts"})
         if "FROM msi_v2.subjects" in sql:
@@ -70,6 +72,36 @@ class _RegistrationConn:
 
     def commit(self):
         self.committed = True
+
+
+class _HodListConn:
+    def __init__(self, missing_table=""):
+        self.missing_table = missing_table
+        self.params = []
+
+    def execute(self, sql, params=None):
+        self.params.append((sql, tuple(params or ())))
+        if "SELECT to_regclass(%s)" in sql:
+            table_name = (params or ("",))[0]
+            return _Result({"table_name": None if table_name == self.missing_table else table_name})
+        if "WHERE account.role = 'head_of_department'" in sql:
+            return _Result(
+                rows=[
+                    {
+                        "account_id": 80,
+                        "login": "HOD0001",
+                        "display_name": "Head of Math Department",
+                        "role": "head_of_department",
+                        "status": "active",
+                        "subject_id": 5,
+                        "subject_name": "Mathematics",
+                        "scope_type": "head_of_department",
+                        "created_at": "2026-07-06 10:00:00+00",
+                        "updated_at": "2026-07-06 10:15:00+00",
+                    }
+                ]
+            )
+        raise AssertionError(f"Unexpected SQL: {sql}")
 
 
 def test_academic_director_hod_service_generates_hod_login_and_hashes_password():
@@ -129,11 +161,34 @@ def test_academic_director_bootstrap_generates_ad_login_and_hashes_password():
         assert check_password_hash(password_hash, "AD0001")
 
 
-def test_ad_and_hod_staff_codes_use_staff_login_path():
-    from backend.identity.credentials import detect_login_role
+def test_list_head_of_department_accounts_returns_safe_display_payload():
+    result = staff_registration._list_head_of_department_accounts(_HodListConn())
 
-    assert detect_login_role("AD0001") == "admin"
-    assert detect_login_role("HOD0001") == "admin"
+    assert result["warning"] == ""
+    assert result["items"] == [
+        {
+            "account_id": 80,
+            "login": "HOD0001",
+            "display_name": "Head of Math Department",
+            "role": "head_of_department",
+            "status": "active",
+            "subject_id": 5,
+            "subject_name": "Mathematics",
+            "scope_type": "head_of_department",
+            "created_at": "2026-07-06 10:00:00+00",
+            "updated_at": "2026-07-06 10:15:00+00",
+        }
+    ]
+    assert "password_hash" not in result["items"][0]
+
+
+def test_list_head_of_department_accounts_warns_when_scope_table_missing():
+    result = staff_registration._list_head_of_department_accounts(
+        _HodListConn(missing_table="msi_v2.staff_subject_scopes")
+    )
+
+    assert result["items"] == []
+    assert "msi_v2.staff_subject_scopes" in result["warning"]
 
 
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
@@ -177,6 +232,16 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
     }
     assert "account_id" not in body["credentials"]
     assert "staff_id" not in body["credentials"]
+    assert body["headOfDepartment"] == {
+        "login": "HOD0001",
+        "display_name": "Head of Math Department",
+        "role": "head_of_department",
+        "status": "active",
+        "subject_name": "Mathematics",
+    }
+    assert "account_id" not in body["headOfDepartment"]
+    assert "staff_id" not in body["headOfDepartment"]
+    assert "password_hash" not in body["headOfDepartment"]
 
 
 def test_head_of_department_workspace_route_loads(client, monkeypatch):
@@ -206,59 +271,20 @@ def test_head_of_department_workspace_route_loads(client, monkeypatch):
 
 
 def test_head_of_department_can_access_subject_scoped_academy_page(client, monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
-    import backend.roles.head_of_department.academy_scope as academy_scope
+    import backend.roles.head_of_department.routes as hod_routes
 
     monkeypatch.setattr(
-        admin_page,
-        "build_admin_page_context",
-        lambda **kwargs: {
-            "panel": "teachers",
-            "school_filter": "all",
-            "sync_errors": [],
-            "load_error": "",
-            "admin_students": [],
-            "admin_teachers": [],
-            "admin_teacher_candidates": [],
-            "admin_teacher_academy": [{"id": 7, "subject_id": 5, "full_name": "Math Teacher"}],
-            "admin_complaints": [],
-            "admin_parents": [],
-            "admin_parent_children": [],
-            "admin_teacher_options": [],
-            "admin_group_options": [],
-            "admin_teacher_edit": None,
-            "admin_teacher_edit_school": "",
-            "admin_school_options": [{"code": "all", "label": "All Schools"}],
-            "admin_quick_stats": {},
-            "admin_school_info": [],
-            "admin_subject_info": [],
-            "admin_group_zones": {"green": [], "yellow": [], "red": []},
-            "admin_resource_types": [],
-            "admin_resource_active_types": [],
-            "admin_resources": [],
-            "admin_resource_subject_options": [],
-            "admin_resource_upload_enabled": False,
-        },
-    )
-    monkeypatch.setattr(
-        admin_page,
-        "list_admin_academic_context",
+        hod_routes,
+        "_head_of_department_academy_context",
         lambda: {
-            "schools": [],
-            "subjects": [],
-            "groups": [],
-            "enrollments": [],
-            "lessons": [],
-            "schedules": [],
-            "sessions": [],
+            "teachers": [],
+            "academy_teachers": [{"id": 7, "subject_id": 5, "full_name": "Math Teacher"}],
+            "group_options": [],
+            "subjects": [{"id": 5, "subject_name": "Mathematics"}],
             "curriculum_programs": [],
             "curriculum_items": [],
-            "enrollment_summary": {},
         },
     )
-    monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
-    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
-    monkeypatch.setattr(academy_scope, "filter_admin_context_for_current_hod", lambda page_context, academic_context: None)
     _set_session(
         client,
         {
@@ -272,9 +298,12 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
     response = client.get("/head-of-department/teacher-academy")
 
     assert response.status_code == 200
-    assert 'data-react-page="admin-home"' in response.text
+    assert 'data-react-page="head-of-department-academy"' in response.text
+    assert 'data-react-page="admin-home"' not in response.text
     assert "head_of_department" in response.text
     assert "adminTeacherAcademy" in response.text
+    assert "Math Teacher" in response.text
+    assert "Training tab" not in response.text
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
@@ -299,6 +328,60 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
     assert response.status_code == 403
     assert response.json()["message"] == "This Teacher Academy teacher is outside your subject scope."
+
+
+def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
+    import backend.roles.admin.routes.teacher_routes as teacher_routes
+
+    captured = {}
+
+    def fake_add_assessment(**kwargs):
+        captured.update(kwargs)
+        return True, ""
+
+    monkeypatch.setattr(teacher_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: True)
+    monkeypatch.setattr(teacher_routes, "add_assessment", fake_add_assessment)
+    monkeypatch.setattr(teacher_routes, "invalidate_admin_page_context_cache", lambda: None)
+    monkeypatch.setattr(teacher_routes, "list_academy_teachers", lambda: [])
+    monkeypatch.setattr(teacher_routes, "list_teachers", lambda: [])
+    monkeypatch.setattr(teacher_routes, "filter_academy_teachers_for_current_scope", lambda rows: rows)
+    _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
+
+    response = client.post(
+        "/admin/teacher-academy/7/assessments",
+        data={"lesson_assignment_id": "21", "decision": "passed"},
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Assessment saved."
+    assert captured["academy_teacher_id"] == 7
+    assert captured["lesson_assignment_id"] == "21"
+    assert captured["decision"] == "passed"
+
+
+def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
+    import backend.roles.admin.routes.teacher_routes as teacher_routes
+
+    monkeypatch.setattr(teacher_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
+    _set_session(
+        client,
+        {
+            "auth_role": "head_of_department",
+            "auth_login": "HOD0001",
+            "account_id": 80,
+            "staff_id": 40,
+        },
+    )
+
+    response = client.post(
+        "/admin/teacher-academy/assignments/21",
+        data={"assignment_id": "21"},
+        headers=XHR,
+    )
+
+    assert response.status_code == 403
+    assert response.json()["message"] == "This Teacher Academy lesson is outside your subject scope."
 
 
 def test_hod_filters_academy_rows_by_assigned_subject():

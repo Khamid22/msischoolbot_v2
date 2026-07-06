@@ -427,7 +427,7 @@ function TeacherPreviewSelector({
   const selectedTeacher = teachers.find((teacher) => previewKeyFor(teacher) === selectedTeacherKey) || teachers[0];
   const selectedLogin = asString(selectedTeacher?.login);
   const selectedKind = asString(selectedTeacher?.__previewKind);
-  const selectedStatus = selectedKind === "academy" ? "Training teacher" : "Active teacher";
+  const selectedStatus = selectedKind === "academy" ? "Academy teacher" : "Active teacher";
 
   return (
     <div className="mb-3 rounded-xl border border-foreground/8 bg-surface px-3 py-2 shadow-card animate-in fade-in slide-in-from-top-1 duration-200 motion-reduce:animate-none">
@@ -447,7 +447,7 @@ function TeacherPreviewSelector({
             const kind = asString(teacher.__previewKind);
             const isAcademy = kind === "academy";
             const assignedGroup = isAcademy
-              ? asString(teacher.subject) || "Training"
+              ? asString(teacher.subject) || "Teacher Academy"
               : asString(teacher.assigned_group) || "No group";
             return (
               <option key={teacherKey || asString(teacher.full_name)} value={teacherKey}>

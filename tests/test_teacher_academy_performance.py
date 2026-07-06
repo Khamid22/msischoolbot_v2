@@ -156,3 +156,16 @@ def test_lightweight_teacher_academy_lookup_returns_matching_teacher(monkeypatch
     assert teacher["progress"]["assigned_count"] == 1
     assert teacher["progress"]["assessed_count"] == 1
     assert any("LIMIT 1" in sql for sql, _params in conn.queries)
+
+
+def test_progress_target_matches_selected_assignment_count():
+    six_assignments = [{"id": index + 1, "status": "assigned"} for index in range(6)]
+    ten_assignments = [{"id": index + 1, "status": "assigned"} for index in range(10)]
+
+    six_progress = academy_service._progress_for(six_assignments, [])
+    ten_progress = academy_service._progress_for(ten_assignments, [])
+
+    assert six_progress["assigned_count"] == 6
+    assert six_progress["target_lessons"] == 6
+    assert ten_progress["assigned_count"] == 10
+    assert ten_progress["target_lessons"] == 10

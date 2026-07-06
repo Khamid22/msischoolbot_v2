@@ -190,7 +190,7 @@ export function CandidateDetailModal({
                 }
               />
               <StageButton
-                label="Send to Training"
+                label="Send to Practice"
                 tone="muted"
                 disabled={busy}
                 onClick={() =>
@@ -200,9 +200,9 @@ export function CandidateDetailModal({
                       candidate_status: "training_ready",
                       candidate_event_type: "redeem",
                       candidate_result: "reopened",
-                      candidate_event_notes: "Candidate restored to training.",
+                      candidate_event_notes: "Candidate restored to practice.",
                     },
-                    { confirmMessage: `Restore ${name} to training?` },
+                    { confirmMessage: `Restore ${name} to practice?` },
                   )
                 }
               />
@@ -213,7 +213,7 @@ export function CandidateDetailModal({
             // Awaiting the head of department's final decision.
             <>
               <StageButton
-                label="Back to Training"
+                label="Back to Practice"
                 tone="muted"
                 disabled={busy}
                 onClick={() =>
@@ -221,7 +221,7 @@ export function CandidateDetailModal({
                     candidate_status: "training_ready",
                     candidate_event_type: "review",
                     candidate_result: "returned_to_training",
-                    candidate_event_notes: "Returned to training for more lessons.",
+                    candidate_event_notes: "Returned to practice for more lessons.",
                   })
                 }
               />
@@ -236,9 +236,9 @@ export function CandidateDetailModal({
                       candidate_status: "rejected",
                       candidate_event_type: "final_decision",
                       candidate_result: "training_rejected",
-                      candidate_event_notes: "Not approved for hire after training.",
+                      candidate_event_notes: "Not approved for hire after practice.",
                     },
-                    { confirmMessage: `Reject ${name} after training?` },
+                    { confirmMessage: `Reject ${name} after practice?` },
                   )
                 }
               />
@@ -248,7 +248,7 @@ export function CandidateDetailModal({
             <>
               <StageButton label="Add Evaluation" disabled={busy} onClick={onAddEvaluation} />
               <StageButton
-                label="Mark Training Complete"
+                label="Mark Practice Complete"
                 tone="muted"
                 disabled={busy}
                 onClick={() =>
@@ -258,7 +258,7 @@ export function CandidateDetailModal({
                       candidate_status: "training_passed",
                       candidate_event_type: "training_complete",
                       candidate_result: "awaiting_decision",
-                      candidate_event_notes: "Training complete — sent to the head of department for a decision.",
+                      candidate_event_notes: "Practice complete - sent to the head of department for a decision.",
                     },
                     { confirmMessage: `Send ${name} to the head for a final decision?` },
                   )
@@ -271,4 +271,3 @@ export function CandidateDetailModal({
     </div>
   );
 }
-

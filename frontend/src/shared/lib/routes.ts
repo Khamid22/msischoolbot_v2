@@ -28,7 +28,20 @@ export const routes = {
   adminTeacherCandidateEventDelete: (candidateId: number | string, eventId: number | string) =>
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/delete`,
   adminTeacherAcademyCreate: "/admin/teacher-academy",
+  academicDirectorOverview: "/academic-director",
+  academicDirectorTeacherAcademy: "/academic-director/teacher-academy",
+  academicDirectorHeadOfDepartments: "/academic-director/head-of-departments",
+  academicDirectorTimetable: "/academic-director/timetable",
+  academicDirectorAnnouncements: "/academic-director/announcements",
+  academicDirectorProfile: "/academic-director/profile",
+  academicDirectorProfileSection: "/academic-director#academic-director-profile",
   academicDirectorHeadOfDepartmentCreate: "/academic-director/api/head-of-departments",
+  headOfDepartmentOverview: "/head-of-department",
+  headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy",
+  headOfDepartmentTimetable: "/head-of-department/timetable",
+  headOfDepartmentAnnouncements: "/head-of-department/announcements",
+  headOfDepartmentProfile: "/head-of-department/profile",
+  headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile",
   adminTeacherAcademyAssignment: (assignmentId: number | string) =>
     `/admin/teacher-academy/assignments/${assignmentId}`,
   adminTeacherAcademyAssessment: (academyTeacherId: number | string) =>

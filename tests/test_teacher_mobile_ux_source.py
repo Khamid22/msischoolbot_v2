@@ -21,24 +21,34 @@ def test_dismissible_layer_hook_closes_on_outside_pointer_and_escape():
     assert "containsTarget" in source
 
 
-def test_action_menu_and_academy_modal_use_dismissible_layer():
+def test_action_menu_and_academy_modal_use_shared_dismissible_modal():
     action_menu = _read("shared/ui/ActionMenu.tsx")
     academy_panel = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+    modal_source = _read("shared/ui/Modal.tsx")
 
     assert "useDismissibleLayer" in action_menu
     assert "dismissibleRefs" in action_menu
-    assert "useDismissibleLayer" in academy_panel
-    assert 'role="dialog"' in academy_panel
-    assert 'aria-modal="true"' in academy_panel
-    assert "aria-label={title}" in academy_panel
+    assert 'import { Modal } from "@/shared/ui/Modal";' in academy_panel
+    assert "<Modal" in academy_panel
+    assert "useDismissibleLayer" not in academy_panel
+    assert 'role="dialog"' in modal_source
+    assert 'aria-modal="true"' in modal_source
+    assert "createPortal" in modal_source
+    assert "closeOnOutsideClick" in modal_source
 
 
 def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+    mobile_list = _read("shared/ui/MobileCardList.tsx")
+    responsive_table = _read("shared/ui/ResponsiveTable.tsx")
 
     assert "function AcademyTeacherCard" in source
-    assert "lg:hidden" in source
-    assert "hidden max-h-[calc(100dvh-20rem)] overflow-auto lg:block" in source
+    assert "MobileCardList" in source
+    assert 'className="p-3"' in source
+    assert "ResponsiveTable" in source
+    assert 'className="max-h-[calc(100dvh-20rem)]"' in source
+    assert "lg:hidden" in mobile_list
+    assert "hidden lg:block" in responsive_table
     assert "No academy lessons assigned." in source
     assert "TeacherAcademyPanel" in source
     assert 'const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";' in source
@@ -50,12 +60,70 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
 
 def test_teacher_academy_actions_use_schedule_not_assign():
     source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+    shared_source = _read("roles/admin/panels/teachers/shared.ts")
 
-    assert "Schedule Training Lesson" in source
+    assert "Schedule Academy Lesson" in source
+    assert "Schedule Training Lesson" not in source
+    assert '{ key: "training", label: "Lesson Practice"' in shared_source
+    assert '{ key: "training", label: "Training"' not in shared_source
     assert "Save Schedule" in source
     assert "Schedule" in source
     assert "\n                                  Assign\n" not in source
+    assert "Assign Real Group" not in source
+    assert 'label: "Schedule"' in source
+    assert '{scheduled ? "Assess" : "Schedule"}' in source
     assert "setScheduleTarget({ teacher, assignment: nextAssignment })" in source
+    assert "setAssessmentTarget({ teacher, assignment: nextAssignment })" in source
+    assert "primaryAction" in source
+    assert "secondaryActions" in source
+    assert "rowActions" in source
+    assert "ActionMenu" in source
+
+
+def test_phase3_shared_responsive_components_exist_and_are_used():
+    action_menu = _read("shared/ui/ActionMenu.tsx")
+    icon_button = _read("shared/ui/IconButton.tsx")
+    metric_card = _read("shared/ui/MetricCard.tsx")
+    empty_state = _read("shared/ui/EmptyState.tsx")
+    status_badge = _read("shared/ui/StatusBadge.tsx")
+    mobile_list = _read("shared/ui/MobileCardList.tsx")
+    responsive_table = _read("shared/ui/ResponsiveTable.tsx")
+    progress_bar = _read("shared/ui/ProgressBar.tsx")
+    academy_source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+    announcements_source = _read("roles/admin/panels/AnnouncementsPanel.tsx")
+
+    assert "export function IconButton" in icon_button
+    assert "export function MetricCard" in metric_card
+    assert "export function EmptyState" in empty_state
+    assert "export function StatusBadge" in status_badge
+    assert "export function MobileCardList" in mobile_list
+    assert "export function ResponsiveTable" in responsive_table
+    assert "export function ProgressBar" in progress_bar
+    assert "createPortal" in action_menu
+    assert "fixed z-[90]" in action_menu
+    assert "window.addEventListener(\"scroll\", updateMenuPosition, true)" in action_menu
+    assert "IconButton" in academy_source
+    assert "MetricCard" in academy_source
+    assert "ProgressBar" in academy_source
+    assert "EmptyState" in academy_source
+    assert "ActionMenu" in announcements_source
+    assert "MetricCard" in announcements_source
+    assert "EmptyState" in announcements_source
+
+
+def test_head_of_departments_has_mobile_cards_desktop_table_and_compact_login():
+    source = _read("roles/academic_director/pages/HeadOfDepartments.tsx")
+
+    assert "function DepartmentCard" in source
+    assert "MobileCardList" in source
+    assert 'hideAt="md"' in source
+    assert "ResponsiveTable" in source
+    assert 'showAt="md"' in source
+    assert "MetricCard" in source
+    assert "StatusBadge" in source
+    assert "EmptyState" in source
+    assert "Account Login" in source
+    assert "font-mono" in source
 
 
 def test_teacher_academy_modals_select_assignment_ids():
@@ -77,13 +145,19 @@ def test_teacher_academy_modals_select_assignment_ids():
 def test_teacher_mobile_bottom_nav_contract():
     source = _read("roles/teacher/pages/TeacherHome.tsx")
     mobile_tabs = source.split("const teacherMobileTabs", 1)[1].split("];", 1)[0]
+    active_mobile_tabs = source.split("const activeTeacherMobileTabs", 1)[1].split("];", 1)[0]
 
     assert 'label: "Home"' in mobile_tabs
     assert 'label: "Lessons"' in mobile_tabs
     assert 'label: "Updates"' in mobile_tabs
     assert 'label: "Profile"' in mobile_tabs
+    assert 'label: "Home"' in active_mobile_tabs
+    assert 'label: "Reports"' in active_mobile_tabs
+    assert 'label: "Timetable"' in active_mobile_tabs
+    assert 'label: "Profile"' in active_mobile_tabs
     assert "fixed inset-x-0 bottom-0" in source
     assert "Teacher mobile navigation" in source
+    assert source.count('aria-label="Teacher mobile navigation"') == 1
     assert "var(--app-bottom-inset)" in source
     assert 'aria-current={isActive ? "page" : undefined}' in source
     assert "const mobileTabs = isTraining ? teacherMobileTabs : activeTeacherMobileTabs;" in source
@@ -112,9 +186,11 @@ def test_teacher_academy_mobile_home_is_compact_and_profile_is_separate():
     assert "Roadmap assignments" not in home_block
     assert "AcademyProfileSummary" in profile_block
     assert "AcademyScoreSnapshot" in profile_block
-    assert 'Assessment chart will appear after the first report.' in source
+    assert "if (!rows.length) return null;" in source
+    assert 'Assessment chart will appear after the first report.' not in source
     assert 'hidden sm:inline-flex' in profile_block
-    assert 'activeTab === "career" || (!isTraining && activeTab === "profile")' in source
+    assert 'activeTab === "career" || (!isTraining && activeTab === "profile")' not in source
+    assert '{activeTab === "career" ? (' in source
 
 
 def test_teacher_cabinet_design_is_applied_to_academy_shell():

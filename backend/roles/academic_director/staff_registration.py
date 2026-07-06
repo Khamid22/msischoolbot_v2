@@ -35,6 +35,17 @@ def _phase1_accounts_available(conn: Any) -> bool:
     return bool(row and row["table_name"])
 
 
+def _table_available(conn: Any, table_name: str) -> bool:
+    safe_name = _text(table_name)
+    if not safe_name:
+        return False
+    try:
+        row = conn.execute("SELECT to_regclass(%s) AS table_name", (safe_name,)).fetchone()
+    except Exception:
+        return False
+    return bool(row and row["table_name"])
+
+
 def _subject_row(conn: Any, subject_id: Any) -> dict[str, Any] | None:
     parsed_subject_id = _to_int(subject_id)
     if not parsed_subject_id:
@@ -369,6 +380,76 @@ def create_head_of_department_account(
         )
 
 
+def _hod_account_payload(row: Any) -> dict[str, Any]:
+    return {
+        "account_id": _to_int(row["account_id"]),
+        "login": _text(row["login"]),
+        "display_name": _text(row["display_name"]) or _text(row["login"]),
+        "role": _text(row["role"]) or "head_of_department",
+        "status": _text(row["status"]) or "active",
+        "subject_id": _to_int(row["subject_id"]),
+        "subject_name": _text(row["subject_name"]) or "Not assigned",
+        "scope_type": _text(row["scope_type"]) or "head_of_department",
+        "created_at": _text(row["created_at"]),
+        "updated_at": _text(row["updated_at"]),
+    }
+
+
+def _list_head_of_department_accounts(conn: Any) -> dict[str, Any]:
+    required_tables = (
+        "msi_v2.accounts",
+        "msi_v2.staff_profiles",
+        "msi_v2.staff_subject_scopes",
+        "msi_v2.subjects",
+    )
+    missing = [table_name for table_name in required_tables if not _table_available(conn, table_name)]
+    if missing:
+        return {
+            "items": [],
+            "warning": f"Head of Department account tables are not available yet: {', '.join(missing)}.",
+        }
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                account.id AS account_id,
+                account.login,
+                COALESCE(NULLIF(account.full_name, ''), NULLIF(profile.department, ''), account.login) AS display_name,
+                account.role,
+                account.status,
+                scope.subject_id,
+                subject.subject_name,
+                scope.scope_type,
+                account.created_at::text AS created_at,
+                COALESCE(scope.updated_at, profile.updated_at, account.updated_at)::text AS updated_at
+            FROM msi_v2.accounts account
+            LEFT JOIN msi_v2.staff_profiles profile
+              ON profile.account_id = account.id
+            LEFT JOIN msi_v2.staff_subject_scopes scope
+              ON scope.account_id = account.id
+             AND scope.scope_type = 'head_of_department'
+             AND scope.status = 'active'
+            LEFT JOIN msi_v2.subjects subject
+              ON subject.id = scope.subject_id
+            WHERE account.role = 'head_of_department'
+            ORDER BY COALESCE(scope.updated_at, profile.updated_at, account.updated_at) DESC,
+                     account.id DESC
+            """
+        ).fetchall()
+    except Exception as exc:
+        return {
+            "items": [],
+            "warning": f"Head of Department accounts could not be loaded: {exc}",
+        }
+    return {"items": [_hod_account_payload(row) for row in rows], "warning": ""}
+
+
+def list_head_of_department_accounts() -> dict[str, Any]:
+    with queries.connect_auth_db() as conn:
+        return _list_head_of_department_accounts(conn)
+
+
 def create_academic_director_account(
     *,
     login: str = "AD0001",
@@ -528,6 +609,8 @@ def _create_head_of_department_account(
 __all__ = [
     "create_academic_director_account",
     "create_head_of_department_account",
+    "list_head_of_department_accounts",
     "_create_academic_director_account",
     "_create_head_of_department_account",
+    "_list_head_of_department_accounts",
 ]

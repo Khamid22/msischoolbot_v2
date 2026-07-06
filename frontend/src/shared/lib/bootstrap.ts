@@ -17,6 +17,13 @@ export type ReactPageName =
   | "support-home"
   | "academic-director-home"
   | "academic-director-academy"
+  | "academic-director-head-of-departments"
+  | "academic-director-timetable"
+  | "academic-director-announcements"
+  | "head-of-department-home"
+  | "head-of-department-academy"
+  | "head-of-department-timetable"
+  | "head-of-department-announcements"
   | "unauthorized"
   | "student-not-found";
 
@@ -44,6 +51,13 @@ const REACT_PAGES = new Set<ReactPageName>([
   "support-home",
   "academic-director-home",
   "academic-director-academy",
+  "academic-director-head-of-departments",
+  "academic-director-timetable",
+  "academic-director-announcements",
+  "head-of-department-home",
+  "head-of-department-academy",
+  "head-of-department-timetable",
+  "head-of-department-announcements",
   "unauthorized",
   "student-not-found",
 ]);

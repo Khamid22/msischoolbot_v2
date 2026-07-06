@@ -72,7 +72,7 @@ export function ClosedCandidatesOverviewCard({
   const stageGroups = [
     { key: "interview", label: "Interview", tone: "bg-amber-500" },
     { key: "math_test", label: "Math Test", tone: "bg-sky-500" },
-    { key: "training", label: "Training / Final", tone: "bg-violet-500" },
+    { key: "training", label: "Practice / Final", tone: "bg-violet-500" },
     { key: "withdrawn", label: "Withdrawn", tone: "bg-slate-500" },
     { key: "other", label: "Other", tone: "bg-zinc-500" },
   ]
@@ -332,4 +332,3 @@ export function RoleMetric({
     </div>
   );
 }
-

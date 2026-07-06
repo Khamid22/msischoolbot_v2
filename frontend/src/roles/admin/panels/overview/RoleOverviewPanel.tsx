@@ -7,7 +7,7 @@ import { ClosedCandidatesOverviewCard, HrAttentionCard, RoleMetric } from "./car
 function academyStatusLabel(value: unknown) {
   const labels: Record<string, string> = {
     new_academy_teacher: "New Academy Teacher",
-    in_training: "In Training",
+    in_training: "In Academy",
     ready_for_evaluation: "Ready for Evaluation",
     needs_improvement: "Needs Improvement",
     ready_for_active_teacher: "Ready for Active Teacher",
@@ -15,7 +15,7 @@ function academyStatusLabel(value: unknown) {
     rejected: "Rejected",
     on_hold: "On Hold",
   };
-  return labels[asString(value)] || asString(value) || "In Training";
+  return labels[asString(value)] || asString(value) || "In Academy";
 }
 
 function formatDateTime(value: unknown) {
@@ -112,7 +112,7 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
 
   return (
     <div className="space-y-3">
-      <ChartCard title="Training Teacher Profile" subtitle="Teacher role preview for Academy trainees" icon={<GraduationCap className="h-4 w-4 text-info" />}>
+      <ChartCard title="Teacher Academy Profile" subtitle="Teacher role preview for Academy teachers" icon={<GraduationCap className="h-4 w-4 text-info" />}>
         <div className="grid gap-3 xl:grid-cols-[1fr_0.8fr]">
           <div className="rounded-xl border border-foreground/8 bg-background p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -123,7 +123,7 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
                 </p>
               </div>
               <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-700">
-                Training
+                Academy
               </span>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
@@ -148,7 +148,7 @@ function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }
             </div>
           </div>
           <div className="rounded-xl border border-foreground/8 bg-background p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Next Training Lesson</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Next Academy Lesson</p>
             {progress.nextAssignment ? (
               <div className="mt-3">
                 <p className="text-base font-bold">{asString(progress.nextAssignment.lesson_number)}</p>
@@ -274,8 +274,8 @@ export function RoleOverviewPanel({ state }: { state: any }) {
         return {
           candidateId: asNumber(candidate.id),
           fullName: asString(candidate.full_name) || "Candidate",
-          title: "Training needs first evaluation",
-          detail: `${relativeDaysLabel(ageDays)} in training with no lesson review`,
+          title: "Practice needs first evaluation",
+          detail: `${relativeDaysLabel(ageDays)} in practice with no lesson review`,
           tone: "bad" as const,
           priority: 4,
           tab: "training" as const,
@@ -286,8 +286,8 @@ export function RoleOverviewPanel({ state }: { state: any }) {
         return {
           candidateId: asNumber(candidate.id),
           fullName: asString(candidate.full_name) || "Candidate",
-          title: "Training looks stalled",
-          detail: `${relativeDaysLabel(ageDays)} since the last training activity`,
+          title: "Practice looks stalled",
+          detail: `${relativeDaysLabel(ageDays)} since the last practice activity`,
           tone: "warn" as const,
           priority: 3,
           tab: "training" as const,
@@ -347,7 +347,7 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     },
     {
       key: "training_ready",
-      label: "Training",
+      label: "Practice",
       count: inTraining,
       tone: "bg-emerald-500",
       tab: "training" as const,
@@ -401,7 +401,7 @@ export function RoleOverviewPanel({ state }: { state: any }) {
       <div className="space-y-3">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <RoleMetric label="New" value={newCandidates} detail="fresh applications" icon={<Users className="h-4 w-4" />} tone="bg-sky-50" />
-          <RoleMetric label="Training" value={inTraining} detail="trainees in lessons" icon={<GraduationCap className="h-4 w-4" />} tone="bg-emerald-50" />
+          <RoleMetric label="Practice" value={inTraining} detail="trainees in lessons" icon={<GraduationCap className="h-4 w-4" />} tone="bg-emerald-50" />
           <RoleMetric label="Review" value={awaitingDecision} detail="awaiting final decision" icon={<Trophy className="h-4 w-4" />} tone="bg-violet-50" />
           <RoleMetric label="Overdue" value={urgentItems.length} detail="need attention now" icon={<Clock3 className="h-4 w-4" />} tone={urgentItems.length ? "bg-rose-50" : "bg-slate-50"} />
         </div>

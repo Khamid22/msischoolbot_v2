@@ -1,8 +1,16 @@
 import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trophy, X } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trophy } from "lucide-react";
+import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { EmptyState } from "@/shared/ui/EmptyState";
+import { IconButton } from "@/shared/ui/IconButton";
+import { MetricCard } from "@/shared/ui/MetricCard";
+import { Modal } from "@/shared/ui/Modal";
+import { MobileCardList } from "@/shared/ui/MobileCardList";
+import { ProgressBar } from "@/shared/ui/ProgressBar";
+import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
+import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { routes } from "@/shared/lib/routes";
-import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCategories, ToastTone } from "./shared";
 
@@ -31,7 +39,7 @@ const rubric = [
 function statusLabel(value: unknown) {
   const labels: Record<string, string> = {
     new_academy_teacher: "New Academy Teacher",
-    in_training: "In Training",
+    in_training: "In Academy",
     ready_for_evaluation: "Ready for Evaluation",
     needs_improvement: "Needs Improvement",
     ready_for_active_teacher: "Ready for Active Teacher",
@@ -39,7 +47,15 @@ function statusLabel(value: unknown) {
     rejected: "Rejected",
     on_hold: "On Hold",
   };
-  return labels[asString(value)] || asString(value) || "In Training";
+  return labels[asString(value)] || asString(value) || "In Academy";
+}
+
+function academyStatusTone(value: unknown): "success" | "warning" | "danger" | "info" {
+  const status = asString(value);
+  if (status === "ready_for_active_teacher" || status === "approved") return "success";
+  if (status === "needs_improvement" || status === "on_hold") return "warning";
+  if (status === "rejected") return "danger";
+  return "info";
 }
 
 function decisionLabel(value: unknown) {
@@ -156,13 +172,7 @@ function subjectOptionsFromState(state: any) {
 }
 
 function metric(label: string, value: string | number, detail: string) {
-  return (
-    <div className="rounded-lg border border-foreground/8 bg-background px-3 py-2.5">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-bold leading-none">{value}</p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
-    </div>
-  );
+  return <MetricCard label={label} value={value} detail={detail} className="bg-background" />;
 }
 
 type AnalyticsRow = {
@@ -196,9 +206,7 @@ function MiniAnalyticsCard({
                 <span className="truncate text-[11px] font-bold text-foreground">{row.label}</span>
                 <span className="shrink-0 text-[11px] font-black text-muted-foreground">{row.detail}</span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, row.value))}%` }} />
-              </div>
+              <ProgressBar value={row.value} className="h-1.5" />
             </div>
           ))}
         </div>
@@ -215,7 +223,7 @@ function academyAnalyticsRows(academyTeachers: AcademyTeacher[]) {
   const total = academyTeachers.length;
   const statusGroups = [
     {
-      label: "In training",
+      label: "In academy",
       count: academyTeachers.filter((teacher) =>
         ["new_academy_teacher", "in_training", "ready_for_evaluation"].includes(asString(teacher.academy_status)),
       ).length,
@@ -645,7 +653,7 @@ function AssignmentModal({
   }
 
   return (
-    <ModalShell title="Schedule Training Lesson" subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"} onClose={onClose}>
+    <ModalShell title="Schedule Academy Lesson" subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"} onClose={onClose}>
       <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
           <div className="min-w-0">
@@ -834,7 +842,7 @@ function AssessmentModal({
             <label className="block">
               <FieldLabel>Session Type</FieldLabel>
               <select name="session_type" defaultValue="training_simulation" className="h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10">
-                <option value="training_simulation">Training simulation</option>
+                <option value="training_simulation">Academy simulation</option>
                 <option value="practice_with_class">Practice with class</option>
                 <option value="final_evaluation">Final evaluation</option>
               </select>
@@ -873,13 +881,13 @@ function AssessmentModal({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/35 px-4 py-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
-                <p className="text-sm font-semibold text-foreground">{selectedAssignment ? assignmentTitle(selectedAssignment) : "Training lesson"}</p>
+                <p className="text-sm font-semibold text-foreground">{selectedAssignment ? assignmentTitle(selectedAssignment) : "Academy lesson"}</p>
               </div>
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                 Score {weighted.toFixed(2)}
               </span>
             </div>
-            <div className="overflow-x-auto">
+            <div className="miniapp-table-scroll">
               <table className="w-full min-w-[760px] table-fixed text-left">
                 <thead>
                   <tr className="border-b border-foreground/8 bg-surface/80">
@@ -994,7 +1002,7 @@ function PromoteModal({
     <ModalShell title="Promote to Active Teacher" subtitle={asString(teacher.full_name)} onClose={onClose}>
       <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <label className="block">
-          <FieldLabel>Assign Real Group</FieldLabel>
+          <FieldLabel>Active Group</FieldLabel>
           <select name="teacher_assigned_group" required className="w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none">
             <option value="" disabled>Select group</option>
             {groups.map((group) => (
@@ -1176,6 +1184,76 @@ function AcademyTeacherCard({
   const status = asString(teacher.academy_status);
   const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
   const scheduled = assignmentIsScheduled(nextAssignment);
+  const primaryAction = nextAssignment
+    ? scheduled
+      ? {
+          label: "Assess",
+          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+          onClick: () => onAssess(nextAssignment),
+          className: "bg-foreground text-background",
+        }
+      : {
+          label: "Schedule",
+          icon: <CalendarClock className="h-3.5 w-3.5" />,
+          onClick: () => onSchedule(nextAssignment),
+          className: "bg-primary text-primary-foreground",
+        }
+    : assignments.length
+      ? {
+          label: "Review",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          onClick: onDetail,
+          className: "bg-foreground text-background",
+        }
+      : {
+          label: "Details",
+          icon: <Eye className="h-3.5 w-3.5" />,
+          onClick: onDetail,
+          className: "bg-foreground text-background",
+        };
+  const secondaryActions: ActionMenuItem[] = [];
+  if (nextAssignment) {
+    secondaryActions.push(
+      scheduled
+        ? {
+            key: "schedule",
+            label: "Schedule",
+            icon: <CalendarClock className="h-4 w-4" />,
+            onClick: () => onSchedule(nextAssignment),
+          }
+        : {
+            key: "assess",
+            label: "Assess",
+            icon: <ClipboardCheck className="h-4 w-4" />,
+            onClick: () => onAssess(nextAssignment),
+          },
+    );
+  }
+  secondaryActions.push({
+    key: "details",
+    label: "Details",
+    icon: <Eye className="h-4 w-4" />,
+    onClick: onDetail,
+  });
+  if (allowTeacherPreview) {
+    secondaryActions.push({
+      key: "preview",
+      label: "Preview",
+      icon: <Eye className="h-4 w-4" />,
+      onClick: onPreview,
+    });
+  }
+  if (status === "ready_for_active_teacher") {
+    secondaryActions.push(
+      { separator: true, key: "promote-separator" },
+      {
+        key: "promote",
+        label: "Promote",
+        icon: <Trophy className="h-4 w-4" />,
+        onClick: onPromote,
+      },
+    );
+  }
 
   return (
     <article className="rounded-2xl border border-foreground/10 bg-background p-3 shadow-sm">
@@ -1184,26 +1262,16 @@ function AcademyTeacherCard({
           <h3 className="line-clamp-2 text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</h3>
           <p className="mt-1 line-clamp-1 text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
         </button>
-        <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${
-          status === "ready_for_active_teacher"
-            ? "bg-success/10 text-success"
-            : status === "needs_improvement"
-              ? "bg-warning/15 text-warning"
-              : status === "rejected"
-                ? "bg-destructive/10 text-destructive"
-                : "bg-info/10 text-info"
-        }`}>
+        <StatusBadge tone={academyStatusTone(status)} className="shrink-0 text-[10px]">
           {statusLabel(status)}
-        </span>
+        </StatusBadge>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-muted/45 px-3 py-2">
           <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Progress</p>
           <p className="mt-1 text-sm font-black">{progress.assessed}/{progress.target}</p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-background">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
-          </div>
+          <ProgressBar value={percent} className="mt-2 h-1.5 bg-background" />
         </div>
         <div className="rounded-xl bg-muted/45 px-3 py-2">
           <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Average Score</p>
@@ -1238,64 +1306,26 @@ function AcademyTeacherCard({
           <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Account Login</p>
           <p className="mt-1 truncate font-mono text-sm font-black">{login || "Account not created yet"}</p>
         </div>
-        <button
-          type="button"
+        <IconButton
+          label="Copy teacher login"
           disabled={!login}
           onClick={() => onCopyLogin(login)}
-          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2 text-[11px] font-bold disabled:opacity-50"
+          className="h-8 w-8"
         >
           <Copy className="h-3.5 w-3.5" />
-          Copy
-        </button>
+        </IconButton>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {nextAssignment ? (
-          scheduled ? (
-            <>
-              <button type="button" onClick={() => onAssess(nextAssignment)} className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-foreground px-3 text-xs font-black text-background">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-                Assess
-              </button>
-              <button type="button" onClick={() => onSchedule(nextAssignment)} className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-foreground/10 px-3 text-xs font-black">
-                <CalendarClock className="h-3.5 w-3.5" />
-                Schedule
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={() => onSchedule(nextAssignment)} className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground">
-                <CalendarClock className="h-3.5 w-3.5" />
-                Schedule
-              </button>
-              <button type="button" onClick={() => onAssess(nextAssignment)} className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-foreground/10 px-3 text-xs font-black">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-                Assess
-              </button>
-            </>
-          )
-        ) : null}
-        {!nextAssignment && assignments.length ? (
-          <button type="button" onClick={onDetail} className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-foreground px-3 text-xs font-black text-background">
-            <Eye className="h-3.5 w-3.5" />
-            Review
-          </button>
-        ) : null}
-        <button type="button" onClick={onDetail} className="inline-flex h-9 items-center justify-center rounded-lg border border-foreground/10 px-3 text-xs font-black">
-          Details
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={primaryAction.onClick}
+          className={`inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-3 text-xs font-black transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${primaryAction.className}`}
+        >
+          {primaryAction.icon}
+          <span className="truncate">{primaryAction.label}</span>
         </button>
-        {allowTeacherPreview ? (
-          <button type="button" onClick={onPreview} className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-black text-primary">
-            <Eye className="h-3.5 w-3.5" />
-            Preview
-          </button>
-        ) : null}
-        {status === "ready_for_active_teacher" ? (
-          <button type="button" onClick={onPromote} className="inline-flex h-9 items-center justify-center gap-1 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground">
-            <Trophy className="h-3.5 w-3.5" />
-            Promote
-          </button>
-        ) : null}
+        <ActionMenu items={secondaryActions} label={`Actions for ${asString(teacher.full_name) || "academy teacher"}`} />
       </div>
     </article>
   );
@@ -1314,33 +1344,15 @@ function ModalShell({
   onClose: () => void;
   wide?: boolean;
 }) {
-  const panelRef = useDismissibleLayer<HTMLDivElement>({
-    onDismiss: onClose,
-  });
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/55 p-0 backdrop-blur-[2px] animate-in fade-in duration-150 motion-reduce:animate-none sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+    <Modal
+      title={title}
+      subtitle={subtitle}
+      onClose={onClose}
+      size={wide ? "wide" : "lg"}
     >
-      <div
-        ref={panelRef}
-        className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-card-hover animate-in slide-in-from-bottom-2 duration-150 motion-reduce:animate-none sm:max-h-[calc(100dvh-1.5rem)] sm:rounded-2xl sm:zoom-in-95 ${wide ? "sm:max-w-6xl" : "sm:max-w-2xl"}`}
-      >
-        <div className="flex items-center justify-between border-b border-foreground/8 px-4 py-3">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-bold">{title}</h3>
-            {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
-          </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
+      {children}
+    </Modal>
   );
 }
 
@@ -1360,11 +1372,11 @@ function ModalActions({
   disabled?: boolean;
 }) {
   return (
-    <div className="sticky bottom-0 -mx-4 mt-2 flex justify-end gap-2 border-t border-foreground/8 bg-surface px-4 py-3">
-      <button type="button" onClick={onClose} className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted">
+    <div className="sticky bottom-0 -mx-4 mt-2 flex flex-col-reverse gap-2 border-t border-foreground/8 bg-surface px-4 py-3 sm:flex-row sm:justify-end">
+      <button type="button" onClick={onClose} className="min-h-10 rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted">
         Cancel
       </button>
-      <button type="submit" disabled={submitting || disabled} className="rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">
+      <button type="submit" disabled={submitting || disabled} className="min-h-10 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60">
         {submitting ? "Saving..." : submitLabel}
       </button>
     </div>
@@ -1523,6 +1535,26 @@ export function TeacherAcademyPanel({
           }}
         />
       ) : null}
+      {detailTeacher && !scheduleTarget && !assessmentTarget && !promoteTeacher ? (
+        <AcademyDetailModal
+          teacher={detailTeacher}
+          onClose={() => setDetailTeacher(null)}
+          onPreview={() => previewAsTeacher(detailTeacher)}
+          allowTeacherPreview={allowTeacherPreview}
+          onSchedule={(nextAssignment) => {
+            setError("");
+            setScheduleTarget({ teacher: detailTeacher, assignment: nextAssignment });
+          }}
+          onAssess={(nextAssignment) => {
+            setError("");
+            setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
+          }}
+          onPromote={() => {
+            setError("");
+            setPromoteTeacher(detailTeacher);
+          }}
+        />
+      ) : null}
       {scheduleTarget ? (
         <AssignmentModal
           state={state}
@@ -1531,7 +1563,7 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onSubmit={async (assignmentId, fields) => {
-            if (await submit(routes.adminTeacherAcademyAssignment(assignmentId), fields, "Training lesson updated.")) {
+            if (await submit(routes.adminTeacherAcademyAssignment(assignmentId), fields, "Academy lesson updated.")) {
               setScheduleTarget(null);
             }
           }}
@@ -1577,35 +1609,15 @@ export function TeacherAcademyPanel({
           }}
         />
       ) : null}
-      {detailTeacher ? (
-        <AcademyDetailModal
-          teacher={detailTeacher}
-          onClose={() => setDetailTeacher(null)}
-          onPreview={() => previewAsTeacher(detailTeacher)}
-          allowTeacherPreview={allowTeacherPreview}
-          onSchedule={(nextAssignment) => {
-            setError("");
-            setScheduleTarget({ teacher: detailTeacher, assignment: nextAssignment });
-          }}
-          onAssess={(nextAssignment) => {
-            setError("");
-            setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
-          }}
-          onPromote={() => {
-            setError("");
-            setPromoteTeacher(detailTeacher);
-          }}
-        />
-      ) : null}
 
       <ChartCard
         title="Teacher Academy"
-        subtitle="New teachers training on selected curriculum-guided lessons"
+        subtitle="New teachers in selected Teacher Academy lessons"
         icon={<GraduationCap className="h-4 w-4 text-info" />}
         className="flex min-h-0 flex-1 flex-col"
         bodyClassName="flex min-h-0 flex-1 flex-col"
         headerActions={
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
             {canCreateHeadOfDepartment ? (
               <button
                 type="button"
@@ -1613,10 +1625,10 @@ export function TeacherAcademyPanel({
                   setError("");
                   setHodOpen(true);
                 }}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3 text-sm font-bold text-foreground hover:bg-muted"
+                className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3 py-1.5 text-sm font-bold leading-tight text-foreground hover:bg-muted sm:flex-none"
               >
                 <Plus className="h-4 w-4" />
-                New HOD
+                <span>New HOD</span>
               </button>
             ) : null}
             {canCreateAcademyTeacher ? (
@@ -1626,10 +1638,10 @@ export function TeacherAcademyPanel({
                   setError("");
                   setCreateOpen(true);
                 }}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"
+                className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-bold leading-tight text-primary-foreground sm:flex-none"
               >
                 <Plus className="h-4 w-4" />
-                New Academy Teacher
+                <span>New Academy Teacher</span>
               </button>
             ) : null}
           </div>
@@ -1658,16 +1670,16 @@ export function TeacherAcademyPanel({
             </div>
           </div>
         ) : null}
-        <div className="mb-3 grid shrink-0 gap-2 sm:grid-cols-4">
-          {metric("Academy Teachers", stats.total, "training records")}
-          {metric("In Training", stats.inTraining, "active training paths")}
+        <div className="mb-3 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+          {metric("Academy Teachers", stats.total, "academy records")}
+          {metric("In Academy", stats.inTraining, "active academy paths")}
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
         <div className="mb-3 grid shrink-0 gap-2 md:grid-cols-2 xl:grid-cols-4">
           <MiniAnalyticsCard
             title="Academy status distribution"
-            subtitle="Training, ready, completed, support"
+            subtitle="Academy, ready, completed, support"
             rows={analytics.statusRows}
             emptyLabel="No academy teachers yet."
           />
@@ -1693,7 +1705,7 @@ export function TeacherAcademyPanel({
         <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
             <>
-              <div className="space-y-3 p-3 lg:hidden">
+              <MobileCardList className="p-3">
                 {sortedTeachers.map((teacher) => {
                   return (
                     <AcademyTeacherCard
@@ -1709,17 +1721,17 @@ export function TeacherAcademyPanel({
                     />
                   );
                 })}
-              </div>
-              <div className="hidden max-h-[calc(100dvh-20rem)] overflow-auto lg:block">
-                <table className="w-full min-w-[860px] table-fixed border-collapse text-left">
+              </MobileCardList>
+              <ResponsiveTable className="max-h-[calc(100dvh-20rem)]">
+                <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
                   <colgroup>
-                    <col className="w-[20%]" />
-                    <col className="w-[13%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[18%]" />
-                    <col className="w-[13%]" />
-                    <col className="w-[10%]" />
+                    <col className="w-[22%]" />
                     <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[17%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[8%]" />
+                    <col className="w-[16%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-surface/95 shadow-[0_1px_0_hsl(var(--foreground)/0.08)] backdrop-blur">
                     <tr>
@@ -1741,6 +1753,49 @@ export function TeacherAcademyPanel({
                       const status = asString(teacher.academy_status);
                       const login = asString(teacher.login);
                       const scheduled = assignmentIsScheduled(nextAssignment);
+                      const rowActions: ActionMenuItem[] = [];
+                      if (nextAssignment) {
+                        rowActions.push(
+                          scheduled
+                            ? {
+                                key: "schedule",
+                                label: "Schedule",
+                                icon: <CalendarClock className="h-4 w-4" />,
+                                onClick: () => setScheduleTarget({ teacher, assignment: nextAssignment }),
+                              }
+                            : {
+                                key: "assess",
+                                label: "Assess",
+                                icon: <ClipboardCheck className="h-4 w-4" />,
+                                onClick: () => setAssessmentTarget({ teacher, assignment: nextAssignment }),
+                              },
+                        );
+                      }
+                      rowActions.push({
+                        key: "details",
+                        label: "Details",
+                        icon: <Eye className="h-4 w-4" />,
+                        onClick: () => setDetailTeacher(teacher),
+                      });
+                      if (allowTeacherPreview) {
+                        rowActions.push({
+                          key: "preview",
+                          label: "Preview",
+                          icon: <Eye className="h-4 w-4" />,
+                          onClick: () => previewAsTeacher(teacher),
+                        });
+                      }
+                      if (status === "ready_for_active_teacher") {
+                        rowActions.push(
+                          { separator: true, key: "promote-separator" },
+                          {
+                            key: "promote",
+                            label: "Promote",
+                            icon: <Trophy className="h-4 w-4" />,
+                            onClick: () => setPromoteTeacher(teacher),
+                          },
+                        );
+                      }
                       return (
                         <tr
                           key={asNumber(teacher.id)}
@@ -1758,27 +1813,18 @@ export function TeacherAcademyPanel({
                                 </button>
                                 <span className="mt-1 flex min-w-0 items-center gap-1.5">
                                   <span className="truncate font-mono text-[11px] font-black text-foreground">{login || "Creating..."}</span>
-                                  <button
-                                    type="button"
+                                  <IconButton
+                                    label="Copy teacher login"
                                     disabled={!login}
                                     onClick={() => copyLogin(login)}
-                                    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-foreground/10 bg-surface text-muted-foreground ${login ? "hover:text-foreground" : "opacity-40"}`}
-                                    aria-label="Copy teacher login"
+                                    className="h-6 w-6 rounded-md"
                                   >
                                     <Copy className="h-3 w-3" />
-                                  </button>
+                                  </IconButton>
                                 </span>
-                                <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
-                                  status === "ready_for_active_teacher"
-                                    ? "bg-success/10 text-success"
-                                    : status === "needs_improvement"
-                                      ? "bg-warning/15 text-warning"
-                                      : status === "rejected"
-                                        ? "bg-destructive/10 text-destructive"
-                                        : "bg-info/10 text-info"
-                                }`}>
+                                <StatusBadge tone={academyStatusTone(status)} className="mt-1 text-[9px]">
                                   {statusLabel(teacher.academy_status)}
-                                </span>
+                                </StatusBadge>
                               </span>
                             </div>
                           </td>
@@ -1791,9 +1837,7 @@ export function TeacherAcademyPanel({
                                 <span className="text-[11px] font-black">{progress.assessed}/{progress.target}</span>
                                 <span className="text-[10px] font-bold text-muted-foreground">{percent}%</span>
                               </div>
-                              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${percent}%` }} />
-                              </div>
+                              <ProgressBar value={percent} />
                             </div>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
@@ -1817,53 +1861,39 @@ export function TeacherAcademyPanel({
                             <span className="text-sm font-black">{progress.average == null ? "-" : progress.average.toFixed(2)}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <div className="flex flex-wrap justify-end gap-1.5">
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                               {nextAssignment ? (
-                                scheduled ? (
-                                  <>
-                                    <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                      <ClipboardCheck className="h-3.5 w-3.5" />
-                                      Assess
-                                    </button>
-                                    <button type="button" onClick={() => setScheduleTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
-                                      <CalendarClock className="h-3.5 w-3.5" />
-                                      Schedule
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button type="button" onClick={() => setScheduleTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11px] font-bold text-primary-foreground transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                      <CalendarClock className="h-3.5 w-3.5" />
-                                      Schedule
-                                    </button>
-                                    <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
-                                      <ClipboardCheck className="h-3.5 w-3.5" />
-                                      Assess
-                                    </button>
-                                  </>
-                                )
-                              ) : null}
-                              {!nextAssignment && academyAssignments(teacher).length ? (
-                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    scheduled
+                                      ? setAssessmentTarget({ teacher, assignment: nextAssignment })
+                                      : setScheduleTarget({ teacher, assignment: nextAssignment })
+                                  }
+                                  className={`inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg px-2.5 text-[11px] font-bold transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                                    scheduled
+                                      ? "bg-foreground text-background hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
+                                      : "bg-primary text-primary-foreground hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
+                                  }`}
+                                >
+                                  {scheduled ? <ClipboardCheck className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
+                                  {scheduled ? "Assess" : "Schedule"}
+                                </button>
+                              ) : academyAssignments(teacher).length ? (
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
                                   <Eye className="h-3.5 w-3.5" />
                                   Review
                                 </button>
-                              ) : null}
-                              <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-foreground/10 bg-background px-2.5 text-[11px] font-bold transition hover:bg-muted">
-                                Details
-                              </button>
-                              {allowTeacherPreview ? (
-                                <button type="button" onClick={() => previewAsTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary transition hover:bg-primary/10 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+                              ) : (
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-foreground px-2.5 text-[11px] font-bold text-background transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
                                   <Eye className="h-3.5 w-3.5" />
-                                  Preview
+                                  Details
                                 </button>
-                              ) : null}
-                              {status === "ready_for_active_teacher" ? (
-                                <button type="button" onClick={() => setPromoteTeacher(teacher)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary px-2.5 text-[11px] font-bold text-primary-foreground transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                  <Trophy className="h-3.5 w-3.5" />
-                                  Promote
-                                </button>
-                              ) : null}
+                              )}
+                              <ActionMenu
+                                label={`Actions for ${asString(teacher.full_name) || "academy teacher"}`}
+                                items={rowActions}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -1871,14 +1901,15 @@ export function TeacherAcademyPanel({
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTable>
             </>
           ) : (
-            <div className="flex min-h-[22rem] flex-1 flex-col items-center justify-center px-3 py-10 text-center">
-              <BookOpenCheck className="mx-auto h-5 w-5 text-muted-foreground" />
-              <p className="mt-2 text-sm font-bold">No academy teachers yet.</p>
-              <p className="mt-1 text-xs text-muted-foreground">Create a trainee and choose the curriculum lessons for their training pack.</p>
-            </div>
+            <EmptyState
+              icon={<BookOpenCheck className="h-6 w-6" />}
+              title="No academy teachers yet."
+              detail="Create a trainee and choose the curriculum lessons for their Teacher Academy lesson plan."
+              className="min-h-[22rem]"
+            />
           )}
         </div>
       </ChartCard>

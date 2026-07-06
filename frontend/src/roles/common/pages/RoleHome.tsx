@@ -6,17 +6,23 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import {
-  AcademicDirectorMobileNav,
+  AcademicDirectorPageShell,
   AcademicDirectorProfileSection,
-  AcademicDirectorSidebar,
   AcademicDirectorTeacherAcademyCta,
+  HeadOfDepartmentPageShell,
+  HeadOfDepartmentProfileSection,
+  HeadOfDepartmentTeacherAcademyCta,
+  academicDirectorActiveNavFromPath,
+  headOfDepartmentActiveNavFromPath,
   type AcademicDirectorNavKey,
+  type HeadOfDepartmentNavKey,
 } from "@/roles/common/components/AcademicDirectorShell";
 
 interface RoleHomeCard {
   label?: string;
   value?: string;
   description?: string;
+  detail?: string;
 }
 
 interface RoleHomeProps {
@@ -30,15 +36,16 @@ interface RoleHomeProps {
   csrfToken?: string;
 }
 
-function MetricCard({ label, value, description }: Required<RoleHomeCard>) {
+function MetricCard({ label, value, description, detail }: Required<RoleHomeCard>) {
+  const supportingText = description || detail;
   return (
     <section className="rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
       <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       <p className="mt-2 text-2xl font-black leading-none text-foreground">{value}</p>
-      {description ? (
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{description}</p>
+      {supportingText ? (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{supportingText}</p>
       ) : null}
     </section>
   );
@@ -49,10 +56,13 @@ function normalizeRoleName(value: string | undefined) {
 }
 
 function currentAcademicDirectorNav(): AcademicDirectorNavKey {
-  if (typeof window === "undefined") return "home";
-  if (window.location.hash === "#academic-director-profile") return "profile";
-  if (window.location.pathname.includes("/teacher-academy")) return "academy";
-  return "home";
+  if (typeof window === "undefined") return "overview";
+  return academicDirectorActiveNavFromPath(window.location.pathname, window.location.hash);
+}
+
+function currentHeadOfDepartmentNav(): HeadOfDepartmentNavKey {
+  if (typeof window === "undefined") return "overview";
+  return headOfDepartmentActiveNavFromPath(window.location.pathname, window.location.hash);
 }
 
 function AcademicDirectorHome({
@@ -75,11 +85,12 @@ function AcademicDirectorHome({
       ];
 
   return (
-    <div className="min-h-[var(--tg-viewport-height)] bg-background text-foreground">
-      <AcademicDirectorSidebar authLogin={authLogin} csrfToken={csrfToken} active={activeNav} />
-
-      <main className="min-h-[var(--tg-viewport-height)] px-4 pb-[calc(var(--app-bottom-inset)+5.75rem)] pt-5 sm:px-6 lg:ml-64 lg:px-8 lg:pb-8">
-        <section className="mx-auto flex max-w-6xl flex-col gap-5">
+    <AcademicDirectorPageShell
+      authLogin={authLogin}
+      csrfToken={csrfToken}
+      active={activeNav}
+      maxWidthClass="max-w-6xl"
+    >
           <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
@@ -90,7 +101,7 @@ function AcademicDirectorHome({
                   <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
                     {roleDisplayName}
                   </p>
-                  <h1 className="mt-1 text-2xl font-black tracking-normal text-foreground">
+                  <h1 className="mt-1 break-words text-2xl font-black tracking-normal text-foreground">
                     {title}
                   </h1>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -99,32 +110,99 @@ function AcademicDirectorHome({
                 </div>
               </div>
               {authLogin ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
+                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  {authLogin}
+                  <span className="truncate">{authLogin}</span>
                 </div>
               ) : null}
             </div>
           </header>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
             {normalizedCards.map((card) => (
               <MetricCard
                 key={`${card.label || "card"}-${card.value || "value"}`}
                 label={card.label || "Status"}
                 value={card.value || "Ready"}
                 description={card.description || ""}
+                detail={card.detail || ""}
               />
             ))}
           </div>
 
           <AcademicDirectorTeacherAcademyCta />
           <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
-        </section>
-      </main>
+    </AcademicDirectorPageShell>
+  );
+}
 
-      <AcademicDirectorMobileNav active={activeNav} />
-    </div>
+function HeadOfDepartmentHome({
+  authLogin,
+  roleDisplayName,
+  title,
+  description,
+  cards,
+  csrfToken,
+}: Required<Pick<RoleHomeProps, "roleDisplayName" | "title" | "description" | "cards">> &
+  Pick<RoleHomeProps, "authLogin" | "csrfToken">) {
+  const activeNav = currentHeadOfDepartmentNav();
+  const normalizedCards = cards.length
+    ? cards
+    : [
+        { label: "Subject Scope", value: "Ready", description: "Assigned subjects are available." },
+        { label: "Teacher Academy", value: "Ready", description: "Academy teachers are subject-scoped." },
+        { label: "Reports", value: "Ready", description: "Assessment reports are available." },
+      ];
+
+  return (
+    <HeadOfDepartmentPageShell
+      authLogin={authLogin}
+      csrfToken={csrfToken}
+      active={activeNav}
+      maxWidthClass="max-w-6xl"
+    >
+          <header className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <LayoutDashboard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    {roleDisplayName}
+                  </p>
+                  <h1 className="mt-1 break-words text-2xl font-black tracking-normal text-foreground">
+                    {title}
+                  </h1>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    {description}
+                  </p>
+                </div>
+              </div>
+              {authLogin ? (
+                <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-3 py-2 text-xs font-bold text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span className="truncate">{authLogin}</span>
+                </div>
+              ) : null}
+            </div>
+          </header>
+
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+            {normalizedCards.map((card) => (
+              <MetricCard
+                key={`${card.label || "card"}-${card.value || "value"}`}
+                label={card.label || "Status"}
+                value={card.value || "Ready"}
+                description={card.description || ""}
+                detail={card.detail || ""}
+              />
+            ))}
+          </div>
+
+          <HeadOfDepartmentTeacherAcademyCta />
+          <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+    </HeadOfDepartmentPageShell>
   );
 }
 
@@ -142,6 +220,18 @@ export function RoleHome({
   if (normalizedRole === "academic_director") {
     return (
       <AcademicDirectorHome
+        authLogin={authLogin}
+        roleDisplayName={roleDisplayName}
+        title={title}
+        description={description}
+        cards={cards}
+        csrfToken={csrfToken}
+      />
+    );
+  }
+  if (normalizedRole === "head_of_department") {
+    return (
+      <HeadOfDepartmentHome
         authLogin={authLogin}
         roleDisplayName={roleDisplayName}
         title={title}
@@ -197,6 +287,7 @@ export function RoleHome({
               label={card.label || "Status"}
               value={card.value || "Ready"}
               description={card.description || ""}
+              detail={card.detail || ""}
             />
           ))}
         </div>

@@ -2,9 +2,81 @@
 
 from fastapi import APIRouter, Depends
 
+from backend.domains.announcements.service import list_announcements
+from backend.render import generate_csrf, render_react_page
+from backend.roles.admin.services.academic_service import list_admin_academic_context
+from backend.roles.admin.services.teacher_academy_service import list_teacher_academy_page_context
+from backend.roles.head_of_department.academy_scope import (
+    current_hod_subject_ids,
+    filter_rows_by_subject_scope,
+)
 from backend.roles.head_of_department.workspace_cards import head_of_department_workspace_cards
 from backend.roles.role_home import render_role_home
 from backend.utils.guards import require_role
+from backend.utils.session import current_auth_login, current_auth_role
+
+
+def _to_int(value):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return parsed if parsed > 0 else 0
+
+
+def _filter_subject_rows(rows, subject_ids):
+    scoped_ids = set(subject_ids or [])
+    if not scoped_ids:
+        return []
+    return [
+        row for row in rows
+        if _to_int(row.get("subject_id") or row.get("id") or row.get("subjectId")) in scoped_ids
+    ]
+
+
+def _head_of_department_academy_context():
+    context = list_teacher_academy_page_context()
+    subject_ids = current_hod_subject_ids()
+    context["academy_teachers"] = filter_rows_by_subject_scope(
+        context.get("academy_teachers") or [],
+        subject_ids,
+    )
+    context["subjects"] = _filter_subject_rows(context.get("subjects") or [], subject_ids)
+    context["curriculum_programs"] = _filter_subject_rows(
+        context.get("curriculum_programs") or [],
+        subject_ids,
+    )
+    program_ids = {
+        _to_int(row.get("id"))
+        for row in context.get("curriculum_programs") or []
+        if _to_int(row.get("id"))
+    }
+    context["curriculum_items"] = [
+        row for row in context.get("curriculum_items") or []
+        if _to_int(row.get("program_id") or row.get("programId")) in program_ids
+    ]
+    return context
+
+
+def _head_of_department_timetable_context():
+    try:
+        context = list_admin_academic_context()
+    except Exception as exc:
+        return {"schedules": [], "sessions": [], "warning": f"Subject timetable could not be loaded: {exc}"}
+    subject_ids = current_hod_subject_ids()
+    return {
+        "schedules": filter_rows_by_subject_scope(context.get("schedules") or [], subject_ids),
+        "sessions": filter_rows_by_subject_scope(context.get("sessions") or [], subject_ids),
+        "warning": "",
+    }
+
+
+def _head_of_department_announcement_context():
+    try:
+        announcements = list_announcements(include_drafts=True)
+    except Exception as exc:
+        return {"announcements": [], "warning": f"Announcements could not be loaded: {exc}"}
+    return {"announcements": announcements, "warning": ""}
 
 
 def register_head_of_department_page_routes(app, *, render_admin_page=None):
@@ -20,16 +92,76 @@ def register_head_of_department_page_routes(app, *, render_admin_page=None):
             cards=head_of_department_workspace_cards(),
         )
 
-    @router.get("/head-of-department/teacher-academy", operation_id="head_of_department_teacher_academy")
-    def head_of_department_teacher_academy():
-        if callable(render_admin_page):
-            return render_admin_page(admin_panel="teachers", admin_mode="head_of_department")
+    @router.get("/head-of-department/timetable", operation_id="head_of_department_timetable")
+    def head_of_department_timetable():
+        timetable_context = _head_of_department_timetable_context()
+        return render_react_page(
+            "head-of-department-timetable",
+            {
+                "authLogin": current_auth_login(),
+                "authRole": current_auth_role(),
+                "role": "head_of_department",
+                "workspace": "timetable",
+                "adminAcademicSchedules": timetable_context.get("schedules", []),
+                "adminAcademicSessions": timetable_context.get("sessions", []),
+                "warning": timetable_context.get("warning", ""),
+                "csrfToken": generate_csrf(),
+            },
+            title="Head of Department Timetable",
+            description="Subject-scoped timetable workspace.",
+            telegram=True,
+        )
+
+    @router.get("/head-of-department/announcements", operation_id="head_of_department_announcements")
+    def head_of_department_announcements():
+        announcement_context = _head_of_department_announcement_context()
+        return render_react_page(
+            "head-of-department-announcements",
+            {
+                "authLogin": current_auth_login(),
+                "authRole": current_auth_role(),
+                "role": "head_of_department",
+                "workspace": "announcements",
+                "adminAnnouncements": announcement_context.get("announcements", []),
+                "warning": announcement_context.get("warning", ""),
+                "csrfToken": generate_csrf(),
+            },
+            title="Head of Department Announcements",
+            description="Subject-scoped announcements workspace.",
+            telegram=True,
+        )
+
+    @router.get("/head-of-department/profile", operation_id="head_of_department_profile")
+    def head_of_department_profile():
         return render_role_home(
             "head-of-department-home",
             "head_of_department",
-            title="Teacher Academy",
-            description="Teacher Academy management is temporarily unavailable.",
+            title="Head of Department Profile",
+            description="Head of Department profile and logout.",
             cards=head_of_department_workspace_cards(),
+        )
+
+    @router.get("/head-of-department/teacher-academy", operation_id="head_of_department_teacher_academy")
+    def head_of_department_teacher_academy():
+        academy_context = _head_of_department_academy_context()
+        return render_react_page(
+            "head-of-department-academy",
+            {
+                "authLogin": current_auth_login(),
+                "authRole": current_auth_role(),
+                "adminMode": "head_of_department",
+                "adminSchool": "all",
+                "adminTeachers": academy_context.get("teachers", []),
+                "adminTeacherAcademy": academy_context.get("academy_teachers", []),
+                "adminGroupOptions": academy_context.get("group_options", []),
+                "adminAcademicSubjects": academy_context.get("subjects", []),
+                "adminAcademicCurriculumPrograms": academy_context.get("curriculum_programs", []),
+                "adminAcademicCurriculumItems": academy_context.get("curriculum_items", []),
+                "csrfToken": generate_csrf(),
+            },
+            title="Head of Department Teacher Academy",
+            description="Subject-scoped Teacher Academy management.",
+            telegram=True,
         )
 
     app.include_router(router)

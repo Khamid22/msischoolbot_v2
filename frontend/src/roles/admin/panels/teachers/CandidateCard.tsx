@@ -205,11 +205,10 @@ export function CandidateCard({
         {status === "training_ready" ? (
           <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Ready for training
+            Ready for practice
           </div>
         ) : null}
       </div>
     </div>
   );
 }
-

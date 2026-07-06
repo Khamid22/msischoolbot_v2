@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
 import {
   AlertTriangle,
   Megaphone,
@@ -11,11 +11,14 @@ import {
   Sparkles,
   Trash2,
   Users,
-  X,
 } from "lucide-react";
+import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { EmptyState } from "@/shared/ui/EmptyState";
+import { IconButton } from "@/shared/ui/IconButton";
+import { MetricCard } from "@/shared/ui/MetricCard";
+import { Modal } from "@/shared/ui/Modal";
 import { routes } from "@/shared/lib/routes";
-import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../shared";
 import { jsonCsrfHeaders, csrfHeaders } from "@/shared/lib/api";
 
@@ -91,11 +94,11 @@ const hrBroadcastTemplates: Array<{
   },
   {
     key: "training",
-    label: "Training Session",
+    label: "Practice Session",
     summary: "Share a lesson practice or observation update.",
-    title: "Training session update",
+    title: "Practice session update",
     body:
-      "Please review the lesson plan and be ready for the upcoming training session. Bring your notebook, teaching materials, and arrive on time.",
+      "Please review the lesson plan and be ready for the upcoming practice session. Bring your notebook, teaching materials, and arrive on time.",
     audience: "trainees",
     priority: "important",
   },
@@ -194,10 +197,6 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   );
   const [tab, setTab] = useState<"all" | Status>("all");
   const [open, setOpen] = useState(false);
-  const composerRef = useDismissibleLayer<HTMLFormElement>({
-    enabled: open,
-    onDismiss: () => setOpen(false),
-  });
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState<AnnouncementForm>(() => createEmptyForm(defaultAudience));
   const [saving, setSaving] = useState(false);
@@ -367,20 +366,20 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
             Only HR audiences are shown here. Student-facing school announcements stay outside this workspace.
           </div>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {isHrMode ? (
             <>
-              <StatTile icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} />
-              <StatTile icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} />
-              <StatTile icon={<Pin className="h-4 w-4" />} label="Pinned" value={stats.pinned} />
-              <StatTile icon={<AlertTriangle className="h-4 w-4" />} label="Urgent" value={stats.urgent} />
+              <MetricCard icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} detail="sent broadcasts" tone="success" />
+              <MetricCard icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} detail="in progress" />
+              <MetricCard icon={<Pin className="h-4 w-4" />} label="Pinned" value={stats.pinned} detail="highlighted" tone="info" />
+              <MetricCard icon={<AlertTriangle className="h-4 w-4" />} label="Urgent" value={stats.urgent} detail="priority notices" tone="warning" />
             </>
           ) : (
             <>
-              <StatTile icon={<Megaphone className="h-4 w-4" />} label="Total" value={stats.total} />
-              <StatTile icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} />
-              <StatTile icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} />
-              <StatTile icon={<Users className="h-4 w-4" />} label="Reach" value={stats.reach} />
+              <MetricCard icon={<Megaphone className="h-4 w-4" />} label="Total" value={stats.total} detail="all announcements" tone="info" />
+              <MetricCard icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} detail="visible posts" tone="success" />
+              <MetricCard icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} detail="not published" />
+              <MetricCard icon={<Users className="h-4 w-4" />} label="Reach" value={stats.reach} detail="target audience" />
             </>
           )}
         </div>
@@ -407,100 +406,104 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
 
       <div className="space-y-3">
         {filtered.length === 0 ? (
-          <div className="rounded-lg border border-foreground/10 bg-surface px-4 py-10 text-center text-sm text-muted-foreground">
-            {emptyStateLabel}
-          </div>
+          <EmptyState title={emptyStateLabel} icon={<Megaphone className="h-6 w-6" />} />
         ) : (
-          filtered.map((item) => (
-            <article
-              key={item.id}
-              className={`rounded-lg border bg-surface p-4 shadow-card ${
-                item.pinned ? "border-primary/40" : "border-foreground/10"
-              }`}
-            >
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {item.pinned ? <Pin className="h-4 w-4 text-primary" /> : null}
-                    <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${priorityClass(item.priority)}`}>
-                      {item.priority === "urgent" ? <AlertTriangle className="h-3 w-3" /> : null}
-                      {item.priority === "info" ? <Sparkles className="h-3 w-3" /> : null}
-                      {priorityLabels[item.priority]}
-                    </span>
-                    <span className="rounded-full border border-foreground/10 bg-background px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                      {audienceLabels[item.audience]}
-                    </span>
-                    {item.status !== "published" ? (
-                      <span className="rounded-full border border-foreground/10 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                        {item.status}
+          filtered.map((item) => {
+            const menuItems: ActionMenuItem[] = [
+              {
+                key: "edit",
+                label: "Edit",
+                icon: <Pencil className="h-4 w-4" />,
+                onClick: () => openEdit(item),
+              },
+              { separator: true, key: "delete-separator" },
+              {
+                key: "delete",
+                label: "Delete",
+                icon: <Trash2 className="h-4 w-4" />,
+                onClick: () => deleteItem(item),
+                danger: true,
+              },
+            ];
+
+            return (
+              <article
+                key={item.id}
+                className={`rounded-lg border bg-surface p-4 shadow-card ${
+                  item.pinned ? "border-primary/40" : "border-foreground/10"
+                }`}
+              >
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.pinned ? <Pin className="h-4 w-4 text-primary" /> : null}
+                      <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${priorityClass(item.priority)}`}>
+                        {item.priority === "urgent" ? <AlertTriangle className="h-3 w-3" /> : null}
+                        {item.priority === "info" ? <Sparkles className="h-3 w-3" /> : null}
+                        {priorityLabels[item.priority]}
                       </span>
-                    ) : null}
+                      <span className="rounded-full border border-foreground/10 bg-background px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                        {audienceLabels[item.audience]}
+                      </span>
+                      {item.status !== "published" ? (
+                        <span className="rounded-full border border-foreground/10 px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                          {item.status}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                      {item.body}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>{item.author}</span>
+                      <span>|</span>
+                      <span>{formatDate(item.publishedAt || item.updatedAt || item.createdAt)}</span>
+                      {item.status === "published" && !isHrMode ? (
+                        <>
+                          <span>|</span>
+                          <span>{item.views} views</span>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                    {item.body}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{item.author}</span>
-                    <span>|</span>
-                    <span>{formatDate(item.publishedAt || item.updatedAt || item.createdAt)}</span>
-                    {item.status === "published" && !isHrMode ? (
-                      <>
-                        <span>|</span>
-                        <span>{item.views} views</span>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-                {!isTeacherMode ? (
-                <div className="flex shrink-0 flex-wrap gap-1">
-                  {item.status !== "published" ? (
-                    <IconButton
-                      label="Publish"
-                      onClick={() => patchItem(item, { status: "published" })}
-                    >
-                      <Send className="h-4 w-4" />
-                    </IconButton>
+                  {!isTeacherMode ? (
+                    <div className="flex shrink-0 items-center gap-2 md:justify-end">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          item.status !== "published"
+                            ? patchItem(item, { status: "published" })
+                            : openEdit(item)
+                        }
+                        className="inline-flex h-9 min-w-[5.5rem] items-center justify-center gap-1 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      >
+                        {item.status !== "published" ? <Send className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                        {item.status !== "published" ? "Publish" : "Edit"}
+                      </button>
+                      <IconButton
+                        label={item.pinned ? "Unpin" : "Pin"}
+                        onClick={() => patchItem(item, { pinned: !item.pinned })}
+                      >
+                        {item.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                      </IconButton>
+                      <ActionMenu items={menuItems} label={`Actions for ${item.title}`} />
+                    </div>
                   ) : null}
-                  <IconButton
-                    label={item.pinned ? "Unpin" : "Pin"}
-                    onClick={() => patchItem(item, { pinned: !item.pinned })}
-                  >
-                    {item.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                  </IconButton>
-                  <IconButton label="Edit" onClick={() => openEdit(item)}>
-                    <Pencil className="h-4 w-4" />
-                  </IconButton>
-                  <IconButton label="Delete" danger onClick={() => deleteItem(item)}>
-                    <Trash2 className="h-4 w-4" />
-                  </IconButton>
                 </div>
-                ) : null}
-              </div>
-            </article>
-          ))
+              </article>
+            );
+          })
         )}
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-4" role="dialog" aria-modal="true">
-          <form
-            ref={composerRef}
-            onSubmit={save}
-            className="flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-surface shadow-card-hover"
-          >
-            <div className="flex items-center justify-between border-b border-foreground/5 px-5 py-3">
-              <h3 className="text-sm font-bold">
-                {editing ? (isHrMode ? "Edit Broadcast" : "Edit Announcement") : isHrMode ? "New Broadcast" : "New Announcement"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+        <Modal
+          title={editing ? (isHrMode ? "Edit Broadcast" : "Edit Announcement") : isHrMode ? "New Broadcast" : "New Announcement"}
+          onClose={() => setOpen(false)}
+          size="md"
+        >
+          <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
               {error ? <p className="text-xs font-semibold text-destructive">{error}</p> : null}
               {isHrMode ? (
@@ -528,7 +531,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                   onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
                   maxLength={120}
                   className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
-                  placeholder={isHrMode ? "Training session update" : "Midterm exam schedule"}
+                  placeholder={isHrMode ? "Practice session update" : "Midterm exam schedule"}
                 />
               </label>
               <label className="block">
@@ -598,7 +601,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                 </label>
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-foreground/5 px-5 py-3">
+            <div className="flex flex-col-reverse gap-2 border-t border-foreground/5 px-5 py-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -615,7 +618,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       ) : null}
     </div>
   );
@@ -626,47 +629,5 @@ function FieldLabel({ children }: { children: string }) {
     <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
       {children}
     </span>
-  );
-}
-
-function StatTile({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-foreground/10 bg-background p-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold tabular-nums">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function IconButton({
-  children,
-  label,
-  danger = false,
-  onClick,
-}: {
-  children: ReactNode;
-  label: string;
-  danger?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={`flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted ${
-        danger ? "text-destructive" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
