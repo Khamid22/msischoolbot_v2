@@ -327,7 +327,6 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
   const graphLineMinWidth = Math.max(
     360,
     graphLineData.length * (graphMetric === "exam" ? 88 : 72),
-    graphLineSeries.length * 70,
   );
   const graphBarMinWidth = Math.max(360, graphBarRows.length * (graphMetric === "academic" ? 96 : 76));
   const graphDomain: [number, number] = [1, 9];
@@ -584,7 +583,7 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
 
               {graphIsAll && graphLineSeries.length ? (
                 <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
-                  <div className="h-80 sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphLineMinWidth }}>
+                  <div className="h-80 min-w-full sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphLineMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={graphLineData} margin={{ top: 6, right: 12, left: -6, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -635,7 +634,7 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
                 </div>
               ) : graphBarRows.length ? (
                 <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
-                  <div className="h-80 sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphBarMinWidth }}>
+                  <div className="h-80 min-w-full sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphBarMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={graphBarRows} margin={{ top: 16, right: graphMetric === "academic" ? 8 : 12, left: -6, bottom: 0 }}>
                         <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
@@ -685,7 +684,7 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
                 </div>
               ) : (
                 <div className="flex h-80 flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground sm:h-[32rem] lg:h-[35rem]">
-                  No graph data for this selection yet.
+                  {graphMetric === "exam" ? "No exam performance data yet." : "No graph data for this selection yet."}
                 </div>
               )}
             </div>
@@ -698,4 +697,3 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
     </div>
   );
 }
-

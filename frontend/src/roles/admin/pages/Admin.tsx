@@ -293,7 +293,7 @@ function systemAdminCardIcon(label: string) {
 function SystemAdminCardRow({ cards }: { cards: SystemAdminCard[] }) {
   if (!cards.length) return null;
   return (
-    <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
         <div key={`${card.label}-${card.value}`} className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">

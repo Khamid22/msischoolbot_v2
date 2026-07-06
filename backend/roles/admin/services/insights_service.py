@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from backend.domains.academics.exam_filters import is_exam_performance_row
 from database.academics import canonical
 
 _EXAM_NAME_ALIASES = {
@@ -483,6 +484,14 @@ def build_admin_subject_info(metrics, dataset = None, school_option_catalog = No
                 student_exam_bests: dict[str, float] = {}
                 for exam in exam_results:
                     if not isinstance(exam, dict):
+                        continue
+                    if not is_exam_performance_row(
+                        item_type=exam.get("itemType") or exam.get("item_type") or exam.get("type"),
+                        exam_name=exam.get("examName"),
+                        label=exam.get("label"),
+                        title=exam.get("title") or exam.get("topic") or exam.get("assessment"),
+                        attempt=exam.get("attempt"),
+                    ):
                         continue
                     score = safe_float(exam.get("score"))
                     if score is None or score <= 0:
@@ -971,6 +980,7 @@ __all__ = [
     "build_admin_group_highlights",
     "build_admin_group_zones",
     "build_admin_subject_info",
+    "is_exam_performance_row",
     "build_admin_student_ratings",
     "build_admin_attention",
     "build_admin_quick_stats",

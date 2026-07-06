@@ -41,12 +41,6 @@ def _placeholder_cards() -> list[dict[str, str]]:
             "detail": "active linked accounts",
             "tone": "text-blue-700",
         },
-        {
-            "label": "Audit / Settings",
-            "value": "Placeholder",
-            "detail": "technical tools later",
-            "tone": "text-slate-700",
-        },
     ]
 
 

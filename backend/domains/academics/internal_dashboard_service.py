@@ -2,6 +2,7 @@
 
 import math
 
+from backend.domains.academics.exam_filters import is_exam_performance_row
 from database import queries
 
 _SCHOOL_DISPLAY_NAMES = {
@@ -115,16 +116,38 @@ def _homework_payload(rows):
     ]
 
 
+def _row_value(row, key, default=""):
+    try:
+        return row[key]
+    except (KeyError, TypeError):
+        getter = getattr(row, "get", None)
+        if callable(getter):
+            return getter(key, default)
+    return default
+
+
 def _exam_payload(rows):
-    return [
-        {
-            "label": row["label"],
-            "examName": row["exam_name"] or "",
-            "attempt": row["attempt"] or "",
-            "score": float(row["score"]),
-        }
-        for row in rows
-    ]
+    results = []
+    for row in rows:
+        label = _row_value(row, "label")
+        exam_name = _row_value(row, "exam_name")
+        if not is_exam_performance_row(
+            item_type=_row_value(row, "item_type"),
+            exam_name=exam_name,
+            label=label,
+            title=_row_value(row, "item_title"),
+            attempt=_row_value(row, "attempt"),
+        ):
+            continue
+        results.append(
+            {
+                "label": label,
+                "examName": exam_name or "",
+                "attempt": _row_value(row, "attempt") or "",
+                "score": float(_row_value(row, "score")),
+            }
+        )
+    return results
 
 
 def get_subject_dashboards_from_db(subject_name):
@@ -329,10 +352,12 @@ def build_internal_dataset(school_code=""):
                    lower(COALESCE(er.attempt, ''))
                    )
                    gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(NULLIF(spi.lesson_number, ''), er.exam_name) AS label,
+                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
                    er.exam_name,
                    er.attempt,
-                   er.score
+                   er.score,
+                   COALESCE(spi.item_type, '') AS item_type,
+                   COALESCE(spi.title, '') AS item_title
             FROM msi_v2.exam_results er
             JOIN msi_v2.group_students gs
               ON gs.group_id = er.group_id AND gs.student_id = er.student_id
@@ -534,10 +559,12 @@ def build_internal_overview_dataset(school_code=""):
                    lower(COALESCE(er.attempt, ''))
                    )
                    gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(NULLIF(spi.lesson_number, ''), er.exam_name) AS label,
+                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
                    er.exam_name,
                    er.attempt,
-                   er.score
+                   er.score,
+                   COALESCE(spi.item_type, '') AS item_type,
+                   COALESCE(spi.title, '') AS item_title
             FROM msi_v2.exam_results er
             JOIN msi_v2.group_students gs
               ON gs.group_id = er.group_id AND gs.student_id = er.student_id
@@ -813,10 +840,12 @@ def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="
                    lower(COALESCE(er.exam_name, '')),
                    lower(COALESCE(er.attempt, ''))
                    )
-                   COALESCE(NULLIF(spi.lesson_number, ''), er.exam_name) AS label,
+                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
                    er.exam_name,
                    er.attempt,
-                   er.score
+                   er.score,
+                   COALESCE(spi.item_type, '') AS item_type,
+                   COALESCE(spi.title, '') AS item_title
             FROM msi_v2.exam_results er
             LEFT JOIN msi_v2.subject_program_items spi ON spi.id = er.program_item_id
             WHERE er.group_id = %s

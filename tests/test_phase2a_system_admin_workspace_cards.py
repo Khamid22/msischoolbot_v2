@@ -139,7 +139,6 @@ def _mock_cards():
         {"label": "Active Accounts", "value": "181", "detail": "usable accounts"},
         {"label": "Pending Accounts", "value": "3", "detail": "waiting for activation/linking"},
         {"label": "Telegram Links", "value": "5", "detail": "active linked accounts"},
-        {"label": "Audit / Settings", "value": "Placeholder", "detail": "technical tools later"},
     ]
 
 
@@ -175,13 +174,8 @@ def test_system_admin_card_provider_counts_accounts(monkeypatch):
             "detail": "active linked accounts",
             "tone": "text-blue-700",
         },
-        {
-            "label": "Audit / Settings",
-            "value": "Placeholder",
-            "detail": "technical tools later",
-            "tone": "text-slate-700",
-        },
     ]
+    assert "Audit / Settings" not in {card["label"] for card in cards}
 
 
 def test_system_admin_card_provider_returns_placeholders_on_db_failure(monkeypatch):
@@ -198,7 +192,8 @@ def test_system_admin_card_provider_returns_placeholders_on_db_failure(monkeypat
     assert cards[1]["value"] == "-"
     assert cards[2]["value"] == "-"
     assert cards[3]["value"] == "-"
-    assert cards[4]["value"] == "Placeholder"
+    assert len(cards) == 4
+    assert "Audit / Settings" not in {card["label"] for card in cards}
 
 
 def test_system_admin_admin_can_access_admin_with_cards(client, monkeypatch):
@@ -226,7 +221,7 @@ def test_system_admin_admin_can_access_admin_with_cards(client, monkeypatch):
     assert "Active Accounts" in response.text
     assert "Pending Accounts" in response.text
     assert "Telegram Links" in response.text
-    assert "Audit / Settings" in response.text
+    assert "Audit / Settings" not in response.text
     assert "185" in response.text
 
 
@@ -265,8 +260,8 @@ def test_admin_route_renders_placeholders_when_card_db_fails(client, monkeypatch
     assert response.status_code == 200
     assert 'data-react-page="admin-home"' in response.text
     assert "Total Accounts" in response.text
-    assert "Audit / Settings" in response.text
-    assert "Placeholder" in response.text
+    assert "Audit / Settings" not in response.text
+    assert "Placeholder" not in response.text
 
 
 @pytest.mark.parametrize(

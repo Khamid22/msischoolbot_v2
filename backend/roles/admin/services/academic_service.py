@@ -3,6 +3,7 @@
 import re
 from datetime import UTC, datetime
 
+from backend.domains.academics.exam_filters import is_exam_performance_row
 from database import queries
 from database.academics import canonical
 from backend.domains.academics.postgres_service import (
@@ -457,6 +458,8 @@ def get_group_gradebook(group_id):
                 f"""
                 SELECT gs.legacy_enrollment_id AS enrollment_id,
                        er.exam_name, er.attempt, er.score,
+                       COALESCE(spi.item_type, '') AS item_type,
+                       COALESCE(spi.title, '') AS item_title,
                        COALESCE(
                          to_char(exam_session.session_date, 'DD/MM/YYYY'),
                          to_char(er.created_at, 'DD/MM/YYYY'),
@@ -465,6 +468,7 @@ def get_group_gradebook(group_id):
                 FROM msi_v2.exam_results er
                 JOIN msi_v2.group_students gs
                      ON gs.group_id = er.group_id AND gs.student_id = er.student_id
+                LEFT JOIN msi_v2.subject_program_items spi ON spi.id = er.program_item_id
                 LEFT JOIN LATERAL (
                     SELECT ls.session_date
                     FROM msi_v2.lesson_sessions ls
@@ -479,6 +483,14 @@ def get_group_gradebook(group_id):
                 enrollment_ids,
             ).fetchall():
                 label = str(row["exam_name"] or "").strip()
+                if not is_exam_performance_row(
+                    item_type=row["item_type"],
+                    exam_name=row["exam_name"],
+                    label=label,
+                    title=row["item_title"],
+                    attempt=row["attempt"],
+                ):
+                    continue
                 if not label:
                     continue
                 score = float(row["score"])
