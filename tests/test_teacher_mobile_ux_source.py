@@ -33,6 +33,36 @@ def test_action_menu_and_academy_modal_use_dismissible_layer():
     assert "aria-label={title}" in academy_panel
 
 
+def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
+    source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+
+    assert "function AcademyTeacherCard" in source
+    assert "lg:hidden" in source
+    assert "hidden max-h-[calc(100dvh-20rem)] overflow-auto lg:block" in source
+    assert "No academy lessons assigned." in source
+    assert "TeacherAcademyPanel" in source
+
+
+def test_teacher_academy_actions_use_schedule_not_assign():
+    source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+
+    assert "Schedule Training Lesson" in source
+    assert "Save Schedule" in source
+    assert "Schedule" in source
+    assert "\n                                  Assign\n" not in source
+    assert "setScheduleTarget({ teacher, assignment: nextAssignment })" in source
+
+
+def test_teacher_academy_modals_select_assignment_ids():
+    source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
+
+    assert 'name="assignment_id"' in source
+    assert "onSubmit(asNumber(selectedAssignment?.id), fields)" in source
+    assert 'name="lesson_assignment_id"' in source
+    assert "fields.lesson_assignment_id = String(asNumber(selectedAssignment?.id));" in source
+    assert "Select lesson assignment" in source
+
+
 def test_teacher_mobile_bottom_nav_contract():
     source = _read("roles/teacher/pages/TeacherHome.tsx")
     mobile_tabs = source.split("const teacherMobileTabs", 1)[1].split("];", 1)[0]
@@ -45,7 +75,9 @@ def test_teacher_mobile_bottom_nav_contract():
     assert "Teacher mobile navigation" in source
     assert "var(--app-bottom-inset)" in source
     assert 'aria-current={isActive ? "page" : undefined}' in source
-    assert '${isTraining ? "hidden sm:flex" : "flex"}' in source
+    assert '${isTraining ? "hidden" : "flex"}' in source
+    assert "function CabinetSidebar" in source
+    assert "Teacher cabinet desktop navigation" in source
 
 
 def test_teacher_mobile_tables_and_cards_are_compact():
@@ -71,6 +103,18 @@ def test_teacher_academy_mobile_home_is_compact_and_profile_is_separate():
     assert 'Assessment chart will appear after the first report.' in source
     assert 'hidden sm:inline-flex' in profile_block
     assert 'activeTab === "career" || (!isTraining && activeTab === "profile")' in source
+
+
+def test_teacher_cabinet_design_is_applied_to_academy_shell():
+    source = _read("roles/teacher/pages/TeacherHome.tsx")
+
+    assert "bg-[#F0F2F6]" in source
+    assert "bg-[#12203D]" in source
+    assert "text-[#2F5DE0]" in source
+    assert "Teacher Cabinet" in source
+    assert "AcademyLessonsScreen" in source
+    assert "No academy lessons assigned." in source
+    assert "No assessment reports yet." in source
 
 
 def test_teacher_academy_and_active_tabs_stay_available():

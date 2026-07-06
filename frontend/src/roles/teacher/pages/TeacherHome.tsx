@@ -190,6 +190,18 @@ const teacherMobileTabs: Array<{ key: TabKey; label: string; icon: LucideIcon }>
   { key: "profile", label: "Profile", icon: UserRound },
 ];
 
+function teacherInitials(name?: string, fallback = "T") {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return fallback;
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
 const scoreLabels: Record<string, string> = {
   teacher_guidance_compliance_score: "Teacher guidance compliance",
   timing_adherence_score: "Timing adherence",
@@ -261,6 +273,83 @@ function average(values: number[]) {
   return clean.length ? clean.reduce((sum, value) => sum + value, 0) / clean.length : 0;
 }
 
+function CabinetSidebar({
+  teacher,
+  academy,
+  tabs,
+  activeTab,
+  setActiveTab,
+  csrfToken,
+}: {
+  teacher: TeacherInfo;
+  academy: AcademyTeacher | null;
+  tabs: Array<{ key: TabKey; label: string; icon: LucideIcon }>;
+  activeTab: TabKey;
+  setActiveTab: (tab: TabKey) => void;
+  csrfToken?: string;
+}) {
+  return (
+    <aside className="hidden min-h-screen w-60 shrink-0 flex-col bg-[#12203D] text-white shadow-2xl md:sticky md:top-0 md:flex">
+      <div className="flex items-center gap-3 px-4 py-5">
+        <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-sm">
+          <span className="text-sm font-black leading-none tracking-wide">MSI</span>
+          <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.2em] text-white/60">School</span>
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-black leading-5">Teacher Cabinet</p>
+          <p className="truncate text-xs font-semibold text-white/55">{academy ? "Teacher Academy" : "Teaching Workspace"}</p>
+        </div>
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-1 px-3 py-2" aria-label="Teacher cabinet desktop navigation">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex h-11 items-center gap-3 rounded-2xl px-3 text-left text-sm font-black transition-all ${
+                isActive ? "bg-white text-[#12203D] shadow-sm" : "text-white/64 hover:bg-white/10 hover:text-white"
+              }`}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <Icon className={`h-4 w-4 ${isActive ? "text-[#2F5DE0]" : "text-white/50"}`} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="border-t border-white/10 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2F5DE0] text-sm font-black text-white">
+            {teacherInitials(teacher.full_name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-black leading-5">{teacher.full_name || "Teacher"}</p>
+            <p className="truncate text-xs font-semibold text-white/55">
+              {teacher.login}
+              {academy ? " · Academy" : ""}
+            </p>
+          </div>
+          <form action={routes.logout} method="post" className="shrink-0">
+            <input type="hidden" name="csrf_token" value={csrfToken || ""} />
+            <button
+              type="submit"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function countAttendance(groups: GroupGradebook[]) {
   let present = 0;
   let total = 0;
@@ -316,14 +405,14 @@ function MetricCard({
   tone?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:rounded-2xl sm:p-4">
+    <div className="rounded-[0.875rem] border border-[#E4E7EC] bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:p-3.5">
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase leading-4 tracking-wide text-slate-500 sm:text-[11px]">{label}</p>
-          <p className={`mt-1 truncate text-xl font-black leading-7 sm:mt-2 sm:text-2xl ${tone}`}>{value}</p>
-          <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-4 text-slate-500 sm:mt-1 sm:text-xs">{detail}</p>
+          <p className="truncate text-[10px] font-bold uppercase leading-4 tracking-wide text-[#7A8296] sm:text-[11px]">{label}</p>
+          <p className={`mt-1 truncate text-xl font-black leading-7 text-[#12203D] ${tone}`}>{value}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-4 text-[#7A8296]">{detail}</p>
         </div>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600 sm:h-9 sm:w-9">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F4F6FA] text-[#2F5DE0]">
           {icon}
         </div>
       </div>
@@ -333,10 +422,10 @@ function MetricCard({
 
 function EmptyState({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
   return (
-    <div className="flex min-h-[18rem] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 text-center">
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">{icon}</div>
-      <p className="text-sm font-black text-slate-900">{title}</p>
-      <p className="mt-1 max-w-md text-sm text-slate-500">{detail}</p>
+    <div className="flex min-h-[14rem] flex-col items-center justify-center rounded-[0.875rem] border border-dashed border-[#E4E7EC] bg-white/70 px-6 text-center">
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F4F6FA] text-[#7A8296]">{icon}</div>
+      <p className="text-sm font-black text-[#12203D]">{title}</p>
+      <p className="mt-1 max-w-md text-sm text-[#7A8296]">{detail}</p>
     </div>
   );
 }
@@ -529,6 +618,96 @@ function ReportsTable({ reports }: { reports: AcademyAssessment[] }) {
         </table>
       </div>
     </div>
+  );
+}
+
+function AcademyLessonsScreen({
+  assignments,
+  reports,
+}: {
+  assignments: AcademyAssignment[];
+  reports: AcademyAssessment[];
+}) {
+  const reportByAssignment = new Map(reports.map((report) => [asNumber(report.lesson_assignment_id), report]));
+  if (!assignments.length) {
+    return (
+      <EmptyState
+        icon={<ClipboardList className="h-5 w-5" />}
+        title="No academy lessons assigned."
+        detail="Academic Department will assign lessons before the training sequence begins."
+      />
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="px-1">
+        <h2 className="text-xl font-black text-[#12203D]">Lessons</h2>
+        <p className="mt-1 text-sm font-medium text-[#7A8296]">Teacher Academy assigned lessons</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {assignments.map((assignment, index) => {
+          const report = reportByAssignment.get(assignment.id);
+          const score = asNumber(report?.weighted_overall_score);
+          const status = report ? "Assessed" : statusLabel(assignment.status || "assigned");
+          return (
+            <article key={assignment.id} className="rounded-[0.875rem] border border-[#E4E7EC] bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F4F6FA] text-xs font-black text-[#7A8296]">
+                  {assignment.sequence_no || index + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-[#12203D]">
+                        {assignment.lesson_number || `Lesson ${index + 1}`}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[#5B6478]">
+                        {assignment.lesson_topic || "Curriculum lesson"}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-black uppercase ${report ? "border-emerald-200 bg-emerald-50 text-emerald-700" : statusClass(assignment.status)}`}>
+                      {status}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-[#7A8296]">
+                    <span className="rounded-full bg-[#F4F6FA] px-2 py-1">{assignment.lesson_number || "Academy lesson"}</span>
+                    <span className="rounded-full bg-[#F4F6FA] px-2 py-1">{displayDate(assignment.session_datetime)}</span>
+                    <span className="rounded-full bg-[#F4F6FA] px-2 py-1">{assignment.evaluator_name || "Academic Director"}</span>
+                  </div>
+
+                  {report ? (
+                    <div className="mt-4 space-y-3 rounded-xl bg-[#F7F8FA] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-black uppercase tracking-wide text-[#7A8296]">Assessment report</p>
+                        <p className="text-lg font-black text-[#2F5DE0]">{score ? score.toFixed(1) : "-"}</p>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-[#7A8296]">Strengths</p>
+                          <p className="mt-1 line-clamp-3 text-xs leading-5 text-[#5B6478]">{report.strengths || "Not recorded yet."}</p>
+                        </div>
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-[10px] font-black uppercase tracking-wide text-[#7A8296]">Areas for improvement</p>
+                          <p className="mt-1 line-clamp-3 text-xs leading-5 text-[#5B6478]">{report.areas_for_improvement || "Not recorded yet."}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-white px-3 py-2 text-xs font-semibold leading-5 text-[#5B6478]">
+                        {report.final_recommendation || "No written report yet."}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-[#E4E7EC] bg-[#F7F8FA] px-3 py-3 text-xs font-semibold text-[#7A8296]">
+                      No assessment reports yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -863,21 +1042,34 @@ export default function TeacherHome(props: TeacherPageProps) {
   const summaryCards = workspaceCards.length ? workspaceCards : fallbackCards;
 
   return (
-    <div className="app-min-height bg-slate-50 text-slate-900">
+    <div className={`app-min-height ${isTraining ? "bg-[#F0F2F6] text-[#12203D] md:flex" : "bg-slate-50 text-slate-900"}`}>
+      {isTraining ? (
+        <CabinetSidebar
+          teacher={teacher}
+          academy={academy}
+          tabs={visibleTabs}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          csrfToken={props.csrfToken}
+        />
+      ) : null}
+
+      <div className={isTraining ? "min-w-0 flex-1" : ""}>
       <header
-        className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl"
+        className={`${isTraining ? "md:hidden" : "sticky top-0"} z-40 border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl`}
         style={{ paddingTop: "var(--app-top-inset)" }}
       >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-600 font-black text-white shadow-sm">
-              {(teacher.full_name || "T").slice(0, 1).toUpperCase()}
+            <div className={`${isTraining ? "bg-[#12203D]" : "bg-blue-600"} flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-black text-white shadow-sm`}>
+              {isTraining ? "MSI" : teacherInitials(teacher.full_name)}
             </div>
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-black">{teacher.full_name || "Teacher"}</p>
+              <p className="truncate text-sm font-black">{isTraining ? "Teacher Cabinet" : teacher.full_name || "Teacher"}</p>
               <p className="truncate text-xs font-semibold text-slate-500">
-                {teacher.login}
-                {academy?.subject ? ` · ${academy.subject}` : teacher.assigned_group ? ` · ${teacher.assigned_group}` : ""}
+                {isTraining
+                  ? `${teacher.full_name || "Teacher"} · ${teacher.login}`
+                  : `${teacher.login}${teacher.assigned_group ? ` · ${teacher.assigned_group}` : ""}`}
               </p>
             </div>
             <span className={`hidden rounded-full border px-2.5 py-1 text-[10px] font-black uppercase sm:inline-flex ${isTraining ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
@@ -898,28 +1090,28 @@ export default function TeacherHome(props: TeacherPageProps) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl space-y-3 px-3 py-3 pb-[calc(var(--app-bottom-inset)+6.5rem)] sm:space-y-4 sm:px-6 sm:py-4 sm:pb-4">
-        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 sm:rounded-3xl sm:p-4">
+      <main className={`${isTraining ? "mx-auto w-full max-w-6xl space-y-3 px-3 py-3 pb-[calc(var(--app-bottom-inset)+6.5rem)] sm:space-y-4 sm:px-5 sm:py-5 md:pb-5 lg:px-7" : "mx-auto w-full max-w-7xl space-y-3 px-3 py-3 pb-[calc(var(--app-bottom-inset)+6.5rem)] sm:space-y-4 sm:px-6 sm:py-4 sm:pb-4"}`}>
+        <section className={`${isTraining ? "rounded-[1.125rem] border border-[#E4E7EC] bg-[#12203D] p-4 text-white shadow-sm sm:p-5" : "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-3xl sm:p-4"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-wide text-blue-600">Teacher Cabinet</p>
-              <h1 className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">
+              <p className={`${isTraining ? "text-white/60" : "text-blue-600"} text-[11px] font-black uppercase tracking-wide`}>Teacher Cabinet</p>
+              <h1 className={`${isTraining ? "text-white" : "text-slate-950"} mt-1 text-xl font-black sm:text-2xl`}>
                 {isTraining ? "Teacher Academy" : "Teaching Workspace"}
               </h1>
-              <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+              <p className={`${isTraining ? "text-white/62" : "text-slate-500"} mt-1 max-w-2xl text-sm font-medium`}>
                 {isTraining
                   ? `${academy?.subject_program_name || academy?.subject || "Curriculum"} training path`
                   : "Groups, student progress, lesson activity, and teacher growth in one place."}
               </p>
             </div>
             {isTraining ? (
-              <div className="min-w-[14rem] rounded-2xl bg-slate-50 p-3">
-                <div className="flex items-center justify-between text-xs font-black text-slate-600">
+              <div className="min-w-[14rem] rounded-2xl bg-white/10 p-3">
+                <div className="flex items-center justify-between text-xs font-black text-white/72">
                   <span>Academy progress</span>
                   <span>{assessedCount}/{targetLessons}</span>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-200">
-                  <div className="h-2 rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${academyProgressPercent}%` }} />
+                <div className="mt-2 h-2 rounded-full bg-white/12">
+                  <div className="h-2 rounded-full bg-[#2F5DE0] transition-all duration-500" style={{ width: `${academyProgressPercent}%` }} />
                 </div>
               </div>
             ) : null}
@@ -927,7 +1119,7 @@ export default function TeacherHome(props: TeacherPageProps) {
         </section>
 
         <nav
-          className={`${isTraining ? "hidden sm:flex" : "flex"} gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm`}
+          className={`${isTraining ? "hidden" : "flex"} gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-sm`}
           aria-label="Teacher cabinet"
         >
           {visibleTabs.map((tab) => {
@@ -1013,7 +1205,7 @@ export default function TeacherHome(props: TeacherPageProps) {
 
         {activeTab === "reports" ? (
           <section className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <ReportsTable reports={reports} />
+            {isTraining ? <AcademyLessonsScreen assignments={journey} reports={reports} /> : <ReportsTable reports={reports} />}
           </section>
         ) : null}
 
@@ -1153,6 +1345,7 @@ export default function TeacherHome(props: TeacherPageProps) {
           })}
         </div>
       </nav>
+      </div>
     </div>
   );
 }
