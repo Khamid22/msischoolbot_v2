@@ -30,19 +30,7 @@ def _signed_init_data(*, user_id=42, auth_date=1, bot_token=BOT_TOKEN):
     return urlencode(fields)
 
 
-def test_old_import_path_still_exports_public_helpers():
-    from backend.utils.telegram_auth import (
-        telegram_user_from_init_data,
-        telegram_user_id_from_init_data,
-        verify_telegram_init_data,
-    )
-
-    assert callable(verify_telegram_init_data)
-    assert callable(telegram_user_id_from_init_data)
-    assert callable(telegram_user_from_init_data)
-
-
-def test_new_import_path_exports_public_helpers():
+def test_import_path_exports_public_helpers():
     from backend.integrations.telegram.init_data import (
         telegram_user_from_init_data,
         telegram_user_id_from_init_data,
@@ -54,54 +42,47 @@ def test_new_import_path_exports_public_helpers():
     assert callable(telegram_user_from_init_data)
 
 
-def test_old_and_new_paths_share_same_public_functions():
-    import backend.integrations.telegram.init_data as new_path
-    import backend.utils.telegram_auth as old_path
-
-    assert old_path.__all__ == new_path.__all__
-    assert old_path.verify_telegram_init_data is new_path.verify_telegram_init_data
-    assert old_path.telegram_user_id_from_init_data is new_path.telegram_user_id_from_init_data
-    assert old_path.telegram_user_from_init_data is new_path.telegram_user_from_init_data
-
-
-def test_old_and_new_paths_verify_valid_init_data_the_same_way():
-    import backend.integrations.telegram.init_data as new_path
-    import backend.utils.telegram_auth as old_path
+def test_import_path_verifies_valid_init_data():
+    import backend.integrations.telegram.init_data as init_data_module
 
     init_data = _signed_init_data()
 
-    old_fields = old_path.verify_telegram_init_data(
-        init_data,
-        bot_token=BOT_TOKEN,
-        max_age_seconds=0,
-    )
-    new_fields = new_path.verify_telegram_init_data(
+    fields = init_data_module.verify_telegram_init_data(
         init_data,
         bot_token=BOT_TOKEN,
         max_age_seconds=0,
     )
 
-    assert old_fields == new_fields
-    assert old_path.telegram_user_id_from_init_data(
+    assert fields
+    assert init_data_module.telegram_user_id_from_init_data(
         init_data,
         bot_token=BOT_TOKEN,
         max_age_seconds=0,
     ) == 42
-    assert new_path.telegram_user_from_init_data(
+    assert init_data_module.telegram_user_from_init_data(
         init_data,
         bot_token=BOT_TOKEN,
         max_age_seconds=0,
     )["id"] == 42
 
 
-def test_invalid_init_data_returns_none_from_old_and_new_paths():
-    import backend.integrations.telegram.init_data as new_path
-    import backend.utils.telegram_auth as old_path
+def test_invalid_init_data_returns_none():
+    import backend.integrations.telegram.init_data as init_data_module
 
     invalid_init_data = "auth_date=1&user=%7B%7D&hash=bad"
 
-    assert old_path.verify_telegram_init_data(invalid_init_data, bot_token=BOT_TOKEN) is None
-    assert new_path.verify_telegram_init_data(invalid_init_data, bot_token=BOT_TOKEN) is None
-    assert old_path.telegram_user_id_from_init_data(invalid_init_data, bot_token=BOT_TOKEN) is None
-    assert new_path.telegram_user_from_init_data(invalid_init_data, bot_token=BOT_TOKEN) is None
-
+    assert init_data_module.verify_telegram_init_data(invalid_init_data, bot_token=BOT_TOKEN) is None
+    assert (
+        init_data_module.telegram_user_id_from_init_data(
+            invalid_init_data,
+            bot_token=BOT_TOKEN,
+        )
+        is None
+    )
+    assert (
+        init_data_module.telegram_user_from_init_data(
+            invalid_init_data,
+            bot_token=BOT_TOKEN,
+        )
+        is None
+    )

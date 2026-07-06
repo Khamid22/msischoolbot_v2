@@ -5,10 +5,14 @@ node_modules/
 frontend/node_modules/
 .claude/worktrees/
 backups/
+tmp/
+temp/
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.bak
+*.backup
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

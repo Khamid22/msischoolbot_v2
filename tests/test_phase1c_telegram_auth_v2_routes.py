@@ -50,52 +50,11 @@ def _auth_result(role, *, account_role=None, **session_overrides):
     }
 
 
-def test_flag_off_legacy_telegram_path_still_used(client, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
-
-    calls = {"legacy_teacher": 0, "auth_v2": 0}
-    monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9003))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: False)
-
-    def unexpected_auth_v2(telegram_user_id):
-        calls["auth_v2"] += 1
-        raise AssertionError("Auth V2 Telegram must not run when the flag is off")
-
-    def fake_get_teacher_by_telegram_user_id(telegram_user_id):
-        calls["legacy_teacher"] += 1
-        return {
-            "id": 10,
-            "staff_id": 2,
-            "login": "TCH001",
-            "full_name": "Teacher User",
-            "assigned_group": "IGCSE",
-        }
-
-    monkeypatch.setattr(identity_routes, "authenticate_account_telegram", unexpected_auth_v2)
-    monkeypatch.setattr(
-        identity_routes,
-        "get_teacher_by_telegram_user_id",
-        fake_get_teacher_by_telegram_user_id,
-    )
-
-    response = _post_telegram_auth(client)
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "ok": True,
-        "linked": True,
-        "role": "teacher",
-        "redirect": "/teacher",
-    }
-    assert calls == {"legacy_teacher": 1, "auth_v2": 0}
-
-
-def test_flag_on_uses_account_telegram_links_service(client, monkeypatch):
+def test_uses_account_telegram_links_service(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     calls = {}
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9002))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
 
     def fake_auth_v2(telegram_user_id):
@@ -120,11 +79,10 @@ def test_flag_on_uses_account_telegram_links_service(client, monkeypatch):
     assert calls == {"telegram_user_id": 9002}
 
 
-def test_flag_on_active_parent_telegram_link_returns_parent(client, monkeypatch):
+def test_active_parent_telegram_link_returns_parent(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9001))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,
@@ -149,7 +107,7 @@ def test_flag_on_active_parent_telegram_link_returns_parent(client, monkeypatch)
     }
 
 
-def test_flag_on_active_student_telegram_link_returns_dashboard_and_records_activity(
+def test_active_student_telegram_link_returns_dashboard_and_records_activity(
     client,
     monkeypatch,
 ):
@@ -157,7 +115,6 @@ def test_flag_on_active_student_telegram_link_returns_dashboard_and_records_acti
 
     activity_calls = []
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9002))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,
@@ -191,11 +148,10 @@ def test_flag_on_active_student_telegram_link_returns_dashboard_and_records_acti
     assert activity_calls == [1001]
 
 
-def test_flag_on_active_teacher_telegram_link_returns_teacher(client, monkeypatch):
+def test_active_teacher_telegram_link_returns_teacher(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9003))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,
@@ -222,11 +178,10 @@ def test_flag_on_active_teacher_telegram_link_returns_teacher(client, monkeypatc
     }
 
 
-def test_flag_on_system_admin_telegram_link_returns_admin_compatibility(client, monkeypatch):
+def test_system_admin_telegram_link_returns_admin_compatibility(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9004))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,
@@ -262,11 +217,10 @@ def test_flag_on_system_admin_telegram_link_returns_admin_compatibility(client, 
     assert session_payload["admin_id"] == 1
 
 
-def test_flag_on_missing_link_returns_legacy_safe_shape(client, monkeypatch):
+def test_missing_link_returns_safe_shape(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9999))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(identity_routes, "authenticate_account_telegram", lambda telegram_user_id: None)
 
@@ -284,7 +238,7 @@ def test_flag_on_missing_link_returns_legacy_safe_shape(client, monkeypatch):
         ("missing_profile", 9007),
     ],
 )
-def test_flag_on_rejected_account_link_returns_safe_shape(
+def test_rejected_account_link_returns_safe_shape(
     client,
     monkeypatch,
     case_name,
@@ -298,7 +252,6 @@ def test_flag_on_rejected_account_link_returns_safe_shape(
         "_telegram_auth_context",
         lambda init_data: _telegram_context(telegram_user_id),
     )
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(identity_routes, "authenticate_account_telegram", lambda telegram_user_id: None)
 
@@ -316,7 +269,6 @@ def test_parent_invite_start_param_still_runs_before_auth_v2(client, monkeypatch
         "_telegram_auth_context",
         lambda init_data: _telegram_context(9001, start_param="parent_INVITE"),
     )
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(
         identity_routes,
         "_link_parent_from_telegram_start_param",
@@ -348,7 +300,6 @@ def test_success_json_shape_does_not_expose_raw_auth_v2_objects(client, monkeypa
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9001))
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,

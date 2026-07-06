@@ -4,7 +4,7 @@ import os
 import threading
 import time
 
-from backend.utils.normalization import normalize_school_code
+from database.academics.canonical import normalize_school_code
 from backend.domains.academics.rating_service import (
     build_students_by_subject_group,
     load_dataset,
@@ -65,7 +65,7 @@ def _set_cached_student_panel_payload(cache_key, payload):
 
 
 def _normalize_student_school_code(value):
-    normalized = normalize_school_code(value)
+    normalized = normalize_school_code(value, default="")
     if normalized in {"school5", "sehriyo"}:
         return normalized
     return ""

@@ -1,2 +1,0 @@
-"""Owner role entry points."""
-

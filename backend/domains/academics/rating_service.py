@@ -15,7 +15,7 @@ import os
 import threading
 import time
 
-from backend.utils.normalization import (
+from database.academics.canonical import (
     normalize_text as _normalize,
     normalize_school_code as _normalize_school_code,
 )
@@ -636,7 +636,7 @@ def load_dashboard_payload(
     requested_school="",
     force_refresh=False,
 ):
-    normalized_requested_school = _normalize_school_code(requested_school)
+    normalized_requested_school = _normalize_school_code(requested_school, default="")
     from backend.domains.academics.internal_dashboard_service import get_enrollment_dashboard
     db_payload = get_enrollment_dashboard(
         student_id,

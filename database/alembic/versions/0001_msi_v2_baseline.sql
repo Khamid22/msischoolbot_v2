@@ -4,7 +4,7 @@
 -- It does not drop or alter the old public tables.
 --
 -- Apply locally with:
---   psql "$DATABASE_URL" -f scripts/rebuild_database_v2.sql
+--   python -m alembic upgrade head
 --
 -- Or through the app wrapper/import scripts before cutover.
 

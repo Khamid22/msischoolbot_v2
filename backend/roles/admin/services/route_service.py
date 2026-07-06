@@ -2,7 +2,7 @@
 
 from database import queries
 
-from backend.utils.normalization import (
+from database.academics.canonical import (
     normalize_school_code,
     normalize_text,
 )
@@ -19,7 +19,7 @@ def school_code_from_name(school_name):
 
 def group_belongs_to_school(group_name, school_code, load_dataset=None):
     normalized_group = str(group_name or "").strip()
-    normalized_school = normalize_school_code(school_code)
+    normalized_school = normalize_school_code(school_code, default="")
     if not normalized_group or not normalized_school or normalized_school == "all":
         return True
 

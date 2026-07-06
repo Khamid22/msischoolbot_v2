@@ -5,15 +5,15 @@ the entire schema; on the existing local/prod databases (already at this shape)
 it is idempotent (CREATE ... IF NOT EXISTS / ADD COLUMN IF NOT EXISTS) — or the
 database is simply stamped at this revision.
 
-Future schema changes are new migrations, not edits to rebuild_database_v2.sql.
+Future schema changes are new migrations, not edits to the baseline SQL
+snapshot beside this migration.
 
 Revision ID: 0001_msi_v2_baseline
 Revises:
 Create Date: 2026-07-01
 """
-from pathlib import Path
-
 from alembic import op
+from pathlib import Path
 
 # revision identifiers, used by Alembic.
 revision = "0001_msi_v2_baseline"
@@ -21,7 +21,7 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-_SCHEMA_SQL = Path(__file__).resolve().parents[2] / "rebuild_database_v2.sql"
+_SCHEMA_SQL = Path(__file__).with_suffix(".sql")
 
 
 def _schema_sql() -> str:

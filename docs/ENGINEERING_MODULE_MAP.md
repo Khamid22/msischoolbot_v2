@@ -37,7 +37,6 @@ tgbot/
   helpers.py
 
 scripts/
-  sync_gradebooks_from_excel.py
 ```
 
 ## Current Backend Modules

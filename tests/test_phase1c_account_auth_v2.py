@@ -189,10 +189,8 @@ def _authenticate(login, password="correct-password"):
     return auth_v2.authenticate_account_password(login, password, conn=_FakeConn())
 
 
-def test_feature_flag_defaults_off(monkeypatch):
-    monkeypatch.delenv("ACCOUNT_AUTH_V2_ENABLED", raising=False)
-
-    assert auth_v2.account_auth_v2_enabled() is False
+def test_account_auth_is_unconditional():
+    assert "account_auth_v2_enabled" not in auth_v2.__all__
 
 
 def test_active_student_authenticates():

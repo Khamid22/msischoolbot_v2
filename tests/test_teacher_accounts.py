@@ -1,4 +1,3 @@
-from backend.identity.credentials import detect_login_role
 from backend.identity.teachers import subject_teacher_login_prefix
 
 
@@ -6,13 +5,6 @@ def test_subject_teacher_login_prefix_examples():
     assert subject_teacher_login_prefix("IGCSE Mathematics A") == "math"
     assert subject_teacher_login_prefix("English as a Second Language") == "eng"
     assert subject_teacher_login_prefix("Biology") == "bio"
-
-
-def test_detect_login_role_accepts_subject_teacher_logins():
-    assert detect_login_role("matht123") == "teacher"
-    assert detect_login_role("engt001") == "teacher"
-    assert detect_login_role("biot12") == "teacher"
-    assert detect_login_role("TCH001") == "teacher"
 
 
 def test_teacher_workspace_includes_academy_payload(monkeypatch):

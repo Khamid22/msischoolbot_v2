@@ -1,18 +1,17 @@
-"""Shared-account password auth helpers for Phase 1C.
+"""Shared-account password auth helpers.
 
 This module reads the Phase 1 ``msi_v2.accounts`` tables and builds
-legacy-compatible session payloads for feature-flagged Auth V2 password login.
+route-compatible session payloads for account/profile password login.
 """
 
 from __future__ import annotations
 
 from typing import Any, Callable
 
-from backend.core.config import account_auth_v2_enabled
 from backend.core.security import verify_password_hash
 from backend.identity.common import connect
 from backend.identity.roles import normalize_role
-from backend.utils.normalization import normalize_school_code
+from database.academics.canonical import normalize_school_code
 
 
 PASSWORD_LOGIN_ALLOWED_STATUS = "active"
@@ -434,7 +433,6 @@ def authenticate_account_password(
 
 
 __all__ = [
-    "account_auth_v2_enabled",
     "authenticate_account_password",
     "build_legacy_session_payload",
     "get_account_by_login",

@@ -5,28 +5,19 @@ from fastapi import Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from backend.render import render_admin_redirect
-from backend.utils.telegram_auth import telegram_user_id_from_init_data, verify_telegram_init_data
+from backend.integrations.telegram.init_data import (
+    verify_telegram_init_data,
+)
 from backend.identity.parent_invites import load_parent_invite_code_payload
 from backend.identity.account_service import (
-    detect_login_role,
-    get_admin_by_telegram_user_id,
-    get_student_by_telegram_user_id,
     get_teacher_by_id,
-    get_teacher_by_telegram_user_id,
-    link_student_telegram_user,
     record_student_activity,
-    verify_admin_credentials,
-    verify_student_credentials,
-    verify_teacher_credentials,
 )
-from backend.identity.account_auth_v2 import (
-    account_auth_v2_enabled,
-    authenticate_account_password,
-)
+from backend.identity.account_auth_v2 import authenticate_account_password
 from backend.identity.account_telegram_auth_v2 import authenticate_account_telegram
 from backend.identity.roles import dashboard_path_for_role
 from backend.utils.guards import unauthorized_response
-from backend.roles.parent.services import link_parent_via_invite, parent_from_telegram_user_id
+from backend.roles.parent.services import link_parent_via_invite
 from backend.utils.session import (
     build_dashboard_url,
     current_admin_role,
@@ -36,8 +27,6 @@ from backend.utils.session import (
     logout_portal_session,
     set_admin_session,
     set_parent_session,
-    set_student_session,
-    set_teacher_session,
     url_for,
 )
 from backend.utils.context import request as request_proxy, session
@@ -366,80 +355,22 @@ def register_user_auth_routes(
                 "redirect": dashboard_path_for_role("parent"),
             })
 
-        if account_auth_v2_enabled():
-            auth_result = authenticate_account_telegram(telegram_user_id)
-            if not auth_result:
-                return jsonify({"ok": True, "linked": False})
-            if not set_account_auth_v2_session(auth_result):
-                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-
-            record_account_auth_v2_student_activity(auth_result)
-            redirect_url = account_auth_v2_redirect_url(auth_result)
-            response_role = account_auth_v2_response_role(auth_result)
-            return jsonify({
-                "ok": True,
-                "linked": True,
-                "role": response_role or current_auth_role(),
-                "redirect": redirect_url or dashboard_url_for_current_session() or url_for("student.home"),
-            })
-
-        teacher = get_teacher_by_telegram_user_id(telegram_user_id)
-        if teacher:
-            if not set_teacher_session(teacher):
-                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-            return jsonify({
-                "ok": True,
-                "linked": True,
-                "role": "teacher",
-                "redirect": dashboard_path_for_role("teacher"),
-            })
-
-        staff_user = get_admin_by_telegram_user_id(telegram_user_id)
-        if staff_user:
-            if not set_admin_session(staff_user):
-                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-            role = current_auth_role()
-            return jsonify({
-                "ok": True,
-                "linked": True,
-                "role": role,
-                "redirect": dashboard_path_for_role(role),
-            })
-
-        parent = parent_from_telegram_user_id(telegram_user_id)
-        if parent:
-            if not set_parent_session(parent, telegram_user_id):
-                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-            return jsonify({
-                "ok": True,
-                "linked": True,
-                "role": "parent",
-                "redirect": dashboard_path_for_role("parent"),
-            })
-
-        student = get_student_by_telegram_user_id(telegram_user_id)
-        if not student:
+        auth_result = authenticate_account_telegram(telegram_user_id)
+        if not auth_result:
             # Signature is valid but this Telegram account is not linked yet.
             return jsonify({"ok": True, "linked": False})
 
-        if not set_student_session(student, telegram_user_id):
+        if not set_account_auth_v2_session(auth_result):
             return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
 
-        # Record the login immediately so "last seen" reflects this session even
-        # if a later heartbeat ping is missed.
-        record_student_activity(int(student["id"]))
-
-        enrollment_id = student.get("enrollment_id")
-        redirect_url = (
-            build_dashboard_url(enrollment_id, school=student.get("school_code", ""))
-            if enrollment_id
-            else url_for("student.home")
-        )
+        record_account_auth_v2_student_activity(auth_result)
+        redirect_url = account_auth_v2_redirect_url(auth_result)
+        response_role = account_auth_v2_response_role(auth_result)
         return jsonify({
             "ok": True,
             "linked": True,
-            "role": "student",
-            "redirect": redirect_url,
+            "role": response_role or current_auth_role(),
+            "redirect": redirect_url or dashboard_url_for_current_session() or url_for("student.home"),
         })
 
     @students.post("/login")
@@ -447,7 +378,6 @@ def register_user_auth_routes(
     def login(request: Request):
         login_value = str(request_proxy.form.get("login", "")).strip()
         password_value = str(request_proxy.form.get("password", ""))
-        init_data_value = str(request_proxy.form.get("init_data", ""))
         csrf_token_value = str(request_proxy.form.get("csrf_token", ""))
 
         # Validate CSRF manually
@@ -464,103 +394,20 @@ def register_user_auth_routes(
                 auth_login_input=login_value,
             ), 400)
 
-        if account_auth_v2_enabled():
-            auth_result = authenticate_account_password(login_value, password_value)
-            if not auth_result:
-                return with_status(render_login_page(
-                    auth_error="Invalid login or password.",
-                    auth_login_input=login_value,
-                ), 401)
-            if not set_account_auth_v2_session(auth_result):
-                return with_status(render_login_page(
-                    auth_error="Unable to initialize account session.",
-                    auth_login_input=login_value,
-                ), 500)
-            record_account_auth_v2_student_activity(auth_result)
-            redirect_url = account_auth_v2_redirect_url(auth_result)
-            return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
-
-        role_hint = detect_login_role(login_value)
-
-        if role_hint == "admin":
-            admin = verify_admin_credentials(login_value, password_value)
-            if not admin:
-                return with_status(render_login_page(
-                    auth_error="Invalid admin credentials.",
-                    auth_login_input=login_value,
-                ), 401)
-
-            if not set_admin_session(admin):
-                return with_status(render_login_page(
-                    auth_error="Unable to initialize account session.",
-                    auth_login_input=login_value,
-                ), 500)
-            return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("admin"))
-
-        if role_hint == "student":
-            student = verify_student_credentials(login_value, password_value)
-            if not student:
-                return with_status(render_login_page(
-                    auth_error="Invalid student credentials.",
-                    auth_login_input=login_value,
-                ), 401)
-
-            # Link the Telegram account only from a verified initData signature, never
-            # from a client-supplied raw id (which could be forged to hijack a login).
-            telegram_user_id = telegram_user_id_from_init_data(init_data_value)
-            if telegram_user_id is not None:
-                linked = link_student_telegram_user(
-                    int(student["id"]),
-                    telegram_user_id,
-                )
-                if not linked:
-                    return with_status(render_login_page(
-                        auth_error="Unable to link Telegram account. Please try again from Telegram.",
-                        auth_login_input=login_value,
-                    ), 500)
-
-            if not set_student_session(student, telegram_user_id):
-                return with_status(render_login_page(
-                    auth_error="Unable to initialize student session.",
-                    auth_login_input=login_value,
-                ), 500)
-            # Record the login immediately so "last seen" reflects this session
-            # even if a later heartbeat ping is missed.
-            record_student_activity(int(student["id"]))
-            enrollment_id = student.get("enrollment_id")
-            if enrollment_id:
-                return redirect(build_dashboard_url(enrollment_id, school=student.get("school_code", "")))
-            return redirect(url_for("student.home"))
-
-        if role_hint == "teacher":
-            teacher = verify_teacher_credentials(login_value, password_value)
-            if not teacher:
-                return with_status(render_login_page(
-                    auth_error="Invalid teacher credentials.",
-                    auth_login_input=login_value,
-                ), 401)
-
-            if not set_teacher_session(teacher):
-                return with_status(render_login_page(
-                    auth_error="Unable to initialize teacher session.",
-                    auth_login_input=login_value,
-                ), 500)
-            return redirect(dashboard_path_for_role("teacher"))
-
-        # No role prefix matched — try parent credentials (free-form logins).
-        admin = verify_admin_credentials(login_value, password_value)
-        if admin and str(admin.get("role", "")).strip().lower() == "parent":
-            if not set_admin_session(admin):
-                return with_status(render_login_page(
-                    auth_error="Unable to initialize parent session.",
-                    auth_login_input=login_value,
-                ), 500)
-            return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("parent"))
-
-        return with_status(render_login_page(
-            auth_error="Invalid login or password.",
-            auth_login_input=login_value,
-        ), 401)
+        auth_result = authenticate_account_password(login_value, password_value)
+        if not auth_result:
+            return with_status(render_login_page(
+                auth_error="Invalid login or password.",
+                auth_login_input=login_value,
+            ), 401)
+        if not set_account_auth_v2_session(auth_result):
+            return with_status(render_login_page(
+                auth_error="Unable to initialize account session.",
+                auth_login_input=login_value,
+            ), 500)
+        record_account_auth_v2_student_activity(auth_result)
+        redirect_url = account_auth_v2_redirect_url(auth_result)
+        return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
 
     @students.post("/logout")
     def logout():

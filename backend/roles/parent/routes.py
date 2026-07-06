@@ -21,7 +21,7 @@ from backend.roles.parent.services import (
     resolve_parent_child_dashboard,
 )
 from backend.roles.parent.workspace_cards import build_parent_workspace_cards
-from backend.utils.telegram_auth import telegram_user_from_init_data
+from backend.integrations.telegram.init_data import telegram_user_from_init_data
 from backend.utils.session import set_parent_session, url_for
 from backend.identity.parent_invites import get_parent_invite_token, load_parent_invite_payload
 

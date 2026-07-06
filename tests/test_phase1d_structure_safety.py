@@ -112,55 +112,15 @@ def test_critical_routes_remain_registered(app, method, path):
     assert method in routes[path]
 
 
-def test_account_auth_v2_flag_off_keeps_legacy_login_path_available(app, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
-
-    client = _rate_limit_isolated_client(app, "legacy-login")
-    calls = {"legacy": 0, "auth_v2": 0}
-    _set_csrf_session(client)
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: False)
-
-    def unexpected_auth_v2(login, password):
-        calls["auth_v2"] += 1
-        raise AssertionError("Auth V2 must not run when ACCOUNT_AUTH_V2_ENABLED=0")
-
-    def fake_legacy_student(login, password):
-        calls["legacy"] += 1
-        return {
-            "id": 1001,
-            "full_name": "Example Student",
-            "student_id": "MSI00001",
-            "subjects": "",
-            "school_code": "sehriyo",
-            "telegram_user_id": None,
-            "enrollment_id": 321,
-        }
-
-    monkeypatch.setattr(identity_routes, "authenticate_account_password", unexpected_auth_v2)
-    monkeypatch.setattr(identity_routes, "verify_student_credentials", fake_legacy_student)
-    monkeypatch.setattr(identity_routes, "record_student_activity", lambda student_id: None)
-
-    response = _post_login(client)
-
-    assert response.status_code == 302
-    assert response.headers["location"] == "/dashboard/321?school=sehriyo"
-    assert calls == {"legacy": 1, "auth_v2": 0}
-
-
-def test_account_auth_v2_flag_on_keeps_account_login_path_available(app, monkeypatch):
+def test_account_login_path_is_always_available(app, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     client = _rate_limit_isolated_client(app, "account-login")
-    calls = {"legacy": 0, "auth_v2": 0}
+    calls = {"auth": 0}
     _set_csrf_session(client)
-    monkeypatch.setattr(identity_routes, "account_auth_v2_enabled", lambda: True)
-
-    def unexpected_legacy(login, password):
-        calls["legacy"] += 1
-        raise AssertionError("Legacy auth must not run when ACCOUNT_AUTH_V2_ENABLED=1")
 
     def fake_auth_v2(login, password):
-        calls["auth_v2"] += 1
+        calls["auth"] += 1
         return _auth_v2_result(
             "student",
             auth_login="MSI00001",
@@ -172,14 +132,13 @@ def test_account_auth_v2_flag_on_keeps_account_login_path_available(app, monkeyp
         )
 
     monkeypatch.setattr(identity_routes, "authenticate_account_password", fake_auth_v2)
-    monkeypatch.setattr(identity_routes, "verify_student_credentials", unexpected_legacy)
     monkeypatch.setattr(identity_routes, "record_student_activity", lambda student_id: None)
 
     response = _post_login(client)
 
     assert response.status_code == 302
     assert response.headers["location"] == "/dashboard/321?school=sehriyo"
-    assert calls == {"legacy": 0, "auth_v2": 1}
+    assert calls == {"auth": 1}
 
 
 @pytest.mark.parametrize(

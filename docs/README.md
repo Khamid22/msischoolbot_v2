@@ -40,10 +40,9 @@ Start here for senior engineer review:
 6. [Engineering Route Map](./ENGINEERING_ROUTE_MAP.md)
 7. [Engineering Telegram Flow](./ENGINEERING_TELEGRAM_FLOW.md)
 8. [Engineering Payment Access Policy](./ENGINEERING_PAYMENT_ACCESS_POLICY.md)
-9. [Engineering Migration Plan](./ENGINEERING_MIGRATION_PLAN.md)
-10. [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
-11. [Engineering Testing](./ENGINEERING_TESTING.md)
-12. [Engineering Technical Debt](./ENGINEERING_TECHNICAL_DEBT.md)
+9. [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
+10. [Engineering Testing](./ENGINEERING_TESTING.md)
+11. [Engineering Technical Debt](./ENGINEERING_TECHNICAL_DEBT.md)
 
 ### Existing Architecture Notes
 
@@ -53,7 +52,6 @@ These planning files contain earlier detailed architecture notes:
 - [MSI LMS Modules](./MSI_LMS_MODULES.md)
 - [MSI LMS Target Schema](./MSI_LMS_TARGET_SCHEMA.md)
 - [MSI LMS Auth And Roles](./MSI_LMS_AUTH_AND_ROLES.md)
-- [MSI LMS Migration Plan](./MSI_LMS_MIGRATION_PLAN.md)
 - [MSI LMS Payment Access Policy](./MSI_LMS_PAYMENT_ACCESS_POLICY.md)
 - [MSI LMS Telegram Parent Linking](./MSI_LMS_TELEGRAM_PARENT_LINKING.md)
 

@@ -380,4 +380,3 @@ route function -> raw SQL for complex business workflows
 | `backend/domains/academics/*` | Academic Structure, Delivery, Assessment |
 | `backend/domains/payments/service.py` | Operations / Payments |
 | `tgbot/handlers/start.py` | Telegram integration adapter |
-| `scripts/sync_gradebooks_from_excel.py` | Excel import integration |

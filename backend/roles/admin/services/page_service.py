@@ -12,7 +12,7 @@ from backend.identity.account_service import (
 from .teacher_candidate_service import list_teacher_candidates
 from .teacher_academy_service import list_academy_teachers
 from backend.domains.complaints.service import list_complaints
-from backend.utils.normalization import normalize_text
+from database.academics.canonical import normalize_text
 from .parent_service import list_parent_accounts, list_parent_children
 from database.academics.performance_summary import (
     list_subject_summaries,

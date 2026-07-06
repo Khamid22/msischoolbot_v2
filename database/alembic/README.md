@@ -1,8 +1,8 @@
 # Database migrations (Alembic)
 
-The `msi_v2` schema is owned by Alembic. `scripts/rebuild_database_v2.sql` is the
-frozen **baseline snapshot** (migration `0001_msi_v2_baseline`); do **not** edit it
-for new changes — add a migration instead.
+The `msi_v2` schema is owned by Alembic. `versions/0001_msi_v2_baseline.sql` is
+the frozen **baseline snapshot** for migration `0001_msi_v2_baseline`; do **not**
+edit it for new changes — add a migration instead.
 
 The DB URL is read from `DATABASE_URL` (`.env` locally, injected on Railway) by
 `alembic/env.py`. Migrations are plain SQL via `op.execute(...)` (this project

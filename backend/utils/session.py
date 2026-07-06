@@ -2,7 +2,7 @@
 
 from backend.identity.roles import dashboard_path_for_role, is_valid_role, normalize_role
 from backend.utils.context import session
-from backend.utils.normalization import normalize_school_code
+from database.academics.canonical import normalize_school_code
 
 
 def current_auth_role():
@@ -97,7 +97,7 @@ def current_student_full_name():
 def current_student_school_code():
     if current_auth_role() != "student":
         return ""
-    return normalize_school_code(session.get("student_school_code", ""))
+    return normalize_school_code(session.get("student_school_code", ""), default="")
 
 
 def parse_telegram_user_id(raw_value):
@@ -189,7 +189,7 @@ def set_student_session(student, telegram_user_id=None):
     if enrollment_id is not None:
         session["student_enrollment_id"] = enrollment_id
     session["student_full_name"] = str(student.get("full_name", "")).strip()
-    student_school_code = normalize_school_code(student.get("school_code", ""))
+    student_school_code = normalize_school_code(student.get("school_code", ""), default="")
     if student_school_code:
         session["student_school_code"] = student_school_code
     parsed_telegram_user_id = parse_telegram_user_id(telegram_user_id)
@@ -266,7 +266,7 @@ def try_auto_login_student_by_telegram(telegram_user_id, fetch_student_by_telegr
 def build_dashboard_url(enrollment_id, subject="", group="", **extra_params):
     normalized_subject = str(subject or "").strip()
     normalized_group = str(group or "").strip()
-    normalized_school = normalize_school_code(extra_params.pop("school", ""))
+    normalized_school = normalize_school_code(extra_params.pop("school", ""), default="")
     if not normalized_school:
         normalized_school = current_student_school_code()
 

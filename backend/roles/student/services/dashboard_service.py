@@ -19,7 +19,7 @@ from backend.domains.academics.rating_service import (
     load_dataset,
     round_grade_half_up,
 )
-from backend.utils.normalization import normalize_text
+from database.academics.canonical import normalize_text
 from backend.utils.session import current_auth_role, current_student_db_id
 
 

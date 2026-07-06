@@ -191,7 +191,6 @@ The folder move is not required before all decisions are approved. Ownership can
 | `backend/domains/complaints` | Communication and Support |
 | `backend/identity` | Identity and Access domain |
 | `database/queries` | Repository layer |
-| `scripts/sync_gradebooks_from_excel.py` | Excel import integration |
 | `tgbot` parent linking | Telegram integration + Parent Linking domain |
 
 ## Target Architecture Rule
