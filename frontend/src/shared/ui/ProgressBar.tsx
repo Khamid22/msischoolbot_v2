@@ -6,9 +6,17 @@ interface ProgressBarProps {
   /** Render a compact "3/12" fraction next to the bar. */
   showFraction?: boolean;
   className?: string;
+  fillClassName?: string;
 }
 
-export function ProgressBar({ value, max = 100, label, showFraction = false, className = "" }: ProgressBarProps) {
+export function ProgressBar({
+  value,
+  max = 100,
+  label,
+  showFraction = false,
+  className = "",
+  fillClassName = "bg-progress-accent",
+}: ProgressBarProps) {
   const safeMax = max > 0 ? max : 100;
   const clamped = Math.min(safeMax, Math.max(0, value));
   const pct = (clamped / safeMax) * 100;
@@ -23,7 +31,7 @@ export function ProgressBar({ value, max = 100, label, showFraction = false, cla
       className={`h-2 w-full overflow-hidden rounded-full bg-muted ${showFraction ? "" : className}`}
     >
       <div
-        className="bg-progress-accent h-full rounded-full transition-all duration-300 ease-out motion-reduce:transition-none"
+        className={`${fillClassName} h-full rounded-full transition-all duration-300 ease-out motion-reduce:transition-none`}
         style={{ width: `${pct}%` }}
       />
     </div>

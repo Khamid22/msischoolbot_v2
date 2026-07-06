@@ -7,7 +7,7 @@ from backend.utils.context import session
 from backend.utils.session import url_for
 
 from database.academics import canonical
-from backend.identity.account_service import (
+from backend.domains.students.service import (
     get_dashboard_student_profile,
     get_student_db_id_by_enrollment_id,
 )
@@ -163,7 +163,7 @@ def build_subject_switch_options(
     # runtime, collapsing the switcher to a single subject). Dataset matching
     # below remains a fallback when the DB source is unavailable.
     try:
-        from backend.domains.academics.internal_dashboard_service import (
+        from backend.domains.students.service import (
             get_student_subject_enrollments,
         )
 

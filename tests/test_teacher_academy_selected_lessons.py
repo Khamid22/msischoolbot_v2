@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import backend.roles.admin.services.teacher_academy_service as academy_service
+import backend.domains.teacher_academy.service as academy_service
 
 
 class _Rows:

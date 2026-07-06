@@ -6,15 +6,14 @@ from backend.utils.context import current_app, request, session
 from backend.utils.session import url_for
 from werkzeug.utils import secure_filename
 
-from backend.identity.account_service import (
+from backend.domains.students.service import (
     admin_change_student_password,
-    assign_teacher_to_group,
     get_admin_student_profile,
     list_students_for_admin,
-    list_teachers,
     update_student_admin_profile,
 )
-from backend.identity.parent_invites import create_parent_invite_code, create_parent_invite_token
+from backend.domains.teachers.service import assign_teacher_to_group, list_teachers
+from backend.domains.parents.service import create_parent_invite_code, create_parent_invite_token
 from backend.roles.admin.routes.request_payload import request_payload
 from backend.roles.admin.services.academic_service import (
     create_student_with_enrollment_from_payload,

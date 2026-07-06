@@ -27,7 +27,6 @@ export const routes = {
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/edit`,
   adminTeacherCandidateEventDelete: (candidateId: number | string, eventId: number | string) =>
     `/admin/teacher-candidates/${candidateId}/events/${eventId}/delete`,
-  adminTeacherAcademyCreate: "/admin/teacher-academy",
   academicDirectorOverview: "/academic-director",
   academicDirectorTeacherAcademy: "/academic-director/teacher-academy",
   academicDirectorHeadOfDepartments: "/academic-director/head-of-departments",
@@ -45,6 +44,8 @@ export const routes = {
     `/academic-director/api/teacher-academy/${academyTeacherId}/status`,
   academicDirectorTeacherAcademyPromote: (academyTeacherId: number | string) =>
     `/academic-director/api/teacher-academy/${academyTeacherId}/promote`,
+  academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
+    `/academic-director/api/teacher-academy/${academyTeacherId}/delete`,
   headOfDepartmentOverview: "/head-of-department",
   headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy",
   headOfDepartmentTimetable: "/head-of-department/timetable",
@@ -57,14 +58,6 @@ export const routes = {
     `/head-of-department/api/teacher-academy/${academyTeacherId}/assessments`,
   headOfDepartmentTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
     `/head-of-department/api/teacher-academy/${academyTeacherId}/status`,
-  adminTeacherAcademyAssignment: (assignmentId: number | string) =>
-    `/admin/teacher-academy/assignments/${assignmentId}`,
-  adminTeacherAcademyAssessment: (academyTeacherId: number | string) =>
-    `/admin/teacher-academy/${academyTeacherId}/assessments`,
-  adminTeacherAcademyStatus: (academyTeacherId: number | string) =>
-    `/admin/teacher-academy/${academyTeacherId}/status`,
-  adminTeacherAcademyPromote: (academyTeacherId: number | string) =>
-    `/admin/teacher-academy/${academyTeacherId}/promote`,
   adminResourceTypeAdd: "/admin/resources/types/add",
   adminResourceTypeDelete: (typeId: number | string) => `/admin/resources/types/${typeId}/delete`,
   adminResourceTypeRename: (typeId: number | string) => `/admin/resources/types/${typeId}/rename`,

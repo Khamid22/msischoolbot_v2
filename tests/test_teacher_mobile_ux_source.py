@@ -48,16 +48,23 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     assert "MobileCardList" in source
     assert 'className="p-3"' in source
     assert "ResponsiveTable" in source
-    assert 'className="max-h-[calc(100dvh-20rem)]"' in source
+    assert 'className="max-h-[calc(100dvh-20rem)] 2xl:max-h-[48rem]"' in source
     assert "lg:hidden" in mobile_list
     assert "hidden lg:block" in responsive_table
     assert "No academy lessons assigned." in source
     assert "TeacherAcademyPanel" in source
-    assert 'const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";' in source
+    assert 'const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";' in source
+    assert "canScheduleAcademyLesson" in source
+    assert "canAssessAcademyLesson" in source
     assert "Academy status distribution" in source
     assert "Average score by subject" in source
     assert "Completion rate by subject" in source
     assert "Recent assessment trend" in source
+    assert "subjectProgressFillClass" in source
+    assert "from-blue-900 via-blue-700 to-indigo-500" in source
+    assert "from-emerald-600 via-teal-500 to-cyan-500" in source
+    assert "2xl:grid-cols-4" in source
+    assert "2xl:max-h-[48rem]" in source
 
 
 def test_teacher_academy_actions_use_schedule_not_assign():
@@ -80,6 +87,11 @@ def test_teacher_academy_actions_use_schedule_not_assign():
     assert "secondaryActions" in source
     assert "rowActions" in source
     assert "ActionMenu" in source
+    assert "ConfirmDialog" in source
+    assert "Delete teacher" in source
+    assert "routes.academicDirectorTeacherAcademyDelete" in source
+    assert "canDeleteAcademyTeacher" in source
+    assert "routes.adminTeacherAcademy" not in source
 
 
 def test_phase3_shared_responsive_components_exist_and_are_used():
@@ -166,6 +178,17 @@ def test_teacher_mobile_bottom_nav_contract():
     assert 'bottomNavActiveKey(activeTab, cabinetMode)' in source
     assert "function CabinetSidebar" in source
     assert "Teacher cabinet desktop navigation" in source
+
+
+def test_teacher_cabinet_has_no_admin_preview_mode_source():
+    source = _read("roles/teacher/pages/TeacherHome.tsx")
+
+    assert "previewRole" not in source
+    assert "devPreviewEnabled" not in source
+    assert "ADMIN_PREVIEW_ROLES" not in source
+    assert "devPreviewRole" not in source
+    assert "msi_admin_mode" not in source
+    assert "Student mode" not in source
 
 
 def test_teacher_mobile_tables_and_cards_are_compact():

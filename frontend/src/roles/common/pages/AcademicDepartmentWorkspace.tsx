@@ -25,7 +25,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type WorkspaceKind = "timetable" | "announcements";
 type Row = Record<string, unknown>;
-type EventKind = "session" | "schedule";
+type EventKind = "session" | "schedule" | "academy";
 type TimetableRange = "today" | "week";
 
 type TimetableItem = {
@@ -43,6 +43,7 @@ interface AcademicDepartmentWorkspaceProps {
   workspace?: WorkspaceKind;
   adminAcademicSchedules?: Row[];
   adminAcademicSessions?: Row[];
+  adminAcademyLessonEvents?: Row[];
   adminAnnouncements?: Row[];
   warning?: string;
 }
@@ -67,10 +68,6 @@ function uniqueOptions(rows: Row[], keys: string[]) {
     }
   });
   return [...values].sort((a, b) => a.localeCompare(b));
-}
-
-function uniqueCount(rows: Row[], keys: string[]) {
-  return uniqueOptions(rows, keys).length;
 }
 
 function statusTone(value: unknown): "neutral" | "success" | "warning" | "danger" | "info" {
@@ -136,7 +133,7 @@ function displayDateFromKey(key: string, fallback = "Date not set") {
 }
 
 function timetableDateKey(item: TimetableItem) {
-  return parseDateKey(item.row.session_date) || parseDateKey(item.row.start_date);
+  return parseDateKey(item.row.session_date) || parseDateKey(item.row.start_date) || parseDateKey(item.row.session_datetime);
 }
 
 function timetableTitle(item: TimetableItem) {
@@ -148,11 +145,14 @@ function timetableTitle(item: TimetableItem) {
 }
 
 function timetableStatus(item: TimetableItem) {
-  return asText(item.row.status) || (item.kind === "session" ? "scheduled" : "active");
+  return asText(item.row.status) || (item.kind === "schedule" ? "active" : "scheduled");
 }
 
 function timetableTime(row: Row) {
-  return [asText(row.start_time), asText(row.end_time)].filter(Boolean).join(" - ") || asText(row.weekdays) || "Time not set";
+  const explicit = [asText(row.start_time), asText(row.end_time)].filter(Boolean).join(" - ");
+  if (explicit) return explicit;
+  const sessionTime = asText(row.session_datetime).replace(" ", "T").split("T", 2)[1]?.slice(0, 5) || "";
+  return sessionTime || asText(row.weekdays) || "Time not set";
 }
 
 function timetableLocation(row: Row) {
@@ -214,6 +214,12 @@ function TimetableEventCard({ item }: { item: TimetableItem }) {
           <MapPin className="h-4 w-4 shrink-0 text-primary" />
           <span className="truncate font-bold text-foreground">{timetableLocation(row)}</span>
         </div>
+        {asText(row.evaluator_name) ? (
+          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate font-bold text-foreground">Evaluator: {asText(row.evaluator_name)}</span>
+          </div>
+        ) : null}
       </dl>
     </article>
   );
@@ -247,10 +253,12 @@ function FilterSelect({
 function TimetableContent({
   schedules,
   sessions,
+  academyLessons,
   isHod,
 }: {
   schedules: Row[];
   sessions: Row[];
+  academyLessons: Row[];
   isHod: boolean;
 }) {
   const [range, setRange] = useState<TimetableRange>("week");
@@ -262,8 +270,9 @@ function TimetableContent({
     () => [
       ...sessions.map((row, index) => ({ row, kind: "session" as const, kindLabel: "Session", index })),
       ...schedules.map((row, index) => ({ row, kind: "schedule" as const, kindLabel: "Schedule", index })),
+      ...academyLessons.map((row, index) => ({ row, kind: "academy" as const, kindLabel: "Academy lesson", index })),
     ],
-    [schedules, sessions],
+    [academyLessons, schedules, sessions],
   );
   const sourceRows = items.map((item) => item.row);
   const subjectOptions = uniqueOptions(sourceRows, ["subject_name"]);
@@ -296,7 +305,7 @@ function TimetableContent({
         <MetricCard label="Today" value={todayCount} detail="dated events" tone="success" />
         <MetricCard label="Sessions" value={sessions.length} detail="scheduled lessons" tone="info" />
         <MetricCard label="Schedules" value={schedules.length} detail="recurring rules" />
-        <MetricCard label="Subjects" value={uniqueCount(sourceRows, ["subject_id", "subject_name"])} detail="visible scopes" />
+        <MetricCard label="Academy" value={academyLessons.length} detail="scheduled academy lessons" />
       </MetricGrid>
 
       <section className="rounded-2xl border border-border bg-surface p-4 shadow-card">
@@ -343,6 +352,7 @@ function TimetableContent({
                 <option value="all">All events</option>
                 <option value="session">Sessions</option>
                 <option value="schedule">Schedules</option>
+                <option value="academy">Academy lessons</option>
               </FilterSelect>
             </div>
           </div>
@@ -414,6 +424,9 @@ function TimetableContent({
                       </td>
                       <td className="max-w-[14rem] px-4 py-3">
                         <p className="truncate font-semibold text-muted-foreground">{asText(row.teacher_name) || "Not assigned"}</p>
+                        {asText(row.evaluator_name) ? (
+                          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">Evaluator: {asText(row.evaluator_name)}</p>
+                        ) : null}
                       </td>
                       <td className="max-w-[14rem] px-4 py-3">
                         <p className="truncate font-semibold text-muted-foreground">{timetableLocation(row)}</p>
@@ -528,6 +541,7 @@ export default function AcademicDepartmentWorkspace({
   workspace = "timetable",
   adminAcademicSchedules = [],
   adminAcademicSessions = [],
+  adminAcademyLessonEvents = [],
   adminAnnouncements = [],
   warning = "",
 }: AcademicDepartmentWorkspaceProps) {
@@ -546,6 +560,7 @@ export default function AcademicDepartmentWorkspace({
       : "Scheduled sessions and recurring timetable rules across Academic Department.";
   const schedules = rowsFrom(adminAcademicSchedules);
   const sessions = rowsFrom(adminAcademicSessions);
+  const academyLessons = rowsFrom(adminAcademyLessonEvents);
   const announcements = rowsFrom(adminAnnouncements);
   const content = (
     <>
@@ -598,7 +613,7 @@ export default function AcademicDepartmentWorkspace({
       {isAnnouncements ? (
         <AnnouncementsContent announcements={announcements} />
       ) : (
-        <TimetableContent schedules={schedules} sessions={sessions} isHod={isHod} />
+        <TimetableContent schedules={schedules} sessions={sessions} academyLessons={academyLessons} isHod={isHod} />
       )}
     </>
   );

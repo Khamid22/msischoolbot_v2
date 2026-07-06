@@ -1,4 +1,4 @@
-from backend.identity import account_telegram_auth_v2 as telegram_auth_v2
+from backend.identity import account_telegram_auth as account_telegram_auth
 
 
 class _Result:
@@ -235,7 +235,13 @@ class _FakeConn:
 
 
 def _authenticate(telegram_user_id):
-    return telegram_auth_v2.authenticate_account_telegram(telegram_user_id, conn=_FakeConn())
+    return account_telegram_auth.authenticate_account_telegram(telegram_user_id, conn=_FakeConn())
+
+
+def test_previous_account_telegram_auth_import_path_still_works():
+    import backend.identity.account_telegram_auth_v2 as previous_telegram_auth
+
+    assert previous_telegram_auth.authenticate_account_telegram is account_telegram_auth.authenticate_account_telegram
 
 
 def test_active_parent_telegram_link_authenticates():

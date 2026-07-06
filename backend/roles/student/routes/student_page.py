@@ -16,7 +16,7 @@ from backend.roles.student.routes.chat_routes import register_chat_routes
 from backend.roles.student.routes.comment_routes import register_comment_routes
 from backend.roles.student.routes.resources import register_resources_routes
 from backend.roles.student.routes.office_hours_routes import register_office_hours_routes
-from backend.identity.account_service import (
+from backend.domains.students.service import (
     get_student_db_id_by_enrollment_id,
     record_student_activity,
 )

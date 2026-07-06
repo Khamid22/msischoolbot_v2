@@ -8,16 +8,18 @@ from backend.render import render_admin_redirect
 from backend.integrations.telegram.init_data import (
     verify_telegram_init_data,
 )
-from backend.identity.parent_invites import load_parent_invite_code_payload
+from backend.domains.parents.service import (
+    link_parent_via_invite,
+    load_parent_invite_code_payload,
+)
 from backend.identity.account_service import (
     get_teacher_by_id,
     record_student_activity,
 )
-from backend.identity.account_auth_v2 import authenticate_account_password
-from backend.identity.account_telegram_auth_v2 import authenticate_account_telegram
+from backend.identity.account_auth import authenticate_account_password
+from backend.identity.account_telegram_auth import authenticate_account_telegram
 from backend.identity.roles import dashboard_path_for_role
 from backend.utils.guards import unauthorized_response
-from backend.roles.parent.services import link_parent_via_invite
 from backend.utils.session import (
     build_dashboard_url,
     current_admin_role,
@@ -190,7 +192,7 @@ def register_user_auth_routes(
     def render_admin_redirect_page(redirect_url):
         return render_admin_redirect(redirect_url)
 
-    def set_account_auth_v2_session(auth_result):
+    def set_account_session(auth_result):
         if not isinstance(auth_result, dict):
             return False
         session_payload = auth_result.get("session")
@@ -205,7 +207,7 @@ def register_user_auth_routes(
         session.permanent = True
         return True
 
-    def account_auth_v2_redirect_url(auth_result):
+    def account_redirect_url(auth_result):
         session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
         if not isinstance(session_payload, dict):
             return ""
@@ -227,7 +229,7 @@ def register_user_auth_routes(
 
         return dashboard_path_for_role(canonical_role)
 
-    def account_auth_v2_response_role(auth_result):
+    def account_response_role(auth_result):
         session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
         if not isinstance(session_payload, dict):
             return ""
@@ -238,7 +240,7 @@ def register_user_auth_routes(
             or ""
         ).strip()
 
-    def record_account_auth_v2_student_activity(auth_result):
+    def record_account_student_activity(auth_result):
         session_payload = auth_result.get("session") if isinstance(auth_result, dict) else {}
         if not isinstance(session_payload, dict) or session_payload.get("auth_role") != "student":
             return
@@ -360,12 +362,12 @@ def register_user_auth_routes(
             # Signature is valid but this Telegram account is not linked yet.
             return jsonify({"ok": True, "linked": False})
 
-        if not set_account_auth_v2_session(auth_result):
+        if not set_account_session(auth_result):
             return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
 
-        record_account_auth_v2_student_activity(auth_result)
-        redirect_url = account_auth_v2_redirect_url(auth_result)
-        response_role = account_auth_v2_response_role(auth_result)
+        record_account_student_activity(auth_result)
+        redirect_url = account_redirect_url(auth_result)
+        response_role = account_response_role(auth_result)
         return jsonify({
             "ok": True,
             "linked": True,
@@ -400,13 +402,13 @@ def register_user_auth_routes(
                 auth_error="Invalid login or password.",
                 auth_login_input=login_value,
             ), 401)
-        if not set_account_auth_v2_session(auth_result):
+        if not set_account_session(auth_result):
             return with_status(render_login_page(
                 auth_error="Unable to initialize account session.",
                 auth_login_input=login_value,
             ), 500)
-        record_account_auth_v2_student_activity(auth_result)
-        redirect_url = account_auth_v2_redirect_url(auth_result)
+        record_account_student_activity(auth_result)
+        redirect_url = account_redirect_url(auth_result)
         return redirect(redirect_url or dashboard_url_for_current_session() or url_for("student.home"))
 
     @students.post("/logout")

@@ -57,7 +57,7 @@ def test_uses_account_telegram_links_service(client, monkeypatch):
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9002))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
 
-    def fake_auth_v2(telegram_user_id):
+    def fake_account_auth(telegram_user_id):
         calls["telegram_user_id"] = telegram_user_id
         return _auth_result(
             "student",
@@ -69,7 +69,7 @@ def test_uses_account_telegram_links_service(client, monkeypatch):
             student_school_code="sehriyo",
         )
 
-    monkeypatch.setattr(identity_routes, "authenticate_account_telegram", fake_auth_v2)
+    monkeypatch.setattr(identity_routes, "authenticate_account_telegram", fake_account_auth)
     monkeypatch.setattr(identity_routes, "record_student_activity", lambda student_id: None)
 
     response = _post_telegram_auth(client)
@@ -261,7 +261,7 @@ def test_rejected_account_link_returns_safe_shape(
     assert response.json() == {"ok": True, "linked": False}
 
 
-def test_parent_invite_start_param_still_runs_before_auth_v2(client, monkeypatch):
+def test_parent_invite_start_param_still_runs_before_account_auth(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(
@@ -280,10 +280,10 @@ def test_parent_invite_start_param_still_runs_before_auth_v2(client, monkeypatch
         },
     )
 
-    def unexpected_auth_v2(telegram_user_id):
-        raise AssertionError("Parent invite linking must run before Auth V2 Telegram lookup")
+    def unexpected_account_auth(telegram_user_id):
+        raise AssertionError("Parent invite linking must run before Account Authentication Telegram lookup")
 
-    monkeypatch.setattr(identity_routes, "authenticate_account_telegram", unexpected_auth_v2)
+    monkeypatch.setattr(identity_routes, "authenticate_account_telegram", unexpected_account_auth)
 
     response = _post_telegram_auth(client)
 
@@ -296,7 +296,7 @@ def test_parent_invite_start_param_still_runs_before_auth_v2(client, monkeypatch
     }
 
 
-def test_success_json_shape_does_not_expose_raw_auth_v2_objects(client, monkeypatch):
+def test_success_json_shape_does_not_expose_raw_account_auth_objects(client, monkeypatch):
     import backend.domains.identity.routes as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9001))

@@ -25,7 +25,7 @@ from backend.utils.session import (
     current_auth_role,
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
-from backend.roles.admin.services.parent_service import list_linked_parents_for_student
+from backend.domains.parents.service import list_linked_parents_for_student
 from backend.domains.announcements.service import list_announcements
 
 ADMIN_PANEL_MODES = {
@@ -130,7 +130,7 @@ def register_admin_page_routes(
             session["admin_last_school"] = school_filter
 
         resolved_admin_mode = str(admin_mode or "").strip().lower()
-        preview_enabled = _dev_preview_enabled()
+        preview_enabled = current_auth_role() == "admin" and _dev_preview_enabled()
         if preview_enabled:
             resolved_admin_mode = _normalize_admin_panel_mode(resolved_admin_mode)
         else:
@@ -249,8 +249,6 @@ def register_admin_page_routes(
 
     def ensure_admin_role(request_obj: Request):
         if current_auth_role() == "admin":
-            return
-        if current_auth_role() in {"academic_director", "head_of_department"} and request_obj.url.path.startswith("/admin/teacher-academy"):
             return
         requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
         if requested_with == "XMLHttpRequest":

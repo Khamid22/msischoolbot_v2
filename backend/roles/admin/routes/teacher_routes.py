@@ -1,7 +1,7 @@
 from backend.utils.response_helpers import jsonify, with_status
 from backend.utils.context import request
 
-from backend.identity.account_service import (
+from backend.domains.teachers.service import (
     delete_teacher_by_id,
     get_teacher_by_id,
     list_teachers,
@@ -11,12 +11,7 @@ from backend.identity.account_service import (
 from database.academics.canonical import normalize_school_code
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.route_service import group_belongs_to_school
-from backend.utils.session import current_auth_login, current_auth_role
-from backend.roles.head_of_department.academy_scope import (
-    can_current_user_manage_academy_assignment,
-    can_current_user_manage_academy_teacher,
-    filter_academy_teachers_for_current_scope,
-)
+from backend.utils.session import current_auth_login
 from backend.roles.admin.services.teacher_candidate_service import (
     create_teacher_candidate,
     delete_candidate_event,
@@ -25,14 +20,6 @@ from backend.roles.admin.services.teacher_candidate_service import (
     list_teacher_candidates,
     update_candidate_event,
     update_teacher_candidate_status,
-)
-from backend.roles.admin.services.teacher_academy_service import (
-    add_assessment,
-    create_academy_teacher,
-    list_academy_teachers,
-    promote_academy_teacher,
-    update_academy_status,
-    update_assignment,
 )
 
 
@@ -96,82 +83,6 @@ def _resolve_teacher_fields(mode):
     return full_name, pay_rate, assigned_group, assigned_school, progression, ""
 
 
-def _form_list(name):
-    getter = getattr(request.form, "getlist", None)
-    if callable(getter):
-        raw_items = getter(name)
-    else:
-        raw_items = [str(request.form.get(name, "") or "")]
-    values = []
-    for raw in raw_items:
-        values.extend(item.strip() for item in str(raw or "").split(",") if item.strip())
-    return values
-
-
-def _academy_payload(message, *, credentials=None):
-    invalidate_admin_page_context_cache()
-    payload = {
-        "ok": True,
-        "message": message,
-        "academy": filter_academy_teachers_for_current_scope(list_academy_teachers()),
-        "teachers": list_teachers(),
-    }
-    if credentials:
-        payload["credentials"] = credentials
-    return jsonify(
-        payload
-    )
-
-
-ACADEMY_SECTIONS = (
-    "starter",
-    "warmup",
-    "teaching_session_1",
-    "teaching_session_2",
-    "teaching_session_3",
-    "end_activity",
-    "homework",
-)
-
-ACADEMY_CRITERIA_REMARKS = (
-    ("tgc", "teacher_guidance_compliance_score", "teacher_guidance_compliance_remarks"),
-    ("ta", "timing_adherence_score", "timing_adherence_remarks"),
-    ("rf", "resource_familiarity_score", "resource_familiarity_remarks"),
-    ("ef", "english_fluency_score", "english_fluency_remarks"),
-    ("con", "confidence_delivery_score", "confidence_delivery_remarks"),
-    ("se", "engagement_technique_score", "engagement_technique_remarks"),
-)
-
-
-def _assessment_sections_from_form():
-    sections = {}
-    for key in ACADEMY_SECTIONS:
-        sections[key] = {
-            "status": request.form.get(f"{key}_status", "not_applicable"),
-            "time_used": request.form.get(f"{key}_time_used", ""),
-            "remarks": request.form.get(f"{key}_remarks", ""),
-        }
-    criteria = {}
-    for key, score_key, remarks_key in ACADEMY_CRITERIA_REMARKS:
-        criteria[key] = {
-            "score": request.form.get(score_key, ""),
-            "remarks": request.form.get(remarks_key, ""),
-        }
-    sections["marking_criteria"] = criteria
-    return sections
-
-
-def _assessment_scores_from_form():
-    return {
-        "teacher_guidance_compliance_score": request.form.get("teacher_guidance_compliance_score", ""),
-        "timing_adherence_score": request.form.get("timing_adherence_score", ""),
-        "resource_familiarity_score": request.form.get("resource_familiarity_score", ""),
-        "english_fluency_score": request.form.get("english_fluency_score", ""),
-        "confidence_delivery_score": request.form.get("confidence_delivery_score", ""),
-        "engagement_technique_score": request.form.get("engagement_technique_score", ""),
-    }
-
-
 def register_admin_teacher_routes(
     router,
     *,
@@ -193,133 +104,6 @@ def register_admin_teacher_routes(
                 {"ok": True, "message": message, "teachers": list_teachers()}
             )
         return render_admin_page(admin_notice=message, admin_panel="teachers")
-
-    def _academy_error(message, status=400):
-        if _wants_json():
-            return jsonify({"ok": False, "message": message}, status_code=status)
-        return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), status)
-
-    # Compatibility route. Academic Director and HOD use their own API routes.
-    @router.post("/admin/teacher-academy")
-    def create_teacher_academy_route():
-        if current_auth_role() == "head_of_department":
-            return _academy_error("Head of Department cannot create Teacher Academy teacher accounts.", status=403)
-        create_result = create_academy_teacher(
-            full_name=request.form.get("academy_full_name", ""),
-            subject_program_id=request.form.get("academy_subject_program_id", ""),
-            selected_curriculum_item_ids=_form_list("academy_curriculum_item_ids"),
-            position=request.form.get("academy_position", "Trainee Teacher"),
-            employment_type=request.form.get("academy_employment_type", "academy"),
-            telegram_username=request.form.get("academy_telegram_username", ""),
-            phone=request.form.get("academy_phone", ""),
-            email=request.form.get("academy_email", ""),
-            academy_start_date=request.form.get("academy_start_date", ""),
-            mentor_id=request.form.get("academy_mentor_id", "0"),
-            department_head_id=request.form.get("academy_department_head_id", "0"),
-            notes=request.form.get("academy_notes", ""),
-            created_by=current_auth_login() or "Academic Director",
-            return_credentials=True,
-        )
-        if isinstance(create_result, tuple) and len(create_result) == 3:
-            created, error_message, credentials = create_result
-        else:
-            created, error_message = create_result
-            credentials = {}
-        if not created:
-            return _academy_error(error_message or "Unable to create academy teacher.")
-        if _wants_json():
-            safe_credentials = {
-                "role": "teacher",
-                "login": credentials.get("login", ""),
-                "teacher_code": credentials.get("teacher_code", ""),
-                "temporary_password": credentials.get("temporary_password", ""),
-                "display_name": credentials.get("display_name", ""),
-                "subject_name": credentials.get("subject_name", ""),
-            }
-            return _academy_payload("Academy teacher created with selected Teacher Academy lessons.", credentials=safe_credentials)
-        return render_admin_page(admin_notice="Academy teacher created.", admin_panel="teachers")
-
-    # Compatibility route. Academic Director and HOD use their own API routes.
-    @router.post("/admin/teacher-academy/assignments/{assignment_id}")
-    def update_teacher_academy_assignment_route(assignment_id: int):
-        if not can_current_user_manage_academy_assignment(assignment_id):
-            return _academy_error("This Teacher Academy lesson is outside your subject scope.", status=403)
-        updated, error_message = update_assignment(
-            assignment_id=assignment_id,
-            assignment_type=request.form.get("assignment_type", ""),
-            deadline_date=request.form.get("deadline_date", ""),
-            session_datetime=request.form.get("session_datetime", ""),
-            evaluator_id=request.form.get("evaluator_id", "0"),
-            focus_areas=_form_list("focus_areas"),
-            notes_to_trainee=request.form.get("notes_to_trainee", ""),
-            status=request.form.get("assignment_status", "assigned"),
-        )
-        if not updated:
-            return _academy_error(error_message or "Unable to update assignment.")
-        if _wants_json():
-            return _academy_payload("Academy lesson updated.")
-        return render_admin_page(admin_notice="Academy lesson updated.", admin_panel="teachers")
-
-    # Compatibility route. Academic Director and HOD use their own API routes.
-    @router.post("/admin/teacher-academy/{academy_teacher_id}/assessments")
-    def add_teacher_academy_assessment_route(academy_teacher_id: int):
-        if not can_current_user_manage_academy_teacher(academy_teacher_id):
-            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
-        saved, error_message = add_assessment(
-            academy_teacher_id=academy_teacher_id,
-            lesson_assignment_id=request.form.get("lesson_assignment_id", ""),
-            assessment_type=request.form.get("assessment_type", "academy_practice_lesson"),
-            evaluator_id=request.form.get("evaluator_id", "0"),
-            assessment_datetime=request.form.get("assessment_datetime", ""),
-            session_type=request.form.get("session_type", "training_simulation"),
-            class_label=request.form.get("class_label", ""),
-            section_feedback=_assessment_sections_from_form(),
-            scores=_assessment_scores_from_form(),
-            strengths=request.form.get("strengths", ""),
-            areas_for_improvement=request.form.get("areas_for_improvement", ""),
-            final_recommendation=request.form.get("final_recommendation", ""),
-            decision=request.form.get("decision", "needs_improvement"),
-            created_by=current_auth_login() or "Academic Director",
-        )
-        if not saved:
-            return _academy_error(error_message or "Unable to save assessment.")
-        if _wants_json():
-            return _academy_payload("Assessment saved.")
-        return render_admin_page(admin_notice="Assessment saved.", admin_panel="teachers")
-
-    # Compatibility route. Academic Director and HOD use their own API routes.
-    @router.post("/admin/teacher-academy/{academy_teacher_id}/status")
-    def update_teacher_academy_status_route(academy_teacher_id: int):
-        if not can_current_user_manage_academy_teacher(academy_teacher_id):
-            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
-        updated, error_message = update_academy_status(
-            academy_teacher_id=academy_teacher_id,
-            status=request.form.get("academy_status", ""),
-        )
-        if not updated:
-            return _academy_error(error_message or "Unable to update academy status.")
-        if _wants_json():
-            return _academy_payload("Academy status updated.")
-        return render_admin_page(admin_notice="Academy status updated.", admin_panel="teachers")
-
-    # Compatibility route. Academic Director uses its own API route.
-    @router.post("/admin/teacher-academy/{academy_teacher_id}/promote")
-    def promote_teacher_academy_route(academy_teacher_id: int):
-        if not can_current_user_manage_academy_teacher(academy_teacher_id):
-            return _academy_error("This Teacher Academy teacher is outside your subject scope.", status=403)
-        promoted, error_message = promote_academy_teacher(
-            academy_teacher_id=academy_teacher_id,
-            assigned_group=request.form.get("teacher_assigned_group", ""),
-            pay_rate=request.form.get("teacher_pay_rate", "0"),
-            category=request.form.get("teacher_category", "junior"),
-            semester_stage=request.form.get("teacher_semester_stage", "1-2"),
-            promotion_notes=request.form.get("teacher_promotion_notes", ""),
-        )
-        if not promoted:
-            return _academy_error(error_message or "Unable to promote academy teacher.")
-        if _wants_json():
-            return _academy_payload("Academy teacher promoted to Active Teachers.")
-        return render_admin_page(admin_notice="Academy teacher promoted.", admin_panel="teachers")
 
     @router.post("/admin/teacher-candidates")
     def create_teacher_candidate_route():

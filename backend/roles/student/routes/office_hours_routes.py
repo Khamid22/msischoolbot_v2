@@ -4,60 +4,8 @@ from backend.utils.session import url_for, current_student_db_id
 from backend.render import render_react_page, generate_csrf
 from backend.roles.student.services import payload_service
 from backend.domains.office_hours import service as oh_service
-
-
-def _list_enrolled_subject_options(student_id, school_code, fallback_subject_name):
-    from database import connect_auth_db
-
-    subject_name = str(fallback_subject_name or "").strip()
-    fallback = [{"id": 0, "name": subject_name}] if subject_name else []
-    school_code = str(school_code or "").strip()
-
-    try:
-        with connect_auth_db() as conn:
-            current = conn.execute(
-                """
-                SELECT
-                    st.id AS internal_student_id,
-                    st.legacy_student_row_id,
-                    st.full_name,
-                    sch.school_key
-                FROM msi_v2.students st
-                LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
-                LEFT JOIN msi_v2.group_students gs ON gs.student_id = st.id
-                WHERE COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
-                  AND (%s = '' OR lower(sch.school_key) = lower(%s))
-                LIMIT 1
-                """,
-                (student_id, school_code, school_code),
-            ).fetchone()
-            if not current:
-                return fallback
-
-            internal_student_id = current.get("internal_student_id")
-            rows = conn.execute(
-                """
-                SELECT DISTINCT subj.id, subj.subject_name AS name
-                FROM msi_v2.group_students gs
-                JOIN msi_v2.groups g ON g.id = gs.group_id
-                JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-                JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
-                WHERE gs.student_id = %s
-                  AND gs.enrollment_status = 'active'
-                  AND subj.status = 'active'
-                ORDER BY subj.subject_name
-                """,
-                (internal_student_id,),
-            ).fetchall()
-    except Exception:
-        return fallback
-
-    subjects = [
-        {"id": int(row["id"]), "name": str(row["name"] or "").strip()}
-        for row in rows
-        if row.get("id") and str(row.get("name") or "").strip()
-    ]
-    return subjects or fallback
+from backend.domains.students.service import list_enrolled_subject_options
+from backend.domains.teachers.service import list_teachers
 
 
 def register_office_hours_routes(students):
@@ -102,14 +50,13 @@ def register_office_hours_routes(students):
             school=school_code,
         )
 
-        subjects_options = _list_enrolled_subject_options(
+        subjects_options = list_enrolled_subject_options(
             student_id=student_id,
             school_code=school_code,
             fallback_subject_name=subject_name,
         )
 
         # Get list of teachers for filtering
-        from backend.identity.account_service import list_teachers
         teachers_list = list_teachers()
 
         return render_react_page(

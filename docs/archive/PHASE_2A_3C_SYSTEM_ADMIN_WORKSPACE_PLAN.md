@@ -4,7 +4,7 @@ Date: 2026-07-06
 Project: MSI LMS Portal  
 Branch: FastAPI-Run-System
 
-This is a planning document only. Do not implement code, change Auth V2, change `/admin` compatibility, change the student dashboard, change parent Telegram flow, change database schema, or delete legacy code in this phase.
+This is a planning document only. Do not implement code, change Account Authentication, change `/admin` compatibility, change the student dashboard, change parent Telegram flow, change database schema, or delete legacy code in this phase.
 
 ## Goal
 
@@ -58,12 +58,12 @@ Target product role:
 Current compatibility:
 
 - Canonical role helpers map `system_admin` to dashboard path `/admin`.
-- Auth V2 password login builds canonical session metadata:
+- Account Authentication password login builds canonical session metadata:
   - `account_role = "system_admin"`
   - `canonical_role = "system_admin"`
   - `staff_role = "system_admin"`
   - `staff_id`
-- For Phase 1C compatibility, Auth V2 also sets:
+- For Phase 1C compatibility, Account Authentication also sets:
   - `auth_role = "admin"`
   - `admin_id = staff_id`
   - `admin_role = "owner"` or `"system_admin"`
@@ -242,7 +242,7 @@ The Phase 2A-3C implementation must not change:
 - `/admin` route path.
 - `/admin/continue`.
 - `system_admin` dashboard path `/admin`.
-- Auth V2 system_admin session compatibility.
+- Account Authentication system_admin session compatibility.
 - `auth_role = "admin"` compatibility for system_admin.
 - canonical metadata such as `account_role` and `canonical_role`.
 - legacy admin tools.
@@ -360,7 +360,7 @@ Required tests:
 ## Risks
 
 - Current `/admin` is a mixed legacy business/admin/technical workspace; adding technical cards should not imply the full split is complete.
-- Auth V2 currently writes `auth_role = "admin"` for system_admin. Removing that compatibility too early would break `/admin`.
+- Account Authentication currently writes `auth_role = "admin"` for system_admin. Removing that compatibility too early would break `/admin`.
 - Account counts depend on Phase 1 account tables existing in the target database.
 - Exposing canonical role metadata to the frontend may be useful, but it must not become a new authorization boundary by itself.
 - Admin page context already loads many domains; card provider failures must remain isolated.
@@ -373,7 +373,7 @@ Phase 2A-3C can be implemented only after this plan is approved.
 The implementation is acceptable when:
 
 - `/admin` compatibility remains unchanged.
-- system_admin Auth V2 still reaches `/admin`.
+- system_admin Account Authentication still reaches `/admin`.
 - Legacy admin routes and APIs remain registered.
 - No parent Telegram flow changes.
 - No student dashboard changes.

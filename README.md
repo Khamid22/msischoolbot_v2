@@ -1,55 +1,29 @@
-# MSI School Bot And Portal
+# MSI School LMS
 
-This project has four runtime areas:
+MSI School LMS is a FastAPI, React, PostgreSQL, and Telegram Mini App system for school operations, academic departments, Teacher Academy workflows, student dashboards, parent access, and role-specific staff workspaces.
 
-- `tgbot/` - Telegram bot only
-- `web/backend/` - FastAPI backend only
-- `web/frontend/` - React frontend only
-- `shared/` - Python logic and PostgreSQL access shared by bot and backend
-
-PostgreSQL is the source of truth. Do not delete database values during cleanup.
-
-## Architecture
+## Current Architecture
 
 ```text
-web/frontend -> web/backend -> shared -> shared/db -> PostgreSQL
-tgbot -----------------------> shared -> shared/db -> PostgreSQL
+frontend/                 React/Vite app
+backend/                  FastAPI app, role routes, and business domains
+database/                 PostgreSQL connection, schema bootstrap, migrations, and temporary query wrappers
+tgbot/                    Telegram bot handlers
+docs/                     active engineering and product documentation
 ```
 
-The bot and web backend must not import each other.
+Backend domain code lives under `backend/domains/`. Role-specific web routes live under `backend/roles/`. Temporary compatibility wrappers remain in `database/queries/`, `database/cross_queries/`, and selected `backend/identity/` modules while the database access layer is being separated.
 
-## Current Source Map
-
-```text
-shared/
-  academics/        subject, date, school, and summary rules
-  identity/         login, passwords, profiles, Telegram links
-  db/               PostgreSQL connection, tables, shared SQL queries
-
-tgbot/
-  handlers/         aiogram command/callback handlers
-  keyboards/        Telegram inline keyboard builders
-  helpers.py        bot-specific formatting helpers
-
-web/backend/
-  server.py         FastAPI app composition
-  routes/           small system routes
-  roles/            role-specific backend workflows
-  domains/          reusable backend business domains
-  utils/            web-only helpers
-  static/react/     generated React build output
-
-web/frontend/src/
-  app/              React app bootstrap
-  shared/           reusable frontend UI and browser helpers
-  roles/            role-specific React screens
-```
+The live database schema is still `msi_v2`. Do not rename it or edit schema objects without the reviewed schema migration plan.
 
 ## Main Docs
 
-- `AGENTS.md` - rules for coding assistants
-- `docs/README.md` - MSI LMS Portal documentation index
+- `CURRENT_ARCHITECTURE.md` - current backend/frontend/domain map and smoke checklist
+- `docs/README.md` - documentation index
 - `docs/GLOSSARY.md` - naming rules for confusing concepts
+- `SCHEMA_RENAME_MSI_V2_TO_LMS_PLAN.md` - planned physical schema rename, not implemented
+
+Historical phase plans are archived under `docs/archive/`.
 
 ## Run Locally
 
@@ -59,19 +33,19 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-Run both web and bot:
+Run the app:
 
 ```bash
 python main.py
 ```
 
-Run only web:
+Run only the web backend:
 
 ```bash
 python main.py web
 ```
 
-Run only bot:
+Run only the Telegram bot:
 
 ```bash
 python main.py bot
@@ -79,37 +53,22 @@ python main.py bot
 
 ## Frontend
 
-React source lives in `web/frontend/src`.
-
-Check and build:
+React source lives in `frontend/src`.
 
 ```bash
-cd web/frontend
-npm run check-types
-npm run build
+npm --prefix frontend run check-types
+npm --prefix frontend run build
 ```
 
-The build writes generated files into `web/backend/static/react/`. Do not edit
-that generated folder manually.
+The build writes generated files into `backend/static/react/`. Do not edit generated build output manually.
 
 ## Verification
 
-Backend/import check:
-
 ```bash
-python3 -m compileall -q shared tgbot web/backend scripts main.py
-python3 - <<'PY'
-from web.backend.server import app
-print(app.name)
-PY
-```
-
-Frontend check:
-
-```bash
-cd web/frontend
-npm run check-types
-npm run build
+python3 -m pytest
+npm --prefix frontend run check-types
+npm --prefix frontend run build
+git diff --check
 ```
 
 ## Environment

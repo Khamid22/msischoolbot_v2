@@ -5,7 +5,7 @@ import time
 from backend.utils.response_helpers import jsonify, redirect, with_status
 from backend.utils.context import request, session
 from backend.utils.session import url_for
-from backend.identity.account_service import change_student_password
+from backend.domains.students.service import change_student_password
 from backend.domains.academics.rating_service import (
     build_students_by_subject_group,
     get_group_cache_entry,

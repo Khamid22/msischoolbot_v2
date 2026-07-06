@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from database import queries
+from backend.domains.announcements import queries as announcement_queries
 
 AUDIENCES = {
     "all",
@@ -29,7 +30,7 @@ def _connect():
 
 # Schema DDL now lives in the query layer; re-exported here so existing callers
 # (and `from .announcements import ensure_announcements_schema`) keep working.
-ensure_announcements_schema = queries.ensure_announcements_schema
+ensure_announcements_schema = announcement_queries.ensure_announcements_schema
 
 
 def _normalize_choice(value, allowed, default):
@@ -58,23 +59,7 @@ def _row_to_dict(row):
 def list_announcements(include_drafts=True):
     with _connect() as conn:
         ensure_announcements_schema(conn)
-        if include_drafts:
-            rows = conn.execute(
-                """
-                SELECT *, '' AS author, 0 AS views, '' AS scheduled_at
-                FROM msi_v2.announcements
-                ORDER BY pinned DESC, updated_at DESC, id DESC
-                """
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT *, '' AS author, 0 AS views, '' AS scheduled_at
-                FROM msi_v2.announcements
-                WHERE status = 'published'
-                ORDER BY pinned DESC, published_at DESC, updated_at DESC, id DESC
-                """
-            ).fetchall()
+        rows = announcement_queries.list_announcement_rows(conn, include_drafts=include_drafts)
     return [_row_to_dict(row) for row in rows]
 
 
@@ -101,34 +86,21 @@ def create_announcement(
     published_at = now if normalized_status == "published" else ""
     with _connect() as conn:
         ensure_announcements_schema(conn)
-        cur = conn.execute(
-            """
-            INSERT INTO msi_v2.announcements (
-                title, body, audience, priority, status, pinned,
-                published_at, created_at, updated_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz, %s::timestamptz)
-            RETURNING id
-            """,
-            (
-                normalized_title,
-                normalized_body,
-                _normalize_choice(audience, AUDIENCES, "all"),
-                _normalize_choice(priority, PRIORITIES, "info"),
-                normalized_status,
-                bool(pinned),
-                published_at or None,
-                now,
-                now,
-            ),
+        inserted = announcement_queries.insert_announcement_row(
+            conn,
+            title=normalized_title,
+            body=normalized_body,
+            audience=_normalize_choice(audience, AUDIENCES, "all"),
+            priority=_normalize_choice(priority, PRIORITIES, "info"),
+            status=normalized_status,
+            pinned=bool(pinned),
+            published_at=published_at,
+            created_at=now,
+            updated_at=now,
         )
-        inserted = cur.fetchone()
         announcement_id = int(inserted["id"] or 0) if inserted else 0
         conn.commit()
-        row = conn.execute(
-            "SELECT *, '' AS author, 0 AS views, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
-            (announcement_id,),
-        ).fetchone()
+        row = announcement_queries.get_announcement_row(conn, announcement_id)
     return _row_to_dict(row)
 
 
@@ -136,10 +108,7 @@ def update_announcement(announcement_id, **values):
     now = _utc_now_iso()
     with _connect() as conn:
         ensure_announcements_schema(conn)
-        existing = conn.execute(
-            "SELECT *, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
-            (int(announcement_id),),
-        ).fetchone()
+        existing = announcement_queries.get_announcement_row(conn, announcement_id)
         if not existing:
             raise ValueError("Announcement not found.")
 
@@ -161,47 +130,34 @@ def update_announcement(announcement_id, **values):
         if status != "published":
             published_at = ""
 
-        conn.execute(
-            """
-            UPDATE msi_v2.announcements
-            SET title = %s, body = %s, audience = %s, priority = %s, status = %s,
-                pinned = %s, published_at = %s::timestamptz, updated_at = %s::timestamptz
-            WHERE id = %s
-            """,
-            (
-                title,
-                body,
-                _normalize_choice(
-                    existing["audience"] if values.get("audience") is None else values.get("audience"),
-                    AUDIENCES,
-                    "all",
-                ),
-                _normalize_choice(
-                    existing["priority"] if values.get("priority") is None else values.get("priority"),
-                    PRIORITIES,
-                    "info",
-                ),
-                status,
-                bool(existing["pinned"] if values.get("pinned") is None else values.get("pinned")),
-                published_at or None,
-                now,
-                int(announcement_id),
+        announcement_queries.update_announcement_row(
+            conn,
+            announcement_id,
+            title=title,
+            body=body,
+            audience=_normalize_choice(
+                existing["audience"] if values.get("audience") is None else values.get("audience"),
+                AUDIENCES,
+                "all",
             ),
+            priority=_normalize_choice(
+                existing["priority"] if values.get("priority") is None else values.get("priority"),
+                PRIORITIES,
+                "info",
+            ),
+            status=status,
+            pinned=bool(existing["pinned"] if values.get("pinned") is None else values.get("pinned")),
+            published_at=published_at,
+            updated_at=now,
         )
         conn.commit()
-        row = conn.execute(
-            "SELECT *, '' AS author, 0 AS views, '' AS scheduled_at FROM msi_v2.announcements WHERE id = %s",
-            (int(announcement_id),),
-        ).fetchone()
+        row = announcement_queries.get_announcement_row(conn, announcement_id)
     return _row_to_dict(row)
 
 
 def delete_announcement(announcement_id):
     with _connect() as conn:
         ensure_announcements_schema(conn)
-        cur = conn.execute(
-            "DELETE FROM msi_v2.announcements WHERE id = %s",
-            (int(announcement_id),),
-        )
+        cur = announcement_queries.delete_announcement_row(conn, announcement_id)
         conn.commit()
     return cur.rowcount > 0

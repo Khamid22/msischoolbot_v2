@@ -225,6 +225,59 @@ def test_system_admin_admin_can_access_admin_with_cards(client, monkeypatch):
     assert "185" in response.text
 
 
+def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, monkeypatch):
+    import backend.roles.admin.routes.admin_page as admin_page
+
+    _patch_admin_page_context(monkeypatch)
+    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", _mock_cards)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("ADMIN_PREVIEW_ROLES", raising=False)
+    _set_session(
+        client,
+        {
+            "auth_role": "admin",
+            "auth_login": "admin",
+            "account_role": "system_admin",
+            "canonical_role": "system_admin",
+            "admin_id": 1,
+            "admin_role": "owner",
+        },
+    )
+
+    response = client.get("/admin?mode=student")
+
+    assert response.status_code == 200
+    assert '"devPreviewEnabled":false' in response.text
+    assert '"previewRole":"admin"' in response.text
+    assert '"adminMode":"admin"' in response.text
+
+
+def test_admin_preview_can_be_explicitly_enabled_for_true_admin(client, monkeypatch):
+    import backend.roles.admin.routes.admin_page as admin_page
+
+    _patch_admin_page_context(monkeypatch)
+    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", _mock_cards)
+    monkeypatch.setenv("ADMIN_PREVIEW_ROLES", "1")
+    _set_session(
+        client,
+        {
+            "auth_role": "admin",
+            "auth_login": "admin",
+            "account_role": "system_admin",
+            "canonical_role": "system_admin",
+            "admin_id": 1,
+            "admin_role": "owner",
+        },
+    )
+
+    response = client.get("/admin?mode=student")
+
+    assert response.status_code == 200
+    assert '"devPreviewEnabled":true' in response.text
+    assert '"previewRole":"student"' in response.text
+    assert '"adminMode":"student"' in response.text
+
+
 def test_wrong_role_is_denied_from_admin(client):
     _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 1})
 

@@ -2,6 +2,7 @@
 
 import math
 
+from backend.domains.academics import queries as academic_queries
 from backend.domains.academics.exam_filters import is_exam_performance_row
 from database import queries
 
@@ -60,9 +61,7 @@ def _academic_tables_exist(conn) -> bool:
     global _academic_tables_known_present
     if _academic_tables_known_present:
         return True
-    rows = conn.execute(
-        "SELECT tablename AS name FROM pg_tables WHERE schemaname = 'msi_v2'"
-    ).fetchall()
+    rows = academic_queries.list_msi_v2_table_names(conn)
     existing = {str(r["name"]) for r in rows}
     present = {
         "schools",
@@ -160,38 +159,7 @@ def get_subject_dashboards_from_db(subject_name):
         if not _academic_tables_exist(conn):
             return []
 
-        rows = conn.execute(
-            """
-            SELECT COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
-                   st.full_name,
-                   COALESCE(hw.average_grade, 0) AS average_grade,
-                   COALESCE(coins.total_coins, 0) AS coins,
-                   sub.subject_name,
-                   g.group_name,
-                   g.group_code
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            JOIN msi_v2.groups g ON g.id = gs.group_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            LEFT JOIN (
-                SELECT student_id, group_id, round(avg(score)::numeric, 1) AS average_grade
-                FROM msi_v2.homework_scores
-                WHERE score IS NOT NULL
-                GROUP BY student_id, group_id
-            ) hw ON hw.student_id = gs.student_id AND hw.group_id = gs.group_id
-            LEFT JOIN (
-                SELECT student_id, group_id, sum(amount)::integer AS total_coins
-                FROM msi_v2.coin_events
-                GROUP BY student_id, group_id
-            ) coins ON coins.student_id = gs.student_id AND coins.group_id = gs.group_id
-            WHERE gs.enrollment_status = 'active'
-              AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
-              AND lower(trim(sub.subject_name)) = %s
-            ORDER BY g.group_name, st.full_name
-            """,
-            (subject_norm,),
-        ).fetchall()
+        rows = academic_queries.list_subject_dashboard_rows(conn, subject_norm)
 
         dashboards = []
         for row in rows:
@@ -232,151 +200,11 @@ def build_internal_dataset(school_code=""):
         if not _academic_tables_exist(conn):
             return None
 
-        rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
-                   st.full_name,
-                   COALESCE(hw.average_grade, 0) AS average_grade,
-                   COALESCE(coins.total_coins, 0) AS coins,
-                   s.school_key AS school_code,
-                   s.school_name,
-                   sub.subject_name,
-                   sub.subject_short AS subject_code,
-                   g.group_name,
-                   g.group_code
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            JOIN msi_v2.groups g ON g.id = gs.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            LEFT JOIN (
-                SELECT student_id, group_id, round(avg(score)::numeric, 1) AS average_grade
-                FROM msi_v2.homework_scores
-                WHERE score IS NOT NULL
-                GROUP BY student_id, group_id
-            ) hw ON hw.student_id = gs.student_id AND hw.group_id = gs.group_id
-            LEFT JOIN (
-                SELECT student_id, group_id, sum(amount)::integer AS total_coins
-                FROM msi_v2.coin_events
-                GROUP BY student_id, group_id
-            ) coins ON coins.student_id = gs.student_id AND coins.group_id = gs.group_id
-            WHERE gs.enrollment_status = 'active'
-              AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY sub.subject_name, g.group_name, st.full_name
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        lesson_rows = conn.execute(
-            """
-            SELECT s.school_key AS school_code,
-                   sub.subject_name,
-                   g.group_name,
-                   spi.lesson_number,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   spi.item_order AS lesson_order
-            FROM msi_v2.lesson_sessions ls
-            JOIN msi_v2.groups g ON g.id = ls.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            WHERE spi.item_type = 'lesson'
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY sub.subject_name, g.group_name, spi.item_order, spi.lesson_number
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        attendance_rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS enrollment_id,
-                   spi.lesson_number AS lesson_label,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   '' AS attendance_type,
-                   ar.attendance_status AS status
-            FROM msi_v2.attendance_records ar
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = ar.group_id AND gs.student_id = ar.student_id
-            JOIN msi_v2.lesson_sessions ls ON ls.id = ar.lesson_session_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            JOIN msi_v2.groups g ON g.id = ar.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY gs.legacy_enrollment_id, spi.item_order, spi.lesson_number
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        homework_rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS enrollment_id,
-                   spi.lesson_number AS lesson_label,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   'Homework' AS score_type,
-                   hs.score
-            FROM msi_v2.homework_scores hs
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = hs.group_id AND gs.student_id = hs.student_id
-            JOIN msi_v2.lesson_sessions ls ON ls.id = hs.lesson_session_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            JOIN msi_v2.groups g ON g.id = hs.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND hs.score IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY gs.legacy_enrollment_id, spi.item_order, spi.lesson_number
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        exam_rows = conn.execute(
-            """
-            SELECT DISTINCT ON (
-                   gs.legacy_enrollment_id,
-                   lower(COALESCE(er.exam_name, '')),
-                   lower(COALESCE(er.attempt, ''))
-                   )
-                   gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
-                   er.exam_name,
-                   er.attempt,
-                   er.score,
-                   COALESCE(spi.item_type, '') AS item_type,
-                   COALESCE(spi.title, '') AS item_title
-            FROM msi_v2.exam_results er
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = er.group_id AND gs.student_id = er.student_id
-            JOIN msi_v2.groups g ON g.id = er.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = er.program_item_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND er.score IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY gs.legacy_enrollment_id,
-                     lower(COALESCE(er.exam_name, '')),
-                     lower(COALESCE(er.attempt, '')),
-                     er.updated_at DESC,
-                     er.id DESC
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
+        rows = academic_queries.list_internal_dataset_enrollment_rows(conn, normalized_school)
+        lesson_rows = academic_queries.list_internal_dataset_lesson_rows(conn, normalized_school)
+        attendance_rows = academic_queries.list_internal_dataset_attendance_rows(conn, normalized_school)
+        homework_rows = academic_queries.list_internal_dataset_homework_rows(conn, normalized_school)
+        exam_rows = academic_queries.list_internal_dataset_exam_rows(conn, normalized_school)
 
     attendance_by_enrollment = {}
     for row in attendance_rows:
@@ -501,112 +329,10 @@ def build_internal_overview_dataset(school_code=""):
         if not _academic_tables_exist(conn):
             return None
 
-        enrollment_rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS id,
-                   COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
-                   st.full_name,
-                   s.school_key AS school_code,
-                   s.school_name,
-                   sub.subject_name,
-                   g.group_name
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            JOIN msi_v2.groups g ON g.id = gs.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY sub.subject_name, g.group_name, st.full_name
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        homework_rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS enrollment_id,
-                   spi.lesson_number AS lesson_label,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   'Homework' AS score_type,
-                   hs.score
-            FROM msi_v2.homework_scores hs
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = hs.group_id AND gs.student_id = hs.student_id
-            JOIN msi_v2.lesson_sessions ls ON ls.id = hs.lesson_session_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            JOIN msi_v2.groups g ON g.id = hs.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND hs.score IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY gs.legacy_enrollment_id, spi.item_order, spi.lesson_number
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        exam_rows = conn.execute(
-            """
-            SELECT DISTINCT ON (
-                   gs.legacy_enrollment_id,
-                   lower(COALESCE(er.exam_name, '')),
-                   lower(COALESCE(er.attempt, ''))
-                   )
-                   gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
-                   er.exam_name,
-                   er.attempt,
-                   er.score,
-                   COALESCE(spi.item_type, '') AS item_type,
-                   COALESCE(spi.title, '') AS item_title
-            FROM msi_v2.exam_results er
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = er.group_id AND gs.student_id = er.student_id
-            JOIN msi_v2.groups g ON g.id = er.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = er.program_item_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND er.score IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-            ORDER BY gs.legacy_enrollment_id,
-                     lower(COALESCE(er.exam_name, '')),
-                     lower(COALESCE(er.attempt, '')),
-                     er.updated_at DESC,
-                     er.id DESC
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
-
-        attendance_rows = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS enrollment_id,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   ar.attendance_status AS status
-            FROM msi_v2.attendance_records ar
-            JOIN msi_v2.group_students gs
-              ON gs.group_id = ar.group_id AND gs.student_id = ar.student_id
-            JOIN msi_v2.lesson_sessions ls ON ls.id = ar.lesson_session_id
-            JOIN msi_v2.groups g ON g.id = ar.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            WHERE gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-              AND ls.session_date IS NOT NULL
-              AND ar.attendance_status IS NOT NULL
-              AND ar.attendance_status <> ''
-            ORDER BY gs.legacy_enrollment_id, ls.session_date
-            """,
-            (normalized_school, normalized_school),
-        ).fetchall()
+        enrollment_rows = academic_queries.list_internal_overview_enrollment_rows(conn, normalized_school)
+        homework_rows = academic_queries.list_internal_dataset_homework_rows(conn, normalized_school)
+        exam_rows = academic_queries.list_internal_dataset_exam_rows(conn, normalized_school)
+        attendance_rows = academic_queries.list_internal_overview_attendance_rows(conn, normalized_school)
 
     homework_by_enrollment = {}
     for row in homework_rows:
@@ -661,64 +387,12 @@ def build_internal_overview_dataset(school_code=""):
 
 
 def get_student_subject_enrollments(public_dashboard_id):
-    """All active enrollments for the SAME student as the given dashboard id.
+    """Compatibility wrapper for DB-3 student domain ownership."""
+    from backend.domains.students.service import (
+        get_student_subject_enrollments as _get_student_subject_enrollments,
+    )
 
-    Identifies the student by (full_name_norm, school_id) of the current
-    enrollment, then returns one entry per subject/group they are enrolled in.
-    This is the reliable source for the dashboard's subject switcher — it does
-    not depend on loading and name-matching the whole school dataset.
-    Returns: [{"student_id": <public_dashboard_id>, "subject", "group"}].
-    """
-    try:
-        dashboard_id = int(public_dashboard_id)
-    except (TypeError, ValueError):
-        return []
-
-    with queries.connect_auth_db() as conn:
-        if not _academic_tables_exist(conn):
-            return []
-
-        ref = conn.execute(
-            """
-            SELECT st.id AS student_id, st.school_id
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            WHERE COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
-            LIMIT 1
-            """,
-            (dashboard_id,),
-        ).fetchone()
-        if not ref:
-            return []
-
-        rows = conn.execute(
-            """
-            SELECT COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS id,
-                   sub.subject_name AS subject,
-                   g.group_name AS grp
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            JOIN msi_v2.groups g ON g.id = gs.group_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            WHERE gs.enrollment_status = 'active'
-              AND st.id = %s
-              AND st.school_id = %s
-              AND COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) IS NOT NULL
-            ORDER BY sub.subject_name, g.group_name
-            """,
-            (ref["student_id"], ref["school_id"]),
-        ).fetchall()
-
-    return [
-        {
-            "student_id": int(row["id"]),
-            "subject": str(row["subject"] or "").strip(),
-            "group": str(row["grp"] or "").strip(),
-        }
-        for row in rows
-        if row["id"]
-    ]
+    return _get_student_subject_enrollments(public_dashboard_id)
 
 
 def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="", group_name=""):
@@ -736,128 +410,40 @@ def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="
         if not _academic_tables_exist(conn):
             return None
 
-        enrollment = conn.execute(
-            """
-            SELECT gs.legacy_enrollment_id AS id,
-                   COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
-                   st.full_name,
-                   COALESCE(hw.average_grade, 0) AS average_grade,
-                   COALESCE(coins.total_coins, 0) AS coins,
-                   s.school_key AS school_code,
-                   s.school_name,
-                   sub.subject_name,
-                   sub.subject_short AS subject_code,
-                   g.group_name,
-                   g.group_code,
-                   gs.group_id,
-                   gs.student_id
-            FROM msi_v2.group_students gs
-            JOIN msi_v2.students st ON st.id = gs.student_id
-            JOIN msi_v2.groups g ON g.id = gs.group_id
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects sub ON sub.id = sp.subject_id
-            LEFT JOIN (
-                SELECT student_id, group_id, round(avg(score)::numeric, 1) AS average_grade
-                FROM msi_v2.homework_scores
-                WHERE score IS NOT NULL
-                GROUP BY student_id, group_id
-            ) hw ON hw.student_id = gs.student_id AND hw.group_id = gs.group_id
-            LEFT JOIN (
-                SELECT student_id, group_id, sum(amount)::integer AS total_coins
-                FROM msi_v2.coin_events
-                GROUP BY student_id, group_id
-            ) coins ON coins.student_id = gs.student_id AND coins.group_id = gs.group_id
-            WHERE COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
-              AND gs.enrollment_status = 'active'
-              AND gs.legacy_enrollment_id IS NOT NULL
-              AND lower(g.group_name) <> 'online'
-              AND (%s = '' OR s.school_key = %s)
-              AND (%s = '' OR lower(trim(regexp_replace(sub.subject_name, '[[:space:]]+', ' ', 'g'))) = %s)
-              AND (%s = '' OR lower(trim(regexp_replace(g.group_name, '[[:space:]]+', ' ', 'g'))) = %s)
-            LIMIT 1
-            """,
-            (
-                student_id,
-                normalized_school,
-                normalized_school,
-                normalized_subject,
-                normalized_subject,
-                normalized_group,
-                normalized_group,
-            ),
-        ).fetchone()
+        enrollment = academic_queries.get_enrollment_dashboard_row(
+            conn,
+            public_dashboard_id=student_id,
+            normalized_school=normalized_school,
+            normalized_subject=normalized_subject,
+            normalized_group=normalized_group,
+        )
 
         if not enrollment:
             return None
 
-        enrollment_id = int(enrollment["id"])
-
-        attendance_rows = conn.execute(
-            """
-            SELECT spi.lesson_number AS lesson_label,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   '' AS attendance_type,
-                   ar.attendance_status AS status
-            FROM msi_v2.attendance_records ar
-            JOIN msi_v2.lesson_sessions ls ON ls.id = ar.lesson_session_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            WHERE ar.group_id = %s
-              AND ar.student_id = %s
-            ORDER BY spi.item_order, spi.lesson_number
-            """,
-            (enrollment["group_id"], enrollment["student_id"]),
-        ).fetchall()
+        attendance_rows = academic_queries.list_enrollment_attendance_rows(
+            conn,
+            enrollment["group_id"],
+            enrollment["student_id"],
+        )
 
         attendance_lessons, present_count, absent_count, justified_count = (
             _attendance_payload(attendance_rows)
         )
 
-        hw_rows = conn.execute(
-            """
-            SELECT spi.lesson_number AS lesson_label,
-                   spi.title AS topic,
-                   COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
-                   'Homework' AS score_type,
-                   hs.score
-            FROM msi_v2.homework_scores hs
-            JOIN msi_v2.lesson_sessions ls ON ls.id = hs.lesson_session_id
-            JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            WHERE hs.group_id = %s
-              AND hs.student_id = %s
-              AND hs.score IS NOT NULL
-            ORDER BY spi.item_order, spi.lesson_number
-            """,
-            (enrollment["group_id"], enrollment["student_id"]),
-        ).fetchall()
+        hw_rows = academic_queries.list_enrollment_homework_rows(
+            conn,
+            enrollment["group_id"],
+            enrollment["student_id"],
+        )
 
         homework_grades = _homework_payload(hw_rows)
 
-        exam_rows = conn.execute(
-            """
-            SELECT DISTINCT ON (
-                   lower(COALESCE(er.exam_name, '')),
-                   lower(COALESCE(er.attempt, ''))
-                   )
-                   COALESCE(NULLIF(er.exam_name, ''), NULLIF(spi.title, ''), NULLIF(spi.lesson_number, ''), 'Exam') AS label,
-                   er.exam_name,
-                   er.attempt,
-                   er.score,
-                   COALESCE(spi.item_type, '') AS item_type,
-                   COALESCE(spi.title, '') AS item_title
-            FROM msi_v2.exam_results er
-            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = er.program_item_id
-            WHERE er.group_id = %s
-              AND er.student_id = %s
-              AND er.score IS NOT NULL
-            ORDER BY lower(COALESCE(er.exam_name, '')),
-                     lower(COALESCE(er.attempt, '')),
-                     er.updated_at DESC,
-                     er.id DESC
-            """,
-            (enrollment["group_id"], enrollment["student_id"]),
-        ).fetchall()
+        exam_rows = academic_queries.list_enrollment_exam_rows(
+            conn,
+            enrollment["group_id"],
+            enrollment["student_id"],
+        )
 
         exam_results = _exam_payload(exam_rows)
 

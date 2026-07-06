@@ -246,7 +246,7 @@ Recommended sequence:
 | Current module | Proposed target |
 |---|---|
 | `database/queries/teacher_queries.py` | `backend/domains/teachers/queries.py`; Teacher Academy-specific helper usage should move into `backend/domains/teacher_academy/queries.py` when appropriate. |
-| `backend/roles/admin/services/teacher_academy_service.py` SQL | `backend/domains/teacher_academy/queries.py` |
+| Teacher Academy SQL | `backend/domains/teacher_academy/queries.py` |
 | `database/cross_queries/student_queries.py` | `backend/domains/students/queries.py` plus identity-specific account lookups. |
 | `database/queries/parent_account_queries.py` | `backend/domains/parents/queries.py` and `backend/identity/accounts.py`. |
 | `database/queries/parent_queries.py` | `backend/domains/parents/queries.py`. |

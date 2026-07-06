@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trophy } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy } from "lucide-react";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { IconButton } from "@/shared/ui/IconButton";
 import { MetricCard } from "@/shared/ui/MetricCard";
@@ -23,6 +24,7 @@ type TeacherAcademyActionRoutes = {
   assessmentCreate: (academyTeacherId: number | string) => string;
   statusUpdate: (academyTeacherId: number | string) => string;
   promote?: (academyTeacherId: number | string) => string;
+  delete?: (academyTeacherId: number | string) => string;
 };
 
 const focusAreas = [
@@ -191,6 +193,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       assessmentCreate: routes.academicDirectorTeacherAcademyAssessmentCreate,
       statusUpdate: routes.academicDirectorTeacherAcademyStatusUpdate,
       promote: routes.academicDirectorTeacherAcademyPromote,
+      delete: routes.academicDirectorTeacherAcademyDelete,
     };
   }
   if (roleMode === "head_of_department" || adminMode === "head_of_department") {
@@ -202,11 +205,10 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
     };
   }
   return {
-    create: routes.adminTeacherAcademyCreate,
-    assignmentUpdate: routes.adminTeacherAcademyAssignment,
-    assessmentCreate: routes.adminTeacherAcademyAssessment,
-    statusUpdate: routes.adminTeacherAcademyStatus,
-    promote: routes.adminTeacherAcademyPromote,
+    create: "",
+    assignmentUpdate: () => "",
+    assessmentCreate: () => "",
+    statusUpdate: () => "",
   };
 }
 
@@ -214,7 +216,42 @@ type AnalyticsRow = {
   label: string;
   value: number;
   detail: string;
+  fillClassName?: string;
 };
+
+const subjectProgressGradients = [
+  "bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500",
+  "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500",
+  "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500",
+  "bg-gradient-to-r from-teal-600 via-emerald-500 to-lime-500",
+  "bg-gradient-to-r from-cyan-600 via-sky-500 to-blue-500",
+  "bg-gradient-to-r from-rose-600 via-pink-500 to-orange-400",
+  "bg-gradient-to-r from-indigo-600 via-slate-500 to-cyan-500",
+];
+
+function subjectProgressFillClass(subject: string) {
+  const normalized = subject.toLowerCase();
+  if (normalized.includes("math")) {
+    return "bg-gradient-to-r from-blue-900 via-blue-700 to-indigo-500";
+  }
+  if (normalized.includes("english")) {
+    return "bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500";
+  }
+  if (normalized.includes("physics")) {
+    return "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500";
+  }
+  if (normalized.includes("chem")) {
+    return "bg-gradient-to-r from-teal-600 via-emerald-500 to-lime-500";
+  }
+  if (normalized.includes("bio")) {
+    return "bg-gradient-to-r from-lime-600 via-green-500 to-emerald-500";
+  }
+  let hash = 0;
+  for (const char of normalized) {
+    hash = (hash + char.charCodeAt(0)) % subjectProgressGradients.length;
+  }
+  return subjectProgressGradients[hash];
+}
 
 function MiniAnalyticsCard({
   title,
@@ -228,20 +265,20 @@ function MiniAnalyticsCard({
   emptyLabel: string;
 }) {
   return (
-    <section className="rounded-xl border border-foreground/8 bg-background px-3 py-3">
-      <div className="mb-3">
-        <p className="text-xs font-black text-foreground">{title}</p>
+    <section className="flex min-h-[10.75rem] flex-col rounded-2xl border border-foreground/8 bg-background px-4 py-4">
+      <div className="mb-3 shrink-0">
+        <p className="text-sm font-black leading-5 text-foreground">{title}</p>
         <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{subtitle}</p>
       </div>
       {rows.length ? (
-        <div className="space-y-2.5">
+        <div className="min-h-0 flex-1 space-y-3">
           {rows.slice(0, 6).map((row) => (
             <div key={row.label}>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="truncate text-[11px] font-bold text-foreground">{row.label}</span>
-                <span className="shrink-0 text-[11px] font-black text-muted-foreground">{row.detail}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-foreground">{row.label}</span>
+                <span className="shrink-0 text-sm font-black text-muted-foreground">{row.detail}</span>
               </div>
-              <ProgressBar value={row.value} className="h-1.5" />
+              <ProgressBar value={row.value} className="h-1.5" fillClassName={row.fillClassName} label={row.label} />
             </div>
           ))}
         </div>
@@ -305,13 +342,13 @@ function academyAnalyticsRows(academyTeachers: AcademyTeacher[]) {
   const subjectScoreRows = Array.from(scoreBySubject.entries())
     .map(([label, bucket]) => {
       const score = bucket.sum / bucket.count;
-      return { label, value: score * 10, detail: score.toFixed(1) };
+      return { label, value: score * 10, detail: score.toFixed(1), fillClassName: subjectProgressFillClass(label) };
     })
     .sort((left, right) => right.value - left.value);
   const completionRows = Array.from(completionBySubject.entries())
     .map(([label, bucket]) => {
       const percent = Math.round(bucket.sum / bucket.count);
-      return { label, value: percent, detail: `${percent}%` };
+      return { label, value: percent, detail: `${percent}%`, fillClassName: subjectProgressFillClass(label) };
     })
     .sort((left, right) => right.value - left.value);
 
@@ -1355,6 +1392,8 @@ function AcademyDetailModal({
   onAssess,
   onPromote,
   allowTeacherPreview,
+  canSchedule,
+  canAssess,
   canPromote,
 }: {
   teacher: AcademyTeacher;
@@ -1364,6 +1403,8 @@ function AcademyDetailModal({
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
   allowTeacherPreview: boolean;
+  canSchedule: boolean;
+  canAssess: boolean;
   canPromote: boolean;
 }) {
   const assignments = academyAssignments(teacher);
@@ -1421,10 +1462,16 @@ function AcademyDetailModal({
                         {dateLabel(assignment.session_datetime)} · {asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
                       </p>
                     </div>
-                    <div className="flex shrink-0 gap-1.5">
-                      <button type="button" onClick={() => onSchedule(assignment)} className="rounded-md border border-foreground/10 px-2 py-1 text-[11px] font-bold hover:bg-muted">Schedule</button>
-                      <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2 py-1 text-[11px] font-bold text-background">Assess</button>
-                    </div>
+                    {canSchedule || canAssess ? (
+                      <div className="flex shrink-0 gap-1.5">
+                        {canSchedule ? (
+                          <button type="button" onClick={() => onSchedule(assignment)} className="rounded-md border border-foreground/10 px-2 py-1 text-[11px] font-bold hover:bg-muted">Schedule</button>
+                        ) : null}
+                        {canAssess ? (
+                          <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2 py-1 text-[11px] font-bold text-background">Assess</button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   {asString(assignment.specification_points) ? (
                     <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{asString(assignment.specification_points)}</p>
@@ -1464,22 +1511,30 @@ function AcademyDetailModal({
 function AcademyTeacherCard({
   teacher,
   allowTeacherPreview,
+  canSchedule,
+  canAssess,
   canPromote,
+  canDelete,
   onPreview,
   onDetail,
   onSchedule,
   onAssess,
   onPromote,
+  onDelete,
   onCopyLogin,
 }: {
   teacher: AcademyTeacher;
   allowTeacherPreview: boolean;
+  canSchedule: boolean;
+  canAssess: boolean;
   canPromote: boolean;
+  canDelete: boolean;
   onPreview: () => void;
   onDetail: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
+  onDelete: () => void;
   onCopyLogin: (login: string) => void;
 }) {
   const assignments = academyAssignments(teacher);
@@ -1489,7 +1544,8 @@ function AcademyTeacherCard({
   const status = asString(teacher.academy_status);
   const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
   const scheduled = assignmentIsScheduled(nextAssignment);
-  const primaryAction = nextAssignment
+  const canUsePrimaryLessonAction = nextAssignment && (scheduled ? canAssess : canSchedule);
+  const primaryAction = canUsePrimaryLessonAction
     ? scheduled
       ? {
           label: "Assess",
@@ -1518,21 +1574,22 @@ function AcademyTeacherCard({
         };
   const secondaryActions: ActionMenuItem[] = [];
   if (nextAssignment) {
-    secondaryActions.push(
-      scheduled
-        ? {
-            key: "schedule",
-            label: "Schedule",
-            icon: <CalendarClock className="h-4 w-4" />,
-            onClick: () => onSchedule(nextAssignment),
-          }
-        : {
-            key: "assess",
-            label: "Assess",
-            icon: <ClipboardCheck className="h-4 w-4" />,
-            onClick: () => onAssess(nextAssignment),
-          },
-    );
+    if (canSchedule) {
+      secondaryActions.push({
+        key: "schedule",
+        label: scheduled ? "Reschedule" : "Schedule",
+        icon: <CalendarClock className="h-4 w-4" />,
+        onClick: () => onSchedule(nextAssignment),
+      });
+    }
+    if (scheduled && canAssess) {
+      secondaryActions.push({
+        key: "assess",
+        label: "Assess",
+        icon: <ClipboardCheck className="h-4 w-4" />,
+        onClick: () => onAssess(nextAssignment),
+      });
+    }
   }
   secondaryActions.push({
     key: "details",
@@ -1556,6 +1613,18 @@ function AcademyTeacherCard({
         label: "Promote",
         icon: <Trophy className="h-4 w-4" />,
         onClick: onPromote,
+      },
+    );
+  }
+  if (canDelete) {
+    secondaryActions.push(
+      { separator: true, key: "delete-separator" },
+      {
+        key: "delete",
+        label: "Delete teacher",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: onDelete,
+        danger: true,
       },
     );
   }
@@ -1714,6 +1783,7 @@ export function TeacherAcademyPanel({
   const [scheduleTarget, setScheduleTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
   const [assessmentTarget, setAssessmentTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
   const [promoteTeacher, setPromoteTeacher] = useState<AcademyTeacher | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AcademyTeacher | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -1737,7 +1807,7 @@ export function TeacherAcademyPanel({
       onAcademyChange(data.academy as AcademyTeacher[]);
       if (detailTeacher) {
         const updated = (data.academy as AcademyTeacher[]).find((teacher) => asNumber(teacher.id) === asNumber(detailTeacher.id));
-        if (updated) setDetailTeacher(updated);
+        setDetailTeacher(updated || null);
       }
     }
     if (Array.isArray(data.teachers)) {
@@ -1765,8 +1835,11 @@ export function TeacherAcademyPanel({
   const authRole = asString(state.props?.authRole).toLowerCase();
   const academyApi = useMemo(() => teacherAcademyActionRoutes(adminMode, authRole), [adminMode, authRole]);
   const canCreateHeadOfDepartment = adminMode === "academic_director" || authRole === "academic_director";
-  const canCreateAcademyTeacher = adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const canScheduleAcademyLesson = Boolean(academyApi.assignmentUpdate(0));
+  const canAssessAcademyLesson = Boolean(academyApi.assessmentCreate(0));
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
 
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
     const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
@@ -1809,6 +1882,23 @@ export function TeacherAcademyPanel({
       return;
     }
     setPromoteTeacher(teacher);
+  }
+
+  async function confirmDeleteAcademyTeacher() {
+    if (!deleteTarget || !academyApi.delete) return;
+    const teacherId = asNumber(deleteTarget.id);
+    if (!teacherId) {
+      showToast("Academy teacher id is missing.", "danger");
+      setDeleteTarget(null);
+      return;
+    }
+    const result = await submit(academyApi.delete(teacherId), {}, "Academy teacher deleted.");
+    if (result) {
+      if (detailTeacher && asNumber(detailTeacher.id) === teacherId) {
+        setDetailTeacher(null);
+      }
+      setDeleteTarget(null);
+    }
   }
 
   return (
@@ -1871,6 +1961,8 @@ export function TeacherAcademyPanel({
             setError("");
             openPromote(detailTeacher);
           }}
+          canSchedule={canScheduleAcademyLesson}
+          canAssess={canAssessAcademyLesson}
           canPromote={canPromoteAcademyTeacher}
         />
       ) : null}
@@ -1928,6 +2020,22 @@ export function TeacherAcademyPanel({
           }}
         />
       ) : null}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete academy teacher?"
+        message={
+          <>
+            This removes the academy teacher record, assigned lessons, assessment reports, and the generated academy-only login.
+          </>
+        }
+        confirmLabel="Delete teacher"
+        danger
+        busy={submitting}
+        onConfirm={confirmDeleteAcademyTeacher}
+        onCancel={() => {
+          if (!submitting) setDeleteTarget(null);
+        }}
+      />
 
       <ChartCard
         title="Teacher Academy"
@@ -1995,7 +2103,7 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
-        <div className="mb-3 grid shrink-0 gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-3 grid shrink-0 items-stretch gap-3 md:grid-cols-2 2xl:grid-cols-4">
           <MiniAnalyticsCard
             title="Academy status distribution"
             subtitle="Academy, ready, completed, support"
@@ -2031,18 +2139,25 @@ export function TeacherAcademyPanel({
                       key={asNumber(teacher.id)}
                       teacher={teacher}
                       allowTeacherPreview={allowTeacherPreview}
+                      canSchedule={canScheduleAcademyLesson}
+                      canAssess={canAssessAcademyLesson}
+                      canDelete={canDeleteAcademyTeacher}
                       onPreview={() => previewAsTeacher(teacher)}
                       onDetail={() => setDetailTeacher(teacher)}
                       onSchedule={(targetAssignment) => setScheduleTarget({ teacher, assignment: targetAssignment })}
                       onAssess={(targetAssignment) => setAssessmentTarget({ teacher, assignment: targetAssignment })}
                       onPromote={() => openPromote(teacher)}
+                      onDelete={() => {
+                        setError("");
+                        setDeleteTarget(teacher);
+                      }}
                       onCopyLogin={copyLogin}
                       canPromote={canPromoteAcademyTeacher}
                     />
                   );
                 })}
               </MobileCardList>
-              <ResponsiveTable className="max-h-[calc(100dvh-20rem)]">
+              <ResponsiveTable className="max-h-[calc(100dvh-20rem)] 2xl:max-h-[48rem]">
                 <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
                   <colgroup>
                     <col className="w-[22%]" />
@@ -2073,23 +2188,25 @@ export function TeacherAcademyPanel({
                       const status = asString(teacher.academy_status);
                       const login = asString(teacher.login);
                       const scheduled = assignmentIsScheduled(nextAssignment);
+                      const canUsePrimaryLessonAction = nextAssignment && (scheduled ? canAssessAcademyLesson : canScheduleAcademyLesson);
                       const rowActions: ActionMenuItem[] = [];
                       if (nextAssignment) {
-                        rowActions.push(
-                          scheduled
-                            ? {
-                                key: "schedule",
-                                label: "Schedule",
-                                icon: <CalendarClock className="h-4 w-4" />,
-                                onClick: () => setScheduleTarget({ teacher, assignment: nextAssignment }),
-                              }
-                            : {
-                                key: "assess",
-                                label: "Assess",
-                                icon: <ClipboardCheck className="h-4 w-4" />,
-                                onClick: () => setAssessmentTarget({ teacher, assignment: nextAssignment }),
-                              },
-                        );
+                        if (canScheduleAcademyLesson) {
+                          rowActions.push({
+                            key: "schedule",
+                            label: scheduled ? "Reschedule" : "Schedule",
+                            icon: <CalendarClock className="h-4 w-4" />,
+                            onClick: () => setScheduleTarget({ teacher, assignment: nextAssignment }),
+                          });
+                        }
+                        if (scheduled && canAssessAcademyLesson) {
+                          rowActions.push({
+                            key: "assess",
+                            label: "Assess",
+                            icon: <ClipboardCheck className="h-4 w-4" />,
+                            onClick: () => setAssessmentTarget({ teacher, assignment: nextAssignment }),
+                          });
+                        }
                       }
                       rowActions.push({
                         key: "details",
@@ -2113,6 +2230,21 @@ export function TeacherAcademyPanel({
                             label: "Promote",
                             icon: <Trophy className="h-4 w-4" />,
                             onClick: () => openPromote(teacher),
+                          },
+                        );
+                      }
+                      if (canDeleteAcademyTeacher) {
+                        rowActions.push(
+                          { separator: true, key: "delete-separator" },
+                          {
+                            key: "delete",
+                            label: "Delete teacher",
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => {
+                              setError("");
+                              setDeleteTarget(teacher);
+                            },
+                            danger: true,
                           },
                         );
                       }
@@ -2182,7 +2314,7 @@ export function TeacherAcademyPanel({
                           </td>
                           <td className="px-3 py-2.5 align-middle">
                             <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                              {nextAssignment ? (
+                              {canUsePrimaryLessonAction ? (
                                 <button
                                   type="button"
                                   onClick={() =>

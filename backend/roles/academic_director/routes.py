@@ -13,10 +13,14 @@ from backend.roles.academic_director.staff_registration import (
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
-from backend.domains.teacher_academy.service import list_teacher_academy_page_context
+from backend.domains.teacher_academy.service import (
+    list_academy_timetable_events,
+    list_teacher_academy_page_context,
+)
 from backend.roles.common.teacher_academy_api import (
     add_assessment_response,
     create_academy_teacher_response,
+    delete_academy_teacher_response,
     promote_response,
     update_assignment_response,
     update_status_response,
@@ -31,11 +35,13 @@ from backend.utils.session import current_auth_login, current_auth_role
 def _safe_academic_context():
     try:
         context = list_admin_academic_context()
+        academy_lessons = list_academy_timetable_events()
     except Exception as exc:
-        return {"schedules": [], "sessions": [], "warning": f"Academic timetable could not be loaded: {exc}"}
+        return {"schedules": [], "sessions": [], "academy_lessons": [], "warning": f"Academic timetable could not be loaded: {exc}"}
     return {
         "schedules": context.get("schedules", []),
         "sessions": context.get("sessions", []),
+        "academy_lessons": academy_lessons,
         "warning": "",
     }
 
@@ -48,7 +54,7 @@ def _safe_announcement_context():
     return {"announcements": announcements, "warning": ""}
 
 
-def register_academic_director_page_routes(app, *, render_admin_page=None):
+def register_academic_director_page_routes(app):
     router = APIRouter(dependencies=[Depends(require_role("academic_director"))])
 
     @router.get("/academic-director", operation_id="academic_director_home")
@@ -87,6 +93,7 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
                 "workspace": "timetable",
                 "adminAcademicSchedules": academic_context.get("schedules", []),
                 "adminAcademicSessions": academic_context.get("sessions", []),
+                "adminAcademyLessonEvents": academic_context.get("academy_lessons", []),
                 "warning": academic_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },
@@ -102,6 +109,7 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
             rows={
                 "schedules": academic_context.get("schedules", []),
                 "sessions": academic_context.get("sessions", []),
+                "academy_lessons": academic_context.get("academy_lessons", []),
             },
         )
         return response
@@ -271,6 +279,13 @@ def register_academic_director_page_routes(app, *, render_admin_page=None):
     )
     def academic_director_update_academy_status_api(academy_teacher_id: int):
         return update_status_response(academy_teacher_id)
+
+    @router.post(
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/delete",
+        operation_id="academic_director_delete_academy_teacher",
+    )
+    def academic_director_delete_academy_teacher_api(academy_teacher_id: int):
+        return delete_academy_teacher_response(academy_teacher_id)
 
     @router.post(
         "/academic-director/api/teacher-academy/{academy_teacher_id}/promote",

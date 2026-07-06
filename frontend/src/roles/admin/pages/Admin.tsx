@@ -27,6 +27,7 @@ import { ChartCard } from "@/shared/ui/ChartCard";
 import { FormAlert } from "@/shared/ui/PortalCard";
 import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
+import { canUseAdminPreviewForRole } from "@/shared/lib/staleUiState";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import {
   AdminMode,
@@ -688,8 +689,8 @@ function AdminSidebar({
       ? (state.adminMode as AdminMode)
       : "admin";
   const activeAdminProfile = adminModeProfiles[activeAdminMode];
-  const canPreviewRoles = Boolean(state.props?.devPreviewEnabled);
   const realRole = String(state.props?.authRole || "admin");
+  const canPreviewRoles = Boolean(state.props?.devPreviewEnabled) && canUseAdminPreviewForRole(realRole);
 
   return (
     <aside

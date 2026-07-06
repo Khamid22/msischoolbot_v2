@@ -307,9 +307,9 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
-    import backend.roles.admin.routes.teacher_routes as teacher_routes
+    import backend.roles.head_of_department.routes as hod_routes
 
-    monkeypatch.setattr(teacher_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
+    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
     _set_session(
         client,
         {
@@ -321,7 +321,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
     )
 
     response = client.post(
-        "/admin/teacher-academy/7/assessments",
+        "/head-of-department/api/teacher-academy/7/assessments",
         data={"lesson_assignment_id": "3"},
         headers=XHR,
     )
@@ -331,7 +331,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.roles.admin.routes.teacher_routes as teacher_routes
+    import backend.roles.common.teacher_academy_api as academy_api
 
     captured = {}
 
@@ -339,16 +339,15 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
         captured.update(kwargs)
         return True, ""
 
-    monkeypatch.setattr(teacher_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: True)
-    monkeypatch.setattr(teacher_routes, "add_assessment", fake_add_assessment)
-    monkeypatch.setattr(teacher_routes, "invalidate_admin_page_context_cache", lambda: None)
-    monkeypatch.setattr(teacher_routes, "list_academy_teachers", lambda: [])
-    monkeypatch.setattr(teacher_routes, "list_teachers", lambda: [])
-    monkeypatch.setattr(teacher_routes, "filter_academy_teachers_for_current_scope", lambda rows: rows)
+    monkeypatch.setattr(academy_api, "add_assessment", fake_add_assessment)
+    monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
+    monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [])
+    monkeypatch.setattr(academy_api, "list_teachers", lambda: [])
+    monkeypatch.setattr(academy_api, "filter_academy_teachers_for_current_scope", lambda rows: rows)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
     response = client.post(
-        "/admin/teacher-academy/7/assessments",
+        "/academic-director/api/teacher-academy/7/assessments",
         data={"lesson_assignment_id": "21", "decision": "passed"},
         headers=XHR,
     )
@@ -361,9 +360,9 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
 
 
 def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
-    import backend.roles.admin.routes.teacher_routes as teacher_routes
+    import backend.roles.head_of_department.routes as hod_routes
 
-    monkeypatch.setattr(teacher_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
+    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
     _set_session(
         client,
         {
@@ -375,7 +374,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
     )
 
     response = client.post(
-        "/admin/teacher-academy/assignments/21",
+        "/head-of-department/api/teacher-academy/assignments/21",
         data={"assignment_id": "21"},
         headers=XHR,
     )

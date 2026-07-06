@@ -2,7 +2,7 @@ from starlette.requests import Request
 
 
 def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
-    from backend.roles.admin.routes import teacher_routes
+    from backend.roles.common import teacher_academy_api
     from backend.utils.context import _request_context
 
     request = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
@@ -23,7 +23,7 @@ def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
 
     token = _request_context.set(request)
     try:
-        sections = teacher_routes._assessment_sections_from_form()
+        sections = teacher_academy_api.assessment_sections_from_form()
     finally:
         _request_context.reset(token)
 

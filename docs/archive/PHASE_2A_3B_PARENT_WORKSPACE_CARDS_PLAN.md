@@ -4,7 +4,7 @@ Date: 2026-07-06
 Project: MSI LMS Portal  
 Branch: FastAPI-Run-System
 
-This is a planning document only. Do not implement code, change parent Telegram linking flow, change Auth V2, change the student dashboard, change `/admin` compatibility, change database schema, or delete legacy code in this phase.
+This is a planning document only. Do not implement code, change parent Telegram linking flow, change Account Authentication, change the student dashboard, change `/admin` compatibility, change database schema, or delete legacy code in this phase.
 
 ## Goal
 
@@ -24,7 +24,7 @@ The first implementation should be additive and safe:
 2. Do not change `/parent/invite/{code}`, `/parent/link/{token}`, or parent invite token behavior.
 3. Do not change `set_parent_session()` behavior.
 4. Do not change student dashboard routes or `/parent/dashboard/{student_row_id}` redirect behavior.
-5. Do not change Auth V2.
+5. Do not change Account Authentication.
 6. Do not change database schema.
 7. Do not add payment enforcement or account restriction logic.
 8. Do not expose private student, parent, phone, Telegram, or raw grade data in tests or docs.
@@ -76,7 +76,7 @@ Compatibility details:
 
 - `build_render_parent_page()` currently reads `parent_id` directly from `session`.
 - It also reads `admin_id` for legacy parent/admin compatibility fallback.
-- Auth V2 Telegram and legacy invite flows both need to keep producing the same compatible session shape.
+- Account Authentication Telegram and legacy invite flows both need to keep producing the same compatible session shape.
 
 ## 3. Current Parent-Child Linking Data Source
 
@@ -365,7 +365,7 @@ Implementation can start only after this plan is approved.
 Phase 2A-3B is acceptable when:
 
 - No parent Telegram linking code changes.
-- No Auth V2 changes.
+- No Account Authentication changes.
 - No student dashboard changes.
 - No database schema changes.
 - `/parent` still renders for parent sessions.

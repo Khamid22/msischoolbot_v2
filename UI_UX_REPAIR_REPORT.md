@@ -120,7 +120,7 @@ Note: the requested path `frontend/src/App.tsx` does not exist. The active app e
 - Severity: high
 - Suggested fix: Move the UI-only Teacher Academy panel to a role-neutral shared/academic department module, with explicit role capabilities passed in.
 - Whether shared component fix can solve it: partially, through `PageShell`, `ActionMenu`, and role-neutral panel extraction.
-- Risk level: medium. Keep existing backend routes and Auth V2 unchanged.
+- Risk level: medium. Keep existing backend routes and Account Authentication unchanged.
 
 ### 7. Old Admin Console label is isolated but still risky in preview modes
 
@@ -340,7 +340,7 @@ Note: the requested path `frontend/src/App.tsx` does not exist. The active app e
 
 ## Guardrails For Repair Phase
 
-- Do not change Auth V2.
+- Do not change Account Authentication.
 - Do not change database schema.
 - Do not change Teacher Academy backend logic.
 - Keep backend field names such as `training_*` unless a separate migration is approved.

@@ -13,17 +13,18 @@ from backend.render import generate_csrf
 from backend.domains.announcements.service import list_announcements
 from backend.domains.resources.service import list_resources
 from backend.render import render_react_page
-from backend.roles.admin.services.parent_service import list_parent_children
-from backend.roles.parent.services import (
+from backend.domains.parents.service import (
+    get_parent_invite_token,
     link_parent_via_invite,
     list_parent_client_children,
+    list_parent_children,
+    load_parent_invite_payload,
     parent_can_access_student,
     resolve_parent_child_dashboard,
 )
 from backend.roles.parent.workspace_cards import build_parent_workspace_cards
 from backend.integrations.telegram.init_data import telegram_user_from_init_data
 from backend.utils.session import set_parent_session, url_for
-from backend.identity.parent_invites import get_parent_invite_token, load_parent_invite_payload
 
 
 def _page(title, body_html, status_code=200, lang="uz", telegram_webapp=False):

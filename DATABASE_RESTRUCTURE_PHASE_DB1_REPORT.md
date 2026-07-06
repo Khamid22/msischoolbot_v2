@@ -7,9 +7,8 @@ DB-1 keeps the physical PostgreSQL schema unchanged and leaves the old database 
 - `backend.core.database` is now the clean import path for connection helpers. It wraps the existing working helpers from `database.database`.
 - `backend.domains.teacher_academy.service` owns Teacher Academy business logic and imports `backend.domains.teacher_academy.queries`.
 - `backend.domains.teacher_academy.queries` owns Teacher Academy SQL while still using the existing `msi_v2` schema and compatibility helpers from `database.queries`.
-- `backend.roles.admin.services.teacher_academy_service` is a compatibility wrapper around the domain service.
 - Academic Director, HOD, and Teacher Cabinet role edges now import safe Teacher Academy functions from `backend.domains.teacher_academy.service`.
-- Admin teacher routes still import the old admin service path intentionally, through the compatibility wrapper.
+- Admin/system admin can still read Teacher Academy rows through page context, but old admin Teacher Academy mutation routes and the admin service wrapper are removed.
 
 ## 2. New Modules Created
 
@@ -67,11 +66,10 @@ The following legacy Teacher Academy helpers remain re-exported from `database.q
 - `activate_teacher_profile`
 - `set_teacher_group_assignment`
 
-## 4. Compatibility Wrappers Kept
+## 4. Compatibility Kept
 
-- `backend/roles/admin/services/teacher_academy_service.py` now aliases to `backend.domains.teacher_academy.service`.
-- The wrapper updates package/module references so existing imports and tests that monkeypatch the old service path still affect the domain service.
 - `database/database.py`, `database/queries`, `database/cross_queries`, and `database/tables.py` remain untouched.
+- Admin/system admin page compatibility remains, but Teacher Academy mutations use AD/HOD role APIs.
 
 ## 5. Old Database Modules Still Used
 
@@ -139,7 +137,7 @@ Recommended next slice:
 ## 8. Risks Found
 
 - The Teacher Academy admin service had many direct SQL calls mixed with business rules; DB-1 separated those but kept behavior intact.
-- The old service path is still used by admin teacher routes and some tests; the compatibility wrapper is required until all imports are migrated.
+- The old Teacher Academy admin service path is no longer used by admin teacher routes.
 - `msi_v2` references remain in the new Teacher Academy query module by design. Renaming the physical schema requires a separate Railway-safe migration plan.
 - HOD scope, staff registration, announcements, academics, student, parent, and teacher support services still contain direct SQL and old database imports. Those are out of DB-1 scope.
 - `datetime.utcnow()` warnings still exist in existing helper code; DB-1 did not change time behavior.

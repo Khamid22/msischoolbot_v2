@@ -47,7 +47,7 @@ def _rate_limit_isolated_client(app, label):
     )
 
 
-def _auth_v2_result(role, *, account_role=None, **session_overrides):
+def _account_auth_result(role, *, account_role=None, **session_overrides):
     account_role = account_role or role
     session_payload = {
         "account_id": 100,
@@ -119,9 +119,9 @@ def test_account_login_path_is_always_available(app, monkeypatch):
     calls = {"auth": 0}
     _set_csrf_session(client)
 
-    def fake_auth_v2(login, password):
+    def fake_account_auth(login, password):
         calls["auth"] += 1
-        return _auth_v2_result(
+        return _account_auth_result(
             "student",
             auth_login="MSI00001",
             student_db_id=1001,
@@ -131,7 +131,7 @@ def test_account_login_path_is_always_available(app, monkeypatch):
             student_school_code="sehriyo",
         )
 
-    monkeypatch.setattr(identity_routes, "authenticate_account_password", fake_auth_v2)
+    monkeypatch.setattr(identity_routes, "authenticate_account_password", fake_account_auth)
     monkeypatch.setattr(identity_routes, "record_student_activity", lambda student_id: None)
 
     response = _post_login(client)

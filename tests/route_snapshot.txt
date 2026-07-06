@@ -5,6 +5,7 @@
 /academic-director/api/teacher-academy | POST
 /academic-director/api/teacher-academy/assignments/{assignment_id} | POST
 /academic-director/api/teacher-academy/{academy_teacher_id}/assessments | POST
+/academic-director/api/teacher-academy/{academy_teacher_id}/delete | POST
 /academic-director/api/teacher-academy/{academy_teacher_id}/promote | POST
 /academic-director/api/teacher-academy/{academy_teacher_id}/status | POST
 /academic-director/head-of-departments | GET
@@ -72,11 +73,6 @@
 /admin/students/{student_row_id}/dashboard/{target} | GET
 /admin/students/{student_row_id}/password | POST
 /admin/students/{student_row_id}/profile | POST
-/admin/teacher-academy | POST
-/admin/teacher-academy/assignments/{assignment_id} | POST
-/admin/teacher-academy/{academy_teacher_id}/assessments | POST
-/admin/teacher-academy/{academy_teacher_id}/promote | POST
-/admin/teacher-academy/{academy_teacher_id}/status | POST
 /admin/teacher-candidates | POST
 /admin/teacher-candidates/{candidate_id}/events/{event_id}/delete | POST
 /admin/teacher-candidates/{candidate_id}/events/{event_id}/edit | POST

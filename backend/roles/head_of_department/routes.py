@@ -5,7 +5,10 @@ from fastapi import APIRouter, Depends
 from backend.domains.announcements.service import list_announcements
 from backend.render import generate_csrf, render_react_page
 from backend.roles.admin.services.academic_service import list_admin_academic_context
-from backend.domains.teacher_academy.service import list_teacher_academy_page_context
+from backend.domains.teacher_academy.service import (
+    list_academy_timetable_events,
+    list_teacher_academy_page_context,
+)
 from backend.roles.head_of_department.academy_scope import (
     current_hod_subject_ids,
     can_current_user_manage_academy_assignment,
@@ -69,12 +72,14 @@ def _head_of_department_academy_context():
 def _head_of_department_timetable_context():
     try:
         context = list_admin_academic_context()
+        subject_ids = current_hod_subject_ids()
+        academy_lessons = list_academy_timetable_events(subject_ids)
     except Exception as exc:
-        return {"schedules": [], "sessions": [], "warning": f"Subject timetable could not be loaded: {exc}"}
-    subject_ids = current_hod_subject_ids()
+        return {"schedules": [], "sessions": [], "academy_lessons": [], "warning": f"Subject timetable could not be loaded: {exc}"}
     return {
         "schedules": filter_rows_by_subject_scope(context.get("schedules") or [], subject_ids),
         "sessions": filter_rows_by_subject_scope(context.get("sessions") or [], subject_ids),
+        "academy_lessons": academy_lessons,
         "warning": "",
     }
 
@@ -87,7 +92,7 @@ def _head_of_department_announcement_context():
     return {"announcements": announcements, "warning": ""}
 
 
-def register_head_of_department_page_routes(app, *, render_admin_page=None):
+def register_head_of_department_page_routes(app):
     router = APIRouter(dependencies=[Depends(require_role("head_of_department"))])
 
     @router.get("/head-of-department", operation_id="head_of_department_home")
@@ -112,6 +117,7 @@ def register_head_of_department_page_routes(app, *, render_admin_page=None):
                 "workspace": "timetable",
                 "adminAcademicSchedules": timetable_context.get("schedules", []),
                 "adminAcademicSessions": timetable_context.get("sessions", []),
+                "adminAcademyLessonEvents": timetable_context.get("academy_lessons", []),
                 "warning": timetable_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },

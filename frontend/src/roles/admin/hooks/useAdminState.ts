@@ -29,7 +29,7 @@ import {
 import { XHR_HEADERS } from "@/shared/lib/api";
 import {
   canUseAdminPreviewForRole,
-  clearStaleRolePreviewStorage,
+  clearRolePreviewStorage,
 } from "@/shared/lib/staleUiState";
 
 function preferredSchoolCode(schoolCodes: string[]) {
@@ -71,7 +71,11 @@ const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
 const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
 
 function serverAdminMode(props: AdminPageProps) {
-  return normalizeAdminMode(props.previewRole || props.adminMode || props.authRole || "admin");
+  const realRole = asString(props.authRole || props.adminMode);
+  if (props.devPreviewEnabled && canUseAdminPreviewForRole(realRole)) {
+    return normalizeAdminMode(props.previewRole || props.adminMode || props.authRole || "admin");
+  }
+  return normalizeAdminMode(props.adminMode || props.authRole || "admin");
 }
 
 function storedAdminMode() {
@@ -89,7 +93,7 @@ export function useAdminState(props: AdminPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
   const realRole = asString(props.authRole || props.adminMode || props.previewRole);
   const serverMode = serverAdminMode(props);
-  const allowPreviewMode = canUseAdminPreviewForRole(realRole);
+  const allowPreviewMode = Boolean(props.devPreviewEnabled) && canUseAdminPreviewForRole(realRole);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [previewRole, setPreviewRoleState] = useState<AdminMode>(() => {
     if (!allowPreviewMode) {
@@ -232,7 +236,7 @@ export function useAdminState(props: AdminPageProps) {
 
   useEffect(() => {
     if (!allowPreviewMode) {
-      clearStaleRolePreviewStorage(realRole);
+      clearRolePreviewStorage();
       if (serverMode !== adminMode) {
         setPreviewRoleState(serverMode);
       }
@@ -465,7 +469,7 @@ export function useAdminState(props: AdminPageProps) {
     }
     const fallbackTab = visibleTabs[0]?.key || "overview";
     setActiveTab(fallbackTab);
-    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, adminMode);
+    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, allowPreviewMode ? adminMode : "");
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.history.replaceState({}, "", nextUrl);
@@ -732,7 +736,7 @@ export function useAdminState(props: AdminPageProps) {
   function switchAdminTab(nextTab: AdminTab) {
     setActiveTab(nextTab);
     setMobileNavOpen(false);
-    const nextUrl = buildAdminTabUrl(nextTab, currentSchool, adminMode);
+    const nextUrl = buildAdminTabUrl(nextTab, currentSchool, allowPreviewMode ? adminMode : "");
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.history.pushState({}, "", nextUrl);
@@ -744,7 +748,7 @@ export function useAdminState(props: AdminPageProps) {
       setPreviewRoleState(serverMode);
       setActiveTab(tabsForAdminMode(serverMode)[0]?.key || "overview");
       setMobileNavOpen(false);
-      clearStaleRolePreviewStorage(realRole);
+      clearRolePreviewStorage();
       return;
     }
     const normalizedMode = normalizeAdminMode(nextMode);

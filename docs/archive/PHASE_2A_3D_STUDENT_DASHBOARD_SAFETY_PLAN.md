@@ -4,7 +4,7 @@ Date: 2026-07-06
 Project: MSI LMS Portal  
 Branch: FastAPI-Run-System
 
-This is a planning document only. Do not implement code, change Auth V2, change `/admin` compatibility, change parent Telegram flow, change database schema, delete legacy code, or deeply redesign the frontend in this phase.
+This is a planning document only. Do not implement code, change Account Authentication, change `/admin` compatibility, change parent Telegram flow, change database schema, delete legacy code, or deeply redesign the frontend in this phase.
 
 ## Goal
 
@@ -241,7 +241,7 @@ What must not change:
 ## 7. What Already Works
 
 - Student password login redirects to `/dashboard/{student_enrollment_id}` when the session has an enrollment id.
-- Student Telegram login through Auth V2/legacy flow redirects to the current dashboard when linked.
+- Student Telegram login through Account Authentication/legacy flow redirects to the current dashboard when linked.
 - `/student` redirects to dashboard for valid student sessions.
 - Dashboard, AAP, AR, rating, resources, chat, and office-hours pages share the same payload access service.
 - Student dashboard ownership is checked by session enrollment id, not by name.
@@ -305,7 +305,7 @@ Phase 2A-3D must not change:
 - `embed=admin`.
 - `admin_return_panel` and `admin_return_school`.
 - Student Telegram/login behavior.
-- Auth V2.
+- Account Authentication.
 - `/admin` compatibility.
 - Database schema.
 - Legacy route aliases and route snapshot.

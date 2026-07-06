@@ -118,7 +118,9 @@ function AcademicDirectorHome({
       <RoleMetricCards cards={normalizedCards} />
 
       <AcademicDirectorTeacherAcademyCta />
-      <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      {activeNav === "profile" ? (
+        <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      ) : null}
     </AcademicDirectorPageShell>
   );
 }
@@ -162,7 +164,9 @@ function HeadOfDepartmentHome({
       <RoleMetricCards cards={normalizedCards} />
 
       <HeadOfDepartmentTeacherAcademyCta />
-      <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      {activeNav === "profile" ? (
+        <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      ) : null}
     </HeadOfDepartmentPageShell>
   );
 }

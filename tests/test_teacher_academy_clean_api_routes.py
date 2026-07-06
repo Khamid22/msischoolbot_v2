@@ -67,6 +67,7 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
         "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/promote",
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/delete",
         "/head-of-department/api/teacher-academy/assignments/{assignment_id}",
         "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
         "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
@@ -132,10 +133,15 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
         calls["promote"] = kwargs
         return True, ""
 
+    def fake_delete(**kwargs):
+        calls["delete"] = kwargs
+        return True, ""
+
     monkeypatch.setattr(academy_api, "update_assignment", fake_update_assignment)
     monkeypatch.setattr(academy_api, "add_assessment", fake_add_assessment)
     monkeypatch.setattr(academy_api, "update_academy_status", fake_update_status)
     monkeypatch.setattr(academy_api, "promote_academy_teacher", fake_promote)
+    monkeypatch.setattr(academy_api, "delete_academy_teacher", fake_delete)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
     schedule_response = client.post(
@@ -158,11 +164,16 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
         data={"teacher_assigned_group": "Grade 8A", "teacher_pay_rate": "100000"},
         headers=XHR,
     )
+    delete_response = client.post(
+        "/academic-director/api/teacher-academy/91/delete",
+        headers=XHR,
+    )
 
     assert schedule_response.status_code == 200
     assert assessment_response.status_code == 200
     assert status_response.status_code == 200
     assert promote_response.status_code == 200
+    assert delete_response.status_code == 200
     assert calls["assignment"]["assignment_id"] == 8
     assert calls["assignment"]["status"] == "ready"
     assert calls["assessment"]["academy_teacher_id"] == 91
@@ -171,6 +182,7 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
     assert calls["status"] == {"academy_teacher_id": 91, "status": "ready_for_active_teacher"}
     assert calls["promote"]["academy_teacher_id"] == 91
     assert calls["promote"]["assigned_group"] == "Grade 8A"
+    assert calls["delete"]["academy_teacher_id"] == 91
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
@@ -249,7 +261,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
     assert denied.json()["message"] == "This Teacher Academy teacher is outside your subject scope."
 
 
-def test_frontend_teacher_academy_uses_clean_role_routes_and_keeps_admin_compatibility():
+def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fallback():
     panel_source = Path("frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     ad_page = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
@@ -258,11 +270,30 @@ def test_frontend_teacher_academy_uses_clean_role_routes_and_keeps_admin_compati
     assert "routes.academicDirectorTeacherAcademyCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssessmentCreate" in panel_source
+    assert "routes.academicDirectorTeacherAcademyDelete" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssessmentCreate" in panel_source
     assert "submit(routes.adminTeacherAcademy" not in panel_source
+    assert "routes.adminTeacherAcademy" not in panel_source
     assert "academicDirectorTeacherAcademyCreate: \"/academic-director/api/teacher-academy\"" in routes_source
+    assert "academicDirectorTeacherAcademyDelete" in routes_source
     assert "headOfDepartmentTeacherAcademyAssignmentUpdate" in routes_source
-    assert "adminTeacherAcademyCreate: \"/admin/teacher-academy\"" in routes_source
+    assert "adminTeacherAcademy" not in routes_source
+    assert "/admin/teacher-academy" not in routes_source
     assert "adminMode: props.adminMode || \"academic_director\"" in ad_page
     assert "adminMode: \"head_of_department\"" in hod_page
+
+
+def test_teacher_academy_legacy_deletion_plan_documents_completed_admin_cleanup():
+    plan_source = Path("TEACHER_ACADEMY_LEGACY_DELETION_PLAN.md").read_text()
+
+    for required in [
+        "Status: completed",
+        "Removed old admin Teacher Academy action routes",
+        "Removed `backend/roles/admin/services/teacher_academy_service.py`",
+        "Removed `adminTeacherAcademy...` frontend action helpers",
+        "Academic Director mode uses `/academic-director/api/teacher-academy...`",
+        "Head of Department mode uses `/head-of-department/api/teacher-academy...`",
+        "Admin/system admin no longer posts Teacher Academy actions through `/admin`.",
+    ]:
+        assert required in plan_source

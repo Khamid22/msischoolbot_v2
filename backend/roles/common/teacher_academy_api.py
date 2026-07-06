@@ -5,12 +5,13 @@ from __future__ import annotations
 from backend.domains.teacher_academy.service import (
     add_assessment,
     create_academy_teacher,
+    delete_academy_teacher,
     list_academy_teachers,
     promote_academy_teacher,
     update_academy_status,
     update_assignment,
 )
-from backend.identity.account_service import list_teachers
+from backend.domains.teachers.service import list_teachers
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.utils.context import request
 from backend.utils.response_helpers import jsonify
@@ -193,6 +194,13 @@ def update_status_response(academy_teacher_id: int):
     return academy_payload("Academy status updated.")
 
 
+def delete_academy_teacher_response(academy_teacher_id: int):
+    deleted, error_message = delete_academy_teacher(academy_teacher_id=academy_teacher_id)
+    if not deleted:
+        return academy_error(error_message or "Unable to delete academy teacher.")
+    return academy_payload("Academy teacher deleted.")
+
+
 def promote_response(academy_teacher_id: int):
     promoted, error_message = promote_academy_teacher(
         academy_teacher_id=academy_teacher_id,
@@ -212,6 +220,7 @@ __all__ = [
     "academy_payload",
     "add_assessment_response",
     "create_academy_teacher_response",
+    "delete_academy_teacher_response",
     "form_list",
     "promote_response",
     "update_assignment_response",

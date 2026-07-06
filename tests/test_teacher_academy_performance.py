@@ -1,6 +1,6 @@
 """Teacher Academy performance-oriented service coverage."""
 
-import backend.roles.admin.services.teacher_academy_service as academy_service
+import backend.domains.teacher_academy.service as academy_service
 
 
 class _Rows:
@@ -169,3 +169,163 @@ def test_progress_target_matches_selected_assignment_count():
     assert six_progress["target_lessons"] == 6
     assert ten_progress["assigned_count"] == 10
     assert ten_progress["target_lessons"] == 10
+
+
+def test_academy_timetable_events_include_only_scheduled_assignments_and_scope(monkeypatch):
+    monkeypatch.setattr(
+        academy_service,
+        "list_academy_teachers",
+        lambda: [
+            {
+                "id": 3,
+                "full_name": "Academy Math Teacher",
+                "subject_id": 2,
+                "subject": "Mathematics",
+                "assignments": [
+                    {
+                        "id": 8,
+                        "lesson_number": "Lesson 3",
+                        "lesson_topic": "HCF and LCM",
+                        "session_datetime": "2026-07-08T09:00:00+00:00",
+                        "evaluator_id": 44,
+                        "evaluator_name": "Math HOD",
+                        "status": "assigned",
+                    },
+                    {
+                        "id": 9,
+                        "lesson_number": "Lesson 4",
+                        "lesson_topic": "Fractions",
+                        "session_datetime": "",
+                        "evaluator_id": 44,
+                        "evaluator_name": "Math HOD",
+                        "status": "assigned",
+                    },
+                ],
+            },
+            {
+                "id": 4,
+                "full_name": "Academy English Teacher",
+                "subject_id": 7,
+                "subject": "English",
+                "assignments": [
+                    {
+                        "id": 10,
+                        "lesson_number": "Lesson 1",
+                        "lesson_topic": "Essay planning",
+                        "session_datetime": "2026-07-09 10:30:00+00",
+                        "evaluator_id": 45,
+                        "evaluator_name": "English HOD",
+                        "status": "ready",
+                    },
+                ],
+            },
+        ],
+    )
+
+    all_events = academy_service.list_academy_timetable_events()
+    scoped_events = academy_service.list_academy_timetable_events({2})
+
+    assert [event["assignment_id"] for event in all_events] == [8, 10]
+    assert all_events[0]["title"] == "Lesson 3 - HCF and LCM"
+    assert all_events[0]["session_date"] == "2026-07-08"
+    assert all_events[0]["start_time"] == "09:00"
+    assert all_events[0]["teacher_name"] == "Academy Math Teacher"
+    assert all_events[0]["evaluator_name"] == "Math HOD"
+    assert all_events[0]["status"] == "assigned"
+    assert [event["assignment_id"] for event in scoped_events] == [8]
+
+
+def test_delete_academy_teacher_removes_generated_academy_identity(monkeypatch):
+    calls = []
+
+    class Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+
+        def commit(self):
+            calls.append(("commit",))
+
+    conn = Conn()
+    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: calls.append(("ensure",)))
+    monkeypatch.setattr(
+        academy_service.queries,
+        "get_academy_teacher_delete_row",
+        lambda conn, academy_teacher_id: {
+            "id": academy_teacher_id,
+            "staff_id": 44,
+            "teacher_id": 12,
+            "teacher_status": "academy",
+            "promoted_teacher_id": 0,
+        },
+    )
+    monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: True)
+    monkeypatch.setattr(academy_service.queries, "list_teacher_account_ids_for_staff", lambda conn, staff_id: [88])
+    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(
+        academy_service.queries,
+        "delete_teacher_profiles_for_delete",
+        lambda conn, teacher_id, account_ids: calls.append(("teacher_profiles", teacher_id, account_ids)),
+    )
+    monkeypatch.setattr(
+        academy_service.queries,
+        "delete_staff_profiles_for_delete",
+        lambda conn, staff_id, account_ids: calls.append(("staff_profiles", staff_id, account_ids)),
+    )
+    monkeypatch.setattr(academy_service.queries, "delete_teacher_accounts_for_delete", lambda conn, account_ids: calls.append(("accounts", account_ids)))
+    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_staff_row", lambda conn, staff_id: calls.append(("staff", staff_id)))
+    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_profile_row", lambda conn, teacher_id: calls.append(("teacher", teacher_id)))
+
+    deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
+
+    assert deleted is True
+    assert message == ""
+    assert ("academy", 91) in calls
+    assert ("teacher_profiles", 12, [88]) in calls
+    assert ("staff_profiles", 44, [88]) in calls
+    assert ("accounts", [88]) in calls
+    assert ("staff", 44) in calls
+    assert ("teacher", 12) in calls
+    assert ("commit",) in calls
+
+
+def test_delete_academy_teacher_preserves_non_academy_identity(monkeypatch):
+    calls = []
+
+    class Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+
+        def commit(self):
+            calls.append(("commit",))
+
+    conn = Conn()
+    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: None)
+    monkeypatch.setattr(
+        academy_service.queries,
+        "get_academy_teacher_delete_row",
+        lambda conn, academy_teacher_id: {
+            "id": academy_teacher_id,
+            "staff_id": 44,
+            "teacher_id": 12,
+            "teacher_status": "active",
+            "promoted_teacher_id": 12,
+        },
+    )
+    monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: (_ for _ in ()).throw(AssertionError("identity cleanup should be skipped")))
+    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(academy_service.queries, "delete_teacher_profiles_for_delete", lambda *args, **kwargs: calls.append(("unexpected", "teacher_profiles")))
+    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_staff_row", lambda *args, **kwargs: calls.append(("unexpected", "staff")))
+
+    deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
+
+    assert deleted is True
+    assert message == ""
+    assert calls == [("academy", 91), ("commit",)]

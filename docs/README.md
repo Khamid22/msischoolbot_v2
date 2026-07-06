@@ -2,7 +2,7 @@
 
 This directory contains the planning and architecture documentation for MSI LMS Portal.
 
-Status: documentation package for CEO review, senior engineer review, and final architecture agreement.
+Status: active documentation index. Historical phase plans live in `docs/archive/`.
 
 ## Project Context
 
@@ -32,17 +32,18 @@ Start here for business and leadership review:
 
 Start here for senior engineer review:
 
-1. [Engineering Overview](./ENGINEERING_OVERVIEW.md)
-2. [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
-3. [Engineering Module Map](./ENGINEERING_MODULE_MAP.md)
-4. [Engineering Database](./ENGINEERING_DATABASE.md)
-5. [Engineering Auth And Roles](./ENGINEERING_AUTH_AND_ROLES.md)
-6. [Engineering Route Map](./ENGINEERING_ROUTE_MAP.md)
-7. [Engineering Telegram Flow](./ENGINEERING_TELEGRAM_FLOW.md)
-8. [Engineering Payment Access Policy](./ENGINEERING_PAYMENT_ACCESS_POLICY.md)
-9. [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
-10. [Engineering Testing](./ENGINEERING_TESTING.md)
-11. [Engineering Technical Debt](./ENGINEERING_TECHNICAL_DEBT.md)
+1. [Current Architecture](../CURRENT_ARCHITECTURE.md)
+2. [Engineering Overview](./ENGINEERING_OVERVIEW.md)
+3. [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
+4. [Engineering Module Map](./ENGINEERING_MODULE_MAP.md)
+5. [Engineering Database](./ENGINEERING_DATABASE.md)
+6. [Engineering Auth And Roles](./ENGINEERING_AUTH_AND_ROLES.md)
+7. [Engineering Route Map](./ENGINEERING_ROUTE_MAP.md)
+8. [Engineering Telegram Flow](./ENGINEERING_TELEGRAM_FLOW.md)
+9. [Engineering Payment Access Policy](./ENGINEERING_PAYMENT_ACCESS_POLICY.md)
+10. [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
+11. [Engineering Testing](./ENGINEERING_TESTING.md)
+12. [Engineering Technical Debt](./ENGINEERING_TECHNICAL_DEBT.md)
 
 ### Existing Architecture Notes
 
@@ -55,6 +56,10 @@ These planning files contain earlier detailed architecture notes:
 - [MSI LMS Payment Access Policy](./MSI_LMS_PAYMENT_ACCESS_POLICY.md)
 - [MSI LMS Telegram Parent Linking](./MSI_LMS_TELEGRAM_PARENT_LINKING.md)
 
+### Historical Plans
+
+Phase-era implementation plans are archived under [docs/archive](./archive/). Keep them for history, but use `CURRENT_ARCHITECTURE.md` and the engineering docs above as the current source of truth.
+
 ## Review Workflow
 
 ```mermaid
@@ -64,7 +69,7 @@ flowchart TD
     Review2[Senior Engineer Review]
     Review3[CEO/User Review]
     Decisions[Final Architecture Decisions]
-    Implementation[Phase-by-Phase Implementation]
+    Implementation[Implementation]
 
     Codex --> Review1 --> Review2 --> Review3 --> Decisions --> Implementation
 ```

@@ -4,16 +4,13 @@ import time
 
 from database import queries
 from database.academics import canonical
-from backend.identity.account_service import (
-    get_admin_student_profile,
-    list_students_for_admin,
-    list_teachers,
-)
+from backend.domains.students.service import get_admin_student_profile, list_students_for_admin
+from backend.domains.teachers.service import list_teachers
+from backend.domains.teacher_academy.service import list_academy_teachers
 from .teacher_candidate_service import list_teacher_candidates
-from .teacher_academy_service import list_academy_teachers
 from backend.domains.complaints.service import list_complaints
 from database.academics.canonical import normalize_text
-from .parent_service import list_parent_accounts, list_parent_children
+from backend.domains.parents.service import list_parent_accounts, list_parent_children
 from database.academics.performance_summary import (
     list_subject_summaries,
 )

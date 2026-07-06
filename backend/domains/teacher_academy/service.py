@@ -4,7 +4,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash
 
 from backend.domains.teacher_academy import queries
-from backend.identity.teachers import list_teachers, upsert_teacher
+from backend.domains.teachers.service import list_teachers, upsert_teacher
 from backend.roles.admin.services.teacher_academy_notifications import notify_academy_teacher_event
 
 VALID_ACADEMY_STATUSES = {
@@ -467,6 +467,71 @@ def list_academy_teachers():
     return teachers
 
 
+def _academy_event_date_parts(session_datetime):
+    raw = str(session_datetime or "").strip()
+    if not raw:
+        return "", ""
+    normalized = raw.replace(" ", "T")
+    date_part = normalized[:10] if len(normalized) >= 10 else ""
+    time_part = ""
+    if "T" in normalized:
+        time_part = normalized.split("T", 1)[1][:5]
+    return date_part, time_part
+
+
+def list_academy_timetable_events(subject_ids=None):
+    scoped_subject_ids = {
+        _as_int(subject_id)
+        for subject_id in (subject_ids or [])
+        if _as_int(subject_id)
+    }
+    events = []
+    for teacher in list_academy_teachers():
+        subject_id = _as_int(teacher.get("subject_id"))
+        if scoped_subject_ids and subject_id not in scoped_subject_ids:
+            continue
+        for assignment in teacher.get("assignments") or []:
+            session_datetime = str(assignment.get("session_datetime") or "").strip()
+            if not session_datetime:
+                continue
+            session_date, start_time = _academy_event_date_parts(session_datetime)
+            lesson_number = str(assignment.get("lesson_number") or "").strip()
+            lesson_topic = str(assignment.get("lesson_topic") or "").strip()
+            title = " - ".join(part for part in (lesson_number, lesson_topic) if part) or "Academy lesson"
+            events.append(
+                {
+                    "id": f"academy-{_as_int(assignment.get('id'))}",
+                    "assignment_id": _as_int(assignment.get("id")),
+                    "academy_teacher_id": _as_int(teacher.get("id")),
+                    "subject_id": subject_id,
+                    "subject_name": str(teacher.get("subject") or teacher.get("subject_program_name") or ""),
+                    "teacher_name": str(teacher.get("full_name") or ""),
+                    "group_name": "Teacher Academy",
+                    "title": title,
+                    "lesson_number": lesson_number,
+                    "lesson_topic": lesson_topic,
+                    "session_datetime": session_datetime,
+                    "session_date": session_date,
+                    "start_time": start_time,
+                    "end_time": "",
+                    "room": "Teacher Academy",
+                    "online_url": "",
+                    "status": str(assignment.get("status") or "scheduled"),
+                    "evaluator_id": _as_int(assignment.get("evaluator_id")),
+                    "evaluator_name": str(assignment.get("evaluator_name") or ""),
+                    "event_type": "academy_lesson",
+                }
+            )
+    return sorted(
+        events,
+        key=lambda row: (
+            str(row.get("session_date") or "9999-99-99"),
+            str(row.get("start_time") or ""),
+            str(row.get("teacher_name") or ""),
+        ),
+    )
+
+
 def get_academy_teacher_for_teacher_account(teacher_id, staff_id=None):
     parsed_teacher_id = _as_int(teacher_id)
     parsed_staff_id = _as_int(staff_id)
@@ -808,6 +873,47 @@ def update_academy_status(*, academy_teacher_id, status):
     return True, ""
 
 
+def delete_academy_teacher(*, academy_teacher_id):
+    parsed_teacher_id = _as_int(academy_teacher_id)
+    if not parsed_teacher_id:
+        return False, "Academy teacher not found."
+
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        row = queries.get_academy_teacher_delete_row(conn, parsed_teacher_id)
+        if not row:
+            return False, "Academy teacher not found."
+
+        staff_id = _as_int(row["staff_id"])
+        teacher_id = _as_int(row["teacher_id"])
+        teacher_status = str(row["teacher_status"] or "").strip().lower()
+        promoted_teacher_id = _as_int(row["promoted_teacher_id"])
+        delete_generated_identity = bool(staff_id and teacher_id and teacher_status == "academy" and not promoted_teacher_id)
+        account_ids: list[int] = []
+        if delete_generated_identity and _phase1_accounts_available(conn):
+            account_ids = queries.list_teacher_account_ids_for_staff(conn, staff_id=staff_id)
+
+        queries.delete_academy_teacher_row(conn, parsed_teacher_id)
+
+        if delete_generated_identity:
+            queries.delete_teacher_profiles_for_delete(
+                conn,
+                teacher_id=teacher_id,
+                account_ids=account_ids,
+            )
+            queries.delete_staff_profiles_for_delete(
+                conn,
+                staff_id=staff_id,
+                account_ids=account_ids,
+            )
+            queries.delete_teacher_accounts_for_delete(conn, account_ids)
+            queries.delete_academy_teacher_staff_row(conn, staff_id)
+            queries.delete_academy_teacher_profile_row(conn, teacher_id)
+
+        conn.commit()
+    return True, ""
+
+
 def _academy_teacher_for_promotion(academy_teacher_id):
     parsed_teacher_id = _as_int(academy_teacher_id)
     if not parsed_teacher_id:
@@ -885,8 +991,10 @@ __all__ = [
     "backfill_academy_teacher_accounts",
     "get_academy_teacher_for_teacher_account",
     "list_academy_teachers",
+    "list_academy_timetable_events",
     "list_teacher_academy_page_context",
     "create_academy_teacher",
+    "delete_academy_teacher",
     "update_assignment",
     "add_assessment",
     "update_academy_status",

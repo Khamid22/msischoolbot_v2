@@ -8,7 +8,7 @@ from backend.utils.session import (
     current_student_enrollment_id,
     current_student_full_name,
 )
-from backend.roles.parent.services import parent_can_access_dashboard
+from backend.domains.parents.service import parent_can_access_dashboard
 
 
 def load_student_payload_for_view(

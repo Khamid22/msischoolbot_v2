@@ -3,7 +3,7 @@ from backend.utils.context import session
 
 from backend.roles.admin.routes.request_payload import request_payload
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
-from backend.roles.admin.services.parent_service import (
+from backend.domains.parents.service import (
     assign_parent_child,
     delete_parent_account,
     remove_parent_child,

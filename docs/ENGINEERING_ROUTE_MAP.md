@@ -108,8 +108,9 @@ Current admin routes include:
 - `/admin/api/office-hours/*`.
 - `/admin/teachers/*`.
 - `/admin/teacher-candidates/*`.
-- `/admin/teacher-academy/*`.
 - `/admin/parents/*`.
+- Teacher Academy mutations are owned by Academic Director and HOD role APIs;
+  admin/system admin keeps read-only page compatibility where needed.
 
 Target:
 

@@ -1,7 +1,7 @@
 """Teacher role service facade."""
 
 from database import queries
-from backend.identity.account_service import (  # noqa: F401
+from backend.domains.teachers.service import (  # noqa: F401
     assign_teacher_to_group,
     get_teacher_by_id,
     get_teacher_name_by_group,

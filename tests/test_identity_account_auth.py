@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash
 
-from backend.identity import account_auth_v2 as auth_v2
+from backend.identity import account_auth
 
 
 class _Result:
@@ -173,7 +173,7 @@ class _FakeConn:
     def execute(self, sql, params=None):
         params = tuple(params or ())
         if "FROM msi_v2.accounts" in sql:
-            return _Result(self.accounts.get(auth_v2.normalize_login(params[0])))
+            return _Result(self.accounts.get(account_auth.normalize_login(params[0])))
         if "FROM msi_v2.student_profiles" in sql:
             return _Result(self.student_profiles.get(int(params[0])))
         if "FROM msi_v2.teacher_profiles" in sql:
@@ -186,11 +186,17 @@ class _FakeConn:
 
 
 def _authenticate(login, password="correct-password"):
-    return auth_v2.authenticate_account_password(login, password, conn=_FakeConn())
+    return account_auth.authenticate_account_password(login, password, conn=_FakeConn())
 
 
 def test_account_auth_is_unconditional():
-    assert "account_auth_v2_enabled" not in auth_v2.__all__
+    assert not any(name.endswith("_enabled") for name in account_auth.__all__)
+
+
+def test_previous_account_auth_import_path_still_works():
+    import backend.identity.account_auth_v2 as previous_account_auth
+
+    assert previous_account_auth.authenticate_account_password is account_auth.authenticate_account_password
 
 
 def test_active_student_authenticates():

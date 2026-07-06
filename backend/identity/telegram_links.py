@@ -2,6 +2,7 @@
 
 from database.academics import canonical
 from database import queries
+from backend.domains.parents import queries as parent_queries
 from backend.identity.common import DB_LOCK, connect, utc_now_iso
 from backend.identity.storage import init_storage
 
@@ -59,7 +60,7 @@ def link_student_telegram_user(student_row_id, telegram_user_id):
                 student_row_id,
             )
             queries.clear_admin_telegram_user_conflicts(conn, telegram_user_id)
-            queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
+            parent_queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
             queries.update_student_telegram_user(conn, telegram_user_id, student_row_id)
             conn.commit()
     return True
@@ -80,7 +81,7 @@ def link_admin_telegram_user(admin_id, telegram_user_id):
                 return False
             queries.clear_student_telegram_user_conflicts(conn, telegram_user_id, -1)
             queries.clear_admin_telegram_user_conflicts(conn, telegram_user_id, admin_id)
-            queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
+            parent_queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
             queries.update_admin_telegram_user(conn, telegram_user_id, admin_id)
             conn.commit()
     return True
@@ -143,11 +144,11 @@ def unlink_telegram_user_links(telegram_user_id):
         with connect() as conn:
             student_row = queries.get_student_by_telegram_id(conn, telegram_user_id)
             admin_row = queries.get_admin_by_telegram_id(conn, telegram_user_id)
-            parent_row = queries.get_parent_by_telegram_id(conn, telegram_user_id)
+            parent_row = parent_queries.get_parent_by_telegram_id(conn, telegram_user_id)
 
             queries.clear_student_telegram_user_conflicts(conn, telegram_user_id, -1)
             queries.clear_admin_telegram_user_conflicts(conn, telegram_user_id)
-            queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
+            parent_queries.clear_parent_telegram_user_conflicts(conn, telegram_user_id)
             conn.commit()
 
     return {

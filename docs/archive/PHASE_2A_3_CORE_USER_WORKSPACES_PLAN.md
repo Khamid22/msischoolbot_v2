@@ -24,7 +24,7 @@ These are higher-risk than CEO, Academic Director, Customer Support, and HR Mana
 3. Do not break the teacher workspace.
 4. Do not break `/admin` compatibility.
 5. Do not remove legacy auth.
-6. Do not change Auth V2 behavior in this phase.
+6. Do not change Account Authentication behavior in this phase.
 7. Do not change database schema.
 8. System Admin still uses admin compatibility for now.
 9. Add read-only cards first; avoid new write actions until ownership and permissions are tested.
@@ -41,7 +41,7 @@ Reasoning:
 
 - Teacher already has scoped workspace data and is lower risk than student/admin.
 - Parent already has useful child summary data, but the Telegram flow must be protected.
-- System Admin should remain compatible with `/admin` until Auth V2 and account management are stable.
+- System Admin should remain compatible with `/admin` until Account Authentication and account management are stable.
 - Student dashboard is mature and central to current users, so it should be touched last.
 
 ## Teacher Workspace
@@ -301,7 +301,7 @@ Session fields are important:
 ### 4. What Already Works
 
 - Student login redirects to own dashboard.
-- Auth V2 can create legacy-compatible student session payload.
+- Account Authentication can create legacy-compatible student session payload.
 - Student dashboard shows attendance/progress/exam/resource/navigation data.
 - Subject switcher exists.
 - AAP/AR pages exist.
@@ -372,7 +372,7 @@ Near-term improvement should be cleanup, not new structure:
 - `GET /admin`
 - Many existing admin routes and APIs under `/admin/*` and `/admin/api/*`.
 
-Current Auth V2 behavior:
+Current Account Authentication behavior:
 
 - Canonical account role is `system_admin`.
 - Compatibility session sets `auth_role = "admin"` so legacy `/admin` routes keep working.
@@ -415,7 +415,7 @@ The system_admin role does not yet have a separate `/system-admin` route.
 ### 4. What Already Works
 
 - `/admin` loads for legacy admin-compatible session.
-- System admin Auth V2 redirects to `/admin`.
+- System admin Account Authentication redirects to `/admin`.
 - Admin panel can manage existing operational data.
 - Admin panel can access academic context, students, teachers, parents, resources, payments, complaints, and announcements.
 - Existing tests cover admin route registration and system_admin compatibility.
@@ -458,7 +458,7 @@ Suggested first implementation:
 
 ### 8. Tests Needed
 
-- system_admin Auth V2 still redirects to `/admin`.
+- system_admin Account Authentication still redirects to `/admin`.
 - system_admin session still includes canonical role metadata.
 - `/admin` still loads with `auth_role = "admin"`.
 - Non-admin roles cannot access `/admin`.
@@ -505,7 +505,7 @@ Do not add student dashboard API changes in this phase. The current student dash
 - Full test suite passes before and after each step.
 - Teacher, Parent, Student, and `/admin` routes still load.
 - Parent invite and Telegram flows remain unchanged.
-- Auth V2 tests remain green.
+- Account Authentication tests remain green.
 - Route snapshot remains stable unless a new route is intentionally approved.
 - New cards are read-only.
 - New tests do not require real private data.
@@ -515,7 +515,7 @@ Do not add student dashboard API changes in this phase. The current student dash
 
 ```mermaid
 flowchart TD
-    Auth[Auth V2 or legacy auth] --> Session[Legacy-compatible session]
+    Auth[Account Authentication or legacy auth] --> Session[Legacy-compatible session]
     Session --> Teacher[/teacher/]
     Session --> Parent[/parent/]
     Session --> Student[/dashboard/{student_id}/]

@@ -434,8 +434,8 @@ def _bootstrap_app(app_instance):
     register_ceo_page_routes(app_instance)
     register_hr_manager_page_routes(app_instance)
     register_customer_support_page_routes(app_instance)
-    register_academic_director_page_routes(app_instance, render_admin_page=render_admin_page)
-    register_head_of_department_page_routes(app_instance, render_admin_page=render_admin_page)
+    register_academic_director_page_routes(app_instance)
+    register_head_of_department_page_routes(app_instance)
     register_parent_invite_routes(app_instance)
 
     _APP_BOOTSTRAPPED = True

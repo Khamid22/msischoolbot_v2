@@ -9,19 +9,20 @@ from __future__ import annotations
 from typing import Any
 
 from backend.core.database import connect_auth_db
+from backend.domains.teachers import queries as teacher_queries
 from database import queries as legacy_queries
 
 
 # Compatibility exports used by the Teacher Academy service and existing tests.
 ensure_teacher_academy_schema = legacy_queries.ensure_teacher_academy_schema
-get_teacher_by_full_name_row = legacy_queries.get_teacher_by_full_name_row
-insert_teacher_profile_row = legacy_queries.insert_teacher_profile_row
-upsert_teacher_subject = legacy_queries.upsert_teacher_subject
-get_teacher_auth_row_by_id = legacy_queries.get_teacher_auth_row_by_id
-get_next_teacher_code = legacy_queries.get_next_teacher_code
-insert_teacher_auth = legacy_queries.insert_teacher_auth
-activate_teacher_profile = legacy_queries.activate_teacher_profile
-set_teacher_group_assignment = legacy_queries.set_teacher_group_assignment
+get_teacher_by_full_name_row = teacher_queries.get_teacher_by_full_name_row
+insert_teacher_profile_row = teacher_queries.insert_teacher_profile_row
+upsert_teacher_subject = teacher_queries.upsert_teacher_subject
+get_teacher_auth_row_by_id = teacher_queries.get_teacher_auth_row_by_id
+get_next_teacher_code = teacher_queries.get_next_teacher_code
+insert_teacher_auth = teacher_queries.insert_teacher_auth
+activate_teacher_profile = teacher_queries.activate_teacher_profile
+set_teacher_group_assignment = teacher_queries.set_teacher_group_assignment
 
 
 def get_subject_program(conn: Any, program_id: int) -> Any:
@@ -659,6 +660,103 @@ def get_academy_teacher_id(conn: Any, academy_teacher_id: int) -> Any:
     ).fetchone()
 
 
+def get_academy_teacher_delete_row(conn: Any, academy_teacher_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT
+            at.id,
+            at.user_id AS staff_id,
+            at.promoted_teacher_id,
+            COALESCE(staff.teacher_id, 0) AS teacher_id,
+            COALESCE(staff.login, '') AS login,
+            COALESCE(teacher.status, '') AS teacher_status
+        FROM msi_v2.academy_teachers at
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+        LEFT JOIN msi_v2.teachers teacher ON teacher.id = staff.teacher_id
+        WHERE at.id = %s
+        LIMIT 1
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+
+
+def list_teacher_account_ids_for_staff(conn: Any, *, staff_id: int) -> list[int]:
+    if not staff_id:
+        return []
+    rows = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.accounts
+        WHERE legacy_source_table = 'msi_staff'
+          AND legacy_source_id = %s
+          AND role = 'teacher'
+        ORDER BY id ASC
+        """,
+        (staff_id,),
+    ).fetchall()
+    return [int(row["id"]) for row in rows if int(row["id"] or 0) > 0]
+
+
+def _delete_by_ids(conn: Any, table_name: str, id_column: str, ids: list[int]) -> None:
+    safe_ids = [int(item) for item in ids if int(item or 0) > 0]
+    if not safe_ids:
+        return
+    placeholders = ", ".join(["%s"] * len(safe_ids))
+    conn.execute(
+        f"DELETE FROM {table_name} WHERE {id_column} IN ({placeholders})",
+        tuple(safe_ids),
+    )
+
+
+def delete_teacher_profiles_for_delete(conn: Any, *, teacher_id: int, account_ids: list[int]) -> None:
+    if account_ids:
+        _delete_by_ids(conn, "msi_v2.teacher_profiles", "account_id", account_ids)
+    if teacher_id:
+        conn.execute(
+            "DELETE FROM msi_v2.teacher_profiles WHERE teacher_id = %s",
+            (teacher_id,),
+        )
+
+
+def delete_staff_profiles_for_delete(conn: Any, *, staff_id: int, account_ids: list[int]) -> None:
+    if account_ids:
+        _delete_by_ids(conn, "msi_v2.staff_profiles", "account_id", account_ids)
+    if staff_id:
+        conn.execute(
+            "DELETE FROM msi_v2.staff_profiles WHERE staff_id = %s",
+            (staff_id,),
+        )
+
+
+def delete_teacher_accounts_for_delete(conn: Any, account_ids: list[int]) -> None:
+    _delete_by_ids(conn, "msi_v2.accounts", "id", account_ids)
+
+
+def delete_academy_teacher_row(conn: Any, academy_teacher_id: int) -> None:
+    conn.execute(
+        "DELETE FROM msi_v2.academy_teachers WHERE id = %s",
+        (academy_teacher_id,),
+    )
+
+
+def delete_academy_teacher_staff_row(conn: Any, staff_id: int) -> None:
+    if not staff_id:
+        return
+    conn.execute(
+        "DELETE FROM msi_v2.msi_staff WHERE id = %s",
+        (staff_id,),
+    )
+
+
+def delete_academy_teacher_profile_row(conn: Any, teacher_id: int) -> None:
+    if not teacher_id:
+        return
+    conn.execute(
+        "DELETE FROM msi_v2.teachers WHERE id = %s AND status = 'academy'",
+        (teacher_id,),
+    )
+
+
 def update_academy_teacher_status(conn: Any, *, academy_teacher_id: int, status: str, updated_at: str) -> None:
     conn.execute(
         """
@@ -696,7 +794,14 @@ __all__ = [
     "activate_teacher_profile",
     "approve_academy_teacher_promotion",
     "connect_auth_db",
+    "delete_academy_teacher_profile_row",
+    "delete_academy_teacher_row",
+    "delete_academy_teacher_staff_row",
+    "delete_staff_profiles_for_delete",
+    "delete_teacher_accounts_for_delete",
+    "delete_teacher_profiles_for_delete",
     "ensure_teacher_academy_schema",
+    "get_academy_teacher_delete_row",
     "get_academy_teacher_id",
     "get_academy_teacher_row_for_account",
     "get_assignment_for_assessment",
@@ -717,6 +822,7 @@ __all__ = [
     "insert_teacher_profile_row",
     "list_academy_teacher_account_backfill_rows",
     "list_academy_teacher_rows",
+    "list_teacher_account_ids_for_staff",
     "list_active_group_options",
     "list_active_subjects",
     "list_assessment_rows",

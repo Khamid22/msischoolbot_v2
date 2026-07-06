@@ -19,8 +19,8 @@ export function canUseAdminPreviewForRole(role: unknown) {
   return normalized === "admin" || normalized === "system_admin";
 }
 
-export function clearStaleRolePreviewStorage(role: unknown) {
-  if (canUseAdminPreviewForRole(role) || typeof window === "undefined") {
+export function clearRolePreviewStorage() {
+  if (typeof window === "undefined") {
     return;
   }
   try {
@@ -28,4 +28,11 @@ export function clearStaleRolePreviewStorage(role: unknown) {
   } catch {
     /* Ignore storage access errors in private/embedded browsers. */
   }
+}
+
+export function clearStaleRolePreviewStorage(role: unknown) {
+  if (canUseAdminPreviewForRole(role)) {
+    return;
+  }
+  clearRolePreviewStorage();
 }

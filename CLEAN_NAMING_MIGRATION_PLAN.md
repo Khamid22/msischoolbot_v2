@@ -22,7 +22,7 @@ This document is an audit and migration plan only. Do not rename the live databa
 Command used:
 
 ```bash
-rg -n -i "auth_v2|Auth V2|ACCOUNT_AUTH_V2_ENABLED|account_auth_v2|msi_v2|legacy_source|legacy_login|Phase 1C|Phase 1|\bv2\b|\bold\b|legacy|compatibility|compat" \
+rg -n -i "auth_v2|Account Authentication|ACCOUNT_AUTH_V2_ENABLED|account_auth_v2|msi_v2|legacy_source|legacy_login|Phase 1C|Phase 1|\bv2\b|\bold\b|legacy|compatibility|compat" \
   --glob '!backend/static/react/**' \
   --glob '!frontend/node_modules/**' \
   --glob '!node_modules/**' \
@@ -35,7 +35,7 @@ Summary counts from the audit:
 | Term | Matches | Files | Classification |
 |---|---:|---:|---|
 | `auth_v2` | 37 | 8 | REPLACE_THEN_RENAME |
-| `Auth V2` | 26 | 8 | SAFE_RENAME_NOW in docs/UI, REPLACE_THEN_RENAME in code/test names |
+| `Account Authentication` | 26 | 8 | SAFE_RENAME_NOW in docs/UI, REPLACE_THEN_RENAME in code/test names |
 | `ACCOUNT_AUTH_V2_ENABLED` | 5 | 2 | SAFE_RENAME_NOW after confirming flag is already removed |
 | `account_auth_v2` | 21 | 5 | REPLACE_THEN_RENAME |
 | `msi_v2` | 1132 | 69 | DATABASE_MIGRATION_REQUIRED |
@@ -56,16 +56,16 @@ Summary counts from the audit:
 These can be cleaned without database changes, as long as the wording change is reviewed and tests stay green.
 
 - Visible/documentation wording:
-  - `Auth V2` -> `Authentication`
-  - `Account Auth V2` -> `Account Authentication`
+  - `Account Authentication` -> `Authentication`
+  - `Account Authentication` -> `Account Authentication`
   - `MSI v2` -> `LMS`
   - `Training` -> `Teacher Academy` where user-facing
 - Stabilization/audit docs:
-  - `UI_UX_REPAIR_REPORT.md` references to `Auth V2`, `legacy`, and `old Admin Console` can be rewritten as clean product language if the report remains useful.
+  - `UI_UX_REPAIR_REPORT.md` references to `Account Authentication`, `legacy`, and `old Admin Console` can be rewritten as clean product language if the report remains useful.
   - Current engineering docs can replace migration-era wording, except archived phase plans that intentionally describe history.
 - Test names and comments that do not affect imports:
   - `test_phase1c_*` display names can be renamed once matching import aliases exist.
-  - Assertions mentioning `Auth V2` in failure messages can say `Authentication`.
+  - Assertions mentioning `Account Authentication` in failure messages can say `Authentication`.
 - Frontend comments and labels:
   - `old hash collided`, `legacy candidate`, `Training teacher`, and similar wording should be cleaned when not referring to a real compatibility path.
 - Environment flag references:
@@ -170,10 +170,10 @@ from backend.identity.auth import *  # noqa: F401,F403
 ### Phase 3: Rename files/tests
 
 1. Rename test files from `phase1c` / `auth_v2` naming to identity-focused names.
-2. Update docs from `Auth V2` to `Authentication`.
+2. Update docs from `Account Authentication` to `Authentication`.
 3. Add source checks:
    - no `ACCOUNT_AUTH_V2_ENABLED`
-   - no `Auth V2` outside archived migration docs
+   - no `Account Authentication` outside archived migration docs
    - no imports from `backend.identity.account_auth_v2` outside the wrapper test
 4. Keep wrapper files until one full deploy cycle has passed.
 
@@ -260,28 +260,27 @@ Option C: Temporary compatibility views/synonyms
 
 Target domain: `backend/domains/teacher_academy`.
 
-Current implementation is mostly under `backend/roles/admin/services/teacher_academy_service.py` and admin routes.
+Current implementation now lives in the Teacher Academy domain service and
+queries. Academic Director and Head of Department routes own the mutation API.
+Admin/system admin can still load Teacher Academy rows for compatibility, but
+does not own Teacher Academy action routes.
 
 Recommended sequence:
 
-1. Create `backend/domains/teacher_academy/service.py`.
-2. Move pure Teacher Academy business functions there.
-3. Keep `backend/roles/admin/services/teacher_academy_service.py` as a wrapper for route compatibility.
-4. Move scope helpers carefully:
+1. Keep `backend/domains/teacher_academy/service.py` as the business logic entrypoint.
+2. Keep Teacher Academy SQL in `backend/domains/teacher_academy/queries.py`.
+3. Keep old admin action routes removed.
+4. Move scope helpers carefully when their domain boundary is clearer:
    - HOD subject guard logic can stay in role layer until domain boundaries are clearer.
-5. Update imports gradually.
-6. Keep admin route URLs unchanged:
-   - `/admin/teacher-academy`
-   - `/admin/teacher-academy/assignments/{assignment_id}`
-   - `/admin/teacher-academy/{academy_teacher_id}/assessments`
-7. Add tests that Schedule and Assess still submit `assignment_id` / `lesson_assignment_id`.
+5. Rename the shared `adminTeacherAcademy` bootstrap prop with a dual-read fallback.
+6. Add tests that Schedule and Assess still submit `assignment_id` / `lesson_assignment_id`.
 
 ## UI and Docs Rename Plan
 
 Visible/product-facing renames:
 
-- `Auth V2` -> `Authentication`
-- `Account Auth V2` -> `Account Authentication`
+- `Account Authentication` -> `Authentication`
+- `Account Authentication` -> `Account Authentication`
 - `MSI v2` -> `LMS`
 - `Training teacher` -> `Academy teacher`
 - `Training lesson` -> `Teacher Academy lesson`
@@ -299,7 +298,7 @@ Add these after Phase 1 clean identity modules exist:
 
 1. Source checks:
    - no `ACCOUNT_AUTH_V2_ENABLED` references
-   - no visible `Auth V2` label in frontend/docs except archived migration docs
+   - no visible `Account Authentication` label in frontend/docs except archived migration docs
    - no `account_auth_v2` imports except compatibility wrapper tests
    - no user-facing `Training` labels where Teacher Academy is meant
 2. Import checks:
@@ -346,7 +345,7 @@ Recommended first implementation PR:
 3. Update internal imports in `backend/domains/identity/routes.py`.
 4. Rename helper functions in identity routes.
 5. Add import compatibility tests.
-6. Rename visible docs wording from `Auth V2` to `Authentication` in current docs.
+6. Rename visible docs wording from `Account Authentication` to `Authentication` in current docs.
 7. Do not touch `msi_v2`, `legacy_*`, or database migrations.
 
 Required checks for that PR:

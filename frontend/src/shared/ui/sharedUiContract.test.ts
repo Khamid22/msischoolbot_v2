@@ -56,6 +56,13 @@ describe("RoleWorkspaceShell", () => {
     assert.match(src, /"Escape"/);
   });
 
+  it("places the website drawer toggle before the mobile title block", () => {
+    assert.match(
+      src,
+      /<button[\s\S]*?setDrawerOpen\(true\)[\s\S]*?<Menu className="h-5 w-5" \/>[\s\S]*?<\/button>\s*<div className="min-w-0 flex-1">/,
+    );
+  });
+
   it("keeps Telegram Mini App detection safe for browser builds", () => {
     assert.match(telegramSrc, /export function isTelegramMiniApp/);
     assert.match(telegramSrc, /typeof window === "undefined"/);
