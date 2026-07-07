@@ -17,8 +17,6 @@ import {
 import { routes } from "@/shared/lib/routes";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { MetricCard } from "@/shared/ui/MetricCard";
-import { MetricGrid } from "@/shared/ui/MetricGrid";
-import { MobileCardList } from "@/shared/ui/MobileCardList";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
@@ -160,37 +158,30 @@ function timetableLocation(row: Row) {
 }
 
 function sortTimetableItems(items: TimetableItem[]) {
+  const todayKey = dateKeyFromDate(new Date());
   return [...items].sort((a, b) => {
     const dateA = timetableDateKey(a) || "9999-99-99";
     const dateB = timetableDateKey(b) || "9999-99-99";
+    const upcomingA = dateA >= todayKey ? 0 : 1;
+    const upcomingB = dateB >= todayKey ? 0 : 1;
+    if (upcomingA !== upcomingB) return upcomingA - upcomingB;
     if (dateA !== dateB) return dateA.localeCompare(dateB);
     return timetableTime(a.row).localeCompare(timetableTime(b.row));
   });
 }
 
-function groupTimetableItems(items: TimetableItem[]) {
-  const groups = new Map<string, TimetableItem[]>();
-  sortTimetableItems(items).forEach((item) => {
-    const key = timetableDateKey(item) || "unscheduled";
-    const group = groups.get(key) || [];
-    group.push(item);
-    groups.set(key, group);
-  });
-  return [...groups.entries()];
-}
-
-function TimetableEventCard({ item }: { item: TimetableItem }) {
+function TimetableEventCard({ item, className = "" }: { item: TimetableItem; className?: string }) {
   const row = item.row;
   const dateKey = timetableDateKey(item);
   const status = timetableStatus(item);
 
   return (
-    <article className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+    <article className={`rounded-lg border border-border bg-surface p-3 shadow-sm ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-wide text-primary">{item.kindLabel}</p>
-          <h2 className="mt-1 line-clamp-2 text-base font-black text-foreground">{timetableTitle(item)}</h2>
-          <p className="mt-1 truncate text-xs font-bold text-muted-foreground">
+          <h2 className="mt-1 line-clamp-2 text-sm font-black text-foreground">{timetableTitle(item)}</h2>
+          <p className="mt-1 truncate text-[11px] font-bold text-muted-foreground">
             {asText(row.teacher_name) || "Teacher not assigned"}
           </p>
         </div>
@@ -198,25 +189,25 @@ function TimetableEventCard({ item }: { item: TimetableItem }) {
           {status}
         </StatusBadge>
       </div>
-      <dl className="mt-4 grid gap-2 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-          <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+      <dl className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="truncate font-bold text-foreground">
             {displayDateFromKey(dateKey)}
             {item.kind === "schedule" && asText(row.end_date) ? ` - ${asText(row.end_date)}` : ""}
           </span>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-          <Clock3 className="h-4 w-4 shrink-0 text-primary" />
+        <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
+          <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="truncate font-bold text-foreground">{timetableTime(row)}</span>
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-          <MapPin className="h-4 w-4 shrink-0 text-primary" />
+        <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="truncate font-bold text-foreground">{timetableLocation(row)}</span>
         </div>
         {asText(row.evaluator_name) ? (
-          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+          <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
             <span className="truncate font-bold text-foreground">Evaluator: {asText(row.evaluator_name)}</span>
           </div>
         ) : null}
@@ -265,6 +256,7 @@ function TimetableContent({
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [teacherFilter, setTeacherFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState<"all" | EventKind>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const items = useMemo<TimetableItem[]>(
     () => [
@@ -280,6 +272,7 @@ function TimetableContent({
   const todayKey = dateKeyFromDate(new Date());
   const todayCount = items.filter((item) => timetableDateKey(item) === todayKey).length;
   const academyHref = isHod ? routes.headOfDepartmentTeacherAcademy : routes.academicDirectorTeacherAcademy;
+  const activeFilterCount = [subjectFilter !== "all", teacherFilter !== "all", eventTypeFilter !== "all"].filter(Boolean).length;
 
   const filteredItems = sortTimetableItems(
     items.filter((item) => {
@@ -297,98 +290,116 @@ function TimetableContent({
     setSubjectFilter("all");
     setTeacherFilter("all");
     setEventTypeFilter("all");
+    setFiltersOpen(false);
   };
 
   return (
     <>
-      <MetricGrid>
-        <MetricCard label="Today" value={todayCount} detail="dated events" tone="success" />
-        <MetricCard label="Sessions" value={sessions.length} detail="scheduled lessons" tone="info" />
-        <MetricCard label="Schedules" value={schedules.length} detail="recurring rules" />
-        <MetricCard label="Academy" value={academyLessons.length} detail="scheduled academy lessons" />
-      </MetricGrid>
+      <div className="grid grid-cols-4 gap-2">
+        <MetricCard label="Today" value={todayCount} detail="dated" tone="success" density="compact" />
+        <MetricCard label="Sessions" value={sessions.length} detail="lessons" tone="info" density="compact" />
+        <MetricCard label="Rules" value={schedules.length} detail="recurring" density="compact" />
+        <MetricCard label="Academy" value={academyLessons.length} detail="academy" density="compact" />
+      </div>
 
-      <section className="rounded-2xl border border-border bg-surface p-4 shadow-card">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 flex-1">
+      <section className="relative rounded-lg border border-border bg-surface p-3 shadow-card">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <ListFilter className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-black text-foreground">Timetable View</h2>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div>
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Range</span>
-                <div className="grid h-10 grid-cols-2 rounded-lg border border-border bg-background p-1">
-                  {(["today", "week"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setRange(option)}
-                      className={`rounded-md px-3 text-sm font-black capitalize transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none ${
-                        range === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <div className="grid h-9 w-36 grid-cols-2 rounded-lg border border-border bg-background p-1">
+              {(["today", "week"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setRange(option)}
+                  className={`rounded-md px-2 text-xs font-black capitalize transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 motion-reduce:transition-none ${
+                    range === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((current) => !current)}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              aria-expanded={filtersOpen}
+            >
+              Filters
+              {activeFilterCount ? (
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span>
+              ) : null}
+            </button>
+          </div>
+        </div>
+        {filtersOpen ? (
+          <div className="absolute left-3 right-3 top-[calc(100%+0.5rem)] z-20 rounded-lg border border-border bg-surface/95 p-3 shadow-card-hover backdrop-blur sm:left-auto sm:w-[22rem]">
+            <div className="grid gap-3">
               {subjectOptions.length ? (
                 <FilterSelect label="Subject filter" value={subjectFilter} onChange={setSubjectFilter}>
                   <option value="all">All subjects</option>
                   {subjectOptions.map((subject) => <option key={subject} value={subject}>{subject}</option>)}
                 </FilterSelect>
               ) : null}
-
               {teacherOptions.length ? (
                 <FilterSelect label="Teacher filter" value={teacherFilter} onChange={setTeacherFilter}>
                   <option value="all">All teachers</option>
                   {teacherOptions.map((teacher) => <option key={teacher} value={teacher}>{teacher}</option>)}
                 </FilterSelect>
               ) : null}
-
               <FilterSelect label="Event type" value={eventTypeFilter} onChange={(value) => setEventTypeFilter(value as typeof eventTypeFilter)}>
                 <option value="all">All events</option>
                 <option value="session">Sessions</option>
                 <option value="schedule">Schedules</option>
                 <option value="academy">Academy lessons</option>
               </FilterSelect>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-border bg-background text-xs font-black text-foreground hover:bg-muted"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex h-9 flex-1 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground"
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
-            <a
-              href={academyHref}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-black text-primary-foreground transition-transform duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none motion-reduce:active:scale-100"
-            >
-              <BookOpenCheck className="h-4 w-4" />
-              Schedule Academy Lesson
-            </a>
-            <a
-              href={academyHref}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-background px-3 text-sm font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
-            >
-              Open Teacher Academy
-            </a>
-          </div>
-        </div>
+        ) : null}
       </section>
 
       {items.length && filteredItems.length ? (
         <>
-          <MobileCardList hideAt="md">
-            {groupTimetableItems(filteredItems).map(([dateKey, group]) => (
-              <section key={dateKey} className="space-y-3">
-                <div className="sticky top-2 z-10 rounded-lg border border-border bg-background/95 px-3 py-2 text-xs font-black uppercase tracking-wide text-muted-foreground shadow-sm backdrop-blur">
-                  {dateKey === "unscheduled" ? "Recurring / Date not set" : displayDateFromKey(dateKey)}
-                </div>
-                {group.map((item) => (
-                  <TimetableEventCard key={`${item.kind}-${asText(item.row.id) || item.index}`} item={item} />
-                ))}
-              </section>
-            ))}
-          </MobileCardList>
+          <div className="md:hidden">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-black uppercase tracking-wide text-muted-foreground">
+                Upcoming first
+              </p>
+              <p className="shrink-0 text-[11px] font-bold text-muted-foreground">{filteredItems.length} events</p>
+            </div>
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
+              {filteredItems.map((item) => (
+                <TimetableEventCard
+                  key={`${item.kind}-${asText(item.row.id) || item.index}`}
+                  item={item}
+                  className="min-w-[82%] snap-start"
+                />
+              ))}
+            </div>
+          </div>
 
           <ResponsiveTable showAt="md" className="rounded-xl border border-border bg-surface shadow-card">
             <table className="w-full min-w-[860px] divide-y divide-border text-left text-sm">
@@ -478,29 +489,63 @@ function TimetableContent({
 }
 
 function AnnouncementsContent({ announcements }: { announcements: Row[] }) {
+  const [activeTab, setActiveTab] = useState<"all" | "published" | "draft" | "urgent">("all");
   const publishedCount = announcements.filter((row) => asText(row.status).toLowerCase() === "published").length;
   const draftCount = announcements.filter((row) => asText(row.status).toLowerCase() === "draft").length;
   const urgentCount = announcements.filter((row) => ["urgent", "high"].includes(asText(row.priority).toLowerCase())).length;
   const pinnedCount = announcements.filter((row) => Boolean(row.pinned)).length;
+  const tabs = [
+    { key: "all" as const, label: "All", count: announcements.length, detail: "visible", tone: "info" },
+    { key: "published" as const, label: "Published", count: publishedCount, detail: "live", tone: "success" },
+    { key: "draft" as const, label: "Drafts", count: draftCount, detail: "draft", tone: draftCount ? "warning" : "default" },
+    { key: "urgent" as const, label: "Urgent", count: urgentCount, detail: `${pinnedCount} pinned`, tone: urgentCount ? "danger" : "default" },
+  ];
+  const filteredAnnouncements = announcements.filter((row) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "published") return asText(row.status).toLowerCase() === "published";
+    if (activeTab === "draft") return asText(row.status).toLowerCase() === "draft";
+    return ["urgent", "high"].includes(asText(row.priority).toLowerCase());
+  });
 
   return (
     <>
-      <MetricGrid>
-        <MetricCard label="Announcements" value={announcements.length} detail="visible records" tone="info" />
-        <MetricCard label="Published" value={publishedCount} detail="live updates" tone="success" />
-        <MetricCard label="Drafts" value={draftCount} detail="not yet live" tone={draftCount ? "warning" : "default"} />
-        <MetricCard label="Urgent" value={urgentCount} detail={`${pinnedCount} pinned`} tone={urgentCount ? "danger" : "default"} />
-      </MetricGrid>
+      <div className="grid grid-cols-4 gap-2" role="tablist" aria-label="Announcement filters">
+        {tabs.map((tab) => {
+          const selected = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              role="tab"
+              aria-selected={selected}
+              className={`min-h-[3.875rem] rounded-lg border px-2 py-2 text-left shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                selected
+                  ? "border-primary/30 bg-primary text-primary-foreground"
+                  : "border-border bg-card text-card-foreground hover:bg-muted"
+              }`}
+            >
+              <span className={`block truncate text-[9px] font-black uppercase leading-3 tracking-wide ${selected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                {tab.label}
+              </span>
+              <span className="mt-0.5 block truncate text-lg font-black leading-none tabular-nums sm:text-xl">{tab.count}</span>
+              <span className={`mt-0.5 block truncate text-[10px] font-semibold leading-3 ${selected ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+                {tab.detail}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-      {announcements.length ? (
+      {filteredAnnouncements.length ? (
         <section className="grid gap-3">
-          {announcements.map((item, index) => {
+          {filteredAnnouncements.map((item, index) => {
             const title = asText(item.title) || "Announcement";
             const status = asText(item.status) || "draft";
             const priority = asText(item.priority) || "normal";
             const audience = asText(item.audience) || "all";
             return (
-              <article key={`${asText(item.id) || title}-${index}`} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+              <article key={`${asText(item.id) || title}-${index}`} className="rounded-lg border border-border bg-surface p-3 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -525,8 +570,8 @@ function AnnouncementsContent({ announcements }: { announcements: Row[] }) {
       ) : (
         <EmptyState
           icon={<Megaphone className="h-6 w-6" />}
-          title="No announcements yet"
-          detail="Existing announcement records will appear here when the announcement service returns them."
+          title={announcements.length ? `No ${activeTab} announcements` : "No announcements yet"}
+          detail={announcements.length ? "Choose a different announcement tab." : "Existing announcement records will appear here when the announcement service returns them."}
         />
       )}
     </>
@@ -581,15 +626,14 @@ export default function AcademicDepartmentWorkspace({
               </div>
             ) : null}
             {isAnnouncements ? (
-              <button
-                type="button"
-                disabled
-                aria-label="New Announcement coming soon"
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border bg-muted px-3 text-xs font-black text-muted-foreground opacity-80"
+              <a
+                href="/?panel=announcements&audience=all"
+                aria-label="Write announcement to everyone"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground"
               >
                 <Plus className="h-4 w-4" />
-                Coming soon
-              </button>
+                Write Announcement to Everyone
+              </a>
             ) : (
               <a
                 href={isHod ? routes.headOfDepartmentTeacherAcademy : routes.academicDirectorTeacherAcademy}

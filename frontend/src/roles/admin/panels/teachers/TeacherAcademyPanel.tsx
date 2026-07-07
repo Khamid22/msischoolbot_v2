@@ -182,7 +182,7 @@ function subjectOptionsFromState(state: any) {
 }
 
 function metric(label: string, value: string | number, detail: string) {
-  return <MetricCard label={label} value={value} detail={detail} className="bg-background" />;
+  return <MetricCard label={label} value={value} detail={detail} density="compact" className="bg-background" />;
 }
 
 function teacherAcademyActionRoutes(adminMode: string, authRole: string): TeacherAcademyActionRoutes {
@@ -269,7 +269,7 @@ function MiniAnalyticsCard({
   emptyLabel: string;
 }) {
   return (
-    <section className="flex min-h-[7.5rem] flex-col rounded-xl border border-foreground/8 bg-background px-3 py-3">
+    <section className="flex min-h-[6rem] flex-col rounded-lg border border-foreground/8 bg-background px-2.5 py-2.5">
       <div className="mb-2 shrink-0">
         <p className="truncate text-xs font-black leading-4 text-foreground">{title}</p>
         <p className="mt-0.5 truncate text-[10px] font-semibold leading-4 text-muted-foreground">{subtitle}</p>
@@ -1651,61 +1651,46 @@ function AcademyTeacherCard({
   }
 
   return (
-    <article className="rounded-2xl border border-foreground/10 bg-background p-3 shadow-sm">
+    <article className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <button type="button" onClick={onDetail} className="min-w-0 flex-1 text-left">
-          <h3 className="line-clamp-2 text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</h3>
-          <p className="mt-1 line-clamp-1 text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+          <h3 className="truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</h3>
+          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
         </button>
         <StatusBadge tone={academyStatusTone(status)} className="shrink-0 text-[10px]">
           {statusLabel(status)}
         </StatusBadge>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-muted/45 px-3 py-2">
-          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Progress</p>
-          <p className="mt-1 text-sm font-black">{progress.assessed}/{progress.target}</p>
-          <ProgressBar value={percent} className="mt-2 h-1.5 bg-background" />
-        </div>
-        <div className="rounded-xl bg-muted/45 px-3 py-2">
-          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Average Score</p>
-          <p className="mt-1 text-sm font-black">{progress.average == null ? "-" : progress.average.toFixed(2)}</p>
-          <p className="mt-1 text-[11px] font-semibold text-muted-foreground">{progress.latest == null ? "No latest score" : `Latest ${progress.latest.toFixed(2)}`}</p>
-        </div>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-foreground/8 bg-surface px-3 py-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Next Lesson</p>
-            {nextAssignment ? (
-              <>
-                <p className="mt-1 line-clamp-2 text-sm font-black">{assignmentTitle(nextAssignment)}</p>
-                <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
-                  {dateLabel(nextAssignment.session_datetime)} · {asString(nextAssignment.evaluator_name) || "No evaluator"}
-                </p>
-              </>
-            ) : (
-              <p className="mt-1 text-sm font-bold text-muted-foreground">
-                {assignments.length ? "No pending lesson." : "No academy lessons assigned."}
-              </p>
-            )}
-          </div>
-          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-muted/45 px-3 py-2">
+      <div className="mt-3 grid grid-cols-[6.5rem_1fr] gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Account Login</p>
-          <p className="mt-1 truncate font-mono text-sm font-black">{login || "Account not created yet"}</p>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Progress</span>
+            <span className="text-[10px] font-black text-foreground">{percent}%</span>
+          </div>
+          <ProgressBar value={percent} className="h-1.5 bg-muted" />
+          <p className="mt-1 text-xs font-black text-foreground">{progress.assessed}/{progress.target}</p>
         </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Next</p>
+          <p className="mt-1 truncate text-xs font-black text-foreground">
+            {nextAssignment ? assignmentTitle(nextAssignment) : assignments.length ? "No pending lesson" : "No lessons assigned"}
+          </p>
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-muted-foreground">
+            {nextAssignment ? `${dateLabel(nextAssignment.session_datetime)} · ${asString(nextAssignment.evaluator_name) || "No evaluator"}` : `Avg ${progress.average == null ? "-" : progress.average.toFixed(2)}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2 text-[11px]">
+        <span className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1 font-mono font-black text-foreground">
+          {login || "Account pending"}
+        </span>
         <IconButton
           label="Copy teacher login"
           disabled={!login}
           onClick={() => onCopyLogin(login)}
-          className="h-8 w-8"
+          className="h-7 w-7 rounded-md"
         >
           <Copy className="h-3.5 w-3.5" />
         </IconButton>
@@ -2107,7 +2092,7 @@ export function TeacherAcademyPanel({
         className="flex min-h-0 flex-1 flex-col"
         bodyClassName="flex min-h-0 flex-1 flex-col"
         headerActions={
-          <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:justify-end">
             {canCreateHeadOfDepartment ? (
               <button
                 type="button"
@@ -2115,10 +2100,10 @@ export function TeacherAcademyPanel({
                   setError("");
                   setHodOpen(true);
                 }}
-                className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-foreground/10 bg-surface px-3 py-1.5 text-sm font-bold leading-tight text-foreground hover:bg-muted sm:flex-none"
+                className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-foreground/10 bg-surface px-2 py-1.5 text-xs font-black leading-tight text-foreground hover:bg-muted sm:px-3 sm:text-sm"
               >
                 <Plus className="h-4 w-4" />
-                <span>New HOD</span>
+                <span className="truncate">New HOD</span>
               </button>
             ) : null}
             {canCreateAcademyTeacher ? (
@@ -2128,10 +2113,11 @@ export function TeacherAcademyPanel({
                   setError("");
                   setCreateOpen(true);
                 }}
-                className="inline-flex min-h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-bold leading-tight text-primary-foreground sm:flex-none"
+                className="inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-2 py-1.5 text-xs font-black leading-tight text-primary-foreground sm:px-3 sm:text-sm"
               >
                 <Plus className="h-4 w-4" />
-                <span>New Academy Teacher</span>
+                <span className="truncate sm:hidden">New Teacher</span>
+                <span className="hidden truncate sm:inline">New Academy Teacher</span>
               </button>
             ) : null}
           </div>
@@ -2160,7 +2146,7 @@ export function TeacherAcademyPanel({
             </div>
           </div>
         ) : null}
-        <div className="mb-3 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="mb-3 grid shrink-0 grid-cols-4 gap-2">
           {metric("Academy Teachers", stats.total, "academy records")}
           {metric("In Academy", stats.inTraining, "active academy paths")}
           {metric("Ready", stats.ready, "promotion review")}
@@ -2192,7 +2178,7 @@ export function TeacherAcademyPanel({
             emptyLabel="No assessment trend yet."
           />
         </div>
-        <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+        <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
             <>
               <MobileCardList className="p-3">
