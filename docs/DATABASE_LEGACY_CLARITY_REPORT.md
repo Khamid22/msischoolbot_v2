@@ -4,7 +4,7 @@ Branch: FastAPI-Run-System
 
 ## Summary
 
-The root `database/` package is still active and must not be deleted in this pass. No database schema, Alembic migration, or Alembic history was changed.
+The root `database/` package is still active and must not be deleted in this pass. DB connection ownership moved to `backend.core.database`; `database/database.py` is now only a temporary compatibility wrapper. No database schema, Alembic migration, or Alembic history was changed.
 
 Files deleted from `database/`: none.
 
@@ -12,7 +12,7 @@ Files deleted from `database/`: none.
 
 | Import family | Still imported by | App areas | Later owner |
 | --- | --- | --- | --- |
-| `database.database` | `backend/core/database.py`, `database/alembic/env.py` | DB connection wrapper and Alembic migrations | Keep low-level connection code behind `backend.core.database`; keep Alembic under `database/alembic` until a dedicated migration package is planned. |
+| `database.database` | Direct legacy imports only; app and Alembic now import `backend.core.database` | Compatibility import surface | Delete after direct imports to `database.database` hit zero. |
 | `from database import queries` | `backend/identity/*`, `backend/domains/*`, `backend/roles/*`, `backend/utils/demo_auth.py` | Identity bootstrap/auth, resources, announcements, complaints, office hours, payments, academics, role page data, system admin cards | Move one domain at a time into `backend/domains/<domain>/queries.py`; route/page layers should call services. |
 | `database.queries.teacher_queries` | Tests and Teacher Academy readiness coverage | Teacher compatibility checks | `backend.domains.teachers.queries`. |
 | `database.cross_queries.student_queries` | Tests | Student compatibility checks | `backend.domains.students.queries`. |
@@ -26,7 +26,7 @@ Files deleted from `database/`: none.
 | Path | Decision | Why |
 | --- | --- | --- |
 | `database/alembic/` | KEEP | Owns current migration history. Deleting or moving it would risk Railway/startup migration workflows. |
-| `database/database.py` | KEEP | Wrapped by `backend/core/database.py` and imported by Alembic. |
+| `database/database.py` | KEEP_TEMPORARILY | Temporary compatibility wrapper around `backend.core.database`; no longer owns connection implementation. |
 | `database/queries/__init__.py` | KEEP_TEMPORARILY | Active `from database import queries` imports remain across backend domains and role services. |
 | `database/cross_queries/__init__.py` | KEEP_TEMPORARILY | Shared query re-export remains active while web and Telegram query ownership is split. |
 | `database/queries/teacher_queries.py` | KEEP_TEMPORARILY | Re-exports teacher domain queries for compatibility tests and readiness coverage. |
@@ -45,11 +45,12 @@ Files deleted from `database/`: none.
 
 ## Deletable Now
 
-None. Every database file is either active real code, active migration history, or a documented temporary compatibility wrapper.
+None. `database/database.py` is now only a compatibility wrapper, but keep it until direct legacy imports are proven gone in runtime and operational scripts.
 
 ## Later Migration Direction
 
 1. Move payment, complaint, resource, office-hours, lesson catalog, and subject summary SQL into matching `backend/domains/<domain>/queries.py` modules.
 2. Replace `from database import queries` in identity/domain/role code with domain services or domain query modules.
-3. Keep `database/alembic` stable until migration execution paths are intentionally moved and tested.
-4. Delete legacy query wrappers only after `rg "from database import queries"` and wrapper-specific import checks hit zero.
+3. Keep `database/alembic` stable; its environment now imports `_database_url` from `backend.core.database`.
+4. Delete `database/database.py` after direct imports to that module hit zero.
+5. Delete legacy query wrappers only after `rg "from database import queries"` and wrapper-specific import checks hit zero.

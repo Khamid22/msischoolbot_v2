@@ -46,6 +46,8 @@ These wrappers still have active imports or test coverage. They now carry the re
 | `backend/identity/parent_invites.py` | `tgbot/handlers/start.py`, `tests/test_database_restructure_db4_parents.py` | `backend.domains.parents.service` | Telegram invite flow still imports this path. |
 | `backend/roles/admin/services/parent_service.py` | `tests/test_database_restructure_db4_parents.py` | `backend.domains.parents.service` | Kept for compatibility coverage until admin imports are fully retired. |
 | `backend/roles/parent/services.py` | `tests/test_database_restructure_db4_parents.py` | `backend.domains.parents.service` | Kept for compatibility coverage until parent role imports are fully retired. |
+| `config.py` | External/root imports; current app code has moved to `backend.core.config` | `backend.core.config` | Kept as a root compatibility import surface. |
+| `database/database.py` | External/direct legacy imports; `database/__init__.py` and Alembic now use core directly | `backend.core.database` | Kept as a direct legacy compatibility import surface. |
 | `database/queries/__init__.py` | Many active `from database import queries` imports in backend/domain/role code | Domain query modules and `backend.core.database` | Central query barrel is still broadly active. |
 | `database/cross_queries/__init__.py` | Re-export surface for shared query package | Domain query modules plus Telegram-specific query modules | Active until shared query ownership is separated. |
 | `database/queries/teacher_queries.py` | `tests/test_database_restructure_db2_teachers.py`, `tests/test_teacher_academy_tomorrow_ready.py` | `backend.domains.teachers.queries` | Compatibility tests and Teacher Academy helper references remain. |
@@ -60,4 +62,5 @@ These wrappers still have active imports or test coverage. They now carry the re
 - HOD Teacher Academy action routes now live in `backend/api/v1/head_of_department/teacher_academy.py`.
 - Teacher Academy business logic remains in `backend/domains/teacher_academy/service.py`.
 - Teacher Academy SQL remains in `backend/domains/teacher_academy/queries.py`.
-- `backend/core/config.py` is no longer an empty placeholder; it is the clean package path for runtime settings helpers.
+- `backend/core/config.py` owns runtime settings helpers.
+- `backend/core/database.py` owns DB connection and pooling helpers; `database/database.py` is now only a compatibility wrapper.

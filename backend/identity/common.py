@@ -3,7 +3,7 @@
 import threading
 from datetime import datetime
 
-from database import queries
+from backend.core.database import connect_auth_db as connect
 
 DB_LOCK = threading.Lock()
 SYNC_LOCK = threading.Lock()
@@ -13,9 +13,4 @@ def utc_now_iso():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def connect():
-    return queries.connect_auth_db()
-
-
 __all__ = ["DB_LOCK", "SYNC_LOCK", "connect", "utc_now_iso"]
-

@@ -4,7 +4,7 @@
 
 DB-1 keeps the physical PostgreSQL schema unchanged and leaves the old database package in place.
 
-- `backend.core.database` is now the clean import path for connection helpers. It wraps the existing working helpers from `database.database`.
+- `backend.core.database` is now the owner of connection helpers. `database.database` is only a temporary compatibility wrapper.
 - `backend.domains.teacher_academy.service` owns Teacher Academy business logic and imports `backend.domains.teacher_academy.queries`.
 - `backend.domains.teacher_academy.queries` owns Teacher Academy SQL while still using the existing `msi_v2` schema and compatibility helpers from `database.queries`.
 - Academic Director, HOD, and Teacher Cabinet role edges now import safe Teacher Academy functions from `backend.domains.teacher_academy.service`.

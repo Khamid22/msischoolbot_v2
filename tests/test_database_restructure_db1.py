@@ -7,10 +7,22 @@ def test_core_database_clean_import_path_exports_connection_helpers():
     import backend.core.database as core_database
 
     assert callable(core_database.connect_db)
+    assert callable(core_database.connect)
     assert callable(core_database.connect_auth_db)
     assert callable(core_database.get_db_backend)
     assert callable(core_database.get_db_backend_for_connection)
     assert callable(core_database.close_idle_pool_connections)
+
+
+def test_legacy_database_module_wraps_core_database():
+    source = Path("database/database.py").read_text()
+    core_source = Path("backend/core/database.py").read_text()
+    alembic_source = Path("database/alembic/env.py").read_text()
+
+    assert "from backend.core.database import" in source
+    assert "Temporary compatibility wrapper. Delete after" in source
+    assert "from database.database import" not in core_source
+    assert "from backend.core.database import _database_url" in alembic_source
 
 
 def test_teacher_academy_domain_modules_import_successfully():

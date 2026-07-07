@@ -6,7 +6,7 @@ import asyncio
 import logging
 import threading
 
-from config import get_web_settings
+from backend.core.config import get_web_settings
 from backend.identity.storage import init_storage
 
 
@@ -107,7 +107,7 @@ def _is_address_in_use_error(exc):
 
 def run_web_server():
     import uvicorn
-    from config import get_web_settings
+    from backend.core.config import get_web_settings
 
     listen_targets = _web_listen_targets()
     if not listen_targets:

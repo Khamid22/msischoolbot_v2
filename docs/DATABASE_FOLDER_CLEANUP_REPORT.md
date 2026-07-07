@@ -8,7 +8,7 @@ Scope: audit and documentation for the root `database/` folder during API v1 cle
 
 | Import group | Status | Reason |
 | --- | --- | --- |
-| `database.database` | KEEP | Still wrapped by `backend/core/database.py` and referenced by migrations/compatibility code. |
+| `database.database` | KEEP_TEMPORARILY | Temporary compatibility wrapper around `backend/core/database.py`. |
 | `database.queries` | KEEP | Active wrappers remain for teachers, students, parents, announcements, and admin compatibility. |
 | `database.cross_queries` | KEEP | Student/parent dashboard compatibility still depends on these modules. |
 | `database.academics` | KEEP | Canonical academic helpers remain active. |

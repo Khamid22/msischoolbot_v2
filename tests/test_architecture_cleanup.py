@@ -70,6 +70,8 @@ def test_kept_temporary_wrappers_are_documented():
         Path("backend/identity/parent_invites.py"),
         Path("backend/roles/admin/services/parent_service.py"),
         Path("backend/roles/parent/services.py"),
+        Path("config.py"),
+        Path("database/database.py"),
         Path("database/queries/__init__.py"),
         Path("database/cross_queries/__init__.py"),
         Path("database/queries/teacher_queries.py"),
@@ -86,6 +88,7 @@ def test_main_startup_imports_storage_not_account_service():
     main_source = Path("main.py").read_text()
 
     assert "from backend.identity.storage import init_storage" in main_source
+    assert "from backend.core.config import get_web_settings" in main_source
     assert "backend.identity.account_service" not in main_source
     assert callable(importlib.import_module("backend.identity.storage").init_storage)
     importlib.import_module("main")

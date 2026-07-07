@@ -19,7 +19,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from database.database import _database_url  # noqa: E402
+from backend.core.database import _database_url  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:

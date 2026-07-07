@@ -39,7 +39,7 @@ They remain intentionally because active imports and compatibility tests still r
 
 ## Old Database Modules Still Required
 
-- `database.database`: wrapped by `backend/core/database.py` and used by Alembic.
+- `database.database`: temporary compatibility wrapper around `backend/core/database.py`.
 - `database.queries`: compatibility facade for active admin/student/identity modules.
 - `database.academics.canonical`: canonical normalization helpers still used across backend code.
 - `database.tables`: table bootstrap helpers for still-active flows.
@@ -54,6 +54,6 @@ They remain intentionally because active imports and compatibility tests still r
 
 ## Risk Notes
 
-- Directly deleting `database.queries` or `database.database` is high risk today.
+- Directly deleting `database.queries` or `database.database` is high risk today until compatibility imports hit zero.
 - Directly renaming `msi_v2` would break Railway unless done with a migration window and rollback.
 - Moving all remaining database imports at once would be too large for review.

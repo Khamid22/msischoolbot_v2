@@ -92,9 +92,9 @@ No database schema, Alembic history, role page URL, Telegram Mini App flow, or a
 | Path | Classification | Reason |
 | --- | --- | --- |
 | `backend/core/` | KEEP_REAL_CODE | Shared infrastructure package. |
-| `backend/core/database.py` | KEEP_REAL_CODE | Clean import path wrapping active DB connection helpers. |
+| `backend/core/database.py` | KEEP_REAL_CODE | Owns active DB connection and pooling helpers; legacy `database/database.py` wraps this module. |
 | `backend/core/security.py` | KEEP_REAL_CODE | Password hash generation and verification helpers. |
-| `backend/core/config.py` | KEEP_REAL_CODE | Clean package import path for runtime settings helpers. |
+| `backend/core/config.py` | KEEP_REAL_CODE | Owns runtime settings helpers; root `config.py` wraps this module. |
 | `backend/core/README.md` | KEEP_REAL_CODE | Updated to describe real core modules. |
 | `backend/core/__init__.py` | FILL_LATER_KEEP_WITH_REASON | Package marker required for active `backend.core.*` imports. |
 
