@@ -7,7 +7,7 @@ import logging
 import threading
 
 from config import get_web_settings
-from backend.identity.account_service import init_storage
+from backend.identity.storage import init_storage
 
 
 _ADDRESS_IN_USE_ERRNOS = {
