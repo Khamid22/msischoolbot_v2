@@ -102,6 +102,11 @@
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/system/status | GET
+/api/v1/teacher/office-hours/availability | GET
+/api/v1/teacher/office-hours/availability | POST
+/api/v1/teacher/office-hours/availability/{availability_id} | PATCH
+/api/v1/teacher/office-hours/bookings | GET
+/api/v1/teacher/office-hours/bookings/{booking_id} | PATCH
 /auth/telegram | POST
 /ceo | GET
 /customer-support | GET
@@ -138,9 +143,4 @@
 /support | GET
 /sw.js | GET
 /teacher | GET
-/teacher/api/office-hours/availability | GET
-/teacher/api/office-hours/availability | POST
-/teacher/api/office-hours/availability/{availability_id} | PATCH
-/teacher/api/office-hours/bookings | GET
-/teacher/api/office-hours/bookings/{booking_id} | PATCH
 /unauthorized | GET

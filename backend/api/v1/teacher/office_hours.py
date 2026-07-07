@@ -1,0 +1,133 @@
+"""Teacher office-hours API v1 routes."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from backend.api import ApiSuccess, api_success
+from backend.api.v1.teacher.schemas import (
+    AvailabilityCreated,
+    AvailabilityList,
+    BookingList,
+    CancelAvailabilityRequest,
+    CreateAvailabilityRequest,
+    UpdateBookingStatusRequest,
+)
+from backend.domains.office_hours import service as oh_service
+from backend.security import CurrentUser, get_current_user
+
+router = APIRouter(prefix="/office-hours")
+
+
+@router.get(
+    "/availability",
+    operation_id="api_v1_teacher_list_availability",
+    response_model=ApiSuccess[AvailabilityList],
+)
+def list_availability(
+    subject_id: int | None = None,
+    status: str | None = None,
+    starts_at_from: str | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
+    availabilities = oh_service.list_availabilities(
+        teacher_id=user.teacher_id,
+        subject_id=subject_id,
+        status=status,
+        starts_at_from=starts_at_from,
+    )
+    return api_success({"availabilities": availabilities})
+
+
+@router.post(
+    "/availability",
+    operation_id="api_v1_teacher_create_availability",
+    response_model=ApiSuccess[AvailabilityCreated],
+)
+def create_availability(
+    payload: CreateAvailabilityRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        availability_id = oh_service.create_availability(
+            teacher_id=user.teacher_id,
+            subject_id=payload.subject_id,
+            starts_at=payload.starts_at,
+            ends_at=payload.ends_at,
+            slot_minutes=payload.slot_minutes,
+            room=payload.room,
+            capacity=payload.capacity,
+            planned_topic=payload.planned_topic.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return api_success({"availability_id": availability_id})
+
+
+@router.patch(
+    "/availability/{availability_id}",
+    operation_id="api_v1_teacher_cancel_availability",
+    response_model=ApiSuccess[None],
+)
+def cancel_availability(
+    availability_id: int,
+    payload: CancelAvailabilityRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    if payload.status != "cancelled":
+        raise HTTPException(status_code=400, detail="Only 'cancelled' state transitions are allowed.")
+    try:
+        oh_service.cancel_availability(availability_id, teacher_id=user.teacher_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return api_success()
+
+
+@router.get(
+    "/bookings",
+    operation_id="api_v1_teacher_list_bookings",
+    response_model=ApiSuccess[BookingList],
+)
+def list_bookings(
+    availability_id: int | None = None,
+    student_row_id: int | None = None,
+    subject_id: int | None = None,
+    status: str | None = None,
+    starts_at_from: str | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
+    bookings = oh_service.list_bookings(
+        availability_id=availability_id,
+        teacher_id=user.teacher_id,
+        student_row_id=student_row_id,
+        subject_id=subject_id,
+        status=status,
+        starts_at_from=starts_at_from,
+    )
+    return api_success({"bookings": bookings})
+
+
+@router.patch(
+    "/bookings/{booking_id}",
+    operation_id="api_v1_teacher_update_booking_status",
+    response_model=ApiSuccess[None],
+)
+def update_booking_status(
+    booking_id: int,
+    payload: UpdateBookingStatusRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        oh_service.update_booking_status(
+            booking_id,
+            payload.status,
+            payload.teacher_note,
+            teacher_id=user.teacher_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return api_success()

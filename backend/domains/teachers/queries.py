@@ -437,6 +437,34 @@ def delete_teacher_row_by_id(conn, teacher_id):
     )
 
 
+
+def list_subject_options_for_teacher_rows(conn, teacher_id):
+    """Active subjects offered to a teacher: all subjects when the teacher has
+    no active subject assignment, otherwise only their assigned subjects."""
+    return conn.execute(
+        """
+        SELECT DISTINCT s.id, s.subject_name AS name
+        FROM msi_v2.subjects s
+        LEFT JOIN msi_v2.teacher_subjects ts
+          ON ts.subject_id = s.id
+         AND ts.teacher_id = %s
+         AND ts.status = 'active'
+        WHERE s.status = 'active'
+          AND (
+            EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_subjects assigned
+                WHERE assigned.teacher_id = %s
+                  AND assigned.status = 'active'
+            ) = false
+            OR ts.teacher_id IS NOT NULL
+          )
+        ORDER BY s.subject_name
+        """,
+        (teacher_id, teacher_id),
+    ).fetchall()
+
+
 __all__ = [
     "list_teachers_rows",
     "get_teacher_login_row",
@@ -458,4 +486,5 @@ __all__ = [
     "delete_teacher_by_group",
     "update_teacher_row_by_id",
     "delete_teacher_row_by_id",
+    "list_subject_options_for_teacher_rows",
 ]

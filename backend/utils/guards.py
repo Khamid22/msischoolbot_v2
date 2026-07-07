@@ -34,7 +34,6 @@ def _wants_json(request: Request) -> bool:
         requested_with == "XMLHttpRequest"
         or path.startswith("/api/")
         or path.startswith("/admin/api/")
-        or path.startswith("/teacher/api/")
     )
 
 

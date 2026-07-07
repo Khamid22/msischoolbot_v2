@@ -342,3 +342,12 @@ __all__ = [
     "update_teacher_by_id",
     "upsert_teacher",
 ]
+
+
+def list_subject_options_for_teacher(teacher_id):
+    """Subject options for the teacher workspace selects."""
+    import database
+
+    with database.connect_auth_db() as conn:
+        rows = queries.list_subject_options_for_teacher_rows(conn, teacher_id)
+    return [dict(row) for row in rows]
