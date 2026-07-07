@@ -1,3 +1,5 @@
+import pytest
+
 from werkzeug.security import generate_password_hash
 
 from backend.identity import account_auth
@@ -193,10 +195,9 @@ def test_account_auth_is_unconditional():
     assert not any(name.endswith("_enabled") for name in account_auth.__all__)
 
 
-def test_previous_account_auth_import_path_still_works():
-    import backend.identity.account_auth_v2 as previous_account_auth
-
-    assert previous_account_auth.authenticate_account_password is account_auth.authenticate_account_password
+def test_previous_account_auth_import_path_is_gone():
+    with pytest.raises(ModuleNotFoundError):
+        import backend.identity.account_auth_v2  # noqa: F401
 
 
 def test_active_student_authenticates():

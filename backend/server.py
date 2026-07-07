@@ -13,7 +13,7 @@ from backend.utils.limiter import limiter
 from backend.utils.context import RequestContextMiddleware
 from backend.utils.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from backend.utils.guards import install_guard_handler
-from backend.identity.roles import is_valid_role, normalize_role, role_display_name
+from backend.security.roles import is_valid_role, normalize_role, role_display_name
 from config import get_web_settings
 from backend.domains.academics.rating_service import clear_group_cache
 from backend.roles.admin.routes import register_admin_page_routes

@@ -1,7 +1,7 @@
 import asyncio
 import html
 
-from backend.identity.account_service import (
+from backend.identity.telegram_links import (
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
 )

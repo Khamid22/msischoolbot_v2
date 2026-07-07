@@ -1,3 +1,5 @@
+import pytest
+
 from backend.identity import account_telegram_auth as account_telegram_auth
 
 
@@ -238,10 +240,9 @@ def _authenticate(telegram_user_id):
     return account_telegram_auth.authenticate_account_telegram(telegram_user_id, conn=_FakeConn())
 
 
-def test_previous_account_telegram_auth_import_path_still_works():
-    import backend.identity.account_telegram_auth_v2 as previous_telegram_auth
-
-    assert previous_telegram_auth.authenticate_account_telegram is account_telegram_auth.authenticate_account_telegram
+def test_previous_account_telegram_auth_import_path_is_gone():
+    with pytest.raises(ModuleNotFoundError):
+        import backend.identity.account_telegram_auth_v2  # noqa: F401
 
 
 def test_active_parent_telegram_link_authenticates():

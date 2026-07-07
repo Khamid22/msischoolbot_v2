@@ -8,7 +8,7 @@ from backend.utils.context import request, session
 from backend.utils.performance import PagePerformanceTimer, log_page_performance
 from backend.utils.session import url_for
 from backend.render import generate_csrf, render_react_page
-from backend.identity.roles import normalize_role
+from backend.security.roles import normalize_role
 
 from backend.roles.admin.routes.academic_routes import register_academic_admin_routes
 from backend.roles.admin.routes.admins import register_admin_routes

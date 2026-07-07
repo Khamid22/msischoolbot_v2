@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from werkzeug.security import generate_password_hash
+from backend.core.security import generate_password_hash
 
 from backend.domains.teacher_academy import queries
 from backend.domains.teachers.service import list_teachers, upsert_teacher

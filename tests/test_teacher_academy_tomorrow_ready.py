@@ -316,12 +316,12 @@ def test_academy_workspace_cards_show_required_counts():
 
 
 def test_teacher_route_exposes_academy_overview_lessons_timetable_and_updates(client, monkeypatch):
-    import backend.identity.account_service as account_service
+    import backend.domains.teachers.service as teacher_service
     import backend.roles.teacher.routes as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _academy_workspace())
-    monkeypatch.setattr(account_service, "get_teacher_by_id", lambda teacher_id: {"assigned_group": ""})
+    monkeypatch.setattr(teacher_service, "get_teacher_by_id", lambda teacher_id: {"assigned_group": ""})
     monkeypatch.setattr(database, "connect_auth_db", lambda: _SubjectConnection())
     _set_session(
         client,

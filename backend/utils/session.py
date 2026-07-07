@@ -1,6 +1,6 @@
 """Centralized session/auth state helpers used by route modules."""
 
-from backend.identity.roles import dashboard_path_for_role, is_valid_role, normalize_role
+from backend.security.roles import dashboard_path_for_role, is_valid_role, normalize_role
 from backend.utils.context import session
 from database.academics.canonical import normalize_school_code
 

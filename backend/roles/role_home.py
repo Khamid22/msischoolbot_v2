@@ -1,4 +1,4 @@
-from backend.identity.roles import normalize_role, role_display_name
+from backend.security.roles import normalize_role, role_display_name
 from backend.render import generate_csrf, render_react_page
 from backend.utils.session import current_auth_login, current_auth_role
 

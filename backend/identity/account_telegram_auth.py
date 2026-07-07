@@ -14,7 +14,7 @@ from backend.identity.account_auth import (
     load_account_profile,
 )
 from backend.identity.common import connect
-from backend.identity.roles import normalize_role
+from backend.security.roles import normalize_role
 
 
 TELEGRAM_AUTH_ROLES = {

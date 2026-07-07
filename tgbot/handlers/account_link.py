@@ -8,7 +8,7 @@ from tgbot.helpers import (
     linked_student_from_user,
     run_blocking,
 )
-from backend.identity.account_service import unlink_telegram_user_links
+from backend.identity.telegram_links import unlink_telegram_user_links
 
 router = Router()
 

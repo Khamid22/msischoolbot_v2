@@ -306,7 +306,7 @@ def create_student_with_enrollment(full_name, group_id):
     a duplicate code, then writes a ``group_students`` row with freshly minted
     legacy ids so the student immediately shows in the group's gradebook.
     """
-    from werkzeug.security import generate_password_hash
+    from backend.core.security import generate_password_hash
 
     full_name = str(full_name or "").strip()
     group_id = int(group_id or 0)

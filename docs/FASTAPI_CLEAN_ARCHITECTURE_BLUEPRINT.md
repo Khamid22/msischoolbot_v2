@@ -82,6 +82,14 @@ Two planes, never mixed in one module:
 
 ### 3.2 Delete after retargeting imports (mechanical, same day)
 
+> **STATUS 2026-07-07: DONE.** All files below plus `identity/teachers.py`,
+> `identity/student_accounts.py`, `identity/passwords.py` were deleted; role and
+> permission registries merged into `backend/security/`; password hashing
+> centralized in `backend/core/security.py` (the only module that may import
+> werkzeug hashing — stored hashes stay werkzeug-format). Remaining werkzeug
+> use: `secure_filename` in `roles/admin/routes/student_routes.py`, which dies
+> with that file in Phase 3.
+
 | File | Precondition |
 | --- | --- |
 | `backend/identity/account_auth_v2.py` | 8-line `sys.modules` alias → import `identity.account_auth` directly |

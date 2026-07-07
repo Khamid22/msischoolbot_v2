@@ -90,3 +90,75 @@ def role_has_permission(role: str, permission: str) -> bool:
     norm_role = roles.normalize_role(role)
     allowed = ROLE_PERMISSIONS.get(norm_role, set())
     return permission in allowed
+
+
+# Fine-grained feature permissions used by page-route guards. A separate
+# vocabulary from the module-level PERMISSION_* constants above: these gate
+# individual portal features, not whole management areas.
+ROLE_FEATURE_PERMISSIONS = {
+    "admin": {"*"},
+    "system_admin": {"*"},
+    "ceo": {
+        "view_global_reports",
+        "view_finance_summary",
+        "view_school_performance",
+        "view_staff_summary",
+    },
+    "hr_manager": {
+        "manage_candidates",
+        "view_candidates",
+        "manage_interviews",
+        "manage_teacher_academy",
+        "view_teacher_profiles",
+    },
+    "customer_support": {
+        "view_tickets",
+        "reply_tickets",
+        "view_parent_contacts",
+        "view_student_basic_info",
+    },
+    "student": {
+        "view_own_dashboard",
+        "view_own_attendance",
+        "view_own_grades",
+        "view_resources",
+        "use_student_chat",
+    },
+    "teacher": {
+        "view_assigned_groups",
+        "manage_attendance",
+        "submit_grades",
+        "view_resources",
+        "write_student_comments",
+    },
+    "parent": {
+        "view_child_progress",
+        "view_child_attendance",
+        "view_child_grades",
+        "view_payments",
+        "contact_support",
+    },
+    "academic_director": {
+        "view_academic_reports",
+        "view_teacher_performance",
+        "observe_lessons",
+        "manage_curriculum_progress",
+        "review_demo_lessons",
+    },
+    "head_of_department": {
+        "view_teacher_performance",
+        "observe_lessons",
+        "manage_teacher_academy",
+        "view_teacher_profiles",
+    },
+}
+
+
+def has_permission(role, permission) -> bool:
+    """Feature-permission check against ROLE_FEATURE_PERMISSIONS ("*" = all)."""
+    normalized_role = roles.normalize_role(role)
+    normalized_permission = str(permission or "").strip()
+    if not normalized_role or not normalized_permission:
+        return False
+    allowed = ROLE_FEATURE_PERMISSIONS.get(normalized_role, set())
+    return "*" in allowed or normalized_permission in allowed

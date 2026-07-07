@@ -12,13 +12,11 @@ from backend.domains.parents.service import (
     link_parent_via_invite,
     load_parent_invite_code_payload,
 )
-from backend.identity.account_service import (
-    get_teacher_by_id,
-    record_student_activity,
-)
+from backend.domains.students.service import record_student_activity
+from backend.domains.teachers.service import get_teacher_by_id
 from backend.identity.account_auth import authenticate_account_password
 from backend.identity.account_telegram_auth import authenticate_account_telegram
-from backend.identity.roles import dashboard_path_for_role
+from backend.security.roles import dashboard_path_for_role
 from backend.utils.guards import unauthorized_response
 from backend.utils.session import (
     build_dashboard_url,

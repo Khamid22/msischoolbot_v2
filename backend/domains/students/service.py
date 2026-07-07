@@ -10,7 +10,7 @@ import threading
 import time
 
 from database.academics import canonical
-from werkzeug.security import check_password_hash, generate_password_hash
+from backend.core.security import generate_password_hash, verify_password_hash
 
 from backend.domains.students import queries
 from backend.domains.teachers.service import get_teacher_name_by_group
@@ -472,7 +472,7 @@ def change_student_password(student_row_id, current_password, new_password):
             if not auth_row:
                 return False, "Student account was not found."
 
-            if not check_password_hash(
+            if not verify_password_hash(
                 str(auth_row["password_hash"] or ""),
                 current_password_value,
             ):

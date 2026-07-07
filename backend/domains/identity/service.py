@@ -4,7 +4,7 @@ Shared login/account logic lives in ``backend.identity``. FastAPI session
 helpers live in ``backend.utils``.
 """
 
-from backend.identity.account_service import (  # noqa: F401
+from backend.identity.telegram_links import (  # noqa: F401
     get_admin_by_telegram_user_id,
     get_student_by_telegram_user_id,
     link_admin_telegram_user,

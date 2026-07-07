@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from werkzeug.security import generate_password_hash
+from backend.core.security import generate_password_hash
 
 from database import queries
 

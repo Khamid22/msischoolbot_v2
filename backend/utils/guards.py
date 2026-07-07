@@ -9,8 +9,8 @@ by ``install_guard_handler`` unwraps it.
 from fastapi import Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from backend.identity.permissions import has_permission
-from backend.identity.roles import is_valid_role, normalize_role, role_display_name
+from backend.security.permissions import has_permission
+from backend.security.roles import is_valid_role, normalize_role, role_display_name
 
 
 class GuardResponse(Exception):

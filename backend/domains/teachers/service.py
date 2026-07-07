@@ -1,12 +1,11 @@
 """Teacher domain service facade.
 
-This module owns teacher profile/account helper behavior. Legacy imports from
-``backend.identity.teachers`` remain as compatibility re-exports.
+This module owns teacher profile/account helper behavior.
 """
 
 import re
 
-from werkzeug.security import generate_password_hash
+from backend.core.security import generate_password_hash
 
 from backend.domains.teachers import queries
 from backend.identity.common import DB_LOCK, connect, utc_now_iso

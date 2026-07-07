@@ -3,7 +3,7 @@
 import logging
 import os
 
-from werkzeug.security import generate_password_hash
+from backend.core.security import generate_password_hash
 
 from database import queries
 from backend.identity.common import DB_LOCK, connect, utc_now_iso

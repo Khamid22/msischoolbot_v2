@@ -1,5 +1,7 @@
 """DB-3 student domain migration coverage."""
 
+import pytest
+
 from pathlib import Path
 
 
@@ -33,18 +35,14 @@ def test_student_legacy_query_wrapper_still_exports_domain_functions():
     assert legacy_student_queries.get_student_by_telegram_id is student_queries.get_student_by_telegram_id
 
 
-def test_student_identity_wrappers_still_export_domain_services():
-    import backend.domains.students.service as student_service
-    import backend.identity.passwords as legacy_passwords
-    import backend.identity.profiles as legacy_profiles
-    import backend.identity.student_accounts as legacy_student_accounts
-
-    assert legacy_student_accounts.list_students_for_admin is student_service.list_students_for_admin
-    assert legacy_student_accounts.record_student_activity is student_service.record_student_activity
-    assert legacy_profiles.get_admin_student_profile is student_service.get_admin_student_profile
-    assert legacy_profiles.get_dashboard_student_profile is student_service.get_dashboard_student_profile
-    assert legacy_passwords.change_student_password is student_service.change_student_password
-    assert legacy_passwords.admin_change_student_password is student_service.admin_change_student_password
+def test_student_identity_wrappers_are_gone():
+    for module_name in (
+        "backend.identity.passwords",
+        "backend.identity.profiles",
+        "backend.identity.student_accounts",
+    ):
+        with pytest.raises(ModuleNotFoundError):
+            __import__(module_name)
 
 
 def test_student_domain_imports_are_used_where_safe():
@@ -69,9 +67,6 @@ def test_student_domain_imports_are_used_where_safe():
 def test_student_legacy_files_are_only_compatibility_wrappers():
     wrapper_paths = [
         "database/cross_queries/student_queries.py",
-        "backend/identity/student_accounts.py",
-        "backend/identity/profiles.py",
-        "backend/identity/passwords.py",
     ]
     for path in wrapper_paths:
         source = Path(path).read_text()

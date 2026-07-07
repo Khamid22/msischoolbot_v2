@@ -196,4 +196,13 @@ describe("IconButton / ActionMenu", () => {
     assert.match(src, /role="menu"/);
     assert.match(src, /uiLayers\.popover/);
   });
+
+  it("ActionMenu clamps its popover to the viewport and can flip above the trigger", () => {
+    const src = source("ActionMenu.tsx");
+    assert.match(src, /spaceBelow/);
+    assert.match(src, /spaceAbove/);
+    assert.match(src, /placement: opensAbove \? "top" : "bottom"/);
+    assert.match(src, /maxHeight/);
+    assert.match(src, /overflow-y-auto/);
+  });
 });

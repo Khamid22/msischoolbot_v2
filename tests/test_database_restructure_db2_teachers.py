@@ -1,5 +1,7 @@
 """DB-2 teacher domain migration coverage."""
 
+import pytest
+
 from pathlib import Path
 
 
@@ -28,14 +30,9 @@ def test_teacher_legacy_query_wrapper_still_exports_domain_functions():
     assert legacy_teacher_queries.upsert_teacher_subject is teacher_queries.upsert_teacher_subject
 
 
-def test_teacher_identity_wrapper_still_exports_domain_services():
-    import backend.domains.teachers.service as teacher_service
-    import backend.identity.teachers as legacy_teacher_service
-
-    assert legacy_teacher_service.list_teachers is teacher_service.list_teachers
-    assert legacy_teacher_service.get_teacher_by_id is teacher_service.get_teacher_by_id
-    assert legacy_teacher_service.upsert_teacher is teacher_service.upsert_teacher
-    assert legacy_teacher_service.subject_teacher_login_prefix is teacher_service.subject_teacher_login_prefix
+def test_teacher_identity_wrapper_is_gone():
+    with pytest.raises(ModuleNotFoundError):
+        import backend.identity.teachers  # noqa: F401
 
 
 def test_teacher_domain_imports_are_used_where_safe():

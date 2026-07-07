@@ -7,8 +7,8 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.identity.permissions import has_permission
-from backend.identity.roles import (
+from backend.security.permissions import has_permission
+from backend.security.roles import (
     dashboard_path_for_role,
     normalize_role,
     role_display_name,

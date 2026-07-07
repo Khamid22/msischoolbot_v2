@@ -159,12 +159,12 @@ def test_teacher_workspace_card_provider_returns_placeholders(teacher_id, worksp
 
 
 def test_teacher_route_loads_and_shows_mocked_cards(client, monkeypatch):
-    import backend.identity.account_service as account_service
+    import backend.domains.teachers.service as teacher_service
     import backend.roles.teacher.routes as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _teacher_workspace())
-    monkeypatch.setattr(account_service, "get_teacher_by_id", lambda teacher_id: {"assigned_group": "A1"})
+    monkeypatch.setattr(teacher_service, "get_teacher_by_id", lambda teacher_id: {"assigned_group": "A1"})
     monkeypatch.setattr(database, "connect_auth_db", lambda: _SubjectConnection())
     _set_session(
         client,
@@ -201,7 +201,7 @@ def test_wrong_role_is_denied_from_teacher_workspace(client):
 
 
 def test_teacher_route_db_failure_returns_placeholder_cards(client, monkeypatch):
-    import backend.identity.account_service as account_service
+    import backend.domains.teachers.service as teacher_service
     import backend.roles.teacher.routes as teacher_routes
     import database
 
@@ -212,7 +212,7 @@ def test_teacher_route_db_failure_returns_placeholder_cards(client, monkeypatch)
         raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", fail_workspace)
-    monkeypatch.setattr(account_service, "get_teacher_by_id", fail_db)
+    monkeypatch.setattr(teacher_service, "get_teacher_by_id", fail_db)
     monkeypatch.setattr(database, "connect_auth_db", fail_db)
     _set_session(
         client,

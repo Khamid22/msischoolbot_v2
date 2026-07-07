@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from werkzeug.security import check_password_hash
+# The only module allowed to import werkzeug hashing: stored hashes are
+# werkzeug-format, so verification must stay compatible with existing rows.
+from werkzeug.security import check_password_hash, generate_password_hash as _werkzeug_generate
 
 
 def verify_password_hash(password_hash: Any, password: Any) -> bool:
@@ -17,5 +19,9 @@ def verify_password_hash(password_hash: Any, password: Any) -> bool:
         return False
 
 
-__all__ = ["verify_password_hash"]
+def generate_password_hash(password: Any) -> str:
+    return _werkzeug_generate(str(password or ""))
+
+
+__all__ = ["verify_password_hash", "generate_password_hash"]
 

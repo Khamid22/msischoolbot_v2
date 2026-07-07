@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from backend.core.security import verify_password_hash
 from backend.identity.common import connect
-from backend.identity.roles import normalize_role
+from backend.security.roles import normalize_role
 from database.academics.canonical import normalize_school_code
 
 

@@ -69,7 +69,7 @@ def register_teacher_page_routes(app):
         timer.mark("card_build")
 
         # Get teacher's DB details for academic info (subject, etc.)
-        from backend.identity.account_service import get_teacher_by_id
+        from backend.domains.teachers.service import get_teacher_by_id
         try:
             teacher_db = get_teacher_by_id(teacher_id) if teacher_id else None
         except Exception:
