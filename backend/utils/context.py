@@ -25,6 +25,7 @@ class RequestContextMiddleware:
             content_type = request.headers.get("content-type", "")
             if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
                 try:
+                    cached_body = await request.body()
                     form = await request.form()
                     request.state.form_data = form
                 except Exception:

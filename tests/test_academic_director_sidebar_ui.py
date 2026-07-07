@@ -397,15 +397,24 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
 def test_academic_department_overviews_do_not_render_duplicate_profile_logout_blocks():
     source = Path("frontend/src/roles/common/pages/RoleHome.tsx").read_text()
+    route_source = Path("backend/roles/academic_director/routes.py").read_text()
+    hod_route_source = Path("backend/roles/head_of_department/routes.py").read_text()
     ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split("function HeadOfDepartmentHome", 1)[0]
     hod_overview_block = source.split("function HeadOfDepartmentHome", 1)[1].split("export function RoleHome", 1)[0]
+    ad_overview_return = ad_overview_block.rsplit("return (", 1)[1]
+    hod_overview_return = hod_overview_block.rsplit("return (", 1)[1]
 
-    assert 'activeNav === "profile"' in ad_overview_block
-    assert 'activeNav === "profile"' in hod_overview_block
+    assert 'view?: "overview" | "profile"' in source
+    assert 'view="profile"' in route_source
+    assert 'view="profile"' in hod_route_source
+    assert 'view === "profile"' in ad_overview_block
+    assert 'view === "profile"' in hod_overview_block
     assert "AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken}" in ad_overview_block
     assert "HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken}" in hod_overview_block
-    assert "AcademicDirectorTeacherAcademyCta" in ad_overview_block
-    assert "HeadOfDepartmentTeacherAcademyCta" in hod_overview_block
+    assert "AcademicDirectorProfileSection" not in ad_overview_return
+    assert "HeadOfDepartmentProfileSection" not in hod_overview_return
+    assert "AcademicDirectorTeacherAcademyCta" in ad_overview_return
+    assert "HeadOfDepartmentTeacherAcademyCta" in hod_overview_return
 
 
 def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobile_nav():
@@ -445,13 +454,13 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'academicDirectorTimetable: "/academic-director/timetable"' in routes_source
     assert 'academicDirectorAnnouncements: "/academic-director/announcements"' in routes_source
     assert 'academicDirectorProfile: "/academic-director/profile"' in routes_source
-    assert 'academicDirectorProfileSection: "/academic-director#academic-director-profile"' in routes_source
+    assert "academicDirectorProfileSection" not in routes_source
     assert 'headOfDepartmentOverview: "/head-of-department"' in routes_source
     assert 'headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy"' in routes_source
     assert 'headOfDepartmentTimetable: "/head-of-department/timetable"' in routes_source
     assert 'headOfDepartmentAnnouncements: "/head-of-department/announcements"' in routes_source
     assert 'headOfDepartmentProfile: "/head-of-department/profile"' in routes_source
-    assert 'headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile"' in routes_source
+    assert "headOfDepartmentProfileSection" not in routes_source
     assert "href: routes.academicDirectorTeacherAcademy" in nav_source
     assert "href: routes.academicDirectorHeadOfDepartments" in nav_source
     assert "href: routes.academicDirectorTimetable" in nav_source

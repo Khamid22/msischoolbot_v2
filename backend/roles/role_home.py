@@ -10,6 +10,7 @@ def render_role_home(
     title: str,
     description: str,
     cards: list[dict] | None = None,
+    view: str = "overview",
 ):
     normalized_role = normalize_role(role)
     display_name = role_display_name(normalized_role)
@@ -23,6 +24,7 @@ def render_role_home(
             "title": title,
             "description": description,
             "cards": cards or [],
+            "view": view,
             "csrfToken": generate_csrf(),
         },
         title=f"{display_name} Portal",

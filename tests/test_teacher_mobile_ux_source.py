@@ -70,9 +70,11 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
 def test_teacher_academy_actions_use_schedule_not_assign():
     source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
     shared_source = _read("roles/admin/panels/teachers/shared.ts")
+    teacher_home_source = _read("roles/teacher/pages/TeacherHome.tsx")
 
     assert "Schedule Academy Lesson" in source
     assert "Schedule Training Lesson" not in source
+    assert "assign lessons" not in teacher_home_source
     assert '{ key: "training", label: "Lesson Practice"' in shared_source
     assert '{ key: "training", label: "Training"' not in shared_source
     assert "Save Schedule" in source

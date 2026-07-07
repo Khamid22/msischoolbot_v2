@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.roles.common.teacher_academy_api as academy_api
+    import backend.api.v1.teacher_academy_actions as academy_api
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
@@ -41,18 +41,43 @@ def _patch_api_payload(monkeypatch):
 def _route_methods(app):
     routes = {}
 
-    def walk(route_list):
+    def join_paths(prefix, path):
+        if not prefix:
+            return path
+        if not path or path == "/":
+            return prefix
+        return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+    def routes_already_include_prefix(route_list, prefix):
+        if not prefix:
+            return True
+        for route in route_list:
+            path = getattr(route, "path", None)
+            if path is not None:
+                return path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
+        return False
+
+    def walk(route_list, prefix=""):
         for route in route_list:
             if type(route).__name__ == "_IncludedRouter":
-                walk(route.original_router.routes)
+                router_prefix = getattr(route.original_router, "prefix", "")
+                next_prefix = (
+                    prefix
+                    if routes_already_include_prefix(route.original_router.routes, router_prefix)
+                    else join_paths(prefix, router_prefix)
+                )
+                walk(
+                    route.original_router.routes,
+                    next_prefix,
+                )
                 continue
             path = getattr(route, "path", None)
             methods = getattr(route, "methods", None)
             if path is not None and methods:
-                routes.setdefault(path, set()).update(methods)
+                routes.setdefault(join_paths(prefix, path), set()).update(methods)
             nested = getattr(route, "routes", None)
             if nested:
-                walk(nested)
+                walk(nested, prefix)
 
     walk(app.routes)
     return routes
@@ -62,6 +87,27 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
     routes = _route_methods(app)
 
     for path in [
+        "/api/v1/academic-director/head-of-departments",
+        "/api/v1/academic-director/teacher-academy",
+        "/api/v1/academic-director/teacher-academy/assignments/{assignment_id}",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/status",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete",
+        "/api/v1/head-of-department/teacher-academy/assignments/{assignment_id}",
+        "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments",
+        "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete",
+        "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status",
+    ]:
+        assert "POST" in routes[path]
+
+
+def test_old_role_teacher_academy_api_routes_are_absent(app):
+    routes = _route_methods(app)
+
+    for path in [
+        "/academic-director/api/head-of-departments",
         "/academic-director/api/teacher-academy",
         "/academic-director/api/teacher-academy/assignments/{assignment_id}",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
@@ -72,7 +118,7 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
         "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
         "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
     ]:
-        assert "POST" in routes[path]
+        assert "POST" not in routes.get(path, set())
 
 
 def test_academic_director_create_academy_teacher_uses_selected_lessons_and_safe_credentials(client, monkeypatch):
@@ -94,7 +140,7 @@ def test_academic_director_create_academy_teacher_uses_selected_lessons_and_safe
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
     response = client.post(
-        "/academic-director/api/teacher-academy",
+        "/api/v1/academic-director/teacher-academy",
         data={
             "academy_full_name": "Example Teacher",
             "academy_subject_program_id": "7",
@@ -105,9 +151,9 @@ def test_academic_director_create_academy_teacher_uses_selected_lessons_and_safe
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["ok"] is True
-    assert payload["credentials"]["login"] == "TCH0004"
-    assert "password_hash" not in payload["credentials"]
+    assert payload["status"] == "success"
+    assert payload["data"]["credentials"]["login"] == "TCH0004"
+    assert "password_hash" not in payload["data"]["credentials"]
     assert captured["selected_curriculum_item_ids"] == ["103", "101"]
     assert captured["created_by"] == "AD0001"
     assert captured["return_credentials"] is True
@@ -137,41 +183,51 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
         calls["delete"] = kwargs
         return True, ""
 
+    def fake_delete_assessment(**kwargs):
+        calls["delete_assessment"] = kwargs
+        return True, ""
+
     monkeypatch.setattr(academy_api, "update_assignment", fake_update_assignment)
     monkeypatch.setattr(academy_api, "add_assessment", fake_add_assessment)
     monkeypatch.setattr(academy_api, "update_academy_status", fake_update_status)
     monkeypatch.setattr(academy_api, "promote_academy_teacher", fake_promote)
     monkeypatch.setattr(academy_api, "delete_academy_teacher", fake_delete)
+    monkeypatch.setattr(academy_api, "delete_assessment", fake_delete_assessment)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
     schedule_response = client.post(
-        "/academic-director/api/teacher-academy/assignments/8",
+        "/api/v1/academic-director/teacher-academy/assignments/8",
         data={"assignment_id": "8", "session_datetime": "2026-07-08T09:00", "assignment_status": "ready"},
         headers=XHR,
     )
     assessment_response = client.post(
-        "/academic-director/api/teacher-academy/91/assessments",
+        "/api/v1/academic-director/teacher-academy/91/assessments",
         data={"lesson_assignment_id": "8", "decision": "passed"},
         headers=XHR,
     )
     status_response = client.post(
-        "/academic-director/api/teacher-academy/91/status",
+        "/api/v1/academic-director/teacher-academy/91/status",
         data={"academy_status": "ready_for_active_teacher"},
         headers=XHR,
     )
+    assessment_delete_response = client.post(
+        "/api/v1/academic-director/teacher-academy/91/assessments/17/delete",
+        headers=XHR,
+    )
     promote_response = client.post(
-        "/academic-director/api/teacher-academy/91/promote",
+        "/api/v1/academic-director/teacher-academy/91/promote",
         data={"teacher_assigned_group": "Grade 8A", "teacher_pay_rate": "100000"},
         headers=XHR,
     )
     delete_response = client.post(
-        "/academic-director/api/teacher-academy/91/delete",
+        "/api/v1/academic-director/teacher-academy/91/delete",
         headers=XHR,
     )
 
     assert schedule_response.status_code == 200
     assert assessment_response.status_code == 200
     assert status_response.status_code == 200
+    assert assessment_delete_response.status_code == 200
     assert promote_response.status_code == 200
     assert delete_response.status_code == 200
     assert calls["assignment"]["assignment_id"] == 8
@@ -180,13 +236,14 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
     assert calls["assessment"]["lesson_assignment_id"] == "8"
     assert calls["assessment"]["created_by"] == "AD0001"
     assert calls["status"] == {"academy_teacher_id": 91, "status": "ready_for_active_teacher"}
+    assert calls["delete_assessment"] == {"academy_teacher_id": 91, "assessment_id": 17}
     assert calls["promote"]["academy_teacher_id"] == 91
     assert calls["promote"]["assigned_group"] == "Grade 8A"
     assert calls["delete"]["academy_teacher_id"] == 91
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.api.v1.head_of_department.router as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {"update": 0}
@@ -196,11 +253,11 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
         return True, ""
 
     monkeypatch.setattr(academy_api, "update_assignment", fake_update_assignment)
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: True)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: True)
     _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80, "staff_id": 40})
 
     response = client.post(
-        "/head-of-department/api/teacher-academy/assignments/8",
+        "/api/v1/head-of-department/teacher-academy/assignments/8",
         data={"assignment_id": "8", "assignment_status": "ready"},
         headers=XHR,
     )
@@ -208,9 +265,9 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     assert response.status_code == 200
     assert calls["update"] == 1
 
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
     denied = client.post(
-        "/head-of-department/api/teacher-academy/assignments/9",
+        "/api/v1/head-of-department/teacher-academy/assignments/9",
         data={"assignment_id": "9", "assignment_status": "ready"},
         headers=XHR,
     )
@@ -223,12 +280,13 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
 @pytest.mark.parametrize(
     ("path", "service_name", "expected_key"),
     [
-        ("/head-of-department/api/teacher-academy/91/assessments", "add_assessment", "assessment"),
-        ("/head-of-department/api/teacher-academy/91/status", "update_academy_status", "status"),
+        ("/api/v1/head-of-department/teacher-academy/91/assessments", "add_assessment", "assessment"),
+        ("/api/v1/head-of-department/teacher-academy/91/assessments/17/delete", "delete_assessment", "delete_assessment"),
+        ("/api/v1/head-of-department/teacher-academy/91/status", "update_academy_status", "status"),
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.api.v1.head_of_department.router as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}
@@ -238,7 +296,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
         return True, ""
 
     monkeypatch.setattr(academy_api, service_name, fake_service)
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: True)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: True)
     _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80, "staff_id": 40})
 
     response = client.post(
@@ -250,7 +308,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
     assert response.status_code == 200
     assert expected_key in calls
 
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
     denied = client.post(
         path,
         data={"lesson_assignment_id": "8", "academy_status": "ready_for_evaluation"},
@@ -264,36 +322,48 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
 def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fallback():
     panel_source = Path("frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
+    api_routes_source = Path("frontend/src/shared/api/routes.ts").read_text()
     ad_page = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
     hod_page = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
 
     assert "routes.academicDirectorTeacherAcademyCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssessmentCreate" in panel_source
+    assert "routes.academicDirectorTeacherAcademyAssessmentDelete" in panel_source
     assert "routes.academicDirectorTeacherAcademyDelete" in panel_source
+    assert "Delete assessment report" in panel_source
+    assert "assessmentDelete" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssessmentCreate" in panel_source
+    assert "routes.headOfDepartmentTeacherAcademyAssessmentDelete" in panel_source
     assert "submit(routes.adminTeacherAcademy" not in panel_source
     assert "routes.adminTeacherAcademy" not in panel_source
-    assert "academicDirectorTeacherAcademyCreate: \"/academic-director/api/teacher-academy\"" in routes_source
+    assert "apiRoutes.academicDirectorTeacherAcademyCreate" in routes_source
+    assert 'academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy"' in api_routes_source
     assert "academicDirectorTeacherAcademyDelete" in routes_source
+    assert "academicDirectorTeacherAcademyAssessmentDelete" in routes_source
     assert "headOfDepartmentTeacherAcademyAssignmentUpdate" in routes_source
+    assert "headOfDepartmentTeacherAcademyAssessmentDelete" in routes_source
     assert "adminTeacherAcademy" not in routes_source
     assert "/admin/teacher-academy" not in routes_source
+    assert "/academic-director/api" not in routes_source
+    assert "/head-of-department/api" not in routes_source
+    assert "/academic-director/api" not in api_routes_source
+    assert "/head-of-department/api" not in api_routes_source
     assert "adminMode: props.adminMode || \"academic_director\"" in ad_page
     assert "adminMode: \"head_of_department\"" in hod_page
 
 
 def test_teacher_academy_legacy_deletion_plan_documents_completed_admin_cleanup():
-    plan_source = Path("TEACHER_ACADEMY_LEGACY_DELETION_PLAN.md").read_text()
+    plan_source = Path("docs/TEACHER_ACADEMY_LEGACY_DELETION_PLAN.md").read_text()
 
     for required in [
         "Status: completed",
         "Removed old admin Teacher Academy action routes",
         "Removed `backend/roles/admin/services/teacher_academy_service.py`",
         "Removed `adminTeacherAcademy...` frontend action helpers",
-        "Academic Director mode uses `/academic-director/api/teacher-academy...`",
-        "Head of Department mode uses `/head-of-department/api/teacher-academy...`",
+        "Academic Director mode uses `/api/v1/academic-director/teacher-academy...`",
+        "Head of Department mode uses `/api/v1/head-of-department/teacher-academy...`",
         "Admin/system admin no longer posts Teacher Academy actions through `/admin`.",
     ]:
         assert required in plan_source

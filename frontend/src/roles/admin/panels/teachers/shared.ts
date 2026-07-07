@@ -155,7 +155,10 @@ export async function postForm(url: string, fields: Record<string, string>, csrf
     } catch {
       data = {};
     }
-    return { ok: res.ok && data.ok !== false, data };
+    const isApiSuccess = data.status === "success" && data.data && typeof data.data === "object";
+    const isApiError = data.status === "error";
+    const payload = isApiSuccess ? data.data as Record<string, unknown> : data;
+    return { ok: res.ok && !isApiError && data.ok !== false, data: payload };
   } catch {
     return { ok: false, data: { message: "Network error. Please try again." } };
   }

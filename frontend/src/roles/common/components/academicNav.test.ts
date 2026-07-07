@@ -37,7 +37,7 @@ describe("Academic Director navigation", () => {
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/timetable"), "timetable");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/announcements"), "announcements");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/profile"), "profile");
-    assert.equal(academicDirectorActiveNavFromPath("/academic-director", "#academic-director-profile"), "profile");
+    assert.equal(academicDirectorActiveNavFromPath("/academic-director", "#academic-director-profile"), "overview");
   });
 });
 
@@ -68,7 +68,7 @@ describe("Head of Department navigation", () => {
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-department/timetable"), "timetable");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-department/announcements"), "announcements");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-department/profile"), "profile");
-    assert.equal(headOfDepartmentActiveNavFromPath("/head-of-department", "#head-of-department-profile"), "profile");
+    assert.equal(headOfDepartmentActiveNavFromPath("/head-of-department", "#head-of-department-profile"), "overview");
   });
 });
 

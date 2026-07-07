@@ -423,6 +423,10 @@ def _bootstrap_app(app_instance):
     from backend.routes.system import router as system_router
     app_instance.include_router(system_router)
 
+    # Include JSON/action API router before page routes.
+    from backend.api.v1.router import router as api_v1_router
+    app_instance.include_router(api_v1_router)
+
     # Register admin and student page routes
     render_admin_page = register_admin_page_routes(
         app_instance,

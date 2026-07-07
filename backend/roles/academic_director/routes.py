@@ -7,28 +7,16 @@ from backend.domains.announcements.service import list_announcements
 from backend.roles.role_home import render_role_home
 from backend.roles.workspace_counts import academic_director_workspace_cards
 from backend.roles.academic_director.staff_registration import (
-    create_head_of_department_account,
     list_active_subjects,
     list_head_of_department_accounts,
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
-from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.domains.teacher_academy.service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
 )
-from backend.roles.common.teacher_academy_api import (
-    add_assessment_response,
-    create_academy_teacher_response,
-    delete_academy_teacher_response,
-    promote_response,
-    update_assignment_response,
-    update_status_response,
-)
-from backend.utils.context import request
 from backend.utils.guards import require_role
 from backend.utils.performance import PagePerformanceTimer, log_page_performance
-from backend.utils.response_helpers import jsonify
 from backend.utils.session import current_auth_login, current_auth_role
 
 
@@ -151,6 +139,7 @@ def register_academic_director_page_routes(app):
             title="Academic Director Profile",
             description="Academic Director profile and logout.",
             cards=academic_director_workspace_cards(),
+            view="profile",
         )
 
     @router.get("/academic-director/teacher-academy", operation_id="academic_director_teacher_academy")
@@ -220,79 +209,6 @@ def register_academic_director_page_routes(app):
             rows={"head_of_departments": hod_context.get("items", [])},
         )
         return response
-
-    @router.post("/academic-director/api/head-of-departments", operation_id="academic_director_create_hod")
-    def academic_director_create_hod():
-        created, error_message, credentials = create_head_of_department_account(
-            display_name=request.form.get("hod_display_name", ""),
-            subject_id=request.form.get("hod_subject_id", ""),
-            created_by=current_auth_login() or "Academic Director",
-        )
-        if not created:
-            return jsonify(
-                {"ok": False, "message": error_message or "Unable to create Head of Department."},
-                status_code=400,
-            )
-        invalidate_admin_page_context_cache()
-        return jsonify(
-            {
-                "ok": True,
-                "message": "Head of Department account created.",
-                "credentials": {
-                    "role": "head_of_department",
-                    "login": credentials.get("login", ""),
-                    "temporary_password": credentials.get("temporary_password", ""),
-                    "display_name": credentials.get("display_name", ""),
-                    "subject_name": credentials.get("subject_name", ""),
-                },
-                "headOfDepartment": {
-                    "login": credentials.get("login", ""),
-                    "display_name": credentials.get("display_name", ""),
-                    "role": "head_of_department",
-                    "status": "active",
-                    "subject_name": credentials.get("subject_name", ""),
-                },
-            }
-        )
-
-    @router.post("/academic-director/api/teacher-academy", operation_id="academic_director_create_academy_teacher")
-    def academic_director_create_academy_teacher_api():
-        return create_academy_teacher_response(created_by_label="Academic Director")
-
-    @router.post(
-        "/academic-director/api/teacher-academy/assignments/{assignment_id}",
-        operation_id="academic_director_update_academy_assignment",
-    )
-    def academic_director_update_academy_assignment_api(assignment_id: int):
-        return update_assignment_response(assignment_id)
-
-    @router.post(
-        "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
-        operation_id="academic_director_add_academy_assessment",
-    )
-    def academic_director_add_academy_assessment_api(academy_teacher_id: int):
-        return add_assessment_response(academy_teacher_id, created_by_label="Academic Director")
-
-    @router.post(
-        "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
-        operation_id="academic_director_update_academy_status",
-    )
-    def academic_director_update_academy_status_api(academy_teacher_id: int):
-        return update_status_response(academy_teacher_id)
-
-    @router.post(
-        "/academic-director/api/teacher-academy/{academy_teacher_id}/delete",
-        operation_id="academic_director_delete_academy_teacher",
-    )
-    def academic_director_delete_academy_teacher_api(academy_teacher_id: int):
-        return delete_academy_teacher_response(academy_teacher_id)
-
-    @router.post(
-        "/academic-director/api/teacher-academy/{academy_teacher_id}/promote",
-        operation_id="academic_director_promote_academy_teacher",
-    )
-    def academic_director_promote_academy_teacher_api(academy_teacher_id: int):
-        return promote_response(academy_teacher_id)
 
     app.include_router(router)
 

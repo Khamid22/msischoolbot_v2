@@ -54,15 +54,15 @@ export const headOfDepartmentNavConfig: ReadonlyArray<AcademicNavConfigItem<Head
 export const headOfDepartmentMobileNavConfig: ReadonlyArray<AcademicNavConfigItem<HeadOfDepartmentNavKey>> =
   mobileNavItemsFrom(headOfDepartmentNavConfig);
 
-export function academicDirectorActiveNavFromPath(pathname: string, hash = ""): AcademicDirectorNavKey {
-  if (hash === "#academic-director-profile" || normalizeNavPathname(pathname) === routes.academicDirectorProfile) {
+export function academicDirectorActiveNavFromPath(pathname: string, _hash = ""): AcademicDirectorNavKey {
+  if (normalizeNavPathname(pathname) === routes.academicDirectorProfile) {
     return "profile";
   }
   return activeNavKeyFromPath(academicDirectorNavConfig, pathname, "overview");
 }
 
-export function headOfDepartmentActiveNavFromPath(pathname: string, hash = ""): HeadOfDepartmentNavKey {
-  if (hash === "#head-of-department-profile" || normalizeNavPathname(pathname) === routes.headOfDepartmentProfile) {
+export function headOfDepartmentActiveNavFromPath(pathname: string, _hash = ""): HeadOfDepartmentNavKey {
+  if (normalizeNavPathname(pathname) === routes.headOfDepartmentProfile) {
     return "profile";
   }
   return activeNavKeyFromPath(headOfDepartmentNavConfig, pathname, "overview");

@@ -1,3 +1,5 @@
+import { apiRoutes } from "@/shared/api/routes";
+
 const adminStudentQuery = (school = "all") =>
   `school=${encodeURIComponent(String(school || "all"))}&embed=admin`;
 
@@ -33,31 +35,23 @@ export const routes = {
   academicDirectorTimetable: "/academic-director/timetable",
   academicDirectorAnnouncements: "/academic-director/announcements",
   academicDirectorProfile: "/academic-director/profile",
-  academicDirectorProfileSection: "/academic-director#academic-director-profile",
-  academicDirectorHeadOfDepartmentCreate: "/academic-director/api/head-of-departments",
-  academicDirectorTeacherAcademyCreate: "/academic-director/api/teacher-academy",
-  academicDirectorTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
-    `/academic-director/api/teacher-academy/assignments/${assignmentId}`,
-  academicDirectorTeacherAcademyAssessmentCreate: (academyTeacherId: number | string) =>
-    `/academic-director/api/teacher-academy/${academyTeacherId}/assessments`,
-  academicDirectorTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
-    `/academic-director/api/teacher-academy/${academyTeacherId}/status`,
-  academicDirectorTeacherAcademyPromote: (academyTeacherId: number | string) =>
-    `/academic-director/api/teacher-academy/${academyTeacherId}/promote`,
-  academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
-    `/academic-director/api/teacher-academy/${academyTeacherId}/delete`,
+  academicDirectorHeadOfDepartmentCreate: apiRoutes.academicDirectorHeadOfDepartmentCreate,
+  academicDirectorTeacherAcademyCreate: apiRoutes.academicDirectorTeacherAcademyCreate,
+  academicDirectorTeacherAcademyAssignmentUpdate: apiRoutes.academicDirectorTeacherAcademyAssignmentUpdate,
+  academicDirectorTeacherAcademyAssessmentCreate: apiRoutes.academicDirectorTeacherAcademyAssessmentCreate,
+  academicDirectorTeacherAcademyAssessmentDelete: apiRoutes.academicDirectorTeacherAcademyAssessmentDelete,
+  academicDirectorTeacherAcademyStatusUpdate: apiRoutes.academicDirectorTeacherAcademyStatusUpdate,
+  academicDirectorTeacherAcademyPromote: apiRoutes.academicDirectorTeacherAcademyPromote,
+  academicDirectorTeacherAcademyDelete: apiRoutes.academicDirectorTeacherAcademyDelete,
   headOfDepartmentOverview: "/head-of-department",
   headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy",
   headOfDepartmentTimetable: "/head-of-department/timetable",
   headOfDepartmentAnnouncements: "/head-of-department/announcements",
   headOfDepartmentProfile: "/head-of-department/profile",
-  headOfDepartmentProfileSection: "/head-of-department#head-of-department-profile",
-  headOfDepartmentTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
-    `/head-of-department/api/teacher-academy/assignments/${assignmentId}`,
-  headOfDepartmentTeacherAcademyAssessmentCreate: (academyTeacherId: number | string) =>
-    `/head-of-department/api/teacher-academy/${academyTeacherId}/assessments`,
-  headOfDepartmentTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
-    `/head-of-department/api/teacher-academy/${academyTeacherId}/status`,
+  headOfDepartmentTeacherAcademyAssignmentUpdate: apiRoutes.headOfDepartmentTeacherAcademyAssignmentUpdate,
+  headOfDepartmentTeacherAcademyAssessmentCreate: apiRoutes.headOfDepartmentTeacherAcademyAssessmentCreate,
+  headOfDepartmentTeacherAcademyAssessmentDelete: apiRoutes.headOfDepartmentTeacherAcademyAssessmentDelete,
+  headOfDepartmentTeacherAcademyStatusUpdate: apiRoutes.headOfDepartmentTeacherAcademyStatusUpdate,
   adminResourceTypeAdd: "/admin/resources/types/add",
   adminResourceTypeDelete: (typeId: number | string) => `/admin/resources/types/${typeId}/delete`,
   adminResourceTypeRename: (typeId: number | string) => `/admin/resources/types/${typeId}/rename`,

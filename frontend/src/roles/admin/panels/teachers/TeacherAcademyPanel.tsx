@@ -22,6 +22,7 @@ type TeacherAcademyActionRoutes = {
   create: string;
   assignmentUpdate: (assignmentId: number | string) => string;
   assessmentCreate: (academyTeacherId: number | string) => string;
+  assessmentDelete: (academyTeacherId: number | string, assessmentId: number | string) => string;
   statusUpdate: (academyTeacherId: number | string) => string;
   promote?: (academyTeacherId: number | string) => string;
   delete?: (academyTeacherId: number | string) => string;
@@ -191,6 +192,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       create: routes.academicDirectorTeacherAcademyCreate,
       assignmentUpdate: routes.academicDirectorTeacherAcademyAssignmentUpdate,
       assessmentCreate: routes.academicDirectorTeacherAcademyAssessmentCreate,
+      assessmentDelete: routes.academicDirectorTeacherAcademyAssessmentDelete,
       statusUpdate: routes.academicDirectorTeacherAcademyStatusUpdate,
       promote: routes.academicDirectorTeacherAcademyPromote,
       delete: routes.academicDirectorTeacherAcademyDelete,
@@ -201,6 +203,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       create: "",
       assignmentUpdate: routes.headOfDepartmentTeacherAcademyAssignmentUpdate,
       assessmentCreate: routes.headOfDepartmentTeacherAcademyAssessmentCreate,
+      assessmentDelete: routes.headOfDepartmentTeacherAcademyAssessmentDelete,
       statusUpdate: routes.headOfDepartmentTeacherAcademyStatusUpdate,
     };
   }
@@ -208,6 +211,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
     create: "",
     assignmentUpdate: () => "",
     assessmentCreate: () => "",
+    assessmentDelete: () => "",
     statusUpdate: () => "",
   };
 }
@@ -1390,10 +1394,12 @@ function AcademyDetailModal({
   onPreview,
   onSchedule,
   onAssess,
+  onDeleteAssessment,
   onPromote,
   allowTeacherPreview,
   canSchedule,
   canAssess,
+  canDeleteAssessment,
   canPromote,
 }: {
   teacher: AcademyTeacher;
@@ -1401,10 +1407,12 @@ function AcademyDetailModal({
   onPreview: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
+  onDeleteAssessment: (assessment: Record<string, unknown>) => void;
   onPromote: () => void;
   allowTeacherPreview: boolean;
   canSchedule: boolean;
   canAssess: boolean;
+  canDeleteAssessment: boolean;
   canPromote: boolean;
 }) {
   const assignments = academyAssignments(teacher);
@@ -1490,7 +1498,20 @@ function AcademyDetailModal({
                       <p className="text-sm font-bold">{asString(assessment.lesson_number)} · {asString(assessment.lesson_topic)}</p>
                       <p className="text-[11px] text-muted-foreground">{dateLabel(assessment.assessment_datetime)} · {asString(assessment.evaluator_name) || "Evaluator not set"}</p>
                     </div>
-                    <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{Number(assessment.weighted_overall_score || 0).toFixed(2)}</span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{Number(assessment.weighted_overall_score || 0).toFixed(2)}</span>
+                      {canDeleteAssessment ? (
+                        <button
+                          type="button"
+                          aria-label="Delete assessment report"
+                          title="Delete report"
+                          onClick={() => onDeleteAssessment(assessment)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="mt-2 text-xs font-bold">{decisionLabel(assessment.decision)}</p>
                   <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{asString(assessment.areas_for_improvement) || asString(assessment.final_recommendation) || "No notes."}</p>
@@ -1784,6 +1805,7 @@ export function TeacherAcademyPanel({
   const [assessmentTarget, setAssessmentTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
   const [promoteTeacher, setPromoteTeacher] = useState<AcademyTeacher | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AcademyTeacher | null>(null);
+  const [assessmentDeleteTarget, setAssessmentDeleteTarget] = useState<{ teacher: AcademyTeacher; assessment: Record<string, unknown> } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -1838,6 +1860,7 @@ export function TeacherAcademyPanel({
   const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canScheduleAcademyLesson = Boolean(academyApi.assignmentUpdate(0));
   const canAssessAcademyLesson = Boolean(academyApi.assessmentCreate(0));
+  const canDeleteAssessmentReport = Boolean(academyApi.assessmentDelete(0, 0));
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
 
@@ -1901,6 +1924,25 @@ export function TeacherAcademyPanel({
     }
   }
 
+  async function confirmDeleteAssessmentReport() {
+    if (!assessmentDeleteTarget) return;
+    const teacherId = asNumber(assessmentDeleteTarget.teacher.id);
+    const assessmentId = asNumber(assessmentDeleteTarget.assessment.id);
+    if (!teacherId || !assessmentId) {
+      showToast("Assessment report id is missing.", "danger");
+      setAssessmentDeleteTarget(null);
+      return;
+    }
+    const result = await submit(
+      academyApi.assessmentDelete(teacherId, assessmentId),
+      {},
+      "Assessment report deleted.",
+    );
+    if (result) {
+      setAssessmentDeleteTarget(null);
+    }
+  }
+
   return (
     <>
       {createOpen ? (
@@ -1957,12 +1999,17 @@ export function TeacherAcademyPanel({
             setError("");
             setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
           }}
+          onDeleteAssessment={(assessment) => {
+            setError("");
+            setAssessmentDeleteTarget({ teacher: detailTeacher, assessment });
+          }}
           onPromote={() => {
             setError("");
             openPromote(detailTeacher);
           }}
           canSchedule={canScheduleAcademyLesson}
           canAssess={canAssessAcademyLesson}
+          canDeleteAssessment={canDeleteAssessmentReport}
           canPromote={canPromoteAcademyTeacher}
         />
       ) : null}
@@ -2034,6 +2081,22 @@ export function TeacherAcademyPanel({
         onConfirm={confirmDeleteAcademyTeacher}
         onCancel={() => {
           if (!submitting) setDeleteTarget(null);
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(assessmentDeleteTarget)}
+        title="Delete assessment report?"
+        message={
+          <>
+            This removes the selected report and recalculates the lesson progress.
+          </>
+        }
+        confirmLabel="Delete report"
+        danger
+        busy={submitting}
+        onConfirm={confirmDeleteAssessmentReport}
+        onCancel={() => {
+          if (!submitting) setAssessmentDeleteTarget(null);
         }}
       />
 

@@ -852,6 +852,104 @@ def add_assessment(
     return True, ""
 
 
+def _assignment_status_from_decision(decision):
+    normalized = str(decision or "").strip()
+    return (
+        "passed"
+        if normalized in {"passed", "ready_for_final_evaluation", "approved_for_active_teacher"}
+        else "needs_improvement"
+    )
+
+
+def _academy_status_from_decision(decision):
+    normalized = str(decision or "").strip()
+    if normalized == "approved_for_active_teacher":
+        return "ready_for_active_teacher"
+    if normalized == "rejected":
+        return "rejected"
+    if normalized in {"needs_improvement", "reassign_lesson"}:
+        return "needs_improvement"
+    if normalized == "ready_for_final_evaluation":
+        return "ready_for_evaluation"
+    return None
+
+
+def delete_assessment(*, academy_teacher_id, assessment_id):
+    parsed_teacher_id = _as_int(academy_teacher_id)
+    parsed_assessment_id = _as_int(assessment_id)
+    if not parsed_teacher_id or not parsed_assessment_id:
+        return False, "Assessment report not found."
+
+    now = _utc_now_iso()
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        assessment = queries.get_assessment_delete_row(
+            conn,
+            academy_teacher_id=parsed_teacher_id,
+            assessment_id=parsed_assessment_id,
+        )
+        if not assessment:
+            return False, "Assessment report not found."
+
+        lesson_assignment_id = _as_int(assessment["lesson_assignment_id"])
+        queries.delete_assessment_row(conn, parsed_assessment_id)
+
+        if lesson_assignment_id:
+            latest_assignment_assessment = queries.get_latest_assessment_for_assignment(
+                conn,
+                academy_teacher_id=parsed_teacher_id,
+                lesson_assignment_id=lesson_assignment_id,
+            )
+            if latest_assignment_assessment:
+                assignment_status = _assignment_status_from_decision(latest_assignment_assessment["decision"])
+            else:
+                assignment = queries.get_assignment_schedule_row(conn, lesson_assignment_id)
+                assignment_status = "ready" if assignment and str(assignment["session_datetime"] or "").strip() else "assigned"
+            queries.update_assignment_status(
+                conn,
+                assignment_id=lesson_assignment_id,
+                status=assignment_status,
+                updated_at=now,
+            )
+
+        latest_teacher_assessment = queries.get_latest_assessment_for_teacher(conn, parsed_teacher_id)
+        next_status = (
+            _academy_status_from_decision(latest_teacher_assessment["decision"])
+            if latest_teacher_assessment
+            else None
+        )
+        current_status = str(queries.get_academy_teacher_status(conn, parsed_teacher_id) or "").strip()
+        assessment_driven_statuses = {
+            "needs_improvement",
+            "ready_for_evaluation",
+            "ready_for_active_teacher",
+            "rejected",
+        }
+        if next_status:
+            queries.update_academy_teacher_status(
+                conn,
+                academy_teacher_id=parsed_teacher_id,
+                status=next_status,
+                updated_at=now,
+            )
+        elif current_status in assessment_driven_statuses:
+            queries.update_academy_teacher_status(
+                conn,
+                academy_teacher_id=parsed_teacher_id,
+                status="in_training",
+                updated_at=now,
+            )
+        else:
+            queries.touch_academy_teacher(
+                conn,
+                academy_teacher_id=parsed_teacher_id,
+                updated_at=now,
+            )
+
+        conn.commit()
+    return True, ""
+
+
 def update_academy_status(*, academy_teacher_id, status):
     parsed_teacher_id = _as_int(academy_teacher_id)
     if not parsed_teacher_id:
@@ -997,6 +1095,7 @@ __all__ = [
     "delete_academy_teacher",
     "update_assignment",
     "add_assessment",
+    "delete_assessment",
     "update_academy_status",
     "promote_academy_teacher",
 ]

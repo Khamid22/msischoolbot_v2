@@ -34,18 +34,43 @@ def _set_session(client, data):
 def _route_methods(app):
     routes = {}
 
-    def walk(route_list):
+    def join_paths(prefix, path):
+        if not prefix:
+            return path
+        if not path or path == "/":
+            return prefix
+        return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+    def routes_already_include_prefix(route_list, prefix):
+        if not prefix:
+            return True
+        for route in route_list:
+            path = getattr(route, "path", None)
+            if path is not None:
+                return path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
+        return False
+
+    def walk(route_list, prefix=""):
         for route in route_list:
             if type(route).__name__ == "_IncludedRouter":
-                walk(route.original_router.routes)
+                router_prefix = getattr(route.original_router, "prefix", "")
+                next_prefix = (
+                    prefix
+                    if routes_already_include_prefix(route.original_router.routes, router_prefix)
+                    else join_paths(prefix, router_prefix)
+                )
+                walk(
+                    route.original_router.routes,
+                    next_prefix,
+                )
                 continue
             path = getattr(route, "path", None)
             methods = getattr(route, "methods", None)
             if path is not None and methods:
-                routes.setdefault(path, set()).update(methods)
+                routes.setdefault(join_paths(prefix, path), set()).update(methods)
             nested = getattr(route, "routes", None)
             if nested:
-                walk(nested)
+                walk(nested, prefix)
 
     walk(app.routes)
     return routes
@@ -348,8 +373,8 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
     assert 'data-react-page="admin-home"' not in response.text
 
 
-def test_academic_director_can_create_academy_teacher_through_clean_role_api(client, monkeypatch):
-    import backend.roles.common.teacher_academy_api as academy_api
+def test_academic_director_can_create_academy_teacher_through_api_v1(client, monkeypatch):
+    import backend.api.v1.teacher_academy_actions as academy_api
 
     calls = []
     monkeypatch.setattr(
@@ -364,7 +389,7 @@ def test_academic_director_can_create_academy_teacher_through_clean_role_api(cli
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
 
     response = client.post(
-        "/academic-director/api/teacher-academy",
+        "/api/v1/academic-director/teacher-academy",
         data={
             "academy_full_name": "Example Teacher",
             "academy_subject_program_id": "5",
@@ -375,7 +400,7 @@ def test_academic_director_can_create_academy_teacher_through_clean_role_api(cli
     )
 
     assert response.status_code == 200
-    assert response.json()["ok"] is True
+    assert response.json()["status"] == "success"
     assert calls
     assert calls[0]["full_name"] == "Example Teacher"
     assert calls[0]["selected_curriculum_item_ids"] == ["101", "102"]
@@ -417,11 +442,13 @@ def test_notification_does_not_crash_without_telegram_link():
         ("GET", "/parent"),
         ("GET", "/student"),
         ("GET", "/dashboard/{student_id}"),
-        ("POST", "/academic-director/api/teacher-academy"),
-        ("POST", "/academic-director/api/teacher-academy/assignments/{assignment_id}"),
-        ("POST", "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments"),
-        ("POST", "/head-of-department/api/teacher-academy/assignments/{assignment_id}"),
-        ("POST", "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments"),
+        ("POST", "/api/v1/academic-director/teacher-academy"),
+        ("POST", "/api/v1/academic-director/teacher-academy/assignments/{assignment_id}"),
+        ("POST", "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments"),
+        ("POST", "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete"),
+        ("POST", "/api/v1/head-of-department/teacher-academy/assignments/{assignment_id}"),
+        ("POST", "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments"),
+        ("POST", "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete"),
         ("GET", "/academic-director/teacher-academy"),
     ],
 )
@@ -442,5 +469,12 @@ def test_old_admin_teacher_academy_action_routes_are_removed(app):
         "/admin/teacher-academy/{academy_teacher_id}/status",
         "/admin/teacher-academy/{academy_teacher_id}/promote",
         "/admin/teacher-academy/{academy_teacher_id}/delete",
+        "/academic-director/api/teacher-academy",
+        "/academic-director/api/teacher-academy/assignments/{assignment_id}",
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
+        "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
+        "/head-of-department/api/teacher-academy/assignments/{assignment_id}",
+        "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
+        "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
     ]:
         assert path not in routes

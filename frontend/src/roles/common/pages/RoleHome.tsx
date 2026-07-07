@@ -12,8 +12,6 @@ import {
   HeadOfDepartmentPageShell,
   HeadOfDepartmentProfileSection,
   HeadOfDepartmentTeacherAcademyCta,
-  academicDirectorActiveNavFromPath,
-  headOfDepartmentActiveNavFromPath,
   type AcademicDirectorNavKey,
   type HeadOfDepartmentNavKey,
 } from "@/roles/common/components/AcademicDirectorShell";
@@ -36,6 +34,7 @@ interface RoleHomeProps {
   title?: string;
   description?: string;
   cards?: RoleHomeCard[];
+  view?: "overview" | "profile";
   csrfToken?: string;
 }
 
@@ -68,26 +67,18 @@ function normalizeRoleName(value: string | undefined) {
   return String(value || "").trim().toLowerCase().replace(/-/g, "_");
 }
 
-function currentAcademicDirectorNav(): AcademicDirectorNavKey {
-  if (typeof window === "undefined") return "overview";
-  return academicDirectorActiveNavFromPath(window.location.pathname, window.location.hash);
-}
-
-function currentHeadOfDepartmentNav(): HeadOfDepartmentNavKey {
-  if (typeof window === "undefined") return "overview";
-  return headOfDepartmentActiveNavFromPath(window.location.pathname, window.location.hash);
-}
-
 function AcademicDirectorHome({
   authLogin,
   roleDisplayName,
   title,
   description,
   cards,
+  view,
   csrfToken,
 }: Required<Pick<RoleHomeProps, "roleDisplayName" | "title" | "description" | "cards">> &
-  Pick<RoleHomeProps, "authLogin" | "csrfToken">) {
-  const activeNav = currentAcademicDirectorNav();
+  Pick<RoleHomeProps, "authLogin" | "view" | "csrfToken">) {
+  const isProfileView = view === "profile";
+  const activeNav: AcademicDirectorNavKey = isProfileView ? "profile" : "overview";
   const normalizedCards = cards.length
     ? cards
     : [
@@ -96,6 +87,29 @@ function AcademicDirectorHome({
         { label: "Subjects", value: "Ready", description: "Subject records are available." },
         { label: "Students", value: "Ready", description: "Student records are available." },
       ];
+
+  if (isProfileView) {
+    return (
+      <AcademicDirectorPageShell
+        authLogin={authLogin}
+        csrfToken={csrfToken}
+        active={activeNav}
+        maxWidthClass="max-w-4xl"
+      >
+        <PageHeader
+          title={title}
+          subtitle={description}
+          badge={
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+              {roleDisplayName}
+            </span>
+          }
+          actions={<AccountBadge authLogin={authLogin} />}
+        />
+        <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      </AcademicDirectorPageShell>
+    );
+  }
 
   return (
     <AcademicDirectorPageShell
@@ -118,9 +132,6 @@ function AcademicDirectorHome({
       <RoleMetricCards cards={normalizedCards} />
 
       <AcademicDirectorTeacherAcademyCta />
-      {activeNav === "profile" ? (
-        <AcademicDirectorProfileSection authLogin={authLogin} csrfToken={csrfToken} />
-      ) : null}
     </AcademicDirectorPageShell>
   );
 }
@@ -131,10 +142,12 @@ function HeadOfDepartmentHome({
   title,
   description,
   cards,
+  view,
   csrfToken,
 }: Required<Pick<RoleHomeProps, "roleDisplayName" | "title" | "description" | "cards">> &
-  Pick<RoleHomeProps, "authLogin" | "csrfToken">) {
-  const activeNav = currentHeadOfDepartmentNav();
+  Pick<RoleHomeProps, "authLogin" | "view" | "csrfToken">) {
+  const isProfileView = view === "profile";
+  const activeNav: HeadOfDepartmentNavKey = isProfileView ? "profile" : "overview";
   const normalizedCards = cards.length
     ? cards
     : [
@@ -142,6 +155,29 @@ function HeadOfDepartmentHome({
         { label: "Teacher Academy", value: "Ready", description: "Academy teachers are subject-scoped." },
         { label: "Reports", value: "Ready", description: "Assessment reports are available." },
       ];
+
+  if (isProfileView) {
+    return (
+      <HeadOfDepartmentPageShell
+        authLogin={authLogin}
+        csrfToken={csrfToken}
+        active={activeNav}
+        maxWidthClass="max-w-4xl"
+      >
+        <PageHeader
+          title={title}
+          subtitle={description}
+          badge={
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+              {roleDisplayName}
+            </span>
+          }
+          actions={<AccountBadge authLogin={authLogin} />}
+        />
+        <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
+      </HeadOfDepartmentPageShell>
+    );
+  }
 
   return (
     <HeadOfDepartmentPageShell
@@ -164,9 +200,6 @@ function HeadOfDepartmentHome({
       <RoleMetricCards cards={normalizedCards} />
 
       <HeadOfDepartmentTeacherAcademyCta />
-      {activeNav === "profile" ? (
-        <HeadOfDepartmentProfileSection authLogin={authLogin} csrfToken={csrfToken} />
-      ) : null}
     </HeadOfDepartmentPageShell>
   );
 }
@@ -179,6 +212,7 @@ export function RoleHome({
   title = "Workspace Dashboard",
   description = "Your role workspace is ready.",
   cards = [],
+  view = "overview",
   csrfToken = "",
 }: RoleHomeProps) {
   const normalizedRole = normalizeRoleName(role || authRole);
@@ -190,6 +224,7 @@ export function RoleHome({
         title={title}
         description={description}
         cards={cards}
+        view={view}
         csrfToken={csrfToken}
       />
     );
@@ -202,6 +237,7 @@ export function RoleHome({
         title={title}
         description={description}
         cards={cards}
+        view={view}
         csrfToken={csrfToken}
       />
     );

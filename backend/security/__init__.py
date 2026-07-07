@@ -27,6 +27,8 @@ from backend.security.permissions import (
     role_has_permission,
 )
 from backend.security.dependencies import (
+    CurrentUser,
+    get_current_user,
     get_current_user_role,
     require_role,
     require_permission,
@@ -55,6 +57,8 @@ __all__ = [
     "PERMISSION_SYSTEM_SETTINGS",
     "ALL_PERMISSIONS",
     "role_has_permission",
+    "CurrentUser",
+    "get_current_user",
     "get_current_user_role",
     "require_role",
     "require_permission",

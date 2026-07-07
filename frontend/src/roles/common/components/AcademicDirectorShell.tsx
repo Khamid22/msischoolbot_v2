@@ -179,7 +179,7 @@ export function AcademicDirectorTeacherAcademyCta() {
   return (
     <TeacherAcademyCta
       href={routes.academicDirectorTeacherAcademy}
-      description="Register academy teachers, assign lessons, schedule observations, and review reports."
+      description="Register academy teachers, select lessons, schedule observations, and review reports."
     />
   );
 }

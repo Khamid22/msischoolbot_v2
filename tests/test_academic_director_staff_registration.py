@@ -192,10 +192,10 @@ def test_list_head_of_department_accounts_warns_when_scope_table_missing():
 
 
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
-    import backend.roles.academic_director.routes as academic_routes
+    import backend.api.v1.academic_director.router as academic_director_api
 
     monkeypatch.setattr(
-        academic_routes,
+        academic_director_api,
         "create_head_of_department_account",
         lambda **kwargs: (
             True,
@@ -211,18 +211,19 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
             },
         ),
     )
-    monkeypatch.setattr(academic_routes, "invalidate_admin_page_context_cache", lambda: None)
+    monkeypatch.setattr(academic_director_api, "invalidate_admin_page_context_cache", lambda: None)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
 
     response = client.post(
-        "/academic-director/api/head-of-departments",
+        "/api/v1/academic-director/head-of-departments",
         data={"hod_display_name": "Head of Math Department", "hod_subject_id": "5"},
         headers=XHR,
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["ok"] is True
+    payload = response.json()
+    assert payload["status"] == "success"
+    body = payload["data"]
     assert body["credentials"] == {
         "role": "head_of_department",
         "login": "HOD0001",
@@ -307,9 +308,9 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.api.v1.head_of_department.router as hod_api_routes
 
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
     _set_session(
         client,
         {
@@ -321,7 +322,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
     )
 
     response = client.post(
-        "/head-of-department/api/teacher-academy/7/assessments",
+        "/api/v1/head-of-department/teacher-academy/7/assessments",
         data={"lesson_assignment_id": "3"},
         headers=XHR,
     )
@@ -331,7 +332,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.roles.common.teacher_academy_api as academy_api
+    import backend.api.v1.teacher_academy_actions as academy_api
 
     captured = {}
 
@@ -347,22 +348,22 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
     response = client.post(
-        "/academic-director/api/teacher-academy/7/assessments",
+        "/api/v1/academic-director/teacher-academy/7/assessments",
         data={"lesson_assignment_id": "21", "decision": "passed"},
         headers=XHR,
     )
 
     assert response.status_code == 200
-    assert response.json()["message"] == "Assessment saved."
+    assert response.json()["data"]["message"] == "Assessment saved."
     assert captured["academy_teacher_id"] == 7
     assert captured["lesson_assignment_id"] == "21"
     assert captured["decision"] == "passed"
 
 
 def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.api.v1.head_of_department.router as hod_api_routes
 
-    monkeypatch.setattr(hod_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
     _set_session(
         client,
         {
@@ -374,7 +375,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
     )
 
     response = client.post(
-        "/head-of-department/api/teacher-academy/assignments/21",
+        "/api/v1/head-of-department/teacher-academy/assignments/21",
         data={"assignment_id": "21"},
         headers=XHR,
     )

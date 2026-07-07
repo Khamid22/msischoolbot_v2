@@ -32,7 +32,7 @@ Start here for business and leadership review:
 
 Start here for senior engineer review:
 
-1. [Current Architecture](../CURRENT_ARCHITECTURE.md)
+1. [Current Architecture](./CURRENT_ARCHITECTURE.md)
 2. [Engineering Overview](./ENGINEERING_OVERVIEW.md)
 3. [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
 4. [Engineering Module Map](./ENGINEERING_MODULE_MAP.md)
@@ -56,9 +56,22 @@ These planning files contain earlier detailed architecture notes:
 - [MSI LMS Payment Access Policy](./MSI_LMS_PAYMENT_ACCESS_POLICY.md)
 - [MSI LMS Telegram Parent Linking](./MSI_LMS_TELEGRAM_PARENT_LINKING.md)
 
+### Cleanup Reports
+
+- [API V1 Old Route Deletion Report](./API_V1_OLD_ROUTE_DELETION_REPORT.md)
+- [Role Page-Only Cleanup Report](./ROLE_PAGE_ONLY_CLEANUP_REPORT.md)
+- [Domain Query Migration Report](./DOMAIN_QUERY_MIGRATION_REPORT.md)
+- [Database Folder Cleanup Report](./DATABASE_FOLDER_CLEANUP_REPORT.md)
+- [Identity Naming Cleanup Report](./IDENTITY_NAMING_CLEANUP_REPORT.md)
+- [Frontend API Route Cleanup Report](./FRONTEND_API_ROUTE_CLEANUP_REPORT.md)
+- [Frontend UI Legacy Cleanup Report](./FRONTEND_UI_LEGACY_CLEANUP_REPORT.md)
+- [Backend Cleanliness Report](./BACKEND_CLEANLINESS_REPORT.md)
+- [Frontend Cleanliness Report](./FRONTEND_CLEANLINESS_REPORT.md)
+- [Database Architecture Cleanup Report](./DATABASE_ARCHITECTURE_CLEANUP_REPORT.md)
+
 ### Historical Plans
 
-Phase-era implementation plans are archived under [docs/archive](./archive/). Keep them for history, but use `CURRENT_ARCHITECTURE.md` and the engineering docs above as the current source of truth.
+Phase-era implementation plans are archived under [docs/archive](./archive/). Keep them for history, but use `docs/CURRENT_ARCHITECTURE.md` and the engineering docs above as the current source of truth.
 
 ## Review Workflow
 

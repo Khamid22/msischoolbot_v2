@@ -78,3 +78,15 @@ def test_timetable_and_announcements_query_modules_own_runtime_sql():
     assert "FROM msi_v2.announcements" in announcement_query_source
     assert "FROM msi_v2.subject_programs" in academic_query_source
     assert "FROM msi_v2.group_students" in academic_query_source
+
+
+def test_hod_teacher_academy_scope_sql_lives_in_domain_queries():
+    scope_source = Path("backend/roles/head_of_department/academy_scope.py").read_text()
+    academy_query_source = Path("backend/domains/teacher_academy/queries.py").read_text()
+
+    assert "from backend.domains.teacher_academy import queries as academy_queries" in scope_source
+    assert "from database import queries" not in scope_source
+    assert "msi_v2." not in scope_source
+    assert "list_hod_subject_scope_rows" in academy_query_source
+    assert "get_academy_teacher_subject_id" in academy_query_source
+    assert "get_assignment_subject_id" in academy_query_source

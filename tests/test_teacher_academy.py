@@ -1,12 +1,7 @@
-from starlette.requests import Request
-
-
 def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
-    from backend.roles.common import teacher_academy_api
-    from backend.utils.context import _request_context
+    from backend.api.v1 import teacher_academy_actions
 
-    request = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
-    request.state.form_data = {
+    form_data = {
         "teacher_guidance_compliance_score": "8",
         "teacher_guidance_compliance_remarks": "Followed the guide closely.",
         "timing_adherence_score": "7",
@@ -21,11 +16,7 @@ def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
         "engagement_technique_remarks": "Checked students often.",
     }
 
-    token = _request_context.set(request)
-    try:
-        sections = teacher_academy_api.assessment_sections_from_form()
-    finally:
-        _request_context.reset(token)
+    sections = teacher_academy_actions.assessment_sections_from_form(form_data)
 
     criteria = sections["marking_criteria"]
     assert criteria["tgc"] == {"score": "8", "remarks": "Followed the guide closely."}

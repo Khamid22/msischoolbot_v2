@@ -1,141 +1,77 @@
-# FastAPI API & Security Foundation
+# FastAPI API Foundation
 
-This document describes the role permissions, Pydantic schemas, and security dependencies designed for professionalizing backend route implementations in the MSI School project.
+This is the mandatory route standard for new and migrated backend API endpoints.
+The API plane is JSON only and lives under `backend/api/v1`. HTML shell routes
+belong in the pages/role route layer until the `backend/pages` split lands.
 
----
+## Route Standard
 
-## 1. Supported Roles
+Every migrated endpoint must follow these six rules:
 
-All backend roles are defined as string constants under `web/backend/security/roles.py`:
+1. Inputs are declared with FastAPI and Pydantic: `Form()`, `Query()`, path
+   parameters, or a Pydantic body model. Do not use the legacy request proxy or
+   `request_payload`.
+2. Outputs use the `ApiSuccess[T]` envelope with `response_model=` and
+   `api_success(...)`. Do not return `jsonify(...)`, `{"ok": ...}`, or bare
+   message dictionaries from v1 routes.
+3. Operational failures raise `HTTPException`. Do not hand-roll JSON error
+   responses inside handlers.
+4. Auth is resolved by router dependencies and `CurrentUser` from
+   `backend.security.dependencies`. Do not call `current_auth_*()` inside API
+   handlers.
+5. Route modules do not open database connections or run SQL. They call
+   domain services; SQL lives in `backend/domains/*/queries.py`.
+6. Do not hide unexpected failures behind blanket `except Exception` defaults.
+   Let the global handler log them.
 
-*   `ROLE_OWNER = "owner"` (Super-admin with access to all settings and operations)
-*   `ROLE_CEO = "ceo"` (Executive role with dashboard and data management access)
-*   `ROLE_ADMIN = "admin"` (Administrative operations including user, teacher, parent, resource, and schedule management)
-*   `ROLE_TEACHER = "teacher"` (Academics and study material resources management)
-*   `ROLE_CUSTOMER_SUPPORT = "customer_support"` (Viewing complaints, chat message handling, and user viewing)
-*   `ROLE_PARENT = "parent"` (Read-only student dashboard views for their linked children)
-*   `ROLE_STUDENT = "student"` (Read-only personal student dashboard access)
-
----
-
-## 2. Permissions & Mapping
-
-Permissions are granular actions mapped to roles in `web/backend/security/permissions.py`:
-
-*   `PERMISSION_VIEW_DASHBOARD`
-*   `PERMISSION_MANAGE_STUDENTS`
-*   `PERMISSION_MANAGE_TEACHERS`
-*   `PERMISSION_MANAGE_PARENTS`
-*   `PERMISSION_MANAGE_ANNOUNCEMENTS`
-*   `PERMISSION_MANAGE_RESOURCES`
-*   `PERMISSION_MANAGE_COMPLAINTS`
-*   `PERMISSION_MANAGE_PAYMENTS`
-*   `PERMISSION_MANAGE_ACADEMICS`
-*   `PERMISSION_SYSTEM_SETTINGS`
-
-### Role-Permission Matrix
-
-| Permission | Owner | CEO | Admin | Teacher | Support | Parent | Student |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `view_dashboard` | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| `manage_students` | Yes | Yes | Yes | - | - | - | - |
-| `manage_teachers` | Yes | Yes | Yes | - | - | - | - |
-| `manage_parents` | Yes | Yes | Yes | - | - | - | - |
-| `manage_announcements`| Yes | Yes | Yes | - | - | - | - |
-| `manage_resources` | Yes | Yes | Yes | Yes | - | - | - |
-| `manage_complaints` | Yes | Yes | Yes | - | Yes | - | - |
-| `manage_payments` | Yes | Yes | Yes | - | - | - | - |
-| `manage_academics` | Yes | Yes | Yes | Yes | - | - | - |
-| `system_settings` | Yes | - | - | - | - | - | - |
-
----
-
-## 3. Dependency Injection
-
-FastAPI routes should protect themselves using security dependencies defined in `web/backend/security/dependencies.py`:
-
-### `Depends(get_current_user_role)`
-Resolves the current active session role (raising 401 if unauthenticated).
-
-### `Depends(require_role(allowed_roles))`
-Restricts endpoint access to specific roles (raising 403 if role mismatch).
+## Canonical Example
 
 ```python
-from fastapi import APIRouter, Depends
-from web.backend.security import require_role, ROLE_ADMIN, ROLE_OWNER
+from typing import Annotated
 
-router = APIRouter()
+from fastapi import APIRouter, Depends, Form, HTTPException
 
-@router.get("/admin/settings")
-def get_settings(role: str = Depends(require_role([ROLE_ADMIN, ROLE_OWNER]))):
-    return {"message": "Hello Administrator!"}
+from backend.api import ApiSuccess, api_success
+from backend.security import CurrentUser, get_current_user, require_role
+
+router = APIRouter(
+    prefix="/academic-director",
+    dependencies=[Depends(require_role("academic_director"))],
+)
+
+
+@router.post("/head-of-departments", response_model=ApiSuccess[HodCreated])
+def create_hod(
+    payload: Annotated[CreateHodForm, Form()],
+    user: CurrentUser = Depends(get_current_user),
+):
+    created, error, creds = create_head_of_department_account(
+        display_name=payload.hod_display_name,
+        subject_id=payload.hod_subject_id,
+        created_by=user.login,
+    )
+    if not created:
+        raise HTTPException(400, error or "Unable to create Head of Department.")
+    return api_success(HodCreated.from_credentials(creds))
 ```
 
-### `Depends(require_permission(required_permission))`
-Restricts endpoint access to users possessing the specified permission (raising 403 if permission is missing).
+## Shared Contracts
 
-```python
-from fastapi import APIRouter, Depends
-from web.backend.security import require_permission, PERMISSION_MANAGE_RESOURCES
+- Response envelopes: `backend/api/schemas.py` and `backend/api/responses.py`.
+- Security dependencies: `backend/security/dependencies.py`.
+- Role and permission constants: `backend/security/roles.py` and
+  `backend/security/permissions.py`.
+- Canonical frontend API URLs: `frontend/src/shared/api/routes.ts`.
 
-router = APIRouter()
+## Migration Proofs
 
-@router.post("/resources/upload")
-def upload_resource(role: str = Depends(require_permission(PERMISSION_MANAGE_RESOURCES))):
-    return {"message": "Resource successfully uploaded."}
+For a slice to count as clean, these checks should not find hits inside its v1
+route modules:
+
+```bash
+rg "from backend.utils.context|request\\.form|jsonify\\(|request_payload" backend/api/v1
+rg "connect_auth_db" backend/api/v1
 ```
 
----
-
-## 4. Standard Response Formats
-
-API response shapes are defined as Pydantic models under `web/backend/api/schemas.py`. Use the response helper functions under `web/backend/api/responses.py` to return standardized shapes.
-
-### Success Response (`ApiSuccess[T]`)
-Returned for successful API calls containing a data payload.
-```json
-{
-  "status": "success",
-  "data": {
-    "login": "MSI0001",
-    "role": "student"
-  }
-}
-```
-*Helper Usage:*
-```python
-from web.backend.api import api_success
-return api_success(user_data)
-```
-
-### Message Response (`ApiMessage`)
-Returned for simple actions that yield a generic status message.
-```json
-{
-  "status": "success",
-  "message": "Operation completed successfully."
-}
-```
-*Helper Usage:*
-```python
-from web.backend.api import api_message
-return api_message("Announcement deleted successfully.")
-```
-
-### Error Response (`ApiError`)
-Returned for operational, validation, or system errors.
-```json
-{
-  "status": "error",
-  "message": "Resource was not found.",
-  "code": "RESOURCE_NOT_FOUND",
-  "details": {
-    "resource_id": 42
-  }
-}
-```
-*Helper Usage:*
-```python
-from web.backend.api import api_error
-return api_error(message="Invalid parameters", code="VALIDATION_FAILED", status_code=400)
-```
+The OpenAPI `/docs` page should show request schemas and `ApiSuccess[...]`
+responses for every JSON endpoint in the migrated slice.

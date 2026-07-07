@@ -905,7 +905,7 @@ function AcademyLessonsScreen({
       <EmptyState
         icon={<ClipboardList className="h-5 w-5" />}
         title="No academy lessons assigned."
-        detail="Academic Department will assign lessons before the Teacher Academy sequence begins."
+        detail="Academic Department will select lessons before the Teacher Academy sequence begins."
       />
     );
   }

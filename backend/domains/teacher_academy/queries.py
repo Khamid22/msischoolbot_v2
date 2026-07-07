@@ -25,6 +25,49 @@ activate_teacher_profile = teacher_queries.activate_teacher_profile
 set_teacher_group_assignment = teacher_queries.set_teacher_group_assignment
 
 
+def list_hod_subject_scope_rows(conn: Any, *, account_id: int, staff_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT DISTINCT scope.subject_id
+        FROM msi_v2.staff_subject_scopes scope
+        LEFT JOIN msi_v2.staff_profiles profile ON profile.id = scope.staff_profile_id
+        WHERE scope.status = 'active'
+          AND scope.scope_type = 'head_of_department'
+          AND (
+            scope.account_id = NULLIF(%s::bigint, 0)
+            OR profile.staff_id = NULLIF(%s::bigint, 0)
+          )
+        """,
+        (int(account_id or 0), int(staff_id or 0)),
+    ).fetchall()
+
+
+def get_academy_teacher_subject_id(conn: Any, academy_teacher_id: int) -> int:
+    row = conn.execute(
+        """
+        SELECT subject_id
+        FROM msi_v2.academy_teachers
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (int(academy_teacher_id or 0),),
+    ).fetchone()
+    return int(row["subject_id"] or 0) if row else 0
+
+
+def get_assignment_subject_id(conn: Any, assignment_id: int) -> int:
+    row = conn.execute(
+        """
+        SELECT subject_id
+        FROM msi_v2.academy_lesson_assignments
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (int(assignment_id or 0),),
+    ).fetchone()
+    return int(row["subject_id"] or 0) if row else 0
+
+
 def get_subject_program(conn: Any, program_id: int) -> Any:
     return conn.execute(
         """
@@ -642,6 +685,64 @@ def insert_assessment(
     )
 
 
+def get_assessment_delete_row(conn: Any, *, academy_teacher_id: int, assessment_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, academy_teacher_id, lesson_assignment_id
+        FROM msi_v2.academy_assessments
+        WHERE id = %s AND academy_teacher_id = %s
+        LIMIT 1
+        """,
+        (assessment_id, academy_teacher_id),
+    ).fetchone()
+
+
+def delete_assessment_row(conn: Any, assessment_id: int) -> None:
+    conn.execute(
+        "DELETE FROM msi_v2.academy_assessments WHERE id = %s",
+        (assessment_id,),
+    )
+
+
+def get_latest_assessment_for_assignment(conn: Any, *, academy_teacher_id: int, lesson_assignment_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT decision
+        FROM msi_v2.academy_assessments
+        WHERE academy_teacher_id = %s AND lesson_assignment_id = %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (academy_teacher_id, lesson_assignment_id),
+    ).fetchone()
+
+
+def get_latest_assessment_for_teacher(conn: Any, academy_teacher_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT decision
+        FROM msi_v2.academy_assessments
+        WHERE academy_teacher_id = %s
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+
+
+def get_academy_teacher_status(conn: Any, academy_teacher_id: int) -> str:
+    row = conn.execute(
+        """
+        SELECT academy_status
+        FROM msi_v2.academy_teachers
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+    return str(row["academy_status"] or "") if row else ""
+
+
 def update_assignment_status(conn: Any, *, assignment_id: int, status: str, updated_at: str) -> None:
     conn.execute(
         """
@@ -794,6 +895,7 @@ __all__ = [
     "activate_teacher_profile",
     "approve_academy_teacher_promotion",
     "connect_auth_db",
+    "delete_assessment_row",
     "delete_academy_teacher_profile_row",
     "delete_academy_teacher_row",
     "delete_academy_teacher_staff_row",
@@ -804,8 +906,14 @@ __all__ = [
     "get_academy_teacher_delete_row",
     "get_academy_teacher_id",
     "get_academy_teacher_row_for_account",
+    "get_academy_teacher_status",
+    "get_academy_teacher_subject_id",
+    "get_assessment_delete_row",
     "get_assignment_for_assessment",
     "get_assignment_schedule_row",
+    "get_assignment_subject_id",
+    "get_latest_assessment_for_assignment",
+    "get_latest_assessment_for_teacher",
     "get_next_teacher_code",
     "get_subject_program",
     "get_teacher_account_for_provisioning",
@@ -830,6 +938,7 @@ __all__ = [
     "list_curriculum_items",
     "list_curriculum_lessons",
     "list_curriculum_programs",
+    "list_hod_subject_scope_rows",
     "phase1_accounts_available",
     "set_teacher_group_assignment",
     "touch_academy_teacher",

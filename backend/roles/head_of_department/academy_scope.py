@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from database import queries
+from backend.core.database import connect_auth_db
+from backend.domains.teacher_academy import queries as academy_queries
 from backend.utils.context import session
 from backend.utils.session import current_auth_role, current_staff_id
 
@@ -27,27 +28,18 @@ def _safe_query_subject_ids(account_id: int, staff_id: int, conn: Any | None = N
 
     def _load(active_conn: Any) -> set[int]:
         try:
-            rows = active_conn.execute(
-                """
-                SELECT DISTINCT scope.subject_id
-                FROM msi_v2.staff_subject_scopes scope
-                LEFT JOIN msi_v2.staff_profiles profile ON profile.id = scope.staff_profile_id
-                WHERE scope.status = 'active'
-                  AND scope.scope_type = 'head_of_department'
-                  AND (
-                    scope.account_id = NULLIF(%s::bigint, 0)
-                    OR profile.staff_id = NULLIF(%s::bigint, 0)
-                  )
-                """,
-                (account_id, staff_id),
-            ).fetchall()
+            rows = academy_queries.list_hod_subject_scope_rows(
+                active_conn,
+                account_id=account_id,
+                staff_id=staff_id,
+            )
         except Exception:
             return set()
         return _row_subject_ids(rows)
 
     if conn is not None:
         return _load(conn)
-    with queries.connect_auth_db() as opened_conn:
+    with connect_auth_db() as opened_conn:
         return _load(opened_conn)
 
 
@@ -76,29 +68,11 @@ def filter_academy_teachers_for_current_scope(rows: Iterable[dict[str, Any]]) ->
 
 
 def _subject_id_for_academy_teacher(conn: Any, academy_teacher_id: Any) -> int:
-    row = conn.execute(
-        """
-        SELECT subject_id
-        FROM msi_v2.academy_teachers
-        WHERE id = %s
-        LIMIT 1
-        """,
-        (_to_int(academy_teacher_id),),
-    ).fetchone()
-    return _to_int(row["subject_id"]) if row else 0
+    return _to_int(academy_queries.get_academy_teacher_subject_id(conn, _to_int(academy_teacher_id)))
 
 
 def _subject_id_for_assignment(conn: Any, assignment_id: Any) -> int:
-    row = conn.execute(
-        """
-        SELECT subject_id
-        FROM msi_v2.academy_lesson_assignments
-        WHERE id = %s
-        LIMIT 1
-        """,
-        (_to_int(assignment_id),),
-    ).fetchone()
-    return _to_int(row["subject_id"]) if row else 0
+    return _to_int(academy_queries.get_assignment_subject_id(conn, _to_int(assignment_id)))
 
 
 def can_current_user_manage_academy_teacher(academy_teacher_id: Any) -> bool:
@@ -107,7 +81,7 @@ def can_current_user_manage_academy_teacher(academy_teacher_id: Any) -> bool:
         return True
     if role != "head_of_department":
         return False
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         subject_ids = current_hod_subject_ids(conn=conn)
         return _subject_id_for_academy_teacher(conn, academy_teacher_id) in subject_ids
 
@@ -118,7 +92,7 @@ def can_current_user_manage_academy_assignment(assignment_id: Any) -> bool:
         return True
     if role != "head_of_department":
         return False
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         subject_ids = current_hod_subject_ids(conn=conn)
         return _subject_id_for_assignment(conn, assignment_id) in subject_ids
 

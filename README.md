@@ -18,7 +18,7 @@ The live database schema is still `msi_v2`. Do not rename it or edit schema obje
 
 ## Main Docs
 
-- `CURRENT_ARCHITECTURE.md` - current backend/frontend/domain map and smoke checklist
+- `docs/CURRENT_ARCHITECTURE.md` - current backend/frontend/domain map and smoke checklist
 - `docs/README.md` - documentation index
 - `docs/GLOSSARY.md` - naming rules for confusing concepts
 - `SCHEMA_RENAME_MSI_V2_TO_LMS_PLAN.md` - planned physical schema rename, not implemented
