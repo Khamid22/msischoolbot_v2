@@ -36,7 +36,13 @@ function isAction(item: ActionMenuItem): item is Extract<ActionMenuItem, { onCli
  */
 export function ActionMenu({ items, label = "More actions", trigger, align = "right" }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [menuPosition, setMenuPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 208,
+    maxHeight: 320,
+    placement: "bottom" as "top" | "bottom",
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -61,14 +67,33 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
     const triggerRect = triggerRef.current?.getBoundingClientRect();
     if (!triggerRect) return;
 
-    const menuWidth = 208;
     const gutter = 8;
+    const spacing = 6;
+    const viewportWidth = Math.max(1, window.innerWidth - gutter * 2);
+    const viewportHeight = Math.max(1, window.innerHeight - gutter * 2);
+    const menuWidth = Math.min(208, viewportWidth);
+    const estimatedHeight = items.reduce((height, item) => height + (isAction(item) ? 40 : 9), 8);
+    const measuredHeight = menuRef.current?.scrollHeight || estimatedHeight;
+    const naturalHeight = Math.min(measuredHeight, viewportHeight);
+    const spaceBelow = window.innerHeight - triggerRect.bottom - spacing - gutter;
+    const spaceAbove = triggerRect.top - spacing - gutter;
+    const opensAbove = naturalHeight > spaceBelow && spaceAbove > spaceBelow;
+    const minimumHeight = Math.min(96, viewportHeight);
+    const availableHeight = Math.max(minimumHeight, opensAbove ? spaceAbove : spaceBelow);
+    const maxHeight = Math.max(minimumHeight, Math.min(naturalHeight, availableHeight));
+    const preferredTop = opensAbove
+      ? triggerRect.top - spacing - maxHeight
+      : triggerRect.bottom + spacing;
     const preferredLeft = align === "right" ? triggerRect.right - menuWidth : triggerRect.left;
     const maxLeft = Math.max(gutter, window.innerWidth - menuWidth - gutter);
+    const maxTop = Math.max(gutter, window.innerHeight - maxHeight - gutter);
 
     setMenuPosition({
-      top: triggerRect.bottom + 6,
+      top: Math.min(Math.max(gutter, preferredTop), maxTop),
       left: Math.min(Math.max(gutter, preferredLeft), maxLeft),
+      width: menuWidth,
+      maxHeight,
+      placement: opensAbove ? "top" : "bottom",
     });
   }
 
@@ -76,6 +101,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
     if (!open) return;
 
     updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
 
@@ -84,6 +110,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
       if (actionIndexes.length) focusItem(actionIndexes[0]);
     }, 0);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
@@ -107,6 +134,16 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
         : (position + direction + actionIndexes.length) % actionIndexes.length;
     focusItem(actionIndexes[nextPosition]);
   }
+
+  const placementAnimation = menuPosition.placement === "top" ? "slide-in-from-bottom-1" : "slide-in-from-top-1";
+  const placementOrigin =
+    menuPosition.placement === "top"
+      ? align === "right"
+        ? "origin-bottom-right"
+        : "origin-bottom-left"
+      : align === "right"
+        ? "origin-top-right"
+        : "origin-top-left";
 
   return (
     <div ref={containerRef} className="relative inline-block text-left">
@@ -139,16 +176,19 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
           id={menuId}
           role="menu"
           aria-label={label}
-          style={{ top: menuPosition.top, left: menuPosition.left }}
+          style={{
+            top: menuPosition.top,
+            left: menuPosition.left,
+            width: menuPosition.width,
+            maxHeight: menuPosition.maxHeight,
+          }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
               close();
             }
           }}
-          className={`fixed ${uiLayers.popover} w-52 overflow-hidden rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-top-1 duration-150 motion-reduce:animate-none ${
-            align === "right" ? "origin-top-right" : "origin-top-left"
-          }`}
+          className={`fixed ${uiLayers.popover} overflow-x-hidden overflow-y-auto rounded-lg border border-foreground/10 bg-surface py-1 shadow-card-hover animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none ${placementAnimation} ${placementOrigin}`}
         >
           {items.map((item, index) => {
             if (!isAction(item)) {
