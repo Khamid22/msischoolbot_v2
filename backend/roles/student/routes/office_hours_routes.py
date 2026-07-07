@@ -3,7 +3,6 @@ from backend.utils.context import request
 from backend.utils.session import url_for, current_student_db_id
 from backend.render import render_react_page, generate_csrf
 from backend.roles.student.services import payload_service
-from backend.domains.office_hours import service as oh_service
 from backend.domains.students.service import list_enrolled_subject_options
 from backend.domains.teachers.service import list_teachers
 
@@ -74,87 +73,3 @@ def register_office_hours_routes(students):
             back_mode="history",
             back_url=back_url,
         )
-
-    @students.get("/api/office-hours/availability")
-    def student_list_availability():
-        teacher_id = request.args.get("teacher_id")
-        subject_id = request.args.get("subject_id")
-        starts_at_from = request.args.get("starts_at_from")
-
-        try:
-            t_id = int(teacher_id) if teacher_id else None
-            s_id = int(subject_id) if subject_id else None
-        except ValueError:
-            return jsonify({"ok": False, "message": "Invalid query parameters."}, status_code=400)
-
-        # Students only see active availabilities
-        availabilities = oh_service.list_availabilities(
-            teacher_id=t_id,
-            subject_id=s_id,
-            status='active',
-            starts_at_from=starts_at_from
-        )
-        return jsonify({"ok": True, "availabilities": availabilities})
-
-    @students.get("/api/office-hours/bookings")
-    def student_list_bookings():
-        student_row_id = current_student_db_id()
-        if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
-
-        bookings = oh_service.list_bookings(
-            student_row_id=student_row_id
-        )
-        return jsonify({"ok": True, "bookings": bookings})
-
-    @students.post("/api/office-hours/bookings")
-    def student_create_booking():
-        from backend.roles.admin.routes.request_payload import request_payload
-        payload = request_payload()
-        student_row_id = current_student_db_id()
-        if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
-
-        try:
-            availability_id = int(payload.get("availability_id"))
-            student_note = str(payload.get("student_note", ""))
-            student_topic_request = str(payload.get("student_topic_request", "") or "").strip()
-        except (TypeError, ValueError, KeyError):
-            return jsonify({"ok": False, "message": "Missing or invalid payload parameters."}, status_code=400)
-
-        try:
-            booking_id = oh_service.create_booking(
-                availability_id=availability_id,
-                student_row_id=student_row_id,
-                student_note=student_note,
-                student_topic_request=student_topic_request,
-            )
-            return jsonify({"ok": True, "booking_id": booking_id})
-        except ValueError as exc:
-            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
-        except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}, status_code=500)
-
-    @students.patch("/api/office-hours/bookings/{booking_id}")
-    def student_cancel_booking(booking_id: int):
-        from backend.roles.admin.routes.request_payload import request_payload
-        payload = request_payload()
-        status = payload.get("status")
-        if status != "cancelled":
-            return jsonify({"ok": False, "message": "Only 'cancelled' state transitions are allowed."}, status_code=400)
-        student_row_id = current_student_db_id()
-        if not student_row_id:
-            return jsonify({"ok": False, "message": "Student session required."}, status_code=401)
-
-        try:
-            oh_service.update_booking_status(
-                booking_id,
-                'cancelled',
-                'Cancelled by student.',
-                student_row_id=student_row_id,
-            )
-            return jsonify({"ok": True})
-        except PermissionError as exc:
-            return jsonify({"ok": False, "message": str(exc)}, status_code=403)
-        except Exception as exc:
-            return jsonify({"ok": False, "message": str(exc)}, status_code=500)

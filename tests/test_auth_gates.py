@@ -28,7 +28,7 @@ def test_unauthenticated_page_redirects_home(client):
 
 
 def test_unauthenticated_api_returns_401_json(client):
-    response = client.get("/api/students/5/dashboard", headers=XHR)
+    response = client.get("/api/v1/student/office-hours/bookings", headers=XHR)
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Authentication required."}
 
@@ -124,7 +124,7 @@ def test_cross_origin_post_rejected(client):
 
 
 def test_api_post_without_xhr_marker_rejected(client):
-    response = client.post("/api/chat/messages", json={"body": "hi"})
+    response = client.post("/api/v1/student/chat/messages", json={"body": "hi"})
     assert response.status_code == 403
     assert response.json() == {"status": "error", "message": "Cross-origin request rejected."}
 

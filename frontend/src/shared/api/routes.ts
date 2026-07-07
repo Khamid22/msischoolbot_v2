@@ -22,3 +22,13 @@ export const apiRoutes = {
   headOfDepartmentTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
     `/api/v1/head-of-department/teacher-academy/${academyTeacherId}/status`,
 };
+
+export const studentApiRoutes = {
+  activityPing: "/api/v1/student/activity/ping",
+  chatMessages: "/api/v1/student/chat/messages",
+  chatMessage: (id: number | string) => `/api/v1/student/chat/messages/${id}`,
+  officeHoursAvailability: "/api/v1/student/office-hours/availability",
+  officeHoursBookings: "/api/v1/student/office-hours/bookings",
+  officeHoursBooking: (id: number | string) => `/api/v1/student/office-hours/bookings/${id}`,
+  resourceComments: (resourceId: number | string) => `/api/v1/student/resources/${resourceId}/comments`,
+};

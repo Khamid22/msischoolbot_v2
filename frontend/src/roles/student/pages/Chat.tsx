@@ -138,9 +138,9 @@ export default function ChatPage(props: ChatPageProps) {
     setMessages([]);
     latestIdRef.current = 0;
     try {
-      const res = await fetch(`/api/chat/messages?room=${encodeURIComponent(room)}`);
+      const res = await fetch(`/api/v1/student/chat/messages?room=${encodeURIComponent(room)}`);
       const data = await res.json();
-      const msgs: ChatMessage[] = Array.isArray(data.messages) ? data.messages : [];
+      const msgs: ChatMessage[] = Array.isArray(data.data?.messages) ? data.data.messages : [];
       setMessages(msgs);
       setHasMore(msgs.length >= 40);
       if (msgs.length) latestIdRef.current = msgs[msgs.length - 1].id;
@@ -157,10 +157,10 @@ export default function ChatPage(props: ChatPageProps) {
     }
     try {
       const res = await fetch(
-        `/api/chat/messages?room=${encodeURIComponent(room)}&after_id=${latestIdRef.current}`
+        `/api/v1/student/chat/messages?room=${encodeURIComponent(room)}&after_id=${latestIdRef.current}`
       );
       const data = await res.json();
-      const incoming: ChatMessage[] = Array.isArray(data.messages) ? data.messages : [];
+      const incoming: ChatMessage[] = Array.isArray(data.data?.messages) ? data.data.messages : [];
       if (incoming.length) {
         setMessages((prev) => {
           // merge, avoid duplicates
@@ -179,10 +179,10 @@ export default function ChatPage(props: ChatPageProps) {
     if (!oldest) return;
     try {
       const res = await fetch(
-        `/api/chat/messages?room=${encodeURIComponent(activeRoom)}&before_id=${oldest}`
+        `/api/v1/student/chat/messages?room=${encodeURIComponent(activeRoom)}&before_id=${oldest}`
       );
       const data = await res.json();
-      const older: ChatMessage[] = Array.isArray(data.messages) ? data.messages : [];
+      const older: ChatMessage[] = Array.isArray(data.data?.messages) ? data.data.messages : [];
       if (older.length) {
         setMessages((prev) => [...older, ...prev]);
         setHasMore(older.length >= 40);
@@ -208,22 +208,23 @@ export default function ChatPage(props: ChatPageProps) {
     setSending(true);
     setSendError("");
     try {
-      const res = await fetch("/api/chat/messages", {
+      const res = await fetch("/api/v1/student/chat/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ room: activeRoom, body }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setSendError(data.error ?? "Failed to send.");
+        setSendError(data.message ?? "Failed to send.");
       } else {
+        const sent = data.data.message;
         setDraft("");
         setMessages((prev) => {
           const known = new Set(prev.map((m) => m.id));
-          if (known.has(data.message.id)) return prev;
-          return [...prev, data.message];
+          if (known.has(sent.id)) return prev;
+          return [...prev, sent];
         });
-        latestIdRef.current = Math.max(latestIdRef.current, data.message.id);
+        latestIdRef.current = Math.max(latestIdRef.current, sent.id);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       }
     } catch {
@@ -233,7 +234,7 @@ export default function ChatPage(props: ChatPageProps) {
     }
   }
   async function handleDelete(id: number) {
-    const res = await fetch(`/api/chat/messages/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/v1/student/chat/messages/${id}`, { method: "DELETE" });
     if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== id));
   }
   function startEdit(msg: ChatMessage) {
@@ -248,7 +249,7 @@ export default function ChatPage(props: ChatPageProps) {
     if (!body) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/chat/messages/${editTarget.id}`, {
+      const res = await fetch(`/api/v1/student/chat/messages/${editTarget.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
@@ -257,7 +258,7 @@ export default function ChatPage(props: ChatPageProps) {
       if (res.ok) {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === editTarget.id ? { ...m, body: data.body, editedAt: data.editedAt } : m
+            m.id === editTarget.id ? { ...m, body: data.data?.body, editedAt: data.data?.editedAt } : m
           )
         );
         setEditTarget(null);

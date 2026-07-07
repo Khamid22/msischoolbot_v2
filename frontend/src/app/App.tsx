@@ -83,7 +83,7 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
     }
 
     const pingActivity = () => {
-      void fetch("/api/activity/ping", {
+      void fetch("/api/v1/student/activity/ping", {
         method: "GET",
         credentials: "same-origin",
         cache: "no-store",

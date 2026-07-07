@@ -69,9 +69,9 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/resources/${resourceId}/comments`)
+    fetch(`/api/v1/student/resources/${resourceId}/comments`)
       .then((r) => r.json())
-      .then((data) => { if (!cancelled) setComments(Array.isArray(data.comments) ? data.comments : []); })
+      .then((data) => { if (!cancelled) setComments(Array.isArray(data.data?.comments) ? data.data.comments : []); })
       .catch(() => { if (!cancelled) setComments([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -84,16 +84,16 @@ function CommentsSection({ resourceId }: { resourceId: number }) {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const res = await fetch(`/api/resources/${resourceId}/comments`, {
+      const res = await fetch(`/api/v1/student/resources/${resourceId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setSubmitError(data.error || "Could not post comment.");
+        setSubmitError(data.message || "Could not post comment.");
       } else {
-        setComments((prev) => [...prev, data.comment]);
+        setComments((prev) => [...prev, data.data.comment]);
         setDraft("");
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       }

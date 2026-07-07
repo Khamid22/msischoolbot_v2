@@ -123,12 +123,12 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
         params.set("starts_at_from", new Date().toISOString());
       }
 
-      const res = await fetch(`/api/office-hours/availability?${params.toString()}`, {
+      const res = await fetch(`/api/v1/student/office-hours/availability?${params.toString()}`, {
         headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
-        setAvailabilities(data.availabilities || []);
+        setAvailabilities(data.data?.availabilities || []);
       }
     } catch (e) {
       console.error("Failed to fetch office hours availabilities", e);
@@ -137,12 +137,12 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
 
   const fetchMyBookings = async () => {
     try {
-      const res = await fetch("/api/office-hours/bookings", {
+      const res = await fetch("/api/v1/student/office-hours/bookings", {
         headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
-        setMyBookings(data.bookings || []);
+        setMyBookings(data.data?.bookings || []);
       }
     } catch (e) {
       console.error("Failed to fetch my bookings", e);
@@ -158,7 +158,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/office-hours/bookings", {
+      const res = await fetch("/api/v1/student/office-hours/bookings", {
         method: "POST",
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -170,7 +170,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       });
 
       const data = await res.json();
-      if (res.ok && data.ok) {
+      if (res.ok && data.status === "success") {
         setSuccessMsg("Office hour session booked successfully!");
         setStudentTopicRequest("");
         setStudentNote("");
@@ -190,7 +190,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
   const handleCancelBooking = async (bookingId: number) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     try {
-      const res = await fetch(`/api/office-hours/bookings/${bookingId}`, {
+      const res = await fetch(`/api/v1/student/office-hours/bookings/${bookingId}`, {
         method: "PATCH",
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -199,7 +199,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
         })
       });
       const data = await res.json();
-      if (res.ok && data.ok) {
+      if (res.ok && data.status === "success") {
         fetchMyBookings();
         fetchAvailabilities();
       } else {

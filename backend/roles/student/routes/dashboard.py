@@ -334,23 +334,3 @@ def register_dashboard_routes(students):
             back_mode="history",
             back_url=context.get("back_url"),
         )
-
-    @students.get("/api/students/{student_id}/dashboard")
-    def api_student_dashboard(student_id: int):
-        requested_school = request.args.get("school", "").strip()
-        force_refresh = should_force_refresh()
-
-        payload, _dataset, error_message, status_code = payload_service.load_student_payload_for_view(
-            student_id=student_id,
-            requested_subject="",
-            requested_group="",
-            requested_school=requested_school,
-            force_refresh=force_refresh,
-            missing_message="Student not found",
-            session_invalid_message="Student session is invalid.",
-            forbidden_message="Access denied.",
-        )
-        if error_message:
-            return jsonify({"message": error_message}, status_code=status_code)
-
-        return jsonify(payload)

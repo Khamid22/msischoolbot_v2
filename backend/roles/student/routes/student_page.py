@@ -12,8 +12,6 @@ from backend.roles.parent.routes import build_render_parent_page
 from backend.roles.student.routes.dashboard import register_dashboard_routes
 from backend.roles.student.routes.rating_board import register_rating_board_routes
 from backend.roles.student.routes.chat_page import register_chat_page_routes
-from backend.roles.student.routes.chat_routes import register_chat_routes
-from backend.roles.student.routes.comment_routes import register_comment_routes
 from backend.roles.student.routes.resources import register_resources_routes
 from backend.roles.student.routes.office_hours_routes import register_office_hours_routes
 from backend.domains.students.service import (
@@ -88,9 +86,6 @@ def register_student_page_routes(app, *, render_admin_page):
         return response
 
     def track_student_activity(request_obj: Request):
-        # activity_ping records activity itself (with session repair); skip here.
-        if request_obj.url.path == "/api/activity/ping":
-            return
         if current_auth_role() != "student":
             return
         student_db_id = current_student_db_id()
@@ -98,33 +93,6 @@ def register_student_page_routes(app, *, render_admin_page):
             record_student_activity(student_db_id)
 
     students = APIRouter(dependencies=[Depends(track_student_activity)])
-
-    @students.get("/api/activity/ping")
-    def activity_ping():
-        if current_auth_role() != "student":
-            return jsonify({"ok": False, "message": "Student session is missing."}, status_code=401)
-
-        student_db_id = current_student_db_id()
-        if student_db_id is None:
-            return jsonify({"ok": False, "message": "Student session is missing."}, status_code=401)
-
-        result = record_student_activity(student_db_id)
-        if result.get("reason") == "student_not_found":
-            enrollment_id = current_student_enrollment_id()
-            school_code = current_student_school_code()
-            resolved_student_db_id = get_student_db_id_by_enrollment_id(
-                enrollment_id,
-                school_code=school_code,
-            )
-            if resolved_student_db_id and resolved_student_db_id != student_db_id:
-                session["student_db_id"] = resolved_student_db_id
-                result = record_student_activity(resolved_student_db_id)
-
-        if result.get("updated") or result.get("skipped"):
-            return jsonify({"ok": True, **result})
-
-        status_code = 404 if result.get("reason") == "student_not_found" else 500
-        return jsonify({"ok": False, **result}, status_code=status_code)
 
     register_user_auth_routes(
         students,
@@ -136,8 +104,6 @@ def register_student_page_routes(app, *, render_admin_page):
     register_dashboard_routes(students)
     register_rating_board_routes(students)
     register_resources_routes(students)
-    register_comment_routes(students)
     register_chat_page_routes(students)
-    register_chat_routes(students)
     register_office_hours_routes(students)
     app.include_router(students)
