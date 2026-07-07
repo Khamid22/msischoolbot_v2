@@ -1,6 +1,24 @@
 """Authentication and same-origin gates, exercised without any database."""
 
+import json
+import os
+from base64 import b64encode
+
+from itsdangerous import TimestampSigner
+
 XHR = {"X-Requested-With": "XMLHttpRequest"}
+
+
+def _session_secret():
+    return (
+        os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+        or "dev-only-insecure-key-do-not-use-in-prod"
+    )
+
+
+def _set_session(client, data):
+    encoded = b64encode(json.dumps(data).encode("utf-8"))
+    client.cookies.set("session", TimestampSigner(_session_secret()).sign(encoded).decode("utf-8"))
 
 
 def test_unauthenticated_page_redirects_home(client):
@@ -12,24 +30,31 @@ def test_unauthenticated_page_redirects_home(client):
 def test_unauthenticated_api_returns_401_json(client):
     response = client.get("/api/students/5/dashboard", headers=XHR)
     assert response.status_code == 401
-    assert response.json() == {"message": "Authentication required."}
+    assert response.json() == {"status": "error", "message": "Authentication required."}
 
 
 def test_unauthenticated_admin_api_returns_401_json(client):
     response = client.get("/admin/api/complaints", headers=XHR)
     assert response.status_code == 401
-    assert response.json() == {"message": "Authentication required."}
+    assert response.json() == {"status": "error", "message": "Authentication required."}
 
 
 def test_teacher_page_redirects_without_session(client):
-    # /teacher is public in the middleware; the router-level guard dependency
-    # (GuardResponse) must bounce non-teachers to the portal home.
     response = client.get("/teacher")
     assert response.status_code == 302
     assert response.headers["location"] == "/"
 
 
-def test_teacher_api_returns_guard_401_shape(client):
+def test_teacher_api_requires_session(client):
+    # No session at all: the middleware gate answers before the router guard.
+    response = client.get("/teacher/api/office-hours/availability", headers=XHR)
+    assert response.status_code == 401
+    assert response.json() == {"status": "error", "message": "Authentication required."}
+
+
+def test_teacher_api_denies_other_roles_with_guard_shape(client):
+    # Authenticated as a student: middleware passes, router guard denies.
+    _set_session(client, {"auth_role": "student", "auth_login": "MSI00001"})
     response = client.get("/teacher/api/office-hours/availability", headers=XHR)
     assert response.status_code == 401
     body = response.json()
@@ -41,8 +66,7 @@ def test_teacher_cancel_availability_scopes_to_current_teacher(client, monkeypat
     import backend.roles.teacher.routes as teacher_routes
 
     calls = {}
-    monkeypatch.setattr(teacher_routes, "current_auth_role", lambda: "teacher")
-    monkeypatch.setattr(teacher_routes, "current_teacher_id", lambda: 42)
+    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
 
     def fake_cancel(availability_id, *, teacher_id=None):
         calls["availability_id"] = availability_id
@@ -65,8 +89,7 @@ def test_teacher_update_booking_status_scopes_to_current_teacher(client, monkeyp
     import backend.roles.teacher.routes as teacher_routes
 
     calls = {}
-    monkeypatch.setattr(teacher_routes, "current_auth_role", lambda: "teacher")
-    monkeypatch.setattr(teacher_routes, "current_teacher_id", lambda: 42)
+    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
 
     def fake_update(booking_id, status, teacher_note, *, teacher_id=None):
         calls["booking_id"] = booking_id
@@ -99,13 +122,13 @@ def test_cross_origin_post_rejected(client):
         headers={"Origin": "https://evil.example"},
     )
     assert response.status_code == 403
-    assert response.json() == {"message": "Cross-origin request rejected."}
+    assert response.json() == {"status": "error", "message": "Cross-origin request rejected."}
 
 
 def test_api_post_without_xhr_marker_rejected(client):
     response = client.post("/api/chat/messages", json={"body": "hi"})
     assert response.status_code == 403
-    assert response.json() == {"message": "Cross-origin request rejected."}
+    assert response.json() == {"status": "error", "message": "Cross-origin request rejected."}
 
 
 def test_login_without_csrf_returns_400_html(client):

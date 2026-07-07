@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.core.security import generate_password_hash
 
@@ -46,7 +46,7 @@ RUBRIC_WEIGHTS = {
 
 
 def _utc_now_iso():
-    return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _ensure_schema(conn):

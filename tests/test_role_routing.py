@@ -157,4 +157,4 @@ def test_invalid_session_role_fails_closed(client):
     response = client.get("/ceo", headers=XHR)
 
     assert response.status_code == 403
-    assert response.json() == {"message": "Invalid session role."}
+    assert response.json() == {"status": "error", "message": "Invalid session role."}

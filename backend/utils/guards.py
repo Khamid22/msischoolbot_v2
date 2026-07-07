@@ -45,7 +45,7 @@ def unauthorized_response(
     status_code: int = 403,
 ):
     if _wants_json(request):
-        return JSONResponse({"message": message}, status_code=status_code)
+        return JSONResponse({"status": "error", "message": message}, status_code=status_code)
 
     return HTMLResponse(
         f"""<!doctype html>

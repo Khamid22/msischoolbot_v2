@@ -131,7 +131,7 @@ class AuthAndSecurityMiddleware:
                 origin_netloc = urlparse(origin).netloc
                 origin_name = origin_netloc.split(":")[0] if ":" in origin_netloc else origin_netloc
                 if origin_name != host_name:
-                    response = JSONResponse({"message": "Cross-origin request rejected."}, status_code=403)
+                    response = JSONResponse({"status": "error", "message": "Cross-origin request rejected."}, status_code=403)
                     await response(scope, receive, send)
                     return
             elif is_api:
@@ -141,7 +141,7 @@ class AuthAndSecurityMiddleware:
                 # both headers are allowed here because the SameSite=Lax session
                 # cookie already prevents a cross-site POST from carrying auth.
                 if request_obj.headers.get("X-Requested-With") != "XMLHttpRequest":
-                    response = JSONResponse({"message": "Cross-origin request rejected."}, status_code=403)
+                    response = JSONResponse({"status": "error", "message": "Cross-origin request rejected."}, status_code=403)
                     await response(scope, receive, send)
                     return
 
@@ -149,7 +149,6 @@ class AuthAndSecurityMiddleware:
         is_public = (
             path in PUBLIC_PATHS
             or path.startswith("/static/")
-            or path.startswith("/teacher/")
             # Parent invite links are reached by a logged-out parent. Auth is the
             # signed, server-verified token in the URL itself (same trust model as
             # /auth/telegram), so the path must bypass the session-cookie gate.
@@ -165,7 +164,7 @@ class AuthAndSecurityMiddleware:
                     requested_with = request_obj.headers.get("X-Requested-With") or ""
                     is_xhr = requested_with == "XMLHttpRequest"
                     if path.startswith("/api/") or is_xhr:
-                        response = JSONResponse({"message": "Invalid session role."}, status_code=403)
+                        response = JSONResponse({"status": "error", "message": "Invalid session role."}, status_code=403)
                         await response(scope, receive, send)
                         return
                     response = RedirectResponse(url="/unauthorized", status_code=302)
@@ -174,7 +173,7 @@ class AuthAndSecurityMiddleware:
                 requested_with = request_obj.headers.get("X-Requested-With") or ""
                 is_xhr = requested_with == "XMLHttpRequest"
                 if path.startswith("/api/") or is_xhr:
-                    response = JSONResponse({"message": "Authentication required."}, status_code=401)
+                    response = JSONResponse({"status": "error", "message": "Authentication required."}, status_code=401)
                     await response(scope, receive, send)
                     return
                 response = RedirectResponse(url="/", status_code=302)
@@ -184,7 +183,7 @@ class AuthAndSecurityMiddleware:
                 requested_with = request_obj.headers.get("X-Requested-With") or ""
                 is_xhr = requested_with == "XMLHttpRequest"
                 if path.startswith("/api/") or is_xhr:
-                    response = JSONResponse({"message": "Invalid session role."}, status_code=403)
+                    response = JSONResponse({"status": "error", "message": "Invalid session role."}, status_code=403)
                     await response(scope, receive, send)
                     return
                 response = RedirectResponse(url="/unauthorized", status_code=302)
@@ -282,7 +281,7 @@ def handle_rate_limited(request_obj: Request, exc: RateLimitExceeded):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
-        return JSONResponse({"message": message}, status_code=429)
+        return JSONResponse({"status": "error", "message": message}, status_code=429)
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(message, status_code=429)
 
@@ -293,7 +292,7 @@ def handle_http_exception(request_obj: Request, exc: HTTPException):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
-        return JSONResponse({"message": exc.detail}, status_code=exc.status_code)
+        return JSONResponse({"status": "error", "message": exc.detail}, status_code=exc.status_code)
     if exc.status_code in {401, 403}:
         return RedirectResponse(url="/", status_code=302)
     from fastapi.responses import PlainTextResponse
@@ -308,7 +307,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
-        return JSONResponse({"message": "Something went wrong. Please try again."}, status_code=500)
+        return JSONResponse({"status": "error", "message": "Something went wrong. Please try again."}, status_code=500)
     return RedirectResponse(url="/", status_code=302)
 
 
