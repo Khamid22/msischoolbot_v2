@@ -19,8 +19,6 @@ export interface RoleSidebarProps<Key extends string = string> {
   navLabel: string;
   roleLabel: string;
   sectionLabel: string;
-  workspaceLabel: string;
-  workspaceDescription?: string;
   initialsFallback?: string;
   brandLabel?: string;
   logoutAction?: string;
@@ -28,9 +26,9 @@ export interface RoleSidebarProps<Key extends string = string> {
 
 /**
  * Desktop workspace sidebar shared by every role: dark navy panel, fixed
- * 16rem width, workspace summary, real anchor nav links with active state,
- * and an account footer with logout. Hidden below the `lg` breakpoint —
- * pair with RoleMobileNav.
+ * 16rem width, real anchor nav links with active state, and an account
+ * footer with logout. Hidden below the `lg` breakpoint — pair with
+ * RoleMobileNav.
  */
 export function RoleSidebar<Key extends string = string>({
   authLogin,
@@ -41,8 +39,6 @@ export function RoleSidebar<Key extends string = string>({
   navLabel,
   roleLabel,
   sectionLabel,
-  workspaceLabel,
-  workspaceDescription,
   initialsFallback = "MS",
   brandLabel = "MSI School",
   logoutAction = routes.logout,
@@ -66,25 +62,12 @@ export function RoleSidebar<Key extends string = string>({
             <span className="block truncate text-xs text-slate-300">{roleLabel}</span>
           </div>
         </a>
-        <div className="mt-3">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Workspace
-          </span>
-          <div className="flex min-h-9 items-center rounded-lg border border-white/12 bg-white/10 px-2 py-1.5 text-xs font-bold leading-4 text-white">
-            {workspaceLabel}
-          </div>
-          {workspaceDescription ? (
-            <span className="mt-1 block text-[11px] leading-4 text-slate-400">
-              {workspaceDescription}
-            </span>
-          ) : null}
-        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        <nav className="space-y-2" aria-label={navLabel}>
-          <div className="space-y-0.5">
-            <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
+        <nav aria-label={navLabel}>
+          <div className="space-y-1">
+            <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               {sectionLabel}
             </p>
             {navItems.map((item) => {
@@ -95,7 +78,7 @@ export function RoleSidebar<Key extends string = string>({
                   key={item.key}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`relative flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 pl-3 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                  className={`relative flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 pl-3 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -104,7 +87,7 @@ export function RoleSidebar<Key extends string = string>({
                   {isActive ? (
                     <span
                       aria-hidden="true"
-                      className="absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80"
+                      className="absolute left-1 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white/80"
                     />
                   ) : null}
                   <Icon className="h-4 w-4 shrink-0" />

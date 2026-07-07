@@ -51,8 +51,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
   mobileNavItems,
   roleLabel,
   sectionLabel,
-  workspaceLabel,
-  workspaceDescription,
   navLabel,
   mobileNavLabel,
   initialsFallback,
@@ -104,8 +102,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
         navLabel={navLabel || `${roleLabel} navigation`}
         roleLabel={roleLabel}
         sectionLabel={sectionLabel}
-        workspaceLabel={workspaceLabel}
-        workspaceDescription={workspaceDescription}
         initialsFallback={initialsFallback}
         brandLabel={brandLabel}
         logoutAction={logoutAction}
@@ -131,7 +127,6 @@ export function RoleWorkspaceShell<Key extends string = string>({
             </button>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-foreground">{roleLabel}</p>
-              <p className="truncate text-xs font-semibold text-muted-foreground">{workspaceLabel}</p>
             </div>
           </div>
         ) : null}
