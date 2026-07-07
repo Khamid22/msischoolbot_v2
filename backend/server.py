@@ -10,7 +10,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from slowapi.errors import RateLimitExceeded
 from backend.utils.limiter import limiter
 
-from backend.utils.context import RequestContextMiddleware
+from fastapi import Depends
+from backend.utils.context import RequestContextMiddleware, prime_body_state
 from backend.utils.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from backend.utils.guards import install_guard_handler
 from backend.security.roles import is_valid_role, normalize_role, role_display_name
@@ -215,6 +216,7 @@ class AuthAndSecurityMiddleware:
 
 # Instantiate FastAPI application
 app = FastAPI(
+    dependencies=[Depends(prime_body_state)],
     title="MSI School API",
     description="Backend API for MSI School Bot and Web portal management, serving multiple role-based dashboards.",
     version="1.0.0",

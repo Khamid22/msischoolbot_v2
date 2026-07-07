@@ -1,12 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.testclient import TestClient
 
-from backend.utils.context import RequestContextMiddleware, request as legacy_request
+from backend.utils.context import (
+    RequestContextMiddleware,
+    prime_body_state,
+    request as legacy_request,
+)
 
 
 def test_json_body_is_available_to_legacy_proxy_and_downstream_request():
-    app = FastAPI()
+    # The middleware never touches the body; prime_body_state (app-level
+    # dependency) parses it once, and both consumers must still see it.
+    app = FastAPI(dependencies=[Depends(prime_body_state)])
     app.add_middleware(RequestContextMiddleware)
 
     @app.post("/echo")

@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 import os
 import json
 
@@ -30,7 +31,7 @@ from backend.utils.session import (
     url_for,
 )
 from backend.utils.context import request as request_proxy, session
-from backend.utils.response_helpers import jsonify, redirect, abort, with_status
+from backend.utils.response_helpers import redirect, abort, with_status
 from backend.utils.limiter import limiter
 
 _ADMIN_HANDOFF_SALT = "admin-website-handoff"
@@ -341,14 +342,14 @@ def register_user_auth_routes(
 
         telegram_context = _telegram_auth_context(init_data)
         if not telegram_context:
-            return jsonify({"ok": False, "error": "invalid_init_data"}, status_code=401)
+            return JSONResponse({"ok": False, "error": "invalid_init_data"}, status_code=401)
         telegram_user_id = int(telegram_context["telegram_user_id"])
 
         invite_parent = _link_parent_from_telegram_start_param(telegram_context)
         if invite_parent:
             if not set_parent_session(invite_parent, telegram_user_id):
-                return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
-            return jsonify({
+                return JSONResponse({"ok": False, "error": "session_init_failed"}, status_code=500)
+            return JSONResponse({
                 "ok": True,
                 "linked": True,
                 "role": "parent",
@@ -358,15 +359,15 @@ def register_user_auth_routes(
         auth_result = authenticate_account_telegram(telegram_user_id)
         if not auth_result:
             # Signature is valid but this Telegram account is not linked yet.
-            return jsonify({"ok": True, "linked": False})
+            return JSONResponse({"ok": True, "linked": False})
 
         if not set_account_session(auth_result):
-            return jsonify({"ok": False, "error": "session_init_failed"}, status_code=500)
+            return JSONResponse({"ok": False, "error": "session_init_failed"}, status_code=500)
 
         record_account_student_activity(auth_result)
         redirect_url = account_redirect_url(auth_result)
         response_role = account_response_role(auth_result)
-        return jsonify({
+        return JSONResponse({
             "ok": True,
             "linked": True,
             "role": response_role or current_auth_role(),

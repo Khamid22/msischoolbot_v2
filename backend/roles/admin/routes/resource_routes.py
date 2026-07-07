@@ -1,4 +1,5 @@
-from backend.utils.response_helpers import jsonify, with_status
+from fastapi.responses import JSONResponse
+from backend.utils.response_helpers import with_status
 from backend.utils.context import request, session
 from backend.utils.session import url_for
 
@@ -29,7 +30,7 @@ def register_admin_resource_routes(
         return str(request.headers.get("X-Requested-With", "")).strip() == "XMLHttpRequest"
 
     def xhr_success(message):
-        return jsonify(
+        return JSONResponse(
             {
                 "ok": True,
                 "message": message,
@@ -38,7 +39,7 @@ def register_admin_resource_routes(
         )
 
     def xhr_error(message, status_code=400):
-        return jsonify({"ok": False, "message": message}, status_code=status_code)
+        return JSONResponse({"ok": False, "message": message}, status_code=status_code)
 
     @router.post("/admin/resources/types/add")
     def add_resource_type():

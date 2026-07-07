@@ -1,4 +1,4 @@
-from backend.utils.response_helpers import jsonify, redirect
+from backend.utils.response_helpers import redirect
 from backend.utils.context import request
 from backend.utils.session import url_for, current_student_db_id
 from backend.render import render_react_page, generate_csrf

@@ -1,9 +1,10 @@
+from fastapi.responses import JSONResponse
 import os
 
 from fastapi import APIRouter, Depends, Request
 
 from backend.utils.guards import GuardResponse
-from backend.utils.response_helpers import jsonify, redirect
+from backend.utils.response_helpers import redirect
 from backend.utils.context import request, session
 from backend.utils.performance import PagePerformanceTimer, log_page_performance
 from backend.utils.session import url_for
@@ -250,7 +251,7 @@ def register_admin_page_routes(
         requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
         if requested_with == "XMLHttpRequest":
             raise GuardResponse(
-                jsonify({"ok": False, "message": "Admin authentication required."}, status_code=401)
+                JSONResponse({"ok": False, "message": "Admin authentication required."}, status_code=401)
             )
         raise GuardResponse(redirect(url_for("student.home")))
 

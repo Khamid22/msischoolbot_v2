@@ -1,4 +1,5 @@
-from backend.utils.response_helpers import jsonify, with_status
+from fastapi.responses import JSONResponse
+from backend.utils.response_helpers import with_status
 from backend.utils.context import request
 
 from backend.domains.teachers.service import (
@@ -90,7 +91,7 @@ def register_admin_teacher_routes(
 ):
     def _teacher_error(message, *, teacher_edit=None, status=400):
         if _wants_json():
-            return jsonify({"ok": False, "message": message}, status_code=status)
+            return JSONResponse({"ok": False, "message": message}, status_code=status)
         return with_status(render_admin_page(
                 auth_error=message,
                 admin_panel="teachers",
@@ -100,7 +101,7 @@ def register_admin_teacher_routes(
     def _teacher_success(message):
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {"ok": True, "message": message, "teachers": list_teachers()}
             )
         return render_admin_page(admin_notice=message, admin_panel="teachers")
@@ -120,12 +121,12 @@ def register_admin_teacher_routes(
         if not created:
             message = error_message or "Unable to add candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {
                     "ok": True,
                     "message": "Candidate added.",
@@ -152,12 +153,12 @@ def register_admin_teacher_routes(
         if not updated:
             message = error_message or "Unable to update candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {
                     "ok": True,
                     "message": "Candidate updated.",
@@ -175,7 +176,7 @@ def register_admin_teacher_routes(
         if not candidate:
             message = "Candidate not found."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=404)
+                return JSONResponse({"ok": False, "message": message}, status_code=404)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 404)
 
         assigned_group = request.form.get("teacher_assigned_group", "").strip()
@@ -193,14 +194,14 @@ def register_admin_teacher_routes(
         if not assigned_group:
             message = "Select a group to promote this candidate."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         if assigned_school and assigned_school != "all":
             if not group_belongs_to_school(assigned_group, assigned_school):
                 message = "Selected group does not belong to the selected school."
                 if _wants_json():
-                    return jsonify({"ok": False, "message": message}, status_code=400)
+                    return JSONResponse({"ok": False, "message": message}, status_code=400)
                 return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         training_summary = get_teacher_candidate_training_summary(candidate_id)
@@ -223,7 +224,7 @@ def register_admin_teacher_routes(
         if not created:
             message = "Unable to create the teacher record."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         update_teacher_candidate_status(
@@ -237,7 +238,7 @@ def register_admin_teacher_routes(
 
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {
                     "ok": True,
                     "message": "Candidate promoted to active teacher.",
@@ -263,12 +264,12 @@ def register_admin_teacher_routes(
         if not updated:
             message = error_message or "Unable to edit evaluation."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {"ok": True, "message": "Evaluation updated.", "candidates": list_teacher_candidates()}
             )
         return render_admin_page(admin_notice="Evaluation updated.", admin_panel="teachers")
@@ -282,12 +283,12 @@ def register_admin_teacher_routes(
         if not deleted:
             message = error_message or "Unable to delete evaluation."
             if _wants_json():
-                return jsonify({"ok": False, "message": message}, status_code=400)
+                return JSONResponse({"ok": False, "message": message}, status_code=400)
             return with_status(render_admin_page(auth_error=message, admin_panel="teachers"), 400)
 
         invalidate_admin_page_context_cache()
         if _wants_json():
-            return jsonify(
+            return JSONResponse(
                 {"ok": True, "message": "Evaluation deleted.", "candidates": list_teacher_candidates()}
             )
         return render_admin_page(admin_notice="Evaluation deleted.", admin_panel="teachers")

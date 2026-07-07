@@ -1,9 +1,10 @@
 """Teacher role page route — workspace scoped to the logged-in teacher."""
 
+from fastapi.responses import JSONResponse
 from backend.render import generate_csrf, render_react_page
 from backend.roles.teacher.services import build_teacher_workspace
 from backend.roles.teacher.workspace_cards import build_teacher_workspace_cards
-from backend.utils.response_helpers import redirect, jsonify
+from backend.utils.response_helpers import redirect
 from fastapi import APIRouter, Depends, Request
 
 from backend.utils.guards import GuardResponse
@@ -24,7 +25,7 @@ def register_teacher_page_routes(app):
         requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
         if requested_with == "XMLHttpRequest" or request_obj.url.path.startswith("/teacher/api/"):
             raise GuardResponse(
-                jsonify({"ok": False, "message": "Teacher authentication required."}, status_code=401)
+                JSONResponse({"ok": False, "message": "Teacher authentication required."}, status_code=401)
             )
         raise GuardResponse(redirect("/"))
 

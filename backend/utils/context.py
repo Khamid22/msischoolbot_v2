@@ -1,9 +1,7 @@
 import contextvars
-import json
 import os
 import shutil
 from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.datastructures import UploadFile
 
 
@@ -11,6 +9,13 @@ _request_context = contextvars.ContextVar("request_context")
 
 
 class RequestContextMiddleware:
+    """Expose the current request to legacy page handlers via a contextvar.
+
+    Deliberately never touches the request body: body parsing happens exactly
+    once, inside ``prime_body_state`` (an async dependency), so the
+    consumed-receive-channel hang class of bugs cannot come back.
+    """
+
     def __init__(self, app):
         self.app = app
 
@@ -19,43 +24,36 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request = Request(scope, receive=receive)
-        cached_body = None
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-            content_type = request.headers.get("content-type", "")
-            if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-                try:
-                    cached_body = await request.body()
-                    form = await request.form()
-                    request.state.form_data = form
-                except Exception:
-                    request.state.form_data = {}
-            elif "application/json" in content_type:
-                try:
-                    cached_body = await request.body()
-                    body = json.loads(cached_body.decode("utf-8")) if cached_body else {}
-                    request.state.json_data = body if isinstance(body, dict) else {}
-                except Exception:
-                    request.state.json_data = {}
-
-        token = _request_context.set(request)
+        token = _request_context.set(Request(scope, receive=receive))
         try:
-            if cached_body is None:
-                await self.app(scope, receive, send)
-                return
-
-            sent_body = False
-
-            async def replay_cached_body():
-                nonlocal sent_body
-                if sent_body:
-                    return {"type": "http.request", "body": b"", "more_body": False}
-                sent_body = True
-                return {"type": "http.request", "body": cached_body, "more_body": False}
-
-            await self.app(scope, replay_cached_body, send)
+            await self.app(scope, receive, send)
         finally:
             _request_context.reset(token)
+
+
+async def prime_body_state(request: Request) -> None:
+    """App-level dependency: lazily parse mutating-request bodies for the
+    legacy ``request.form`` / ``request.get_json`` proxies.
+
+    Runs on the event loop with FastAPI's own Request instance, so Starlette's
+    internal caching means endpoint ``Form()``/body parameters and this parse
+    share one read of the stream. ``request.state`` lives on the ASGI scope,
+    so the contextvar proxy sees the parsed data too.
+    """
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        try:
+            request.state.form_data = await request.form()
+        except Exception:
+            request.state.form_data = {}
+    elif "application/json" in content_type:
+        try:
+            body = await request.json()
+            request.state.json_data = body if isinstance(body, dict) else {}
+        except Exception:
+            request.state.json_data = {}
 
 
 def get_current_request() -> Request | None:
