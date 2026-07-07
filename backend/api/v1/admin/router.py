@@ -1,7 +1,22 @@
-"""Admin API v1 router placeholder for existing safe migrations."""
+"""Admin API v1 router.
 
-from fastapi import APIRouter
+Preserves the legacy admin-session gate exactly: a session whose auth_role
+normalizes to "admin" (which includes owner logins) may call admin APIs.
+Sub-role scoping via admin_role is a later hardening step.
+"""
 
-router = APIRouter(prefix="/admin")
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from backend.api.v1.admin.office_hours import router as office_hours_router
+from backend.security.roles import normalize_role
+
+
+def require_admin_session(request: Request):
+    if normalize_role(request.session.get("auth_role")) != "admin":
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
+
+
+router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin_session)])
+router.include_router(office_hours_router)
 
 __all__ = ["router"]

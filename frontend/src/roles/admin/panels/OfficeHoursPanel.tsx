@@ -137,12 +137,12 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
 
   const fetchData = async () => {
     try {
-      const res = await fetch("/admin/api/office-hours/availability", {
+      const res = await fetch("/api/v1/admin/office-hours/availability", {
         headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
-        setAvailabilities(data.availabilities || []);
+        setAvailabilities(data.data?.availabilities || []);
       }
     } catch (e) {
       console.error(e);
@@ -159,12 +159,12 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
 
   const fetchBookingsForSlot = async (slotId: number) => {
     try {
-      const res = await fetch(`/admin/api/office-hours/bookings?availability_id=${slotId}`, {
+      const res = await fetch(`/api/v1/admin/office-hours/bookings?availability_id=${slotId}`, {
         headers: XHR_HEADERS
       });
       if (res.ok) {
         const data = await res.json();
-        setSlotBookings(data.bookings || []);
+        setSlotBookings(data.data?.bookings || []);
       }
     } catch (e) {
       console.error(e);
@@ -189,7 +189,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
     const endsAtDate = new Date(startsAtDate.getTime() + slotMinutes * 60_000);
 
     try {
-      const res = await fetch("/admin/api/office-hours/availability", {
+      const res = await fetch("/api/v1/admin/office-hours/availability", {
         method: "POST",
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -206,7 +206,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
       });
 
       const data = await res.json();
-      if (res.ok && data.ok) {
+      if (res.ok && data.status === "success") {
         setCreateOpen(false);
         // Reset form
         setNewTeacherId("");
@@ -228,7 +228,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
   const handleCancelSlot = async (id: number) => {
     if (!confirm("Are you sure you want to cancel this availability slot? All active bookings for it will also be cancelled.")) return;
     try {
-      const res = await fetch(`/admin/api/office-hours/availability/${id}`, {
+      const res = await fetch(`/api/v1/admin/office-hours/availability/${id}`, {
         method: "PATCH",
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -249,7 +249,7 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
 
   const handleUpdateBookingStatus = async (bookingId: number, status: string) => {
     try {
-      const res = await fetch(`/admin/api/office-hours/bookings/${bookingId}`, {
+      const res = await fetch(`/api/v1/admin/office-hours/bookings/${bookingId}`, {
         method: "PATCH",
         headers: JSON_HEADERS,
         body: JSON.stringify({

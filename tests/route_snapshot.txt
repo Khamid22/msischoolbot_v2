@@ -35,11 +35,6 @@
 /admin/api/complaints/{complaint_id} | GET
 /admin/api/complaints/{complaint_id} | PATCH
 /admin/api/complaints/{complaint_id}/replies | POST
-/admin/api/office-hours/availability | GET
-/admin/api/office-hours/availability | POST
-/admin/api/office-hours/availability/{availability_id} | PATCH
-/admin/api/office-hours/bookings | GET
-/admin/api/office-hours/bookings/{booking_id} | PATCH
 /admin/api/resource-upload-progress/{upload_id} | GET
 /admin/api/resources | GET
 /admin/api/student-payments/{payment_id} | DELETE
@@ -82,6 +77,11 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
+/api/v1/admin/office-hours/availability | GET
+/api/v1/admin/office-hours/availability | POST
+/api/v1/admin/office-hours/availability/{availability_id} | PATCH
+/api/v1/admin/office-hours/bookings | GET
+/api/v1/admin/office-hours/bookings/{booking_id} | PATCH
 /api/v1/auth/me | GET
 /api/v1/head-of-department/teacher-academy/assignments/{assignment_id} | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments | POST
