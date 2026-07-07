@@ -369,12 +369,12 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function loadChatRooms() {
-    fetch("/admin/api/chat/rooms")
+    fetch("/api/v1/admin/chat/rooms")
       .then((r) => r.json())
       .then((d) => {
         const base = [{ room: "global", active: 0 }];
         const merged = [...base];
-        for (const r of d.rooms ?? []) {
+        for (const r of d.data?.rooms ?? []) {
           if (!merged.find((x) => x.room === r.room)) merged.push(r);
         }
         setChatRooms(merged);
@@ -384,26 +384,26 @@ export function useAdminState(props: AdminPageProps) {
 
   function loadChatMessages(room: string) {
     setChatLoading(true);
-    fetch(`/admin/api/chat/messages?room=${encodeURIComponent(room)}`)
+    fetch(`/api/v1/admin/chat/messages?room=${encodeURIComponent(room)}`)
       .then((r) => r.json())
       .then((d) => {
-        setChatMessages(Array.isArray(d.messages) ? d.messages : []);
+        setChatMessages(Array.isArray(d.data?.messages) ? d.data.messages : []);
       })
       .catch(() => {})
       .finally(() => setChatLoading(false));
   }
 
   function loadBlocked() {
-    fetch("/admin/api/chat/blocked")
+    fetch("/api/v1/admin/chat/blocked")
       .then((r) => r.json())
       .then((d) => {
-        setBlockedUsers(Array.isArray(d.blocked) ? d.blocked : []);
+        setBlockedUsers(Array.isArray(d.data?.blocked) ? d.data.blocked : []);
       })
       .catch(() => {});
   }
 
   function adminDeleteMsg(id: number) {
-    fetch(`/admin/api/chat/messages/${id}`, { method: "DELETE" })
+    fetch(`/api/v1/admin/chat/messages/${id}`, { method: "DELETE" })
       .then((r) => {
         if (r.ok)
           setChatMessages((prev) =>
@@ -414,7 +414,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function adminBlockUser(studentId: string) {
-    fetch("/admin/api/chat/block", {
+    fetch("/api/v1/admin/chat/block", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ studentId, reason: blockReason }),
@@ -429,7 +429,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function adminUnblock(studentId: string) {
-    fetch(`/admin/api/chat/block/${encodeURIComponent(studentId)}`, { method: "DELETE" })
+    fetch(`/api/v1/admin/chat/block/${encodeURIComponent(studentId)}`, { method: "DELETE" })
       .then((r) => {
         if (r.ok) loadBlocked();
       })

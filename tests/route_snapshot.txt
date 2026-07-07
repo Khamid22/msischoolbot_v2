@@ -24,12 +24,6 @@
 /admin/api/announcements | POST
 /admin/api/announcements/{announcement_id} | DELETE
 /admin/api/announcements/{announcement_id} | PATCH
-/admin/api/chat/block | POST
-/admin/api/chat/block/{student_id} | DELETE
-/admin/api/chat/blocked | GET
-/admin/api/chat/messages | GET
-/admin/api/chat/messages/{msg_id} | DELETE
-/admin/api/chat/rooms | GET
 /admin/api/complaints | GET
 /admin/api/complaints | POST
 /admin/api/complaints/{complaint_id} | GET
@@ -77,6 +71,12 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
+/api/v1/admin/chat/block | POST
+/api/v1/admin/chat/block/{student_id} | DELETE
+/api/v1/admin/chat/blocked | GET
+/api/v1/admin/chat/messages | GET
+/api/v1/admin/chat/messages/{msg_id} | DELETE
+/api/v1/admin/chat/rooms | GET
 /api/v1/admin/office-hours/availability | GET
 /api/v1/admin/office-hours/availability | POST
 /api/v1/admin/office-hours/availability/{availability_id} | PATCH

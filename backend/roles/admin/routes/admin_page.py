@@ -13,7 +13,6 @@ from backend.security.roles import normalize_role
 from backend.roles.admin.routes.academic_routes import register_academic_admin_routes
 from backend.roles.admin.routes.admins import register_admin_routes
 from backend.roles.admin.routes.announcement_routes import register_announcement_admin_routes
-from backend.roles.admin.routes.chat_admin_routes import register_admin_chat_routes
 from backend.roles.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
@@ -271,6 +270,5 @@ def register_admin_page_routes(
         render_edit_student_page=render_edit_student_page,
         delete_uploaded_student_photo=delete_uploaded_student_photo,
     )
-    register_admin_chat_routes(admin_routes)
     app.include_router(admin_routes)
     return render_admin_page
