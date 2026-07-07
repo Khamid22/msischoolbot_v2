@@ -2,9 +2,9 @@
 
 import math
 
+from backend.core.database import connect_auth_db
 from backend.domains.academics import queries as academic_queries
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from database import queries
 
 _SCHOOL_DISPLAY_NAMES = {
     "school5": "School 5",
@@ -155,7 +155,7 @@ def get_subject_dashboards_from_db(subject_name):
     if not subject_norm:
         return []
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         if not _academic_tables_exist(conn):
             return []
 
@@ -196,7 +196,7 @@ def build_internal_dataset(school_code=""):
     """Return the old Sheets-style dataset shape from internal DB rows."""
     normalized_school = str(school_code or "").strip().casefold()
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         if not _academic_tables_exist(conn):
             return None
 
@@ -325,7 +325,7 @@ def build_internal_overview_dataset(school_code=""):
     """Return the minimal Sheets-style dataset shape needed by admin overview charts."""
     normalized_school = str(school_code or "").strip().casefold()
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         if not _academic_tables_exist(conn):
             return None
 
@@ -406,7 +406,7 @@ def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="
     normalized_subject = _filter_text(subject_name)
     normalized_group = _filter_text(group_name)
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         if not _academic_tables_exist(conn):
             return None
 

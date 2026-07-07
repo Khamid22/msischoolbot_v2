@@ -6,8 +6,8 @@ frontend already consumes so nothing on the admin pages breaks.
 
 from datetime import datetime, time, timedelta
 
+from backend.core.database import connect_auth_db
 from database.academics import canonical
-from database import queries
 from backend.domains.academics import queries as academic_queries
 from backend.domains.timetable import queries as timetable_queries
 
@@ -17,7 +17,7 @@ def _utc_now_iso():
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def _normalize(value):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from database import queries
+from backend.core.database import connect_auth_db
 
 
 def _count_label(value: Any) -> str:
@@ -58,7 +58,7 @@ def system_admin_workspace_cards() -> list[dict[str, str]]:
     """Return account-level System Admin cards, failing closed to placeholders."""
     cards = _placeholder_cards()
     try:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             total_accounts = _count_row(conn, "SELECT COUNT(*) AS count FROM msi_v2.accounts")
             active_accounts = _count_row(
                 conn,

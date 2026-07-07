@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.core.database import connect_auth_db
 from backend.core.security import generate_password_hash
-
-from database import queries
 
 
 def _text(value: Any) -> str:
@@ -86,7 +85,7 @@ def list_active_subjects() -> list[dict[str, Any]]:
     database itself) is unavailable, so failures collapse to an empty list.
     """
     try:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             return _list_active_subjects(conn)
     except Exception:
         return []
@@ -400,7 +399,7 @@ def create_head_of_department_account(
     subject_id: Any,
     created_by: str = "",
 ) -> tuple[bool, str, dict[str, Any]]:
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         return _create_head_of_department_account(
             conn,
             display_name=display_name,
@@ -476,7 +475,7 @@ def _list_head_of_department_accounts(conn: Any) -> dict[str, Any]:
 
 
 def list_head_of_department_accounts() -> dict[str, Any]:
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         return _list_head_of_department_accounts(conn)
 
 
@@ -487,7 +486,7 @@ def create_academic_director_account(
     temporary_password: str = "",
     commit: bool = True,
 ) -> tuple[bool, str, dict[str, Any]]:
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         return _create_academic_director_account(
             conn,
             login=login,

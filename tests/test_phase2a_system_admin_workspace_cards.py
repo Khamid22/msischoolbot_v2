@@ -167,7 +167,7 @@ def _mock_cards():
 def test_system_admin_card_provider_counts_accounts(monkeypatch):
     import backend.roles.admin.system_admin_cards as system_cards
 
-    monkeypatch.setattr(system_cards.queries, "connect_auth_db", lambda: _SystemAdminConnection())
+    monkeypatch.setattr(system_cards, "connect_auth_db", lambda: _SystemAdminConnection())
 
     cards = system_admin_workspace_cards()
 
@@ -206,7 +206,7 @@ def test_system_admin_card_provider_returns_placeholders_on_db_failure(monkeypat
     def fail_connect():
         raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr(system_cards.queries, "connect_auth_db", fail_connect)
+    monkeypatch.setattr(system_cards, "connect_auth_db", fail_connect)
 
     cards = system_admin_workspace_cards()
 
@@ -317,7 +317,7 @@ def test_admin_route_renders_placeholders_when_card_db_fails(client, monkeypatch
     def fail_connect():
         raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr(system_cards.queries, "connect_auth_db", fail_connect)
+    monkeypatch.setattr(system_cards, "connect_auth_db", fail_connect)
     _set_session(
         client,
         {

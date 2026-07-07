@@ -3,8 +3,8 @@
 import re
 from datetime import UTC, datetime
 
+from backend.core.database import connect_auth_db
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from database import queries
 from database.academics import canonical
 from backend.domains.academics.postgres_service import (
     create_group_from_program,
@@ -46,7 +46,7 @@ def delete_group(group_id):
     if group_id <= 0:
         raise ValueError("group_id is required.")
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         group_row = conn.execute(
             """
             SELECT g.id, coalesce(g.legacy_group_id, g.id) AS public_id,
@@ -294,7 +294,7 @@ def get_group_gradebook(group_id):
     if group_id <= 0:
         raise ValueError("group_id is required")
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         group_row = conn.execute(
             """
             SELECT g.id, g.legacy_group_id, g.group_name, g.group_code,
@@ -579,7 +579,7 @@ def update_enrollment_status(enrollment_id, status, reason=""):
 
     now = _now()
     disqualified_at = "" if normalized_status == "active" else now.strftime("%Y-%m-%dT%H:%M:%SZ")
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         row = _get_v2_enrollment(conn, enrollment_id)
         if not row:
             raise ValueError("Enrollment not found.")
@@ -622,7 +622,7 @@ def move_enrollment_group(enrollment_id, group_id):
     if group_id <= 0:
         raise ValueError("Target group is required.")
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         row = _get_v2_enrollment(conn, enrollment_id)
         if not row:
             raise ValueError("Enrollment not found.")
@@ -689,7 +689,7 @@ def record_attendance_from_payload(payload):
     status = status_aliases.get(status, status)
     if status not in {"", "present", "absent", "justified"}:
         raise ValueError("Unsupported attendance status.")
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")
@@ -729,7 +729,7 @@ def record_homework_from_payload(payload):
     score = float(payload.get("score", 0))
     if score < 1 or score > 9:
         raise ValueError("Homework score must be between 1 and 9.")
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")
@@ -775,7 +775,7 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
         if next_start_time is not None and next_end_time <= next_start_time:
             raise ValueError("End time must be after the start time.")
 
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         row = conn.execute(
             """
             SELECT ls.id, ls.status, ls.session_date,
@@ -834,7 +834,7 @@ def record_exam_from_payload(payload):
     score = float(payload.get("score", 0))
     if score < 1 or score > 9:
         raise ValueError("Exam score must be between 1 and 9.")
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")
@@ -910,7 +910,7 @@ def record_coin_from_payload(payload):
     enrollment_id = int(payload.get("enrollment_id", 0))
     amount = int(payload.get("amount", 0))
     source = str(payload.get("source", "manual") or "manual").strip()
-    with queries.connect_auth_db() as conn:
+    with connect_auth_db() as conn:
         enrollment = _get_v2_enrollment(conn, enrollment_id)
         if not enrollment:
             raise ValueError("Enrollment not found.")

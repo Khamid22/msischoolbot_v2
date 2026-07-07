@@ -1,5 +1,6 @@
 """Business helpers used by admin route handlers."""
 
+from backend.core.database import connect_auth_db
 from backend.domains.students.service import (
     resolve_sheet_student_for_admin,
     school_code_from_name,
@@ -18,9 +19,7 @@ def group_belongs_to_school(group_name, school_code, load_dataset=None):
         return True
 
     try:
-        from database import queries
-
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             row = conn.execute(
                 """
                 SELECT 1

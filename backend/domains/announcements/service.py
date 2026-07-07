@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from database import queries
+from backend.core.database import connect_auth_db
 from backend.domains.announcements import queries as announcement_queries
 
 AUDIENCES = {
@@ -25,7 +25,7 @@ def _utc_now_iso():
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 # Schema DDL now lives in the query layer; re-exported here so existing callers

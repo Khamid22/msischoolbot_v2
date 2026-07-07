@@ -1,6 +1,6 @@
 """Teacher role service facade."""
 
-from database import queries
+from backend.core.database import connect_auth_db
 from backend.domains.teachers.service import (  # noqa: F401
     assign_teacher_to_group,
     get_teacher_by_id,
@@ -218,7 +218,7 @@ def build_teacher_workspace(teacher_id, staff_id=None):
     group_name = str(teacher.get("assigned_group") or "").strip()
     gradebooks = []
     if group_name:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             ensure_academic_schema(conn)
             group_rows = conn.execute(
                 """

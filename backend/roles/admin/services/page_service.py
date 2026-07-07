@@ -2,7 +2,7 @@ import os
 import threading
 import time
 
-from database import queries
+from backend.core.database import connect_auth_db
 from database.academics import canonical
 from backend.domains.students.service import get_admin_student_profile, list_students_for_admin
 from backend.domains.teachers.service import list_teachers
@@ -119,7 +119,7 @@ def _set_cached_admin_page_context(cache_key, context):
 def _get_schools_from_db():
     """Return list of (code, name) from active client schools."""
     try:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             rows = conn.execute(
                 """
                 SELECT school_key AS code, school_name AS name
@@ -135,7 +135,7 @@ def _get_schools_from_db():
 
 def _get_groups_from_db(school_filter="all"):
     try:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             if school_filter and school_filter != "all":
                 rows = conn.execute(
                     """
@@ -167,7 +167,7 @@ def _get_groups_from_db(school_filter="all"):
 def _get_group_school_sets_from_db():
     """Return {group_name: set(school_codes)} from DB."""
     try:
-        with queries.connect_auth_db() as conn:
+        with connect_auth_db() as conn:
             rows = conn.execute(
                 """
                 SELECT g.group_name, s.school_key AS school_code
