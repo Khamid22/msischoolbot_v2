@@ -119,11 +119,11 @@ export function RoleWorkspaceShell<Key extends string = string>({
         }`}
       >
         {shouldUseDrawer ? (
-          <div className="sticky top-[calc(var(--app-top-inset)+0.5rem)] z-30 mb-3 flex items-center gap-3 rounded-xl border border-border bg-surface/95 px-3 py-2 shadow-card backdrop-blur lg:hidden">
+          <div className="sticky top-[calc(var(--app-top-inset)+0.5rem)] z-30 mb-3 flex items-center gap-3 rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-card backdrop-blur lg:hidden">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
               aria-label={`Open ${roleLabel} navigation`}
               aria-expanded={drawerOpen}
             >
@@ -174,7 +174,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
               <a
                 href={homeHref}
                 onClick={() => setDrawerOpen(false)}
-                className="flex min-w-0 items-center gap-2.5 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="flex min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/12 font-bold text-white ring-1 ring-white/10">
                   {(brandLabel || "MSI School").charAt(0) || "M"}
@@ -208,12 +208,18 @@ export function RoleWorkspaceShell<Key extends string = string>({
                       href={item.href}
                       onClick={() => setDrawerOpen(false)}
                       aria-current={isActive ? "page" : undefined}
-                      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
+                      className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 pl-4 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
                         isActive
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       }`}
                     >
+                      {isActive ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80"
+                        />
+                      ) : null}
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">{item.label}</span>
                     </a>

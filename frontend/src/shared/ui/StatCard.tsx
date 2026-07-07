@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { motion } from "@/shared/lib/motion";
 
 interface StatCardProps {
@@ -11,24 +11,28 @@ interface StatCardProps {
 
 export function StatCard({ title, value, icon, href, colorClass = "text-foreground" }: StatCardProps) {
   const content = (
-    <div className="flex min-h-[4.5rem] flex-col justify-between gap-1.5 p-2.5 sm:min-h-[4.75rem] sm:p-3">
-      <p className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground ${colorClass}`}>
+    <div className="flex min-h-[5rem] min-w-0 flex-col justify-between gap-2 p-3">
+      <p className={`flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase leading-4 tracking-wide ${colorClass}`}>
         {icon}
-        {title}
+        <span className="min-w-0 line-clamp-2">{title}</span>
       </p>
-      <h3 className="font-display text-lg font-bold leading-none sm:text-xl">{value}</h3>
+      <h3 className="font-display break-words text-xl font-black leading-none tracking-normal sm:text-2xl">{value}</h3>
     </div>
   );
 
-  const baseClass = `rounded-lg border border-foreground/10 bg-surface shadow-card ${motion.card}`;
+  const baseClass = `overflow-hidden rounded-lg border border-border/80 bg-card text-card-foreground shadow-card ${motion.card}`;
 
   if (href) {
     return (
-      <a href={href} className={`${baseClass} block`}>
+      <a
+        href={href}
+        aria-label={`${title}: ${value}`}
+        className={`${baseClass} block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35`}
+      >
         {content}
       </a>
     );
   }
 
-  return <div className={baseClass}>{content}</div>;
+  return <div className={baseClass} aria-label={`${title}: ${value}`}>{content}</div>;
 }

@@ -56,7 +56,7 @@ export function RoleSidebar<Key extends string = string>({
       <div className="border-b border-white/10 px-3 py-3">
         <a
           href={homeHref}
-          className="flex min-w-0 items-center gap-2.5 rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          className="flex min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/12 font-bold text-white ring-1 ring-white/10">
             {brandLabel.charAt(0) || "M"}
@@ -70,7 +70,7 @@ export function RoleSidebar<Key extends string = string>({
           <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Workspace
           </span>
-          <div className="flex h-9 items-center rounded-lg border border-white/12 bg-white/10 px-2 text-xs font-bold text-white">
+          <div className="flex min-h-9 items-center rounded-lg border border-white/12 bg-white/10 px-2 py-1.5 text-xs font-bold leading-4 text-white">
             {workspaceLabel}
           </div>
           {workspaceDescription ? (
@@ -95,12 +95,18 @@ export function RoleSidebar<Key extends string = string>({
                   key={item.key}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                  className={`relative flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 pl-3 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   }`}
                 >
+                  {isActive ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-1 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80"
+                    />
+                  ) : null}
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 truncate">{item.label}</span>
                 </a>

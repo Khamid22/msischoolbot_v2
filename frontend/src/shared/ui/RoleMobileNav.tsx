@@ -20,7 +20,7 @@ export function RoleMobileNav<Key extends string = string>({
 }: RoleMobileNavProps<Key>) {
   return (
     <nav
-      className={`fixed inset-x-0 bottom-0 ${uiLayers.mobileNav} border-t border-border bg-surface/95 px-2 pt-2 shadow-card backdrop-blur lg:hidden`}
+      className={`fixed inset-x-0 bottom-0 ${uiLayers.mobileNav} border-t border-border/80 bg-card/95 px-2 pt-2 shadow-card backdrop-blur lg:hidden`}
       style={{
         paddingBottom: "max(0.5rem, var(--app-bottom-inset))",
         paddingLeft: "calc(var(--app-left-inset) + 0.5rem)",
@@ -40,13 +40,13 @@ export function RoleMobileNav<Key extends string = string>({
               key={item.key}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-center text-[10.5px] font-bold leading-tight transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none ${
+              className={`flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-center text-[10.5px] font-black leading-[1.05] transition-[background-color,color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none ${
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
               <span className="max-w-full break-words">{item.label}</span>
             </a>
           );

@@ -3,11 +3,11 @@ import { forwardRef, type ReactNode } from "react";
 export type BadgeTone = "neutral" | "success" | "warning" | "danger" | "info";
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: "border-foreground/10 bg-muted text-muted-foreground",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  warning: "border-amber-200 bg-amber-50 text-amber-700",
-  danger: "border-rose-200 bg-rose-50 text-rose-700",
-  info: "border-sky-200 bg-sky-50 text-sky-700",
+  neutral: "border-border bg-muted text-muted-foreground",
+  success: "border-success/25 bg-success/10 text-success",
+  warning: "border-warning/35 bg-warning/15 text-warning-foreground",
+  danger: "border-destructive/25 bg-destructive/10 text-destructive",
+  info: "border-info/25 bg-info/10 text-info",
 };
 
 interface BadgeProps {
@@ -30,7 +30,7 @@ export const Badge = forwardRef<HTMLElement, BadgeProps>(function Badge(
   ref,
 ) {
   const base =
-    "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold leading-tight";
+    "inline-flex min-h-6 max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold leading-tight";
   const classes = `${base} ${toneClasses[tone]} ${className}`;
 
   if (onClick) {
@@ -40,7 +40,7 @@ export const Badge = forwardRef<HTMLElement, BadgeProps>(function Badge(
         type="button"
         title={title}
         onClick={onClick}
-        className={`${classes} transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30`}
+        className={`${classes} transition-[transform,filter,box-shadow] duration-150 hover:brightness-95 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none motion-reduce:active:scale-100`}
       >
         {icon}
         {children}
