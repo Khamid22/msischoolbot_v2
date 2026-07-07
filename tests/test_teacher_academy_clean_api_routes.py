@@ -243,7 +243,7 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
-    import backend.api.v1.head_of_department.router as hod_api_routes
+    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {"update": 0}
@@ -286,7 +286,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):
-    import backend.api.v1.head_of_department.router as hod_api_routes
+    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}

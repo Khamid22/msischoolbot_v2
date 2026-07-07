@@ -577,7 +577,7 @@ export function createUploadId() {
 export function buildUploadProgressUrl(uploadId: string, afterSeq = 0) {
   const params = new URLSearchParams();
   params.set("after_seq", String(Math.max(0, Math.floor(Number(afterSeq) || 0))));
-  return `/admin/api/resource-upload-progress/${encodeURIComponent(uploadId)}?${params.toString()}`;
+  return `/api/v1/admin/resource-upload-progress/${encodeURIComponent(uploadId)}?${params.toString()}`;
 }
 
 const adminTabKeys = new Set<string>(tabs.map((tab) => tab.key));

@@ -12,7 +12,6 @@ from backend.security.roles import normalize_role
 
 from backend.roles.admin.routes.academic_routes import register_academic_admin_routes
 from backend.roles.admin.routes.admins import register_admin_routes
-from backend.roles.admin.routes.announcement_routes import register_announcement_admin_routes
 from backend.roles.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
@@ -232,7 +231,7 @@ def register_admin_page_routes(
                 "csrfToken": generate_csrf(),
                 "saveUrl": url_for("admin.save_admin_student_profile", student_row_id=student_row_id),
                 "changePasswordUrl": url_for("admin.admin_change_student_password_route", student_row_id=student_row_id),
-                "parentInviteApiUrl": f"/admin/api/students/{student_row_id}/parent-invite",
+                "parentInviteApiUrl": f"/api/v1/admin/students/{student_row_id}/parent-invite",
                 "linkedParents": list_linked_parents_for_student(student_row_id),
                 "viewDashboardUrl": url_for("admin.admin_student_dashboard", student_row_id=student_row_id),
                 "backUrl": back_url,
@@ -262,7 +261,6 @@ def register_admin_page_routes(
         render_admin_page=render_admin_page,
         clear_group_cache=clear_group_cache,
     )
-    register_announcement_admin_routes(admin_routes)
 
     register_admin_routes(
         admin_routes,

@@ -3,6 +3,9 @@
 Parent account service ownership moved to ``backend.domains.parents.service`` in
 DB-4. Keep this module temporarily so admin routes and older imports continue
 to work while callers migrate to the parent domain package.
+
+Temporary compatibility wrapper. Delete after admin parent routes import
+``backend.domains.parents.service`` directly.
 """
 
 from backend.domains.parents.service import (  # noqa: F401

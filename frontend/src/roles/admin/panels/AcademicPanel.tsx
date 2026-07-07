@@ -3,7 +3,7 @@ import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Trash2, Users, X 
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
-import { csrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, csrfHeaders } from "@/shared/lib/api";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, compareSubjectsByPreferredOrder, programInitials, Lesson } from "./academic/shared";
@@ -181,12 +181,13 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         headers: csrfHeaders(csrf),
       });
       const json = await response.json();
-      if (!response.ok || !json.ok) {
-        showGroupToast(asString(json.message) || "Unable to delete group.", "danger");
+      if (!apiSucceeded(response, json)) {
+        showGroupToast(apiErrorMessage(json, "Unable to delete group."), "danger");
         return;
       }
-      if (Array.isArray(json.groups)) {
-        setGroupRowsOverride(json.groups);
+      const data = apiData<{ groups?: Array<Record<string, unknown>> }>(json);
+      if (Array.isArray(data.groups)) {
+        setGroupRowsOverride(data.groups);
       } else {
         setGroupRowsOverride((current) =>
           (current ?? groups).filter((row: Record<string, unknown>) => asNumber(row.id) !== id),

@@ -7,8 +7,16 @@ Sub-role scoping via admin_role is a later hardening step.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from backend.api.v1.admin.academic import router as academic_router
+from backend.api.v1.admin.announcements import router as announcements_router
 from backend.api.v1.admin.chat import router as chat_router
+from backend.api.v1.admin.complaints import router as complaints_router
+from backend.api.v1.admin.parents import router as parents_router
+from backend.api.v1.admin.payments import router as payments_router
 from backend.api.v1.admin.office_hours import router as office_hours_router
+from backend.api.v1.admin.resources import progress_router as resource_progress_router
+from backend.api.v1.admin.resources import router as resources_router
+from backend.api.v1.admin.students import router as students_router
 from backend.security.roles import normalize_role
 
 
@@ -18,7 +26,15 @@ def require_admin_session(request: Request):
 
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin_session)])
+router.include_router(academic_router)
+router.include_router(announcements_router)
 router.include_router(chat_router)
+router.include_router(complaints_router)
+router.include_router(parents_router)
+router.include_router(payments_router)
 router.include_router(office_hours_router)
+router.include_router(resource_progress_router)
+router.include_router(resources_router)
+router.include_router(students_router)
 
 __all__ = ["router"]

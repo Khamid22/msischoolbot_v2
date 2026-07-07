@@ -55,8 +55,8 @@ def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
     action_source = Path("backend/api/v1/teacher_academy_actions.py").read_text()
 
     for path in [
-        Path("backend/api/v1/academic_director/router.py"),
-        Path("backend/api/v1/head_of_department/router.py"),
+        Path("backend/api/v1/academic_director/teacher_academy.py"),
+        Path("backend/api/v1/head_of_department/teacher_academy.py"),
     ]:
         source = path.read_text()
         assert "response_model=ApiSuccess[" in source
@@ -79,3 +79,24 @@ def test_frontend_teacher_academy_api_helpers_use_api_v1_namespace():
     assert "headOfDepartmentTeacherAcademyAssessmentDelete" in source
     assert "/academic-director/api" not in source
     assert "/head-of-department/api" not in source
+
+
+def test_teacher_academy_routes_live_in_role_specific_modules():
+    academic_director_router = Path("backend/api/v1/academic_director/router.py").read_text()
+    hod_router = Path("backend/api/v1/head_of_department/router.py").read_text()
+    academic_director_academy = Path("backend/api/v1/academic_director/teacher_academy.py").read_text()
+    hod_academy = Path("backend/api/v1/head_of_department/teacher_academy.py").read_text()
+
+    assert "from backend.api.v1.academic_director.teacher_academy import register_teacher_academy_routes" in academic_director_router
+    assert "from backend.api.v1.head_of_department.teacher_academy import register_teacher_academy_routes" in hod_router
+    assert "register_teacher_academy_routes(router)" in academic_director_router
+    assert "register_teacher_academy_routes(router)" in hod_router
+    assert "api_v1_academic_director_create_academy_teacher" in academic_director_academy
+    assert "api_v1_head_of_department_update_academy_assignment" in hod_academy
+
+
+def test_no_ad_or_hod_frontend_posts_to_legacy_admin_teacher_academy():
+    for path in Path("frontend/src").rglob("*.ts*"):
+        source = path.read_text()
+        assert "/admin/teacher-academy" not in source
+        assert "admin/teacher-academy" not in source

@@ -26,7 +26,7 @@ import {
   tabsForAdminMode,
   trimEmptyMonthlyMonths,
 } from "../shared";
-import { XHR_HEADERS } from "@/shared/lib/api";
+import { JSON_HEADERS, XHR_HEADERS, apiData } from "@/shared/lib/api";
 import {
   canUseAdminPreviewForRole,
   clearRolePreviewStorage,
@@ -336,7 +336,7 @@ export function useAdminState(props: AdminPageProps) {
         return;
       }
 
-      const payload = (await res.json()) as { events?: unknown[]; done?: unknown };
+      const payload = apiData<{ events?: unknown[]; done?: unknown }>(await res.json());
       const events: unknown[] = Array.isArray(payload.events) ? payload.events : [];
       let sawTerminalEvent = Boolean(payload.done);
       events.forEach((event) => {
@@ -369,7 +369,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function loadChatRooms() {
-    fetch("/api/v1/admin/chat/rooms")
+    fetch("/api/v1/admin/chat/rooms", { headers: XHR_HEADERS })
       .then((r) => r.json())
       .then((d) => {
         const base = [{ room: "global", active: 0 }];
@@ -384,7 +384,7 @@ export function useAdminState(props: AdminPageProps) {
 
   function loadChatMessages(room: string) {
     setChatLoading(true);
-    fetch(`/api/v1/admin/chat/messages?room=${encodeURIComponent(room)}`)
+    fetch(`/api/v1/admin/chat/messages?room=${encodeURIComponent(room)}`, { headers: XHR_HEADERS })
       .then((r) => r.json())
       .then((d) => {
         setChatMessages(Array.isArray(d.data?.messages) ? d.data.messages : []);
@@ -394,7 +394,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function loadBlocked() {
-    fetch("/api/v1/admin/chat/blocked")
+    fetch("/api/v1/admin/chat/blocked", { headers: XHR_HEADERS })
       .then((r) => r.json())
       .then((d) => {
         setBlockedUsers(Array.isArray(d.data?.blocked) ? d.data.blocked : []);
@@ -403,7 +403,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function adminDeleteMsg(id: number) {
-    fetch(`/api/v1/admin/chat/messages/${id}`, { method: "DELETE" })
+    fetch(`/api/v1/admin/chat/messages/${id}`, { method: "DELETE", headers: XHR_HEADERS })
       .then((r) => {
         if (r.ok)
           setChatMessages((prev) =>
@@ -416,7 +416,7 @@ export function useAdminState(props: AdminPageProps) {
   function adminBlockUser(studentId: string) {
     fetch("/api/v1/admin/chat/block", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
       body: JSON.stringify({ studentId, reason: blockReason }),
     })
       .then((r) => {
@@ -429,7 +429,7 @@ export function useAdminState(props: AdminPageProps) {
   }
 
   function adminUnblock(studentId: string) {
-    fetch(`/api/v1/admin/chat/block/${encodeURIComponent(studentId)}`, { method: "DELETE" })
+    fetch(`/api/v1/admin/chat/block/${encodeURIComponent(studentId)}`, { method: "DELETE", headers: XHR_HEADERS })
       .then((r) => {
         if (r.ok) loadBlocked();
       })
@@ -444,11 +444,12 @@ export function useAdminState(props: AdminPageProps) {
       const res = await fetch(url, {
         cache: "no-store",
         credentials: "same-origin",
+        headers: XHR_HEADERS,
       });
       if (!res.ok) {
         return;
       }
-      const data = await res.json();
+      const data = apiData<{ students?: Array<Record<string, unknown>> }>(await res.json());
       if (Array.isArray(data.students)) {
         setStudents(normalizeStudentRows(data.students));
       }
@@ -784,9 +785,9 @@ export function useAdminState(props: AdminPageProps) {
 
   async function refreshResources() {
     try {
-      const res = await fetch(routes.adminResourcesApi);
+      const res = await fetch(routes.adminResourcesApi, { headers: XHR_HEADERS });
       if (res.ok) {
-        const data = await res.json();
+        const data = apiData<{ resources?: Array<Record<string, unknown>> }>(await res.json());
         if (Array.isArray(data.resources)) {
           setResourcesList(data.resources);
         }

@@ -5,7 +5,7 @@ import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
 import { FormAlert } from "@/shared/ui/PortalCard";
 import { asNumber, getStudentCode, getStudentRowId } from "../shared";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 interface StudentProfile {
@@ -127,11 +127,12 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
         body: JSON.stringify({}),
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setParentInviteError(String(json.message || "Could not create parent link."));
+      if (!apiSucceeded(response, json)) {
+        setParentInviteError(apiErrorMessage(json, "Could not create parent link."));
         return;
       }
-      const nextUrl = String(json.inviteUrl || json.invite_url || "");
+      const data = apiData<Record<string, unknown>>(json);
+      const nextUrl = String(data.inviteUrl || data.invite_url || "");
       if (!nextUrl) {
         setParentInviteError("Parent link was created, but no URL was returned.");
         return;

@@ -22,7 +22,7 @@ import { ParentToolbar } from "./parents/ParentToolbar";
 import { ParentTable } from "./parents/ParentTable";
 import { ParentDrawer } from "./parents/ParentDrawer";
 import { LinkStudentModal } from "./parents/LinkStudentModal";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 
 type ConfirmKind = "unlink" | "delete";
 type ConfirmState = { kind: ConfirmKind; parent: ParentRow; child?: ParentRow } | null;
@@ -125,10 +125,10 @@ export default function ParentsPanel({ state }: { state: any }) {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     const json = await response.json().catch(() => ({}));
-    if (!response.ok || !json.ok) {
-      throw new Error(asString(json.message) || "Something went wrong. Please try again.");
+    if (!apiSucceeded(response, json)) {
+      throw new Error(apiErrorMessage(json, "Something went wrong. Please try again."));
     }
-    return json as Record<string, unknown>;
+    return apiData<Record<string, unknown>>(json);
   }
 
   async function linkStudent(parent: ParentRow, studentRowId: number) {

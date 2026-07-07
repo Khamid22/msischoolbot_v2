@@ -3,7 +3,7 @@ import { CreditCard, Plus, Search, UserRound, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString, getStudentCode, getStudentRowId, sortSubjectsMathFirst } from "../shared";
-import { XHR_HEADERS, jsonCsrfHeaders } from "@/shared/lib/api";
+import { XHR_HEADERS, apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type PaymentRow = Record<string, unknown>;
@@ -304,11 +304,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
         headers: XHR_HEADERS,
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to load payments.");
+      if (!apiSucceeded(response, json)) {
+        setError(apiErrorMessage(json, "Unable to load payments."));
         return;
       }
-      applyResult(childId, json);
+      applyResult(childId, apiData<Record<string, unknown>>(json));
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -361,11 +361,11 @@ export default function PaymentsPanel({ state }: { state: any }) {
         }),
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to save payment.");
+      if (!apiSucceeded(response, json)) {
+        setError(apiErrorMessage(json, "Unable to save payment."));
         return;
       }
-      applyResult(childId, json);
+      applyResult(childId, apiData<Record<string, unknown>>(json));
       setForm({
         subject: subjectsList(selectedChild)[0] || "",
         currency: "UZS",

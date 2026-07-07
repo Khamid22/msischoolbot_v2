@@ -6,7 +6,7 @@ import { Pagination } from "@/shared/ui/Pagination";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 
 type ActivityFilter = "all" | "recent" | "inactive" | "never";
 const STUDENTS_PAGE_SIZE = 10;
@@ -61,11 +61,11 @@ function AddStudentModal({
         body: JSON.stringify({ full_name: fullName.trim(), group_id: Number(groupId) }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Could not add student.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Could not add student."));
         return;
       }
-      setCreated(json.student as CreatedStudent);
+      setCreated(apiData<{ student?: CreatedStudent }>(json).student || null);
     } catch {
       setError("Network error. Please try again.");
     } finally {

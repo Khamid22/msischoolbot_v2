@@ -6,7 +6,7 @@ import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
 import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, randomLessonStartMinutesForSeed, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
 
@@ -521,8 +521,8 @@ export function SchedulePanel({ state }: { state: any }) {
         body: JSON.stringify({ lesson_date: dayIso, start_time: start, end_time: end }),
       });
       const data = await response.json();
-      if (!response.ok || !data.ok) {
-        throw new Error(asString(data.message) || "Could not move the class.");
+      if (!apiSucceeded(response, data)) {
+        throw new Error(apiErrorMessage(data, "Could not move the class."));
       }
       showToast(message);
     } catch (dropError) {
@@ -713,11 +713,17 @@ export function SchedulePanel({ state }: { state: any }) {
           online_url: form.onlineUrl,
         }),
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        setError(asString(data.message) || "Could not create schedule.");
+      const json = await response.json();
+      if (!apiSucceeded(response, json)) {
+        setError(apiErrorMessage(json, "Could not create schedule."));
         return;
       }
+      const data = apiData<{
+        schedule?: Record<string, unknown>;
+        schedules?: ScheduleRow[];
+        sessions?: SessionRow[];
+        lessons?: LessonHistoryRow[];
+      }>(json);
       setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
       setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       if (Array.isArray(data.lessons)) setLessons(data.lessons);

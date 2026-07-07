@@ -3,6 +3,9 @@
 Parent DB access and workflow ownership moved to
 ``backend.domains.parents.service`` in DB-4. Keep this role-level module as a
 temporary import surface for routes and tests while callers migrate.
+
+Temporary compatibility wrapper. Delete after parent role routes import
+``backend.domains.parents.service`` directly.
 """
 
 from backend.domains.parents.service import (  # noqa: F401

@@ -142,7 +142,6 @@ def _is_admin_demo_path(path):
         path == "/"
         or path == "/admin"
         or path.startswith("/admin/")
-        or path.startswith("/admin/api/")
     )
 
 

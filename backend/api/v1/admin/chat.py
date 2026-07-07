@@ -2,34 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from backend.api import ApiSuccess, api_success
+from backend.api.v1.admin.schemas import (
+    AdminChatMessages,
+    BlockStudentRequest,
+    BlockedStudents,
+    ChatRooms,
+)
 from backend.domains.communication import chat_service
 from backend.security import CurrentUser, get_current_user
 
 router = APIRouter(prefix="/chat")
-
-
-class BlockStudentRequest(BaseModel):
-    studentId: str = ""
-    reason: str = ""
-
-
-class AdminChatMessages(BaseModel):
-    messages: list[dict[str, Any]]
-    room: str
-
-
-class BlockedStudents(BaseModel):
-    blocked: list[dict[str, Any]]
-
-
-class ChatRooms(BaseModel):
-    rooms: list[dict[str, Any]]
 
 
 @router.get(

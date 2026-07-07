@@ -20,7 +20,7 @@ import { MetricCard } from "@/shared/ui/MetricCard";
 import { Modal } from "@/shared/ui/Modal";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "../shared";
-import { jsonCsrfHeaders, csrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders, csrfHeaders } from "@/shared/lib/api";
 
 type Audience =
   | "all"
@@ -303,11 +303,11 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
         },
       );
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to save announcement.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to save announcement."));
         return;
       }
-      const saved = normalizeAnnouncement(json.announcement || {});
+      const saved = normalizeAnnouncement(apiData<{ announcement?: Record<string, unknown> }>(json).announcement || {});
       setItems((prev) =>
         editing
           ? prev.map((item) => (item.id === saved.id ? saved : item))
@@ -328,8 +328,8 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
       body: JSON.stringify({ ...item, ...values }),
     });
     const json = await res.json();
-    if (!res.ok || !json.ok) return;
-    const updated = normalizeAnnouncement(json.announcement || {});
+    if (!apiSucceeded(res, json)) return;
+    const updated = normalizeAnnouncement(apiData<{ announcement?: Record<string, unknown> }>(json).announcement || {});
     setItems((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
   }
 

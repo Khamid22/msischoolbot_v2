@@ -61,7 +61,7 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     ):
         return _CACHE_NO_STORE
 
-    if request_path.startswith("/api/") or request_path.startswith("/admin/api/"):
+    if request_path.startswith("/api/"):
         return _CACHE_NO_STORE
 
     if request_path.startswith("/static/react/"):
@@ -123,7 +123,7 @@ class AuthAndSecurityMiddleware:
         # form posts like /admin/teachers are covered too.
         if request_obj.method in _STATE_CHANGING_METHODS and path not in _SAME_ORIGIN_EXEMPT_PATHS:
             origin = request_obj.headers.get("Origin") or request_obj.headers.get("Referer") or ""
-            is_api = path.startswith("/api/") or path.startswith("/admin/api/")
+            is_api = path.startswith("/api/")
             if origin:
                 from urllib.parse import urlparse
                 host = request_obj.headers.get("host") or ""
@@ -280,7 +280,7 @@ def handle_rate_limited(request_obj: Request, exc: RateLimitExceeded):
     message = "Too many attempts. Please wait a moment and try again."
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
-    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+    if request_obj.url.path.startswith("/api/") or is_xhr:
         return JSONResponse({"status": "error", "message": message}, status_code=429)
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(message, status_code=429)
@@ -291,7 +291,7 @@ def handle_rate_limited(request_obj: Request, exc: RateLimitExceeded):
 def handle_http_exception(request_obj: Request, exc: HTTPException):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
-    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+    if request_obj.url.path.startswith("/api/") or is_xhr:
         return JSONResponse({"status": "error", "message": exc.detail}, status_code=exc.status_code)
     if exc.status_code in {401, 403}:
         return RedirectResponse(url="/", status_code=302)
@@ -306,7 +306,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
     logging.exception("Unhandled error on %s %s", request_obj.method, request_obj.url.path)
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
-    if request_obj.url.path.startswith(("/api/", "/admin/api/")) or is_xhr:
+    if request_obj.url.path.startswith("/api/") or is_xhr:
         return JSONResponse({"status": "error", "message": "Something went wrong. Please try again."}, status_code=500)
     return RedirectResponse(url="/", status_code=302)
 

@@ -1,7 +1,7 @@
 import os
 import time
 
-from backend.utils.response_helpers import jsonify, redirect, with_status
+from backend.utils.response_helpers import redirect, with_status
 from backend.utils.context import current_app, request, session
 from backend.utils.session import url_for
 from werkzeug.utils import secure_filename
@@ -9,15 +9,9 @@ from werkzeug.utils import secure_filename
 from backend.domains.students.service import (
     admin_change_student_password,
     get_admin_student_profile,
-    list_students_for_admin,
     update_student_admin_profile,
 )
 from backend.domains.teachers.service import assign_teacher_to_group, list_teachers
-from backend.domains.parents.service import create_parent_invite_code, create_parent_invite_token
-from backend.roles.admin.routes.request_payload import request_payload
-from backend.roles.admin.services.academic_service import (
-    create_student_with_enrollment_from_payload,
-)
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.route_service import resolve_sheet_student_for_admin
 
@@ -34,26 +28,6 @@ STUDENT_DASHBOARD_TARGET_ENDPOINTS = {
 }
 
 
-def _request_public_base_url():
-    proto = str(request.headers.get("x-forwarded-proto") or "").split(",")[0].strip()
-    if not proto:
-      proto = "https" if str(request.headers.get("x-forwarded-ssl", "")).lower() == "on" else "http"
-    host = str(request.headers.get("x-forwarded-host") or request.host or "").split(",")[0].strip()
-    return f"{proto}://{host}".rstrip("/") if host else ""
-
-
-def _telegram_parent_invite_url(code):
-    bot_username = (
-        os.environ.get("TELEGRAM_BOT_USERNAME")
-        or os.environ.get("BOT_USERNAME")
-        or ""
-    )
-    bot_username = str(bot_username).strip().lstrip("@")
-    if not bot_username:
-        return ""
-    return f"https://t.me/{bot_username}?start=parent_{code}"
-
-
 def register_admin_student_routes(
     router,
     *,
@@ -61,62 +35,6 @@ def register_admin_student_routes(
     render_edit_student_page,
     delete_uploaded_student_photo,
 ):
-    @router.get("/admin/api/students")
-    def admin_students_api():
-        school_filter = str(request.args.get("school", "all")).strip().casefold()
-        if school_filter not in {"all", "school5", "sehriyo"}:
-            school_filter = "all"
-        students = list_students_for_admin(school_filter=school_filter)
-        return jsonify({"students": students})
-
-    @router.post("/admin/api/students")
-    def admin_create_student_api():
-        try:
-            result = create_student_with_enrollment_from_payload(request_payload())
-        except (TypeError, ValueError) as exc:
-            return jsonify({"ok": False, "message": str(exc)}, status_code=400)
-        invalidate_admin_page_context_cache()
-        return jsonify({"ok": True, "student": result})
-
-    @router.post("/admin/api/students/{student_row_id}/parent-invite")
-    def admin_create_parent_invite(student_row_id: int):
-        profile = get_admin_student_profile(student_row_id)
-        if not profile:
-            return jsonify({"ok": False, "message": "Selected student was not found."}, status_code=404)
-
-        token = create_parent_invite_token(
-            {
-                "student_row_id": int(student_row_id),
-                "student_code": str(profile.get("student_code") or profile.get("student_id") or "").strip(),
-                "student_name": str(profile.get("full_name") or "").strip(),
-                "issued_by": int(session.get("admin_id", 0) or 0),
-                "issued_at": int(time.time()),
-            }
-        )
-        invite_path = f"/parent/link/{token}"
-        base_url = _request_public_base_url()
-        web_invite_url = f"{base_url}{invite_path}" if base_url else invite_path
-        invite_code = create_parent_invite_code(
-            token,
-            student_row_id,
-            issued_by=int(session.get("admin_id", 0) or 0),
-        )
-        telegram_invite_url = _telegram_parent_invite_url(invite_code)
-        invite_url = telegram_invite_url or web_invite_url
-        return jsonify(
-            {
-                "ok": True,
-                "invite_code": invite_code,
-                "inviteCode": invite_code,
-                "invite_url": invite_url,
-                "inviteUrl": invite_url,
-                "telegram_invite_url": telegram_invite_url,
-                "telegramInviteUrl": telegram_invite_url,
-                "web_invite_url": web_invite_url,
-                "webInviteUrl": web_invite_url,
-            }
-        )
-
     @router.get("/admin/students/{student_row_id}")
     def admin_student_profile(student_row_id: int):
         admin_notice = request.args.get("notice", "").strip()

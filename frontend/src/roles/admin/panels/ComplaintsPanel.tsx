@@ -23,7 +23,7 @@ import {
   statusLabel,
   type ThreadMessage,
 } from "./complaintFormat";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 
 // Filter options for the helpdesk queue. "all" / "open" are virtual: "open"
 // keeps every ticket that still needs work (anything not resolved), the rest map
@@ -301,12 +301,13 @@ export default function ComplaintsPanel({ state }: { state: any }) {
         body: JSON.stringify(payload),
       });
       const json = await response.json().catch(() => ({}));
-      if (!response.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update ticket.");
+      if (!apiSucceeded(response, json)) {
+        setError(apiErrorMessage(json, "Unable to update ticket."));
         return;
       }
-      if (json.complaint && typeof json.complaint === "object") {
-        replaceComplaint(json.complaint as Record<string, unknown>);
+      const complaint = apiData<{ complaint?: unknown }>(json).complaint;
+      if (complaint && typeof complaint === "object") {
+        replaceComplaint(complaint as Record<string, unknown>);
       }
     } catch {
       setError("Network error. Please try again.");

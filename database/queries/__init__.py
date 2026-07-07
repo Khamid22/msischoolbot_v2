@@ -1,4 +1,8 @@
-"""Web backend queries — also re-exports shared queries for a unified namespace."""
+"""Web backend query compatibility barrel.
+
+Temporary compatibility wrapper. Delete after active web imports migrate to
+domain query modules and ``backend.core.database``.
+"""
 
 from database import connect_auth_db, get_db_backend
 from database.cross_queries import *

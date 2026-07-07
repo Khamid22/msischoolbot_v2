@@ -308,7 +308,7 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
-    import backend.api.v1.head_of_department.router as hod_api_routes
+    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
     _set_session(
@@ -361,7 +361,7 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
 
 
 def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
-    import backend.api.v1.head_of_department.router as hod_api_routes
+    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
     _set_session(

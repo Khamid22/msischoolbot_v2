@@ -34,7 +34,7 @@ def test_unauthenticated_api_returns_401_json(client):
 
 
 def test_unauthenticated_admin_api_returns_401_json(client):
-    response = client.get("/admin/api/complaints", headers=XHR)
+    response = client.get("/api/v1/admin/complaints", headers=XHR)
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Authentication required."}
 

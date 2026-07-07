@@ -6,7 +6,7 @@ import { motion } from "@/shared/lib/motion";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
-import { jsonCsrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
 
 type CompactTooltipItem = {
@@ -127,8 +127,8 @@ export function GroupGradebook({
     try {
       const res = await fetch(routes.adminAcademicGradebookApi(id), { signal });
       const json = await res.json();
-      if (json.ok) setData(json as GradebookData);
-      else setError(json.message || "Failed to load.");
+      if (apiSucceeded(res, json)) setData(apiData<GradebookData>(json));
+      else setError(apiErrorMessage(json, "Failed to load."));
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
       setError("Network error.");
@@ -161,9 +161,9 @@ export function GroupGradebook({
     if (!active || saving) return;
     setSaving(true);
     try {
-      await fetch(routes.adminAcademicAttendanceApi, {
+      const res = await fetch(routes.adminAcademicAttendanceApi, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
           enrollment_id: active.enrollmentId,
           lesson_session_id: active.lesson.id,
@@ -174,6 +174,11 @@ export function GroupGradebook({
           attendance_type: "regular",
         }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to update attendance."));
+        return;
+      }
       patchAtt(active.enrollmentId, active.lesson.lessonNumber, status);
       close();
     } finally {
@@ -206,8 +211,8 @@ export function GroupGradebook({
         }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update homework score.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to update homework score."));
         return;
       }
       patchHw(active.enrollmentId, active.lesson.lessonNumber, score);
@@ -307,8 +312,8 @@ export function GroupGradebook({
         }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update exam score.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to update exam score."));
         return;
       }
       patchExam(activeExam.enrollmentId, activeExam.examLabel, score);
@@ -335,8 +340,8 @@ export function GroupGradebook({
         body: JSON.stringify({ status, reason }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update enrollment.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to update enrollment."));
         return;
       }
       setSelectedStudent(null);
@@ -359,8 +364,8 @@ export function GroupGradebook({
         body: JSON.stringify({ group_id: Number(moveGroupId) }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to move student.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to move student."));
         return;
       }
       setSelectedStudent(null);
@@ -439,11 +444,11 @@ export function GroupGradebook({
         body: JSON.stringify({ lesson_date: trimmed }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setError(asString(json.message) || "Unable to update lesson date.");
+      if (!apiSucceeded(res, json)) {
+        setError(apiErrorMessage(json, "Unable to update lesson date."));
         return;
       }
-      const updated = json.lesson as Partial<Lesson>;
+      const updated = apiData<{ lesson?: Partial<Lesson> }>(json).lesson || {};
       setData((prev) => {
         if (!prev) return prev;
         return {

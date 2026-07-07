@@ -1,2 +1,1 @@
-"""Future core backend package."""
-
+"""Shared backend infrastructure package."""

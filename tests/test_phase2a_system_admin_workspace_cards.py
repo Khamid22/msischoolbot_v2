@@ -32,18 +32,40 @@ def _set_session(client, data):
 def _route_methods(app):
     routes = {}
 
-    def walk(route_list):
+    def join_paths(prefix, path):
+        if not prefix:
+            return path
+        if not path or path == "/":
+            return prefix
+        return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+    def routes_already_include_prefix(route_list, prefix):
+        if not prefix:
+            return True
+        for route in route_list:
+            path = getattr(route, "path", None)
+            if path is not None:
+                return path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
+        return False
+
+    def walk(route_list, prefix=""):
         for route in route_list:
             if type(route).__name__ == "_IncludedRouter":
-                walk(route.original_router.routes)
+                router_prefix = getattr(route.original_router, "prefix", "")
+                next_prefix = (
+                    prefix
+                    if routes_already_include_prefix(route.original_router.routes, router_prefix)
+                    else join_paths(prefix, router_prefix)
+                )
+                walk(route.original_router.routes, next_prefix)
                 continue
             path = getattr(route, "path", None)
             methods = getattr(route, "methods", None)
             if path is not None and methods:
-                routes.setdefault(path, set()).update(methods)
+                routes.setdefault(join_paths(prefix, path), set()).update(methods)
             nested = getattr(route, "routes", None)
             if nested:
-                walk(nested)
+                walk(nested, prefix)
 
     walk(app.routes)
     return routes
@@ -318,17 +340,17 @@ def test_admin_route_renders_placeholders_when_card_db_fails(client, monkeypatch
 
 
 @pytest.mark.parametrize(
-    ("method", "path"),
+        ("method", "path"),
     [
         ("GET", "/admin"),
-        ("GET", "/admin/api/students"),
-        ("GET", "/admin/api/academic/gradebook"),
-        ("GET", "/admin/api/announcements"),
-        ("GET", "/admin/api/complaints"),
-        ("GET", "/admin/api/resources"),
-        ("POST", "/admin/api/students/{student_row_id}/parent-invite"),
+        ("GET", "/api/v1/admin/students"),
+        ("GET", "/api/v1/admin/academic/gradebook"),
+        ("GET", "/api/v1/admin/announcements"),
+        ("GET", "/api/v1/admin/complaints"),
+        ("GET", "/api/v1/admin/resources"),
+        ("POST", "/api/v1/admin/students/{student_row_id}/parent-invite"),
         ("POST", "/admin/teachers"),
-        ("POST", "/admin/parent-children"),
+        ("POST", "/api/v1/admin/parent-children"),
     ],
 )
 def test_existing_admin_routes_remain_registered(app, method, path):
