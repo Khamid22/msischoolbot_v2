@@ -145,7 +145,7 @@ These are active and must stay until replacements are implemented and imports ar
 | `database/queries/office_hours.py` | Used by office hours domain service. |
 | `database/queries/parent_account_queries.py` | Used by parent account and invite flows. |
 | `database/queries/parent_queries.py` | Used by parent service. |
-| `database/queries/payment_queries.py` | Used by payments domain service. |
+| `database/queries/payment_queries.py` | Compatibility wrapper; payment SQL moved to `backend/domains/payments/queries.py`. |
 | `database/queries/resource_queries.py` | Used by resources domain service and storage defaults. |
 | `database/queries/subject_summary_queries.py` | Used by academic performance summaries. |
 | `database/queries/teacher_queries.py` | Used by teacher account services and Teacher Academy. |

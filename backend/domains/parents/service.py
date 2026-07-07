@@ -13,16 +13,17 @@ from datetime import datetime, timedelta
 
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from database import queries as shared_queries
-from database.academics import canonical
 from backend.domains.payments.service import (
     list_student_payments,
     payment_row_to_record,
     payment_summary_for_student,
     summarize_payment_records,
 )
+from backend.domains.payments import queries as payment_queries
 from backend.domains.parents import queries as parent_queries
 from backend.domains.students.service import resolve_public_dashboard_for_student_row
+from database import queries as shared_queries
+from database.academics import canonical
 
 PROGRAM_TOTAL_LESSONS = 180
 PARENT_INVITE_SALT = "msi-parent-invite-v1"
@@ -206,8 +207,8 @@ def _list_child_recent_lessons(conn, child_row):
 
 def _list_child_payment_records(conn, child_row):
     try:
-        shared_queries.ensure_payments_schema(conn)
-        rows = shared_queries.list_student_payment_rows(conn, int(child_row["id"]))
+        payment_queries.ensure_payments_schema(conn)
+        rows = payment_queries.list_student_payment_rows(conn, int(child_row["id"]))
     except Exception:
         return []
     return [payment_row_to_record(row) for row in rows]

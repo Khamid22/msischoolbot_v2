@@ -34,7 +34,7 @@ Files deleted from `database/`: none.
 | `database/queries/parent_account_queries.py` and `database/queries/parent_queries.py` | KEEP_TEMPORARILY | Re-export parent domain queries for compatibility tests. |
 | `database/queries/announcement_queries.py` | KEEP_TEMPORARILY | Re-exports announcement domain queries for compatibility tests. |
 | `database/queries/complaint_queries.py` | KEEP_REAL_CODE | Still contains support-ticket SQL helpers. Later owner should be `backend/domains/complaints/queries.py`. |
-| `database/queries/payment_queries.py` | KEEP_REAL_CODE | Still contains payment SQL helpers. Later owner should be `backend/domains/payments/queries.py`. |
+| `database/queries/payment_queries.py` | KEEP_TEMPORARILY | Temporary compatibility wrapper around `backend/domains/payments/queries.py`. |
 | `database/queries/resource_queries.py` | KEEP_REAL_CODE | Still contains resource SQL helpers. Later owner should be `backend/domains/resources/queries.py`. |
 | `database/queries/office_hours.py` | KEEP_REAL_CODE | Still contains office-hours SQL helpers. Later owner should be `backend/domains/office_hours/queries.py`. |
 | `database/queries/lesson_catalog_queries.py` | KEEP_REAL_CODE | Still contains lesson catalog SQL helpers. Later owner should be student/academics domain query modules. |

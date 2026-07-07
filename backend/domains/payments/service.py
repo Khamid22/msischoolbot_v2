@@ -1,15 +1,18 @@
 import math
 from datetime import date, datetime
 
+from backend.core.database import connect_auth_db
+from backend.domains.payments import queries
+from backend.domains.students import queries as student_queries
 from database.academics import canonical
-from database import queries
+from database.tables import ensure_students_schema
 
 
 VALID_PAYMENT_STATUSES = {"paid", "due", "debt", "upcoming"}
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def _utc_now_iso():
@@ -259,9 +262,9 @@ def create_student_payment(student_row_id, payload, created_by_admin_id=0):
             raise ValueError("Payment amount must be greater than zero.")
 
     with _connect() as conn:
-        queries.ensure_students_schema(conn)
+        ensure_students_schema(conn)
         queries.ensure_payments_schema(conn)
-        student_row = queries.get_student_admin_row(conn, student_id)
+        student_row = student_queries.get_student_admin_row(conn, student_id)
         if not student_row:
             raise ValueError("Student was not found.")
         inserted_rows = []

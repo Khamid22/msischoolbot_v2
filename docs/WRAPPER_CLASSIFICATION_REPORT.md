@@ -54,6 +54,7 @@ These wrappers still have active imports or test coverage. They now carry the re
 | `database/cross_queries/student_queries.py` | `tests/test_database_restructure_db3_students.py` | `backend.domains.students.queries` | Compatibility coverage remains. |
 | `database/queries/parent_account_queries.py` | `tests/test_database_restructure_db4_parents.py` | `backend.domains.parents.queries` | Compatibility coverage remains. |
 | `database/queries/parent_queries.py` | `tests/test_database_restructure_db4_parents.py` | `backend.domains.parents.queries` | Compatibility coverage remains. |
+| `database/queries/payment_queries.py` | Legacy query barrel imports | `backend.domains.payments.queries` | Kept as a wrapper while the database query barrel remains active. |
 | `database/queries/announcement_queries.py` | `tests/test_database_restructure_db5_academics.py` | `backend.domains.announcements.queries` | Compatibility coverage remains. |
 
 ## Active Code Moved Or Clarified

@@ -78,6 +78,7 @@ def test_kept_temporary_wrappers_are_documented():
         Path("database/cross_queries/student_queries.py"),
         Path("database/queries/parent_account_queries.py"),
         Path("database/queries/parent_queries.py"),
+        Path("database/queries/payment_queries.py"),
         Path("database/queries/announcement_queries.py"),
     ]:
         source = path.read_text()
