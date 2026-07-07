@@ -2219,23 +2219,23 @@ export function TeacherAcademyPanel({
                   );
                 })}
               </MobileCardList>
-              <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-[1.5rem] border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
-                <table className="w-full min-w-[1280px] table-fixed border-collapse text-left">
+              <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
+                <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
                   <colgroup>
-                    <col className="w-[30%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[18%]" />
+                    <col className="w-[22%]" />
                     <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[17%]" />
+                    <col className="w-[13%]" />
                     <col className="w-[8%]" />
-                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
                     <tr>
                       {["Teacher", "Subject", "Progress", "Next lesson", "Evaluator", "Score", "Actions"].map((heading) => (
                         <th
                           key={heading}
-                          className="px-7 py-5 text-[13px] font-black uppercase tracking-[0.12em] text-[#64748B]"
+                          className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]"
                         >
                           {heading}
                         </th>
@@ -2316,21 +2316,21 @@ export function TeacherAcademyPanel({
                           className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-[#FAFBFE] motion-reduce:animate-none"
                           style={{ animationDelay: `${index * 30}ms` }}
                         >
-                          <td className="px-7 py-8 align-middle">
-                            <div className="flex min-w-0 items-center gap-5 text-left">
-                              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.4rem] bg-[#E8EBF3] text-base font-black text-[#1E2B72]">
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex min-w-0 items-center gap-2 text-left">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
                                 {initialsFromName(teacher.full_name)}
                               </span>
-                              <span className="min-w-0 flex-1">
+                              <span className="min-w-0">
                                 <button
                                   type="button"
                                   onClick={() => setDetailTeacher(teacher)}
-                                  className="block max-w-full truncate text-left text-lg font-black leading-tight text-[#0F172A] group-hover:underline"
+                                  className="block max-w-full truncate text-left text-sm font-black leading-tight text-[#0F172A] group-hover:underline"
                                 >
                                   {asString(teacher.full_name) || "Academy teacher"}
                                 </button>
-                                <span className="mt-2 flex min-w-0 items-center gap-2">
-                                  <span className="truncate font-mono text-sm font-bold text-[#64748B]">{login || "Creating..."}</span>
+                                <span className="mt-1 flex min-w-0 items-center gap-1.5">
+                                  <span className="truncate font-mono text-[11px] font-bold text-[#64748B]">{login || "Creating..."}</span>
                                   <IconButton
                                     label="Copy teacher login"
                                     disabled={!login}
@@ -2340,47 +2340,45 @@ export function TeacherAcademyPanel({
                                     <Copy className="h-3 w-3" />
                                   </IconButton>
                                 </span>
-                                <StatusBadge tone={academyStatusTone(status)} className="mt-2 px-3 py-1 text-[11px]">
+                                <StatusBadge tone={academyStatusTone(status)} className="mt-1 px-2 py-0.5 text-[9px]">
                                   {statusLabel(teacher.academy_status)}
                                 </StatusBadge>
                               </span>
                             </div>
                           </td>
-                          <td className="px-7 py-8 align-middle">
-                            <span className="block truncate text-base font-black text-[#0F172A]">{asString(teacher.subject) || "Subject not set"}</span>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="line-clamp-2 text-xs font-black text-[#0F172A]">{asString(teacher.subject) || "Subject not set"}</span>
                           </td>
-                          <td className="px-7 py-8 align-middle">
-                            <div className="min-w-0 max-w-[9rem]">
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <span className="text-base font-black text-[#0F172A]">{progress.assessed}/{progress.target}</span>
-                                <span className="text-sm font-bold text-[#64748B]">{percent}%</span>
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="min-w-0">
+                              <div className="mb-1 flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-black text-[#0F172A]">{progress.assessed}/{progress.target}</span>
+                                <span className="text-[10px] font-bold text-[#64748B]">{percent}%</span>
                               </div>
-                              <ProgressBar value={percent} className="h-2 bg-[#EEF2F7]" fillClassName="bg-[#3D5AEA]" />
+                              <ProgressBar value={percent} className="h-1.5 bg-[#EEF2F7]" fillClassName="bg-[#3D5AEA]" />
                             </div>
                           </td>
-                          <td className="px-7 py-8 align-middle">
+                          <td className="px-3 py-2.5 align-middle">
                             {nextAssignment ? (
-                              <div className="min-w-0">
-                                <p className="truncate text-base font-black text-[#0F172A]">{assignmentTitle(nextAssignment)}</p>
-                              </div>
+                              <p className="truncate text-xs font-black text-[#0F172A]">{assignmentTitle(nextAssignment)}</p>
                             ) : (
-                              <span className="text-base font-semibold text-[#64748B]">No academy lessons assigned</span>
+                              <span className="text-xs font-semibold text-[#64748B]">No academy lessons assigned</span>
                             )}
                           </td>
-                          <td className="px-7 py-8 align-middle">
-                            <span className="block truncate text-base font-semibold text-[#64748B]">
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="block truncate text-xs font-bold text-[#64748B]">
                               {nextAssignment ? asString(nextAssignment.evaluator_name) || "Not assigned" : "Not assigned"}
                             </span>
                           </td>
-                          <td className="px-7 py-8 align-middle">
-                            <span className={`text-2xl font-black tabular-nums ${
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className={`text-sm font-black tabular-nums ${
                               progress.average != null && progress.average >= 8 ? "text-[#3BC379]" : "text-[#0F172A]"
                             }`}>
                               {progress.average == null ? "-" : progress.average.toFixed(2)}
                             </span>
                           </td>
-                          <td className="px-7 py-8 align-middle">
-                            <div className="flex items-center justify-end gap-4 whitespace-nowrap">
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                               {canUsePrimaryLessonAction ? (
                                 <button
                                   type="button"
@@ -2389,23 +2387,23 @@ export function TeacherAcademyPanel({
                                       ? setAssessmentTarget({ teacher, assignment: nextAssignment })
                                       : setScheduleTarget({ teacher, assignment: nextAssignment })
                                   }
-                                  className={`inline-flex h-12 min-w-[9.25rem] items-center justify-center gap-3 rounded-[1.35rem] px-5 text-base font-black transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                                  className={`inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg px-2.5 text-[11px] font-bold transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
                                     scheduled
                                       ? "bg-[#0F172A] text-white hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
                                       : "bg-primary text-primary-foreground hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
                                   }`}
                                 >
-                                  {scheduled ? <ClipboardCheck className="h-5 w-5" /> : <CalendarClock className="h-5 w-5" />}
+                                  {scheduled ? <ClipboardCheck className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
                                   {scheduled ? "Assess" : "Schedule"}
                                 </button>
                               ) : academyAssignments(teacher).length ? (
-                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-12 min-w-[9.25rem] items-center justify-center gap-3 rounded-[1.35rem] bg-[#0F172A] px-5 text-base font-black text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                  <Eye className="h-5 w-5" />
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                  <Eye className="h-3.5 w-3.5" />
                                   Review
                                 </button>
                               ) : (
-                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-12 min-w-[9.25rem] items-center justify-center gap-3 rounded-[1.35rem] bg-[#0F172A] px-5 text-base font-black text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                  <Eye className="h-5 w-5" />
+                                <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                  <Eye className="h-3.5 w-3.5" />
                                   Details
                                 </button>
                               )}
