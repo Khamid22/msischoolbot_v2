@@ -63,7 +63,7 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     assert "subjectProgressFillClass" in source
     assert "from-blue-900 via-blue-700 to-indigo-500" in source
     assert "from-emerald-600 via-teal-500 to-cyan-500" in source
-    assert "2xl:grid-cols-4" in source
+    assert "lg:grid-cols-4" in source
     assert "2xl:max-h-[48rem]" in source
 
 

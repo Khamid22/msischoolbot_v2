@@ -269,25 +269,25 @@ function MiniAnalyticsCard({
   emptyLabel: string;
 }) {
   return (
-    <section className="flex min-h-[10.75rem] flex-col rounded-2xl border border-foreground/8 bg-background px-4 py-4">
-      <div className="mb-3 shrink-0">
-        <p className="text-sm font-black leading-5 text-foreground">{title}</p>
-        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{subtitle}</p>
+    <section className="flex min-h-[7.5rem] flex-col rounded-xl border border-foreground/8 bg-background px-3 py-3">
+      <div className="mb-2 shrink-0">
+        <p className="truncate text-xs font-black leading-4 text-foreground">{title}</p>
+        <p className="mt-0.5 truncate text-[10px] font-semibold leading-4 text-muted-foreground">{subtitle}</p>
       </div>
       {rows.length ? (
-        <div className="min-h-0 flex-1 space-y-3">
-          {rows.slice(0, 6).map((row) => (
+        <div className="min-h-0 flex-1 space-y-2">
+          {rows.slice(0, 4).map((row) => (
             <div key={row.label}>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-bold leading-5 text-foreground">{row.label}</span>
-                <span className="shrink-0 text-sm font-black text-muted-foreground">{row.detail}</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-bold leading-4 text-foreground">{row.label}</span>
+                <span className="shrink-0 text-xs font-black text-muted-foreground">{row.detail}</span>
               </div>
-              <ProgressBar value={row.value} className="h-1.5" fillClassName={row.fillClassName} label={row.label} />
+              <ProgressBar value={row.value} className="h-1" fillClassName={row.fillClassName} label={row.label} />
             </div>
           ))}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-6 text-center text-xs font-semibold text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-4 text-center text-[11px] font-semibold text-muted-foreground">
           {emptyLabel}
         </p>
       )}
@@ -2166,7 +2166,7 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
-        <div className="mb-3 grid shrink-0 items-stretch gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="mb-3 grid shrink-0 items-stretch gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <MiniAnalyticsCard
             title="Academy status distribution"
             subtitle="Academy, ready, completed, support"
