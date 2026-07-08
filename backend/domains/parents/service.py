@@ -23,7 +23,7 @@ from backend.domains.payments import queries as payment_queries
 from backend.domains.parents import queries as parent_queries
 from backend.domains.students.service import resolve_public_dashboard_for_student_row
 from database import queries as shared_queries
-from database.academics import canonical
+from backend.domains.academics import canonical
 
 PROGRAM_TOTAL_LESSONS = 180
 PARENT_INVITE_SALT = "msi-parent-invite-v1"

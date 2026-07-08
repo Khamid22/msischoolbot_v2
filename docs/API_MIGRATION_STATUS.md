@@ -33,6 +33,7 @@ Legacy import inventory still active:
 | `backend/api/v1 -> backend.roles.*` | Remaining in AD HOD creation and some admin slices (`staff_registration`, `academic_service`, upload progress helpers) |
 | `backend/domains -> backend.roles.*` | Remaining in resources storage helper only after this slice |
 | `database.queries` / `database.cross_queries` runtime imports | Still active in identity, communication/chat, parents, Teacher Academy compatibility, demo auth, and some role services |
+| `database.database` / `database.academics` runtime imports | 0; connection helpers live in `backend.core.database`, academic helpers live in `backend.domains.academics` |
 | `backend.utils.context` runtime imports | Still active in server, identity routes, render helper, and legacy role page/services. Teacher Academy domain permissions no longer import it. |
 | `jsonify` | 0 backend Python hits |
 
@@ -40,8 +41,11 @@ Import counts on 2026-07-09:
 
 | Import family | Hits | Files | Main blockers |
 | --- | ---: | ---: | --- |
-| `database.queries` / `from database import queries` | 9 | 9 | identity storage/links, communication chat, parent service, Teacher Academy compatibility, demo auth, role services |
+| `from database import queries` | 8 | 8 | identity storage/links, communication chat, parent service, Teacher Academy compatibility, demo auth, role services |
+| `database.queries` | 1 | 1 | compatibility mention/re-export in teacher domain queries |
 | `database.cross_queries` | 1 | 1 | compatibility mention/re-export in student domain queries |
+| `database.database` | 0 | 0 | deleted after imports reached zero |
+| `database.academics` | 0 | 0 | moved to `backend.domains.academics` |
 | `backend.utils.context` | 20 | 20 | legacy page routes, server middleware, identity routes, render/session helpers |
 | `backend.roles.*` | 46 | 27 | admin route/service slices, page helper imports, API v1 admin/AD slices, role services |
 | `jsonify` | 0 | 0 | none |
@@ -159,6 +163,9 @@ Database folder cleanup:
 - Moved `database/queries/resource_queries.py` to `backend/domains/resources/queries.py`.
 - Updated complaints, office-hours, resources, resource comments, and identity storage code to import the domain query modules directly where this slice touched them.
 - Removed the complaint, office-hours, and resource query wrapper exports from `database/queries/__init__.py`.
+- Deleted `database/database.py`; `backend/core/database.py` is now the only runtime DB connection implementation.
+- Moved `database/academics/*` helper modules into `backend/domains/academics/*`.
+- Moved `database/queries/subject_summary_queries.py` into `backend/domains/academics/summary_queries.py`.
 
 ## Migration Map
 

@@ -7,7 +7,7 @@ DEMO_AUTH_ENABLED=1, so production behavior stays unchanged when the flag is off
 import os
 import re
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 from database import queries
 
 _TRUTHY = {"1", "true", "yes", "y", "on"}

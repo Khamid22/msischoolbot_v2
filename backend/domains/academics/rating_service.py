@@ -15,7 +15,7 @@ import os
 import threading
 import time
 
-from database.academics.canonical import (
+from backend.domains.academics.canonical import (
     normalize_text as _normalize,
     normalize_school_code as _normalize_school_code,
 )

@@ -9,7 +9,7 @@ import os
 import threading
 import time
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.core.security import generate_password_hash, verify_password_hash
 
 from backend.domains.students import queries

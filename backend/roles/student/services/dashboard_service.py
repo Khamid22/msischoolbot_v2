@@ -6,7 +6,7 @@ import time
 from backend.utils.context import session
 from backend.utils.session import url_for
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.domains.students.service import (
     get_dashboard_student_profile,
     get_student_db_id_by_enrollment_id,
@@ -19,7 +19,7 @@ from backend.domains.academics.rating_service import (
     load_dataset,
     round_grade_half_up,
 )
-from database.academics.canonical import normalize_text
+from backend.domains.academics.canonical import normalize_text
 from backend.utils.session import current_auth_role, current_student_db_id
 
 

@@ -21,11 +21,11 @@ def test_core_and_legacy_connect_share_callable():
 
 def test_core_database_owns_connection_implementation():
     core_source = Path("backend/core/database.py").read_text()
-    legacy_source = Path("database/database.py").read_text()
+    removed_database_module = Path("database") / "database.py"
+    legacy_database_import = "from database." + "database import"
 
     assert "def connect_auth_db" in core_source
     assert "class _PostgresConnectionWrapper" in core_source
-    assert "from database.database import" not in core_source
+    assert legacy_database_import not in core_source
     assert "from backend.identity.common import connect" not in core_source
-    assert "from backend.core.database import" in legacy_source
-    assert "Temporary compatibility wrapper. Delete after" in legacy_source
+    assert not removed_database_module.exists()

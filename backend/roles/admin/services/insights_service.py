@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from database.academics import canonical
+from backend.domains.academics import canonical
 
 _EXAM_NAME_ALIASES = {
     "half term test 1": "HFT1",

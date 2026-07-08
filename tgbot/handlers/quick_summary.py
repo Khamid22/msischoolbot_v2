@@ -8,7 +8,7 @@ from tgbot.helpers import (
     linked_student_from_user,
     run_blocking,
 )
-from database.academics.performance_summary import get_subject_summaries_for_student
+from backend.domains.academics.performance_summary import get_subject_summaries_for_student
 
 router = Router()
 

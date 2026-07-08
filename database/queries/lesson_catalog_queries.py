@@ -1,6 +1,6 @@
 """Lesson catalog helpers backed by subject program items."""
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 
 
 def replace_lesson_catalog_rows(conn, rows):

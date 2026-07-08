@@ -1,11 +1,12 @@
 """Subject performance summaries derived directly from msi_v2 academic tables."""
 
-from database.academics import canonical
-from database import queries
+from backend.core.database import connect_auth_db
+from backend.domains.academics import canonical
+from backend.domains.academics import summary_queries
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def _format_summary_row(row):
@@ -36,7 +37,7 @@ def list_subject_summaries_by_full_name(full_name):
         return []
 
     with _connect() as conn:
-        rows = queries.list_subject_summary_rows_by_full_name_norm(conn, normalized_name)
+        rows = summary_queries.list_subject_summary_rows_by_full_name_norm(conn, normalized_name)
 
     results = [_format_summary_row(row) for row in rows]
     results.sort(
@@ -51,7 +52,7 @@ def list_subject_summaries_by_full_name(full_name):
 def list_subject_summaries(school_key=""):
     normalized_school_key = canonical.normalize_school_code(school_key, default="")
     with _connect() as conn:
-        rows = queries.list_subject_summary_rows(
+        rows = summary_queries.list_subject_summary_rows(
             conn,
             school_key=normalized_school_key if normalized_school_key else "all",
         )
@@ -60,7 +61,7 @@ def list_subject_summaries(school_key=""):
 
 def list_subject_student_counts():
     with _connect() as conn:
-        rows = queries.list_subject_student_count_rows(conn)
+        rows = summary_queries.list_subject_student_count_rows(conn)
     return [
         {
             "subject_name": str(row["subject_name"] or "").strip(),
@@ -73,7 +74,7 @@ def list_subject_student_counts():
 
 def list_subject_group_counts():
     with _connect() as conn:
-        rows = queries.list_subject_group_count_rows(conn)
+        rows = summary_queries.list_subject_group_count_rows(conn)
     return [
         {
             "subject_name": str(row["subject_name"] or "").strip(),

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from backend.core.database import connect_auth_db
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.domains.academics.postgres_service import (
     create_group_from_program,
     create_schedule,

@@ -1,6 +1,6 @@
 """Telegram account linking helpers."""
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 from database import queries
 from backend.domains.parents import queries as parent_queries
 from backend.identity.common import DB_LOCK, connect, utc_now_iso

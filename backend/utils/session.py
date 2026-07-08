@@ -2,7 +2,7 @@
 
 from backend.security.roles import dashboard_path_for_role, is_valid_role, normalize_role
 from backend.utils.context import session
-from database.academics.canonical import normalize_school_code
+from backend.domains.academics.canonical import normalize_school_code
 
 
 def current_auth_role():

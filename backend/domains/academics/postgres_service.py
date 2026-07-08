@@ -7,7 +7,7 @@ frontend already consumes so nothing on the admin pages breaks.
 from datetime import datetime, time, timedelta
 
 from backend.core.database import connect_auth_db
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.domains.academics import queries as academic_queries
 from backend.domains.timetable import queries as timetable_queries
 

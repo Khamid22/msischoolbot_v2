@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from database.academics import subjects
+from backend.domains.academics import subjects
 
 
 @dataclass(frozen=True)

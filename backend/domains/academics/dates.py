@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from database.academics.text import normalize_text
+from backend.domains.academics.text import normalize_text
 
 PLACEHOLDER_DATE_TOKENS = {
     "",

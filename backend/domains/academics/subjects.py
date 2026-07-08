@@ -2,7 +2,7 @@
 
 import re
 
-from database.academics.text import normalize_text
+from backend.domains.academics.text import normalize_text
 
 SUBJECT_CANONICAL_NAMES = {
     "igcse mathematics a": "IGCSE Mathematics A",

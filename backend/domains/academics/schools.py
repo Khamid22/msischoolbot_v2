@@ -1,6 +1,6 @@
 """Canonical school code and school display rules."""
 
-from database.academics.text import normalize_text
+from backend.domains.academics.text import normalize_text
 
 DEFAULT_SCHOOL_CODE = "school5"
 DEFAULT_SCHOOL_NAME = "School 5"

@@ -9,7 +9,7 @@ from backend.domains.teachers.service import (
     update_teacher_by_id,
     upsert_teacher,
 )
-from database.academics.canonical import normalize_school_code
+from backend.domains.academics.canonical import normalize_school_code
 from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
 from backend.roles.admin.services.route_service import group_belongs_to_school
 from backend.utils.session import current_auth_login

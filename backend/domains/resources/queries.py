@@ -1,6 +1,6 @@
 """Resource library SQL query helpers backed by the clean msi_v2 schema."""
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 
 
 def ensure_resource_storage(conn, created_at):

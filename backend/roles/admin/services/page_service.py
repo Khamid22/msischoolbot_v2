@@ -1,7 +1,7 @@
 import os
 
 from backend.core.database import connect_auth_db
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.domains.admin.page_cache import (
     get_cached_admin_page_context as _get_cached_admin_page_context,
     invalidate_admin_page_context_cache,
@@ -12,9 +12,9 @@ from backend.domains.teachers.service import list_teachers
 from backend.domains.teacher_academy.service import list_academy_teachers
 from .teacher_candidate_service import list_teacher_candidates
 from backend.domains.complaints.service import list_complaints
-from database.academics.canonical import normalize_text
+from backend.domains.academics.canonical import normalize_text
 from backend.domains.parents.service import list_parent_accounts, list_parent_children
-from database.academics.performance_summary import (
+from backend.domains.academics.performance_summary import (
     list_subject_group_counts,
     list_subject_student_counts,
     list_subject_summaries,

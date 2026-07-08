@@ -72,7 +72,6 @@ def test_kept_temporary_wrappers_are_documented():
         Path("backend/roles/admin/services/parent_service.py"),
         Path("backend/roles/parent/services.py"),
         Path("config.py"),
-        Path("database/database.py"),
         Path("database/queries/__init__.py"),
         Path("database/cross_queries/__init__.py"),
         Path("database/queries/teacher_queries.py"),
@@ -147,6 +146,29 @@ def test_complaint_office_hours_and_resource_query_wrappers_moved_to_domains():
     for legacy_import in legacy_module_imports:
         assert legacy_import not in query_barrel
         assert legacy_import not in active_source
+
+
+def test_academic_helpers_moved_out_of_database_folder():
+    active_source = _active_source_text()
+    bot_source = "\n".join(path.read_text() for path in Path("tgbot").rglob("*.py"))
+    old_academic_import = "database." + "academics"
+
+    for path in [
+        Path("backend/domains/academics/canonical.py"),
+        Path("backend/domains/academics/curriculum.py"),
+        Path("backend/domains/academics/dates.py"),
+        Path("backend/domains/academics/performance_summary.py"),
+        Path("backend/domains/academics/schools.py"),
+        Path("backend/domains/academics/subjects.py"),
+        Path("backend/domains/academics/summary_queries.py"),
+        Path("backend/domains/academics/text.py"),
+    ]:
+        assert path.exists(), f"Expected moved academic helper to exist: {path}"
+
+    assert not (Path("database") / "academics").exists()
+    assert not (Path("database") / "queries" / ("subject_" + "summary_queries.py")).exists()
+    assert old_academic_import not in active_source
+    assert old_academic_import not in bot_source
 
 
 def test_complaint_office_hours_and_resource_services_use_domain_queries():

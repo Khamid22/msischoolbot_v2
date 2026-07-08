@@ -4,7 +4,7 @@ from datetime import date, datetime
 from backend.core.database import connect_auth_db
 from backend.domains.payments import queries
 from backend.domains.students import queries as student_queries
-from database.academics import canonical
+from backend.domains.academics import canonical
 from database.tables import ensure_students_schema
 
 
@@ -55,7 +55,7 @@ def _normalize_date_input(value, field_name):
 
 
 def _date_sort_value(value):
-    # Unparseable dates sort last. Canonical date parsing lives in database.academics.canonical.
+    # Unparseable dates sort last. Canonical date parsing lives in the academics domain.
     return canonical.parse_date(value) or date.max
 
 

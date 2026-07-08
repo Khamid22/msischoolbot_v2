@@ -6,7 +6,7 @@ from backend.domains.students.service import (
     school_code_from_name,
 )
 
-from database.academics.canonical import (
+from backend.domains.academics.canonical import (
     normalize_school_code,
     normalize_text,
 )

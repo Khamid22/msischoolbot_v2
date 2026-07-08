@@ -4,7 +4,7 @@ import os
 import threading
 import time
 
-from database.academics.canonical import normalize_school_code
+from backend.domains.academics.canonical import normalize_school_code
 from backend.domains.academics.rating_service import (
     build_students_by_subject_group,
     load_dataset,

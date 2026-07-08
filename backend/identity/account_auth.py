@@ -11,7 +11,7 @@ from typing import Any, Callable
 from backend.core.security import verify_password_hash
 from backend.identity.common import connect
 from backend.security.roles import normalize_role
-from database.academics.canonical import normalize_school_code
+from backend.domains.academics.canonical import normalize_school_code
 
 
 PASSWORD_LOGIN_ALLOWED_STATUS = "active"

@@ -14,14 +14,16 @@ def test_core_database_clean_import_path_exports_connection_helpers():
     assert callable(core_database.close_idle_pool_connections)
 
 
-def test_legacy_database_module_wraps_core_database():
-    source = Path("database/database.py").read_text()
+def test_legacy_database_module_is_removed_after_core_migration():
     core_source = Path("backend/core/database.py").read_text()
+    database_package_source = Path("database/__init__.py").read_text()
     alembic_source = Path("database/alembic/env.py").read_text()
+    removed_database_module = Path("database") / "database.py"
+    legacy_database_import = "from database." + "database import"
 
-    assert "from backend.core.database import" in source
-    assert "Temporary compatibility wrapper. Delete after" in source
-    assert "from database.database import" not in core_source
+    assert not removed_database_module.exists()
+    assert legacy_database_import not in core_source
+    assert "from backend.core.database import connect_auth_db, get_db_backend" in database_package_source
     assert "from backend.core.database import _database_url" in alembic_source
 
 

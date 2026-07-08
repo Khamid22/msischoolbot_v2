@@ -14,5 +14,4 @@ from .meta_queries import *
 from .parent_account_queries import *
 from .parent_queries import *
 from .payment_queries import *
-from .subject_summary_queries import *
 from .teacher_queries import *

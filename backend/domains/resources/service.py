@@ -2,7 +2,7 @@ import re
 import threading
 from datetime import datetime
 
-from database.academics import canonical
+from backend.domains.academics import canonical
 from backend.core.database import connect_auth_db
 from backend.domains.resources import queries
 
