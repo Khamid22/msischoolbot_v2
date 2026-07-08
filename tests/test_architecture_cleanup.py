@@ -117,6 +117,52 @@ def test_announcement_database_query_wrapper_is_removed_after_domain_migration()
     assert "database.queries.announcement_queries" not in active_source
 
 
+def test_complaint_office_hours_and_resource_query_wrappers_moved_to_domains():
+    active_source = _active_source_text()
+    query_barrel = Path("database/queries/__init__.py").read_text()
+
+    for path in [
+        Path("backend/domains/complaints/queries.py"),
+        Path("backend/domains/office_hours/queries.py"),
+        Path("backend/domains/resources/queries.py"),
+    ]:
+        assert path.exists(), f"Expected domain query module to exist: {path}"
+
+    legacy_query_dir = Path("database") / "queries"
+    for path in [
+        legacy_query_dir / "complaint_queries.py",
+        legacy_query_dir / "office_hours.py",
+        legacy_query_dir / "resource_queries.py",
+    ]:
+        assert not path.exists(), f"Old query wrapper should be removed: {path}"
+
+    legacy_module_imports = [
+        "from .complaint_queries import *",
+        "from .office_hours import *",
+        "from .resource_queries import *",
+        "database.queries." + "complaint_queries",
+        "database.queries." + "office_hours",
+        "database.queries." + "resource_queries",
+    ]
+    for legacy_import in legacy_module_imports:
+        assert legacy_import not in query_barrel
+        assert legacy_import not in active_source
+
+
+def test_complaint_office_hours_and_resource_services_use_domain_queries():
+    expected_sources = {
+        Path("backend/domains/complaints/service.py"): "from backend.domains.complaints import queries",
+        Path("backend/domains/office_hours/service.py"): "from backend.domains.office_hours import queries",
+        Path("backend/domains/resources/service.py"): "from backend.domains.resources import queries",
+        Path("backend/domains/resources/comments_service.py"): "from backend.domains.resources import queries",
+    }
+
+    for path, expected_import in expected_sources.items():
+        source = path.read_text()
+        assert expected_import in source
+        assert "from database import queries" not in source
+
+
 def test_main_startup_imports_storage_not_account_service():
     main_source = Path("main.py").read_text()
 

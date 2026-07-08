@@ -3,6 +3,32 @@
 from database.academics import canonical
 
 
+def ensure_resource_storage(conn, created_at):
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
+    ensure_default_resource_types(conn, created_at)
+
+
+def ensure_resource_comments_schema(conn):
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.resource_comments (
+            id BIGSERIAL PRIMARY KEY,
+            resource_id BIGINT NOT NULL REFERENCES msi_v2.resources(id) ON DELETE CASCADE,
+            author_name TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_resource_comments_resource_id
+        ON msi_v2.resource_comments(resource_id, created_at)
+        """
+    )
+
+
 _RESOURCE_TYPE_COLUMNS = """
     id,
     name,
@@ -419,6 +445,8 @@ def list_resource_rows(conn, include_inactive=False, subject_key=""):
 
 
 __all__ = [
+    "ensure_resource_storage",
+    "ensure_resource_comments_schema",
     "list_resource_type_rows",
     "get_resource_type_by_name_row",
     "get_resource_type_by_slug_row",

@@ -23,9 +23,9 @@ from backend.pages.ceo import register_ceo_page_routes
 from backend.pages.customer_support import register_customer_support_page_routes
 from backend.pages.head_of_department import register_head_of_department_page_routes
 from backend.pages.hr_manager import register_hr_manager_page_routes
-from backend.roles.parent.routes import register_parent_invite_routes
-from backend.roles.parent.routes import register_parent_page_routes
-from backend.roles.student.routes import register_student_page_routes
+from backend.pages.parent import register_parent_invite_routes
+from backend.pages.parent import register_parent_page_routes
+from backend.pages.student import register_student_page_routes
 from backend.pages.teacher import register_teacher_page_routes
 
 _BACKEND_DIR = os.path.dirname(__file__)

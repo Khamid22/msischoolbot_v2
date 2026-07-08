@@ -1,9 +1,11 @@
 from datetime import datetime
-from database import queries
+
+from backend.core.database import connect_auth_db
+from backend.domains.office_hours import queries
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def create_availability(

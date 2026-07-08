@@ -80,7 +80,7 @@ def _parent_children():
 
 
 def _patch_parent_dependencies(monkeypatch, children):
-    import backend.roles.parent.routes as parent_routes
+    import backend.pages.parent as parent_routes
 
     if isinstance(children, Exception):
         def raise_children(parent_id):

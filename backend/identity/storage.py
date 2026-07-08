@@ -4,6 +4,7 @@ import logging
 import os
 
 from backend.core.security import generate_password_hash
+from backend.domains.resources import queries as resource_queries
 
 from database import queries
 from backend.identity.common import DB_LOCK, connect, utc_now_iso
@@ -26,7 +27,7 @@ def init_storage():
         # `alembic upgrade head`; run it manually for local dev). Startup only
         # seeds bootstrap data (default resource types + owner account).
         with connect() as conn:
-            queries.ensure_default_resource_types(conn, utc_now_iso())
+            resource_queries.ensure_default_resource_types(conn, utc_now_iso())
             ensure_owner_admin(conn)
             conn.commit()
         _STORAGE_READY = True

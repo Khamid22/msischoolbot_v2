@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from database import queries
+from backend.core.database import connect_auth_db
+from backend.domains.complaints import queries
+from backend.domains.parents import queries as parent_queries
 
 
 VALID_COMPLAINT_STATUSES = {"new", "in_progress", "escalated", "resolved"}
@@ -19,7 +21,7 @@ VALID_COMPLAINT_CATEGORIES = {
 
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def _utc_now_iso():
@@ -198,7 +200,7 @@ def create_complaint(parent_admin_id, student_row_id, payload):
         if not parent_row:
             raise ValueError("Parent account was not found.")
         if student_id > 0:
-            link = queries.get_parent_child_row(conn, parent_id, student_id)
+            link = parent_queries.get_parent_child_row(conn, parent_id, student_id)
             if not link:
                 raise ValueError("This child is not linked to the selected parent.")
 

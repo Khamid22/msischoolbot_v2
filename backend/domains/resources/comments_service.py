@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from database import queries
-
 from backend.domains.communication.chat_service import (
     _DB_LOCK,
     connect_chat_db,
     fmt_display,
     utc_now_iso,
 )
+from backend.domains.resources import queries
 
 COMMENT_MAX_LENGTH = 500
 COMMENTS_PER_PAGE = 50

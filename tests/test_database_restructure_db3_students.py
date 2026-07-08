@@ -47,12 +47,12 @@ def test_student_identity_wrappers_are_gone():
 
 def test_student_domain_imports_are_used_where_safe():
     dashboard_service_source = Path("backend/roles/student/services/dashboard_service.py").read_text()
-    student_page_source = Path("backend/roles/student/routes/student_page.py").read_text()
-    student_routes_source = Path("backend/roles/student/routes/students.py").read_text()
+    student_page_source = Path("backend/pages/student.py").read_text()
+    student_routes_source = Path("backend/pages/student_forms.py").read_text()
     admin_student_routes_source = Path("backend/roles/admin/routes/student_routes.py").read_text()
     admin_page_service_source = Path("backend/roles/admin/services/page_service.py").read_text()
     parent_service_source = Path("backend/domains/parents/service.py").read_text()
-    office_hours_source = Path("backend/roles/student/routes/office_hours_routes.py").read_text()
+    office_hours_source = Path("backend/pages/student_office_hours.py").read_text()
 
     assert "from backend.domains.students.service import (" in dashboard_service_source
     assert "from backend.domains.students.service import (" in student_page_source
@@ -81,7 +81,7 @@ def test_student_public_dashboard_resolution_uses_student_domain():
     route_service_source = Path("backend/roles/admin/services/route_service.py").read_text()
     parent_service_source = Path("backend/domains/parents/service.py").read_text()
     academic_dashboard_source = Path("backend/domains/academics/internal_dashboard_service.py").read_text()
-    office_hours_source = Path("backend/roles/student/routes/office_hours_routes.py").read_text()
+    office_hours_source = Path("backend/pages/student_office_hours.py").read_text()
 
     assert "resolve_sheet_student_for_admin" in route_service_source
     assert "list_public_dashboard_targets_for_student_row" not in route_service_source

@@ -57,7 +57,7 @@ def test_parent_identity_and_admin_wrappers_still_export_domain_services():
 
 def test_parent_domain_imports_are_used_where_safe():
     identity_routes_source = Path("backend/domains/identity/routes.py").read_text()
-    parent_routes_source = Path("backend/roles/parent/routes.py").read_text()
+    parent_routes_source = Path("backend/pages/parent.py").read_text()
     admin_parent_routes_source = Path("backend/api/v1/admin/parents.py").read_text()
     admin_student_routes_source = Path("backend/api/v1/admin/students.py").read_text()
     admin_page_source = Path("backend/roles/admin/routes/admin_page.py").read_text()

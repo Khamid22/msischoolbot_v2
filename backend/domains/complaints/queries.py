@@ -8,6 +8,57 @@ frontend payloads use that word. The storage model is now:
 """
 
 
+def ensure_support_tickets_schema(conn):
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.support_tickets (
+            id BIGSERIAL PRIMARY KEY,
+            parent_id BIGINT REFERENCES msi_v2.parents(id) ON DELETE SET NULL,
+            student_id BIGINT REFERENCES msi_v2.students(id) ON DELETE SET NULL,
+            category TEXT NOT NULL DEFAULT 'other',
+            topic TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'new',
+            assigned_to_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            escalated_to_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            legacy_complaint_id BIGINT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            resolved_at TIMESTAMPTZ
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_support_tickets_status_updated
+        ON msi_v2.support_tickets(status, updated_at)
+        """
+    )
+
+
+def ensure_ticket_messages_schema(conn):
+    conn.execute("CREATE SCHEMA IF NOT EXISTS msi_v2")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS msi_v2.ticket_messages (
+            id BIGSERIAL PRIMARY KEY,
+            ticket_id BIGINT NOT NULL REFERENCES msi_v2.support_tickets(id) ON DELETE CASCADE,
+            author_type TEXT NOT NULL,
+            author_staff_id BIGINT REFERENCES msi_v2.msi_staff(id) ON DELETE SET NULL,
+            author_parent_id BIGINT REFERENCES msi_v2.parents(id) ON DELETE SET NULL,
+            body TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket
+        ON msi_v2.ticket_messages(ticket_id, created_at, id)
+        """
+    )
+
+
 def _ticket_row_select():
     return """
         SELECT
@@ -292,6 +343,8 @@ def count_complaints_by_parent(conn):
 
 __all__ = [
     "count_complaints_by_parent",
+    "ensure_support_tickets_schema",
+    "ensure_ticket_messages_schema",
     "get_parent_complaint_row",
     "insert_complaint_message_row",
     "insert_parent_complaint_row",

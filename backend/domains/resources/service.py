@@ -3,7 +3,8 @@ import threading
 from datetime import datetime
 
 from database.academics import canonical
-from database import queries
+from backend.core.database import connect_auth_db
+from backend.domains.resources import queries
 
 from backend.roles.admin.services.r2_storage_service import (
     build_resource_file_url,
@@ -17,7 +18,7 @@ from backend.roles.admin.services.r2_storage_service import (
 _DB_LOCK = threading.Lock()
 
 def _connect():
-    return queries.connect_auth_db()
+    return connect_auth_db()
 
 
 def _utc_now_iso():
@@ -73,8 +74,7 @@ def _resource_old_to_new_sort_key(row):
 
 
 def _ensure_storage(conn):
-    queries.create_tables(conn)
-    queries.ensure_default_resource_types(conn, _utc_now_iso())
+    queries.ensure_resource_storage(conn, _utc_now_iso())
 
 
 def _to_resource_type(row):

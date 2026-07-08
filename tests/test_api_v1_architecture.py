@@ -36,13 +36,57 @@ def test_server_registers_api_v1_before_role_pages():
     assert "from backend.pages.academic_director import register_academic_director_page_routes" in source
     assert "from backend.pages.head_of_department import register_head_of_department_page_routes" in source
     assert "from backend.pages.teacher import register_teacher_page_routes" in source
+    assert "from backend.pages.student import register_student_page_routes" in source
+    assert "from backend.pages.parent import register_parent_page_routes" in source
+    assert "from backend.pages.parent import register_parent_invite_routes" in source
     assert "from backend.roles.academic_director.routes" not in source
     assert "from backend.roles.head_of_department.routes" not in source
     assert "from backend.roles.teacher.routes" not in source
+    assert "from backend.roles.student.routes" not in source
+    assert "from backend.roles.parent.routes" not in source
     assert "app_instance.include_router(api_v1_router)" in source
     assert source.index("app_instance.include_router(api_v1_router)") < source.index(
         "register_academic_director_page_routes(app_instance)"
     )
+
+
+def test_student_and_parent_page_routes_live_in_pages_layer():
+    for path in [
+        Path("backend/pages/student.py"),
+        Path("backend/pages/student_dashboard.py"),
+        Path("backend/pages/student_forms.py"),
+        Path("backend/pages/student_resources.py"),
+        Path("backend/pages/student_chat.py"),
+        Path("backend/pages/student_office_hours.py"),
+        Path("backend/pages/student_rating_board.py"),
+        Path("backend/pages/parent.py"),
+    ]:
+        assert path.exists(), f"Expected page route module to exist: {path}"
+        source = path.read_text()
+        assert "response_model=ApiSuccess" not in source
+        assert "from database import queries" not in source
+
+
+def test_student_and_parent_role_route_files_are_compatibility_only():
+    wrapper_paths = [
+        Path("backend/roles/student/routes/__init__.py"),
+        Path("backend/roles/student/routes/student_page.py"),
+        Path("backend/roles/student/routes/dashboard.py"),
+        Path("backend/roles/student/routes/students.py"),
+        Path("backend/roles/student/routes/resources.py"),
+        Path("backend/roles/student/routes/chat_page.py"),
+        Path("backend/roles/student/routes/office_hours_routes.py"),
+        Path("backend/roles/student/routes/rating_board.py"),
+        Path("backend/roles/parent/routes.py"),
+    ]
+    for path in wrapper_paths:
+        source = path.read_text()
+        assert "backend.pages." in source
+        assert "render_react_page" not in source
+        assert "HTMLResponse" not in source
+        assert "@router." not in source
+        assert "@app." not in source
+        assert "FROM msi_v2" not in source
 
 
 def test_ad_hod_and_teacher_role_route_files_are_deleted_after_page_move():
