@@ -73,41 +73,43 @@ describe("Head of Departments page", () => {
 });
 
 describe("KPI grids", () => {
-  it("overview and workspace pages use MetricGrid (2 columns on mobile)", () => {
+  it("overview and workspace pages use shared metric components", () => {
     assert.match(rolePages["RoleHome (AD/HOD overview + profile)"], /<MetricGrid>/);
-    assert.match(rolePages["AcademicDepartmentWorkspace (timetable/announcements)"], /<MetricGrid>/);
+    assert.match(rolePages["AcademicDepartmentWorkspace (timetable/announcements)"], /<MetricCard/);
   });
 });
 
 describe("Timetable and Announcements final workspace", () => {
   const src = rolePages["AcademicDepartmentWorkspace (timetable/announcements)"];
 
-  it("timetable has Today/Week view, filters, quick actions, mobile cards, and a desktop table", () => {
+  it("timetable shows academy lessons only, with Today/Week view, filters, cards, and a table", () => {
     for (const token of [
       "TimetableRange",
       "today",
       "week",
       "Subject filter",
       "Teacher filter",
-      "Event type",
       "Schedule Academy Lesson",
       "Open Teacher Academy",
-      "groupTimetableItems",
-      "<MobileCardList",
+      "TimetableEventCard",
+      "sortTimetableItems",
       "<ResponsiveTable",
+      "adminAcademyLessonEvents",
     ]) {
       assert.match(src, new RegExp(token));
     }
+    // Gradebook sessions and recurring schedule rules no longer feed this view.
+    assert.doesNotMatch(src, /adminAcademicSessions/);
+    assert.doesNotMatch(src, /adminAcademicSchedules/);
   });
 
-  it("announcements render cards with KPI, audience, status, priority, and a disabled creation state", () => {
+  it("announcements render cards with KPI, audience, status, and priority", () => {
     for (const token of [
       "AnnouncementsContent",
       "Priority:",
       "Audience:",
       "Status:",
       "Pinned",
-      "Coming soon",
       "No announcements yet",
     ]) {
       assert.match(src, new RegExp(token));

@@ -10,7 +10,6 @@ from backend.roles.academic_director.staff_registration import (
     list_active_subjects,
     list_head_of_department_accounts,
 )
-from backend.roles.admin.services.academic_service import list_admin_academic_context
 from backend.domains.teacher_academy.service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
@@ -21,17 +20,13 @@ from backend.utils.session import current_auth_login, current_auth_role
 
 
 def _safe_academic_context():
+    # The Academic Department timetable shows scheduled Teacher Academy
+    # lessons only — regular gradebook sessions live in the admin panel.
     try:
-        context = list_admin_academic_context()
         academy_lessons = list_academy_timetable_events()
     except Exception as exc:
-        return {"schedules": [], "sessions": [], "academy_lessons": [], "warning": f"Academic timetable could not be loaded: {exc}"}
-    return {
-        "schedules": context.get("schedules", []),
-        "sessions": context.get("sessions", []),
-        "academy_lessons": academy_lessons,
-        "warning": "",
-    }
+        return {"academy_lessons": [], "warning": f"Academic timetable could not be loaded: {exc}"}
+    return {"academy_lessons": academy_lessons, "warning": ""}
 
 
 def _safe_announcement_context():
@@ -79,8 +74,6 @@ def register_academic_director_page_routes(app):
                 "authRole": current_auth_role(),
                 "role": "academic_director",
                 "workspace": "timetable",
-                "adminAcademicSchedules": academic_context.get("schedules", []),
-                "adminAcademicSessions": academic_context.get("sessions", []),
                 "adminAcademyLessonEvents": academic_context.get("academy_lessons", []),
                 "warning": academic_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
@@ -95,8 +88,6 @@ def register_academic_director_page_routes(app):
             timer,
             response=response,
             rows={
-                "schedules": academic_context.get("schedules", []),
-                "sessions": academic_context.get("sessions", []),
                 "academy_lessons": academic_context.get("academy_lessons", []),
             },
         )

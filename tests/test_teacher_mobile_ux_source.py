@@ -56,14 +56,6 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     assert 'const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";' in source
     assert "canScheduleAcademyLesson" in source
     assert "canAssessAcademyLesson" in source
-    assert "Academy status distribution" in source
-    assert "Average score by subject" in source
-    assert "Completion rate by subject" in source
-    assert "Recent assessment trend" in source
-    assert "subjectProgressFillClass" in source
-    assert "from-blue-900 via-blue-700 to-indigo-500" in source
-    assert "from-emerald-600 via-teal-500 to-cyan-500" in source
-    assert "lg:grid-cols-4" in source
     assert "2xl:max-h-[48rem]" in source
 
 
@@ -147,10 +139,18 @@ def test_head_of_departments_has_mobile_cards_desktop_table_and_compact_login():
 def test_teacher_academy_modals_select_assignment_ids():
     source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
 
-    # The schedule modal keeps its lesson assignment selector.
+    # The schedule modal keeps its lesson assignment selector and only picks
+    # the lesson plus a date and time; other assignment fields pass through.
     assert 'name="assignment_id"' in source
-    assert "onSubmit(asNumber(selectedAssignment?.id), fields)" in source
+    assert "onSubmit(asNumber(selectedAssignment.id), {" in source
     assert "Select lesson assignment" in source
+    assert 'type="date"' in source
+    assert 'type="time"' in source
+    assert "session_datetime: sessionDate && sessionTime" in source
+    assert 'name="evaluator_id"' not in source
+    assert 'name="assignment_type"' not in source
+    assert 'name="deadline_date"' not in source
+    assert 'name="notes_to_trainee"' not in source
     # The assessment modal assesses the lesson row it was opened from and ends
     # with an explicit Pass/Fail decision behind a confirmation dialog.
     assert "fields.lesson_assignment_id = String(asNumber(assignment.id));" in source

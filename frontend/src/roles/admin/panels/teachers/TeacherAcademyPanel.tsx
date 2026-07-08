@@ -29,15 +29,6 @@ type TeacherAcademyActionRoutes = {
   delete?: (academyTeacherId: number | string) => string;
 };
 
-const focusAreas = [
-  "Teacher Guidance",
-  "Timing",
-  "Resource Familiarity",
-  "English Fluency",
-  "Confidence",
-  "Student Engagement",
-];
-
 const rubric = [
   { code: "TGC", key: "teacher_guidance_compliance_score", remarksKey: "teacher_guidance_compliance_remarks", label: "Teacher Guidance Compliance", weight: 0.25 },
   { code: "TA", key: "timing_adherence_score", remarksKey: "timing_adherence_remarks", label: "Timing Adherence", weight: 0.2 },
@@ -767,7 +758,6 @@ function NewAcademyTeacherModal({
 }
 
 function AssignmentModal({
-  state,
   teacher,
   assignment,
   submitting,
@@ -775,7 +765,6 @@ function AssignmentModal({
   onSubmit,
   onClose,
 }: {
-  state: any;
   teacher: AcademyTeacher;
   assignment: AcademyAssignment;
   submitting: boolean;
@@ -783,41 +772,41 @@ function AssignmentModal({
   onSubmit: (assignmentId: number, fields: Record<string, string>) => void;
   onClose: () => void;
 }) {
-  const teachers = Array.isArray(state.teachers) ? state.teachers as Array<Record<string, unknown>> : [];
   const assignments = academyAssignments(teacher);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(asNumber(assignment.id) || asNumber(assignments[0]?.id));
   const selectedAssignment = assignmentById(assignments, selectedAssignmentId);
-  const [selectedFocus, setSelectedFocus] = useState<string[]>(
-    Array.isArray(selectedAssignment?.focus_areas) ? selectedAssignment.focus_areas.map(asString).filter(Boolean) : [],
-  );
-  const controlClass = "w-full rounded-lg border-2 border-foreground/10 bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary/50";
+  const initialDateTime = toDateTimeLocal(selectedAssignment?.session_datetime);
+  const [sessionDate, setSessionDate] = useState(initialDateTime.slice(0, 10));
+  const [sessionTime, setSessionTime] = useState(initialDateTime.slice(11, 16));
+  const controlClass = "h-11 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10";
 
   function handleAssignmentChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const nextAssignment = assignmentById(assignments, asNumber(event.target.value));
     setSelectedAssignmentId(asNumber(nextAssignment?.id));
-    setSelectedFocus(
-      Array.isArray(nextAssignment?.focus_areas)
-        ? nextAssignment.focus_areas.map(asString).filter(Boolean)
-        : [],
-    );
-  }
-
-  function toggleFocus(value: string) {
-    setSelectedFocus((current) =>
-      current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
-    );
+    const nextDateTime = toDateTimeLocal(nextAssignment?.session_datetime);
+    setSessionDate(nextDateTime.slice(0, 10));
+    setSessionTime(nextDateTime.slice(11, 16));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const fields: Record<string, string> = {};
-    data.forEach((value, key) => {
-      fields[key] = String(value);
+    if (!selectedAssignment) return;
+    // Only the lesson and its date/time are chosen here; the remaining
+    // assignment fields are passed through unchanged so the update endpoint
+    // does not clear them.
+    const focus = Array.isArray(selectedAssignment.focus_areas)
+      ? selectedAssignment.focus_areas.map(asString).filter(Boolean)
+      : [];
+    onSubmit(asNumber(selectedAssignment.id), {
+      assignment_id: String(asNumber(selectedAssignment.id)),
+      session_datetime: sessionDate && sessionTime ? `${sessionDate}T${sessionTime}` : "",
+      assignment_type: asString(selectedAssignment.assignment_type) || "full_practice_lesson",
+      deadline_date: asString(selectedAssignment.deadline_date),
+      evaluator_id: String(asNumber(selectedAssignment.evaluator_id) || ""),
+      focus_areas: focus.join(","),
+      notes_to_trainee: asString(selectedAssignment.notes_to_trainee),
+      assignment_status: asString(selectedAssignment.status) || "assigned",
     });
-    fields.focus_areas = selectedFocus.join(",");
-    fields.assignment_id = String(asNumber(selectedAssignment?.id));
-    onSubmit(asNumber(selectedAssignment?.id), fields);
   }
 
   return (
@@ -831,106 +820,66 @@ function AssignmentModal({
         <ModalBody className="space-y-4">
           <section className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher / Lesson Summary</p>
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
               <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Selected Lesson</p>
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
               <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">
                 {selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"}
               </p>
               <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">
-                {dateLabel(selectedAssignment?.session_datetime)} · {asString(selectedAssignment?.evaluator_name) || "No evaluator"}
+                {asString(selectedAssignment?.session_datetime) ? `Currently ${dateLabel(selectedAssignment?.session_datetime)}` : "Not scheduled yet"}
               </p>
             </div>
           </section>
 
-          <section className="space-y-3">
-            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Schedule details</p>
-            <label className="block">
-              <FieldLabel>Lesson Assignment</FieldLabel>
-              <select
-                name="assignment_id"
-                required
-                value={selectedAssignmentId || ""}
-                onChange={handleAssignmentChange}
-                className={`${controlClass} font-semibold`}
-              >
-                <option value="" disabled>Select lesson assignment</option>
-                {assignments.map((item) => (
-                  <option key={asNumber(item.id)} value={asNumber(item.id)}>
-                    {assignmentTitle(item)}
-                  </option>
-                ))}
-              </select>
-              {!assignments.length ? (
-                <span className="mt-2 block rounded-lg border border-dashed border-foreground/15 px-3 py-3 text-sm font-semibold text-muted-foreground">
-                  No academy lessons assigned.
-                </span>
-              ) : null}
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <FieldLabel>Date/Time</FieldLabel>
-                <input key={`session-${selectedAssignmentId}`} name="session_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className={controlClass} />
-              </label>
-              <label className="block">
-                <FieldLabel>Evaluator</FieldLabel>
-                <select key={`evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className={controlClass}>
-                  <option value="">Not assigned</option>
-                  {teachers.map((teacher) => (
-                    <option key={asNumber(teacher.id)} value={asNumber(teacher.id)}>
-                      {asString(teacher.full_name)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <FieldLabel>Lesson Type</FieldLabel>
-                <select key={`type-${selectedAssignmentId}`} name="assignment_type" defaultValue={asString(selectedAssignment?.assignment_type) || "full_practice_lesson"} className={controlClass}>
-                  <option value="full_practice_lesson">Practice Lesson</option>
-                  <option value="demo_lesson">Demo Lesson</option>
-                  <option value="observation">Observation</option>
-                  <option value="final_evaluation">Final Evaluation</option>
-                </select>
-              </label>
-              <label className="block">
-                <FieldLabel>Status</FieldLabel>
-                <select key={`status-${selectedAssignmentId}`} name="assignment_status" defaultValue={asString(selectedAssignment?.status) || "assigned"} className={controlClass}>
-                  <option value="assigned">Assigned</option>
-                  <option value="ready">Ready</option>
-                  <option value="assessed">Assessed</option>
-                  <option value="passed">Passed</option>
-                  <option value="needs_improvement">Needs improvement</option>
-                </select>
-              </label>
-              <label className="block sm:col-span-2">
-                <FieldLabel>Deadline</FieldLabel>
-                <input key={`deadline-${selectedAssignmentId}`} name="deadline_date" type="date" defaultValue={asString(selectedAssignment?.deadline_date)} className={controlClass} />
-              </label>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Focus areas</p>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {focusAreas.map((area) => (
-                <label key={area} className="flex items-center gap-2 rounded-lg border border-foreground/8 bg-background px-2.5 py-2 text-xs font-semibold">
-                  <input type="checkbox" checked={selectedFocus.includes(area)} onChange={() => toggleFocus(area)} />
-                  {area}
-                </label>
+          <label className="block">
+            <FieldLabel>Lesson</FieldLabel>
+            <select
+              name="assignment_id"
+              required
+              value={selectedAssignmentId || ""}
+              onChange={handleAssignmentChange}
+              className={controlClass}
+            >
+              <option value="" disabled>Select lesson assignment</option>
+              {assignments.map((item) => (
+                <option key={asNumber(item.id)} value={asNumber(item.id)}>
+                  {assignmentTitle(item)}
+                </option>
               ))}
-            </div>
-          </section>
+            </select>
+            {!assignments.length ? (
+              <span className="mt-2 block rounded-lg border border-dashed border-foreground/15 px-3 py-3 text-sm font-semibold text-muted-foreground">
+                No academy lessons assigned.
+              </span>
+            ) : null}
+          </label>
 
-          <section className="space-y-3">
-            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">Notes</p>
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
-              <FieldLabel>Notes to Trainee</FieldLabel>
-              <textarea key={`notes-${selectedAssignmentId}`} name="notes_to_trainee" rows={3} defaultValue={asString(selectedAssignment?.notes_to_trainee)} className={`${controlClass} resize-none`} />
+              <FieldLabel>Date</FieldLabel>
+              <input
+                type="date"
+                required
+                value={sessionDate}
+                onChange={(event) => setSessionDate(event.target.value)}
+                className={controlClass}
+              />
             </label>
-          </section>
+            <label className="block">
+              <FieldLabel>Time</FieldLabel>
+              <input
+                type="time"
+                required
+                value={sessionTime}
+                onChange={(event) => setSessionTime(event.target.value)}
+                className={controlClass}
+              />
+            </label>
+          </div>
 
           {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
         </ModalBody>
@@ -2063,7 +2012,6 @@ export function TeacherAcademyPanel({
       ) : null}
       {scheduleTarget ? (
         <AssignmentModal
-          state={state}
           teacher={scheduleTarget.teacher}
           assignment={scheduleTarget.assignment}
           submitting={submitting}

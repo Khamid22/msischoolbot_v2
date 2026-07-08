@@ -23,13 +23,10 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type WorkspaceKind = "timetable" | "announcements";
 type Row = Record<string, unknown>;
-type EventKind = "session" | "schedule" | "academy";
 type TimetableRange = "today" | "week";
 
 type TimetableItem = {
   row: Row;
-  kind: EventKind;
-  kindLabel: string;
   index: number;
 };
 
@@ -39,8 +36,6 @@ interface AcademicDepartmentWorkspaceProps {
   role?: string;
   csrfToken?: string;
   workspace?: WorkspaceKind;
-  adminAcademicSchedules?: Row[];
-  adminAcademicSessions?: Row[];
   adminAcademyLessonEvents?: Row[];
   adminAnnouncements?: Row[];
   warning?: string;
@@ -131,19 +126,19 @@ function displayDateFromKey(key: string, fallback = "Date not set") {
 }
 
 function timetableDateKey(item: TimetableItem) {
-  return parseDateKey(item.row.session_date) || parseDateKey(item.row.start_date) || parseDateKey(item.row.session_datetime);
+  return parseDateKey(item.row.session_date) || parseDateKey(item.row.session_datetime);
 }
 
 function timetableTitle(item: TimetableItem) {
   return (
     asText(item.row.title) ||
     [asText(item.row.group_name), asText(item.row.subject_name)].filter(Boolean).join(" · ") ||
-    (item.kind === "session" ? "Scheduled lesson" : "Timetable rule")
+    "Academy lesson"
   );
 }
 
 function timetableStatus(item: TimetableItem) {
-  return asText(item.row.status) || (item.kind === "schedule" ? "active" : "scheduled");
+  return asText(item.row.status) || "scheduled";
 }
 
 function timetableTime(row: Row) {
@@ -179,7 +174,7 @@ function TimetableEventCard({ item, className = "" }: { item: TimetableItem; cla
     <article className={`rounded-lg border border-border bg-surface p-3 shadow-sm ${className}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-primary">{item.kindLabel}</p>
+          <p className="text-[11px] font-black uppercase tracking-wide text-primary">Academy lesson</p>
           <h2 className="mt-1 line-clamp-2 text-sm font-black text-foreground">{timetableTitle(item)}</h2>
           <p className="mt-1 truncate text-[11px] font-bold text-muted-foreground">
             {asText(row.teacher_name) || "Teacher not assigned"}
@@ -192,10 +187,7 @@ function TimetableEventCard({ item, className = "" }: { item: TimetableItem; cla
       <dl className="mt-3 grid gap-1.5 text-xs text-muted-foreground">
         <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
           <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" />
-          <span className="truncate font-bold text-foreground">
-            {displayDateFromKey(dateKey)}
-            {item.kind === "schedule" && asText(row.end_date) ? ` - ${asText(row.end_date)}` : ""}
-          </span>
+          <span className="truncate font-bold text-foreground">{displayDateFromKey(dateKey)}</span>
         </div>
         <div className="flex items-center gap-2 rounded-md bg-muted px-2 py-1.5">
           <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -242,43 +234,35 @@ function FilterSelect({
 }
 
 function TimetableContent({
-  schedules,
-  sessions,
   academyLessons,
   isHod,
 }: {
-  schedules: Row[];
-  sessions: Row[];
   academyLessons: Row[];
   isHod: boolean;
 }) {
   const [range, setRange] = useState<TimetableRange>("week");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [teacherFilter, setTeacherFilter] = useState("all");
-  const [eventTypeFilter, setEventTypeFilter] = useState<"all" | EventKind>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const items = useMemo<TimetableItem[]>(
-    () => [
-      ...sessions.map((row, index) => ({ row, kind: "session" as const, kindLabel: "Session", index })),
-      ...schedules.map((row, index) => ({ row, kind: "schedule" as const, kindLabel: "Schedule", index })),
-      ...academyLessons.map((row, index) => ({ row, kind: "academy" as const, kindLabel: "Academy lesson", index })),
-    ],
-    [academyLessons, schedules, sessions],
+    () => academyLessons.map((row, index) => ({ row, index })),
+    [academyLessons],
   );
   const sourceRows = items.map((item) => item.row);
   const subjectOptions = uniqueOptions(sourceRows, ["subject_name"]);
   const teacherOptions = uniqueOptions(sourceRows, ["teacher_name"]);
   const todayKey = dateKeyFromDate(new Date());
   const todayCount = items.filter((item) => timetableDateKey(item) === todayKey).length;
+  const upcomingCount = items.filter((item) => timetableDateKey(item) >= todayKey).length;
+  const passedCount = items.filter((item) => asText(item.row.status).toLowerCase() === "passed").length;
   const academyHref = isHod ? routes.headOfDepartmentTeacherAcademy : routes.academicDirectorTeacherAcademy;
-  const activeFilterCount = [subjectFilter !== "all", teacherFilter !== "all", eventTypeFilter !== "all"].filter(Boolean).length;
+  const activeFilterCount = [subjectFilter !== "all", teacherFilter !== "all"].filter(Boolean).length;
 
   const filteredItems = sortTimetableItems(
     items.filter((item) => {
       const row = item.row;
       if (range === "today" && timetableDateKey(item) !== todayKey) return false;
-      if (eventTypeFilter !== "all" && item.kind !== eventTypeFilter) return false;
       if (subjectFilter !== "all" && asText(row.subject_name) !== subjectFilter) return false;
       if (teacherFilter !== "all" && asText(row.teacher_name) !== teacherFilter) return false;
       return true;
@@ -289,7 +273,6 @@ function TimetableContent({
     setRange("week");
     setSubjectFilter("all");
     setTeacherFilter("all");
-    setEventTypeFilter("all");
     setFiltersOpen(false);
   };
 
@@ -297,9 +280,9 @@ function TimetableContent({
     <>
       <div className="grid grid-cols-4 gap-2">
         <MetricCard label="Today" value={todayCount} detail="dated" tone="success" density="compact" />
-        <MetricCard label="Sessions" value={sessions.length} detail="lessons" tone="info" density="compact" />
-        <MetricCard label="Rules" value={schedules.length} detail="recurring" density="compact" />
-        <MetricCard label="Academy" value={academyLessons.length} detail="academy" density="compact" />
+        <MetricCard label="Upcoming" value={upcomingCount} detail="scheduled" tone="info" density="compact" />
+        <MetricCard label="Passed" value={passedCount} detail="assessed" density="compact" />
+        <MetricCard label="Academy" value={academyLessons.length} detail="lessons" density="compact" />
       </div>
 
       <section className="relative rounded-lg border border-border bg-surface p-3 shadow-card">
@@ -354,12 +337,6 @@ function TimetableContent({
                   {teacherOptions.map((teacher) => <option key={teacher} value={teacher}>{teacher}</option>)}
                 </FilterSelect>
               ) : null}
-              <FilterSelect label="Event type" value={eventTypeFilter} onChange={(value) => setEventTypeFilter(value as typeof eventTypeFilter)}>
-                <option value="all">All events</option>
-                <option value="session">Sessions</option>
-                <option value="schedule">Schedules</option>
-                <option value="academy">Academy lessons</option>
-              </FilterSelect>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -393,7 +370,7 @@ function TimetableContent({
             <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
               {filteredItems.map((item) => (
                 <TimetableEventCard
-                  key={`${item.kind}-${asText(item.row.id) || item.index}`}
+                  key={asText(item.row.id) || item.index}
                   item={item}
                   className="min-w-[82%] snap-start"
                 />
@@ -407,8 +384,7 @@ function TimetableContent({
                 <tr>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Group / Subject</th>
+                  <th className="px-4 py-3">Lesson / Subject</th>
                   <th className="px-4 py-3">Teacher</th>
                   <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3">Status</th>
@@ -419,18 +395,13 @@ function TimetableContent({
                   const row = item.row;
                   const status = timetableStatus(item);
                   return (
-                    <tr key={`${item.kind}-${asText(row.id) || item.index}`} className="transition-colors duration-150 hover:bg-muted/40 motion-reduce:transition-none">
+                    <tr key={asText(row.id) || item.index} className="transition-colors duration-150 hover:bg-muted/40 motion-reduce:transition-none">
                       <td className="whitespace-nowrap px-4 py-3 font-bold text-foreground">
-                        {displayDateFromKey(timetableDateKey(item), "Recurring")}
+                        {displayDateFromKey(timetableDateKey(item))}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-muted-foreground">{timetableTime(row)}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className="rounded-full border border-border bg-background px-2 py-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                          {item.kindLabel}
-                        </span>
-                      </td>
                       <td className="max-w-[18rem] px-4 py-3">
-                        <p className="truncate font-black text-foreground">{asText(row.group_name) || timetableTitle(item)}</p>
+                        <p className="truncate font-black text-foreground">{timetableTitle(item)}</p>
                         <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asText(row.subject_name) || "Subject not set"}</p>
                       </td>
                       <td className="max-w-[14rem] px-4 py-3">
@@ -457,11 +428,11 @@ function TimetableContent({
       ) : (
         <EmptyState
           icon={<CalendarDays className="h-6 w-6" />}
-          title={items.length ? "No timetable events match these filters" : "No timetable events yet"}
+          title={items.length ? "No academy lessons match these filters" : "No academy lessons scheduled yet"}
           detail={
             items.length
-              ? "Try Week view or clear the subject, teacher, and event type filters."
-              : "Scheduled lessons and recurring timetable rules will appear here when they exist."
+              ? "Try Week view or clear the subject and teacher filters."
+              : "Scheduled Teacher Academy lessons will appear here once you schedule them."
           }
           action={
             items.length ? (
@@ -584,8 +555,6 @@ export default function AcademicDepartmentWorkspace({
   role = "",
   csrfToken = "",
   workspace = "timetable",
-  adminAcademicSchedules = [],
-  adminAcademicSessions = [],
   adminAcademyLessonEvents = [],
   adminAnnouncements = [],
   warning = "",
@@ -601,10 +570,8 @@ export default function AcademicDepartmentWorkspace({
       ? "Subject-scoped academic updates and staff announcements."
       : "Academic announcements from the existing announcement service."
     : isHod
-      ? "Subject-scoped scheduled sessions and timetable rules."
-      : "Scheduled sessions and recurring timetable rules across Academic Department.";
-  const schedules = rowsFrom(adminAcademicSchedules);
-  const sessions = rowsFrom(adminAcademicSessions);
+      ? "Scheduled Teacher Academy lessons within your subject scope."
+      : "Scheduled Teacher Academy lessons across Academic Department.";
   const academyLessons = rowsFrom(adminAcademyLessonEvents);
   const announcements = rowsFrom(adminAnnouncements);
   const content = (
@@ -657,7 +624,7 @@ export default function AcademicDepartmentWorkspace({
       {isAnnouncements ? (
         <AnnouncementsContent announcements={announcements} />
       ) : (
-        <TimetableContent schedules={schedules} sessions={sessions} academyLessons={academyLessons} isHod={isHod} />
+        <TimetableContent academyLessons={academyLessons} isHod={isHod} />
       )}
     </>
   );

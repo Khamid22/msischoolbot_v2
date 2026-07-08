@@ -140,66 +140,6 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
     monkeypatch.setattr(
         academic_director_routes,
-        "list_admin_academic_context",
-        lambda: {
-            "schedules": [
-                {
-                    "id": 10,
-                    "subject_id": 5,
-                    "subject_name": "Mathematics",
-                    "group_name": "Math 10A",
-                    "teacher_name": "Ada Teacher",
-                    "title": "Math morning rule",
-                    "start_time": "09:00",
-                    "end_time": "10:00",
-                    "weekdays": "Mon, Wed",
-                    "room": "A1",
-                    "status": "active",
-                },
-                {
-                    "id": 11,
-                    "subject_id": 7,
-                    "subject_name": "English",
-                    "group_name": "English 9B",
-                    "teacher_name": "Grace Teacher",
-                    "title": "English rule",
-                    "start_time": "11:00",
-                    "end_time": "12:00",
-                    "weekdays": "Tue",
-                    "room": "B2",
-                    "status": "active",
-                },
-            ],
-            "sessions": [
-                {
-                    "id": 20,
-                    "subject_id": 5,
-                    "subject_name": "Mathematics",
-                    "group_name": "Math 10A",
-                    "teacher_name": "Ada Teacher",
-                    "session_date": "06/07/2026",
-                    "start_time": "09:00",
-                    "end_time": "10:00",
-                    "room": "A1",
-                    "status": "scheduled",
-                },
-                {
-                    "id": 21,
-                    "subject_id": 7,
-                    "subject_name": "English",
-                    "group_name": "English 9B",
-                    "teacher_name": "Grace Teacher",
-                    "session_date": "06/07/2026",
-                    "start_time": "11:00",
-                    "end_time": "12:00",
-                    "room": "B2",
-                    "status": "scheduled",
-                },
-            ],
-        },
-    )
-    monkeypatch.setattr(
-        academic_director_routes,
         "list_academy_timetable_events",
         lambda subject_ids=None: [
             {
@@ -255,7 +195,6 @@ def _patch_admin_page_context(monkeypatch):
     )
     monkeypatch.setattr(head_of_department_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
     monkeypatch.setattr(head_of_department_routes, "current_hod_subject_ids", lambda: {5})
-    monkeypatch.setattr(head_of_department_routes, "list_admin_academic_context", academic_director_routes.list_admin_academic_context)
     monkeypatch.setattr(head_of_department_routes, "list_academy_timetable_events", academic_director_routes.list_academy_timetable_events)
     monkeypatch.setattr(head_of_department_routes, "list_announcements", academic_director_routes.list_announcements)
     monkeypatch.setattr(
@@ -351,19 +290,23 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
     assert ad_timetable.status_code == 200
     assert 'data-react-page="academic-director-timetable"' in ad_timetable.text
-    assert "Math 10A" in ad_timetable.text
-    assert "English 9B" in ad_timetable.text
+    # The Academic Department timetable shows academy lessons only — no
+    # gradebook sessions or recurring schedule rules.
+    assert "Math 10A" not in ad_timetable.text
+    assert "English 9B" not in ad_timetable.text
     assert "Lesson 3 - HCF and LCM" in ad_timetable.text
     assert "Academy Math Teacher" in ad_timetable.text
     assert "Lesson 4 - Essay planning" in ad_timetable.text
     assert "Academy English Teacher" in ad_timetable.text
+    assert "adminAcademicSessions" not in ad_timetable.text
+    assert "adminAcademicSchedules" not in ad_timetable.text
     assert "AdminSidebar" not in ad_timetable.text
     assert "Student mode" not in ad_timetable.text
     assert ad_announcements.status_code == 200
     assert 'data-react-page="academic-director-announcements"' in ad_announcements.text
     assert "Term Update" in ad_announcements.text
-    assert "Coming soon" in workspace_source
-    assert "disabled" in workspace_source
+    assert "adminAcademicSessions" not in workspace_source
+    assert "adminAcademicSchedules" not in workspace_source
     assert 'data-react-page="admin-home"' not in ad_announcements.text
     assert ad_profile.status_code == 200
     assert 'data-react-page="academic-director-home"' in ad_profile.text
@@ -377,7 +320,9 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
     assert hod_timetable.status_code == 200
     assert 'data-react-page="head-of-department-timetable"' in hod_timetable.text
-    assert "Math 10A" in hod_timetable.text
+    # Subject scope keeps only the Mathematics academy lesson; gradebook
+    # sessions are no longer part of the timetable.
+    assert "Math 10A" not in hod_timetable.text
     assert "English 9B" not in hod_timetable.text
     assert "Lesson 3 - HCF and LCM" in hod_timetable.text
     assert "Academy Math Teacher" in hod_timetable.text
@@ -389,7 +334,6 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
     assert hod_announcements.status_code == 200
     assert 'data-react-page="head-of-department-announcements"' in hod_announcements.text
     assert "Term Update" in hod_announcements.text
-    assert "Coming soon" in workspace_source
     assert hod_profile.status_code == 200
     assert 'data-react-page="head-of-department-home"' in hod_profile.text
     assert "Head of Department Profile" in hod_profile.text
