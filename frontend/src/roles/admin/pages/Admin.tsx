@@ -317,6 +317,11 @@ function overviewStatCards(state: any): OverviewStatCard[] {
   const studentsBySubject = rowsFrom(quickStats.subject_counts)
     .map((row) => ({ label: asString(row.subject_name || row.label), value: asNumber(row.count || row.value) }))
     .filter((line) => line.label);
+  const groupsBySubject = rowsFrom(quickStats.group_counts)
+    .map((row) => ({ label: asString(row.subject_name || row.label), value: asNumber(row.count || row.value) }))
+    .filter((line) => line.label);
+  const fallbackGroupsBySubject = sumStatLines(subjectInfo, "subject_name", "groups_count");
+  const groupBreakdown = groupsBySubject.length ? groupsBySubject : fallbackGroupsBySubject;
 
   return [
     {
@@ -338,10 +343,10 @@ function overviewStatCards(state: any): OverviewStatCard[] {
       breakdown: studentsBySchool,
     },
     {
-      label: "Subjects",
-      value: asNumber(quickStats.total_subjects),
+      label: "Groups",
+      value: asNumber(quickStats.total_groups) || groupBreakdown.reduce((sum, row) => sum + row.value, 0),
       detail: "groups per subject",
-      breakdown: sumStatLines(subjectInfo, "subject_name", "groups_count"),
+      breakdown: groupBreakdown,
     },
   ];
 }

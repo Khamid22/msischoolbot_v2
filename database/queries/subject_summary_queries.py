@@ -154,9 +154,26 @@ def list_subject_student_count_rows(conn):
     ).fetchall()
 
 
+def list_subject_group_count_rows(conn):
+    return conn.execute(
+        """
+        SELECT subj.subject_name,
+               COUNT(DISTINCT g.id)::integer AS count
+        FROM msi_v2.groups g
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE lower(g.group_name) <> 'online'
+          AND lower(COALESCE(g.status, 'active')) = 'active'
+        GROUP BY subj.id, subj.subject_name
+        ORDER BY count DESC, lower(subj.subject_name) ASC
+        """
+    ).fetchall()
+
+
 __all__ = [
     "replace_subject_summary_rows",
     "list_subject_summary_rows_by_full_name_norm",
     "list_subject_summary_rows",
     "list_subject_student_count_rows",
+    "list_subject_group_count_rows",
 ]

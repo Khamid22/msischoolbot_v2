@@ -71,6 +71,19 @@ def list_subject_student_counts():
     ]
 
 
+def list_subject_group_counts():
+    with _connect() as conn:
+        rows = queries.list_subject_group_count_rows(conn)
+    return [
+        {
+            "subject_name": str(row["subject_name"] or "").strip(),
+            "count": int(row["count"] or 0),
+        }
+        for row in rows
+        if str(row["subject_name"] or "").strip()
+    ]
+
+
 def get_subject_summaries_for_student(full_name, load_dataset=None):
     _ = load_dataset
     return list_subject_summaries_by_full_name(full_name), ""
@@ -78,6 +91,7 @@ def get_subject_summaries_for_student(full_name, load_dataset=None):
 
 __all__ = [
     "get_subject_summaries_for_student",
+    "list_subject_group_counts",
     "list_subject_summaries_by_full_name",
     "list_subject_summaries",
     "list_subject_student_counts",

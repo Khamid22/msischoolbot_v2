@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from backend.roles.admin.services.insights_service import build_admin_subject_counts, build_admin_subject_info
+from backend.roles.admin.services.insights_service import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
 
 
 def test_audit_settings_placeholder_card_is_not_rendered():
@@ -51,6 +51,49 @@ def test_subject_hover_counts_distinct_database_students_per_subject():
     assert build_admin_subject_counts(metrics) == [
         {"subject_name": "IGCSE Mathematics A", "count": 1},
         {"subject_name": "English as a Second Language", "count": 1},
+    ]
+
+
+def test_overview_total_students_matches_subject_count_sum():
+    quick_stats = build_admin_quick_stats(
+        [{"school_name": "School 5", "total_students": 96}, {"school_name": "Sehriyo", "total_students": 45}],
+        [],
+        3,
+        [
+            {"subject_name": "IGCSE Mathematics A", "count": 139},
+            {"subject_name": "IGCSE Chemistry", "count": 32},
+            {"subject_name": "English as a Second Language", "count": 10},
+        ],
+    )
+
+    assert quick_stats["total_students"] == 181
+    assert sum(row["count"] for row in quick_stats["subject_counts"]) == 181
+
+
+def test_overview_total_groups_matches_group_count_sum():
+    group_counts = [
+        {"subject_name": "IGCSE Mathematics A", "count": 13},
+        {"subject_name": "IGCSE Chemistry", "count": 4},
+        {"subject_name": "English as a Second Language", "count": 2},
+    ]
+    quick_stats = build_admin_quick_stats([], [], 3, [], group_counts)
+
+    assert quick_stats["total_subjects"] == 3
+    assert quick_stats["total_groups"] == 19
+    assert quick_stats["group_counts"] == group_counts
+
+
+def test_group_hover_counts_distinct_database_groups_per_subject():
+    metrics = [
+        {"subject": "IGCSE Mathematics A", "group": "7A"},
+        {"subject": "IGCSE Mathematics A", "group": "7A"},
+        {"subject": "IGCSE Mathematics A", "group": "7B"},
+        {"subject": "IGCSE Chemistry", "group": "9A"},
+    ]
+
+    assert build_admin_group_counts(metrics) == [
+        {"subject_name": "IGCSE Mathematics A", "count": 2},
+        {"subject_name": "IGCSE Chemistry", "count": 1},
     ]
 
 

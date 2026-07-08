@@ -12,12 +12,14 @@ from backend.domains.complaints.service import list_complaints
 from database.academics.canonical import normalize_text
 from backend.domains.parents.service import list_parent_accounts, list_parent_children
 from database.academics.performance_summary import (
+    list_subject_group_counts,
     list_subject_student_counts,
     list_subject_summaries,
 )
 from backend.domains.academics.internal_dashboard_service import build_internal_overview_dataset
 
 from .insights_service import (
+    build_admin_group_counts,
     build_admin_group_zones,
     build_admin_quick_stats,
     build_admin_school_info,
@@ -429,6 +431,10 @@ def build_admin_page_context(
             admin_subject_counts = list_subject_student_counts()
         except Exception:
             admin_subject_counts = build_admin_subject_counts(overview_metrics)
+        try:
+            admin_group_counts = list_subject_group_counts()
+        except Exception:
+            admin_group_counts = build_admin_group_counts(overview_metrics)
         admin_subject_info = build_admin_subject_info(
             overview_metrics,
             dataset=overview_dataset,
@@ -447,6 +453,7 @@ def build_admin_page_context(
             admin_teachers,
             total_subjects,
             admin_subject_counts,
+            admin_group_counts,
         )
     if panel in {"overview", "resources"}:
         admin_resources = list_resources(include_inactive=False)
