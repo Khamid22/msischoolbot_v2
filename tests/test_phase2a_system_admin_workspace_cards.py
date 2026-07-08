@@ -95,6 +95,11 @@ def _minimal_page_context():
                 {"school_name": "School 5", "count": 96},
                 {"school_name": "Sehriyo", "count": 45},
             ],
+            "subject_counts": [
+                {"subject_name": "IGCSE Mathematics A", "count": 96},
+                {"subject_name": "English as a Second Language", "count": 43},
+                {"subject_name": "IGCSE Chemistry", "count": 2},
+            ],
         },
         "admin_school_info": [],
         "admin_subject_info": [],
@@ -161,6 +166,7 @@ def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeyp
     assert '"total_schools":2' in response.text
     assert '"total_teachers":3' in response.text
     assert '"total_subjects":3' in response.text
+    assert '"subject_counts"' in response.text
     assert "School 5" in response.text
 
 

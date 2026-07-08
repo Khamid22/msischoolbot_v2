@@ -314,13 +314,16 @@ function overviewStatCards(state: any): OverviewStatCard[] {
   const studentsBySchool = rowsFrom(quickStats.school_counts)
     .map((row) => ({ label: asString(row.school_name), value: asNumber(row.count) }))
     .filter((line) => line.label);
+  const studentsBySubject = rowsFrom(quickStats.subject_counts)
+    .map((row) => ({ label: asString(row.subject_name || row.label), value: asNumber(row.count || row.value) }))
+    .filter((line) => line.label);
 
   return [
     {
       label: "Students",
       value: asNumber(quickStats.total_students),
       detail: "enrolled students",
-      breakdown: sumStatLines(subjectInfo, "subject_name", "students_count"),
+      breakdown: studentsBySubject.length ? studentsBySubject : sumStatLines(subjectInfo, "subject_name", "students_count"),
     },
     {
       label: "Teachers",
@@ -363,7 +366,7 @@ function OverviewStatCards({ state }: { state: any }) {
           <p className="mt-2 text-xl font-black leading-none text-foreground">{card.value.toLocaleString()}</p>
           <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
           {card.breakdown.length ? (
-            <div className="pointer-events-none absolute left-2 right-2 top-[calc(100%-0.25rem)] z-40 hidden rounded-lg border border-foreground/10 bg-surface p-2.5 shadow-card-hover group-hover:block">
+            <div className="pointer-events-none absolute left-2 right-2 top-[calc(100%-0.25rem)] z-40 rounded-lg border border-foreground/10 bg-surface/85 p-2.5 opacity-0 shadow-card-hover backdrop-blur-md transition-opacity duration-200 ease-out group-hover:opacity-100">
               {card.breakdown.map((line) => (
                 <div key={line.label} className="flex items-center justify-between gap-3 py-0.5 text-xs">
                   <span className="min-w-0 truncate text-muted-foreground">{line.label}</span>

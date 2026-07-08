@@ -11,6 +11,8 @@ def _connect():
 def _format_summary_row(row):
     return {
         "enrollment_id": int(row["enrollment_id"]),
+        "student_row_id": int(row["student_row_id"] or 0),
+        "public_dashboard_id": int(row["public_dashboard_id"] or 0),
         "full_name": str(row["full_name"]),
         "school_key": str(row["school_key"] or "").strip(),
         "school_name": str(row["school_name"] or "").strip(),
@@ -56,6 +58,19 @@ def list_subject_summaries(school_key=""):
     return [_format_summary_row(row) for row in rows]
 
 
+def list_subject_student_counts():
+    with _connect() as conn:
+        rows = queries.list_subject_student_count_rows(conn)
+    return [
+        {
+            "subject_name": str(row["subject_name"] or "").strip(),
+            "count": int(row["count"] or 0),
+        }
+        for row in rows
+        if str(row["subject_name"] or "").strip()
+    ]
+
+
 def get_subject_summaries_for_student(full_name, load_dataset=None):
     _ = load_dataset
     return list_subject_summaries_by_full_name(full_name), ""
@@ -65,4 +80,5 @@ __all__ = [
     "get_subject_summaries_for_student",
     "list_subject_summaries_by_full_name",
     "list_subject_summaries",
+    "list_subject_student_counts",
 ]

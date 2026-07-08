@@ -9,6 +9,8 @@ def _subject_summary_select(where_clause="", params=()):
         WITH base AS (
             SELECT
                 gs.legacy_enrollment_id AS enrollment_id,
+                gs.student_id AS student_row_id,
+                COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
                 st.full_name,
                 COALESCE(sch.school_key, '') AS school_key,
                 COALESCE(sch.school_name, '') AS school_name,
@@ -76,6 +78,8 @@ def _subject_summary_select(where_clause="", params=()):
         )
         SELECT
             enrollment_id,
+            student_row_id,
+            public_dashboard_id,
             full_name,
             school_key,
             school_name,
@@ -133,8 +137,26 @@ def list_subject_summary_rows(conn, school_key=""):
     return conn.execute(sql, params).fetchall()
 
 
+def list_subject_student_count_rows(conn):
+    return conn.execute(
+        """
+        SELECT subj.subject_name,
+               COUNT(DISTINCT gs.student_id)::integer AS count
+        FROM msi_v2.group_students gs
+        JOIN msi_v2.groups g ON g.id = gs.group_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE gs.enrollment_status = 'active'
+          AND lower(g.group_name) <> 'online'
+        GROUP BY subj.id, subj.subject_name
+        ORDER BY count DESC, lower(subj.subject_name) ASC
+        """
+    ).fetchall()
+
+
 __all__ = [
     "replace_subject_summary_rows",
     "list_subject_summary_rows_by_full_name_norm",
     "list_subject_summary_rows",
+    "list_subject_student_count_rows",
 ]

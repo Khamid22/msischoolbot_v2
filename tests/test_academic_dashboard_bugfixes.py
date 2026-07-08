@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from backend.domains.academics.exam_filters import is_exam_performance_row
-from backend.roles.admin.services.insights_service import build_admin_subject_info
+from backend.roles.admin.services.insights_service import build_admin_subject_counts, build_admin_subject_info
 
 
 def test_audit_settings_placeholder_card_is_not_rendered():
@@ -16,7 +16,42 @@ def test_audit_settings_placeholder_card_is_not_rendered():
     # hover breakdowns computed from the quick stats already on the page.
     assert "Total Accounts" not in admin_source
     assert "overviewStatCards" in admin_source
-    assert "group-hover:block" in admin_source
+    assert "group-hover:opacity-100" in admin_source
+    assert "bg-surface/85" in admin_source
+
+
+def test_subject_hover_counts_distinct_database_students_per_subject():
+    metrics = [
+        {
+            "school_key": "school5",
+            "school_name": "School 5",
+            "student_key": "101",
+            "full_name": "Example Learner",
+            "subject": "IGCSE Mathematics A",
+            "group": "7A",
+        },
+        {
+            "school_key": "sehriyo",
+            "school_name": "Sehriyo",
+            "student_key": "101",
+            "full_name": "Example Learner",
+            "subject": "IGCSE Mathematics A",
+            "group": "7B",
+        },
+        {
+            "school_key": "school5",
+            "school_name": "School 5",
+            "student_key": "102",
+            "full_name": "Second Learner",
+            "subject": "English as a Second Language",
+            "group": "8A",
+        },
+    ]
+
+    assert build_admin_subject_counts(metrics) == [
+        {"subject_name": "IGCSE Mathematics A", "count": 1},
+        {"subject_name": "English as a Second Language", "count": 1},
+    ]
 
 
 def test_exam_performance_filter_excludes_normal_lesson_topics():

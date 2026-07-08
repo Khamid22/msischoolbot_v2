@@ -88,6 +88,7 @@ def extract_overview_student_metrics(summary_rows, school_option_catalog):
             {
                 "school_key": school_key,
                 "school_name": school_name,
+                "student_key": str(row.get("student_row_id") or row.get("public_dashboard_id") or row.get("full_name", "")).strip(),
                 "full_name": str(row.get("full_name", "")).strip(),
                 "subject": str(row.get("subject_name", "")).strip(),
                 "group": str(row.get("group_name", "")).strip(),
@@ -750,6 +751,27 @@ def build_admin_subject_info(metrics, dataset = None, school_option_catalog = No
     return rows
 
 
+def build_admin_subject_counts(metrics):
+    subject_buckets = {}
+    for item in metrics:
+        subject_name = str(item.get("subject", "")).strip()
+        if not subject_name:
+            continue
+        student_key = str(item.get("student_key", "")).strip()
+        if not student_key:
+            student_key = normalize_text(item.get("full_name", ""))
+        if not student_key:
+            continue
+        subject_buckets.setdefault(subject_name, set()).add(student_key)
+
+    rows = [
+        {"subject_name": subject_name, "count": len(student_keys)}
+        for subject_name, student_keys in subject_buckets.items()
+    ]
+    rows.sort(key=lambda row: (-int(row.get("count", 0)), subject_priority_key(row.get("subject_name", ""))))
+    return rows
+
+
 def build_admin_student_ratings(metrics):
     student_buckets = {}
     for item in metrics:
@@ -956,7 +978,7 @@ def build_admin_attention(student_ratings, dataset, admin_teachers):
     }
 
 
-def build_admin_quick_stats(admin_school_info, admin_teachers, total_subjects):
+def build_admin_quick_stats(admin_school_info, admin_teachers, total_subjects, subject_counts=None):
     total_students = sum(int(row.get("total_students", 0)) for row in admin_school_info)
     school_counts = [
         {
@@ -971,6 +993,7 @@ def build_admin_quick_stats(admin_school_info, admin_teachers, total_subjects):
         "total_teachers": len(admin_teachers),
         "total_subjects": int(total_subjects),
         "school_counts": school_counts,
+        "subject_counts": list(subject_counts or []),
     }
 
 
@@ -979,6 +1002,7 @@ __all__ = [
     "build_admin_school_info",
     "build_admin_group_highlights",
     "build_admin_group_zones",
+    "build_admin_subject_counts",
     "build_admin_subject_info",
     "is_exam_performance_row",
     "build_admin_student_ratings",
