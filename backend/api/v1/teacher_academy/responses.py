@@ -17,7 +17,7 @@ from backend.api.v1.teacher_academy.schemas import (
     form_list,
 )
 from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
-from backend.domains.teacher_academy.permissions import filter_academy_teachers_for_current_scope
+from backend.domains.teacher_academy.permissions import filter_academy_teachers_for_user
 from backend.domains.teacher_academy.service import (
     add_assessment,
     create_academy_teacher,
@@ -30,6 +30,7 @@ from backend.domains.teacher_academy.service import (
     update_assignment,
 )
 from backend.domains.teachers.service import list_teachers
+from backend.security import CurrentUser
 
 
 def academy_error(message: str, status: int = 400) -> None:
@@ -48,11 +49,19 @@ def safe_credentials(credentials: dict | None) -> dict[str, str]:
     }
 
 
-def academy_payload(message: str, *, credentials: dict | None = None):
+def academy_payload(
+    message: str,
+    *,
+    credentials: dict | None = None,
+    scope_user: CurrentUser | None = None,
+):
     invalidate_admin_page_context_cache()
+    academy_rows = list_academy_teachers()
+    if scope_user is not None:
+        academy_rows = filter_academy_teachers_for_user(academy_rows, scope_user)
     payload: dict[str, Any] = {
         "message": message,
-        "academy": filter_academy_teachers_for_current_scope(list_academy_teachers()),
+        "academy": academy_rows,
         "teachers": list_teachers(),
     }
     if credentials:
@@ -77,6 +86,7 @@ def create_academy_teacher_response(
     *,
     created_by_label: str = "Academic Director",
     created_by_login: str = "",
+    scope_user: CurrentUser | None = None,
 ):
     create_result = create_academy_teacher(
         full_name=payload.academy_full_name,
@@ -104,10 +114,16 @@ def create_academy_teacher_response(
     return academy_payload(
         "Academy teacher created with selected Teacher Academy lessons.",
         credentials=credentials,
+        scope_user=scope_user,
     )
 
 
-def update_assignment_response(assignment_id: int, payload: UpdateAcademyAssignmentForm):
+def update_assignment_response(
+    assignment_id: int,
+    payload: UpdateAcademyAssignmentForm,
+    *,
+    scope_user: CurrentUser | None = None,
+):
     updated, error_message = update_assignment(
         assignment_id=assignment_id,
         assignment_type=payload.assignment_type,
@@ -120,7 +136,7 @@ def update_assignment_response(assignment_id: int, payload: UpdateAcademyAssignm
     )
     if not updated:
         academy_error(error_message or "Unable to update assignment.")
-    return academy_payload("Academy lesson updated.")
+    return academy_payload("Academy lesson updated.", scope_user=scope_user)
 
 
 def sync_lessons_response(
@@ -129,6 +145,7 @@ def sync_lessons_response(
     *,
     created_by_label: str = "Academic Director",
     created_by_login: str = "",
+    scope_user: CurrentUser | None = None,
 ):
     synced, error_message = sync_academy_lessons(
         academy_teacher_id=academy_teacher_id,
@@ -137,7 +154,7 @@ def sync_lessons_response(
     )
     if not synced:
         academy_error(error_message or "Unable to update academy lessons.")
-    return academy_payload("Academy lessons updated.")
+    return academy_payload("Academy lessons updated.", scope_user=scope_user)
 
 
 def add_assessment_response(
@@ -146,6 +163,7 @@ def add_assessment_response(
     *,
     created_by_label: str = "Academic Director",
     created_by_login: str = "",
+    scope_user: CurrentUser | None = None,
 ):
     saved, error_message = add_assessment(
         academy_teacher_id=academy_teacher_id,
@@ -165,37 +183,56 @@ def add_assessment_response(
     )
     if not saved:
         academy_error(error_message or "Unable to save assessment.")
-    return academy_payload("Assessment saved.")
+    return academy_payload("Assessment saved.", scope_user=scope_user)
 
 
-def delete_assessment_response(academy_teacher_id: int, assessment_id: int):
+def delete_assessment_response(
+    academy_teacher_id: int,
+    assessment_id: int,
+    *,
+    scope_user: CurrentUser | None = None,
+):
     deleted, error_message = delete_assessment(
         academy_teacher_id=academy_teacher_id,
         assessment_id=assessment_id,
     )
     if not deleted:
         academy_error(error_message or "Unable to delete assessment report.")
-    return academy_payload("Assessment report deleted.")
+    return academy_payload("Assessment report deleted.", scope_user=scope_user)
 
 
-def update_status_response(academy_teacher_id: int, payload: UpdateAcademyStatusForm):
+def update_status_response(
+    academy_teacher_id: int,
+    payload: UpdateAcademyStatusForm,
+    *,
+    scope_user: CurrentUser | None = None,
+):
     updated, error_message = update_academy_status(
         academy_teacher_id=academy_teacher_id,
         status=payload.academy_status,
     )
     if not updated:
         academy_error(error_message or "Unable to update academy status.")
-    return academy_payload("Academy status updated.")
+    return academy_payload("Academy status updated.", scope_user=scope_user)
 
 
-def delete_academy_teacher_response(academy_teacher_id: int):
+def delete_academy_teacher_response(
+    academy_teacher_id: int,
+    *,
+    scope_user: CurrentUser | None = None,
+):
     deleted, error_message = delete_academy_teacher(academy_teacher_id=academy_teacher_id)
     if not deleted:
         academy_error(error_message or "Unable to delete academy teacher.")
-    return academy_payload("Academy teacher deleted.")
+    return academy_payload("Academy teacher deleted.", scope_user=scope_user)
 
 
-def promote_response(academy_teacher_id: int, payload: PromoteAcademyTeacherForm):
+def promote_response(
+    academy_teacher_id: int,
+    payload: PromoteAcademyTeacherForm,
+    *,
+    scope_user: CurrentUser | None = None,
+):
     promoted, error_message = promote_academy_teacher(
         academy_teacher_id=academy_teacher_id,
         assigned_group=payload.teacher_assigned_group,
@@ -206,34 +243,22 @@ def promote_response(academy_teacher_id: int, payload: PromoteAcademyTeacherForm
     )
     if not promoted:
         academy_error(error_message or "Unable to promote academy teacher.")
-    return academy_payload("Academy teacher promoted to Active Teachers.")
+    return academy_payload("Academy teacher promoted to Active Teachers.", scope_user=scope_user)
 
 
 __all__ = [
     "academy_error",
     "academy_payload",
-    "add_assessment",
     "add_assessment_response",
     "assessment_scores_from_form",
     "assessment_sections_from_form",
-    "create_academy_teacher",
     "create_academy_teacher_response",
-    "delete_academy_teacher",
     "delete_academy_teacher_response",
-    "delete_assessment",
     "delete_assessment_response",
-    "filter_academy_teachers_for_current_scope",
     "form_list",
-    "invalidate_admin_page_context_cache",
-    "list_academy_teachers",
-    "list_teachers",
-    "promote_academy_teacher",
     "promote_response",
     "safe_credentials",
-    "sync_academy_lessons",
     "sync_lessons_response",
-    "update_academy_status",
-    "update_assignment",
     "update_assignment_response",
     "update_status_response",
 ]

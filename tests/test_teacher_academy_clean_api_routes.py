@@ -33,7 +33,7 @@ def _patch_api_payload(monkeypatch):
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
-    monkeypatch.setattr(academy_api, "filter_academy_teachers_for_current_scope", lambda rows: list(rows))
+    monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: list(rows))
     monkeypatch.setattr(academy_api, "list_teachers", lambda: [{"id": 44, "full_name": "Example Teacher"}])
     return academy_api
 
@@ -279,7 +279,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
         return True, ""
 
     monkeypatch.setattr(academy_api, "update_assignment", fake_update_assignment)
-    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: True)
+    monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_assignment", lambda user, assignment_id: True)
     _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80, "staff_id": 40})
 
     response = client.post(
@@ -291,7 +291,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     assert response.status_code == 200
     assert calls["update"] == 1
 
-    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_assignment", lambda assignment_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_assignment", lambda user, assignment_id: False)
     denied = client.post(
         "/api/v1/head-of-department/teacher-academy/assignments/9",
         data={"assignment_id": "9", "assignment_status": "ready"},
@@ -323,7 +323,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
         return True, ""
 
     monkeypatch.setattr(academy_api, service_name, fake_service)
-    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: True)
+    monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_teacher", lambda user, teacher_id: True)
     _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80, "staff_id": 40})
 
     response = client.post(
@@ -335,7 +335,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
     assert response.status_code == 200
     assert expected_key in calls
 
-    monkeypatch.setattr(hod_api_routes, "can_current_user_manage_academy_teacher", lambda teacher_id: False)
+    monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_teacher", lambda user, teacher_id: False)
     denied = client.post(
         path,
         data={"lesson_assignment_id": "8", "academy_status": "ready_for_evaluation"},

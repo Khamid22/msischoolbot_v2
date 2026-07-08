@@ -383,7 +383,7 @@ def test_academic_director_can_create_academy_teacher_through_api_v1(client, mon
     )
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [_academy_workspace()["academy"]])
     monkeypatch.setattr(academy_api, "list_teachers", lambda: [])
-    monkeypatch.setattr(academy_api, "filter_academy_teachers_for_current_scope", lambda rows: list(rows))
+    monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: list(rows))
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
 

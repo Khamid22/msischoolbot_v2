@@ -20,6 +20,7 @@ from backend.roles.admin.services.page_service import (
 from backend.utils.session import (
     current_auth_login,
     current_auth_role,
+    current_staff_id,
 )
 from backend.roles.admin.services.academic_service import list_admin_academic_context
 from backend.domains.parents.service import list_linked_parents_for_student
@@ -114,9 +115,15 @@ def register_admin_page_routes(
         announcements = list_announcements()
         timer.mark("support_context_build")
         if current_auth_role() == "head_of_department":
-            from backend.domains.teacher_academy.permissions import filter_admin_context_for_current_hod
+            from backend.domains.teacher_academy.permissions import filter_admin_context_for_hod_scope
 
-            filter_admin_context_for_current_hod(page_context, academic_context)
+            filter_admin_context_for_hod_scope(
+                page_context,
+                academic_context,
+                role=current_auth_role(),
+                account_id=session.get("account_id"),
+                staff_id=current_staff_id() or 0,
+            )
             timer.mark("hod_scope_filter")
 
         panel = page_context["panel"]

@@ -11,12 +11,13 @@ Status baseline: branch `FastAPI-Run-System`, after the 2026-07-08 Teacher Acade
 
 | Area | State |
 | --- | --- |
-| Runtime routes total | 144 |
+| Runtime routes total | 145 |
 | Runtime `/api/v1/*` routes | 76 |
 | Runtime legacy `/admin/api`, `/teacher/api`, role `/api`, or bare non-v1 `/api/*` routes | 0 |
-| Page/form/static/docs routes | 68 |
-| Pydantic request models | 0 endpoints (`request_payload` manual parsing: 37 call sites) |
-| `response_model` usage | 2 files (`api/v1/auth`, `api/v1/system`) |
+| Page/form routes | 57 |
+| Static/docs/public routes | 12 |
+| Pydantic request models | Partial: AD/HOD Teacher Academy, student, teacher office-hours, and migrated admin slices use schemas; old form routes still use compatibility parsing |
+| `response_model` usage | Broad in migrated `/api/v1` slices; remaining old page/form routes are still untyped |
 | Response envelopes in production | 3 (`{"ok"}`, `{"status","data"}`, bare `{"message"}`) |
 | Role registries / permission maps | 2 of each (`identity/` vs `security/`) |
 | Direct DB connections inside `backend/roles/` | 33 (SQL belongs in `domains/*/queries.py`) |
@@ -30,7 +31,7 @@ What is already correct and must NOT change:
 - `backend/api/schemas.py` + `backend/api/responses.py` — the `ApiSuccess`/`ApiError` envelope (exists, underused).
 - `backend/api/v1/router.py` per-role aggregation under `/api/v1`.
 - `backend/api/v1/teacher_academy/{schemas,responses}.py` owns shared Teacher Academy API schemas/adapters.
-- `backend/domains/teacher_academy/{permissions,notifications}.py` owns HOD scope checks and academy notification helpers.
+- `backend/domains/teacher_academy/{permissions,notifications}.py` owns HOD scope checks and academy notification helpers. Permission functions now accept `CurrentUser` or explicit identity context instead of reading the legacy request/session proxy.
 - `backend/pages/{ceo,hr_manager,customer_support}.py` owns the three page-only role shells; their old role route modules are compatibility re-exports.
 - `AuthAndSecurityMiddleware` security ideas: same-origin/CSRF check, fail-closed secret key, security headers, cache-control policy (to be slimmed, not removed).
 - `backend/core/` (config, database, security), `backend/integrations/`, `render.py` page rendering.
@@ -123,7 +124,7 @@ Each `roles/` route file is deleted when its routes have moved to `api/v1/{role}
 | `backend/domains/identity/routes.py` `register_user_auth_routes` closure | `pages/public.py` (login/telegram/logout pages) + `api/v1/auth/` |
 | `database/queries/` (12 modules) + `database/cross_queries/` (3 modules) | SQL relocated into `domains/*/queries.py` as slices touch it. Verified: `tgbot/` has zero imports of these — web-side only |
 
-Note: `roles/*/services/`, `workspace_cards.py`, and `staff_registration.py` are business logic, not transport — they move under `domains/` (or stay put temporarily) but are NOT deleted until importers and tests are migrated. HOD Teacher Academy scope has already moved.
+Note: `roles/*/services/`, `workspace_cards.py`, and `staff_registration.py` are business logic, not transport — they move under `domains/` (or stay put temporarily) but are NOT deleted until importers and tests are migrated. HOD Teacher Academy scope has already moved and no longer depends on `backend.utils.context`.
 
 ### 3.4 Delete last — the Flask emulation layer (Phase 4 endgame)
 
@@ -195,12 +196,14 @@ Frontend contract: canonical URLs live only in `frontend/src/shared/api/routes.t
 
 | Phase | Work | Risk | Exit criterion |
 | --- | --- | --- | --- |
-| 0 | Retrofit the 10 existing v1 routes (AD/HOD) to §5; update `docs/API_FOUNDATION.md` | Low — one frontend module consumes them | v1 tree contains zero `jsonify`/proxy uses |
-| 1 | §3.1 + §3.2 deletions; registry merge; drop werkzeug | Zero | one `roles.py`, one `permissions.py`; wrappers gone |
-| 2 | `CurrentUser` + `require_role` in `security/dependencies.py`; unify exception-handler envelope; slim middleware | Low | one auth dependency system |
-| 3 | Slice migrations: teacher office-hours → student `/api/*` → parent → admin (last, split by panel); per slice: port, Pydantic, frontend URLs, `npm run build`, delete old routes, regen snapshot | Medium, bounded per PR | `route_snapshot.txt` = pages + `/api/v1/*` only |
-| 4 | Delete Flask layer (§3.4); `pages/` fully owns HTML routes | Low by then | greps in §7 all zero |
-| 5 | Slim `server.py` to composition-only; `core/assets.py` replaces monkey-patching | Low | `server.py` ≈ 100 lines |
+| 0 | Inventory and document registered routes/imports | Done for 2026-07-08 baseline | `docs/API_MIGRATION_STATUS.md` lists counts, legacy namespaces, route-file blockers |
+| 1 | Teacher Academy cleanup: schemas/responses split, HOD permissions, notifications, scoped responses | Done for current slice | domain permissions have no `backend.utils.context`; responses `__all__` exposes adapters only |
+| 2 | Move page shells from `roles/` into `pages/`, preserving URLs | Low/medium | page routes load and old role route modules are compatibility re-exports or deleted after imports are zero |
+| 3 | Complete student and teacher API/page split | Medium, bounded per role | JSON routes live under `/api/v1/{student,teacher}` and page shells live in `pages/` |
+| 4 | Parent, AD, and HOD page/API finalization | Medium | invite/link flows and HOD subject scope stay covered by tests |
+| 5 | Admin panel-by-panel migration | Highest, bounded per panel | each admin panel has v1 routes, schemas, domain service/query ownership, and frontend route constants |
+| 6 | Database wrapper removal and Flask-layer deletion | Low by then | legacy import greps in §7 are zero |
+| 7 | Slim `server.py` to composition-only; `core/assets.py` replaces monkey-patching | Low | `server.py` contains app creation, middleware, exception handlers, static mount, and router includes only |
 
 ## 7. Definition of done (verifiable)
 

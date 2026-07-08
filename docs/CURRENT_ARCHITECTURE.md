@@ -24,8 +24,8 @@ backend/
     identity/                       login and Telegram authentication routes
     parents/                        parent invites, links, dashboard access
     students/                       student profile, dashboard, account helpers
-    teacher_academy/                academy teacher, lesson assignment, schedule, assessment flows
-                                    plus HOD subject-scope permissions and notifications
+    teacher_academy/                academy teacher, lesson assignment, schedule, assessment flows,
+                                    explicit HOD subject-scope permissions, and notifications
     teachers/                       teacher profiles, auth helpers, subject assignments
     timetable/                      schedule rules and lesson sessions
   roles/
@@ -72,7 +72,7 @@ Shared UI components are the preferred place for shells, modals, responsive card
 - Academics: operational academic queries are in `backend/domains/academics/queries.py`; service modules shape dashboard and admin payloads.
 - Timetable: schedule/session SQL lives in `backend/domains/timetable/queries.py`.
 - Announcements: CRUD SQL lives in `backend/domains/announcements/queries.py`.
-- Teacher Academy: business logic and SQL live in `backend/domains/teacher_academy`.
+- Teacher Academy: business logic and SQL live in `backend/domains/teacher_academy`. Permission helpers accept `CurrentUser` or explicit `role`/`account_id`/`staff_id` values; legacy session lookups stay in page-layer compatibility code.
 - Teachers, students, and parents: role-owned queries and services live in their matching domain packages.
 
 ## API V1
@@ -95,7 +95,7 @@ Shared UI components are the preferred place for shells, modals, responsive card
 
 `GET /api/v1/auth/me` and `GET /api/v1/system/status` remain in the existing system/auth API modules. Other role API folders exist as placeholders until their current endpoints can move without changing behavior.
 
-Runtime inventory on 2026-07-08: 144 registered routes; 76 are `/api/v1/*`, 62 are page/form routes, and 6 are static/docs/public routes. No runtime route is currently registered under `/admin/api`, `/teacher/api`, `/academic-director/api`, `/head-of-department/api`, or a bare non-v1 `/api/*` path.
+Runtime inventory on 2026-07-08: 145 registered routes; 76 are `/api/v1/*`, 57 are page/form routes, and 12 are static/docs/public routes. No runtime route is currently registered under `/admin/api`, `/teacher/api`, `/student/api`, `/academic-director/api`, `/head-of-department/api`, or a bare non-v1 `/api/*` path.
 
 ## Roles
 
@@ -111,7 +111,7 @@ Runtime inventory on 2026-07-08: 144 registered routes; 76 are `/api/v1/*`, 62 a
 
 AD creates academy teacher: the frontend submits through `frontend/src/shared/api/routes.ts` to `/api/v1/academic-director/teacher-academy`; the API route uses schemas from `backend/api/v1/teacher_academy/schemas.py` and response adapters from `backend/api/v1/teacher_academy/responses.py`; the helper calls `backend/domains/teacher_academy/service.py`; the service uses `backend/domains/teacher_academy/queries.py`.
 
-HOD schedules or assesses: the frontend submits to `/api/v1/head-of-department/teacher-academy...`; the API route checks HOD subject scope through `backend/domains/teacher_academy/permissions.py`; the permission helper delegates SQL to `backend/domains/teacher_academy/queries.py`; the shared API response adapter calls the Teacher Academy domain service.
+HOD schedules or assesses: the frontend submits to `/api/v1/head-of-department/teacher-academy...`; the API route passes `CurrentUser` into `backend/domains/teacher_academy/permissions.py`; the permission helper delegates SQL to `backend/domains/teacher_academy/queries.py`; the shared API response adapter calls the Teacher Academy domain service and filters the returned academy list to the same subject scope.
 
 Teacher sees academy progress: `/teacher` renders the teacher cabinet page and receives bootstrap props from `backend/roles/teacher/routes.py` and `backend/roles/teacher/services.py`. Future JSON endpoints should move under `/api/v1/teacher` only after equivalent tests cover the flow.
 

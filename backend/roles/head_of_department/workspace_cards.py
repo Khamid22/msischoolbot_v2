@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from backend.domains.teacher_academy.permissions import (
-    current_hod_subject_ids,
+    hod_subject_ids_for_context,
     filter_rows_by_subject_scope,
 )
 from backend.domains.teacher_academy.service import list_academy_teachers
+from backend.utils.context import session
+from backend.utils.session import current_auth_role, current_staff_id
 
 
 def _placeholder_cards():
@@ -16,6 +18,15 @@ def _placeholder_cards():
         {"label": "Ready for Review", "value": "0", "detail": "subject scoped"},
         {"label": "Reports", "value": "0", "detail": "teacher journeys"},
     ]
+
+
+def current_hod_subject_ids(conn=None):
+    return hod_subject_ids_for_context(
+        role=current_auth_role(),
+        account_id=session.get("account_id"),
+        staff_id=current_staff_id() or 0,
+        conn=conn,
+    )
 
 
 def head_of_department_workspace_cards() -> list[dict[str, str]]:

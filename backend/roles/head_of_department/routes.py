@@ -9,13 +9,14 @@ from backend.domains.teacher_academy.service import (
     list_teacher_academy_page_context,
 )
 from backend.domains.teacher_academy.permissions import (
-    current_hod_subject_ids,
+    hod_subject_ids_for_context,
     filter_rows_by_subject_scope,
 )
 from backend.roles.head_of_department.workspace_cards import head_of_department_workspace_cards
 from backend.roles.role_home import render_role_home
 from backend.utils.guards import require_role
-from backend.utils.session import current_auth_login, current_auth_role
+from backend.utils.context import session
+from backend.utils.session import current_auth_login, current_auth_role, current_staff_id
 
 
 def _to_int(value):
@@ -34,6 +35,15 @@ def _filter_subject_rows(rows, subject_ids):
         row for row in rows
         if _to_int(row.get("subject_id") or row.get("id") or row.get("subjectId")) in scoped_ids
     ]
+
+
+def current_hod_subject_ids(conn=None):
+    return hod_subject_ids_for_context(
+        role=current_auth_role(),
+        account_id=session.get("account_id"),
+        staff_id=current_staff_id() or 0,
+        conn=conn,
+    )
 
 
 def _head_of_department_academy_context():

@@ -72,6 +72,42 @@ def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
         assert "jsonify" not in source
 
 
+def test_teacher_academy_domain_permissions_do_not_import_legacy_session_context():
+    source = Path("backend/domains/teacher_academy/permissions.py").read_text()
+
+    assert "backend.utils.context" not in source
+    assert "backend.utils.session" not in source
+    assert "from backend.utils" not in source
+
+
+def test_teacher_academy_responses_do_not_export_raw_domain_services():
+    import backend.api.v1.teacher_academy.responses as responses
+
+    raw_service_exports = {
+        "add_assessment",
+        "create_academy_teacher",
+        "delete_academy_teacher",
+        "delete_assessment",
+        "list_academy_teachers",
+        "list_teachers",
+        "promote_academy_teacher",
+        "sync_academy_lessons",
+        "update_academy_status",
+        "update_assignment",
+    }
+
+    assert raw_service_exports.isdisjoint(set(responses.__all__))
+
+
+def test_hod_teacher_academy_api_passes_current_user_to_scope_checks():
+    source = Path("backend/api/v1/head_of_department/teacher_academy.py").read_text()
+
+    assert "user: CurrentUser = Depends(get_current_user)" in source
+    assert "can_user_manage_academy_assignment(user, assignment_id)" in source
+    assert "can_user_manage_academy_teacher(user, academy_teacher_id)" in source
+    assert "scope_user=user" in source
+
+
 def test_frontend_teacher_academy_api_helpers_use_api_v1_namespace():
     source = Path("frontend/src/shared/api/routes.ts").read_text()
 
