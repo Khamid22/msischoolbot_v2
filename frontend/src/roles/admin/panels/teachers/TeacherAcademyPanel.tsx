@@ -1799,21 +1799,13 @@ function AcademyTeacherCard({
   const status = asString(teacher.academy_status);
   const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
   const scheduled = assignmentIsScheduled(nextAssignment);
-  const canUsePrimaryLessonAction = nextAssignment && (scheduled ? canAssess : canSchedule);
-  const primaryAction = canUsePrimaryLessonAction
-    ? scheduled
-      ? {
-          label: "Assess",
-          icon: <ClipboardCheck className="h-3.5 w-3.5" />,
-          onClick: () => onAssess(nextAssignment),
-          className: "bg-foreground text-background",
-        }
-      : {
-          label: "Schedule",
-          icon: <CalendarClock className="h-3.5 w-3.5" />,
-          onClick: () => onSchedule(nextAssignment),
-          className: "bg-primary text-primary-foreground",
-        }
+  const primaryAction = nextAssignment && canAssess
+    ? {
+        label: "Assess",
+        icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+        onClick: () => onAssess(nextAssignment),
+        className: "bg-foreground text-background",
+      }
     : assignments.length
       ? {
           label: "Review",
@@ -1828,23 +1820,13 @@ function AcademyTeacherCard({
           className: "bg-foreground text-background",
         };
   const secondaryActions: ActionMenuItem[] = [];
-  if (nextAssignment) {
-    if (canSchedule) {
-      secondaryActions.push({
-        key: "schedule",
-        label: scheduled ? "Reschedule" : "Schedule",
-        icon: <CalendarClock className="h-4 w-4" />,
-        onClick: () => onSchedule(nextAssignment),
-      });
-    }
-    if (scheduled && canAssess) {
-      secondaryActions.push({
-        key: "assess",
-        label: "Assess",
-        icon: <ClipboardCheck className="h-4 w-4" />,
-        onClick: () => onAssess(nextAssignment),
-      });
-    }
+  if (nextAssignment && canSchedule) {
+    secondaryActions.push({
+      key: "schedule",
+      label: scheduled ? "Reschedule" : "Schedule",
+      icon: <CalendarClock className="h-4 w-4" />,
+      onClick: () => onSchedule(nextAssignment),
+    });
   }
   secondaryActions.push({
     key: "details",
@@ -2485,25 +2467,15 @@ export function TeacherAcademyPanel({
                       const status = asString(teacher.academy_status);
                       const login = asString(teacher.login);
                       const scheduled = assignmentIsScheduled(nextAssignment);
-                      const canUsePrimaryLessonAction = nextAssignment && (scheduled ? canAssessAcademyLesson : canScheduleAcademyLesson);
+                      const canUsePrimaryLessonAction = nextAssignment && canAssessAcademyLesson;
                       const rowActions: ActionMenuItem[] = [];
-                      if (nextAssignment) {
-                        if (canScheduleAcademyLesson) {
-                          rowActions.push({
-                            key: "schedule",
-                            label: scheduled ? "Reschedule" : "Schedule",
-                            icon: <CalendarClock className="h-4 w-4" />,
-                            onClick: () => setScheduleTarget({ teacher, assignment: nextAssignment }),
-                          });
-                        }
-                        if (scheduled && canAssessAcademyLesson) {
-                          rowActions.push({
-                            key: "assess",
-                            label: "Assess",
-                            icon: <ClipboardCheck className="h-4 w-4" />,
-                            onClick: () => setAssessmentTarget({ teacher, assignment: nextAssignment }),
-                          });
-                        }
+                      if (nextAssignment && canScheduleAcademyLesson) {
+                        rowActions.push({
+                          key: "schedule",
+                          label: scheduled ? "Reschedule" : "Schedule",
+                          icon: <CalendarClock className="h-4 w-4" />,
+                          onClick: () => setScheduleTarget({ teacher, assignment: nextAssignment }),
+                        });
                       }
                       rowActions.push({
                         key: "details",
@@ -2617,19 +2589,11 @@ export function TeacherAcademyPanel({
                               {canUsePrimaryLessonAction ? (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    scheduled
-                                      ? setAssessmentTarget({ teacher, assignment: nextAssignment })
-                                      : setScheduleTarget({ teacher, assignment: nextAssignment })
-                                  }
-                                  className={`inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg px-2.5 text-[11px] font-bold transition active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                                    scheduled
-                                      ? "bg-[#0F172A] text-white hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
-                                      : "bg-primary text-primary-foreground hover:-translate-y-px hover:shadow-card motion-reduce:hover:translate-y-0"
-                                  }`}
+                                  onClick={() => setAssessmentTarget({ teacher, assignment: nextAssignment })}
+                                  className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100"
                                 >
-                                  {scheduled ? <ClipboardCheck className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
-                                  {scheduled ? "Assess" : "Schedule"}
+                                  <ClipboardCheck className="h-3.5 w-3.5" />
+                                  Assess
                                 </button>
                               ) : academyAssignments(teacher).length ? (
                                 <button type="button" onClick={() => setDetailTeacher(teacher)} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">

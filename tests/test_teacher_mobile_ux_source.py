@@ -81,8 +81,10 @@ def test_teacher_academy_actions_use_schedule_not_assign():
     assert "Schedule" in source
     assert "\n                                  Assign\n" not in source
     assert "Assign Real Group" not in source
-    assert 'label: "Schedule"' in source
-    assert '{scheduled ? "Assess" : "Schedule"}' in source
+    # Assess is the primary list action; Schedule lives in the action menu.
+    assert 'label: "Assess"' in source
+    assert 'label: scheduled ? "Reschedule" : "Schedule"' in source
+    assert '{scheduled ? "Assess" : "Schedule"}' not in source
     assert "setScheduleTarget({ teacher, assignment: nextAssignment })" in source
     assert "setAssessmentTarget({ teacher, assignment: nextAssignment })" in source
     assert "primaryAction" in source
