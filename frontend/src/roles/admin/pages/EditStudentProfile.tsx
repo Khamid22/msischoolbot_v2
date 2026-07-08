@@ -1,6 +1,6 @@
 import { ChangeEvent, useState } from "react";
 import { Camera, Check, Copy, FileText, KeyRound, Link2, Phone, Save, Send, Trash2, User, Users, X } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
+import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
 import { FormAlert } from "@/shared/ui/PortalCard";
@@ -168,16 +168,6 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
   const pageContent = (
     <>
       <div className="space-y-4 animate-in">
-        {isAdminEmbed && props.viewDashboardUrl ? (
-          <div className="flex justify-end">
-            <a
-              href={withEmbedMode(props.viewDashboardUrl)}
-              className="rounded-lg border border-foreground/10 bg-surface px-3 py-2 text-xs font-bold shadow-card hover:bg-muted"
-            >
-              View Dashboard
-            </a>
-          </div>
-        ) : null}
         {props.authError ? <FormAlert kind="error">{props.authError}</FormAlert> : null}
         {props.adminNotice ? <FormAlert kind="notice">{props.adminNotice}</FormAlert> : null}
 
@@ -477,16 +467,6 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
           backUrl={props.backUrl}
           title="Edit Student Profile"
           subtitle={profileTitle}
-          rightContent={
-            props.viewDashboardUrl ? (
-              <a
-                href={props.viewDashboardUrl}
-                className="rounded-lg border-2 border-foreground/10 px-3 py-1.5 text-[11px] font-bold hover:bg-muted"
-              >
-                View Dashboard
-              </a>
-            ) : null
-          }
         />
       }
     >
