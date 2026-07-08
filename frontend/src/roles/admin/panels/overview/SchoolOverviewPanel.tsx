@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
-import { BarChart3, BookOpen, GraduationCap, School, Users } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { asNumber, asString, findPreferredMathSubject } from "../../shared";
-import { ZoneKey, MonthlyGroupRow, ExamClassOption, GraphMetric, GraphLineSeries, AcademicBarRow, MonthOption, lineColors, scoreAxisTicks, groupNameCollator, safeSvgId, averageGraphValue, normalizedAcademicAverage, compareAverageRowsDesc, compareAcademicRowsDesc, compareZoneGroupRowsDesc, compareLineRowsDesc, compareLineLabelsDesc, metricAverage, academicMonthOption, previousAcademicValue, deltaLabel, zoneForGroup } from "./shared";
+import { ZoneKey, MonthlyGroupRow, ExamClassOption, GraphMetric, GraphLineSeries, AcademicBarRow, MonthOption, lineColors, scoreAxisTicks, groupNameCollator, safeSvgId, averageGraphValue, normalizedAcademicAverage, compareAverageRowsDesc, compareAcademicRowsDesc, compareZoneGroupRowsDesc, compareLineLabelsDesc, metricAverage, academicMonthOption, previousAcademicValue, deltaLabel, zoneForGroup } from "./shared";
 import { Indicator, ZonesDrawer } from "./cards";
 
 export function SchoolOverviewPanel({ state }: { state: any }) {
   const {
-    quickStats,
     selectedOverviewSchool,
     setSelectedOverviewSchool,
     setSelectedSehriyoGrade,
@@ -273,12 +272,6 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
       color,
     };
   });
-  const sortedAcademicClassLineData = [...academicClassLineData].sort((left, right) => {
-    const leftAverage = averageGraphValue(academicClassLineLabels.map((label) => left[academicAapKey(label)])) ?? Number.NEGATIVE_INFINITY;
-    const rightAverage = averageGraphValue(academicClassLineLabels.map((label) => right[academicAapKey(label)])) ?? Number.NEGATIVE_INFINITY;
-    if (leftAverage !== rightAverage) return rightAverage - leftAverage;
-    return groupNameCollator.compare(asString(right.label), asString(left.label));
-  });
   const attendanceMonthRows: Array<{ label: string; average: number | null }> = activeTrendMonth
     ? (filteredMonthlyArSeries as Array<Record<string, unknown>>)
         .map((seriesRow) => {
@@ -294,7 +287,6 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
     : [];
   const graphViewValue = graphMetric === "exam" ? examSelectValue : selectedTrendMonth;
   const examGraphLineLabels = [...examClassLineLabels].sort(compareLineLabelsDesc(examClassLineData));
-  const examGraphLineData = [...examClassLineData].sort(compareLineRowsDesc(examGraphLineLabels));
   const examGraphLineSeries = examGraphLineLabels.map((label, index): GraphLineSeries => ({
     key: label,
     dataKey: label,
@@ -302,7 +294,9 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
     yAxisId: "score",
     color: lineColors[index % lineColors.length],
   }));
-  const graphLineData = graphMetric === "exam" ? examGraphLineData : sortedAcademicClassLineData;
+  // Data points keep their natural x-axis order: months chronologically,
+  // exams in HT1..HT4 order. Only the series/legend order is ranked.
+  const graphLineData = graphMetric === "exam" ? examClassLineData : academicClassLineData;
   const graphLineSeries = graphMetric === "exam" ? examGraphLineSeries : academicClassLineSeries;
   const academicBarRows: AcademicBarRow[] = activeTrendMonth
     ? Array.from(new Set([...trendMonthRows.map((row) => row.label), ...attendanceMonthRows.map((row) => row.label)]))
@@ -370,21 +364,6 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
           onClose={() => setZonesOpen(false)}
         />
       )}
-
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-1 text-xs text-muted-foreground">
-        {[
-          { label: "Students", value: asNumber(quickStats.total_students), icon: <Users className="h-3.5 w-3.5" /> },
-          { label: "Schools", value: asNumber(quickStats.total_schools), icon: <School className="h-3.5 w-3.5" /> },
-          { label: "Teachers", value: asNumber(quickStats.total_teachers), icon: <GraduationCap className="h-3.5 w-3.5" /> },
-          { label: "Subjects", value: asNumber(quickStats.total_subjects), icon: <BookOpen className="h-3.5 w-3.5" /> },
-        ].map((item) => (
-          <span key={item.label} className="inline-flex items-center gap-1.5">
-            <span className="text-muted-foreground/70">{item.icon}</span>
-            <span className="text-sm font-bold text-foreground">{item.value}</span>
-            {item.label}
-          </span>
-        ))}
-      </div>
 
       <ChartCard
         title="Subject Performance"
@@ -511,7 +490,7 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
               />
             </div>
 
-            <div className={`flex min-h-[28rem] flex-1 flex-col rounded-xl border p-2 animate-in fade-in slide-in-from-bottom-1 duration-300 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-card-hover motion-reduce:animate-none motion-reduce:transition-none sm:min-h-[39rem] sm:p-3 ${graphBorderClass}`}>
+            <div className={`flex min-h-[24rem] flex-1 flex-col rounded-xl border p-2 animate-in fade-in slide-in-from-bottom-1 duration-300 transition-[box-shadow,border-color] hover:border-foreground/15 hover:shadow-card-hover motion-reduce:animate-none motion-reduce:transition-none sm:p-3 ${graphBorderClass}`}>
               <div className="mb-2 flex shrink-0 flex-col gap-2 sm:mb-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div>
                   <p className="text-sm font-bold">Performance Graph</p>
@@ -583,9 +562,9 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
 
               {graphIsAll && graphLineSeries.length ? (
                 <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
-                  <div className="h-80 min-w-full sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphLineMinWidth }}>
+                  <div className="h-full min-h-[19rem] min-w-full" style={{ minWidth: graphLineMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={graphLineData} margin={{ top: 6, right: 12, left: -6, bottom: 0 }}>
+                      <AreaChart data={graphLineData} margin={{ top: 6, right: 12, left: -6, bottom: 4 }}>
                         <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
                         <XAxis dataKey={graphMetric === "exam" ? "shortName" : "label"} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={8} />
                         <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} ticks={scoreAxisTicks} tick={{ fontSize: 11 }} width={34} tickMargin={4} axisLine={false} tickLine={false} />
@@ -634,9 +613,9 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
                 </div>
               ) : graphBarRows.length ? (
                 <div className="-mx-1 min-h-0 flex-1 overflow-x-auto pb-1 sm:mx-0 sm:pb-0">
-                  <div className="h-80 min-w-full sm:h-[32rem] lg:h-[35rem]" style={{ minWidth: graphBarMinWidth }}>
+                  <div className="h-full min-h-[19rem] min-w-full" style={{ minWidth: graphBarMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={graphBarRows} margin={{ top: 16, right: graphMetric === "academic" ? 8 : 12, left: -6, bottom: 0 }}>
+                      <BarChart data={graphBarRows} margin={{ top: 16, right: graphMetric === "academic" ? 8 : 12, left: -6, bottom: 4 }}>
                         <CartesianGrid vertical={false} stroke={graphGridStroke} strokeDasharray="4 4" />
                         <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} axisLine={false} tickLine={false} minTickGap={6} />
                         <YAxis yAxisId={graphMetric === "exam" ? "score" : "aap"} domain={graphDomain} ticks={scoreAxisTicks} tick={{ fontSize: 11 }} width={34} tickMargin={4} axisLine={false} tickLine={false} />
@@ -683,7 +662,7 @@ export function SchoolOverviewPanel({ state }: { state: any }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex h-80 flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground sm:h-[32rem] lg:h-[35rem]">
+                <div className="flex min-h-[19rem] flex-1 items-center justify-center rounded-lg border border-dashed border-foreground/15 bg-white/60 text-sm text-muted-foreground">
                   {graphMetric === "exam" ? "No exam performance data yet." : "No graph data for this selection yet."}
                 </div>
               )}

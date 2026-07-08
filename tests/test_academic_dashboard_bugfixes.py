@@ -7,13 +7,16 @@ from backend.roles.admin.services.insights_service import build_admin_subject_in
 
 
 def test_audit_settings_placeholder_card_is_not_rendered():
-    source = Path("backend/roles/admin/system_admin_cards.py").read_text()
     admin_source = Path("frontend/src/roles/admin/pages/Admin.tsx").read_text()
 
-    assert "Audit / Settings" not in source
     assert "Audit / Settings" not in admin_source
     assert "xl:grid-cols-4" in admin_source
     assert "xl:grid-cols-5" not in admin_source
+    # The account-identity cards were replaced by overview stat cards with
+    # hover breakdowns computed from the quick stats already on the page.
+    assert "Total Accounts" not in admin_source
+    assert "overviewStatCards" in admin_source
+    assert "group-hover:block" in admin_source
 
 
 def test_exam_performance_filter_excludes_normal_lesson_topics():
@@ -72,6 +75,13 @@ def test_performance_graph_uses_responsive_full_width_layout():
     source = Path("frontend/src/roles/admin/panels/overview/SchoolOverviewPanel.tsx").read_text()
 
     assert "graphLineSeries.length * 70" not in source
-    assert 'className="h-80 min-w-full sm:h-[32rem] lg:h-[35rem]"' in source
+    # The chart fills the available vertical space instead of forcing tall
+    # fixed heights that clip the x-axis labels and legend.
+    assert 'className="h-full min-h-[19rem] min-w-full"' in source
+    assert "sm:h-[32rem]" not in source
+    assert "lg:h-[35rem]" not in source
     assert '<ResponsiveContainer width="100%" height="100%">' in source
     assert "No exam performance data yet." in source
+    # Month points stay chronological; only the legend order is ranked.
+    assert "sortedAcademicClassLineData" not in source
+    assert 'graphMetric === "exam" ? examClassLineData : academicClassLineData' in source

@@ -14,6 +14,7 @@ import {
   Megaphone,
   Menu,
   MessageSquare,
+  School,
   TrendingUp,
   Trophy,
   User,
@@ -264,45 +265,113 @@ function rowsFrom(value: unknown) {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
 }
 
-type SystemAdminCard = {
+type OverviewStatLine = {
   label: string;
-  value: string;
-  detail: string;
-  tone?: string;
+  value: number;
 };
 
-function normalizeSystemAdminCards(value: unknown): SystemAdminCard[] {
-  return rowsFrom(value)
-    .map((card) => ({
-      label: asString(card.label),
-      value: asString(card.value),
-      detail: asString(card.detail),
-      tone: asString(card.tone),
-    }))
-    .filter((card) => card.label && card.value);
+type OverviewStatCard = {
+  label: string;
+  value: number;
+  detail: string;
+  breakdown: OverviewStatLine[];
+};
+
+function sumStatLines(rows: Array<Record<string, unknown>>, labelKey: string, valueKey: string): OverviewStatLine[] {
+  const counts = new Map<string, number>();
+  rows.forEach((row) => {
+    const label = asString(row[labelKey]);
+    if (!label) return;
+    counts.set(label, (counts.get(label) || 0) + asNumber(row[valueKey]));
+  });
+  return Array.from(counts.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((left, right) => right.value - left.value);
 }
 
-function systemAdminCardIcon(label: string) {
-  const normalized = label.toLowerCase();
-  if (normalized.includes("active")) return <UserRound className="h-4 w-4" />;
-  if (normalized.includes("pending")) return <UserPlus className="h-4 w-4" />;
-  if (normalized.includes("telegram")) return <MessageSquare className="h-4 w-4" />;
-  if (normalized.includes("audit") || normalized.includes("settings")) return <LayoutDashboard className="h-4 w-4" />;
-  return <Users className="h-4 w-4" />;
+function overviewStatCards(state: any): OverviewStatCard[] {
+  const quickStats = state.quickStats || {};
+  const subjectInfo = rowsFrom(state.subjectInfo);
+  const teachers = rowsFrom(Array.isArray(state.teachers) ? state.teachers : state.props?.adminTeachers);
+  const groups = rowsFrom(state.props?.adminAcademicGroups);
+
+  const subjectByGroupName = new Map<string, string>();
+  groups.forEach((group) => {
+    const groupName = asString(group.name || group.group_name).toLowerCase();
+    const subjectName = asString(group.subject_name);
+    if (groupName && subjectName && !subjectByGroupName.has(groupName)) {
+      subjectByGroupName.set(groupName, subjectName);
+    }
+  });
+  const teacherCounts = new Map<string, number>();
+  teachers.forEach((teacher) => {
+    const subject = subjectByGroupName.get(asString(teacher.assigned_group).toLowerCase()) || "No subject yet";
+    teacherCounts.set(subject, (teacherCounts.get(subject) || 0) + 1);
+  });
+  const teachersBySubject = Array.from(teacherCounts.entries())
+    .map(([label, value]) => ({ label, value }))
+    .sort((left, right) => right.value - left.value);
+  const studentsBySchool = rowsFrom(quickStats.school_counts)
+    .map((row) => ({ label: asString(row.school_name), value: asNumber(row.count) }))
+    .filter((line) => line.label);
+
+  return [
+    {
+      label: "Students",
+      value: asNumber(quickStats.total_students),
+      detail: "enrolled students",
+      breakdown: sumStatLines(subjectInfo, "subject_name", "students_count"),
+    },
+    {
+      label: "Teachers",
+      value: asNumber(quickStats.total_teachers),
+      detail: "active teachers",
+      breakdown: teachersBySubject,
+    },
+    {
+      label: "Schools",
+      value: asNumber(quickStats.total_schools),
+      detail: "students per school",
+      breakdown: studentsBySchool,
+    },
+    {
+      label: "Subjects",
+      value: asNumber(quickStats.total_subjects),
+      detail: "groups per subject",
+      breakdown: sumStatLines(subjectInfo, "subject_name", "groups_count"),
+    },
+  ];
 }
 
-function SystemAdminCardRow({ cards }: { cards: SystemAdminCard[] }) {
-  if (!cards.length) return null;
+function overviewStatIcon(label: string) {
+  if (label === "Students") return <Users className="h-4 w-4" />;
+  if (label === "Teachers") return <GraduationCap className="h-4 w-4" />;
+  if (label === "Schools") return <School className="h-4 w-4" />;
+  return <BookOpen className="h-4 w-4" />;
+}
+
+function OverviewStatCards({ state }: { state: any }) {
+  const cards = overviewStatCards(state);
   return (
     <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <div key={`${card.label}-${card.value}`} className="rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
+        <div key={card.label} className="group relative rounded-lg border border-foreground/8 bg-surface p-3 shadow-card">
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-            {systemAdminCardIcon(card.label)}
+            {overviewStatIcon(card.label)}
             <span className="min-w-0 break-words">{card.label}</span>
           </div>
-          <p className={`mt-2 break-words text-xl font-black leading-none ${card.tone || "text-foreground"}`}>{card.value}</p>
-          <p className="mt-1 break-words text-xs text-muted-foreground">{card.detail}</p>
+          <p className="mt-2 text-xl font-black leading-none text-foreground">{card.value.toLocaleString()}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+          {card.breakdown.length ? (
+            <div className="pointer-events-none absolute left-2 right-2 top-[calc(100%-0.25rem)] z-40 hidden rounded-lg border border-foreground/10 bg-surface p-2.5 shadow-card-hover group-hover:block">
+              {card.breakdown.map((line) => (
+                <div key={line.label} className="flex items-center justify-between gap-3 py-0.5 text-xs">
+                  <span className="min-w-0 truncate text-muted-foreground">{line.label}</span>
+                  <span className="shrink-0 font-bold tabular-nums text-foreground">{line.value.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
@@ -874,11 +943,9 @@ export default function AdminPage(props: AdminPageProps) {
     state.visibleTabs.find((tab: { key: string; label: string }) => tab.key === state.activeTab)?.label ||
     tabs.find((tab) => tab.key === state.activeTab)?.label ||
     "Overview";
-  const systemAdminCards = normalizeSystemAdminCards(props.systemAdminCards);
-  const showSystemAdminCards =
-    systemAdminCards.length > 0 &&
+  const showOverviewStatCards =
     state.activeTab === "overview" &&
-    asString(state.adminMode).toLowerCase() === "admin";
+    ["admin", "ceo"].includes(asString(state.adminMode).toLowerCase());
 
   useEffect(() => {
     if (!state.mobileNavOpen) {
@@ -985,7 +1052,7 @@ export default function AdminPage(props: AdminPageProps) {
           />
         ) : null}
 
-        {showSystemAdminCards ? <SystemAdminCardRow cards={systemAdminCards} /> : null}
+        {showOverviewStatCards ? <OverviewStatCards state={state} /> : null}
 
         {state.resourceUploadState.active && state.activeTab !== "resources" ? (
           <div className="mb-4 rounded-lg border border-foreground/10 bg-surface px-4 py-3 shadow-card">

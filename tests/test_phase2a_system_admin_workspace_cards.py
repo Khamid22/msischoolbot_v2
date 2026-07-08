@@ -1,4 +1,4 @@
-"""Phase 2A-3C System Admin workspace cards."""
+"""Admin overview access, preview gating, and route registration."""
 
 import json
 import os
@@ -6,9 +6,6 @@ from base64 import b64encode
 
 import pytest
 from itsdangerous import TimestampSigner
-
-from backend.roles.admin.system_admin_cards import system_admin_workspace_cards
-
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
 
@@ -71,33 +68,6 @@ def _route_methods(app):
     return routes
 
 
-class _Rows:
-    def __init__(self, row):
-        self._row = row
-
-    def fetchone(self):
-        return self._row
-
-
-class _SystemAdminConnection:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return False
-
-    def execute(self, sql):
-        if "account_telegram_links" in sql:
-            return _Rows({"count": 5})
-        if "status = 'active'" in sql:
-            return _Rows({"count": 181})
-        if "status = 'pending'" in sql:
-            return _Rows({"count": 3})
-        if "FROM msi_v2.accounts" in sql:
-            return _Rows({"count": 185})
-        raise AssertionError(f"Unexpected SQL: {sql}")
-
-
 def _minimal_page_context():
     return {
         "panel": "overview",
@@ -116,7 +86,16 @@ def _minimal_page_context():
         "admin_teacher_edit": None,
         "admin_teacher_edit_school": "",
         "admin_school_options": [{"code": "all", "label": "All Schools"}],
-        "admin_quick_stats": {},
+        "admin_quick_stats": {
+            "total_students": 141,
+            "total_schools": 2,
+            "total_teachers": 3,
+            "total_subjects": 3,
+            "school_counts": [
+                {"school_name": "School 5", "count": 96},
+                {"school_name": "Sehriyo", "count": 45},
+            ],
+        },
         "admin_school_info": [],
         "admin_subject_info": [],
         "admin_group_zones": {"green": [], "yellow": [], "red": []},
@@ -155,74 +134,8 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
 
 
-def _mock_cards():
-    return [
-        {"label": "Total Accounts", "value": "185", "detail": "shared login identities"},
-        {"label": "Active Accounts", "value": "181", "detail": "usable accounts"},
-        {"label": "Pending Accounts", "value": "3", "detail": "waiting for activation/linking"},
-        {"label": "Telegram Links", "value": "5", "detail": "active linked accounts"},
-    ]
-
-
-def test_system_admin_card_provider_counts_accounts(monkeypatch):
-    import backend.roles.admin.system_admin_cards as system_cards
-
-    monkeypatch.setattr(system_cards, "connect_auth_db", lambda: _SystemAdminConnection())
-
-    cards = system_admin_workspace_cards()
-
-    assert cards == [
-        {
-            "label": "Total Accounts",
-            "value": "185",
-            "detail": "shared login identities",
-            "tone": "text-slate-900",
-        },
-        {
-            "label": "Active Accounts",
-            "value": "181",
-            "detail": "usable accounts",
-            "tone": "text-emerald-700",
-        },
-        {
-            "label": "Pending Accounts",
-            "value": "3",
-            "detail": "waiting for activation/linking",
-            "tone": "text-amber-700",
-        },
-        {
-            "label": "Telegram Links",
-            "value": "5",
-            "detail": "active linked accounts",
-            "tone": "text-blue-700",
-        },
-    ]
-    assert "Audit / Settings" not in {card["label"] for card in cards}
-
-
-def test_system_admin_card_provider_returns_placeholders_on_db_failure(monkeypatch):
-    import backend.roles.admin.system_admin_cards as system_cards
-
-    def fail_connect():
-        raise RuntimeError("database unavailable")
-
-    monkeypatch.setattr(system_cards, "connect_auth_db", fail_connect)
-
-    cards = system_admin_workspace_cards()
-
-    assert cards[0]["value"] == "-"
-    assert cards[1]["value"] == "-"
-    assert cards[2]["value"] == "-"
-    assert cards[3]["value"] == "-"
-    assert len(cards) == 4
-    assert "Audit / Settings" not in {card["label"] for card in cards}
-
-
-def test_system_admin_admin_can_access_admin_with_cards(client, monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
-
+def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
-    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", _mock_cards)
     _set_session(
         client,
         {
@@ -239,19 +152,22 @@ def test_system_admin_admin_can_access_admin_with_cards(client, monkeypatch):
 
     assert response.status_code == 200
     assert 'data-react-page="admin-home"' in response.text
-    assert "Total Accounts" in response.text
-    assert "Active Accounts" in response.text
-    assert "Pending Accounts" in response.text
-    assert "Telegram Links" in response.text
-    assert "Audit / Settings" not in response.text
-    assert "185" in response.text
+    # The account-identity cards are gone; the overview stat cards read
+    # from the quick stats shipped with the page props.
+    assert "Total Accounts" not in response.text
+    assert "Telegram Links" not in response.text
+    assert "systemAdminCards" not in response.text
+    assert '"total_students":141' in response.text
+    assert '"total_schools":2' in response.text
+    assert '"total_teachers":3' in response.text
+    assert '"total_subjects":3' in response.text
+    assert "School 5" in response.text
 
 
 def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
 
     _patch_admin_page_context(monkeypatch)
-    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", _mock_cards)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("ADMIN_PREVIEW_ROLES", raising=False)
     _set_session(
@@ -278,7 +194,6 @@ def test_admin_preview_can_be_explicitly_enabled_for_true_admin(client, monkeypa
     import backend.roles.admin.routes.admin_page as admin_page
 
     _patch_admin_page_context(monkeypatch)
-    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", _mock_cards)
     monkeypatch.setenv("ADMIN_PREVIEW_ROLES", "1")
     _set_session(
         client,
@@ -307,36 +222,6 @@ def test_wrong_role_is_denied_from_admin(client):
 
     assert response.status_code == 403
     assert response.json()["message"] == "This workspace requires Admin access."
-
-
-def test_admin_route_renders_placeholders_when_card_db_fails(client, monkeypatch):
-    import backend.roles.admin.system_admin_cards as system_cards
-
-    _patch_admin_page_context(monkeypatch)
-
-    def fail_connect():
-        raise RuntimeError("database unavailable")
-
-    monkeypatch.setattr(system_cards, "connect_auth_db", fail_connect)
-    _set_session(
-        client,
-        {
-            "auth_role": "admin",
-            "auth_login": "admin",
-            "account_role": "system_admin",
-            "canonical_role": "system_admin",
-            "admin_id": 1,
-            "admin_role": "owner",
-        },
-    )
-
-    response = client.get("/admin")
-
-    assert response.status_code == 200
-    assert 'data-react-page="admin-home"' in response.text
-    assert "Total Accounts" in response.text
-    assert "Audit / Settings" not in response.text
-    assert "Placeholder" not in response.text
 
 
 @pytest.mark.parametrize(

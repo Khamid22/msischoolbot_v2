@@ -17,7 +17,6 @@ from backend.roles.admin.services.page_service import (
     build_admin_page_context,
     build_edit_student_page_context,
 )
-from backend.roles.admin.system_admin_cards import system_admin_workspace_cards
 from backend.utils.session import (
     current_auth_login,
     current_auth_role,
@@ -113,7 +112,6 @@ def register_admin_page_routes(
         academic_context = list_admin_academic_context()
         timer.mark("academic_context_build")
         announcements = list_announcements()
-        admin_system_cards = system_admin_workspace_cards()
         timer.mark("support_context_build")
         if current_auth_role() == "head_of_department":
             from backend.roles.head_of_department.academy_scope import filter_admin_context_for_current_hod
@@ -180,7 +178,6 @@ def register_admin_page_routes(
                 "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
                 "adminAcademicEnrollmentSummary": academic_context.get("enrollment_summary", {}),
                 "adminAnnouncements": announcements,
-                "systemAdminCards": admin_system_cards,
                 "csrfToken": generate_csrf(),
             },
             title="MSI Admin Panel",
@@ -210,7 +207,6 @@ def register_admin_page_routes(
                 "curriculum_programs": academic_context.get("curriculum_programs", []),
                 "curriculum_items": academic_context.get("curriculum_items", []),
                 "announcements": announcements,
-                "system_admin_cards": admin_system_cards,
             },
         )
         return response

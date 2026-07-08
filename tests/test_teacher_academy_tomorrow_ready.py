@@ -270,7 +270,6 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
-    monkeypatch.setattr(admin_page, "system_admin_workspace_cards", lambda: [])
     monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
 
 
