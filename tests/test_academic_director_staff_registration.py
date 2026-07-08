@@ -246,7 +246,7 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
 
 
 def test_head_of_department_workspace_route_loads(client, monkeypatch):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.pages.head_of_department as hod_routes
 
     monkeypatch.setattr(
         hod_routes,
@@ -272,7 +272,7 @@ def test_head_of_department_workspace_route_loads(client, monkeypatch):
 
 
 def test_head_of_department_can_access_subject_scoped_academy_page(client, monkeypatch):
-    import backend.roles.head_of_department.routes as hod_routes
+    import backend.pages.head_of_department as hod_routes
 
     monkeypatch.setattr(
         hod_routes,

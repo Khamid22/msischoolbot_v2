@@ -9,7 +9,6 @@ from database.cross_queries import *
 from database.tables import *
 
 from .admin_queries import *
-from .announcement_queries import *
 from .complaint_queries import *
 from .lesson_catalog_queries import *
 from .meta_queries import *

@@ -18,15 +18,15 @@ from backend.security.roles import is_valid_role, normalize_role, role_display_n
 from backend.core.config import get_web_settings
 from backend.domains.academics.rating_service import clear_group_cache
 from backend.roles.admin.routes import register_admin_page_routes
-from backend.roles.academic_director.routes import register_academic_director_page_routes
+from backend.pages.academic_director import register_academic_director_page_routes
 from backend.pages.ceo import register_ceo_page_routes
 from backend.pages.customer_support import register_customer_support_page_routes
+from backend.pages.head_of_department import register_head_of_department_page_routes
 from backend.pages.hr_manager import register_hr_manager_page_routes
-from backend.roles.head_of_department.routes import register_head_of_department_page_routes
 from backend.roles.parent.routes import register_parent_invite_routes
 from backend.roles.parent.routes import register_parent_page_routes
 from backend.roles.student.routes import register_student_page_routes
-from backend.roles.teacher.routes import register_teacher_page_routes
+from backend.pages.teacher import register_teacher_page_routes
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")

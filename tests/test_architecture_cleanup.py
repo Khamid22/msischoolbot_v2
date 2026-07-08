@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -79,10 +80,41 @@ def test_kept_temporary_wrappers_are_documented():
         Path("database/queries/parent_account_queries.py"),
         Path("database/queries/parent_queries.py"),
         Path("database/queries/payment_queries.py"),
-        Path("database/queries/announcement_queries.py"),
     ]:
         source = path.read_text()
         assert "Temporary compatibility wrapper. Delete after" in source
+
+
+def test_database_folder_inventory_exists_and_lists_remaining_files():
+    inventory = Path("docs/DATABASE_FOLDER_MIGRATION_STATUS.md")
+    source = inventory.read_text()
+
+    assert inventory.exists()
+    assert "database/alembic/" in source
+    assert "database/queries/announcement_queries.py" in source
+    assert "Deleted `database/queries/announcement_queries.py`" in source
+    for path in Path("database").rglob("*"):
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+            assert str(path) in source, f"{path} missing from database migration inventory"
+
+
+def test_database_generated_caches_are_deleted_and_alembic_remains():
+    assert Path("database/alembic/env.py").exists()
+    assert list(Path("database/alembic/versions").glob("*.py"))
+    tracked_database_files = subprocess.check_output(
+        ["git", "ls-files", "database"],
+        text=True,
+    ).splitlines()
+    assert not [path for path in tracked_database_files if "__pycache__" in path or path.endswith(".pyc")]
+
+
+def test_announcement_database_query_wrapper_is_removed_after_domain_migration():
+    active_source = _active_source_text()
+
+    assert Path("backend/domains/announcements/queries.py").exists()
+    assert not Path("database/queries/announcement_queries.py").exists()
+    assert "from .announcement_queries import *" not in Path("database/queries/__init__.py").read_text()
+    assert "database.queries.announcement_queries" not in active_source
 
 
 def test_main_startup_imports_storage_not_account_service():

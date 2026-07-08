@@ -8,7 +8,6 @@ from backend.utils.response_helpers import redirect
 from fastapi import APIRouter, Depends, Request
 
 from backend.utils.guards import GuardResponse
-from backend.utils.context import request
 from backend.utils.performance import PagePerformanceTimer, log_page_performance
 from backend.utils.session import (
     current_auth_login,

@@ -160,7 +160,7 @@ def test_teacher_workspace_card_provider_returns_placeholders(teacher_id, worksp
 
 def test_teacher_route_loads_and_shows_mocked_cards(client, monkeypatch):
     import backend.domains.teachers.service as teacher_service
-    import backend.roles.teacher.routes as teacher_routes
+    import backend.pages.teacher as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _teacher_workspace())
@@ -202,7 +202,7 @@ def test_wrong_role_is_denied_from_teacher_workspace(client):
 
 def test_teacher_route_db_failure_returns_placeholder_cards(client, monkeypatch):
     import backend.domains.teachers.service as teacher_service
-    import backend.roles.teacher.routes as teacher_routes
+    import backend.pages.teacher as teacher_routes
     import database
 
     def fail_workspace(teacher_id, staff_id=None):

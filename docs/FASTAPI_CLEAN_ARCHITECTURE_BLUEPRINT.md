@@ -32,7 +32,7 @@ What is already correct and must NOT change:
 - `backend/api/v1/router.py` per-role aggregation under `/api/v1`.
 - `backend/api/v1/teacher_academy/{schemas,responses}.py` owns shared Teacher Academy API schemas/adapters.
 - `backend/domains/teacher_academy/{permissions,notifications}.py` owns HOD scope checks and academy notification helpers. Permission functions now accept `CurrentUser` or explicit identity context instead of reading the legacy request/session proxy.
-- `backend/pages/{ceo,hr_manager,customer_support}.py` owns the three page-only role shells; their old role route modules are deleted, with package `__init__.py` files kept as compatibility exports.
+- `backend/pages/{academic_director,head_of_department,teacher,ceo,hr_manager,customer_support}.py` owns migrated page-only role shells; their old role route modules are deleted, with package `__init__.py` files kept as compatibility exports.
 - `AuthAndSecurityMiddleware` security ideas: same-origin/CSRF check, fail-closed secret key, security headers, cache-control policy (to be slimmed, not removed).
 - `backend/core/` (config, database, security), `backend/integrations/`, `render.py` page rendering.
 
@@ -113,16 +113,16 @@ Each `roles/` route file is deleted when its routes have moved to `api/v1/{role}
 
 | Old file(s) | Replaced by |
 | --- | --- |
-| `backend/roles/teacher/routes.py` | `pages/teacher.py` + `api/v1/teacher/` |
+| `backend/roles/teacher/routes.py` | **Deleted 2026-07-09** after moving the page shell to `pages/teacher.py`; teacher JSON office-hours already lives under `api/v1/teacher/` |
 | `backend/roles/student/routes/` (9 files: student_page, dashboard, students, chat_page, chat_routes, comment_routes, resources, rating_board, office_hours_routes) | `pages/student.py` + `api/v1/student/{dashboard,chat,comments,resources,rating,office_hours}.py` |
 | `backend/roles/parent/routes.py` | `pages/parent.py` (incl. token-authed invite pages) + `api/v1/parent/` |
 | `backend/roles/admin/routes/` (12 files: admin_page, admins, student_routes, teacher_routes, payment_routes, academic_routes, resource_routes, chat_admin_routes, announcement_routes, complaint_routes, office_hours_routes, parent_routes) | `pages/admin.py` + `api/v1/admin/{admins,students,teachers,payments,academic,resources,chat,announcements,complaints,office_hours,parents}.py` |
 | `backend/roles/admin/routes/request_payload.py` | Pydantic models — no replacement file |
 | `backend/roles/ceo/routes.py`, `hr_manager/routes.py`, `customer_support/routes.py` | **Deleted 2026-07-08** after page bodies moved to `pages/{ceo,hr_manager,customer_support}.py`; package `__init__.py` files remain compatibility exports |
-| `backend/roles/academic_director/routes.py`, `head_of_department/routes.py` | `pages/{academic_director,head_of_department}.py` (their APIs are already in v1); drop the `/academic_director` underscore alias |
+| `backend/roles/academic_director/routes.py`, `head_of_department/routes.py` | **Deleted 2026-07-09** after moving page shells to `pages/{academic_director,head_of_department}.py`; their APIs already live in v1. Keep the `/academic_director` underscore alias until tests/frontend prove it can be removed |
 | `backend/routes/system.py` + `backend/routes/` package | manifest/sw.js → `pages/public.py`; router includes → `server.py` |
 | `backend/domains/identity/routes.py` `register_user_auth_routes` closure | `pages/public.py` (login/telegram/logout pages) + `api/v1/auth/` |
-| `database/queries/` (12 modules) + `database/cross_queries/` (3 modules) | SQL relocated into `domains/*/queries.py` as slices touch it. Verified: `tgbot/` has zero imports of these — web-side only |
+| `database/queries/` (remaining modules) + `database/cross_queries/` (3 modules) | SQL relocated into `domains/*/queries.py` as slices touch it. `database/queries/announcement_queries.py` was deleted 2026-07-09 after imports moved to `backend/domains/announcements/queries.py` |
 
 Note: `roles/*/services/`, `workspace_cards.py`, and `staff_registration.py` are business logic, not transport — they move under `domains/` (or stay put temporarily) but are NOT deleted until importers and tests are migrated. HOD Teacher Academy scope has already moved and no longer depends on `backend.utils.context`.
 
@@ -150,7 +150,7 @@ Precondition: `grep -r "from backend.utils.context import" backend/` returns zer
 | `backend/api/v1/{role}/schemas.py` (per role, as slices land) | Pydantic request/response models |
 | `backend/api/v1/admin/{admins,students,teachers,payments,academic,resources,chat,announcements,complaints,office_hours,parents}.py` | The 68 admin routes split by panel, aggregated by the existing `api/v1/admin/router.py` |
 | `backend/api/v1/student/{dashboard,chat,comments,resources,rating,office_hours}.py` | The bare `/api/*` student cluster |
-| `backend/api/v1/teacher/office_hours.py` (first teacher slice) | `/teacher/api/office-hours/*` |
+| `backend/api/v1/teacher/office_hours.py` (first teacher slice) | `/api/v1/teacher/office-hours/*` |
 | `docs/API_FOUNDATION.md` (update) | The mandatory route standard (§5) so future slices — human or Codex — follow it |
 
 ---

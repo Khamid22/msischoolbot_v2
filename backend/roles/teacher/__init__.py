@@ -1,6 +1,9 @@
-"""Teacher role entry points."""
+"""Teacher role compatibility exports."""
 
-from backend.roles.teacher.routes import register_teacher_page_routes
+
+def register_teacher_page_routes(app):
+    from backend.pages.teacher import register_teacher_page_routes as register_routes
+
+    return register_routes(app)
 
 __all__ = ["register_teacher_page_routes"]
-

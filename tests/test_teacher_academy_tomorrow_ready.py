@@ -253,7 +253,7 @@ def _minimal_academic_context():
 
 def _patch_admin_page_context(monkeypatch):
     import backend.roles.admin.routes.admin_page as admin_page
-    import backend.roles.academic_director.routes as academic_director_routes
+    import backend.pages.academic_director as academic_director_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -316,7 +316,7 @@ def test_academy_workspace_cards_show_required_counts():
 
 def test_teacher_route_exposes_academy_overview_lessons_timetable_and_updates(client, monkeypatch):
     import backend.domains.teachers.service as teacher_service
-    import backend.roles.teacher.routes as teacher_routes
+    import backend.pages.teacher as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _academy_workspace())

@@ -1,5 +1,9 @@
-"""Head of Department workspace and subject-scope helpers."""
+"""Head of Department role compatibility exports."""
 
-from backend.roles.head_of_department.routes import register_head_of_department_page_routes
+
+def register_head_of_department_page_routes(app):
+    from backend.pages.head_of_department import register_head_of_department_page_routes as register_routes
+
+    return register_routes(app)
 
 __all__ = ["register_head_of_department_page_routes"]

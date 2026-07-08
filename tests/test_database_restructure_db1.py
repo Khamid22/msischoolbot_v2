@@ -55,10 +55,10 @@ def test_teacher_academy_service_uses_domain_queries_not_inline_sql():
     assert "UPDATE msi_v2" not in service_source
 
 
-def test_role_edges_import_teacher_academy_domain_service_where_safe():
+def test_page_and_role_edges_import_teacher_academy_domain_service_where_safe():
     role_sources = [
-        Path("backend/roles/academic_director/routes.py").read_text(),
-        Path("backend/roles/head_of_department/routes.py").read_text(),
+        Path("backend/pages/academic_director.py").read_text(),
+        Path("backend/pages/head_of_department.py").read_text(),
         Path("backend/roles/head_of_department/workspace_cards.py").read_text(),
         Path("backend/roles/teacher/services.py").read_text(),
         Path("backend/roles/admin/services/page_service.py").read_text(),

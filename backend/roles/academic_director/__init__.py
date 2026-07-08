@@ -1,5 +1,9 @@
-"""Academic Director role package."""
+"""Academic Director role compatibility exports."""
 
-from backend.roles.academic_director.routes import register_academic_director_page_routes
+
+def register_academic_director_page_routes(app):
+    from backend.pages.academic_director import register_academic_director_page_routes as register_routes
+
+    return register_routes(app)
 
 __all__ = ["register_academic_director_page_routes"]

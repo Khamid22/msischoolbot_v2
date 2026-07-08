@@ -24,13 +24,12 @@ def test_academics_timetable_and_announcement_query_modules_import_successfully(
     assert callable(announcement_queries.update_announcement_row)
 
 
-def test_announcement_legacy_query_wrapper_still_exports_domain_functions():
-    import backend.domains.announcements.queries as announcement_queries
-    import database.queries.announcement_queries as legacy_announcement_queries
+def test_announcement_legacy_query_wrapper_is_deleted_after_imports_migrate():
+    active_backend_source = "\n".join(path.read_text() for path in Path("backend").rglob("*.py"))
 
-    assert legacy_announcement_queries.ensure_announcements_schema is announcement_queries.ensure_announcements_schema
-    assert legacy_announcement_queries.list_announcement_rows is announcement_queries.list_announcement_rows
-    assert legacy_announcement_queries.insert_announcement_row is announcement_queries.insert_announcement_row
+    assert not Path("database/queries/announcement_queries.py").exists()
+    assert "database.queries.announcement_queries" not in active_backend_source
+    assert "from .announcement_queries import *" not in Path("database/queries/__init__.py").read_text()
 
 
 def test_academic_services_use_domain_query_modules():
@@ -55,7 +54,6 @@ def test_targeted_academic_services_no_longer_embed_schema_sql():
         "backend/domains/academics/postgres_service.py",
         "backend/domains/academics/internal_dashboard_service.py",
         "backend/domains/announcements/service.py",
-        "database/queries/announcement_queries.py",
     ]
     for path in service_paths:
         source = Path(path).read_text()

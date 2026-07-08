@@ -33,16 +33,35 @@ def test_server_registers_api_v1_before_role_pages():
     source = Path("backend/server.py").read_text()
 
     assert "from backend.api.v1.router import router as api_v1_router" in source
+    assert "from backend.pages.academic_director import register_academic_director_page_routes" in source
+    assert "from backend.pages.head_of_department import register_head_of_department_page_routes" in source
+    assert "from backend.pages.teacher import register_teacher_page_routes" in source
+    assert "from backend.roles.academic_director.routes" not in source
+    assert "from backend.roles.head_of_department.routes" not in source
+    assert "from backend.roles.teacher.routes" not in source
     assert "app_instance.include_router(api_v1_router)" in source
     assert source.index("app_instance.include_router(api_v1_router)") < source.index(
         "register_academic_director_page_routes(app_instance)"
     )
 
 
-def test_academic_director_and_hod_role_routes_are_page_only_for_migrated_actions():
+def test_ad_hod_and_teacher_role_route_files_are_deleted_after_page_move():
     for path in [
         Path("backend/roles/academic_director/routes.py"),
         Path("backend/roles/head_of_department/routes.py"),
+        Path("backend/roles/teacher/routes.py"),
+    ]:
+        assert not path.exists()
+
+    assert "backend.pages.academic_director" in Path("backend/roles/academic_director/__init__.py").read_text()
+    assert "backend.pages.head_of_department" in Path("backend/roles/head_of_department/__init__.py").read_text()
+    assert "backend.pages.teacher" in Path("backend/roles/teacher/__init__.py").read_text()
+
+
+def test_academic_director_and_hod_role_routes_are_page_only_for_migrated_actions():
+    for path in [
+        Path("backend/pages/academic_director.py"),
+        Path("backend/pages/head_of_department.py"),
     ]:
         source = path.read_text()
         assert "@router.post" not in source
