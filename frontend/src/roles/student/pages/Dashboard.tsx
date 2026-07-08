@@ -638,14 +638,14 @@ function ChartsFallback() {
     <>
       <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Attendance Rate" subtitle="Loading chart data..." icon={<Calendar className="h-4 w-4 text-success" />}>
-          <div className="h-52 animate-pulse rounded-lg bg-muted/70 sm:h-60" />
+          <div className="h-52 animate-pulse rounded-lg bg-muted/70 sm:h-60 lg:h-[clamp(12rem,26dvh,19rem)]" />
         </ChartCard>
         <ChartCard title="Exam Performance" subtitle="Loading chart data..." icon={<BarChart3 className="h-4 w-4 text-info" />}>
-          <div className="h-56 animate-pulse rounded-lg bg-muted/70 sm:h-64" />
+          <div className="h-56 animate-pulse rounded-lg bg-muted/70 sm:h-64 lg:h-[clamp(12rem,26dvh,19rem)]" />
         </ChartCard>
       </div>
       <ChartCard title="Homework Grades" subtitle="Loading chart data..." icon={<Activity className="h-4 w-4 text-success" />}>
-        <div className="h-64 animate-pulse rounded-lg bg-muted/70" />
+        <div className="h-64 animate-pulse rounded-lg bg-muted/70 lg:h-[clamp(9rem,20dvh,15rem)]" />
       </ChartCard>
     </>
   );

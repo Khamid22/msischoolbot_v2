@@ -465,7 +465,9 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'buildAdminTabUrl(nextTab, currentSchool, allowPreviewMode ? adminMode : "")' in admin_state_source
     assert 'buildAdminTabUrl(fallbackTab, currentSchool, allowPreviewMode ? adminMode : "")' in admin_state_source
     assert 'preview_enabled = current_auth_role() == "admin" and _dev_preview_enabled()' in admin_page_source
-    assert "canUseAdminPreviewForRole(realRole)" in admin_source
+    # Preview gating lives entirely in useAdminState; Admin.tsx just consumes
+    # the resolved state and must not re-derive it.
+    assert "canUseAdminPreviewForRole" not in admin_source
     assert "Account/profile auth is always active." in deployment_doc
     assert "ADMIN_PREVIEW_ROLES=0" in deployment_doc
 

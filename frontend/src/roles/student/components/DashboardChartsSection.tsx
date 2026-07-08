@@ -56,10 +56,10 @@ export default function DashboardChartsSection(props: DashboardChartsSectionProp
         <ChartCard title="Attendance Rate" subtitle={`Total Sessions: ${attendanceTotal}`} icon={<Calendar className="h-4 w-4 text-success" />}>
           {attendanceData.length ? (
             <>
-              <div className="relative h-40 sm:h-44 lg:h-48">
+              <div className="relative h-40 sm:h-44 lg:h-[clamp(9rem,20dvh,15rem)]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={attendanceData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={70} paddingAngle={2}>
+                    <Pie data={attendanceData} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="84%" paddingAngle={2}>
                       {attendanceData.map((entry, index) => (
                         <Cell key={entry.name} fill={attendanceColors[index]} />
                       ))}
@@ -96,7 +96,7 @@ export default function DashboardChartsSection(props: DashboardChartsSectionProp
 
         <ChartCard title="Exam Performance" subtitle="Best score by exam" icon={<TrendingUp className="h-4 w-4 text-info" />}>
           {examChartData.length ? (
-            <div className="h-44 sm:h-48 lg:h-52">
+            <div className="h-44 sm:h-48 lg:h-[clamp(10rem,22dvh,16rem)]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={examChartData} margin={{ top: 8, right: 8, left: -6, bottom: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--foreground) / 0.06)" />
@@ -128,13 +128,13 @@ export default function DashboardChartsSection(props: DashboardChartsSectionProp
       >
         {homeworkChartData.length ? (
           <div className="flex">
-            <div className="sticky left-0 z-10 flex h-56 w-8 shrink-0 flex-col justify-between bg-surface pb-8 pt-3 text-right text-[11px] text-muted-foreground sm:h-52">
+            <div className="sticky left-0 z-10 flex h-56 w-8 shrink-0 flex-col justify-between bg-surface pb-8 pt-3 text-right text-[11px] text-muted-foreground sm:h-52 lg:h-[clamp(9rem,20dvh,15rem)]">
               {homeworkYAxisLabels.map((label) => (
                 <span key={label}>{label}</span>
               ))}
             </div>
             <div className="-mr-4 min-w-0 flex-1 overflow-x-auto pl-1 pr-4 pb-2 sm:mr-0 sm:pr-0">
-              <div className="h-56 sm:h-52" style={{ minWidth: homeworkChartWidth }}>
+              <div className="h-56 sm:h-52 lg:h-[clamp(9rem,20dvh,15rem)]" style={{ minWidth: homeworkChartWidth }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={homeworkChartData} margin={{ top: 10, right: 18, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--foreground) / 0.06)" />
