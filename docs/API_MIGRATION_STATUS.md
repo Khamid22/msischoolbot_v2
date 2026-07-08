@@ -43,7 +43,7 @@ Import counts on 2026-07-08:
 | `database.queries` / `from database import queries` | 13 | 13 | domain services still using query barrel, identity storage/links, demo auth, role services |
 | `database.cross_queries` | 1 | 1 | compatibility mention/re-export in student domain queries |
 | `backend.utils.context` | 21 | 21 | legacy page routes, server middleware, identity routes, render/session helpers |
-| `backend.roles.*` | 64 | 32 | server route registration, page helpers, API v1 admin/AD slices, role services |
+| `backend.roles.*` | 63 | 31 | server route registration, page helpers, API v1 admin/AD slices, role services |
 | `jsonify` | 0 | 0 | none |
 
 ## Role Route File Classification
@@ -58,10 +58,10 @@ Import counts on 2026-07-08:
 | `backend/roles/admin/routes/resource_routes.py` | Form mutation routes | Blocked until resource mutations move to API v1/domain services |
 | `backend/roles/admin/routes/student_routes.py` | Mixed page shell + form mutation routes | Blocked until admin student pages/actions are split |
 | `backend/roles/admin/routes/teacher_routes.py` | Form mutation routes | Blocked until admin teacher/candidate panel migration |
-| `backend/roles/ceo/routes.py` | Compatibility re-export | Safe to delete only after imports from `backend.roles.ceo.routes` are zero |
-| `backend/roles/customer_support/routes.py` | Compatibility re-export | Safe to delete only after imports from `backend.roles.customer_support.routes` are zero |
+| `backend/roles/ceo/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.ceo.routes` reached zero |
+| `backend/roles/customer_support/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.customer_support.routes` reached zero |
 | `backend/roles/head_of_department/routes.py` | Page shell route | Blocked until moved to `backend/pages/head_of_department.py`; HOD scope wrappers are still local page compatibility |
-| `backend/roles/hr_manager/routes.py` | Compatibility re-export | Safe to delete only after imports from `backend.roles.hr_manager.routes` are zero |
+| `backend/roles/hr_manager/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.hr_manager.routes` reached zero |
 | `backend/roles/parent/routes.py` | Mixed page/token route + token form action | Blocked until `backend/pages/parent.py`; preserve invite/link/dashboard behavior |
 | `backend/roles/student/routes/__init__.py` | Route registry compatibility | Blocked until student page modules move to `backend/pages/student.py` |
 | `backend/roles/student/routes/chat_page.py` | Page shell route | Blocked until student chat page moves to pages layer |
@@ -111,7 +111,7 @@ Teacher Academy cleanup:
 - Updated HOD Teacher Academy API routes to pass `CurrentUser` into permission checks and scoped response payloads.
 - Tightened `backend/api/v1/teacher_academy/responses.py.__all__` so it exports only response adapters/helpers, not raw domain service functions.
 
-## Phase 2 Started
+## Phase 2 Completed
 
 Page-shell migration:
 
@@ -121,7 +121,8 @@ Page-shell migration:
   - `backend/pages/hr_manager.py`
   - `backend/pages/customer_support.py`
 - Updated `backend/server.py` to register those page routers from `backend.pages`.
-- Left `backend/roles/{ceo,hr_manager,customer_support}/routes.py` as compatibility re-exports for existing imports/tests.
+- Deleted `backend/roles/{ceo,hr_manager,customer_support}/routes.py` after import checks showed zero remaining importers.
+- Kept `backend/roles/{ceo,hr_manager,customer_support}/__init__.py` as package-level compatibility exports pointing directly to `backend.pages`.
 
 ## Migration Map
 
@@ -133,6 +134,7 @@ Page-shell migration:
 | `roles/admin/services/teacher_academy_notifications.py` | `domains/teacher_academy/notifications.py` | Done |
 | `roles/admin/services/page_service.py` cache store | `domains/admin/page_cache.py` | Done |
 | CEO/HR/Support page shells | `backend/pages/*` | Done |
+| `roles/{ceo,hr_manager,customer_support}/routes.py` compatibility re-exports | deleted; package `__init__.py` exports page registration functions | Done |
 | Remaining role page shells | `backend/pages/*` | Pending |
 | Remaining role business services | matching `backend/domains/*` packages | Pending |
 | Remaining database wrappers | matching `backend/domains/*/queries.py` | Pending |
@@ -147,15 +149,7 @@ python3 -m pytest tests/test_architecture_cleanup.py tests/test_phase1d_structur
 python3 -m pytest tests/test_role_routing.py tests/test_phase2a_role_workspaces.py tests/test_pages.py tests/test_route_snapshot.py
 ```
 
-Full-suite and frontend checks remain to run after the next migration slice:
-
-```bash
-python3 -m pytest
-npm --prefix frontend run check-types
-npm --prefix frontend run build
-```
-
-Most recent verification for the Teacher Academy permission slice:
+Most recent full verification for the Phase 2 small-role cleanup:
 
 ```bash
 python3 -m pytest
@@ -167,7 +161,6 @@ npm --prefix frontend run build
 
 | Candidate | Why next | Blocker |
 | --- | --- | --- |
-| `backend/roles/{ceo,hr_manager,customer_support}/routes.py` | Already compatibility re-exports; page bodies live in `backend/pages/*` | Existing imports/tests still reference old paths |
 | `backend/roles/head_of_department/routes.py` | Page-only after API v1 Teacher Academy migration | Need `backend/pages/head_of_department.py` and test updates |
 | `backend/roles/academic_director/routes.py` | Page-only after API v1 Teacher Academy/HOD actions | Need `backend/pages/academic_director.py`; underscore alias decision |
 | `backend/roles/teacher/routes.py` | Page-only; teacher JSON office-hours already migrated | Need `backend/pages/teacher.py`; preserve teacher cabinet bootstrap |

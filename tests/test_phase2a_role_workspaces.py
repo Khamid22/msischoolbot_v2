@@ -3,6 +3,7 @@
 import json
 import os
 from base64 import b64encode
+from pathlib import Path
 
 import pytest
 from itsdangerous import TimestampSigner
@@ -221,3 +222,16 @@ def test_existing_critical_routes_remain_registered(app, method, path):
 
     assert path in routes
     assert method in routes[path]
+
+
+def test_small_role_route_modules_are_deleted_after_page_move():
+    for path in [
+        Path("backend/roles/ceo/routes.py"),
+        Path("backend/roles/hr_manager/routes.py"),
+        Path("backend/roles/customer_support/routes.py"),
+    ]:
+        assert not path.exists()
+
+    assert "backend.pages.ceo" in Path("backend/roles/ceo/__init__.py").read_text()
+    assert "backend.pages.hr_manager" in Path("backend/roles/hr_manager/__init__.py").read_text()
+    assert "backend.pages.customer_support" in Path("backend/roles/customer_support/__init__.py").read_text()

@@ -1,5 +1,5 @@
-"""HR Manager role package."""
+"""HR Manager role compatibility exports."""
 
-from backend.roles.hr_manager.routes import register_hr_manager_page_routes
+from backend.pages.hr_manager import register_hr_manager_page_routes
 
 __all__ = ["register_hr_manager_page_routes"]

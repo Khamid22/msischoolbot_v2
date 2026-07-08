@@ -32,7 +32,7 @@ What is already correct and must NOT change:
 - `backend/api/v1/router.py` per-role aggregation under `/api/v1`.
 - `backend/api/v1/teacher_academy/{schemas,responses}.py` owns shared Teacher Academy API schemas/adapters.
 - `backend/domains/teacher_academy/{permissions,notifications}.py` owns HOD scope checks and academy notification helpers. Permission functions now accept `CurrentUser` or explicit identity context instead of reading the legacy request/session proxy.
-- `backend/pages/{ceo,hr_manager,customer_support}.py` owns the three page-only role shells; their old role route modules are compatibility re-exports.
+- `backend/pages/{ceo,hr_manager,customer_support}.py` owns the three page-only role shells; their old role route modules are deleted, with package `__init__.py` files kept as compatibility exports.
 - `AuthAndSecurityMiddleware` security ideas: same-origin/CSRF check, fail-closed secret key, security headers, cache-control policy (to be slimmed, not removed).
 - `backend/core/` (config, database, security), `backend/integrations/`, `render.py` page rendering.
 
@@ -118,7 +118,7 @@ Each `roles/` route file is deleted when its routes have moved to `api/v1/{role}
 | `backend/roles/parent/routes.py` | `pages/parent.py` (incl. token-authed invite pages) + `api/v1/parent/` |
 | `backend/roles/admin/routes/` (12 files: admin_page, admins, student_routes, teacher_routes, payment_routes, academic_routes, resource_routes, chat_admin_routes, announcement_routes, complaint_routes, office_hours_routes, parent_routes) | `pages/admin.py` + `api/v1/admin/{admins,students,teachers,payments,academic,resources,chat,announcements,complaints,office_hours,parents}.py` |
 | `backend/roles/admin/routes/request_payload.py` | Pydantic models — no replacement file |
-| `backend/roles/ceo/routes.py`, `hr_manager/routes.py`, `customer_support/routes.py` | **Moved 2026-07-08** to `pages/{ceo,hr_manager,customer_support}.py`; old modules are compatibility re-exports |
+| `backend/roles/ceo/routes.py`, `hr_manager/routes.py`, `customer_support/routes.py` | **Deleted 2026-07-08** after page bodies moved to `pages/{ceo,hr_manager,customer_support}.py`; package `__init__.py` files remain compatibility exports |
 | `backend/roles/academic_director/routes.py`, `head_of_department/routes.py` | `pages/{academic_director,head_of_department}.py` (their APIs are already in v1); drop the `/academic_director` underscore alias |
 | `backend/routes/system.py` + `backend/routes/` package | manifest/sw.js → `pages/public.py`; router includes → `server.py` |
 | `backend/domains/identity/routes.py` `register_user_auth_routes` closure | `pages/public.py` (login/telegram/logout pages) + `api/v1/auth/` |

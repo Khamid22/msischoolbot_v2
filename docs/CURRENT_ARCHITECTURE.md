@@ -105,7 +105,7 @@ Runtime inventory on 2026-07-08: 145 registered routes; 76 are `/api/v1/*`, 57 a
 - `teacher`: active teacher or academy teacher cabinet.
 - `student`: student dashboard and learning tools.
 - `parent`: linked-child parent portal.
-- `ceo`, `hr_manager`, and `customer_support`: page shells now live in `backend/pages/*`; matching `backend/roles/*/routes.py` files are compatibility re-exports.
+- `ceo`, `hr_manager`, and `customer_support`: page shells now live in `backend/pages/*`; matching `backend/roles/*/routes.py` files have been deleted, with package `__init__.py` compatibility exports pointing directly to `backend.pages`.
 
 ## Request Flow Examples
 
@@ -136,7 +136,7 @@ These wrappers should be removed only after import references are eliminated and
 
 - `database/` remains because Alembic history, compatibility query wrappers, and active imports still depend on it.
 - The physical schema remains `msi_v2`; the `lms` rename is only planned.
-- Most old page and form routes still live in `backend/roles/`, including `/admin/*` form actions and major role page shells. CEO, HR Manager, and Customer Support page shells have moved to `backend/pages`.
+- Most old page and form routes still live in `backend/roles/`, including `/admin/*` form actions and major role page shells. CEO, HR Manager, and Customer Support page shells have moved to `backend/pages`, and their old role `routes.py` files are deleted.
 - Admin page routes still use `render_admin_page` because the system/admin workspace has not been moved to `backend/pages/admin.py` yet.
 - API v1 still has temporary imports from role services for a few admin/AD slices (`staff_registration`, `academic_service`, upload progress/storage helpers). These are tracked for later domain moves.
 
