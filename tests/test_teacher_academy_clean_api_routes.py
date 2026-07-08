@@ -93,12 +93,14 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/status",
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/lessons",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete",
         "/api/v1/head-of-department/teacher-academy/assignments/{assignment_id}",
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments",
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete",
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status",
+        "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/lessons",
     ]:
         assert "POST" in routes[path]
 
@@ -242,6 +244,30 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
     assert calls["delete"]["academy_teacher_id"] == 91
 
 
+def test_academic_director_lessons_sync_route_calls_domain_service(client, monkeypatch):
+    academy_api = _patch_api_payload(monkeypatch)
+    captured = {}
+
+    def fake_sync_academy_lessons(**kwargs):
+        captured.update(kwargs)
+        return True, ""
+
+    monkeypatch.setattr(academy_api, "sync_academy_lessons", fake_sync_academy_lessons)
+    _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
+
+    response = client.post(
+        "/api/v1/academic-director/teacher-academy/91/lessons",
+        data={"academy_curriculum_item_ids": "103,101,120"},
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert captured["academy_teacher_id"] == 91
+    assert captured["selected_curriculum_item_ids"] == ["103", "101", "120"]
+    assert captured["created_by"] == "AD0001"
+
+
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
     import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
 
@@ -283,6 +309,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
         ("/api/v1/head-of-department/teacher-academy/91/assessments", "add_assessment", "assessment"),
         ("/api/v1/head-of-department/teacher-academy/91/assessments/17/delete", "delete_assessment", "delete_assessment"),
         ("/api/v1/head-of-department/teacher-academy/91/status", "update_academy_status", "status"),
+        ("/api/v1/head-of-department/teacher-academy/91/lessons", "sync_academy_lessons", "lessons"),
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):

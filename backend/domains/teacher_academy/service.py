@@ -740,6 +740,89 @@ def update_assignment(
     return True, ""
 
 
+def sync_academy_lessons(*, academy_teacher_id, selected_curriculum_item_ids, created_by=""):
+    """Replace the teacher's selected academy lessons with the given curriculum items.
+
+    Assignments whose curriculum item is unticked are deleted together with
+    their assessment reports; newly ticked items become new assignments.
+    """
+    parsed_teacher_id = _as_int(academy_teacher_id)
+    if not parsed_teacher_id:
+        return False, "Academy teacher not found."
+
+    now = _utc_now_iso()
+    with queries.connect_auth_db() as conn:
+        _ensure_schema(conn)
+        teacher = queries.get_academy_teacher_program_row(conn, parsed_teacher_id)
+        if not teacher:
+            return False, "Academy teacher not found."
+        program = _program_row(conn, teacher["subject_program_id"])
+        if not program:
+            return False, "Academy teacher has no subject curriculum program."
+        lessons, lesson_error = _selected_curriculum_lessons(
+            conn,
+            program["id"],
+            selected_curriculum_item_ids,
+        )
+        if lesson_error:
+            return False, lesson_error
+
+        existing_rows = queries.list_assignment_rows(conn, parsed_teacher_id)
+        assignment_id_by_item = {}
+        for row in existing_rows:
+            item_id = int(row["curriculum_item_id"] or 0)
+            if item_id and item_id not in assignment_id_by_item:
+                assignment_id_by_item[item_id] = int(row["id"])
+
+        selected_item_ids = {int(lesson["id"]) for lesson in lessons}
+        removed_assignment_ids = [
+            int(row["id"])
+            for row in existing_rows
+            if int(row["curriculum_item_id"] or 0) not in selected_item_ids
+        ]
+        queries.delete_assignment_rows_with_assessments(conn, removed_assignment_ids)
+
+        added_count = 0
+        for sequence_no, lesson in enumerate(lessons, start=1):
+            assignment_id = assignment_id_by_item.get(int(lesson["id"]))
+            if assignment_id:
+                queries.update_assignment_sequence(
+                    conn,
+                    assignment_id=assignment_id,
+                    sequence_no=sequence_no,
+                    updated_at=now,
+                )
+            else:
+                queries.insert_academy_lesson_assignment(
+                    conn,
+                    academy_teacher_id=parsed_teacher_id,
+                    subject_id=int(program["subject_id"]),
+                    subject_program_id=int(program["id"]),
+                    curriculum_item_id=int(lesson["id"]),
+                    sequence_no=sequence_no,
+                    lesson_number=str(lesson["lesson_number"] or ""),
+                    lesson_topic=str(lesson["title"] or ""),
+                    focus_areas_json=json.dumps([]),
+                    created_by=str(created_by or "").strip(),
+                    created_at=now,
+                )
+                added_count += 1
+        queries.touch_academy_teacher(
+            conn,
+            academy_teacher_id=parsed_teacher_id,
+            updated_at=now,
+        )
+        conn.commit()
+    if added_count or removed_assignment_ids:
+        _notify_academy_event_safe(
+            event_type="lesson_assigned",
+            title="Teacher Academy lessons updated",
+            body=f"{len(lessons)} academy lessons are selected.",
+            source="Academic Department",
+        )
+    return True, ""
+
+
 def _assignment_for_assessment(conn, academy_teacher_id, lesson_assignment_id):
     return queries.get_assignment_for_assessment(
         conn,

@@ -7,11 +7,13 @@ from fastapi import APIRouter, Depends, Form, HTTPException
 from backend.api import ApiSuccess
 from backend.api.v1.teacher_academy_actions import (
     AddAcademyAssessmentForm,
+    SyncAcademyLessonsForm,
     TeacherAcademyMutationResult,
     UpdateAcademyAssignmentForm,
     UpdateAcademyStatusForm,
     add_assessment_response,
     delete_assessment_response,
+    sync_lessons_response,
     update_assignment_response,
     update_status_response,
 )
@@ -35,6 +37,25 @@ def register_teacher_academy_routes(router: APIRouter) -> None:
         if not can_current_user_manage_academy_assignment(assignment_id):
             raise HTTPException(status_code=403, detail="This Teacher Academy lesson is outside your subject scope.")
         return update_assignment_response(assignment_id, payload)
+
+    @router.post(
+        "/teacher-academy/{academy_teacher_id}/lessons",
+        operation_id="api_v1_head_of_department_sync_academy_lessons",
+        response_model=ApiSuccess[TeacherAcademyMutationResult],
+    )
+    def sync_academy_lessons(
+        academy_teacher_id: int,
+        payload: Annotated[SyncAcademyLessonsForm, Form()],
+        user: CurrentUser = Depends(get_current_user),
+    ):
+        if not can_current_user_manage_academy_teacher(academy_teacher_id):
+            raise HTTPException(status_code=403, detail="This Teacher Academy teacher is outside your subject scope.")
+        return sync_lessons_response(
+            academy_teacher_id,
+            payload,
+            created_by_label="Head of Department",
+            created_by_login=user.login,
+        )
 
     @router.post(
         "/teacher-academy/{academy_teacher_id}/assessments",

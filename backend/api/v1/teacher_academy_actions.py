@@ -15,6 +15,7 @@ from backend.domains.teacher_academy.service import (
     delete_academy_teacher,
     list_academy_teachers,
     promote_academy_teacher,
+    sync_academy_lessons,
     update_academy_status,
     update_assignment,
 )
@@ -157,6 +158,10 @@ class AddAcademyAssessmentForm(BaseModel):
         }
 
 
+class SyncAcademyLessonsForm(BaseModel):
+    academy_curriculum_item_ids: FormStringList = Field(default_factory=list)
+
+
 class UpdateAcademyStatusForm(BaseModel):
     academy_status: str = ""
 
@@ -288,6 +293,23 @@ def update_assignment_response(assignment_id: int, payload: UpdateAcademyAssignm
     return academy_payload("Academy lesson updated.")
 
 
+def sync_lessons_response(
+    academy_teacher_id: int,
+    payload: SyncAcademyLessonsForm,
+    *,
+    created_by_label: str = "Academic Director",
+    created_by_login: str = "",
+):
+    synced, error_message = sync_academy_lessons(
+        academy_teacher_id=academy_teacher_id,
+        selected_curriculum_item_ids=payload.academy_curriculum_item_ids,
+        created_by=created_by_login or created_by_label,
+    )
+    if not synced:
+        academy_error(error_message or "Unable to update academy lessons.")
+    return academy_payload("Academy lessons updated.")
+
+
 def add_assessment_response(
     academy_teacher_id: int,
     payload: AddAcademyAssessmentForm,
@@ -364,6 +386,7 @@ __all__ = [
     "AddAcademyAssessmentForm",
     "CreateAcademyTeacherForm",
     "PromoteAcademyTeacherForm",
+    "SyncAcademyLessonsForm",
     "TeacherAcademyMutationResult",
     "UpdateAcademyAssignmentForm",
     "UpdateAcademyStatusForm",
@@ -379,6 +402,7 @@ __all__ = [
     "form_list",
     "promote_response",
     "safe_credentials",
+    "sync_lessons_response",
     "update_assignment_response",
     "update_status_response",
 ]

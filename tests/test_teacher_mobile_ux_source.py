@@ -48,7 +48,7 @@ def test_teacher_academy_admin_list_has_mobile_cards_and_desktop_table():
     assert "MobileCardList" in source
     assert 'className="p-3"' in source
     assert "ResponsiveTable" in source
-    assert 'className="max-h-[calc(100dvh-20rem)] 2xl:max-h-[48rem]"' in source
+    assert "max-h-[calc(100dvh-20rem)]" in source
     assert "lg:hidden" in mobile_list
     assert "hidden lg:block" in responsive_table
     assert "No academy lessons assigned." in source
@@ -145,17 +145,25 @@ def test_head_of_departments_has_mobile_cards_desktop_table_and_compact_login():
 def test_teacher_academy_modals_select_assignment_ids():
     source = _read("roles/admin/panels/teachers/TeacherAcademyPanel.tsx")
 
+    # The schedule modal keeps its lesson assignment selector.
     assert 'name="assignment_id"' in source
     assert "onSubmit(asNumber(selectedAssignment?.id), fields)" in source
-    assert 'name="lesson_assignment_id"' in source
-    assert "fields.lesson_assignment_id = String(asNumber(selectedAssignment?.id));" in source
     assert "Select lesson assignment" in source
-    assert 'name="class_label"' in source
-    assert 'name="decision"' in source
+    # The assessment modal assesses the lesson row it was opened from and ends
+    # with an explicit Pass/Fail decision behind a confirmation dialog.
+    assert "fields.lesson_assignment_id = String(asNumber(assignment.id));" in source
+    assert "fields.decision = decision;" in source
     assert 'name="strengths"' in source
     assert 'name="areas_for_improvement"' in source
-    assert 'name="final_recommendation"' in source
-    assert "Save assessment" in source
+    assert 'name="final_recommendation"' not in source
+    assert 'name="class_label"' not in source
+    assert "Save assessment" not in source
+    assert "Confirm pass?" in source
+    assert "Confirm fail?" in source
+    # The detail modal switches between curriculum selection and assigned lessons.
+    assert "Subject Curriculum" in source
+    assert "CurriculumSelectionTab" in source
+    assert "academy_curriculum_item_ids: selectedIds.join" in source
 
 
 def test_teacher_mobile_bottom_nav_contract():

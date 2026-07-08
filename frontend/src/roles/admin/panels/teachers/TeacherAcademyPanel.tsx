@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy, XCircle } from "lucide-react";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -24,6 +24,7 @@ type TeacherAcademyActionRoutes = {
   assessmentCreate: (academyTeacherId: number | string) => string;
   assessmentDelete: (academyTeacherId: number | string, assessmentId: number | string) => string;
   statusUpdate: (academyTeacherId: number | string) => string;
+  lessonsSync: (academyTeacherId: number | string) => string;
   promote?: (academyTeacherId: number | string) => string;
   delete?: (academyTeacherId: number | string) => string;
 };
@@ -207,6 +208,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       assessmentCreate: routes.academicDirectorTeacherAcademyAssessmentCreate,
       assessmentDelete: routes.academicDirectorTeacherAcademyAssessmentDelete,
       statusUpdate: routes.academicDirectorTeacherAcademyStatusUpdate,
+      lessonsSync: routes.academicDirectorTeacherAcademyLessonsSync,
       promote: routes.academicDirectorTeacherAcademyPromote,
       delete: routes.academicDirectorTeacherAcademyDelete,
     };
@@ -218,6 +220,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       assessmentCreate: routes.headOfDepartmentTeacherAcademyAssessmentCreate,
       assessmentDelete: routes.headOfDepartmentTeacherAcademyAssessmentDelete,
       statusUpdate: routes.headOfDepartmentTeacherAcademyStatusUpdate,
+      lessonsSync: routes.headOfDepartmentTeacherAcademyLessonsSync,
     };
   }
   return {
@@ -226,6 +229,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
     assessmentCreate: () => "",
     assessmentDelete: () => "",
     statusUpdate: () => "",
+    lessonsSync: () => "",
   };
 }
 
@@ -1103,10 +1107,15 @@ function AssignmentModal({
   );
 }
 
+function autoGrowTextarea(event: React.FormEvent<HTMLTextAreaElement>) {
+  const element = event.currentTarget;
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
 function AssessmentModal({
   teacher,
   assignment,
-  state,
   submitting,
   error,
   onSubmit,
@@ -1114,191 +1123,116 @@ function AssessmentModal({
 }: {
   teacher: AcademyTeacher;
   assignment: AcademyAssignment;
-  state: any;
   submitting: boolean;
   error: string;
   onSubmit: (teacherId: number, fields: Record<string, string>) => void;
   onClose: () => void;
 }) {
-  const teachers = Array.isArray(state.teachers) ? state.teachers as Array<Record<string, unknown>> : [];
-  const assignments = academyAssignments(teacher);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState(asNumber(assignment.id) || asNumber(assignments[0]?.id));
-  const selectedAssignment = assignmentById(assignments, selectedAssignmentId);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [assessmentDate] = useState(() => new Date());
   const [scores, setScores] = useState<Record<string, string>>(
     Object.fromEntries(rubric.map((item) => [item.key, "7"])),
   );
+  const [confirmDecision, setConfirmDecision] = useState<"passed" | "needs_improvement" | null>(null);
   const weighted = rubric.reduce((sum, item) => {
     const value = Number(scores[item.key]);
     return sum + (Number.isFinite(value) ? value : 0) * item.weight;
   }, 0);
-  const controlClass = "h-11 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10";
+  const remarksClass = "min-h-10 w-full resize-none overflow-hidden rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10";
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
+  function submitDecision(decision: "passed" | "needs_improvement") {
     const fields: Record<string, string> = {};
-    data.forEach((value, key) => {
-      fields[key] = String(value);
-    });
+    if (formRef.current) {
+      new FormData(formRef.current).forEach((value, key) => {
+        fields[key] = String(value);
+      });
+    }
     rubric.forEach((item) => {
       fields[item.key] = scores[item.key] || "0";
       fields[item.remarksKey] = fields[item.remarksKey] || "";
     });
-    fields.lesson_assignment_id = String(asNumber(selectedAssignment?.id));
-    fields.decision = fields.decision || "passed";
+    fields.lesson_assignment_id = String(asNumber(assignment.id));
+    fields.assessment_datetime = toDateTimeLocal(assessmentDate.toISOString());
+    fields.decision = decision;
     onSubmit(asNumber(teacher.id), fields);
   }
 
   return (
     <ModalShell
       title="Assessment Report"
-      subtitle={`${asString(teacher.full_name)} · ${selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"} · score ${weighted.toFixed(2)}`}
+      subtitle={`${asString(teacher.full_name)} · ${assignmentTitle(assignment)} · score ${weighted.toFixed(2)}`}
       onClose={onClose}
       wide
       mobileMode="fullscreen"
     >
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+      <form ref={formRef} onSubmit={(event) => event.preventDefault()} className="flex min-h-0 flex-1 flex-col">
         <ModalBody className="space-y-4">
-          <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-2">
+          <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-3">
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher name</p>
               <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Selected lesson</p>
-              <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose lesson"}</p>
               <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
             </div>
-          </div>
-          <label className="block">
-            <FieldLabel>Lesson Assignment</FieldLabel>
-            <select
-              name="lesson_assignment_id"
-              required
-              value={selectedAssignmentId || ""}
-              onChange={(event) => setSelectedAssignmentId(asNumber(event.target.value))}
-              className={controlClass}
-            >
-              <option value="" disabled>Select lesson assignment</option>
-              {assignments.map((item) => (
-                <option key={asNumber(item.id)} value={asNumber(item.id)}>
-                  {assignmentTitle(item)}
-                </option>
-              ))}
-            </select>
-            {!assignments.length ? (
-              <span className="mt-2 block rounded-lg border border-dashed border-foreground/15 px-3 py-3 text-sm font-semibold text-muted-foreground">
-                No academy lessons assigned.
-              </span>
-            ) : null}
-          </label>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <label className="block">
-              <FieldLabel>Assessment Type</FieldLabel>
-              <select name="assessment_type" defaultValue="academy_practice_lesson" className={controlClass}>
-                <option value="demo_lesson">Demo lesson</option>
-                <option value="academy_practice_lesson">Academy practice lesson</option>
-                <option value="final_academy_evaluation">Final academy evaluation</option>
-              </select>
-            </label>
-            <label className="block">
-              <FieldLabel>Session Type</FieldLabel>
-              <select name="session_type" defaultValue="training_simulation" className={controlClass}>
-                <option value="training_simulation">Academy simulation</option>
-                <option value="practice_with_class">Practice with class</option>
-                <option value="final_evaluation">Final evaluation</option>
-              </select>
-            </label>
-            <label className="block">
-              <FieldLabel>Date/Time</FieldLabel>
-              <input key={`assessment-date-${selectedAssignmentId}`} name="assessment_datetime" type="datetime-local" defaultValue={toDateTimeLocal(selectedAssignment?.session_datetime)} className={controlClass} />
-            </label>
-            <label className="block">
-              <FieldLabel>Assigned Academic Director</FieldLabel>
-              <select key={`assessment-evaluator-${selectedAssignmentId}`} name="evaluator_id" defaultValue={asString(selectedAssignment?.evaluator_id)} className={controlClass}>
-                <option value="">Not assigned</option>
-                {teachers.map((item) => (
-                  <option key={asNumber(item.id)} value={asNumber(item.id)}>
-                    {asString(item.full_name)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <FieldLabel>Class Label</FieldLabel>
-              <input name="class_label" placeholder="Group or demo class" className={`${controlClass} placeholder:text-muted-foreground/70`} />
-            </label>
-            <label className="block">
-              <FieldLabel>Decision</FieldLabel>
-              <select name="decision" defaultValue="passed" className={controlClass}>
-                <option value="needs_improvement">Needs improvement</option>
-                <option value="passed">Passed</option>
-                <option value="ready_for_final_evaluation">Ready for final evaluation</option>
-                <option value="approved_for_active_teacher">Approved for active teacher</option>
-              </select>
-            </label>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assigned lesson</p>
+              <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{assignmentTitle(assignment)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-primary">Date</p>
+              <p className="mt-1 truncate text-sm font-black text-foreground">{dateLabel(assessmentDate.toISOString())}</p>
+            </div>
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/35 px-4 py-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
-                <p className="text-sm font-semibold text-foreground">{selectedAssignment ? assignmentTitle(selectedAssignment) : "Academy lesson"}</p>
-              </div>
+          <section className="rounded-xl border border-foreground/10">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 px-4 py-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                 Score {weighted.toFixed(2)}
               </span>
             </div>
-            <div className="grid gap-2 p-3 md:grid-cols-2">
+            <div className="divide-y divide-foreground/8">
               {rubric.map((item) => (
-                <div key={item.key} className="rounded-xl border border-foreground/8 bg-surface p-3">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-9 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-black text-primary">
+                <div key={item.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,14rem)_5.5rem_minmax(0,1fr)] sm:items-center">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-black text-primary">
                       {item.code}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold">{item.label}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{item.label}</p>
                       <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
                     </div>
                   </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[7rem_1fr]">
-                    <label className="block">
-                      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Score</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="10"
-                        step="0.1"
-                        value={scores[item.key] || ""}
-                        onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
-                        className="h-10 w-full rounded-xl border border-foreground/10 bg-background px-3 text-center text-sm font-black text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Remarks</span>
-                      <input
-                        name={item.remarksKey}
-                        className="h-10 w-full rounded-xl border border-foreground/10 bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
-                        placeholder="Remarks"
-                      />
-                    </label>
-                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.1"
+                    aria-label={`${item.label} score`}
+                    value={scores[item.key] || ""}
+                    onChange={(event) => setScores((current) => ({ ...current, [item.key]: event.target.value }))}
+                    className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-2 text-center text-sm font-black text-primary outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10"
+                  />
+                  <textarea
+                    name={item.remarksKey}
+                    rows={1}
+                    onInput={autoGrowTextarea}
+                    placeholder="Remarks"
+                    aria-label={`${item.label} remarks`}
+                    className={remarksClass}
+                  />
                 </div>
               ))}
             </div>
           </section>
-          <div className="grid gap-3 lg:grid-cols-3">
+
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block">
               <FieldLabel>Strengths</FieldLabel>
-              <textarea name="strengths" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="What went well?" />
+              <textarea name="strengths" rows={3} onInput={autoGrowTextarea} placeholder="What went well?" className={remarksClass} />
             </label>
             <label className="block">
               <FieldLabel>Areas for Improvement</FieldLabel>
-              <textarea name="areas_for_improvement" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="What should improve next?" />
-            </label>
-            <label className="block">
-              <FieldLabel>Final Recommendation</FieldLabel>
-              <textarea name="final_recommendation" rows={4} className="w-full rounded-xl border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none" placeholder="Final academic department note" />
+              <textarea name="areas_for_improvement" rows={3} onInput={autoGrowTextarea} placeholder="What should improve next?" className={remarksClass} />
             </label>
           </div>
           {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
@@ -1307,12 +1241,47 @@ function AssessmentModal({
           <button type="button" onClick={onClose} className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-foreground/10 bg-background px-4 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 sm:w-auto">
             Cancel
           </button>
-          <button type="submit" disabled={submitting || !selectedAssignment} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 sm:w-auto">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => setConfirmDecision("needs_improvement")}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-5 text-sm font-bold text-destructive transition hover:bg-destructive/10 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:active:scale-100 sm:w-auto"
+          >
+            <XCircle className="h-4 w-4" />
+            Fail
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => setConfirmDecision("passed")}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100 sm:w-auto"
+          >
             <CheckCircle2 className="h-4 w-4" />
-            {submitting ? "Saving..." : "Save assessment"}
+            {submitting ? "Saving..." : "Pass"}
           </button>
         </ModalFooter>
       </form>
+      <ConfirmDialog
+        open={Boolean(confirmDecision)}
+        title={confirmDecision === "passed" ? "Confirm pass?" : "Confirm fail?"}
+        message={
+          <>
+            {asString(teacher.full_name)} · {assignmentTitle(assignment)} · score {weighted.toFixed(2)}.
+          </>
+        }
+        confirmLabel={confirmDecision === "passed" ? "Yes, pass" : "Yes, fail"}
+        cancelLabel="No"
+        danger={confirmDecision === "needs_improvement"}
+        busy={submitting}
+        onConfirm={() => {
+          const decision = confirmDecision;
+          setConfirmDecision(null);
+          if (decision) submitDecision(decision);
+        }}
+        onCancel={() => {
+          if (!submitting) setConfirmDecision(null);
+        }}
+      />
     </ModalShell>
   );
 }
@@ -1401,29 +1370,165 @@ function PromoteModal({
   );
 }
 
+function CurriculumSelectionTab({
+  lessons,
+  assignedItemIds,
+  assessedItemIds,
+  canEdit,
+  submitting,
+  error,
+  onSave,
+}: {
+  lessons: Array<Record<string, unknown>>;
+  assignedItemIds: number[];
+  assessedItemIds: Set<number>;
+  canEdit: boolean;
+  submitting: boolean;
+  error: string;
+  onSave: (selectedIds: number[], removedCount: number, removedAssessedCount: number) => void;
+}) {
+  const [selectedIds, setSelectedIds] = useState<number[]>(assignedItemIds);
+  const [search, setSearch] = useState("");
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const assignedSet = useMemo(() => new Set(assignedItemIds), [assignedItemIds]);
+  const filteredLessons = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return lessons;
+    return lessons.filter((lesson) =>
+      [lesson.lesson_number, lesson.lessonNumber, lesson.title, lesson.specification_points, lesson.book_pages]
+        .map(asString)
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [lessons, search]);
+  const removedIds = assignedItemIds.filter((itemId) => !selectedSet.has(itemId));
+  const addedCount = selectedIds.filter((itemId) => !assignedSet.has(itemId)).length;
+  const dirty = addedCount > 0 || removedIds.length > 0;
+
+  function toggleLesson(lessonId: number) {
+    if (!canEdit || !lessonId) return;
+    setSelectedIds((current) =>
+      current.includes(lessonId) ? current.filter((itemId) => itemId !== lessonId) : [...current, lessonId],
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+        <div className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2">
+          <p className="text-lg font-black leading-6 text-primary">{selectedIds.length}</p>
+          <p className="text-[10px] font-black uppercase tracking-wide text-primary/80">
+            of {lessons.length} lessons selected
+          </p>
+        </div>
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search lessons..."
+          aria-label="Search curriculum lessons"
+          className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary"
+        />
+        {canEdit ? (
+          <button
+            type="button"
+            disabled={!dirty || submitting || !selectedIds.length}
+            onClick={() => {
+              const removedAssessedCount = removedIds.filter((itemId) => assessedItemIds.has(itemId)).length;
+              onSave(selectedIds, removedIds.length, removedAssessedCount);
+            }}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50"
+          >
+            {submitting ? "Saving..." : "Save selection"}
+          </button>
+        ) : null}
+      </div>
+      {canEdit && dirty && !selectedIds.length ? (
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+          Select at least 1 Teacher Academy lesson.
+        </p>
+      ) : null}
+      {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
+      <div className="max-h-[48dvh] overflow-auto rounded-lg border border-foreground/8">
+        {filteredLessons.length ? (
+          filteredLessons.map((lesson) => {
+            const lessonId = asNumber(lesson.id);
+            const checked = selectedSet.has(lessonId);
+            const assessed = assessedItemIds.has(lessonId);
+            return (
+              <label
+                key={lessonId}
+                className={`flex cursor-pointer items-start gap-3 border-b border-foreground/6 px-3 py-2.5 last:border-b-0 ${
+                  checked ? "bg-primary/5" : "bg-background"
+                } ${canEdit ? "" : "cursor-default"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!canEdit}
+                  onChange={() => toggleLesson(lessonId)}
+                  className="mt-1 shrink-0"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-bold">
+                      {asString(lesson.lesson_number) || `Lesson ${asNumber(lesson.item_order)}`} · {asString(lesson.title)}
+                    </span>
+                    {assessed ? (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary">
+                        Assessed
+                      </span>
+                    ) : null}
+                  </span>
+                  {asString(lesson.specification_points) ? (
+                    <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-muted-foreground">
+                      {asString(lesson.specification_points)}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            );
+          })
+        ) : (
+          <p className="px-4 py-8 text-center text-sm font-semibold text-muted-foreground">
+            {lessons.length ? "No lessons match your search." : "No curriculum lessons found for this subject."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AcademyDetailModal({
   teacher,
+  state,
+  submitting,
+  error,
   onClose,
   onPreview,
-  onSchedule,
   onAssess,
   onDeleteAssessment,
   onPromote,
+  onSyncLessons,
   allowTeacherPreview,
-  canSchedule,
+  canEditLessons,
   canAssess,
   canDeleteAssessment,
   canPromote,
 }: {
   teacher: AcademyTeacher;
+  state: any;
+  submitting: boolean;
+  error: string;
   onClose: () => void;
   onPreview: () => void;
-  onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onDeleteAssessment: (assessment: Record<string, unknown>) => void;
   onPromote: () => void;
+  onSyncLessons: (selectedIds: number[]) => Promise<boolean>;
   allowTeacherPreview: boolean;
-  canSchedule: boolean;
+  canEditLessons: boolean;
   canAssess: boolean;
   canDeleteAssessment: boolean;
   canPromote: boolean;
@@ -1432,6 +1537,62 @@ function AcademyDetailModal({
   const assessments = academyAssessments(teacher);
   const progress = teacherProgress(teacher);
   const login = asString(teacher.login);
+  const [activeTab, setActiveTab] = useState<"curriculum" | "lessons">(assignments.length ? "lessons" : "curriculum");
+  const [pendingSync, setPendingSync] = useState<{
+    selectedIds: number[];
+    removedCount: number;
+    removedAssessedCount: number;
+  } | null>(null);
+
+  const curriculumLessons = useMemo(() => {
+    const items = Array.isArray(state.props?.adminAcademicCurriculumItems)
+      ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+      : [];
+    const programId = asNumber(teacher.subject_program_id);
+    return items
+      .filter((item) => {
+        const itemProgramId = asNumber(item.program_id || item.programId);
+        const itemType = asString(item.item_type || item.itemType).toLowerCase();
+        return itemProgramId === programId && itemType === "lesson";
+      })
+      .sort((left, right) => asNumber(left.item_order || left.itemOrder) - asNumber(right.item_order || right.itemOrder));
+  }, [state.props?.adminAcademicCurriculumItems, teacher.subject_program_id]);
+
+  const latestAssessmentByAssignment = useMemo(() => {
+    const map = new Map<number, Record<string, unknown>>();
+    assessments.forEach((assessment) => {
+      const assignmentId = asNumber(assessment.lesson_assignment_id);
+      if (assignmentId) map.set(assignmentId, assessment);
+    });
+    return map;
+  }, [assessments]);
+
+  const assignedItemIds = useMemo(
+    () => assignments.map((assignment) => asNumber(assignment.curriculum_item_id)).filter(Boolean),
+    [assignments],
+  );
+  const assessedItemIds = useMemo(
+    () =>
+      new Set(
+        assignments
+          .filter((assignment) => latestAssessmentByAssignment.has(asNumber(assignment.id)))
+          .map((assignment) => asNumber(assignment.curriculum_item_id))
+          .filter(Boolean),
+      ),
+    [assignments, latestAssessmentByAssignment],
+  );
+
+  async function saveSelection(selectedIds: number[]) {
+    const saved = await onSyncLessons(selectedIds);
+    if (saved) setPendingSync(null);
+    return saved;
+  }
+
+  const tabs = [
+    { key: "curriculum" as const, label: "Subject Curriculum" },
+    { key: "lessons" as const, label: `Assigned Lessons (${assignments.length})` },
+  ];
+
   return (
     <ModalShell title={asString(teacher.full_name)} subtitle={`${asString(teacher.subject)} · ${statusLabel(teacher.academy_status)}`} onClose={onClose} wide>
       <ModalBody>
@@ -1454,90 +1615,150 @@ function AcademyDetailModal({
             Default password equals login.
           </div>
         </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <section>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Selected Academy Lessons</p>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                {allowTeacherPreview ? (
-                  <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
-                    <Eye className="h-3.5 w-3.5" />
-                    Preview as Teacher
-                  </button>
-                ) : null}
-                {canPromote && asString(teacher.academy_status) === "ready_for_active_teacher" ? (
-                  <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
-                    <Trophy className="h-3.5 w-3.5" />
-                    Promote
-                  </button>
-                ) : null}
-              </div>
-            </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div role="tablist" aria-label="Academy teacher sections" className="grid min-w-[16rem] flex-1 grid-cols-2 gap-1 rounded-lg border border-foreground/10 bg-muted/40 p-1">
+            {tabs.map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`rounded-md py-2 text-xs font-black transition-colors motion-reduce:transition-none ${
+                    active ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+            {allowTeacherPreview ? (
+              <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
+                <Eye className="h-3.5 w-3.5" />
+                Preview as Teacher
+              </button>
+            ) : null}
+            {canPromote && asString(teacher.academy_status) === "ready_for_active_teacher" ? (
+              <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
+                <Trophy className="h-3.5 w-3.5" />
+                Promote
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-3">
+          {activeTab === "curriculum" ? (
+            <CurriculumSelectionTab
+              key={assignedItemIds.join(",")}
+              lessons={curriculumLessons}
+              assignedItemIds={assignedItemIds}
+              assessedItemIds={assessedItemIds}
+              canEdit={canEditLessons}
+              submitting={submitting}
+              error={error}
+              onSave={(selectedIds, removedCount, removedAssessedCount) => {
+                if (removedCount > 0) {
+                  setPendingSync({ selectedIds, removedCount, removedAssessedCount });
+                } else {
+                  void saveSelection(selectedIds);
+                }
+              }}
+            />
+          ) : (
             <div className="max-h-[52dvh] overflow-auto rounded-lg border border-foreground/8">
-              {assignments.map((assignment) => (
-                <div key={asNumber(assignment.id)} className="border-b border-foreground/6 bg-background px-3 py-2.5 last:border-b-0">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold">{asNumber(assignment.sequence_no)}. {asString(assignment.lesson_number)} · {asString(assignment.lesson_topic)}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {dateLabel(assignment.session_datetime)} · {asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
-                      </p>
-                    </div>
-                    {canSchedule || canAssess ? (
-                      <div className="flex shrink-0 gap-1.5">
-                        {canSchedule ? (
-                          <button type="button" onClick={() => onSchedule(assignment)} className="rounded-md border border-foreground/10 px-2 py-1 text-[11px] font-bold hover:bg-muted">Schedule</button>
-                        ) : null}
-                        {canAssess ? (
-                          <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2 py-1 text-[11px] font-bold text-background">Assess</button>
-                        ) : null}
+              {assignments.length ? (
+                assignments.map((assignment) => {
+                  const report = latestAssessmentByAssignment.get(asNumber(assignment.id));
+                  return (
+                    <div key={asNumber(assignment.id)} className="border-b border-foreground/6 bg-background px-3 py-2.5 last:border-b-0">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold">{asNumber(assignment.sequence_no)}. {asString(assignment.lesson_number)} · {asString(assignment.lesson_topic)}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            {dateLabel(assignment.session_datetime)} · {asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {report ? (
+                            <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+                              {Number(report.weighted_overall_score || 0).toFixed(2)}
+                            </span>
+                          ) : null}
+                          {report && canDeleteAssessment ? (
+                            <button
+                              type="button"
+                              aria-label="Delete assessment report"
+                              title="Delete report"
+                              onClick={() => onDeleteAssessment(report)}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                          {canAssess ? (
+                            <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                              Assess
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
-                  {asString(assignment.specification_points) ? (
-                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{asString(assignment.specification_points)}</p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </section>
-          <section>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Assessment Reports</p>
-            <div className="max-h-[52dvh] space-y-2 overflow-auto">
-              {assessments.length ? assessments.slice().reverse().map((assessment) => (
-                <div key={asNumber(assessment.id)} className="rounded-lg border border-foreground/8 bg-background p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-bold">{asString(assessment.lesson_number)} · {asString(assessment.lesson_topic)}</p>
-                      <p className="text-[11px] text-muted-foreground">{dateLabel(assessment.assessment_datetime)} · {asString(assessment.evaluator_name) || "Evaluator not set"}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">{Number(assessment.weighted_overall_score || 0).toFixed(2)}</span>
-                      {canDeleteAssessment ? (
-                        <button
-                          type="button"
-                          aria-label="Delete assessment report"
-                          title="Delete report"
-                          onClick={() => onDeleteAssessment(assessment)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                      {report ? (
+                        <p className="mt-1 text-[11px] font-bold">
+                          {decisionLabel(report.decision)}
+                          <span className="font-semibold text-muted-foreground"> · {dateLabel(report.assessment_datetime)} · {asString(report.evaluator_name) || "Evaluator not set"}</span>
+                        </p>
+                      ) : null}
+                      {report && (asString(report.areas_for_improvement) || asString(report.strengths)) ? (
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+                          {asString(report.areas_for_improvement) || asString(report.strengths)}
+                        </p>
+                      ) : !report && asString(assignment.specification_points) ? (
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground">{asString(assignment.specification_points)}</p>
                       ) : null}
                     </div>
-                  </div>
-                  <p className="mt-2 text-xs font-bold">{decisionLabel(assessment.decision)}</p>
-                  <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{asString(assessment.areas_for_improvement) || asString(assessment.final_recommendation) || "No notes."}</p>
-                </div>
-              )) : (
-                <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
-                  <p className="text-sm font-bold text-muted-foreground">No assessment reports yet.</p>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-10 text-center">
+                  <p className="text-sm font-bold text-muted-foreground">No lessons assigned yet.</p>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">Pick lessons in the Subject Curriculum tab.</p>
                 </div>
               )}
             </div>
-          </section>
+          )}
         </div>
       </ModalBody>
+      <ConfirmDialog
+        open={Boolean(pendingSync)}
+        title="Update selected lessons?"
+        message={
+          pendingSync?.removedAssessedCount ? (
+            <>
+              This removes {pendingSync.removedCount} lesson{pendingSync.removedCount === 1 ? "" : "s"} from this academy path,
+              including {pendingSync.removedAssessedCount} with assessment reports — those reports will be deleted.
+            </>
+          ) : (
+            <>
+              This removes {pendingSync?.removedCount} lesson{pendingSync?.removedCount === 1 ? "" : "s"} from this academy path.
+            </>
+          )
+        }
+        confirmLabel="Update lessons"
+        danger
+        busy={submitting}
+        onConfirm={() => {
+          if (pendingSync) void saveSelection(pendingSync.selectedIds);
+        }}
+        onCancel={() => {
+          if (!submitting) setPendingSync(null);
+        }}
+      />
     </ModalShell>
   );
 }
@@ -1858,6 +2079,7 @@ export function TeacherAcademyPanel({
   const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canScheduleAcademyLesson = Boolean(academyApi.assignmentUpdate(0));
   const canAssessAcademyLesson = Boolean(academyApi.assessmentCreate(0));
+  const canEditAcademyLessons = Boolean(academyApi.lessonsSync(0));
   const canDeleteAssessmentReport = Boolean(academyApi.assessmentDelete(0, 0));
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
@@ -1920,6 +2142,20 @@ export function TeacherAcademyPanel({
       }
       setDeleteTarget(null);
     }
+  }
+
+  async function syncAcademyLessons(teacher: AcademyTeacher, selectedIds: number[]) {
+    const teacherId = asNumber(teacher.id);
+    if (!teacherId) {
+      showToast("Academy teacher id is missing.", "danger");
+      return false;
+    }
+    const result = await submit(
+      academyApi.lessonsSync(teacherId),
+      { academy_curriculum_item_ids: selectedIds.join(",") },
+      "Academy lessons updated.",
+    );
+    return Boolean(result);
   }
 
   async function confirmDeleteAssessmentReport() {
@@ -1986,13 +2222,12 @@ export function TeacherAcademyPanel({
       {detailTeacher && !scheduleTarget && !assessmentTarget && !promoteTeacher ? (
         <AcademyDetailModal
           teacher={detailTeacher}
+          state={state}
+          submitting={submitting}
+          error={error}
           onClose={() => setDetailTeacher(null)}
           onPreview={() => previewAsTeacher(detailTeacher)}
           allowTeacherPreview={allowTeacherPreview}
-          onSchedule={(nextAssignment) => {
-            setError("");
-            setScheduleTarget({ teacher: detailTeacher, assignment: nextAssignment });
-          }}
           onAssess={(nextAssignment) => {
             setError("");
             setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
@@ -2005,7 +2240,8 @@ export function TeacherAcademyPanel({
             setError("");
             openPromote(detailTeacher);
           }}
-          canSchedule={canScheduleAcademyLesson}
+          onSyncLessons={(selectedIds) => syncAcademyLessons(detailTeacher, selectedIds)}
+          canEditLessons={canEditAcademyLessons}
           canAssess={canAssessAcademyLesson}
           canDeleteAssessment={canDeleteAssessmentReport}
           canPromote={canPromoteAcademyTeacher}
@@ -2033,7 +2269,6 @@ export function TeacherAcademyPanel({
         <AssessmentModal
           teacher={assessmentTarget.teacher}
           assignment={assessmentTarget.assignment}
-          state={state}
           submitting={submitting}
           error={error}
           onSubmit={async (teacherId, fields) => {

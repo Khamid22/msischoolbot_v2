@@ -761,6 +761,34 @@ def get_academy_teacher_id(conn: Any, academy_teacher_id: int) -> Any:
     ).fetchone()
 
 
+def get_academy_teacher_program_row(conn: Any, academy_teacher_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, subject_id, subject_program_id
+        FROM msi_v2.academy_teachers
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+
+
+def update_assignment_sequence(conn: Any, *, assignment_id: int, sequence_no: int, updated_at: str) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.academy_lesson_assignments
+        SET sequence_no = %s, updated_at = %s::timestamptz
+        WHERE id = %s
+        """,
+        (sequence_no, updated_at, assignment_id),
+    )
+
+
+def delete_assignment_rows_with_assessments(conn: Any, assignment_ids: list[int]) -> None:
+    _delete_by_ids(conn, "msi_v2.academy_assessments", "lesson_assignment_id", assignment_ids)
+    _delete_by_ids(conn, "msi_v2.academy_lesson_assignments", "id", assignment_ids)
+
+
 def get_academy_teacher_delete_row(conn: Any, academy_teacher_id: int) -> Any:
     return conn.execute(
         """

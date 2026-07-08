@@ -9,6 +9,8 @@ export const apiRoutes = {
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/assessments/${assessmentId}/delete`,
   academicDirectorTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/status`,
+  academicDirectorTeacherAcademyLessonsSync: (academyTeacherId: number | string) =>
+    `/api/v1/academic-director/teacher-academy/${academyTeacherId}/lessons`,
   academicDirectorTeacherAcademyPromote: (academyTeacherId: number | string) =>
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/promote`,
   academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
@@ -21,6 +23,8 @@ export const apiRoutes = {
     `/api/v1/head-of-department/teacher-academy/${academyTeacherId}/assessments/${assessmentId}/delete`,
   headOfDepartmentTeacherAcademyStatusUpdate: (academyTeacherId: number | string) =>
     `/api/v1/head-of-department/teacher-academy/${academyTeacherId}/status`,
+  headOfDepartmentTeacherAcademyLessonsSync: (academyTeacherId: number | string) =>
+    `/api/v1/head-of-department/teacher-academy/${academyTeacherId}/lessons`,
 };
 
 export const studentApiRoutes = {

@@ -4,6 +4,7 @@
 node_modules/
 frontend/node_modules/
 .claude/worktrees/
+.codex/
 backups/
 tmp/
 temp/

@@ -65,8 +65,10 @@ def test_teacher_academy_modals_use_shared_modal_system_and_keep_assignment_sele
     assert "Promote to Active Teacher" in source
     assert "size={wide ? \"wide\" : \"lg\"}" in source
     assert "name=\"assignment_id\"" in source
-    assert "name=\"lesson_assignment_id\"" in source
-    assert source.count("Select lesson assignment") >= 2
+    # The assessment modal assesses the lesson row it was opened from, so the
+    # assignment id is set programmatically instead of via a selector.
+    assert "fields.lesson_assignment_id = String(asNumber(assignment.id));" in source
+    assert source.count("Select lesson assignment") >= 1
     assert "const [wizardStep, setWizardStep]" in source
     assert "Teacher Info" in source
     assert "Select Academy Lessons" in source

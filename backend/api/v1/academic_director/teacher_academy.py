@@ -9,6 +9,7 @@ from backend.api.v1.teacher_academy_actions import (
     AddAcademyAssessmentForm,
     CreateAcademyTeacherForm,
     PromoteAcademyTeacherForm,
+    SyncAcademyLessonsForm,
     TeacherAcademyMutationResult,
     UpdateAcademyAssignmentForm,
     UpdateAcademyStatusForm,
@@ -17,6 +18,7 @@ from backend.api.v1.teacher_academy_actions import (
     delete_assessment_response,
     delete_academy_teacher_response,
     promote_response,
+    sync_lessons_response,
     update_assignment_response,
     update_status_response,
 )
@@ -49,6 +51,23 @@ def register_teacher_academy_routes(router: APIRouter) -> None:
         payload: Annotated[UpdateAcademyAssignmentForm, Form()],
     ):
         return update_assignment_response(assignment_id, payload)
+
+    @router.post(
+        "/teacher-academy/{academy_teacher_id}/lessons",
+        operation_id="api_v1_academic_director_sync_academy_lessons",
+        response_model=ApiSuccess[TeacherAcademyMutationResult],
+    )
+    def sync_academy_lessons(
+        academy_teacher_id: int,
+        payload: Annotated[SyncAcademyLessonsForm, Form()],
+        user: CurrentUser = Depends(get_current_user),
+    ):
+        return sync_lessons_response(
+            academy_teacher_id,
+            payload,
+            created_by_label="Academic Director",
+            created_by_login=user.login,
+        )
 
     @router.post(
         "/teacher-academy/{academy_teacher_id}/assessments",
