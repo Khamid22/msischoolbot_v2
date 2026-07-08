@@ -233,173 +233,6 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
   };
 }
 
-type AnalyticsRow = {
-  label: string;
-  value: number;
-  detail: string;
-  fillClassName?: string;
-};
-
-const subjectProgressGradients = [
-  "bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500",
-  "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500",
-  "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500",
-  "bg-gradient-to-r from-teal-600 via-emerald-500 to-lime-500",
-  "bg-gradient-to-r from-cyan-600 via-sky-500 to-blue-500",
-  "bg-gradient-to-r from-rose-600 via-pink-500 to-orange-400",
-  "bg-gradient-to-r from-indigo-600 via-slate-500 to-cyan-500",
-];
-
-function subjectProgressFillClass(subject: string) {
-  const normalized = subject.toLowerCase();
-  if (normalized.includes("math")) {
-    return "bg-gradient-to-r from-blue-900 via-blue-700 to-indigo-500";
-  }
-  if (normalized.includes("english")) {
-    return "bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500";
-  }
-  if (normalized.includes("physics")) {
-    return "bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500";
-  }
-  if (normalized.includes("chem")) {
-    return "bg-gradient-to-r from-teal-600 via-emerald-500 to-lime-500";
-  }
-  if (normalized.includes("bio")) {
-    return "bg-gradient-to-r from-lime-600 via-green-500 to-emerald-500";
-  }
-  let hash = 0;
-  for (const char of normalized) {
-    hash = (hash + char.charCodeAt(0)) % subjectProgressGradients.length;
-  }
-  return subjectProgressGradients[hash];
-}
-
-function MiniAnalyticsCard({
-  title,
-  subtitle,
-  rows,
-  emptyLabel,
-}: {
-  title: string;
-  subtitle: string;
-  rows: AnalyticsRow[];
-  emptyLabel: string;
-}) {
-  return (
-    <section className="flex min-h-[6rem] flex-col rounded-lg border border-foreground/8 bg-background px-2.5 py-2.5">
-      <div className="mb-2 shrink-0">
-        <p className="truncate text-xs font-black leading-4 text-foreground">{title}</p>
-        <p className="mt-0.5 truncate text-[10px] font-semibold leading-4 text-muted-foreground">{subtitle}</p>
-      </div>
-      {rows.length ? (
-        <div className="min-h-0 flex-1 space-y-2">
-          {rows.slice(0, 4).map((row) => (
-            <div key={row.label}>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs font-bold leading-4 text-foreground">{row.label}</span>
-                <span className="shrink-0 text-xs font-black text-muted-foreground">{row.detail}</span>
-              </div>
-              <ProgressBar value={row.value} className="h-1" fillClassName={row.fillClassName} label={row.label} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-4 text-center text-[11px] font-semibold text-muted-foreground">
-          {emptyLabel}
-        </p>
-      )}
-    </section>
-  );
-}
-
-function academyAnalyticsRows(academyTeachers: AcademyTeacher[]) {
-  const total = academyTeachers.length;
-  const statusGroups = [
-    {
-      label: "In academy",
-      count: academyTeachers.filter((teacher) =>
-        ["new_academy_teacher", "in_training", "ready_for_evaluation"].includes(asString(teacher.academy_status)),
-      ).length,
-    },
-    {
-      label: "Ready",
-      count: academyTeachers.filter((teacher) => asString(teacher.academy_status) === "ready_for_active_teacher").length,
-    },
-    {
-      label: "Completed",
-      count: academyTeachers.filter((teacher) => ["approved", "approved_for_active_teacher"].includes(asString(teacher.academy_status))).length,
-    },
-    {
-      label: "Needs support",
-      count: academyTeachers.filter((teacher) => ["needs_improvement", "rejected", "on_hold"].includes(asString(teacher.academy_status))).length,
-    },
-  ];
-  const statusRows = statusGroups
-    .filter((item) => item.count > 0)
-    .map((item) => ({
-      label: item.label,
-      value: total ? Math.round((item.count / total) * 100) : 0,
-      detail: String(item.count),
-    }));
-
-  const scoreBySubject = new Map<string, { sum: number; count: number }>();
-  const completionBySubject = new Map<string, { sum: number; count: number }>();
-  academyTeachers.forEach((teacher) => {
-    const subject = asString(teacher.subject) || "Subject not set";
-    const progress = teacherProgress(teacher);
-    if (progress.average != null && Number.isFinite(progress.average)) {
-      const bucket = scoreBySubject.get(subject) || { sum: 0, count: 0 };
-      bucket.sum += progress.average;
-      bucket.count += 1;
-      scoreBySubject.set(subject, bucket);
-    }
-    if (progress.target > 0) {
-      const bucket = completionBySubject.get(subject) || { sum: 0, count: 0 };
-      bucket.sum += Math.min(100, Math.round((progress.assessed / progress.target) * 100));
-      bucket.count += 1;
-      completionBySubject.set(subject, bucket);
-    }
-  });
-  const subjectScoreRows = Array.from(scoreBySubject.entries())
-    .map(([label, bucket]) => {
-      const score = bucket.sum / bucket.count;
-      return { label, value: score * 10, detail: score.toFixed(1), fillClassName: subjectProgressFillClass(label) };
-    })
-    .sort((left, right) => right.value - left.value);
-  const completionRows = Array.from(completionBySubject.entries())
-    .map(([label, bucket]) => {
-      const percent = Math.round(bucket.sum / bucket.count);
-      return { label, value: percent, detail: `${percent}%`, fillClassName: subjectProgressFillClass(label) };
-    })
-    .sort((left, right) => right.value - left.value);
-
-  const assessmentRows = academyTeachers
-    .flatMap((teacher) =>
-      academyAssessments(teacher).map((assessment) => ({
-        teacherName: asString(teacher.full_name) || "Teacher",
-        lesson: asString(assessment.lesson_number) || "Lesson",
-        score: asNumber(assessment.weighted_overall_score),
-        date: asString(assessment.assessment_datetime || assessment.created_at || assessment.updated_at),
-      })),
-    )
-    .filter((item) => item.score > 0)
-    .sort((left, right) => Date.parse(right.date || "") - Date.parse(left.date || ""))
-    .slice(0, 6)
-    .reverse()
-    .map((item) => ({
-      label: `${item.teacherName} · ${item.lesson}`,
-      value: item.score * 10,
-      detail: item.score.toFixed(1),
-    }));
-
-  return {
-    statusRows,
-    subjectScoreRows,
-    completionRows,
-    assessmentRows,
-  };
-}
-
 function NewHeadOfDepartmentModal({
   state,
   submitting,
@@ -2023,7 +1856,6 @@ export function TeacherAcademyPanel({
       average: scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null,
     };
   }, [academyTeachers]);
-  const analytics = useMemo(() => academyAnalyticsRows(academyTeachers), [academyTeachers]);
 
   function applyPayload(data: Record<string, unknown>) {
     if (Array.isArray(data.academy)) {
@@ -2376,37 +2208,10 @@ export function TeacherAcademyPanel({
             </div>
           </div>
         ) : null}
-        <div className="mb-3 grid shrink-0 grid-cols-4 gap-2">
-          {metric("Academy Teachers", stats.total, "academy records")}
+        <div className="mb-3 grid shrink-0 grid-cols-3 gap-2">
           {metric("In Academy", stats.inTraining, "active academy paths")}
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
-        </div>
-        <div className="mb-3 grid shrink-0 items-stretch gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <MiniAnalyticsCard
-            title="Academy status distribution"
-            subtitle="Academy, ready, completed, support"
-            rows={analytics.statusRows}
-            emptyLabel="No academy teachers yet."
-          />
-          <MiniAnalyticsCard
-            title="Average score by subject"
-            subtitle="Weighted assessment average"
-            rows={analytics.subjectScoreRows}
-            emptyLabel="No assessment scores yet."
-          />
-          <MiniAnalyticsCard
-            title="Completion rate by subject"
-            subtitle="Assessed lessons over assigned lessons"
-            rows={analytics.completionRows}
-            emptyLabel="No assigned lessons yet."
-          />
-          <MiniAnalyticsCard
-            title="Recent assessment trend"
-            subtitle="Latest reports in sequence"
-            rows={analytics.assessmentRows}
-            emptyLabel="No assessment trend yet."
-          />
         </div>
         <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
@@ -2439,12 +2244,12 @@ export function TeacherAcademyPanel({
               <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
                 <table className="w-full min-w-[980px] table-fixed border-collapse text-left">
                   <colgroup>
-                    <col className="w-[22%]" />
-                    <col className="w-[12%]" />
-                    <col className="w-[12%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[13%]" />
                     <col className="w-[17%]" />
                     <col className="w-[13%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[7%]" />
                     <col className="w-[16%]" />
                   </colgroup>
                   <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
@@ -2528,28 +2333,15 @@ export function TeacherAcademyPanel({
                               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
                                 {initialsFromName(teacher.full_name)}
                               </span>
-                              <span className="min-w-0">
+                              <span className="flex min-w-0 flex-1 items-baseline gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setDetailTeacher(teacher)}
-                                  className="block max-w-full truncate text-left text-sm font-black leading-tight text-[#0F172A] group-hover:underline"
+                                  className="min-w-0 truncate text-left text-sm font-black leading-tight text-[#0F172A] group-hover:underline"
                                 >
                                   {asString(teacher.full_name) || "Academy teacher"}
                                 </button>
-                                <span className="mt-1 flex min-w-0 items-center gap-1.5">
-                                  <span className="truncate font-mono text-[11px] font-bold text-[#64748B]">{login || "Creating..."}</span>
-                                  <IconButton
-                                    label="Copy teacher login"
-                                    disabled={!login}
-                                    onClick={() => copyLogin(login)}
-                                    className="h-6 w-6 rounded-md border-0 bg-transparent text-[#64748B] shadow-none hover:bg-[#EEF2F7]"
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </IconButton>
-                                </span>
-                                <StatusBadge tone={academyStatusTone(status)} className="mt-1 px-2 py-0.5 text-[9px]">
-                                  {statusLabel(teacher.academy_status)}
-                                </StatusBadge>
+                                <span className="shrink-0 font-mono text-[11px] font-bold text-[#64748B]">{login || "Creating..."}</span>
                               </span>
                             </div>
                           </td>
