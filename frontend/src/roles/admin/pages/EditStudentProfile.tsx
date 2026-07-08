@@ -1,5 +1,5 @@
 import { ChangeEvent, useState } from "react";
-import { Camera, Check, Copy, FileText, KeyRound, Link2, Phone, Save, Send, Trash2, User, Users } from "lucide-react";
+import { Camera, Check, Copy, FileText, KeyRound, Link2, Phone, Save, Send, Trash2, User, Users, X } from "lucide-react";
 import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { UserAvatar } from "@/shared/ui/Avatar";
@@ -111,6 +111,20 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
     } catch {
       return false;
     }
+  }
+
+  function handleClose() {
+    // Inside the students-list popup the page runs in an iframe: ask the
+    // parent window to dismiss the popup. Standalone, fall back to backUrl.
+    if (isAdminEmbed && typeof window !== "undefined" && window.parent !== window) {
+      window.parent.postMessage({ type: "msi:close-student-editor" }, window.location.origin);
+      return;
+    }
+    if (props.backUrl) {
+      window.location.href = props.backUrl;
+      return;
+    }
+    window.history.back();
   }
 
   async function createParentInvite() {
@@ -370,7 +384,15 @@ export default function EditStudentProfile(props: EditStudentProfileProps) {
             </div>
           </section>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-foreground/10 bg-surface px-5 text-sm font-bold hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+              Close
+            </button>
             <button className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-bold text-primary-foreground hover:opacity-90">
               <Save className="h-4 w-4" />
               Save Profile

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { Check, Copy, Eye, Filter, Pencil, Plus, Search, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, Filter, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { Pagination } from "@/shared/ui/Pagination";
+import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, formatLastSeen, getStudentCode, getStudentRowId, parseTimestampUtc } from "../shared";
@@ -235,6 +236,50 @@ function AddStudentModal({
   );
 }
 
+function EditStudentModal({
+  studentRowId,
+  school,
+  onClose,
+}: {
+  studentRowId: number;
+  school: string;
+  onClose: () => void;
+}) {
+  useDismissibleLayer({ onDismiss: onClose, dismissOnOutsidePointer: false });
+
+  useEffect(() => {
+    // The embedded edit page posts this message when its Close button is
+    // pressed, so the popup and the iframe close together.
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if ((event.data as Record<string, unknown> | null)?.type === "msi:close-student-editor") onClose();
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [onClose]);
+
+  const frameUrl = withEmbedMode(
+    `${routes.adminStudentProfile(studentRowId)}?school=${encodeURIComponent(school || "all")}`,
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/60 p-3 backdrop-blur-[2px] animate-in fade-in duration-200 motion-reduce:animate-none sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="flex h-[min(56rem,94dvh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-card-hover animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-300 motion-reduce:animate-none"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit student profile"
+      >
+        <iframe src={frameUrl} title="Edit student profile" className="h-full w-full flex-1 border-0" />
+      </div>
+    </div>
+  );
+}
+
 function subjectList(value: unknown) {
   return asString(value)
     .split(",")
@@ -295,6 +340,7 @@ export default function StudentsPanel({ state }: { state: any }) {
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [addOpen, setAddOpen] = useState(false);
+  const [editStudentRowId, setEditStudentRowId] = useState(0);
   const [page, setPage] = useState(1);
   const canAddStudents = !isTeacherMode && academicSchools.length > 0 && academicGroups.length > 0;
 
@@ -361,6 +407,13 @@ export default function StudentsPanel({ state }: { state: any }) {
           groups={academicGroups}
           csrf={csrf}
           onClose={() => setAddOpen(false)}
+        />
+      ) : null}
+      {editStudentRowId ? (
+        <EditStudentModal
+          studentRowId={editStudentRowId}
+          school={asString(currentSchool)}
+          onClose={() => setEditStudentRowId(0)}
         />
       ) : null}
       <div className="grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -480,18 +533,19 @@ export default function StudentsPanel({ state }: { state: any }) {
                     <div className="flex shrink-0 gap-1">
                       <a
                         href={routes.adminStudentPanel(studentRowId, currentSchool)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                        className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-2.5 text-xs font-bold hover:bg-muted"
                         aria-label={`Open ${asString(student.full_name)} dashboard`}
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        View
                       </a>
-                      <a
-                        href={routes.adminStudentPanel(studentRowId, currentSchool, "student_profile")}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                      <button
+                        type="button"
+                        onClick={() => setEditStudentRowId(studentRowId)}
+                        className="inline-flex h-8 items-center rounded-lg bg-foreground px-2.5 text-xs font-bold text-background hover:opacity-90"
                         aria-label={`Edit ${asString(student.full_name)}`}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </a>
+                        Edit
+                      </button>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -522,12 +576,20 @@ export default function StudentsPanel({ state }: { state: any }) {
           <table className="h-full w-full table-fixed text-left">
             <thead className="sticky top-0 z-20 bg-surface shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
               <tr className="border-b border-foreground/5">
-                {["Student", "Student Code", "Subjects", "School", "Last Seen", ""].map((heading) => (
+                {/* table-fixed reads column widths from this first row. */}
+                {[
+                  { label: "Student", width: "w-[28%]" },
+                  { label: "Student Code", width: "w-[13%]" },
+                  { label: "Subjects", width: "w-[25%]" },
+                  { label: "School", width: "w-[12%]" },
+                  { label: "Last Seen", width: "w-[11%]" },
+                  { label: "", width: "w-[11%]" },
+                ].map((heading) => (
                   <th
-                    key={heading || "actions"}
-                    className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                    key={heading.label || "actions"}
+                    className={`${heading.width} px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}
                   >
-                    {heading}
+                    {heading.label}
                   </th>
                 ))}
               </tr>
@@ -540,7 +602,7 @@ export default function StudentsPanel({ state }: { state: any }) {
                   const studentCode = getStudentCode(student);
                   return (
                     <tr key={studentRowId} className="border-b border-foreground/5 hover:bg-muted/40">
-                      <td className="w-[30%] px-3 py-2.5">
+                      <td className="px-3 py-2.5">
                         <a
                           href={routes.adminStudentPanel(studentRowId, currentSchool)}
                           className="flex min-w-0 items-center gap-3 hover:underline"
@@ -554,8 +616,8 @@ export default function StudentsPanel({ state }: { state: any }) {
                           </span>
                         </a>
                       </td>
-                      <td className="w-[12%] px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
-                      <td className="w-[26%] px-3 py-2.5">
+                      <td className="px-3 py-2.5 text-xs font-bold">{studentCode || "-"}</td>
+                      <td className="px-3 py-2.5">
                         <div className="flex flex-wrap items-center gap-1">
                           {subjectList(student.subjects).slice(0, 2).map((subject) => (
                             <span
@@ -573,30 +635,31 @@ export default function StudentsPanel({ state }: { state: any }) {
                           ) : null}
                         </div>
                       </td>
-                      <td className="w-[14%] truncate px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
-                      <td className="w-[12%] px-3 py-2.5 text-xs">
+                      <td className="truncate px-3 py-2.5 text-xs text-muted-foreground">{asString(student.school_name)}</td>
+                      <td className="px-3 py-2.5 text-xs">
                         <span className={seen.online ? "font-semibold text-green-600" : "text-muted-foreground"}>
                           {seen.label}
                         </span>
                       </td>
-                      <td className="w-[4%] px-3 py-2.5">
+                      <td className="px-3 py-2.5">
                         <div className="flex justify-end gap-1.5">
                           <a
                             href={routes.adminStudentPanel(studentRowId, currentSchool)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                            className="inline-flex h-8 items-center rounded-lg border border-foreground/10 px-2.5 text-xs font-bold hover:bg-muted"
                             aria-label={`Open ${asString(student.full_name)} dashboard`}
-                            title="Dashboard"
+                            title="Open dashboard"
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            View
                           </a>
-                          <a
-                            href={routes.adminStudentPanel(studentRowId, currentSchool, "student_profile")}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+                          <button
+                            type="button"
+                            onClick={() => setEditStudentRowId(studentRowId)}
+                            className="inline-flex h-8 items-center rounded-lg bg-foreground px-2.5 text-xs font-bold text-background hover:opacity-90"
                             aria-label={`Edit ${asString(student.full_name)}`}
-                            title="Edit"
+                            title="Edit profile"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </a>
+                            Edit
+                          </button>
                         </div>
                       </td>
                     </tr>
