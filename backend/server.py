@@ -19,9 +19,9 @@ from backend.core.config import get_web_settings
 from backend.domains.academics.rating_service import clear_group_cache
 from backend.roles.admin.routes import register_admin_page_routes
 from backend.roles.academic_director.routes import register_academic_director_page_routes
-from backend.roles.ceo.routes import register_ceo_page_routes
-from backend.roles.customer_support.routes import register_customer_support_page_routes
-from backend.roles.hr_manager.routes import register_hr_manager_page_routes
+from backend.pages.ceo import register_ceo_page_routes
+from backend.pages.customer_support import register_customer_support_page_routes
+from backend.pages.hr_manager import register_hr_manager_page_routes
 from backend.roles.head_of_department.routes import register_head_of_department_page_routes
 from backend.roles.parent.routes import register_parent_invite_routes
 from backend.roles.parent.routes import register_parent_page_routes

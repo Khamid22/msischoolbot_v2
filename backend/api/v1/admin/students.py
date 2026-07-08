@@ -17,7 +17,7 @@ from backend.api.v1.admin.schemas import (
 from backend.domains.parents.service import create_parent_invite_code, create_parent_invite_token
 from backend.domains.students.service import get_admin_student_profile, list_students_for_admin
 from backend.roles.admin.services.academic_service import create_student_with_enrollment_from_payload
-from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
+from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
 from backend.security import CurrentUser, get_current_user
 
 router = APIRouter(prefix="/students")

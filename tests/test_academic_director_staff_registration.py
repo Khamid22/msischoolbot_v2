@@ -332,7 +332,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.api.v1.teacher_academy_actions as academy_api
+    import backend.api.v1.teacher_academy.responses as academy_api
 
     captured = {}
 
@@ -385,7 +385,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
 
 
 def test_hod_filters_academy_rows_by_assigned_subject():
-    from backend.roles.head_of_department.academy_scope import filter_rows_by_subject_scope
+    from backend.domains.teacher_academy.permissions import filter_rows_by_subject_scope
 
     rows = [
         {"id": 1, "subject_id": 5, "full_name": "Math Teacher"},

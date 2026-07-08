@@ -81,7 +81,7 @@ def test_timetable_and_announcements_query_modules_own_runtime_sql():
 
 
 def test_hod_teacher_academy_scope_sql_lives_in_domain_queries():
-    scope_source = Path("backend/roles/head_of_department/academy_scope.py").read_text()
+    scope_source = Path("backend/domains/teacher_academy/permissions.py").read_text()
     academy_query_source = Path("backend/domains/teacher_academy/queries.py").read_text()
 
     assert "from backend.domains.teacher_academy import queries as academy_queries" in scope_source

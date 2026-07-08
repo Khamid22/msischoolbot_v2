@@ -11,7 +11,7 @@ from backend.api.v1.academic_director.schemas import (
 )
 from backend.api.v1.academic_director.teacher_academy import register_teacher_academy_routes
 from backend.roles.academic_director.staff_registration import create_head_of_department_account
-from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
+from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
 from backend.security import CurrentUser, get_current_user, require_role
 
 router = APIRouter(prefix="/academic-director", dependencies=[Depends(require_role("academic_director"))])

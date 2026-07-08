@@ -1,5 +1,5 @@
 def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
-    from backend.api.v1 import teacher_academy_actions
+    from backend.api.v1.teacher_academy.responses import assessment_sections_from_form
 
     form_data = {
         "teacher_guidance_compliance_score": "8",
@@ -16,7 +16,7 @@ def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
         "engagement_technique_remarks": "Checked students often.",
     }
 
-    sections = teacher_academy_actions.assessment_sections_from_form(form_data)
+    sections = assessment_sections_from_form(form_data)
 
     criteria = sections["marking_criteria"]
     assert criteria["tgc"] == {"score": "8", "remarks": "Followed the guide closely."}

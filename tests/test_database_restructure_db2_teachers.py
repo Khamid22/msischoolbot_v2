@@ -38,7 +38,7 @@ def test_teacher_identity_wrapper_is_gone():
 def test_teacher_domain_imports_are_used_where_safe():
     teacher_role_source = Path("backend/roles/teacher/services.py").read_text()
     academy_service_source = Path("backend/domains/teacher_academy/service.py").read_text()
-    academy_api_source = Path("backend/api/v1/teacher_academy_actions.py").read_text()
+    academy_api_source = Path("backend/api/v1/teacher_academy/responses.py").read_text()
     admin_teacher_routes_source = Path("backend/roles/admin/routes/teacher_routes.py").read_text()
     admin_page_service_source = Path("backend/roles/admin/services/page_service.py").read_text()
 

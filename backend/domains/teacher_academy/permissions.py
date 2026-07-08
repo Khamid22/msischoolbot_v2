@@ -1,4 +1,4 @@
-"""Subject-scoped Teacher Academy access for Head of Department users."""
+"""Subject-scoped Teacher Academy access helpers."""
 
 from __future__ import annotations
 

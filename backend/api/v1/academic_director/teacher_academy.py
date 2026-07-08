@@ -5,7 +5,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form
 
 from backend.api import ApiSuccess
-from backend.api.v1.teacher_academy_actions import (
+from backend.api.v1.teacher_academy.responses import (
+    add_assessment_response,
+    create_academy_teacher_response,
+    delete_academy_teacher_response,
+    delete_assessment_response,
+    promote_response,
+    sync_lessons_response,
+    update_assignment_response,
+    update_status_response,
+)
+from backend.api.v1.teacher_academy.schemas import (
     AddAcademyAssessmentForm,
     CreateAcademyTeacherForm,
     PromoteAcademyTeacherForm,
@@ -13,14 +23,6 @@ from backend.api.v1.teacher_academy_actions import (
     TeacherAcademyMutationResult,
     UpdateAcademyAssignmentForm,
     UpdateAcademyStatusForm,
-    add_assessment_response,
-    create_academy_teacher_response,
-    delete_assessment_response,
-    delete_academy_teacher_response,
-    promote_response,
-    sync_lessons_response,
-    update_assignment_response,
-    update_status_response,
 )
 from backend.security import CurrentUser, get_current_user
 

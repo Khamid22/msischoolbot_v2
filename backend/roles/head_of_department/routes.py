@@ -8,7 +8,7 @@ from backend.domains.teacher_academy.service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
 )
-from backend.roles.head_of_department.academy_scope import (
+from backend.domains.teacher_academy.permissions import (
     current_hod_subject_ids,
     filter_rows_by_subject_scope,
 )

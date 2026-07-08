@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.roles.admin.services.teacher_academy_notifications import notify_academy_teacher_event
+from backend.domains.teacher_academy.notifications import notify_academy_teacher_event
 from backend.roles.teacher.workspace_cards import build_teacher_workspace_cards
 
 
@@ -373,7 +373,7 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
 
 
 def test_academic_director_can_create_academy_teacher_through_api_v1(client, monkeypatch):
-    import backend.api.v1.teacher_academy_actions as academy_api
+    import backend.api.v1.teacher_academy.responses as academy_api
 
     calls = []
     monkeypatch.setattr(

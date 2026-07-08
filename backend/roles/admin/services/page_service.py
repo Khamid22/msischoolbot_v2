@@ -1,9 +1,12 @@
 import os
-import threading
-import time
 
 from backend.core.database import connect_auth_db
 from database.academics import canonical
+from backend.domains.admin.page_cache import (
+    get_cached_admin_page_context as _get_cached_admin_page_context,
+    invalidate_admin_page_context_cache,
+    set_cached_admin_page_context as _set_cached_admin_page_context,
+)
 from backend.domains.students.service import get_admin_student_profile, list_students_for_admin
 from backend.domains.teachers.service import list_teachers
 from backend.domains.teacher_academy.service import list_academy_teachers
@@ -36,25 +39,8 @@ from backend.domains.resources.service import (
 )
 
 
-_ADMIN_PAGE_CONTEXT_CACHE_LOCK = threading.Lock()
-_ADMIN_PAGE_CONTEXT_CACHE = {}
-
 def _subject_priority_key(subject_name):
     return canonical.subject_sort_key(subject_name)
-
-
-def invalidate_admin_page_context_cache():
-    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
-        _ADMIN_PAGE_CONTEXT_CACHE.clear()
-
-
-def _admin_page_context_cache_ttl_seconds():
-    raw_value = str(os.environ.get("ADMIN_PAGE_CONTEXT_CACHE_SECONDS", "15") or "").strip()
-    try:
-        parsed = int(raw_value)
-    except ValueError:
-        parsed = 15
-    return max(parsed, 0)
 
 
 def _teacher_edit_cache_key(admin_teacher_edit):
@@ -82,42 +68,6 @@ def _build_admin_page_context_cache_key(panel, school_filter, admin_teacher_edit
         _teacher_edit_cache_key(admin_teacher_edit),
         int(parent_admin_id or 0),
     )
-
-
-def _get_cached_admin_page_context(cache_key):
-    now = time.time()
-    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
-        cached_entry = _ADMIN_PAGE_CONTEXT_CACHE.get(cache_key)
-        if cached_entry and now < float(cached_entry.get("expires_at", 0)):
-            return cached_entry.get("context")
-    return None
-
-
-def _set_cached_admin_page_context(cache_key, context):
-    ttl_seconds = _admin_page_context_cache_ttl_seconds()
-    if ttl_seconds <= 0:
-        return
-
-    now = time.time()
-    with _ADMIN_PAGE_CONTEXT_CACHE_LOCK:
-        _ADMIN_PAGE_CONTEXT_CACHE[cache_key] = {
-            "context": context,
-            "expires_at": now + ttl_seconds,
-        }
-        expired_keys = [
-            key
-            for key, entry in _ADMIN_PAGE_CONTEXT_CACHE.items()
-            if float(entry.get("expires_at", 0)) <= now
-        ]
-        for key in expired_keys:
-            _ADMIN_PAGE_CONTEXT_CACHE.pop(key, None)
-        if len(_ADMIN_PAGE_CONTEXT_CACHE) > 128:
-            ordered_entries = sorted(
-                _ADMIN_PAGE_CONTEXT_CACHE.items(),
-                key=lambda item: float(item[1].get("expires_at", 0)),
-            )
-            for key, _entry in ordered_entries[: len(_ADMIN_PAGE_CONTEXT_CACHE) - 128]:
-                _ADMIN_PAGE_CONTEXT_CACHE.pop(key, None)
 
 
 def _get_schools_from_db():

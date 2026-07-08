@@ -23,7 +23,7 @@ def register_teacher_page_routes(app):
         if current_auth_role() == "teacher":
             return
         requested_with = str(request_obj.headers.get("X-Requested-With", "")).strip()
-        if requested_with == "XMLHttpRequest" or request_obj.url.path.startswith("/teacher/api/"):
+        if requested_with == "XMLHttpRequest" or request_obj.url.path.startswith("/api/v1/teacher/"):
             raise GuardResponse(
                 JSONResponse({"ok": False, "message": "Teacher authentication required."}, status_code=401)
             )

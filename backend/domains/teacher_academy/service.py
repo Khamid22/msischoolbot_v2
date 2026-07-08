@@ -5,7 +5,7 @@ from backend.core.security import generate_password_hash
 
 from backend.domains.teacher_academy import queries
 from backend.domains.teachers.service import list_teachers, upsert_teacher
-from backend.roles.admin.services.teacher_academy_notifications import notify_academy_teacher_event
+from backend.domains.teacher_academy.notifications import notify_academy_teacher_event
 
 VALID_ACADEMY_STATUSES = {
     "new_academy_teacher",

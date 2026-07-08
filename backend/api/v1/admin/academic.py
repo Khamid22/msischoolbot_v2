@@ -35,7 +35,7 @@ from backend.roles.admin.services.academic_service import (
     update_enrollment_status_from_payload,
     update_lesson_session_from_payload,
 )
-from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
+from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
 
 router = APIRouter(prefix="/academic")
 

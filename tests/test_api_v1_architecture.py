@@ -52,7 +52,8 @@ def test_academic_director_and_hod_role_routes_are_page_only_for_migrated_action
 
 
 def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
-    action_source = Path("backend/api/v1/teacher_academy_actions.py").read_text()
+    schemas_source = Path("backend/api/v1/teacher_academy/schemas.py").read_text()
+    responses_source = Path("backend/api/v1/teacher_academy/responses.py").read_text()
 
     for path in [
         Path("backend/api/v1/academic_director/teacher_academy.py"),
@@ -64,10 +65,11 @@ def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
         assert "jsonify" not in source
         assert "from backend.utils.guards" not in source
 
-    assert "BaseModel" in action_source
-    assert "api_success" in action_source
-    assert "backend.utils.context" not in action_source
-    assert "jsonify" not in action_source
+    assert "BaseModel" in schemas_source
+    assert "api_success" in responses_source
+    for source in (schemas_source, responses_source):
+        assert "backend.utils.context" not in source
+        assert "jsonify" not in source
 
 
 def test_frontend_teacher_academy_api_helpers_use_api_v1_namespace():

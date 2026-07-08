@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.api.v1.teacher_academy_actions as academy_api
+    import backend.api.v1.teacher_academy.responses as academy_api
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])

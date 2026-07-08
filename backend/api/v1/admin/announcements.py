@@ -12,7 +12,7 @@ from backend.domains.announcements.service import (
     list_announcements,
     update_announcement,
 )
-from backend.roles.admin.services.page_service import invalidate_admin_page_context_cache
+from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
 from backend.security import CurrentUser, get_current_user
 
 router = APIRouter(prefix="/announcements")

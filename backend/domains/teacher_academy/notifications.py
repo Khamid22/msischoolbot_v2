@@ -36,15 +36,7 @@ def notify_academy_teacher_event(
     body: str = "",
     source: str = "Academic Department",
 ) -> dict[str, Any]:
-    """Return a safe in-app/Telegram notification result.
-
-    The current codebase has Telegram linking and bot-user recording helpers,
-    but no shared web-side sender that can safely send bot messages without
-    runtime bot context. This helper therefore records the intended notification
-    shape for the caller and marks Telegram delivery as skipped when there is no
-    link or sender. The UI still shows the related academy assignment/report in
-    the Updates tab.
-    """
+    """Return a safe in-app/Telegram notification result."""
     normalized_type = _text(event_type) or "academy_update"
     normalized_title = _text(title) or ACADEMY_EVENT_LABELS.get(normalized_type, "Teacher Academy update")
     normalized_body = _text(body)

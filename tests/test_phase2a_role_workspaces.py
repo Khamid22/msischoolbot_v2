@@ -69,12 +69,12 @@ def _set_session(client, data):
 
 def _patch_workspace_cards(monkeypatch):
     import backend.roles.academic_director.routes as academic_director_routes
-    import backend.roles.ceo.routes as ceo_routes
-    import backend.roles.customer_support.routes as customer_support_routes
-    import backend.roles.hr_manager.routes as hr_manager_routes
+    import backend.pages.ceo as ceo_page
+    import backend.pages.customer_support as customer_support_page
+    import backend.pages.hr_manager as hr_manager_page
 
     monkeypatch.setattr(
-        ceo_routes,
+        ceo_page,
         "ceo_workspace_cards",
         lambda: [
             {"label": "Schools", "value": "2"},
@@ -94,7 +94,7 @@ def _patch_workspace_cards(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        customer_support_routes,
+        customer_support_page,
         "customer_support_workspace_cards",
         lambda: [
             {"label": "Parents", "value": "4"},
@@ -104,7 +104,7 @@ def _patch_workspace_cards(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        hr_manager_routes,
+        hr_manager_page,
         "hr_manager_workspace_cards",
         lambda: [
             {"label": "Teachers", "value": "3"},

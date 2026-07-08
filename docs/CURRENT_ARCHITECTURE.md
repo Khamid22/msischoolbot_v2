@@ -10,10 +10,11 @@ backend/
       router.py                     JSON/action API router registry
       academic_director/            AD JSON actions migrated where safe
       head_of_department/           HOD JSON actions migrated where safe
-      teacher/                      placeholder for future safe API migrations
-      student/                      placeholder for future safe API migrations
+      teacher/                      teacher office-hours API slice
+      student/                      student chat/comments/office-hours/activity API slices
       parent/                       placeholder for future safe API migrations
-      admin/                        placeholder; active admin APIs remain in /admin/api
+      admin/                        admin API slices for announcements, resources, complaints,
+                                    office hours, payments, parents, students, academic, chat
       ceo/                          placeholder for future safe API migrations
       hr_manager/                   placeholder for future safe API migrations
       customer_support/             placeholder for future safe API migrations
@@ -24,6 +25,7 @@ backend/
     parents/                        parent invites, links, dashboard access
     students/                       student profile, dashboard, account helpers
     teacher_academy/                academy teacher, lesson assignment, schedule, assessment flows
+                                    plus HOD subject-scope permissions and notifications
     teachers/                       teacher profiles, auth helpers, subject assignments
     timetable/                      schedule rules and lesson sessions
   roles/
@@ -33,6 +35,10 @@ backend/
     teacher/                        teacher cabinet
     student/                        student dashboard routes
     parent/                         parent portal routes
+  pages/
+    ceo.py                          CEO page shell
+    hr_manager.py                   HR Manager page shell
+    customer_support.py             Customer Support page shell
   identity/                         temporary compatibility wrappers and shared identity plumbing
   utils/                            request/session/render helpers
 ```
@@ -83,8 +89,13 @@ Shared UI components are the preferred place for shells, modals, responsive card
 - `POST /api/v1/head-of-department/teacher-academy/assignments/{assignment_id}`
 - `POST /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments`
 - `POST /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status`
+- admin v1 slices under `/api/v1/admin/*`
+- student v1 slices under `/api/v1/student/*`
+- teacher office-hours under `/api/v1/teacher/office-hours/*`
 
 `GET /api/v1/auth/me` and `GET /api/v1/system/status` remain in the existing system/auth API modules. Other role API folders exist as placeholders until their current endpoints can move without changing behavior.
+
+Runtime inventory on 2026-07-08: 144 registered routes; 76 are `/api/v1/*`, 62 are page/form routes, and 6 are static/docs/public routes. No runtime route is currently registered under `/admin/api`, `/teacher/api`, `/academic-director/api`, `/head-of-department/api`, or a bare non-v1 `/api/*` path.
 
 ## Roles
 
@@ -94,12 +105,13 @@ Shared UI components are the preferred place for shells, modals, responsive card
 - `teacher`: active teacher or academy teacher cabinet.
 - `student`: student dashboard and learning tools.
 - `parent`: linked-child parent portal.
+- `ceo`, `hr_manager`, and `customer_support`: page shells now live in `backend/pages/*`; matching `backend/roles/*/routes.py` files are compatibility re-exports.
 
 ## Request Flow Examples
 
-AD creates academy teacher: the frontend submits through `frontend/src/shared/api/routes.ts` to `/api/v1/academic-director/teacher-academy`; the API route calls `backend/api/v1/teacher_academy_actions.py`; the helper calls `backend/domains/teacher_academy/service.py`; the service uses `backend/domains/teacher_academy/queries.py`.
+AD creates academy teacher: the frontend submits through `frontend/src/shared/api/routes.ts` to `/api/v1/academic-director/teacher-academy`; the API route uses schemas from `backend/api/v1/teacher_academy/schemas.py` and response adapters from `backend/api/v1/teacher_academy/responses.py`; the helper calls `backend/domains/teacher_academy/service.py`; the service uses `backend/domains/teacher_academy/queries.py`.
 
-HOD schedules or assesses: the frontend submits to `/api/v1/head-of-department/teacher-academy...`; the API route checks HOD subject scope through `backend/roles/head_of_department/academy_scope.py`; the scope helper delegates SQL to `backend/domains/teacher_academy/queries.py`; the shared API action helper calls the Teacher Academy domain service.
+HOD schedules or assesses: the frontend submits to `/api/v1/head-of-department/teacher-academy...`; the API route checks HOD subject scope through `backend/domains/teacher_academy/permissions.py`; the permission helper delegates SQL to `backend/domains/teacher_academy/queries.py`; the shared API response adapter calls the Teacher Academy domain service.
 
 Teacher sees academy progress: `/teacher` renders the teacher cabinet page and receives bootstrap props from `backend/roles/teacher/routes.py` and `backend/roles/teacher/services.py`. Future JSON endpoints should move under `/api/v1/teacher` only after equivalent tests cover the flow.
 
@@ -124,9 +136,9 @@ These wrappers should be removed only after import references are eliminated and
 
 - `database/` remains because Alembic history, compatibility query wrappers, and active imports still depend on it.
 - The physical schema remains `msi_v2`; the `lms` rename is only planned.
-- `/admin/api`, `/teacher/api`, and several student/general `/api` endpoints remain active until equivalent `/api/v1` replacements are implemented and tested.
-- `backend/roles/common/teacher_academy_api.py` remains as a compatibility wrapper around `backend/api/v1/teacher_academy_actions.py`.
-- Admin page routes still use `render_admin_page` because the system/admin workspace has not been moved to an API/page split yet.
+- Most old page and form routes still live in `backend/roles/`, including `/admin/*` form actions and major role page shells. CEO, HR Manager, and Customer Support page shells have moved to `backend/pages`.
+- Admin page routes still use `render_admin_page` because the system/admin workspace has not been moved to `backend/pages/admin.py` yet.
+- API v1 still has temporary imports from role services for a few admin/AD slices (`staff_registration`, `academic_service`, upload progress/storage helpers). These are tracked for later domain moves.
 
 ## Local Run
 

@@ -114,7 +114,7 @@ def register_admin_page_routes(
         announcements = list_announcements()
         timer.mark("support_context_build")
         if current_auth_role() == "head_of_department":
-            from backend.roles.head_of_department.academy_scope import filter_admin_context_for_current_hod
+            from backend.domains.teacher_academy.permissions import filter_admin_context_for_current_hod
 
             filter_admin_context_for_current_hod(page_context, academic_context)
             timer.mark("hod_scope_filter")
