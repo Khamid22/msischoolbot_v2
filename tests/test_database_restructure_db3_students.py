@@ -90,3 +90,58 @@ def test_student_public_dashboard_resolution_uses_student_domain():
     assert "Compatibility wrapper for DB-3 student domain ownership" in academic_dashboard_source
     assert "legacy_public_dashboard_id" not in office_hours_source
     assert "connect_auth_db" not in office_hours_source
+
+
+def test_direct_dashboard_lookup_allows_public_dashboard_without_legacy_enrollment():
+    academic_queries_source = Path("backend/domains/academics/queries.py").read_text()
+    dashboard_lookup_source = academic_queries_source.split("def get_enrollment_dashboard_row", 1)[1].split(
+        "\ndef list_enrollment_attendance_rows",
+        1,
+    )[0]
+
+    assert "COALESCE(\n                   gs.legacy_enrollment_id" in dashboard_lookup_source
+    assert "gs.legacy_enrollment_id IS NOT NULL" not in dashboard_lookup_source
+
+
+def test_student_public_dashboard_resolution_uses_canonical_subject_order(monkeypatch):
+    from backend.domains.students import service as student_service
+
+    class NullConnection:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(student_service, "_connect", lambda: NullConnection())
+    monkeypatch.setattr(
+        student_service.queries,
+        "list_public_dashboard_targets_for_student_row",
+        lambda _conn, _student_row_id: [
+            {
+                "public_dashboard_id": 12846656148,
+                "subject_name": "English as a Second Language",
+                "group_name": "MG1",
+                "school_key": "school5",
+            },
+            {
+                "public_dashboard_id": 1471265890,
+                "subject_name": "IGCSE Mathematics A",
+                "group_name": "MG1",
+                "school_key": "school5",
+            },
+        ],
+    )
+
+    resolved = student_service.resolve_public_dashboard_for_student_row(
+        2,
+        preferred_group="MG1",
+        school_code="school5",
+    )
+
+    assert resolved == {
+        "student_id": 1471265890,
+        "subject": "IGCSE Mathematics A",
+        "group": "MG1",
+        "school": "school5",
+    }

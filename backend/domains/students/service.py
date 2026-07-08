@@ -569,7 +569,7 @@ def resolve_public_dashboard_for_student_row(student_row_id, *, preferred_group=
     candidates.sort(
         key=lambda item: (
             0 if item.get("group_match") else 1,
-            str(item.get("subject", "")).casefold(),
+            canonical.subject_sort_key(item.get("subject", "")),
             str(item.get("group", "")).casefold(),
             int(item.get("student_id", 0)),
         )

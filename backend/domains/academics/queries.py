@@ -574,7 +574,10 @@ def get_enrollment_dashboard_row(
 ):
     return conn.execute(
         """
-        SELECT gs.legacy_enrollment_id AS id,
+        SELECT COALESCE(
+                   gs.legacy_enrollment_id,
+                   COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id)
+               ) AS id,
                COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) AS public_dashboard_id,
                st.full_name,
                COALESCE(hw.average_grade, 0) AS average_grade,
@@ -606,7 +609,6 @@ def get_enrollment_dashboard_row(
         ) coins ON coins.student_id = gs.student_id AND coins.group_id = gs.group_id
         WHERE COALESCE(gs.legacy_public_dashboard_id, st.legacy_public_dashboard_id) = %s
           AND gs.enrollment_status = 'active'
-          AND gs.legacy_enrollment_id IS NOT NULL
           AND lower(g.group_name) <> 'online'
           AND (%s = '' OR s.school_key = %s)
           AND (%s = '' OR lower(trim(regexp_replace(sub.subject_name, '[[:space:]]+', ' ', 'g'))) = %s)
