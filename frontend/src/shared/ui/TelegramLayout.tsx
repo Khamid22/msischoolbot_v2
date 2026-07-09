@@ -17,8 +17,11 @@ const headerPadTop = appTopInset;
 // Using 5.5rem gives a ~0.5rem buffer above both mobile (4.75rem) and desktop (5rem) topbar heights.
 const mainPadTop = `calc(${headerPadTop} + 5.5rem)`;
 
-// Total bottom padding for <main>: device home indicator + Telegram main button.
-const mainPadBottom = `calc(${appBottomInset} + 1rem)`;
+// Total bottom padding for <main>: device home indicator + Telegram main
+// button, plus extra breathing room so the last bit of content never sits
+// flush against (or gets clipped by) mobile browser chrome / Telegram's own
+// overlay controls when --tg-app-height is a pixel or two short.
+const mainPadBottom = `calc(${appBottomInset} + 2.5rem)`;
 const mainPadLeft = appLeftInset;
 const mainPadRight = appRightInset;
 

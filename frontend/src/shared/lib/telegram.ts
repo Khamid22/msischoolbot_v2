@@ -56,9 +56,35 @@ function safePixel(value: unknown): string {
   return `${Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0}px`;
 }
 
+/**
+ * Fallback viewport sync used whenever we are NOT in a real Telegram client
+ * (plain mobile/desktop browser, or telegram-web-app.js loaded outside
+ * Telegram for local preview). `100dvh` is usually accurate, but some mobile
+ * browsers miscalculate it while the address bar animates in/out, so keep
+ * it corrected from the live, widely-supported window/visualViewport size.
+ */
+function syncViewportFromWindow(): void {
+  const height = Math.round(window.visualViewport?.height || window.innerHeight || 0);
+  if (height <= 0) return;
+  const root = document.documentElement;
+  const value = `${height}px`;
+  root.style.setProperty("--tg-app-height", value);
+  root.style.setProperty("--tg-viewport-height", value);
+  root.style.setProperty("--tg-visual-viewport-height", value);
+}
+
+function bindWindowViewportFallback(): void {
+  syncViewportFromWindow();
+  window.addEventListener("resize", syncViewportFromWindow);
+  window.visualViewport?.addEventListener("resize", syncViewportFromWindow);
+}
+
 export function initTelegramViewport(): void {
   const tg = window.Telegram?.WebApp;
-  if (!tg) return;
+  if (!tg) {
+    bindWindowViewportFallback();
+    return;
+  }
 
   try {
     tg.ready();
@@ -67,6 +93,7 @@ export function initTelegramViewport(): void {
   }
 
   if (!isRealTelegramClient(tg)) {
+    bindWindowViewportFallback();
     return;
   }
 
