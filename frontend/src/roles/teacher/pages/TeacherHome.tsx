@@ -406,13 +406,21 @@ function countAttendance(groups: GroupGradebook[]) {
   return total ? Math.round((present / total) * 100) : 0;
 }
 
+function leadingLessonNumber(name: string): number {
+  const match = name.match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
+}
+
 function reportRows(reports: AcademyAssessment[]) {
   return reports
     .filter((report) => asNumber(report.weighted_overall_score) > 0)
     .map((report, index) => ({
       name: report.lesson_number || `Report ${index + 1}`,
       score: Number(asNumber(report.weighted_overall_score).toFixed(1)),
-    }));
+    }))
+    // Trend reads left-to-right by lesson number (Lesson 3 -> Lesson 14),
+    // not by the order lessons happened to be assessed in.
+    .sort((left, right) => leadingLessonNumber(left.name) - leadingLessonNumber(right.name));
 }
 
 function workspaceCardIcon(label: string) {
@@ -564,24 +572,32 @@ function AcademyHeroCard({
   );
 }
 
-function nextScheduledLesson(lessons: AcademyAssignment[]) {
-  if (!lessons.length) return null;
-  const now = Date.now();
-  const futureLessons = lessons
-    .filter((lesson) => {
-      const date = new Date(lesson.session_datetime || lesson.deadline_date || "");
-      return !Number.isNaN(date.getTime()) && date.getTime() >= now;
-    })
-    .sort((first, second) => {
-      const firstDate = new Date(first.session_datetime || first.deadline_date || "").getTime();
-      const secondDate = new Date(second.session_datetime || second.deadline_date || "").getTime();
-      return firstDate - secondDate;
-    });
-  return futureLessons[0] || lessons[0];
+function nextScheduledLesson(assignments: AcademyAssignment[], reports: AcademyAssessment[]) {
+  if (!assignments.length) return null;
+  // "Next" means the next lesson still awaiting assessment, in curriculum
+  // sequence order — not just the earliest lesson that happens to have a
+  // session_datetime, which could already be assessed and long past.
+  const assessedAssignmentIds = new Set(
+    reports.map((report) => asNumber(report.lesson_assignment_id)).filter(Boolean),
+  );
+  const doneStatuses = new Set(["assessed", "passed", "cancelled"]);
+  return (
+    assignments.find(
+      (lesson) => !assessedAssignmentIds.has(asNumber(lesson.id)) && !doneStatuses.has(String(lesson.status || "")),
+    ) || null
+  );
 }
 
-function NextLessonPreview({ lessons, onViewLessons }: { lessons: AcademyAssignment[]; onViewLessons: () => void }) {
-  const lesson = nextScheduledLesson(lessons);
+function NextLessonPreview({
+  lessons,
+  reports,
+  onViewLessons,
+}: {
+  lessons: AcademyAssignment[];
+  reports: AcademyAssessment[];
+  onViewLessons: () => void;
+}) {
+  const lesson = nextScheduledLesson(lessons, reports);
   return (
     <section className="rounded-[1rem] border border-[#E4E7EC] bg-white p-4 shadow-sm">
       <p className="text-[11px] font-black uppercase tracking-wide text-[#7A8296]">Next scheduled lesson</p>
@@ -686,25 +702,35 @@ function LatestUpdatePreview({ updates, onViewUpdates }: { updates: AcademyUpdat
   );
 }
 
-function ScoreTrendSvg({ rows }: { rows: Array<{ name: string; score: number }> }) {
+function ScoreTrendBarChart({ rows }: { rows: Array<{ name: string; score: number }> }) {
   const width = 300;
   const height = 140;
-  const pad = 14;
-  const dots = rows.map((row, index) => {
-    const x = rows.length > 1 ? pad + index * ((width - pad * 2) / (rows.length - 1)) : width / 2;
-    const y = height - pad - Math.min(1, Math.max(0, row.score / 10)) * (height - pad * 2);
-    return { x: Math.round(x), y: Math.round(y) };
+  const padTop = 24; // room for the value label above the tallest bar
+  const padBottom = 6;
+  const gap = 8;
+  const plotHeight = height - padTop - padBottom;
+  const barWidth = Math.max(10, Math.min(32, (width - gap * (rows.length - 1)) / Math.max(1, rows.length)));
+  const usedWidth = rows.length * barWidth + (rows.length - 1) * gap;
+  const startX = Math.max(0, (width - usedWidth) / 2);
+  const bars = rows.map((row, index) => {
+    const x = startX + index * (barWidth + gap);
+    const barHeight = Math.round(Math.min(1, Math.max(0, row.score / 10)) * plotHeight);
+    const y = height - padBottom - barHeight;
+    return { x, y, barHeight, row };
   });
-  const points = dots.map((point) => `${point.x},${point.y}`).join(" ");
   return (
     <>
       <svg width="100%" height="140" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
-        <line x1="0" y1="10" x2={width} y2="10" stroke="#F0F2F6" strokeWidth="1" />
-        <line x1="0" y1="55" x2={width} y2="55" stroke="#F0F2F6" strokeWidth="1" />
-        <line x1="0" y1="100" x2={width} y2="100" stroke="#F0F2F6" strokeWidth="1" />
-        <polyline points={points} fill="none" stroke="#2F5DE0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {dots.map((point, index) => (
-          <circle key={`${point.x}-${index}`} cx={point.x} cy={point.y} r="4" fill="#2F5DE0" stroke="#fff" strokeWidth="1.5" />
+        <line x1="0" y1={padTop} x2={width} y2={padTop} stroke="#F0F2F6" strokeWidth="1" />
+        <line x1="0" y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#F0F2F6" strokeWidth="1" />
+        <line x1="0" y1={height - padBottom} x2={width} y2={height - padBottom} stroke="#F0F2F6" strokeWidth="1" />
+        {bars.map(({ x, y, barHeight, row }, index) => (
+          <g key={`${row.name}-${index}`}>
+            <rect x={x} y={y} width={barWidth} height={Math.max(2, barHeight)} rx="4" fill="#2F5DE0" />
+            <text x={x + barWidth / 2} y={y - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill="#12203D">
+              {row.score.toFixed(1)}
+            </text>
+          </g>
         ))}
       </svg>
       <div className="flex justify-between px-1 pt-0.5">
@@ -726,7 +752,7 @@ function AcademyScoreSnapshot({ rows }: { rows: Array<{ name: string; score: num
       <p className="text-sm font-black text-[#12203D]">Assessment score trend</p>
       <p className="mt-0.5 text-[11.5px] font-semibold text-[#7A8296]">Score out of 10 across assessed lessons</p>
       <div className="mt-3">
-        <ScoreTrendSvg rows={rows} />
+        <ScoreTrendBarChart rows={rows} />
       </div>
     </section>
   );
@@ -1666,7 +1692,8 @@ export default function TeacherHome(props: TeacherPageProps) {
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2">
                   <NextLessonPreview
-                    lessons={trainingTimetable.length ? trainingTimetable : journey}
+                    lessons={journey}
+                    reports={reports}
                     onViewLessons={() => setActiveTab("reports")}
                   />
                   <LatestFeedbackPreview reports={reports} onViewReport={(report) => handleOpenReport(report)} />

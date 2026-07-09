@@ -814,7 +814,6 @@ function AssignmentModal({
       title="Schedule Academy Lesson"
       subtitle={selectedAssignment ? assignmentTitle(selectedAssignment) : "Choose an academy lesson"}
       onClose={onClose}
-      mobileMode="fullscreen"
     >
       <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
         <ModalBody className="space-y-4">
