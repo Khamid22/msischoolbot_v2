@@ -88,6 +88,10 @@ Teacher direct messages require a numeric `msi_staff.telegram_user_id`. A
 stored `telegram_username` is useful for display, but Telegram Bot API cannot
 start a private chat from a username alone.
 
+New Teacher Academy welcome notifications must be greeting-only. They must not
+include assigned lesson names, schedules, or lesson counts in the channel or in
+the teacher direct message.
+
 Web should own:
 
 - session creation.

@@ -734,10 +734,9 @@ def create_academy_teacher(
             "telegram_user_id": 0,
         },
         event_type="teacher_created",
-        title="New Teacher Academy teacher",
-        body=f"{len(lessons)} academy lessons are assigned.",
+        title="Welcome to MSI School",
+        body="Welcome to the MSI School family.",
         source="Academic Department",
-        lessons_count=len(lessons),
     )
     credentials = {
         "role": "teacher",

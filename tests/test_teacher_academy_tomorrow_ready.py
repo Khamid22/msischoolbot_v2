@@ -451,8 +451,8 @@ def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
     result = notifications.notify_academy_teacher_event(
         academy_teacher={"full_name": "Example Teacher", "subject": "Mathematics"},
         event_type="teacher_created",
-        title="New Teacher Academy teacher",
-        body="2 academy lessons are assigned.",
+        title="Welcome to MSI School",
+        body="Welcome to the MSI School family.",
         lessons_count=2,
     )
 
@@ -462,7 +462,9 @@ def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
     assert result["teacher_sent"] is False
     assert sent_messages[0][0] == "-100-math"
     assert "Example Teacher" in sent_messages[0][1]
-    assert "Assigned lessons" in sent_messages[0][1]
+    assert "welcome to the MSI School family" in sent_messages[0][1]
+    assert "Assigned lessons" not in sent_messages[0][1]
+    assert "academy lessons" not in sent_messages[0][1]
 
 
 def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
@@ -492,6 +494,37 @@ def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
     assert result["teacher_sent"] is True
     assert sent_messages[0][0] == "901234"
     assert "L1: Numbers" in sent_messages[0][1]
+
+
+def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
+    from backend.domains.teacher_academy import notifications
+
+    sent_messages = []
+    monkeypatch.setenv("BOT_TOKEN", "test-token")
+    monkeypatch.delenv("TEACHER_ACADEMY_CHANNEL_CHAT_ID", raising=False)
+    monkeypatch.setattr(
+        notifications,
+        "_send_telegram_message",
+        lambda chat_id, text: sent_messages.append((str(chat_id), text)) or (True, ""),
+    )
+
+    result = notifications.notify_academy_teacher_event(
+        academy_teacher={
+            "full_name": "Example Teacher",
+            "subject": "Mathematics",
+            "telegram_user_id": 901234,
+        },
+        event_type="teacher_created",
+        title="Welcome to MSI School",
+        body="Welcome to the MSI School family.",
+        lessons_count=12,
+    )
+
+    assert result["teacher_sent"] is True
+    assert sent_messages[0][0] == "901234"
+    assert "welcome to the MSI School family" in sent_messages[0][1]
+    assert "Assigned lessons" not in sent_messages[0][1]
+    assert "assigned lesson" not in sent_messages[0][1]
 
 
 @pytest.mark.parametrize(

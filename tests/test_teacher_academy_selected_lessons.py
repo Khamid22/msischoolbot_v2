@@ -143,9 +143,10 @@ def test_create_academy_teacher_uses_selected_lesson_ids_in_order(monkeypatch):
     assert [params[4] for params in conn.assignments] == [1, 2]
     assert [params[6] for params in conn.assignments] == ["Algebra", "Numbers"]
     assert conn.notifications[0]["event_type"] == "teacher_created"
+    assert conn.notifications[0]["title"] == "Welcome to MSI School"
     assert conn.notifications[0]["academy_teacher"]["full_name"] == "Example Teacher"
     assert conn.notifications[0]["academy_teacher"]["subject"] == "Mathematics"
-    assert conn.notifications[0]["lessons_count"] == 2
+    assert "lessons" not in conn.notifications[0]["body"]
     assert conn.commits == 1
 
 

@@ -131,11 +131,18 @@ def _channel_message(
     teacher_name = _teacher_display(academy_teacher)
     subject = _text((academy_teacher or {}).get("subject"))
     lines = [f"<b>{_escape(title)}</b>", ""]
+    if event_type == "teacher_created":
+        department = f" and the <b>{_escape(subject)}</b> department" if subject else ""
+        lines.append(
+            f"Hello <b>{_escape(teacher_name)}</b>, welcome to the MSI School family{department}."
+        )
+        lines.append("We are happy to have you with us.")
+        lines.append(f"\nSource: {_escape(source)}")
+        return "\n".join(lines)
+
     lines.append(f"Teacher: <b>{_escape(teacher_name)}</b>")
     if subject:
         lines.append(f"Department: <b>{_escape(subject)}</b>")
-    if event_type == "teacher_created" and lessons_count:
-        lines.append(f"Assigned lessons: <b>{lessons_count}</b>")
     lesson = _lesson_display(assignment)
     if lesson:
         lines.append(f"Lesson: <b>{_escape(lesson)}</b>")
@@ -161,11 +168,20 @@ def _teacher_message(
     assessment: dict[str, Any] | None,
     lessons_count: int,
 ) -> str:
+    teacher_name = _teacher_display(academy_teacher)
+    subject = _text((academy_teacher or {}).get("subject"))
     lines = [f"<b>{_escape(title)}</b>", ""]
     if event_type == "teacher_created":
-        lines.append("Welcome to Teacher Academy.")
-        if lessons_count:
-            lines.append(f"You have <b>{lessons_count}</b> assigned lesson(s).")
+        department = f" and the <b>{_escape(subject)}</b> department" if subject else ""
+        lines.append(
+            f"Hello <b>{_escape(teacher_name)}</b>, welcome to the MSI School family{department}."
+        )
+        lines.append("We are happy to have you with us.")
+        portal_url = _portal_url()
+        if portal_url:
+            lines.extend(["", f"Open portal: {_escape(portal_url)}"])
+        return "\n".join(lines)
+
     lesson = _lesson_display(assignment)
     if lesson:
         lines.append(f"Lesson: <b>{_escape(lesson)}</b>")
