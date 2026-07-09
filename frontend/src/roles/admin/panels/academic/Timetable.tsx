@@ -1,14 +1,16 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { Clock, MapPin, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, X } from "lucide-react";
 import { motion } from "@/shared/lib/motion";
-import { Lesson } from "./shared";
+import { Lesson, addDays, isoDate, startOfWeek, timeToMinutes, timetableEndHour, timetableStartHour, weekdayLabels } from "./shared";
 
 /**
  * Presentational building blocks for the group Timetable tab. These components
  * are intentionally decoupled from data fetching / persistence — the parent
- * (GroupGradebook) owns state, API calls, and date-grouping logic, and passes
- * already-derived values in as props.
+ * (GroupGradebook) owns lesson data, API calls, and date-grouping logic, and
+ * passes already-derived values in as props. View/navigation state (which
+ * day/week/month is on screen) is pure UI state and lives locally in
+ * TimetableCard.
  */
 
 export type TimetableDateGroup = {
@@ -18,6 +20,8 @@ export type TimetableDateGroup = {
   weekday: string;
   lessons: Lesson[];
 };
+
+type ViewMode = "day" | "week" | "month";
 
 const MOBILE_BREAKPOINT_PX = 640;
 
@@ -34,114 +38,502 @@ function useIsMobileViewport(breakpointPx = MOBILE_BREAKPOINT_PX) {
   return isMobile;
 }
 
-function monthDayFromIso(iso: string) {
-  if (!iso) return { month: "—", day: "?" };
-  const date = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return { month: "—", day: "?" };
-  return {
-    month: date.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-    day: date.getDate(),
-  };
+/* ------------------------------- Toolbar -------------------------------- */
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-export function DateBadge({ iso, cancelled = false }: { iso: string; cancelled?: boolean }) {
-  const { month, day } = monthDayFromIso(iso);
+function shiftCursor(view: ViewMode, cursor: Date, direction: 1 | -1): Date {
+  if (view === "day") return addDays(cursor, direction);
+  if (view === "week") return addDays(cursor, direction * 7);
+  const next = new Date(cursor);
+  next.setMonth(next.getMonth() + direction);
+  return next;
+}
+
+function periodLabel(view: ViewMode, cursor: Date): string {
+  if (view === "day") {
+    return cursor.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+  if (view === "month") {
+    return cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  return startOfWeek(cursor).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function TimetableToolbar({
+  view,
+  onViewChange,
+  cursor,
+  onCursorChange,
+}: {
+  view: ViewMode;
+  onViewChange: (view: ViewMode) => void;
+  cursor: Date;
+  onCursorChange: (date: Date) => void;
+}) {
+  const todayLabel = view === "day" ? "Today" : view === "week" ? "This Week" : "This Month";
   return (
-    <div
-      className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl ${
-        cancelled ? "bg-red-100 text-red-700" : "bg-primary/10 text-primary"
-      }`}
-    >
-      <span className="text-[9px] font-bold uppercase leading-none">{month}</span>
-      <span className="mt-0.5 text-base font-black leading-none">{day}</span>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 px-4 py-3">
+      <p className="text-sm font-bold">{periodLabel(view, cursor)}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onCursorChange(shiftCursor(view, cursor, -1))}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+            aria-label={`Previous ${view}`}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onCursorChange(new Date())}
+            className="h-9 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted"
+          >
+            {todayLabel}
+          </button>
+          <button
+            type="button"
+            onClick={() => onCursorChange(shiftCursor(view, cursor, 1))}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"
+            aria-label={`Next ${view}`}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">
+          {(["day", "week", "month"] as ViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => onViewChange(mode)}
+              aria-pressed={view === mode}
+              className={`h-8 rounded-md px-3 text-xs font-bold capitalize transition-colors ${
+                view === mode ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-// A single tint (navy, matching DateBadge) for "set" chips instead of mixing
-// blue/green/etc — keeps the tab from drifting away from the app's accent.
-function chipClass(isSet: boolean, canEdit: boolean) {
-  const base = "inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold transition-[transform,opacity]";
-  const interactive = canEdit ? "hover:-translate-y-px hover:opacity-85" : "cursor-default opacity-70";
-  const tone = isSet ? "border-primary/25 bg-primary/8 text-primary" : "border-foreground/12 bg-background text-muted-foreground";
-  return `${base} ${interactive} ${tone}`;
+/* --------------------------- Week / Day grid ----------------------------- */
+
+const HOUR_PX = 64;
+const TIME_COL_PX = 52;
+const DAY_COL_MIN_PX = 132;
+
+type PositionedLesson = { lesson: Lesson; row: number; rowCount: number; startMin: number; endMin: number };
+
+// Group-scoped overlaps are rare (usually 0-1 lesson/day) but this still
+// clusters same-time-band lessons into side-by-side columns when they happen.
+function layoutTimedLessons(lessons: Lesson[]): PositionedLesson[] {
+  const sorted = [...lessons].sort(
+    (a, b) => timeToMinutes(a.startTime || "") - timeToMinutes(b.startTime || ""),
+  );
+  const output: PositionedLesson[] = [];
+  let cluster: Lesson[] = [];
+  let clusterEnd = -1;
+  function flush() {
+    if (cluster.length === 0) return;
+    const rowCount = cluster.length;
+    cluster.forEach((lesson, index) => {
+      output.push({
+        lesson,
+        row: index,
+        rowCount,
+        startMin: timeToMinutes(lesson.startTime || ""),
+        endMin: timeToMinutes(lesson.endTime || ""),
+      });
+    });
+    cluster = [];
+    clusterEnd = -1;
+  }
+  sorted.forEach((lesson) => {
+    const start = timeToMinutes(lesson.startTime || "");
+    const end = timeToMinutes(lesson.endTime || "");
+    if (cluster.length > 0 && start >= clusterEnd) flush();
+    cluster.push(lesson);
+    clusterEnd = Math.max(clusterEnd, end);
+  });
+  flush();
+  return output;
 }
 
-export function TimetableLessonRow({
+function GridLessonCard({
   lesson,
-  iso,
+  top,
+  height,
+  left,
+  width,
   cancelled,
   canEdit,
   onOpenTime,
   onOpenRoom,
 }: {
   lesson: Lesson;
-  iso: string;
+  top: number;
+  height: number;
+  left: string;
+  width: string;
   cancelled: boolean;
   canEdit: boolean;
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
+  const compact = height < 56;
   const hasTime = Boolean(lesson.startTime && lesson.endTime);
-  const hasRoom = Boolean(lesson.room);
-  const timeLabel = hasTime ? `${lesson.startTime}–${lesson.endTime}` : "Set time";
-  const roomLabel = hasRoom ? lesson.room : "Set room";
-
+  const timeLabel = hasTime ? `${lesson.startTime}–${lesson.endTime}` : "";
   return (
     <div
-      className={`flex flex-col gap-3 rounded-2xl border px-3.5 py-3 shadow-sm sm:flex-row sm:items-center ${
-        cancelled ? "border-red-200 bg-red-50/50" : "border-foreground/6 bg-muted/40"
+      className={`absolute flex flex-col overflow-hidden rounded-lg border px-1.5 py-1 shadow-sm ${
+        cancelled ? "border-red-300 bg-red-500 text-white" : "border-primary/25 bg-primary/10 text-primary"
       }`}
+      style={{ top, height, left, width }}
+      title={`${lesson.lessonNumber}${lesson.topic ? ` · ${lesson.topic}` : ""}`}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <DateBadge iso={iso} cancelled={cancelled} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{lesson.lessonNumber}</p>
-          <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">{lesson.topic || "—"}</p>
-        </div>
-      </div>
+      <p className="truncate text-[10.5px] font-black leading-tight">{lesson.lessonNumber}</p>
+      {!compact && lesson.topic ? (
+        <p className={`truncate text-[9.5px] font-medium leading-tight ${cancelled ? "text-white/85" : "text-primary/75"}`}>
+          {lesson.topic}
+        </p>
+      ) : null}
       {cancelled ? (
-        <span className="inline-flex w-fit shrink-0 items-center rounded-full bg-red-100 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700 shadow-sm sm:ml-auto">
-          Cancelled
-        </span>
-      ) : canEdit ? (
-        <div className="flex flex-wrap shrink-0 items-center gap-1.5 sm:ml-auto sm:flex-nowrap">
-          <button
-            type="button"
-            onClick={onOpenTime}
-            title={`${lesson.lessonNumber} · edit class time`}
-            className={`max-w-[9.5rem] ${chipClass(hasTime, true)}`}
-          >
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 truncate">{timeLabel}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenRoom}
-            title={`${lesson.lessonNumber} · edit room`}
-            className={`max-w-[9.5rem] ${chipClass(hasRoom, true)}`}
-          >
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="min-w-0 truncate">{roomLabel}</span>
-          </button>
-        </div>
+        <p className="mt-auto text-[9px] font-bold uppercase tracking-wide">Cancelled</p>
       ) : (
-        // View-only roles (students/parents, or teachers without edit rights)
-        // get plain labels — never a button that looks editable but isn't.
-        <div className="flex flex-wrap shrink-0 items-center gap-3 text-xs font-semibold text-muted-foreground sm:ml-auto">
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 shrink-0" />
-            {timeLabel}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            {roomLabel}
-          </span>
+        <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={onOpenTime}
+              title={`${lesson.lessonNumber} · edit class time`}
+              className="inline-flex items-center gap-0.5 rounded px-0.5 text-[9px] font-bold hover:bg-primary/20"
+            >
+              <Clock className="h-2.5 w-2.5 shrink-0" />
+              {timeLabel || "Set time"}
+            </button>
+          ) : timeLabel ? (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold opacity-85">
+              <Clock className="h-2.5 w-2.5 shrink-0" />
+              {timeLabel}
+            </span>
+          ) : null}
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={onOpenRoom}
+              title={`${lesson.lessonNumber} · edit room`}
+              className="inline-flex min-w-0 items-center gap-0.5 truncate rounded px-0.5 text-[9px] font-bold hover:bg-primary/20"
+            >
+              <MapPin className="h-2.5 w-2.5 shrink-0" />
+              <span className="min-w-0 truncate">{lesson.room || "Set room"}</span>
+            </button>
+          ) : lesson.room ? (
+            <span className="inline-flex min-w-0 items-center gap-0.5 truncate text-[9px] font-semibold opacity-85">
+              <MapPin className="h-2.5 w-2.5 shrink-0" />
+              <span className="min-w-0 truncate">{lesson.room}</span>
+            </span>
+          ) : null}
         </div>
       )}
     </div>
   );
 }
+
+function TimetableDayColumn({
+  group,
+  dayStartMin,
+  dayEndMin,
+  isLessonCancelled,
+  canEdit,
+  onOpenTime,
+  onOpenRoom,
+}: {
+  group: TimetableDateGroup | undefined;
+  dayStartMin: number;
+  dayEndMin: number;
+  isLessonCancelled: (lesson: Lesson) => boolean;
+  canEdit: boolean;
+  onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+}) {
+  const timed = (group?.lessons ?? []).filter((lesson) => lesson.startTime && lesson.endTime);
+  const positioned = useMemo(() => layoutTimedLessons(timed), [timed]);
+  const gridHeight = ((dayEndMin - dayStartMin) / 60) * HOUR_PX;
+  const hourCount = Math.floor((dayEndMin - dayStartMin) / 60);
+
+  return (
+    <div className="relative border-l border-foreground/10" style={{ height: gridHeight }}>
+      {Array.from({ length: hourCount + 1 }, (_, index) => (
+        <div key={index} className="absolute left-0 right-0 border-t border-foreground/8" style={{ top: index * HOUR_PX }} />
+      ))}
+      {positioned.map(({ lesson, row, rowCount, startMin, endMin }) => {
+        const top = ((startMin - dayStartMin) / 60) * HOUR_PX;
+        const height = Math.max(44, ((endMin - startMin) / 60) * HOUR_PX - 2);
+        const width = rowCount > 1 ? `calc(${100 / rowCount}% - 4px)` : "calc(100% - 4px)";
+        const left = rowCount > 1 ? `calc(${(row * 100) / rowCount}% + 2px)` : "2px";
+        return (
+          <GridLessonCard
+            key={lesson.id}
+            lesson={lesson}
+            top={Math.max(0, top)}
+            height={height}
+            left={left}
+            width={width}
+            cancelled={isLessonCancelled(lesson)}
+            canEdit={canEdit}
+            onOpenTime={(e) => onOpenTime(e, lesson)}
+            onOpenRoom={(e) => onOpenRoom(e, lesson)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function UnscheduledDayCell({
+  lessons,
+  canEdit,
+  onOpenTime,
+  onOpenRoom,
+}: {
+  lessons: Lesson[];
+  canEdit: boolean;
+  onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+}) {
+  if (lessons.length === 0) return <div className="border-l border-foreground/10" />;
+  return (
+    <div className="space-y-1 border-l border-foreground/10 px-1.5 py-1.5">
+      {lessons.map((lesson) => (
+        <div key={lesson.id} className="rounded-lg border border-dashed border-foreground/20 bg-background px-1.5 py-1">
+          <p className="truncate text-[9.5px] font-bold">{lesson.lessonNumber}</p>
+          {canEdit ? (
+            <div className="mt-0.5 flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                onClick={(e) => onOpenTime(e, lesson)}
+                title={`${lesson.lessonNumber} · set class time`}
+                className="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/8 px-1.5 py-0.5 text-[9px] font-bold text-primary hover:bg-primary/15"
+              >
+                <Clock className="h-2.5 w-2.5" />
+                Set time
+              </button>
+              <button
+                type="button"
+                onClick={(e) => onOpenRoom(e, lesson)}
+                title={`${lesson.lessonNumber} · set room`}
+                className="inline-flex min-w-0 items-center gap-0.5 truncate rounded-full border border-foreground/12 bg-background px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground hover:bg-muted"
+              >
+                <MapPin className="h-2.5 w-2.5 shrink-0" />
+                <span className="min-w-0 truncate">{lesson.room || "Set room"}</span>
+              </button>
+            </div>
+          ) : (
+            <span className="mt-0.5 block text-[9px] font-semibold text-muted-foreground">
+              No time set{lesson.room ? ` · ${lesson.room}` : ""}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TimetableTimeGrid({
+  days,
+  groupsByIso,
+  isLessonCancelled,
+  canEdit,
+  onOpenTime,
+  onOpenRoom,
+}: {
+  days: Date[];
+  groupsByIso: Map<string, TimetableDateGroup>;
+  isLessonCancelled: (lesson: Lesson) => boolean;
+  canEdit: boolean;
+  onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+}) {
+  const dayStartMin = timetableStartHour * 60;
+  const dayEndMin = timetableEndHour * 60;
+  const hours = Array.from({ length: timetableEndHour - timetableStartHour + 1 }, (_, index) => timetableStartHour + index);
+  const dayCount = days.length;
+  const todayIso = isoDate(new Date());
+  const gridTemplateColumns =
+    dayCount === 1 ? `${TIME_COL_PX}px 1fr` : `${TIME_COL_PX}px repeat(${dayCount}, minmax(${DAY_COL_MIN_PX}px, 1fr))`;
+
+  const dayEntries = days.map((day) => {
+    const iso = isoDate(day);
+    const group = groupsByIso.get(iso);
+    const untimed = (group?.lessons ?? []).filter(
+      (lesson) => !(lesson.startTime && lesson.endTime) && !isLessonCancelled(lesson),
+    );
+    return { day, iso, group, untimed };
+  });
+  const hasAnyUnscheduled = dayEntries.some((entry) => entry.untimed.length > 0);
+
+  return (
+    <div className="miniapp-table-scroll min-h-0 flex-1 [scrollbar-gutter:stable]">
+      <div style={{ minWidth: dayCount === 1 ? undefined : TIME_COL_PX + dayCount * DAY_COL_MIN_PX }}>
+        <div
+          className="sticky top-0 z-20 grid border-b border-foreground/10 bg-surface/95 backdrop-blur"
+          style={{ gridTemplateColumns }}
+        >
+          <div className="px-2 py-2 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Time</div>
+          {dayEntries.map(({ day, iso }) => {
+            const isToday = iso === todayIso;
+            return (
+              <div key={iso} className={`border-l border-foreground/10 px-2 py-2 text-center ${isToday ? "bg-primary/5" : ""}`}>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                  {weekdayLabels[(day.getDay() + 6) % 7]}
+                </p>
+                <p className={`text-sm font-black leading-tight ${isToday ? "text-primary" : ""}`}>
+                  {day.getDate()} {day.toLocaleDateString("en-US", { month: "short" })}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        {hasAnyUnscheduled ? (
+          <div className="grid border-b border-foreground/10 bg-muted/20" style={{ gridTemplateColumns }}>
+            <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Unscheduled</div>
+            {dayEntries.map(({ iso, untimed }) => (
+              <UnscheduledDayCell key={iso} lessons={untimed} canEdit={canEdit} onOpenTime={onOpenTime} onOpenRoom={onOpenRoom} />
+            ))}
+          </div>
+        ) : null}
+        <div className="grid" style={{ gridTemplateColumns }}>
+          <div className="relative border-r border-foreground/10 bg-muted/10" style={{ height: ((dayEndMin - dayStartMin) / 60) * HOUR_PX }}>
+            {hours.map((hour) => (
+              <div
+                key={hour}
+                className="absolute left-0 right-0 border-t border-foreground/8 px-1.5 pt-1 text-right text-[9px] font-semibold text-muted-foreground"
+                style={{
+                  top: (hour - timetableStartHour) * HOUR_PX,
+                  transform: hour === timetableEndHour ? "translateY(-100%)" : undefined,
+                }}
+              >
+                {String(hour).padStart(2, "0")}:00
+              </div>
+            ))}
+          </div>
+          {dayEntries.map(({ iso, group }) => (
+            <TimetableDayColumn
+              key={iso}
+              group={group}
+              dayStartMin={dayStartMin}
+              dayEndMin={dayEndMin}
+              isLessonCancelled={isLessonCancelled}
+              canEdit={canEdit}
+              onOpenTime={onOpenTime}
+              onOpenRoom={onOpenRoom}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --------------------------------- Month --------------------------------- */
+
+function TimetableMonthView({
+  cursor,
+  groupsByIso,
+  isLessonCancelled,
+  canEdit,
+  onOpenTime,
+  onSelectDay,
+}: {
+  cursor: Date;
+  groupsByIso: Map<string, TimetableDateGroup>;
+  isLessonCancelled: (lesson: Lesson) => boolean;
+  canEdit: boolean;
+  onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onSelectDay: (day: Date) => void;
+}) {
+  const days = useMemo(() => {
+    const gridStart = startOfWeek(startOfMonth(cursor));
+    return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+  }, [cursor]);
+  const monthIndex = cursor.getMonth();
+  const todayIso = isoDate(new Date());
+
+  return (
+    <div className="miniapp-table-scroll min-h-0 flex-1 p-3 [scrollbar-gutter:stable]">
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekdayLabels.map((label) => (
+          <div key={label} className="px-1 pb-1 text-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+            {label}
+          </div>
+        ))}
+        {days.map((day) => {
+          const iso = isoDate(day);
+          const inMonth = day.getMonth() === monthIndex;
+          const isToday = iso === todayIso;
+          const lessons = groupsByIso.get(iso)?.lessons ?? [];
+          const visible = lessons.slice(0, 2);
+          const overflow = lessons.length - visible.length;
+          return (
+            <div
+              key={iso}
+              className={`min-h-[5.5rem] rounded-lg border p-1 ${inMonth ? "border-foreground/8 bg-background" : "border-transparent bg-muted/20"}`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectDay(day)}
+                className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                  isToday ? "bg-primary text-primary-foreground" : inMonth ? "text-foreground hover:bg-muted" : "text-muted-foreground/50"
+                }`}
+              >
+                {day.getDate()}
+              </button>
+              <div className="mt-1 space-y-0.5">
+                {visible.map((lesson) => {
+                  const cancelled = isLessonCancelled(lesson);
+                  const hasTime = Boolean(lesson.startTime && lesson.endTime);
+                  return (
+                    <button
+                      key={lesson.id}
+                      type="button"
+                      disabled={!canEdit || cancelled}
+                      onClick={(e) => onOpenTime(e, lesson)}
+                      title={`${lesson.lessonNumber}${hasTime ? ` · ${lesson.startTime}–${lesson.endTime}` : ""}`}
+                      className={`block w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-bold ${
+                        cancelled ? "bg-red-100 text-red-700" : hasTime ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {hasTime ? `${lesson.startTime} ` : ""}
+                      {lesson.lessonNumber}
+                    </button>
+                  );
+                })}
+                {overflow > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectDay(day)}
+                    className="block w-full truncate rounded px-1 py-0.5 text-left text-[9px] font-bold text-muted-foreground hover:text-foreground"
+                  >
+                    +{overflow} more
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------------- Top-level card ----------------------------- */
 
 export function TimetableCard({
   groups,
@@ -156,6 +548,29 @@ export function TimetableCard({
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
 }) {
+  const [view, setView] = useState<ViewMode>("week");
+  const [cursor, setCursor] = useState<Date>(() => new Date());
+
+  const groupsByIso = useMemo(() => {
+    const map = new Map<string, TimetableDateGroup>();
+    groups.forEach((group) => {
+      if (group.iso) map.set(group.iso, group);
+    });
+    return map;
+  }, [groups]);
+
+  const undatedCount = groups.find((group) => !group.iso)?.lessons.length ?? 0;
+  const datedLessonCount = groups.reduce((sum, group) => sum + (group.iso ? group.lessons.length : 0), 0);
+
+  const days = useMemo(() => {
+    if (view === "day") return [cursor];
+    if (view === "week") {
+      const start = startOfWeek(cursor);
+      return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+    }
+    return [];
+  }, [view, cursor]);
+
   return (
     <div
       className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
@@ -165,46 +580,49 @@ export function TimetableCard({
         minHeight: "26rem",
       }}
     >
-      <div className="shrink-0 px-4 py-4">
+      <div className="shrink-0 px-4 pt-4">
         <p className="text-sm font-bold">Timetable</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {canEdit
-            ? "Conducted lesson dates with class time and room · tap a chip to edit"
-            : "Conducted lesson dates with class time and room"}
+          {canEdit ? "Conducted lesson dates with class time and room · tap to edit" : "Conducted lesson dates with class time and room"}
         </p>
       </div>
-      <div className="h-px shrink-0 bg-foreground/8" />
-      {groups.length === 0 ? (
+      <TimetableToolbar view={view} onViewChange={setView} cursor={cursor} onCursorChange={setCursor} />
+      {undatedCount > 0 ? (
+        <p className="shrink-0 border-b border-foreground/8 bg-amber-50 px-4 py-1.5 text-[11px] font-semibold text-amber-800">
+          {undatedCount} lesson{undatedCount > 1 ? "s" : ""} without a conducted date — set a date from the Gradebook tab.
+        </p>
+      ) : null}
+      {datedLessonCount === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
           No timetable lessons yet.
         </div>
+      ) : view === "month" ? (
+        <TimetableMonthView
+          cursor={cursor}
+          groupsByIso={groupsByIso}
+          isLessonCancelled={isLessonCancelled}
+          canEdit={canEdit}
+          onOpenTime={onOpenTime}
+          onSelectDay={(day) => {
+            setCursor(day);
+            setView("day");
+          }}
+        />
       ) : (
-        <div className="miniapp-table-scroll min-h-0 flex-1 space-y-5 px-4 py-4 [scrollbar-gutter:stable]">
-          {groups.map((group) => (
-            <div key={group.key}>
-              <p className="sticky top-0 z-10 -mx-4 mb-2.5 bg-surface/95 px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground backdrop-blur">
-                {group.weekday ? `${group.weekday} · ${group.display}` : group.display}
-              </p>
-              <div className="space-y-2.5">
-                {group.lessons.map((lesson) => (
-                  <TimetableLessonRow
-                    key={lesson.id}
-                    lesson={lesson}
-                    iso={group.iso}
-                    cancelled={isLessonCancelled(lesson)}
-                    canEdit={canEdit}
-                    onOpenTime={(e) => onOpenTime(e, lesson)}
-                    onOpenRoom={(e) => onOpenRoom(e, lesson)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <TimetableTimeGrid
+          days={days}
+          groupsByIso={groupsByIso}
+          isLessonCancelled={isLessonCancelled}
+          canEdit={canEdit}
+          onOpenTime={onOpenTime}
+          onOpenRoom={onOpenRoom}
+        />
       )}
     </div>
   );
 }
+
+/* --------------------------------- Popovers -------------------------------- */
 
 type PopoverPosition = { top: number; left: number };
 
