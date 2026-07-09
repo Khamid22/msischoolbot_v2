@@ -322,6 +322,9 @@ def get_group_gradebook(group_id):
                        COALESCE(NULLIF(ls.source_topic, ''), spi.title, '') AS topic,
                        COALESCE(to_char(ls.session_date, 'DD/MM/YYYY'), '') AS lesson_date,
                        ls.session_date,
+                       COALESCE(to_char(ls.start_time, 'HH24:MI'), '') AS start_time,
+                       COALESCE(to_char(ls.end_time, 'HH24:MI'), '') AS end_time,
+                       COALESCE(ls.room, '') AS room,
                        COALESCE(NULLIF(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
                        ls.status,
                        COALESCE(NULLIF(ls.source_kind, ''), spi.item_type, 'session') AS source_kind,
@@ -349,6 +352,9 @@ def get_group_gradebook(group_id):
                    ls.lesson_number,
                    ls.topic,
                    ls.lesson_date,
+                   ls.start_time,
+                   ls.end_time,
+                   ls.room,
                    ls.lesson_order,
                    ls.status,
                    ls.source_kind,
@@ -519,6 +525,9 @@ def get_group_gradebook(group_id):
                 "lessonNumber": str(row["lesson_number"]),
                 "topic": str(row["topic"] or ""),
                 "date": str(row["lesson_date"] or ""),
+                "startTime": str(row["start_time"] or ""),
+                "endTime": str(row["end_time"] or ""),
+                "room": str(row["room"] or ""),
                 "order": int(row["lesson_order"] or 0),
                 "status": str(row["status"] or "scheduled"),
                 "sourceKind": str(row["source_kind"] or ""),
@@ -774,11 +783,14 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
             raise ValueError("Both start and end times are required (or both empty to clear).")
         if next_start_time is not None and next_end_time <= next_start_time:
             raise ValueError("End time must be after the start time.")
+    raw_room = payload.get("room", None)
+    should_update_room = raw_room is not None
+    next_room = str(raw_room or "").strip()
 
     with connect_auth_db() as conn:
         row = conn.execute(
             """
-            SELECT ls.id, ls.status, ls.session_date,
+            SELECT ls.id, ls.status, ls.session_date, ls.room,
                    COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
                    COALESCE(NULLIF(ls.source_topic, ''), spi.title, '') AS topic
             FROM msi_v2.lesson_sessions ls
@@ -796,6 +808,7 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
             SET session_date = CASE WHEN %s THEN %s ELSE session_date END,
                 start_time = CASE WHEN %s THEN %s::time ELSE start_time END,
                 end_time = CASE WHEN %s THEN %s::time ELSE end_time END,
+                room = CASE WHEN %s THEN %s ELSE room END,
                 status = COALESCE(NULLIF(%s, ''), status),
                 updated_at = now()
             WHERE id = %s
@@ -807,6 +820,8 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
                 next_start_time,
                 bool(should_update_times),
                 next_end_time,
+                bool(should_update_room),
+                next_room,
                 next_status if next_status is not None else "",
                 lesson_session_id,
             ),
@@ -819,6 +834,7 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
         "lessonNumber": str(row["lesson_number"] or "Session"),
         "topic": str(row["topic"] or ""),
         "date": display_date,
+        "room": next_room if should_update_room else str(row["room"] or ""),
         "startTime": next_start_time or "",
         "endTime": next_end_time or "",
         "status": next_status or str(row["status"] or "scheduled"),

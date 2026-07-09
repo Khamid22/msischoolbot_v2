@@ -591,6 +591,9 @@ export type Lesson = {
   lessonNumber: string;
   topic: string;
   date: string;
+  startTime?: string;
+  endTime?: string;
+  room?: string;
   order: number;
   status?: string;
   sourceKind?: string;

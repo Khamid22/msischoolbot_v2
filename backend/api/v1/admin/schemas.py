@@ -274,6 +274,7 @@ class AdminLessonUpdateRequest(BaseModel):
     status: str | None = None
     start_time: str | None = None
     end_time: str | None = None
+    room: str | None = None
 
 
 class AdminLessonUpdated(BaseModel):
