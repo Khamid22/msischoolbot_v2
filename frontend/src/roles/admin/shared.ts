@@ -90,6 +90,8 @@ export interface AdminPageProps {
   adminAcademicSessions?: Array<Record<string, unknown>>;
   adminAcademicCurriculumPrograms?: Array<Record<string, unknown>>;
   adminAcademicCurriculumItems?: Array<Record<string, unknown>>;
+  adminAcademicEnrollmentSummary?: Record<string, unknown>;
+  adminAcademicContextMode?: "summary" | "full";
   adminAnnouncements?: Array<Record<string, unknown>>;
   csrfToken?: string;
 }

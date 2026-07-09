@@ -38,6 +38,17 @@ ADMIN_PANEL_MODES = {
     "head_of_department",
 }
 
+FULL_ACADEMIC_BOOTSTRAP_PANELS = {
+    "teachers",
+    "subjects",
+    "groups",
+    "schedule",
+    "curriculum",
+    "gradebook",
+    "office_hours",
+    "career_growth",
+}
+
 
 def _dev_preview_enabled():
     forced = os.environ.get("ADMIN_PREVIEW_ROLES", "").strip().lower()
@@ -110,7 +121,12 @@ def register_admin_page_routes(
             force_refresh=force_refresh,
         )
         timer.mark("admin_context_build")
-        academic_context = list_admin_academic_context()
+        panel = page_context["panel"]
+        academic_context_is_full = (
+            current_auth_role() != "admin"
+            or panel in FULL_ACADEMIC_BOOTSTRAP_PANELS
+        )
+        academic_context = list_admin_academic_context(include_heavy=academic_context_is_full)
         timer.mark("academic_context_build")
         announcements = list_announcements()
         timer.mark("support_context_build")
@@ -126,7 +142,6 @@ def register_admin_page_routes(
             )
             timer.mark("hod_scope_filter")
 
-        panel = page_context["panel"]
         school_filter = page_context["school_filter"]
         if current_auth_role() == "admin":
             session["admin_last_panel"] = panel
@@ -184,6 +199,7 @@ def register_admin_page_routes(
                 "adminAcademicCurriculumPrograms": academic_context.get("curriculum_programs", []),
                 "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
                 "adminAcademicEnrollmentSummary": academic_context.get("enrollment_summary", {}),
+                "adminAcademicContextMode": "full" if academic_context_is_full else "summary",
                 "adminAnnouncements": announcements,
                 "csrfToken": generate_csrf(),
             },

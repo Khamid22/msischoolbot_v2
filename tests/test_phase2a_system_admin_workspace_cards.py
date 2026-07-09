@@ -118,7 +118,7 @@ def _minimal_page_context():
     }
 
 
-def _minimal_academic_context():
+def _minimal_academic_context(**_kwargs):
     return {
         "schools": [],
         "subjects": [],

@@ -69,6 +69,16 @@ function urlAdminMode() {
 
 const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
 const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
+const FULL_ACADEMIC_CONTEXT_TABS = new Set<AdminTab>([
+  "teachers",
+  "subjects",
+  "groups",
+  "schedule",
+  "curriculum",
+  "gradebook",
+  "office_hours",
+  "career_growth",
+]);
 
 function serverAdminMode(props: AdminPageProps) {
   const realRole = asString(props.authRole || props.adminMode);
@@ -146,6 +156,21 @@ export function useAdminState(props: AdminPageProps) {
   const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
     Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : []
   );
+  const [academicContextMode, setAcademicContextMode] = useState<"summary" | "full">(
+    props.adminAcademicContextMode === "full" ? "full" : "summary"
+  );
+  const [academicContext, setAcademicContext] = useState(() => ({
+    schools: Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [],
+    subjects: Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [],
+    groups: Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [],
+    enrollments: Array.isArray(props.adminAcademicEnrollments) ? props.adminAcademicEnrollments : [],
+    lessons: Array.isArray(props.adminAcademicLessons) ? props.adminAcademicLessons : [],
+    schedules: Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : [],
+    sessions: Array.isArray(props.adminAcademicSessions) ? props.adminAcademicSessions : [],
+    curriculumPrograms: Array.isArray(props.adminAcademicCurriculumPrograms) ? props.adminAcademicCurriculumPrograms : [],
+    curriculumItems: Array.isArray(props.adminAcademicCurriculumItems) ? props.adminAcademicCurriculumItems : [],
+    enrollmentSummary: props.adminAcademicEnrollmentSummary || {},
+  }));
   const resourceTypes = Array.isArray(props.adminResourceTypes) ? props.adminResourceTypes : [];
   const activeResourceTypes = Array.isArray(props.adminResourceActiveTypes)
     ? props.adminResourceActiveTypes
@@ -494,6 +519,49 @@ export function useAdminState(props: AdminPageProps) {
       setAcademyTeachers(props.adminTeacherAcademy);
     }
   }, [props.adminTeacherAcademy]);
+
+  useEffect(() => {
+    if (academicContextMode === "full" || !FULL_ACADEMIC_CONTEXT_TABS.has(activeTab)) {
+      return;
+    }
+    let cancelled = false;
+    const loadAcademicContext = async () => {
+      try {
+        const res = await fetch(routes.adminAcademicContextApi, {
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: XHR_HEADERS,
+        });
+        if (!res.ok || cancelled) {
+          return;
+        }
+        const data = apiData<Record<string, unknown>>(await res.json());
+        if (cancelled) {
+          return;
+        }
+        setAcademicContext({
+          schools: Array.isArray(data.schools) ? data.schools as Array<Record<string, unknown>> : [],
+          subjects: Array.isArray(data.subjects) ? data.subjects as Array<Record<string, unknown>> : [],
+          groups: Array.isArray(data.groups) ? data.groups as Array<Record<string, unknown>> : [],
+          enrollments: Array.isArray(data.enrollments) ? data.enrollments as Array<Record<string, unknown>> : [],
+          lessons: Array.isArray(data.lessons) ? data.lessons as Array<Record<string, unknown>> : [],
+          schedules: Array.isArray(data.schedules) ? data.schedules as Array<Record<string, unknown>> : [],
+          sessions: Array.isArray(data.sessions) ? data.sessions as Array<Record<string, unknown>> : [],
+          curriculumPrograms: Array.isArray(data.curriculum_programs) ? data.curriculum_programs as Array<Record<string, unknown>> : [],
+          curriculumItems: Array.isArray(data.curriculum_items) ? data.curriculum_items as Array<Record<string, unknown>> : [],
+          enrollmentSummary: data.enrollment_summary && typeof data.enrollment_summary === "object"
+            ? data.enrollment_summary as Record<string, unknown>
+            : {},
+        });
+        setAcademicContextMode("full");
+      } catch (_error) {
+      }
+    };
+    void loadAcademicContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicContextMode, activeTab]);
 
   useEffect(() => {
     if (!parentAccounts.length) {
@@ -987,6 +1055,17 @@ export function useAdminState(props: AdminPageProps) {
       adminMode,
       adminTeachers: teachers,
       adminTeacherAcademy: academyTeachers,
+      adminAcademicSchools: academicContext.schools,
+      adminAcademicSubjects: academicContext.subjects,
+      adminAcademicGroups: academicContext.groups,
+      adminAcademicEnrollments: academicContext.enrollments,
+      adminAcademicLessons: academicContext.lessons,
+      adminAcademicSchedules: academicContext.schedules,
+      adminAcademicSessions: academicContext.sessions,
+      adminAcademicCurriculumPrograms: academicContext.curriculumPrograms,
+      adminAcademicCurriculumItems: academicContext.curriculumItems,
+      adminAcademicEnrollmentSummary: academicContext.enrollmentSummary,
+      adminAcademicContextMode: academicContextMode,
     },
     previewRole,
     adminMode,

@@ -213,22 +213,29 @@ def _schedule_conflict_message(
 # ---------------------------------------------------------------------------
 # Admin context (read)
 # ---------------------------------------------------------------------------
-def list_academic_admin_rows():
+def list_academic_admin_rows(*, include_heavy=True):
     with _connect() as conn:
         schools = [dict(row) for row in academic_queries.list_school_rows(conn)]
         subjects = [dict(row) for row in academic_queries.list_subject_rows(conn)]
         groups = [dict(row) for row in academic_queries.list_group_rows(conn)]
-        enrollments = [dict(row) for row in academic_queries.list_enrollment_rows(conn)]
         enrollment_summary = dict(academic_queries.get_enrollment_summary_row(conn) or {})
         duplicate_names = int(enrollment_summary.get("active_enrollments") or 0) - int(
             enrollment_summary.get("active_unique_students") or 0
         )
         enrollment_summary["active_duplicate_enrollments"] = max(0, duplicate_names)
-        lessons = [dict(row) for row in academic_queries.list_lesson_rows(conn)]
-        schedules = [dict(row) for row in timetable_queries.list_schedule_rows(conn)]
-        sessions = [dict(row) for row in timetable_queries.list_session_rows(conn)]
-        curriculum_programs = [dict(row) for row in academic_queries.list_curriculum_program_rows(conn)]
-        curriculum_items = [dict(row) for row in academic_queries.list_curriculum_item_rows(conn)]
+        enrollments = []
+        lessons = []
+        schedules = []
+        sessions = []
+        curriculum_programs = []
+        curriculum_items = []
+        if include_heavy:
+            enrollments = [dict(row) for row in academic_queries.list_enrollment_rows(conn)]
+            lessons = [dict(row) for row in academic_queries.list_lesson_rows(conn)]
+            schedules = [dict(row) for row in timetable_queries.list_schedule_rows(conn)]
+            sessions = [dict(row) for row in timetable_queries.list_session_rows(conn)]
+            curriculum_programs = [dict(row) for row in academic_queries.list_curriculum_program_rows(conn)]
+            curriculum_items = [dict(row) for row in academic_queries.list_curriculum_item_rows(conn)]
         return {
             "schools": schools,
             "subjects": subjects,

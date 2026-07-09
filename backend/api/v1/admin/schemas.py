@@ -189,6 +189,19 @@ class AdminAcademicContextDelta(BaseModel):
     lessons: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class AdminAcademicContextPayload(BaseModel):
+    schools: list[dict[str, Any]] = Field(default_factory=list)
+    subjects: list[dict[str, Any]] = Field(default_factory=list)
+    groups: list[dict[str, Any]] = Field(default_factory=list)
+    enrollments: list[dict[str, Any]] = Field(default_factory=list)
+    lessons: list[dict[str, Any]] = Field(default_factory=list)
+    schedules: list[dict[str, Any]] = Field(default_factory=list)
+    sessions: list[dict[str, Any]] = Field(default_factory=list)
+    curriculum_programs: list[dict[str, Any]] = Field(default_factory=list)
+    curriculum_items: list[dict[str, Any]] = Field(default_factory=list)
+    enrollment_summary: dict[str, Any] = Field(default_factory=dict)
+
+
 class AdminEnrollmentStatusRequest(BaseModel):
     status: str
     reason: str = ""

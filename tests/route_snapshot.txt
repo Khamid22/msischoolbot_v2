@@ -41,6 +41,7 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/admin/academic/attendance | POST
 /api/v1/admin/academic/coins | POST
+/api/v1/admin/academic/context | GET
 /api/v1/admin/academic/enrollments/{enrollment_id}/group | PATCH
 /api/v1/admin/academic/enrollments/{enrollment_id}/status | PATCH
 /api/v1/admin/academic/exams | POST

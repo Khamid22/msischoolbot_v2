@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.api import ApiSuccess, api_success
 from backend.api.v1.admin.schemas import (
+    AdminAcademicContextPayload,
     AdminAcademicContextDelta,
     AdminCreateScheduleRequest,
     AdminEnrollmentGroupRequest,
@@ -64,6 +65,15 @@ def create_schedule(payload: AdminCreateScheduleRequest):
             "lessons": academic_context.get("lessons", []),
         }
     )
+
+
+@router.get(
+    "/context",
+    operation_id="api_v1_admin_academic_context",
+    response_model=ApiSuccess[AdminAcademicContextPayload],
+)
+def academic_context():
+    return api_success(list_admin_academic_context(include_heavy=True))
 
 
 @router.get(

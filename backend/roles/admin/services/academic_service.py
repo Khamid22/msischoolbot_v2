@@ -16,8 +16,8 @@ from backend.domains.academics.postgres_service import (
 )
 
 
-def list_admin_academic_context():
-    return list_academic_admin_rows()
+def list_admin_academic_context(*, include_heavy=True):
+    return list_academic_admin_rows(include_heavy=include_heavy)
 
 
 def create_subject_from_payload(payload):

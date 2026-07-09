@@ -71,6 +71,7 @@ export const routes = {
   adminAcademicSubjectCreate: "/admin/academic/subjects",
   adminAcademicSchoolCreate: "/admin/academic/schools",
   adminAcademicGroupCreate: "/admin/academic/groups",
+  adminAcademicContextApi: "/api/v1/admin/academic/context",
   adminAcademicGroupApi: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}`,
   adminAcademicScheduleCreate: "/api/v1/admin/academic/schedules",
   adminAcademicGradebookApi: (groupId: number | string) => `/api/v1/admin/academic/gradebook?group_id=${groupId}`,
