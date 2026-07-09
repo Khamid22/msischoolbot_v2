@@ -9,6 +9,7 @@ from backend.api.v1.academic_director.schemas import (
     CreateHeadOfDepartmentForm,
     HeadOfDepartmentCreated,
 )
+from backend.api.v1.academic_director.academic import router as academic_router
 from backend.api.v1.academic_director.teacher_academy import register_teacher_academy_routes
 from backend.roles.academic_director.staff_registration import create_head_of_department_account
 from backend.domains.admin.page_cache import invalidate_admin_page_context_cache
@@ -56,6 +57,7 @@ def create_hod(
 
 
 register_teacher_academy_routes(router)
+router.include_router(academic_router)
 
 
 __all__ = ["router"]

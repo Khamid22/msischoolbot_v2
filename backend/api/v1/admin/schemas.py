@@ -141,6 +141,18 @@ class AdminCreateStudentRequest(BaseModel):
     group_id: int
 
 
+class AdminCreateAcademicSchoolRequest(BaseModel):
+    school_name: str
+    school_code: str = ""
+
+
+class AdminCreateAcademicGroupRequest(BaseModel):
+    school_code: str
+    program_subject_key: str
+    group_name: str
+    group_code: str = ""
+
+
 class AdminStudentsList(BaseModel):
     students: list[dict[str, Any]]
 

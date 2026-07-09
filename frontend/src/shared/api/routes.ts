@@ -15,6 +15,23 @@ export const apiRoutes = {
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/promote`,
   academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/delete`,
+  academicDirectorAcademicContextApi: "/api/v1/academic-director/academic/context",
+  academicDirectorAcademicSchoolCreate: "/api/v1/academic-director/academic/schools",
+  academicDirectorAcademicGroupCreate: "/api/v1/academic-director/academic/groups",
+  academicDirectorAcademicGroupApi: (groupId: number | string) =>
+    `/api/v1/academic-director/academic/groups/${groupId}`,
+  academicDirectorAcademicScheduleCreate: "/api/v1/academic-director/academic/schedules",
+  academicDirectorAcademicGradebookApi: (groupId: number | string) =>
+    `/api/v1/academic-director/academic/gradebook?group_id=${groupId}`,
+  academicDirectorAcademicAttendanceApi: "/api/v1/academic-director/academic/attendance",
+  academicDirectorAcademicHomeworkApi: "/api/v1/academic-director/academic/homework",
+  academicDirectorAcademicExamApi: "/api/v1/academic-director/academic/exams",
+  academicDirectorAcademicLessonApi: (lessonSessionId: number | string) =>
+    `/api/v1/academic-director/academic/lessons/${lessonSessionId}`,
+  academicDirectorAcademicEnrollmentStatusApi: (enrollmentId: number | string) =>
+    `/api/v1/academic-director/academic/enrollments/${enrollmentId}/status`,
+  academicDirectorAcademicEnrollmentGroupApi: (enrollmentId: number | string) =>
+    `/api/v1/academic-director/academic/enrollments/${enrollmentId}/group`,
   headOfDepartmentTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
     `/api/v1/head-of-department/teacher-academy/assignments/${assignmentId}`,
   headOfDepartmentTeacherAcademyAssessmentCreate: (academyTeacherId: number | string) =>

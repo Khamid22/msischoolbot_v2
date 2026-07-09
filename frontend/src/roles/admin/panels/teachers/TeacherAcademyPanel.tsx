@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy, XCircle } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -1790,6 +1790,8 @@ export function TeacherAcademyPanel({
   const [assessmentDeleteTarget, setAssessmentDeleteTarget] = useState<{ teacher: AcademyTeacher; assessment: Record<string, unknown> } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [directorAcademyTab, setDirectorAcademyTab] = useState<"teachers" | "lessons">("teachers");
+  const [directorTeachersView, setDirectorTeachersView] = useState<"academy" | "active">("academy");
 
   const stats = useMemo(() => {
     const inTraining = academyTeachers.filter((teacher) => ["in_training", "needs_improvement", "ready_for_evaluation"].includes(asString(teacher.academy_status))).length;
@@ -1845,6 +1847,7 @@ export function TeacherAcademyPanel({
   const canDeleteAssessmentReport = Boolean(academyApi.assessmentDelete(0, 0));
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const isAcademicDirectorMode = adminMode === "academic_director" || authRole === "academic_director";
 
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
     const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
@@ -1852,6 +1855,41 @@ export function TeacherAcademyPanel({
     if (leftReady !== rightReady) return rightReady - leftReady;
     return asString(right.updated_at).localeCompare(asString(left.updated_at));
   });
+  const activeTeachers = useMemo(() => {
+    const rows = Array.isArray(state.teachers)
+      ? state.teachers as Array<Record<string, unknown>>
+      : Array.isArray(state.props?.adminTeachers)
+        ? state.props.adminTeachers as Array<Record<string, unknown>>
+        : [];
+    return rows.filter((teacher) => {
+      const employmentType = asString(teacher.employment_type || teacher.teacher_employment_type).toLowerCase();
+      const status = asString(teacher.status || teacher.teacher_status || "active").toLowerCase();
+      return employmentType !== "academy" && !["inactive", "deleted", "archived"].includes(status);
+    });
+  }, [state.props?.adminTeachers, state.teachers]);
+  const appointedLessons = useMemo(
+    () =>
+      academyTeachers
+        .flatMap((teacher) =>
+          academyAssignments(teacher).map((assignment) => ({
+            key: `${asNumber(teacher.id)}:${asNumber(assignment.id)}`,
+            teacher,
+            assignment,
+          })),
+        )
+        .sort((left, right) => {
+          const leftDate = Date.parse(asString(left.assignment.session_datetime));
+          const rightDate = Date.parse(asString(right.assignment.session_datetime));
+          const leftHasDate = Number.isFinite(leftDate);
+          const rightHasDate = Number.isFinite(rightDate);
+          if (leftHasDate && rightHasDate && leftDate !== rightDate) return leftDate - rightDate;
+          if (leftHasDate !== rightHasDate) return leftHasDate ? -1 : 1;
+          const teacherCompare = asString(left.teacher.full_name).localeCompare(asString(right.teacher.full_name));
+          if (teacherCompare !== 0) return teacherCompare;
+          return asNumber(left.assignment.sequence_no) - asNumber(right.assignment.sequence_no);
+        }),
+    [academyTeachers],
+  );
 
   function copyLogin(login: string) {
     const normalizedLogin = login.trim();
@@ -2160,6 +2198,267 @@ export function TeacherAcademyPanel({
           {metric("Ready", stats.ready, "promotion review")}
           {metric("Avg Score", stats.average == null ? "-" : stats.average.toFixed(2), "weighted average")}
         </div>
+        {isAcademicDirectorMode ? (
+          <div className="mb-3 space-y-2">
+            <div role="tablist" aria-label="Teacher Academy workspace" className="grid grid-cols-2 gap-1 rounded-lg border border-foreground/10 bg-muted/40 p-1">
+              {[
+                { key: "teachers", label: "Teachers", count: sortedTeachers.length + activeTeachers.length },
+                { key: "lessons", label: "Appointed Lessons", count: appointedLessons.length },
+              ].map((tab) => {
+                const active = directorAcademyTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setDirectorAcademyTab(tab.key as "teachers" | "lessons")}
+                    className={`min-h-9 rounded-md px-3 text-xs font-black transition-colors motion-reduce:transition-none ${
+                      active ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab.label}
+                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px]">{tab.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {directorAcademyTab === "teachers" ? (
+              <div role="tablist" aria-label="Teacher list type" className="inline-grid grid-cols-2 gap-1 rounded-lg border border-foreground/10 bg-background p-1">
+                {[
+                  { key: "academy", label: "Teacher Academy", count: sortedTeachers.length },
+                  { key: "active", label: "Active Teachers", count: activeTeachers.length },
+                ].map((tab) => {
+                  const active = directorTeachersView === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setDirectorTeachersView(tab.key as "academy" | "active")}
+                      className={`min-h-8 rounded-md px-3 text-[11px] font-black transition-colors motion-reduce:transition-none ${
+                        active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {tab.label}
+                      <span className="ml-2 opacity-75">{tab.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {isAcademicDirectorMode && directorAcademyTab === "lessons" ? (
+          <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+            {appointedLessons.length ? (
+              <>
+                <MobileCardList className="p-3">
+                  {appointedLessons.map(({ key, teacher, assignment }) => (
+                    <article key={key} className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-black text-foreground">{assignmentTitle(assignment)}</h3>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">
+                            {asString(teacher.full_name) || "Academy teacher"} · {asString(teacher.subject) || "Subject not set"}
+                          </p>
+                        </div>
+                        <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="shrink-0 text-[10px]">
+                          {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
+                        </StatusBadge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="font-black uppercase tracking-wide text-muted-foreground">Time</p>
+                          <p className="mt-0.5 font-bold text-foreground">{dateLabel(assignment.session_datetime)}</p>
+                        </div>
+                        <div>
+                          <p className="font-black uppercase tracking-wide text-muted-foreground">Evaluator</p>
+                          <p className="mt-0.5 truncate font-bold text-foreground">{asString(assignment.evaluator_name) || "Not assigned"}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {canScheduleAcademyLesson ? (
+                          <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
+                          </button>
+                        ) : null}
+                        {canAssessAcademyLesson ? (
+                          <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            Assess
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </MobileCardList>
+                <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
+                  <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
+                    <colgroup>
+                      <col className="w-[18%]" />
+                      <col className="w-[14%]" />
+                      <col className="w-[27%]" />
+                      <col className="w-[13%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[8%]" />
+                      <col className="w-[8%]" />
+                    </colgroup>
+                    <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
+                      <tr>
+                        {["Teacher", "Subject", "Appointed Lesson", "Time", "Evaluator", "Status", "Actions"].map((heading) => (
+                          <th key={heading} className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#DDE4EF] bg-white">
+                      {appointedLessons.map(({ key, teacher, assignment }, index) => (
+                        <tr
+                          key={key}
+                          className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-[#FAFBFE] motion-reduce:animate-none"
+                          style={{ animationDelay: `${index * 20}ms` }}
+                        >
+                          <td className="px-3 py-2.5 align-middle">
+                            <button type="button" onClick={() => setDetailTeacher(teacher)} className="truncate text-left text-sm font-black leading-tight text-[#0F172A] group-hover:underline">
+                              {asString(teacher.full_name) || "Academy teacher"}
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="line-clamp-2 text-xs font-black text-[#0F172A]">{asString(teacher.subject) || "Subject not set"}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <p className="line-clamp-2 text-xs font-black text-[#0F172A]">{assignmentTitle(assignment)}</p>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="block text-xs font-bold text-[#64748B]">{dateLabel(assignment.session_datetime)}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(assignment.evaluator_name) || "Not assigned"}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
+                              {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
+                            </StatusBadge>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                              {canScheduleAcademyLesson ? (
+                                <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center justify-center rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted">
+                                  {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
+                                </button>
+                              ) : null}
+                              {canAssessAcademyLesson ? (
+                                <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center justify-center rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white">
+                                  Assess
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ResponsiveTable>
+              </>
+            ) : (
+              <EmptyState
+                icon={<CalendarClock className="h-6 w-6" />}
+                title="No appointed lessons yet."
+                detail="Appointed Teacher Academy lessons will appear here after lessons are selected for academy teachers."
+                className="min-h-[22rem]"
+              />
+            )}
+          </div>
+        ) : isAcademicDirectorMode && directorAcademyTab === "teachers" && directorTeachersView === "active" ? (
+          <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+            {activeTeachers.length ? (
+              <>
+                <MobileCardList className="p-3">
+                  {activeTeachers.map((teacher, index) => (
+                    <article key={asNumber(teacher.id) || asString(teacher.login) || index} className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
+                          {initialsFromName(teacher.full_name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Teacher"}</h3>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subjects || teacher.subject) || "Subject not set"}</p>
+                          <p className="mt-1 truncate font-mono text-[11px] font-bold text-muted-foreground">{asString(teacher.login) || asString(teacher.teacher_code) || "Login not set"}</p>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </MobileCardList>
+                <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
+                  <table className="w-full min-w-[780px] table-fixed border-collapse text-left">
+                    <colgroup>
+                      <col className="w-[24%]" />
+                      <col className="w-[22%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                      <col className="w-[18%]" />
+                    </colgroup>
+                    <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
+                      <tr>
+                        {["Teacher", "Subject", "Group", "Contact", "Status"].map((heading) => (
+                          <th key={heading} className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
+                            {heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#DDE4EF] bg-white">
+                      {activeTeachers.map((teacher, index) => (
+                        <tr
+                          key={asNumber(teacher.id) || asString(teacher.login) || index}
+                          className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-[#FAFBFE] motion-reduce:animate-none"
+                          style={{ animationDelay: `${index * 20}ms` }}
+                        >
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
+                                {initialsFromName(teacher.full_name)}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-black text-[#0F172A]">{asString(teacher.full_name) || "Teacher"}</span>
+                                <span className="block truncate font-mono text-[11px] font-bold text-[#64748B]">{asString(teacher.login) || asString(teacher.teacher_code) || "Login not set"}</span>
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="line-clamp-2 text-xs font-black text-[#0F172A]">{asString(teacher.subjects || teacher.subject) || "Subject not set"}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(teacher.assigned_group || teacher.group_name || teacher.group) || "Not assigned"}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(teacher.telegram_username || teacher.phone || teacher.email) || "Not set"}</span>
+                          </td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <StatusBadge tone="success" className="text-[10px]">
+                              {asString(teacher.status || teacher.teacher_status) || "Active"}
+                            </StatusBadge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ResponsiveTable>
+              </>
+            ) : (
+              <EmptyState
+                icon={<UsersRound className="h-6 w-6" />}
+                title="No active teachers found."
+                detail="Active teacher records will appear here when they are available in the academic context."
+                className="min-h-[22rem]"
+              />
+            )}
+          </div>
+        ) : (
         <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
           {sortedTeachers.length ? (
             <>
@@ -2367,6 +2666,7 @@ export function TeacherAcademyPanel({
             />
           )}
         </div>
+        )}
       </ChartCard>
     </>
   );

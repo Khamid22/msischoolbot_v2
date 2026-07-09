@@ -13,6 +13,8 @@ export type AcademicDirectorNavKey =
   | "overview"
   | "academy"
   | "departments"
+  | "groups"
+  | "subjects"
   | "timetable"
   | "announcements"
   | "profile";
@@ -34,14 +36,16 @@ export const academicDirectorNavConfig: ReadonlyArray<AcademicNavConfigItem<Acad
   { key: "overview", label: "Overview", href: routes.academicDirectorOverview },
   { key: "academy", label: "Teacher Academy", mobileLabel: "Academy", href: routes.academicDirectorTeacherAcademy },
   { key: "departments", label: "Head of Departments", href: routes.academicDirectorHeadOfDepartments },
-  { key: "timetable", label: "Timetable", mobileLabel: "Schedule", href: routes.academicDirectorTimetable },
+  { key: "groups", label: "Groups", href: routes.academicDirectorGroups },
+  { key: "subjects", label: "Subjects", href: routes.academicDirectorSubjects },
+  { key: "timetable", label: "Academic Timetable", mobileLabel: "Schedule", href: routes.academicDirectorTimetable },
   { key: "announcements", label: "Announcements", mobileLabel: "News", href: routes.academicDirectorAnnouncements },
   { key: "profile", label: "Profile", href: routes.academicDirectorProfile },
 ];
 
-/** Phone set: Overview, Academy, Schedule, News, Profile (departments is desktop-only). */
+/** Phone set: Overview, Academy, Groups, Schedule, Profile (wide admin-only items are desktop-first). */
 export const academicDirectorMobileNavConfig: ReadonlyArray<AcademicNavConfigItem<AcademicDirectorNavKey>> =
-  mobileNavItemsFrom(academicDirectorNavConfig, ["departments"]);
+  mobileNavItemsFrom(academicDirectorNavConfig, ["departments", "subjects", "announcements"]);
 
 export const headOfDepartmentNavConfig: ReadonlyArray<AcademicNavConfigItem<HeadOfDepartmentNavKey>> = [
   { key: "overview", label: "Overview", href: routes.headOfDepartmentOverview },

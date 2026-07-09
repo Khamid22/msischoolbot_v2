@@ -10,17 +10,26 @@ import {
 } from "./academicNav.ts";
 
 describe("Academic Director navigation", () => {
-  it("desktop nav is Overview, Teacher Academy, Head of Departments, Timetable, Announcements, Profile", () => {
+  it("desktop nav includes academic workspaces after Head of Departments", () => {
     assert.deepEqual(
       academicDirectorNavConfig.map((item) => item.label),
-      ["Overview", "Teacher Academy", "Head of Departments", "Timetable", "Announcements", "Profile"],
+      [
+        "Overview",
+        "Teacher Academy",
+        "Head of Departments",
+        "Groups",
+        "Subjects",
+        "Academic Timetable",
+        "Announcements",
+        "Profile",
+      ],
     );
   });
 
-  it("mobile nav is Overview, Academy, Schedule, News, Profile", () => {
+  it("mobile nav is Overview, Academy, Groups, Schedule, Profile", () => {
     assert.deepEqual(
       academicDirectorMobileNavConfig.map((item) => item.label),
-      ["Overview", "Academy", "Schedule", "News", "Profile"],
+      ["Overview", "Academy", "Groups", "Schedule", "Profile"],
     );
   });
 
@@ -34,6 +43,8 @@ describe("Academic Director navigation", () => {
     assert.equal(academicDirectorActiveNavFromPath("/academic-director"), "overview");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/teacher-academy"), "academy");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/head-of-departments"), "departments");
+    assert.equal(academicDirectorActiveNavFromPath("/academic-director/groups"), "groups");
+    assert.equal(academicDirectorActiveNavFromPath("/academic-director/subjects"), "subjects");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/timetable"), "timetable");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/announcements"), "announcements");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/profile"), "profile");

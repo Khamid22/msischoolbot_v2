@@ -9,6 +9,17 @@ import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../grade
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
 
+type AcademicGradebookRoutes = Pick<
+  typeof routes,
+  | "adminAcademicGradebookApi"
+  | "adminAcademicAttendanceApi"
+  | "adminAcademicHomeworkApi"
+  | "adminAcademicExamApi"
+  | "adminAcademicEnrollmentStatusApi"
+  | "adminAcademicEnrollmentGroupApi"
+  | "adminAcademicLessonApi"
+>;
+
 type CompactTooltipItem = {
   value?: unknown;
   dataKey?: unknown;
@@ -61,11 +72,13 @@ export function GroupGradebook({
   groupId,
   csrf,
   groups,
+  academicRoutes = routes,
   onClose,
 }: {
   groupId: number;
   csrf: string;
   groups: Array<Record<string, unknown>>;
+  academicRoutes?: AcademicGradebookRoutes;
   onClose: () => void;
 }) {
   const [data, setData] = useState<GradebookData | null>(null);
@@ -125,7 +138,7 @@ export function GroupGradebook({
     setError("");
     setActive(null);
     try {
-      const res = await fetch(routes.adminAcademicGradebookApi(id), { signal });
+      const res = await fetch(academicRoutes.adminAcademicGradebookApi(id), { signal });
       const json = await res.json();
       if (apiSucceeded(res, json)) setData(apiData<GradebookData>(json));
       else setError(apiErrorMessage(json, "Failed to load."));
@@ -161,7 +174,7 @@ export function GroupGradebook({
     if (!active || saving) return;
     setSaving(true);
     try {
-      const res = await fetch(routes.adminAcademicAttendanceApi, {
+      const res = await fetch(academicRoutes.adminAcademicAttendanceApi, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
@@ -197,7 +210,7 @@ export function GroupGradebook({
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(routes.adminAcademicHomeworkApi, {
+      const res = await fetch(academicRoutes.adminAcademicHomeworkApi, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({
@@ -301,7 +314,7 @@ export function GroupGradebook({
     setExamSavingKey(key);
     setError("");
     try {
-      const res = await fetch(routes.adminAcademicExamApi, {
+      const res = await fetch(academicRoutes.adminAcademicExamApi, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
@@ -334,7 +347,7 @@ export function GroupGradebook({
     }
     setStatusSavingId(enrollmentId);
     try {
-      const res = await fetch(routes.adminAcademicEnrollmentStatusApi(enrollmentId), {
+      const res = await fetch(academicRoutes.adminAcademicEnrollmentStatusApi(enrollmentId), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ status, reason }),
@@ -358,7 +371,7 @@ export function GroupGradebook({
     setMoveSaving(true);
     setError("");
     try {
-      const res = await fetch(routes.adminAcademicEnrollmentGroupApi(enrollmentId), {
+      const res = await fetch(academicRoutes.adminAcademicEnrollmentGroupApi(enrollmentId), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ group_id: Number(moveGroupId) }),
@@ -438,7 +451,7 @@ export function GroupGradebook({
     setLessonDateSavingId(lesson.id);
     setError("");
     try {
-      const res = await fetch(routes.adminAcademicLessonApi(lesson.id), {
+      const res = await fetch(academicRoutes.adminAcademicLessonApi(lesson.id), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ lesson_date: trimmed }),

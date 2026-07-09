@@ -13,6 +13,7 @@ function pageSource(relativePath: string): string {
 
 const rolePages = {
   "RoleHome (AD/HOD overview + profile)": pageSource("common/pages/RoleHome.tsx"),
+  "AD AcademicWorkspace (groups/subjects/timetable)": pageSource("academic_director/pages/AcademicWorkspace.tsx"),
   "AcademicDepartmentWorkspace (timetable/announcements)": pageSource("common/pages/AcademicDepartmentWorkspace.tsx"),
   "AD HeadOfDepartments": pageSource("academic_director/pages/HeadOfDepartments.tsx"),
   "AD TeacherAcademy": pageSource("academic_director/pages/TeacherAcademy.tsx"),
@@ -76,6 +77,24 @@ describe("KPI grids", () => {
   it("overview and workspace pages use shared metric components", () => {
     assert.match(rolePages["RoleHome (AD/HOD overview + profile)"], /<MetricGrid>/);
     assert.match(rolePages["AcademicDepartmentWorkspace (timetable/announcements)"], /<MetricCard/);
+  });
+});
+
+describe("Academic Director academic workspace", () => {
+  const src = rolePages["AD AcademicWorkspace (groups/subjects/timetable)"];
+
+  it("uses the shared academic panel with Academic Director API routes", () => {
+    for (const token of [
+      "AcademicPanel",
+      "academicDirectorAcademicRoutes",
+      "adminAcademicGroupCreateApi",
+      "adminAcademicSchoolCreateApi",
+      "adminAcademicScheduleCreate",
+      "adminAcademicGradebookApi",
+    ]) {
+      assert.match(src, new RegExp(token));
+    }
+    assert.doesNotMatch(src, /adminAcademyLessonEvents/);
   });
 });
 

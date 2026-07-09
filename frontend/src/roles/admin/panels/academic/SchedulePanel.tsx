@@ -144,6 +144,7 @@ function normalizeBlockStatus(value: unknown): BlockStatus {
 export function SchedulePanel({ state }: { state: any }) {
   const props = state.props || {};
   const csrf: string = asString(props.csrfToken);
+  const academicRoutes = state.academicRoutes || routes;
   const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
   const canDrag = !isTeacherMode;
   const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
@@ -515,7 +516,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setSelectedLessonId(payload.id);
 
     try {
-      const response = await fetch(routes.adminAcademicLessonApi(payload.id), {
+      const response = await fetch(academicRoutes.adminAcademicLessonApi(payload.id), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ lesson_date: dayIso, start_time: start, end_time: end }),
@@ -697,7 +698,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setError("");
     clearToast();
     try {
-      const response = await fetch(routes.adminAcademicScheduleCreate, {
+      const response = await fetch(academicRoutes.adminAcademicScheduleCreate, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({

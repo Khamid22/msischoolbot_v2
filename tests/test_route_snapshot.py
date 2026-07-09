@@ -28,18 +28,23 @@ def flatten_routes(app):
                 return path == prefix or path.startswith(f"{prefix.rstrip('/')}/")
         return False
 
-    def walk(routes, prefix=""):
+    def walk(routes, prefix="", nested_prefix=None):
+        if nested_prefix is None:
+            nested_prefix = prefix
         for r in routes:
             if type(r).__name__ == "_IncludedRouter":
                 router_prefix = getattr(r.original_router, "prefix", "")
+                already_prefixed = routes_already_include_prefix(r.original_router.routes, router_prefix)
                 next_prefix = (
-                    prefix
-                    if routes_already_include_prefix(r.original_router.routes, router_prefix)
-                    else join_paths(prefix, router_prefix)
+                    nested_prefix
+                    if already_prefixed
+                    else join_paths(nested_prefix, router_prefix)
                 )
+                next_nested_prefix = join_paths(nested_prefix, router_prefix)
                 walk(
                     r.original_router.routes,
                     next_prefix,
+                    next_nested_prefix,
                 )
                 continue
             path = getattr(r, "path", None)
@@ -48,7 +53,7 @@ def flatten_routes(app):
                 out.append(f"{join_paths(prefix, path)} | {','.join(sorted(methods)) if methods else '-'}")
             sub = getattr(r, "routes", None)
             if sub:
-                walk(sub, prefix)
+                walk(sub, prefix, nested_prefix)
 
     walk(app.routes)
     return sorted(out)

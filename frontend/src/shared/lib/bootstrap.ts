@@ -18,6 +18,8 @@ export type ReactPageName =
   | "academic-director-home"
   | "academic-director-academy"
   | "academic-director-head-of-departments"
+  | "academic-director-groups"
+  | "academic-director-subjects"
   | "academic-director-timetable"
   | "academic-director-announcements"
   | "head-of-department-home"
@@ -52,6 +54,8 @@ const REACT_PAGES = new Set<ReactPageName>([
   "academic-director-home",
   "academic-director-academy",
   "academic-director-head-of-departments",
+  "academic-director-groups",
+  "academic-director-subjects",
   "academic-director-timetable",
   "academic-director-announcements",
   "head-of-department-home",

@@ -25,23 +25,11 @@ def _set_session(client, data):
 
 
 def _route_methods(app):
-    routes = {}
-
-    def walk(route_list):
-        for route in route_list:
-            if type(route).__name__ == "_IncludedRouter":
-                walk(route.original_router.routes)
-                continue
-            path = getattr(route, "path", None)
-            methods = getattr(route, "methods", None)
-            if path is not None and methods:
-                routes.setdefault(path, set()).update(methods)
-            nested = getattr(route, "routes", None)
-            if nested:
-                walk(nested)
-
-    walk(app.routes)
-    return routes
+    schema = app.openapi()
+    return {
+        path: {method.upper() for method in path_spec.keys()}
+        for path, path_spec in schema.get("paths", {}).items()
+    }
 
 
 def _minimal_admin_page_context():
@@ -77,15 +65,71 @@ def _minimal_admin_page_context():
 
 def _minimal_academic_context():
     return {
-        "schools": [],
-        "subjects": [],
-        "groups": [],
+        "schools": [{"code": "school5", "name": "School 5"}],
+        "subjects": [{"id": 5, "name": "Mathematics", "subject_name": "Mathematics"}],
+        "groups": [
+            {
+                "id": 100,
+                "name": "Math 10A",
+                "group_name": "Math 10A",
+                "subject_name": "Mathematics",
+                "school_code": "school5",
+                "students_count": 12,
+            }
+        ],
         "enrollments": [],
-        "lessons": [],
-        "schedules": [],
-        "sessions": [],
-        "curriculum_programs": [],
-        "curriculum_items": [],
+        "lessons": [
+            {
+                "id": 701,
+                "group_id": 100,
+                "group_name": "Math 10A",
+                "subject_name": "Mathematics",
+                "lesson_number": "Lesson 3",
+                "lesson_topic": "HCF and LCM",
+                "lesson_date": "2026-07-08",
+            }
+        ],
+        "schedules": [
+            {
+                "id": 301,
+                "group_id": 100,
+                "group_name": "Math 10A",
+                "subject_name": "Mathematics",
+                "weekday": 3,
+                "start_time": "09:30",
+                "end_time": "11:00",
+            }
+        ],
+        "sessions": [
+            {
+                "id": 401,
+                "group_id": 100,
+                "group_name": "Math 10A",
+                "subject_name": "Mathematics",
+                "session_date": "2026-07-08",
+                "start_time": "09:30",
+                "end_time": "11:00",
+            }
+        ],
+        "curriculum_programs": [
+            {
+                "id": 5,
+                "subject_key": "igcse-mathematics",
+                "subject_name": "Mathematics",
+                "lesson_count": 1,
+                "exam_count": 0,
+                "total_items": 1,
+            }
+        ],
+        "curriculum_items": [
+            {
+                "id": 900,
+                "program_id": 5,
+                "item_type": "lesson",
+                "lesson_number": "Lesson 3",
+                "title": "HCF and LCM",
+            }
+        ],
         "enrollment_summary": {},
     }
 
@@ -124,6 +168,7 @@ def _patch_admin_page_context(monkeypatch):
 
     monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
     monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
+    monkeypatch.setattr(academic_director_routes, "list_academic_admin_rows", lambda include_heavy=True: _minimal_academic_context())
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(
         academic_director_routes,
@@ -280,32 +325,41 @@ def test_academic_director_head_of_departments_route_loads_safe_page(client, mon
 
 def test_academic_department_timetable_announcements_and_profile_routes_load(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
-    workspace_source = Path("frontend/src/roles/common/pages/AcademicDepartmentWorkspace.tsx").read_text()
+    ad_workspace_source = Path("frontend/src/roles/academic_director/pages/AcademicWorkspace.tsx").read_text()
+    department_workspace_source = Path("frontend/src/roles/common/pages/AcademicDepartmentWorkspace.tsx").read_text()
 
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
+    ad_groups = client.get("/academic-director/groups")
+    ad_subjects = client.get("/academic-director/subjects")
     ad_timetable = client.get("/academic-director/timetable")
     ad_announcements = client.get("/academic-director/announcements")
     ad_profile = client.get("/academic-director/profile")
 
+    assert ad_groups.status_code == 200
+    assert 'data-react-page="academic-director-groups"' in ad_groups.text
+    assert "Math 10A" in ad_groups.text
+    assert ad_subjects.status_code == 200
+    assert 'data-react-page="academic-director-subjects"' in ad_subjects.text
+    assert "Mathematics" in ad_subjects.text
     assert ad_timetable.status_code == 200
     assert 'data-react-page="academic-director-timetable"' in ad_timetable.text
-    # The Academic Department timetable shows academy lessons only — no
-    # gradebook sessions or recurring schedule rules.
-    assert "Math 10A" not in ad_timetable.text
-    assert "English 9B" not in ad_timetable.text
-    assert "Lesson 3 - HCF and LCM" in ad_timetable.text
-    assert "Academy Math Teacher" in ad_timetable.text
-    assert "Lesson 4 - Essay planning" in ad_timetable.text
-    assert "Academy English Teacher" in ad_timetable.text
-    assert "adminAcademicSessions" not in ad_timetable.text
-    assert "adminAcademicSchedules" not in ad_timetable.text
+    # Academic Director timetable is the group academic timetable; Teacher
+    # Academy lesson schedule now lives inside the Teacher Academy page.
+    assert "Math 10A" in ad_timetable.text
+    assert "adminAcademicSessions" in ad_timetable.text
+    assert "adminAcademicSchedules" in ad_timetable.text
+    assert "adminAcademyLessonEvents" not in ad_timetable.text
+    assert "Academy Math Teacher" not in ad_timetable.text
     assert "AdminSidebar" not in ad_timetable.text
     assert "Student mode" not in ad_timetable.text
     assert ad_announcements.status_code == 200
     assert 'data-react-page="academic-director-announcements"' in ad_announcements.text
     assert "Term Update" in ad_announcements.text
-    assert "adminAcademicSessions" not in workspace_source
-    assert "adminAcademicSchedules" not in workspace_source
+    assert "AcademicPanel" in ad_workspace_source
+    assert "academicDirectorAcademicRoutes" in ad_workspace_source
+    assert "adminAcademyLessonEvents" not in ad_workspace_source
+    assert "adminAcademicSessions" not in department_workspace_source
+    assert "adminAcademicSchedules" not in department_workspace_source
     assert 'data-react-page="admin-home"' not in ad_announcements.text
     assert ad_profile.status_code == 200
     assert 'data-react-page="academic-director-home"' in ad_profile.text
@@ -394,6 +448,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'academicDirectorOverview: "/academic-director"' in routes_source
     assert 'academicDirectorTeacherAcademy: "/academic-director/teacher-academy"' in routes_source
     assert 'academicDirectorHeadOfDepartments: "/academic-director/head-of-departments"' in routes_source
+    assert 'academicDirectorGroups: "/academic-director/groups"' in routes_source
+    assert 'academicDirectorSubjects: "/academic-director/subjects"' in routes_source
     assert 'academicDirectorTimetable: "/academic-director/timetable"' in routes_source
     assert 'academicDirectorAnnouncements: "/academic-director/announcements"' in routes_source
     assert 'academicDirectorProfile: "/academic-director/profile"' in routes_source
@@ -406,6 +462,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "headOfDepartmentProfileSection" not in routes_source
     assert "href: routes.academicDirectorTeacherAcademy" in nav_source
     assert "href: routes.academicDirectorHeadOfDepartments" in nav_source
+    assert "href: routes.academicDirectorGroups" in nav_source
+    assert "href: routes.academicDirectorSubjects" in nav_source
     assert "href: routes.academicDirectorTimetable" in nav_source
     assert "href: routes.academicDirectorAnnouncements" in nav_source
     assert "href: routes.academicDirectorProfile" in nav_source
@@ -417,7 +475,7 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "head-of-department-profile" in source
     assert "academicDirectorActiveNavFromPath" in source
     assert "headOfDepartmentActiveNavFromPath" in source
-    assert 'mobileNavItemsFrom(academicDirectorNavConfig, ["departments"])' in nav_source
+    assert 'mobileNavItemsFrom(academicDirectorNavConfig, ["departments", "subjects", "announcements"])' in nav_source
     assert "pointer-events-none" not in source
     assert "AdminSidebar" not in source
     assert "action={routes.logout}" in source
@@ -434,6 +492,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     ).read_text()
     assert '"academic-director-academy"' in app_source
     assert '"academic-director-head-of-departments"' in app_source
+    assert '"academic-director-groups"' in app_source
+    assert '"academic-director-subjects"' in app_source
     assert '"academic-director-timetable"' in app_source
     assert '"academic-director-announcements"' in app_source
     assert '"head-of-department-home"' in app_source
@@ -442,6 +502,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert '"head-of-department-announcements"' in app_source
     assert '"academic-director-academy"' in bootstrap_source
     assert '"academic-director-head-of-departments"' in bootstrap_source
+    assert '"academic-director-groups"' in bootstrap_source
+    assert '"academic-director-subjects"' in bootstrap_source
     assert '"academic-director-timetable"' in bootstrap_source
     assert '"academic-director-announcements"' in bootstrap_source
     assert '"head-of-department-home"' in bootstrap_source
@@ -515,9 +577,15 @@ def test_academic_director_critical_routes_remain_registered(app):
         ("GET", "/academic-director"),
         ("GET", "/academic-director/teacher-academy"),
         ("GET", "/academic-director/head-of-departments"),
+        ("GET", "/academic-director/groups"),
+        ("GET", "/academic-director/subjects"),
         ("GET", "/academic-director/timetable"),
         ("GET", "/academic-director/announcements"),
         ("GET", "/academic-director/profile"),
+        ("GET", "/api/v1/academic-director/academic/context"),
+        ("POST", "/api/v1/academic-director/academic/groups"),
+        ("POST", "/api/v1/academic-director/academic/schools"),
+        ("POST", "/api/v1/academic-director/academic/schedules"),
         ("GET", "/head-of-department"),
         ("GET", "/head-of-department/teacher-academy"),
         ("GET", "/head-of-department/timetable"),

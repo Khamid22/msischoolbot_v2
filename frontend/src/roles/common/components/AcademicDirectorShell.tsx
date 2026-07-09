@@ -1,5 +1,6 @@
 import {
   BookOpenCheck,
+  BookMarked,
   CalendarDays,
   GraduationCap,
   LayoutDashboard,
@@ -34,6 +35,8 @@ const academicDirectorNavIcons: Record<AcademicDirectorNavKey, LucideIcon> = {
   overview: LayoutDashboard,
   academy: GraduationCap,
   departments: UsersRound,
+  groups: UsersRound,
+  subjects: BookMarked,
   timetable: CalendarDays,
   announcements: Megaphone,
   profile: User,

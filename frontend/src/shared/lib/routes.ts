@@ -1,4 +1,4 @@
-import { apiRoutes } from "@/shared/api/routes";
+import { apiRoutes } from "../api/routes.ts";
 
 const adminStudentQuery = (school = "all") =>
   `school=${encodeURIComponent(String(school || "all"))}&embed=admin`;
@@ -32,6 +32,8 @@ export const routes = {
   academicDirectorOverview: "/academic-director",
   academicDirectorTeacherAcademy: "/academic-director/teacher-academy",
   academicDirectorHeadOfDepartments: "/academic-director/head-of-departments",
+  academicDirectorGroups: "/academic-director/groups",
+  academicDirectorSubjects: "/academic-director/subjects",
   academicDirectorTimetable: "/academic-director/timetable",
   academicDirectorAnnouncements: "/academic-director/announcements",
   academicDirectorProfile: "/academic-director/profile",
@@ -83,6 +85,18 @@ export const routes = {
     `/api/v1/admin/academic/enrollments/${enrollmentId}/status`,
   adminAcademicEnrollmentGroupApi: (enrollmentId: number | string) =>
     `/api/v1/admin/academic/enrollments/${enrollmentId}/group`,
+  academicDirectorAcademicSchoolCreate: apiRoutes.academicDirectorAcademicSchoolCreate,
+  academicDirectorAcademicGroupCreate: apiRoutes.academicDirectorAcademicGroupCreate,
+  academicDirectorAcademicContextApi: apiRoutes.academicDirectorAcademicContextApi,
+  academicDirectorAcademicGroupApi: apiRoutes.academicDirectorAcademicGroupApi,
+  academicDirectorAcademicScheduleCreate: apiRoutes.academicDirectorAcademicScheduleCreate,
+  academicDirectorAcademicGradebookApi: apiRoutes.academicDirectorAcademicGradebookApi,
+  academicDirectorAcademicAttendanceApi: apiRoutes.academicDirectorAcademicAttendanceApi,
+  academicDirectorAcademicHomeworkApi: apiRoutes.academicDirectorAcademicHomeworkApi,
+  academicDirectorAcademicExamApi: apiRoutes.academicDirectorAcademicExamApi,
+  academicDirectorAcademicLessonApi: apiRoutes.academicDirectorAcademicLessonApi,
+  academicDirectorAcademicEnrollmentStatusApi: apiRoutes.academicDirectorAcademicEnrollmentStatusApi,
+  academicDirectorAcademicEnrollmentGroupApi: apiRoutes.academicDirectorAcademicEnrollmentGroupApi,
   adminAnnouncementsApi: "/api/v1/admin/announcements",
   adminAnnouncementApi: (announcementId: number | string) => `/api/v1/admin/announcements/${announcementId}`,
   adminParentInvite: (studentRowId: number | string) =>

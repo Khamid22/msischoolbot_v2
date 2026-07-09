@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Trash2, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
-import { apiData, apiErrorMessage, apiSucceeded, csrfHeaders } from "@/shared/lib/api";
+import { apiData, apiErrorMessage, apiSucceeded, csrfHeaders, jsonCsrfHeaders } from "@/shared/lib/api";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "../shared";
 import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, compareSubjectsByPreferredOrder, programInitials, Lesson } from "./academic/shared";
@@ -13,7 +13,7 @@ import { SchedulePanel } from "./academic/SchedulePanel";
 export default function AcademicPanel({ state, kind }: { state: any; kind: AdminTab }) {
   const props = state.props || {};
   const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
-  const schools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
+  const initialSchools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
   const subjects = Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [];
   const initialGroups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
   const curriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
@@ -23,6 +23,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     ? props.adminAcademicCurriculumItems
     : [];
   const csrf: string = asString(props.csrfToken);
+  const academicRoutes = state.academicRoutes || routes;
 
   const [openGroupId, setOpenGroupId] = useState<number | null>(null);
   const [openProgramId, setOpenProgramId] = useState<number | null>(null);
@@ -45,8 +46,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const [groupSubject, setGroupSubject] = useState("all");
   const [groupFiltersOpen, setGroupFiltersOpen] = useState(false);
   const [groupRowsOverride, setGroupRowsOverride] = useState<Array<Record<string, unknown>> | null>(null);
+  const [schoolRowsOverride, setSchoolRowsOverride] = useState<Array<Record<string, unknown>> | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
   const { toast: groupToast, showToast: showGroupToast, clearToast: clearGroupToast } = useFloatingToast();
+  const schools = schoolRowsOverride ?? initialSchools;
   const groups = groupRowsOverride ?? initialGroups;
 
   const schoolNameByCode = useMemo(() => {
@@ -176,7 +179,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     setDeletingGroupId(id);
     clearGroupToast();
     try {
-      const response = await fetch(routes.adminAcademicGroupApi(id), {
+      const response = await fetch(academicRoutes.adminAcademicGroupApi(id), {
         method: "DELETE",
         headers: csrfHeaders(csrf),
       });
@@ -199,6 +202,53 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       showGroupToast("Network error while deleting the group.", "danger");
     } finally {
       setDeletingGroupId(null);
+    }
+  }
+
+  function payloadFromForm(form: HTMLFormElement) {
+    const payload: Record<string, string> = {};
+    new FormData(form).forEach((value, key) => {
+      if (key !== "csrf_token") {
+        payload[key] = String(value);
+      }
+    });
+    return payload;
+  }
+
+  function applyAcademicContextPayload(data: Record<string, unknown>) {
+    if (Array.isArray(data.schools)) {
+      setSchoolRowsOverride(data.schools as Array<Record<string, unknown>>);
+    }
+    if (Array.isArray(data.groups)) {
+      setGroupRowsOverride(data.groups as Array<Record<string, unknown>>);
+    }
+  }
+
+  async function submitAcademicJsonForm(
+    event: FormEvent<HTMLFormElement>,
+    url: string | undefined,
+    successMessage: string,
+    onSuccess?: () => void,
+  ) {
+    if (!url) return;
+    event.preventDefault();
+    clearGroupToast();
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify(payloadFromForm(event.currentTarget)),
+      });
+      const json = await response.json();
+      if (!apiSucceeded(response, json)) {
+        showGroupToast(apiErrorMessage(json, "Unable to save academic record."), "danger");
+        return;
+      }
+      applyAcademicContextPayload(apiData<Record<string, unknown>>(json));
+      onSuccess?.();
+      showGroupToast(successMessage);
+    } catch {
+      showGroupToast("Network error while saving academic record.", "danger");
     }
   }
 
@@ -237,6 +287,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         groupId={openGroupId}
         csrf={csrf}
         groups={groups}
+        academicRoutes={academicRoutes}
         onClose={() => setOpenGroupId(null)}
       />
     );
@@ -410,7 +461,19 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <form action={routes.adminAcademicGroupCreate} method="post" className="space-y-3 px-4 py-4">
+                <form
+                  action={academicRoutes.adminAcademicGroupCreate || routes.adminAcademicGroupCreate}
+                  method="post"
+                  onSubmit={(event) =>
+                    submitAcademicJsonForm(
+                      event,
+                      academicRoutes.adminAcademicGroupCreateApi,
+                      "Group created.",
+                      () => setAddGroupOpen(false),
+                    )
+                  }
+                  className="space-y-3 px-4 py-4"
+                >
                   <input type="hidden" name="csrf_token" value={csrf} />
                   {selectedSchool ? (
                     <>
@@ -506,7 +569,18 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                     </button>
                   </div>
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                    <form action={routes.adminAcademicSchoolCreate} method="post" className="space-y-3 rounded-xl border border-foreground/8 bg-background p-4">
+                    <form
+                      action={academicRoutes.adminAcademicSchoolCreate || routes.adminAcademicSchoolCreate}
+                      method="post"
+                      onSubmit={(event) =>
+                        submitAcademicJsonForm(
+                          event,
+                          academicRoutes.adminAcademicSchoolCreateApi,
+                          "School created.",
+                        )
+                      }
+                      className="space-y-3 rounded-xl border border-foreground/8 bg-background p-4"
+                    >
                       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Add a client school</p>
                       <input type="hidden" name="csrf_token" value={csrf} />
                       <div className="grid gap-3 sm:grid-cols-2">
