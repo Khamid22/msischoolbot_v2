@@ -482,6 +482,24 @@ export function useAdminState(props: AdminPageProps) {
     }
   }
 
+  async function refreshComplaints() {
+    try {
+      const res = await fetch(routes.adminComplaintsApi, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: XHR_HEADERS,
+      });
+      if (!res.ok) {
+        return;
+      }
+      const data = apiData<{ complaints?: Array<Record<string, unknown>> }>(await res.json());
+      if (Array.isArray(data.complaints)) {
+        setComplaints(data.complaints);
+      }
+    } catch (_error) {
+    }
+  }
+
   useEffect(() => {
     setActiveTab(normalizeAdminTab(props.adminPanel));
   }, [props.adminPanel]);
@@ -657,6 +675,13 @@ export function useAdminState(props: AdminPageProps) {
       window.clearInterval(intervalId);
     };
   }, [activeTab, currentSchool]);
+
+  useEffect(() => {
+    if (activeTab !== "complaints") {
+      return;
+    }
+    void refreshComplaints();
+  }, [activeTab]);
 
   const filteredTeacherOptions = teacherOptions.filter((option) => {
     if (!teacherSchool) {
@@ -863,6 +888,13 @@ export function useAdminState(props: AdminPageProps) {
     } catch (_error) {
     }
   }
+
+  useEffect(() => {
+    if (activeTab !== "resources") {
+      return;
+    }
+    void refreshResources();
+  }, [activeTab]);
 
   async function saveEditResource() {
     if (!editingResource || editSaving) return;

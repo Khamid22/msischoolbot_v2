@@ -107,6 +107,19 @@ def register_admin_page_routes(
             admin_school = requested_school
         if not str(admin_mode or "").strip():
             admin_mode = requested_mode
+        preview_enabled = current_auth_role() == "admin" and _dev_preview_enabled()
+        if preview_enabled:
+            pre_context_mode = _normalize_admin_panel_mode(admin_mode)
+        else:
+            pre_context_mode = current_auth_role()
+        if pre_context_mode not in ADMIN_PANEL_MODES:
+            pre_context_mode = "admin"
+        normalized_panel = str(admin_panel or "overview").strip().lower()
+        defer_overview_lists = (
+            current_auth_role() == "admin"
+            and normalized_panel == "overview"
+            and pre_context_mode in {"admin", "ceo"}
+        )
 
         force_refresh = bool(
             str(auth_error or "").strip()
@@ -119,6 +132,7 @@ def register_admin_page_routes(
             admin_teacher_edit=admin_teacher_edit,
             parent_admin_id=session.get("admin_id", 0),
             force_refresh=force_refresh,
+            defer_overview_lists=defer_overview_lists,
         )
         timer.mark("admin_context_build")
         panel = page_context["panel"]
@@ -148,7 +162,6 @@ def register_admin_page_routes(
             session["admin_last_school"] = school_filter
 
         resolved_admin_mode = str(admin_mode or "").strip().lower()
-        preview_enabled = current_auth_role() == "admin" and _dev_preview_enabled()
         if preview_enabled:
             resolved_admin_mode = _normalize_admin_panel_mode(resolved_admin_mode)
         else:

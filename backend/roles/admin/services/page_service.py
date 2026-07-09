@@ -217,6 +217,7 @@ def build_admin_page_context(
     admin_teacher_edit,
     parent_admin_id=0,
     force_refresh=False,
+    defer_overview_lists=False,
 ):
     school_config = build_school_configuration()
     school_option_catalog = school_config["school_option_catalog"]
@@ -277,12 +278,15 @@ def build_admin_page_context(
     admin_teachers = list_teachers()
     admin_teacher_candidates = list_teacher_candidates()
     admin_teacher_academy = list_academy_teachers()
-    admin_complaints = list_complaints()
+    should_defer_overview_lists = bool(defer_overview_lists and panel == "overview")
+    admin_complaints = [] if should_defer_overview_lists else list_complaints()
     admin_parents = list_parent_accounts()
     admin_parent_children = list_parent_children(parent_admin_id)
-    admin_students = list_students_for_admin(
-        school_filter=school_filter if panel == "students" else "all"
-    )
+    admin_students = []
+    if not should_defer_overview_lists:
+        admin_students = list_students_for_admin(
+            school_filter=school_filter if panel == "students" else "all"
+        )
 
     admin_group_options = []
     for group_name in groups:
@@ -405,7 +409,7 @@ def build_admin_page_context(
             admin_subject_counts,
             admin_group_counts,
         )
-    if panel in {"overview", "resources"}:
+    if panel in {"overview", "resources"} and not should_defer_overview_lists:
         admin_resources = list_resources(include_inactive=False)
 
     if panel == "resources":
