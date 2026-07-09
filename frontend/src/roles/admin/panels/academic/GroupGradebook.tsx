@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, CalendarDays, ChevronLeft, Clock, Layers, MapPin, Users, X } from "lucide-react";
+import { BookMarked, CalendarDays, ChevronLeft, Layers, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -8,6 +8,7 @@ import { asNumber, asString } from "../../shared";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
+import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./Timetable";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
@@ -143,11 +144,13 @@ export function GroupGradebook({
   useEffect(() => {
     if (!scheduleEdit) return;
     const handler = (e: MouseEvent) => {
+      // Don't let a stray outside click drop an in-flight save silently.
+      if (scheduleSaving) return;
       if (schedulePopRef.current && !schedulePopRef.current.contains(e.target as Node)) closeScheduleEdit();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [scheduleEdit]);
+  }, [scheduleEdit, scheduleSaving]);
 
   async function load(id: number, signal?: AbortSignal) {
     setLoading(true);
@@ -532,14 +535,8 @@ export function GroupGradebook({
     setScheduleSaving(false);
   }
 
-  async function saveTime() {
+  async function persistTime(start: string, end: string) {
     if (!scheduleEdit || scheduleSaving) return;
-    const start = timeStartInput.trim();
-    const end = timeEndInput.trim();
-    if (Boolean(start) !== Boolean(end)) {
-      setError("Enter both a start and end time, or leave both empty.");
-      return;
-    }
     if (start && end && start >= end) {
       setError("End time must be after the start time.");
       return;
@@ -566,9 +563,25 @@ export function GroupGradebook({
     }
   }
 
-  async function saveRoom() {
+  function saveTime() {
+    const start = timeStartInput.trim();
+    const end = timeEndInput.trim();
+    if (Boolean(start) !== Boolean(end)) {
+      setError("Enter both a start and end time, or leave both empty.");
+      return;
+    }
+    void persistTime(start, end);
+  }
+
+  function clearTime() {
+    // Only resets the fields — Save is the single action that persists.
+    setTimeStartInput("");
+    setTimeEndInput("");
+    setError("");
+  }
+
+  async function persistRoom(room: string) {
     if (!scheduleEdit || scheduleSaving) return;
-    const room = roomInput.trim();
     setScheduleSaving(true);
     setError("");
     try {
@@ -591,16 +604,25 @@ export function GroupGradebook({
     }
   }
 
+  function saveRoom() {
+    void persistRoom(roomInput.trim());
+  }
+
+  function clearRoom() {
+    // Only resets the field — Save is the single action that persists.
+    setRoomInput("");
+    setError("");
+  }
+
   const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const MONTH_ABBREVS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   function weekdayName(iso: string) {
     const parsed = new Date(`${iso}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? "" : WEEKDAY_NAMES[parsed.getDay()];
   }
 
-  function groupLessonsByDate(items: Lesson[]) {
-    const groups: { key: string; iso: string; display: string; weekday: string; lessons: Lesson[] }[] = [];
+  function groupLessonsByDate(items: Lesson[]): TimetableDateGroup[] {
+    const groups: TimetableDateGroup[] = [];
     const indexByKey = new Map<string, number>();
     items.forEach((lesson) => {
       const iso = lessonDateToInputValue(lesson.date);
@@ -733,10 +755,10 @@ export function GroupGradebook({
     ? Math.min(active.anchorRect.left, window.innerWidth - 220)
     : 0;
   const schedulePopTop = scheduleEdit
-    ? Math.min(scheduleEdit.anchorRect.bottom + 4, window.innerHeight - 200)
+    ? Math.min(scheduleEdit.anchorRect.bottom + 8, window.innerHeight - 260)
     : 0;
   const schedulePopLeft = scheduleEdit
-    ? Math.min(scheduleEdit.anchorRect.left, window.innerWidth - 236)
+    ? Math.max(8, Math.min(scheduleEdit.anchorRect.left, window.innerWidth - 316))
     : 0;
   const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
@@ -1331,96 +1353,12 @@ export function GroupGradebook({
       )}
 
       {data && activeView === "timetable" && (
-        lessons.length === 0 ? (
-          <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">
-            No lessons found for this group.
-          </div>
-        ) : (
-          <div
-            className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
-            style={{
-              height: "calc(var(--tg-app-height) - 11rem)",
-              maxHeight: "78dvh",
-              minHeight: "26rem",
-            }}
-          >
-            <div className="shrink-0 border-b border-foreground/8 px-4 py-3">
-              <p className="text-sm font-bold">Timetable</p>
-              <p className="text-xs text-muted-foreground">Conducted lesson dates with class time and room · tap a chip to edit</p>
-            </div>
-            <div className="miniapp-table-scroll min-h-0 flex-1 space-y-5 px-4 py-4 pb-8 [scrollbar-gutter:stable]">
-              {timetableGroups.map((group) => (
-                <div key={group.key}>
-                  <p className="sticky top-0 z-10 -mx-4 mb-2 bg-surface/95 px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground backdrop-blur">
-                    {group.weekday ? `${group.weekday} · ${group.display}` : group.display}
-                  </p>
-                  <div className="space-y-2">
-                    {group.lessons.map((lesson) => {
-                      const cancelled = isCancelledLesson(lesson);
-                      const hasTime = Boolean(lesson.startTime && lesson.endTime);
-                      const hasRoom = Boolean(lesson.room);
-                      return (
-                        <div
-                          key={lesson.id}
-                          className={`flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5 shadow-sm sm:flex-nowrap ${
-                            cancelled ? "border-red-200 bg-red-50/50" : "border-foreground/8 bg-background"
-                          }`}
-                        >
-                          <div
-                            className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg ${
-                              cancelled ? "bg-red-100 text-red-700" : "bg-primary/10 text-primary"
-                            }`}
-                          >
-                            <span className="text-[9px] font-bold uppercase leading-none">
-                              {group.iso ? MONTH_ABBREVS[Number(group.iso.slice(5, 7)) - 1] : "—"}
-                            </span>
-                            <span className="text-base font-black leading-none">
-                              {group.iso ? Number(group.iso.slice(8, 10)) : "?"}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold">{lesson.lessonNumber}</p>
-                            <p className="truncate text-xs text-muted-foreground">{lesson.topic || "—"}</p>
-                          </div>
-                          {cancelled ? (
-                            <span className="inline-flex shrink-0 rounded-md bg-red-100 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700 shadow-sm">
-                              Cancelled
-                            </span>
-                          ) : (
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={(e) => openTimeEdit(e, lesson)}
-                                title={`${lesson.lessonNumber} · edit class time`}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-[transform,opacity] hover:-translate-y-px hover:opacity-85 ${
-                                  hasTime ? "border-blue-200 bg-blue-50 text-blue-700" : "border-foreground/10 bg-surface text-muted-foreground"
-                                }`}
-                              >
-                                <Clock className="h-3 w-3" />
-                                {hasTime ? `${lesson.startTime}–${lesson.endTime}` : "Set time"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => openRoomEdit(e, lesson)}
-                                title={`${lesson.lessonNumber} · edit room`}
-                                className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[11px] font-bold transition-[transform,opacity] hover:-translate-y-px hover:opacity-85 ${
-                                  hasRoom ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-foreground/10 bg-surface text-muted-foreground"
-                                }`}
-                              >
-                                <MapPin className="h-3 w-3" />
-                                {hasRoom ? lesson.room : "Set room"}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
+        <TimetableCard
+          groups={timetableGroups}
+          isLessonCancelled={isCancelledLesson}
+          onOpenTime={openTimeEdit}
+          onOpenRoom={openRoomEdit}
+        />
       )}
 
       {selectedStudent ? (
@@ -1590,87 +1528,36 @@ export function GroupGradebook({
         </div>
       )}
 
-      {scheduleEdit && (
-        <div
+      {scheduleEdit && scheduleEdit.kind === "time" ? (
+        <TimePopover
           ref={schedulePopRef}
-          style={{ position: "fixed", top: schedulePopTop, left: schedulePopLeft, zIndex: 9999 }}
-          className="w-56 rounded-xl border border-foreground/10 bg-surface shadow-xl animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none"
-        >
-          <div className="flex items-center justify-between border-b border-foreground/8 px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold">{scheduleEdit.lesson.lessonNumber}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{formatGradebookDate(scheduleEdit.lesson.date)}</p>
-            </div>
-            <button type="button" onClick={closeScheduleEdit} className="ml-2 shrink-0 rounded p-0.5 hover:bg-muted">
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          </div>
-          <div className="p-3">
-            {scheduleEdit.kind === "time" ? (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Class Time</p>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="time"
-                    value={timeStartInput}
-                    onChange={(e) => setTimeStartInput(e.target.value)}
-                    className="w-full rounded-lg border border-foreground/10 bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
-                  />
-                  <span className="text-xs text-muted-foreground">–</span>
-                  <input
-                    type="time"
-                    value={timeEndInput}
-                    onChange={(e) => setTimeEndInput(e.target.value)}
-                    className="w-full rounded-lg border border-foreground/10 bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={scheduleSaving}
-                    onClick={() => {
-                      setTimeStartInput("");
-                      setTimeEndInput("");
-                    }}
-                    className="shrink-0 rounded-lg border border-foreground/10 px-2.5 py-1.5 text-xs font-bold text-muted-foreground hover:bg-muted disabled:opacity-50"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    type="button"
-                    disabled={scheduleSaving}
-                    onClick={saveTime}
-                    className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                  >
-                    {scheduleSaving ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Room</p>
-                <input
-                  autoFocus
-                  type="text"
-                  value={roomInput}
-                  onChange={(e) => setRoomInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && saveRoom()}
-                  placeholder="Room 2"
-                  className="w-full rounded-lg border border-foreground/10 bg-background px-2 py-1.5 text-sm outline-none focus:border-foreground/30"
-                />
-                <button
-                  type="button"
-                  disabled={scheduleSaving}
-                  onClick={saveRoom}
-                  className="w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-                >
-                  {scheduleSaving ? "Saving..." : "Save"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          lesson={scheduleEdit.lesson}
+          dateLabel={formatGradebookDate(scheduleEdit.lesson.date)}
+          position={{ top: schedulePopTop, left: schedulePopLeft }}
+          startValue={timeStartInput}
+          endValue={timeEndInput}
+          onStartChange={setTimeStartInput}
+          onEndChange={setTimeEndInput}
+          onClear={clearTime}
+          onSave={saveTime}
+          onClose={closeScheduleEdit}
+          saving={scheduleSaving}
+        />
+      ) : null}
+      {scheduleEdit && scheduleEdit.kind === "room" ? (
+        <RoomPopover
+          ref={schedulePopRef}
+          lesson={scheduleEdit.lesson}
+          dateLabel={formatGradebookDate(scheduleEdit.lesson.date)}
+          position={{ top: schedulePopTop, left: schedulePopLeft }}
+          value={roomInput}
+          onChange={setRoomInput}
+          onClear={clearRoom}
+          onSave={saveRoom}
+          onClose={closeScheduleEdit}
+          saving={scheduleSaving}
+        />
+      ) : null}
 
     </div>
   );
