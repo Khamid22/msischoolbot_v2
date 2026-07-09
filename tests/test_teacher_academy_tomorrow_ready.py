@@ -419,7 +419,9 @@ def test_next_teacher_code_uses_four_digit_tch_format():
     assert get_next_teacher_code(_Conn()) == "TCH0004"
 
 
-def test_notification_does_not_crash_without_telegram_link():
+def test_notification_does_not_crash_without_telegram_link(monkeypatch):
+    monkeypatch.delenv("TEACHER_ACADEMY_CHANNEL_CHAT_ID", raising=False)
+
     result = notify_academy_teacher_event(
         academy_teacher={"full_name": "Example Teacher"},
         event_type="assessment_added",
@@ -431,6 +433,65 @@ def test_notification_does_not_crash_without_telegram_link():
     assert result["in_app_available"] is True
     assert result["telegram_sent"] is False
     assert result["reason"] == "telegram_link_missing"
+
+
+def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
+    from backend.domains.teacher_academy import notifications
+
+    sent_messages = []
+    monkeypatch.setenv("BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TEACHER_ACADEMY_CHANNEL_CHAT_ID", "-100-general")
+    monkeypatch.setenv("TEACHER_ACADEMY_MATHEMATICS_CHAT_ID", "-100-math")
+    monkeypatch.setattr(
+        notifications,
+        "_send_telegram_message",
+        lambda chat_id, text: sent_messages.append((str(chat_id), text)) or (True, ""),
+    )
+
+    result = notifications.notify_academy_teacher_event(
+        academy_teacher={"full_name": "Example Teacher", "subject": "Mathematics"},
+        event_type="teacher_created",
+        title="New Teacher Academy teacher",
+        body="2 academy lessons are assigned.",
+        lessons_count=2,
+    )
+
+    assert result["ok"] is True
+    assert result["telegram_sent"] is True
+    assert result["channel_sent"] is True
+    assert result["teacher_sent"] is False
+    assert sent_messages[0][0] == "-100-math"
+    assert "Example Teacher" in sent_messages[0][1]
+    assert "Assigned lessons" in sent_messages[0][1]
+
+
+def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
+    from backend.domains.teacher_academy import notifications
+
+    sent_messages = []
+    monkeypatch.setenv("BOT_TOKEN", "test-token")
+    monkeypatch.delenv("TEACHER_ACADEMY_CHANNEL_CHAT_ID", raising=False)
+    monkeypatch.setattr(
+        notifications,
+        "_send_telegram_message",
+        lambda chat_id, text: sent_messages.append((str(chat_id), text)) or (True, ""),
+    )
+
+    result = notifications.notify_academy_teacher_event(
+        academy_teacher={
+            "full_name": "Example Teacher",
+            "telegram_user_id": 901234,
+        },
+        assignment={"lesson_number": "L1", "lesson_topic": "Numbers"},
+        event_type="lesson_assigned",
+        title="Academy lesson assigned",
+        body="A Teacher Academy lesson has been updated.",
+    )
+
+    assert result["telegram_sent"] is True
+    assert result["teacher_sent"] is True
+    assert sent_messages[0][0] == "901234"
+    assert "L1: Numbers" in sent_messages[0][1]
 
 
 @pytest.mark.parametrize(

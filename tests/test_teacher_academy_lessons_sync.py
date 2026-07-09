@@ -36,7 +36,15 @@ def sync_env(monkeypatch):
     monkeypatch.setattr(
         queries,
         "get_academy_teacher_program_row",
-        lambda _conn, teacher_id: {"id": teacher_id, "subject_id": 2, "subject_program_id": 7},
+        lambda _conn, teacher_id: {
+            "id": teacher_id,
+            "full_name": "Example Teacher",
+            "subject_id": 2,
+            "subject": "Mathematics",
+            "subject_program_id": 7,
+            "telegram_username": "example_teacher",
+            "telegram_user_id": 901234,
+        },
     )
     monkeypatch.setattr(
         queries,
@@ -112,6 +120,10 @@ def test_sync_adds_new_lessons_removes_unticked_and_resequences(sync_env):
     assert inserted["created_by"] == "HOD0001"
     assert conn.committed
     assert calls["notified"]
+    notification = calls["notified"][0]
+    assert notification["academy_teacher"]["full_name"] == "Example Teacher"
+    assert notification["academy_teacher"]["telegram_user_id"] == 901234
+    assert notification["lessons_count"] == 2
 
 
 def test_sync_rejects_empty_selection_and_foreign_curriculum_items(sync_env):

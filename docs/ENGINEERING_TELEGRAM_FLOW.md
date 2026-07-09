@@ -9,8 +9,10 @@ Project: MSI LMS Portal.
 Telegram bot:
 
 - aiogram.
-- handlers in `tgbot/handlers`.
+- runtime router registry in `tgbot/routing.py`.
 - keyboards in `tgbot/keyboards`.
+- legacy handlers were removed; new command/callback handlers should be added
+  through the new bot architecture and registered in `tgbot/routing.py`.
 
 Current parent linking:
 
@@ -65,6 +67,26 @@ Bot should own:
 - Telegram command parsing.
 - Telegram messages.
 - keyboard buttons.
+
+## Teacher Academy Outbound Notifications
+
+Teacher Academy domain events send best-effort outbound Telegram messages
+without depending on inbound bot handlers.
+
+Required environment:
+
+- `BOT_TOKEN`: Telegram bot token used for `sendMessage`.
+- `TEACHER_ACADEMY_CHANNEL_CHAT_ID`: default Teacher Academy channel chat id.
+
+Optional department channel overrides:
+
+- `TEACHER_ACADEMY_<SUBJECT>_CHAT_ID`: subject-specific channel chat id, where
+  the subject name is uppercased and non-alphanumeric characters become `_`.
+  Example: `TEACHER_ACADEMY_MATHEMATICS_CHAT_ID`.
+
+Teacher direct messages require a numeric `msi_staff.telegram_user_id`. A
+stored `telegram_username` is useful for display, but Telegram Bot API cannot
+start a private chat from a username alone.
 
 Web should own:
 

@@ -318,6 +318,57 @@ def _notify_academy_event_safe(**kwargs):
         return {"ok": False, "telegram_sent": False, "in_app_available": True}
 
 
+def _row_value(row, key, default=""):
+    if row is None:
+        return default
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except (KeyError, TypeError, IndexError):
+        return default
+
+
+def _academy_teacher_notification_payload(row):
+    if not row:
+        return {}
+    return {
+        "id": _as_int(_row_value(row, "academy_teacher_id") or _row_value(row, "id")),
+        "full_name": str(_row_value(row, "academy_teacher_name") or _row_value(row, "full_name") or ""),
+        "subject_id": _as_int(_row_value(row, "subject_id")),
+        "subject": str(_row_value(row, "subject") or _row_value(row, "subject_name") or ""),
+        "telegram_username": str(_row_value(row, "telegram_username") or ""),
+        "telegram_user_id": _as_int(_row_value(row, "telegram_user_id")),
+    }
+
+
+def _assignment_notification_payload(row, *, session_datetime=None):
+    if not row:
+        return {}
+    return {
+        "id": _as_int(_row_value(row, "id")),
+        "lesson_number": str(_row_value(row, "lesson_number") or ""),
+        "lesson_topic": str(_row_value(row, "lesson_topic") or ""),
+        "assignment_type": str(_row_value(row, "assignment_type") or ""),
+        "deadline_date": str(_row_value(row, "deadline_date") or ""),
+        "session_datetime": str(
+            session_datetime
+            if session_datetime is not None
+            else (_row_value(row, "session_datetime") or "")
+        ),
+        "evaluator_id": _as_int(_row_value(row, "evaluator_id")),
+        "evaluator_name": str(_row_value(row, "evaluator_name") or ""),
+    }
+
+
+def _assessment_notification_payload(*, decision, weighted_score=None, assessment_datetime=""):
+    return {
+        "decision": str(decision or ""),
+        "weighted_score": weighted_score,
+        "assessment_datetime": str(assessment_datetime or ""),
+    }
+
+
 def _row_to_assignment(row):
     return {
         "id": int(row["id"]),
@@ -434,6 +485,7 @@ def _academy_teacher_payload(row, assignments, assessments):
         "notes": str(row["notes"] or ""),
         "login": str(row["login"] or ""),
         "account_teacher_id": int(row["account_teacher_id"] or 0),
+        "telegram_user_id": _as_int(_row_value(row, "telegram_user_id")),
         "promoted_teacher_id": int(row["promoted_teacher_id"] or 0),
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
@@ -673,11 +725,19 @@ def create_academy_teacher(
             )
         conn.commit()
     _notify_academy_event_safe(
-        academy_teacher={"telegram_username": str(telegram_username or "").strip()},
-        event_type="lesson_assigned",
-        title="Teacher Academy lessons assigned",
-        body=f"{len(lessons)} academy lessons are ready.",
+        academy_teacher={
+            "id": academy_teacher_id,
+            "full_name": normalized_name,
+            "subject_id": int(program["subject_id"] or 0),
+            "subject": subject_name,
+            "telegram_username": str(telegram_username or "").strip(),
+            "telegram_user_id": 0,
+        },
+        event_type="teacher_created",
+        title="New Teacher Academy teacher",
+        body=f"{len(lessons)} academy lessons are assigned.",
         source="Academic Department",
+        lessons_count=len(lessons),
     )
     credentials = {
         "role": "teacher",
@@ -732,6 +792,8 @@ def update_assignment(
         else "lesson_assigned"
     )
     _notify_academy_event_safe(
+        academy_teacher=_academy_teacher_notification_payload(existing),
+        assignment=_assignment_notification_payload(existing, session_datetime=next_session_datetime),
         event_type=event_type,
         title="Academy lesson schedule updated" if event_type == "lesson_time_changed" else "Academy lesson assigned",
         body="A Teacher Academy lesson has been updated.",
@@ -815,10 +877,12 @@ def sync_academy_lessons(*, academy_teacher_id, selected_curriculum_item_ids, cr
         conn.commit()
     if added_count or removed_assignment_ids:
         _notify_academy_event_safe(
+            academy_teacher=_academy_teacher_notification_payload(teacher),
             event_type="lesson_assigned",
             title="Teacher Academy lessons updated",
             body=f"{len(lessons)} academy lessons are selected.",
             source="Academic Department",
+            lessons_count=len(lessons),
         )
     return True, ""
 
@@ -927,6 +991,13 @@ def add_assessment(
             )
         conn.commit()
     _notify_academy_event_safe(
+        academy_teacher=_academy_teacher_notification_payload(assignment),
+        assignment=_assignment_notification_payload(assignment),
+        assessment=_assessment_notification_payload(
+            decision=normalized_decision,
+            weighted_score=weighted_score,
+            assessment_datetime=assessment_datetime,
+        ),
         event_type="assessment_added",
         title="Assessment report added",
         body="An Academic Department assessment report is available.",

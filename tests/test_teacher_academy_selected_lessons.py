@@ -20,6 +20,7 @@ class _AcademyCreateConnection:
     def __init__(self, curriculum_rows):
         self.curriculum_rows = curriculum_rows
         self.assignments = []
+        self.notifications = []
         self.commits = 0
 
     def __enter__(self):
@@ -117,7 +118,8 @@ def _patch_create_dependencies(monkeypatch, curriculum_rows=None):
     monkeypatch.setattr(
         academy_service,
         "_notify_academy_event_safe",
-        lambda **kwargs: {"ok": True, "telegram_sent": False, "in_app_available": True},
+        lambda **kwargs: conn.notifications.append(kwargs)
+        or {"ok": True, "telegram_sent": False, "in_app_available": True},
     )
     return conn
 
@@ -140,6 +142,10 @@ def test_create_academy_teacher_uses_selected_lesson_ids_in_order(monkeypatch):
     assert [params[3] for params in conn.assignments] == [103, 101]
     assert [params[4] for params in conn.assignments] == [1, 2]
     assert [params[6] for params in conn.assignments] == ["Algebra", "Numbers"]
+    assert conn.notifications[0]["event_type"] == "teacher_created"
+    assert conn.notifications[0]["academy_teacher"]["full_name"] == "Example Teacher"
+    assert conn.notifications[0]["academy_teacher"]["subject"] == "Mathematics"
+    assert conn.notifications[0]["lessons_count"] == 2
     assert conn.commits == 1
 
 

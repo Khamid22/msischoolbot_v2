@@ -173,6 +173,20 @@ def list_academy_teacher_rows(conn: Any) -> list[Any]:
                at.notes, at.promoted_teacher_id,
                COALESCE(staff.login, '') AS login,
                COALESCE(staff.teacher_id, 0) AS account_teacher_id,
+               COALESCE(
+                   NULLIF(staff.telegram_user_id, 0),
+                   (
+                       SELECT link.telegram_user_id
+                       FROM msi_v2.account_telegram_links link
+                       JOIN msi_v2.accounts account ON account.id = link.account_id
+                       WHERE link.status = 'active'
+                         AND account.legacy_source_table = 'msi_staff'
+                         AND account.legacy_source_id = staff.id
+                       ORDER BY link.id DESC
+                       LIMIT 1
+                   ),
+                   0
+               ) AS telegram_user_id,
                at.created_at::text AS created_at, at.updated_at::text AS updated_at
         FROM msi_v2.academy_teachers at
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
@@ -198,6 +212,20 @@ def get_academy_teacher_row_for_account(conn: Any, *, teacher_id: int, staff_id:
                at.notes, at.promoted_teacher_id,
                COALESCE(staff.login, '') AS login,
                COALESCE(staff.teacher_id, 0) AS account_teacher_id,
+               COALESCE(
+                   NULLIF(staff.telegram_user_id, 0),
+                   (
+                       SELECT link.telegram_user_id
+                       FROM msi_v2.account_telegram_links link
+                       JOIN msi_v2.accounts account ON account.id = link.account_id
+                       WHERE link.status = 'active'
+                         AND account.legacy_source_table = 'msi_staff'
+                         AND account.legacy_source_id = staff.id
+                       ORDER BY link.id DESC
+                       LIMIT 1
+                   ),
+                   0
+               ) AS telegram_user_id,
                at.created_at::text AS created_at, at.updated_at::text AS updated_at
         FROM msi_v2.academy_teachers at
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
@@ -551,9 +579,40 @@ def insert_academy_lesson_assignment(
 def get_assignment_schedule_row(conn: Any, assignment_id: int) -> Any:
     return conn.execute(
         """
-        SELECT id, academy_teacher_id, session_datetime::text AS session_datetime
-        FROM msi_v2.academy_lesson_assignments
-        WHERE id = %s
+        SELECT
+            ala.id,
+            ala.academy_teacher_id,
+            ala.lesson_number,
+            ala.lesson_topic,
+            ala.assignment_type,
+            ala.deadline_date::text AS deadline_date,
+            ala.session_datetime::text AS session_datetime,
+            ala.evaluator_id,
+            COALESCE(eval.full_name, '') AS evaluator_name,
+            at.full_name AS academy_teacher_name,
+            at.subject_id,
+            COALESCE(subj.subject_name, '') AS subject,
+            at.telegram_username,
+            COALESCE(
+                NULLIF(staff.telegram_user_id, 0),
+                (
+                    SELECT link.telegram_user_id
+                    FROM msi_v2.account_telegram_links link
+                    JOIN msi_v2.accounts account ON account.id = link.account_id
+                    WHERE link.status = 'active'
+                      AND account.legacy_source_table = 'msi_staff'
+                      AND account.legacy_source_id = staff.id
+                    ORDER BY link.id DESC
+                    LIMIT 1
+                ),
+                0
+            ) AS telegram_user_id
+        FROM msi_v2.academy_lesson_assignments ala
+        LEFT JOIN msi_v2.academy_teachers at ON at.id = ala.academy_teacher_id
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = COALESCE(ala.subject_id, at.subject_id)
+        LEFT JOIN msi_v2.teachers eval ON eval.id = ala.evaluator_id
+        WHERE ala.id = %s
         """,
         (assignment_id,),
     ).fetchone()
@@ -602,9 +661,40 @@ def update_assignment_schedule(
 def get_assignment_for_assessment(conn: Any, *, academy_teacher_id: int, lesson_assignment_id: int) -> Any:
     return conn.execute(
         """
-        SELECT id, academy_teacher_id, lesson_number, lesson_topic, evaluator_id
-        FROM msi_v2.academy_lesson_assignments
-        WHERE id = %s AND academy_teacher_id = %s
+        SELECT
+            ala.id,
+            ala.academy_teacher_id,
+            ala.lesson_number,
+            ala.lesson_topic,
+            ala.assignment_type,
+            ala.deadline_date::text AS deadline_date,
+            ala.session_datetime::text AS session_datetime,
+            ala.evaluator_id,
+            COALESCE(eval.full_name, '') AS evaluator_name,
+            at.full_name AS academy_teacher_name,
+            at.subject_id,
+            COALESCE(subj.subject_name, '') AS subject,
+            at.telegram_username,
+            COALESCE(
+                NULLIF(staff.telegram_user_id, 0),
+                (
+                    SELECT link.telegram_user_id
+                    FROM msi_v2.account_telegram_links link
+                    JOIN msi_v2.accounts account ON account.id = link.account_id
+                    WHERE link.status = 'active'
+                      AND account.legacy_source_table = 'msi_staff'
+                      AND account.legacy_source_id = staff.id
+                    ORDER BY link.id DESC
+                    LIMIT 1
+                ),
+                0
+            ) AS telegram_user_id
+        FROM msi_v2.academy_lesson_assignments ala
+        LEFT JOIN msi_v2.academy_teachers at ON at.id = ala.academy_teacher_id
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = COALESCE(ala.subject_id, at.subject_id)
+        LEFT JOIN msi_v2.teachers eval ON eval.id = ala.evaluator_id
+        WHERE ala.id = %s AND ala.academy_teacher_id = %s
         LIMIT 1
         """,
         (lesson_assignment_id, academy_teacher_id),
@@ -764,9 +854,31 @@ def get_academy_teacher_id(conn: Any, academy_teacher_id: int) -> Any:
 def get_academy_teacher_program_row(conn: Any, academy_teacher_id: int) -> Any:
     return conn.execute(
         """
-        SELECT id, subject_id, subject_program_id
-        FROM msi_v2.academy_teachers
-        WHERE id = %s
+        SELECT
+            at.id,
+            at.subject_id,
+            at.subject_program_id,
+            at.full_name,
+            at.telegram_username,
+            COALESCE(
+                NULLIF(staff.telegram_user_id, 0),
+                (
+                    SELECT link.telegram_user_id
+                    FROM msi_v2.account_telegram_links link
+                    JOIN msi_v2.accounts account ON account.id = link.account_id
+                    WHERE link.status = 'active'
+                      AND account.legacy_source_table = 'msi_staff'
+                      AND account.legacy_source_id = staff.id
+                    ORDER BY link.id DESC
+                    LIMIT 1
+                ),
+                0
+            ) AS telegram_user_id,
+            COALESCE(subj.subject_name, '') AS subject
+        FROM msi_v2.academy_teachers at
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
+        LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
+        WHERE at.id = %s
         LIMIT 1
         """,
         (academy_teacher_id,),

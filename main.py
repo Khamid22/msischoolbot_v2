@@ -146,7 +146,7 @@ async def run_bot():
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
 
-    from tgbot.handlers import ALL_ROUTERS
+    from tgbot.routing import BOT_ROUTERS
     from tgbot.settings import settings as bot_settings
 
     bot = Bot(
@@ -155,11 +155,18 @@ async def run_bot():
     )
     dp = Dispatcher()
 
-    # Register all routers in a clean loop
-    for router in ALL_ROUTERS:
+    bot_routers = tuple(BOT_ROUTERS)
+    for router in bot_routers:
         dp.include_router(router)
 
-    logging.info("Starting Telegram bot polling (%d routers).", len(ALL_ROUTERS))
+    if bot_routers:
+        logging.info("Starting Telegram bot polling (%d routers).", len(bot_routers))
+    else:
+        logging.warning(
+            "Starting Telegram bot polling with no registered routers. "
+            "The old handler layer was removed; install the new bot routing layer "
+            "before expecting commands or callbacks to respond."
+        )
     try:
         # Clear any webhook + stale queued updates, then long-poll for updates.
         await bot.delete_webhook(drop_pending_updates=True)
