@@ -9,6 +9,7 @@ import {
   ClipboardList,
   GraduationCap,
   Home,
+  KeyRound,
   LogOut,
   Star,
   TrendingUp,
@@ -18,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
+import { averageRecordedMetrics } from "@/shared/lib/metricMath";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { useLazyVisible } from "@/shared/lib/useLazyVisible";
 import { bottomNavActiveKey, type TeacherTabKey } from "@/roles/teacher/teacherNav";
@@ -310,8 +312,7 @@ function updateBadgeClass(kind?: string, priority?: string) {
 }
 
 function average(values: number[]) {
-  const clean = values.filter((value) => Number.isFinite(value) && value > 0);
-  return clean.length ? clean.reduce((sum, value) => sum + value, 0) / clean.length : 0;
+  return averageRecordedMetrics(values) ?? 0;
 }
 
 function CabinetSidebar({
@@ -375,11 +376,19 @@ function CabinetSidebar({
               {academy ? " · Academy" : ""}
             </p>
           </div>
+          <a
+            href={routes.accountSecurity}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            aria-label="Account security"
+            title="Account security"
+          >
+            <KeyRound className="h-4 w-4" />
+          </a>
           <form action={routes.logout} method="post" className="shrink-0">
             <input type="hidden" name="csrf_token" value={csrfToken || ""} />
             <button
               type="submit"
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               aria-label="Log out"
             >
               <LogOut className="h-4 w-4" />
@@ -1501,7 +1510,7 @@ function CompactGradebook({ groups }: { groups: GroupGradebook[] }) {
                   <tr key={enrollment.enrollmentId} className="hover:bg-[#F7F8FA]">
                     <td className="px-4 py-2.5 font-bold text-[#12203D]">{enrollment.fullName}</td>
                     <td className="px-3 py-2.5 text-center font-black text-[#2F5DE0]">
-                      {enrollment.averageGrade > 0 ? enrollment.averageGrade.toFixed(0) : "-"}
+                      {Number.isFinite(enrollment.averageGrade) ? enrollment.averageGrade.toFixed(0) : "-"}
                     </td>
                     <td className="px-3 py-2.5 text-center font-semibold text-[#7A8296]">{group.lessons.length}</td>
                     <td className="px-3 py-2.5 text-center font-semibold text-[#7A8296]">

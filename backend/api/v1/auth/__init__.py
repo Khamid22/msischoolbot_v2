@@ -1,2 +1,0 @@
-"""Future auth API package."""
-

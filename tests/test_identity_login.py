@@ -43,6 +43,7 @@ def _auth_result(role, *, account_role=None, **session_overrides):
         "account_role": account_role,
         "canonical_role": account_role,
         "auth_role": role,
+        "session_version": 1,
         "auth_login": session_overrides.pop("auth_login", f"{account_role}@test"),
         **session_overrides,
     }
@@ -54,7 +55,7 @@ def _auth_result(role, *, account_role=None, **session_overrides):
 
 
 def test_student_login_uses_accounts(client, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
+    import backend.modules.portal.web as identity_routes
 
     _set_csrf_session(client)
     calls = {"activity": []}
@@ -91,7 +92,7 @@ def test_student_login_uses_accounts(client, monkeypatch):
 
 
 def test_teacher_tch0001_login_uses_accounts(client, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
+    import backend.modules.portal.web as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
@@ -114,7 +115,7 @@ def test_teacher_tch0001_login_uses_accounts(client, monkeypatch):
 
 
 def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
+    import backend.modules.portal.web as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
@@ -141,6 +142,48 @@ def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "database_account",
+    [
+        {"id": 100, "role": "student", "status": "disabled", "session_version": 1},
+        {"id": 100, "role": "student", "status": "active", "session_version": 2},
+        {"id": 100, "role": "teacher", "status": "active", "session_version": 1},
+    ],
+)
+def test_protected_account_session_must_match_database_account(
+    app,
+    client,
+    monkeypatch,
+    database_account,
+):
+    from backend.modules.identity import accounts
+
+    client.cookies.set(
+        "session",
+        _signed_session(
+            {
+                "account_id": 100,
+                "account_role": "student",
+                "canonical_role": "student",
+                "auth_role": "student",
+                "auth_login": "MSI00001",
+                "session_version": 1,
+                "student_db_id": 1001,
+                "student_id": "MSI00001",
+            }
+        ),
+    )
+    monkeypatch.setattr(accounts, "get_account_by_id", lambda account_id: database_account)
+    app.state.testing = False
+    try:
+        response = client.get("/api/v1/auth/me")
+    finally:
+        app.state.testing = True
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "session_expired"
+
+
+@pytest.mark.parametrize(
     "login",
     [
         "disabled-account",
@@ -150,7 +193,7 @@ def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
     ],
 )
 def test_rejected_account_returns_401(client, monkeypatch, login):
-    import backend.domains.identity.routes as identity_routes
+    import backend.modules.portal.web as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(identity_routes, "authenticate_account_password", lambda login_value, password: None)

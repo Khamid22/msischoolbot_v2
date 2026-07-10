@@ -1,93 +1,68 @@
 # Database Folder Migration Status
 
-Date: 2026-07-09
-Branch: `FastAPI-Run-System`
+Date: 2026-07-10
 
-## Goal
+Branch documented: `FastAPI-Run-System`
 
-`database/` is being reduced to migration infrastructure only. Runtime connection
-ownership belongs in `backend/core/database.py`; runtime SQL belongs in
-`backend/domains/*/queries.py`; domain helpers belong under `backend/domains`.
+## Result
 
-Do not delete `database/alembic/`, drop production data, or rename the physical
-`msi_v2` schema during this cleanup.
+The database-folder runtime cleanup is complete. Runtime connection ownership is `backend/core/database.py`, runtime SQL is owned by domain query modules, and schema DDL is owned by Alembic.
 
-## Current Import Inventory
+Current source files under `database/` are limited to:
 
-| Import family | Hits | Files | Current blocker |
-| --- | ---: | ---: | --- |
-| `from database import queries` | 12 | 12 | 8 backend runtime imports remain; 4 are architecture test guard strings |
-| `database.queries` | 25 | 6 | legacy wrapper tests and compatibility docs/strings remain; runtime callers should migrate off `from database import queries` first |
-| `database.cross_queries` | 5 | 3 | student compatibility wrapper tests and compatibility docs/strings remain |
-| `database.database` | 0 | 0 | deleted after imports reached zero |
-| `database.tables` | 2 | 2 | schema/index ensure helpers still used by payments |
-| `database.academics` | 0 | 0 | moved to `backend/domains/academics/*` |
+```text
+database/__init__.py              narrow re-export of core connection helpers
+database/alembic/env.py           Alembic environment
+database/alembic/script.py.mako   revision template
+database/alembic/README.md        migration instructions
+database/alembic/versions/*       frozen baseline and revisions through 0007
+```
 
-Generated cache cleanup completed:
+Generated `__pycache__` files are not architecture and must not be committed.
 
-- Deleted `database/**/__pycache__/`
-- Deleted `database/**/*.pyc`
+## Deleted Runtime Surfaces
 
-## File Classification
+- `database/database.py`
+- `database/tables.py`
+- `database/academics/*`
+- `database/queries/*`
+- `database/cross_queries/*`
 
-| File | Classification | Current purpose | Target destination | Deletion blocker | Risk | Phase |
-| --- | --- | --- | --- | --- | --- | --- |
-| `database/__init__.py` | Compatibility package facade | Re-exports core DB helpers and cross queries | delete or migration-only package after imports are gone | `database` package imports still active | Medium | Final database cleanup |
-| `database/tables.py` | Schema/table ensure helper | Runtime CREATE/INDEX helpers for `msi_v2` | Alembic migrations or domain setup helpers | `backend/domains/payments/*` imports | Medium | Schema-helper migration |
-| `database/alembic/README.md` | Keep migration infrastructure | Alembic docs | keep under `database/alembic` | none | Low | Keep |
-| `database/alembic/env.py` | Keep migration infrastructure | Alembic environment | keep under `database/alembic` | migration runtime | Low | Keep |
-| `database/alembic/script.py.mako` | Keep migration infrastructure | Alembic revision template | keep under `database/alembic` | migration runtime | Low | Keep |
-| `database/alembic/versions/0001_msi_v2_baseline.py` | Keep migration infrastructure | Baseline schema migration | keep under `database/alembic` | migration history | Low | Keep |
-| `database/alembic/versions/0001_msi_v2_baseline.sql` | Keep migration infrastructure | Baseline SQL snapshot | keep under `database/alembic` | migration history | Low | Keep |
-| `database/alembic/versions/0002_lesson_session_source_metadata.py` | Keep migration infrastructure | Lesson session metadata migration | keep under `database/alembic` | migration history | Low | Keep |
-| `database/alembic/versions/0003_shared_accounts_foundation.py` | Keep migration infrastructure | Shared accounts migration | keep under `database/alembic` | migration history | Low | Keep |
-| `database/alembic/versions/0004_head_of_department_subject_scopes.py` | Keep migration infrastructure | HOD subject-scope migration | keep under `database/alembic` | migration history | Low | Keep |
-| `database/cross_queries/__init__.py` | Legacy shared query barrel | Re-exports cross-query wrappers | remove after importers use domains | query barrel and compatibility tests | Medium | Cross-query cleanup |
-| `database/cross_queries/bot_user_queries.py` | Runtime query wrapper | Bot/user lookup SQL compatibility | domain or bot-side query module | importer audit pending | Medium | Cross-query cleanup |
-| `database/cross_queries/student_queries.py` | Runtime query wrapper | Student cross-query compatibility | `backend/domains/students/queries.py` | compatibility tests/docs | Medium | Cross-query cleanup |
-| `database/queries/__init__.py` | Legacy query barrel | Re-exports remaining old query modules plus DB helpers | delete after callers import domain modules directly | 9 active backend imports still use the query barrel | High | Query barrel cleanup |
-| `database/queries/admin_queries.py` | Runtime query wrapper | Admin query compatibility | matching admin/reporting domains | admin services still depend on query barrel | High | Admin panel migration |
-| `database/queries/lesson_catalog_queries.py` | Runtime query wrapper | Lesson catalog SQL | `backend/domains/resources` or academics query module | student lesson catalog role service uses query barrel | Medium | Student/resources slice |
-| `database/queries/meta_queries.py` | Runtime query wrapper | Metadata/count helper SQL | relevant domains/reporting | query barrel users not split | Medium | Reporting cleanup |
-| `database/queries/parent_account_queries.py` | Runtime query wrapper | Parent account SQL | `backend/domains/parents/queries.py` | parent compatibility tests/imports | Medium | Parent slice |
-| `database/queries/parent_queries.py` | Runtime query wrapper | Parent portal SQL | `backend/domains/parents/queries.py` | parent compatibility tests/imports | Medium | Parent slice |
-| `database/queries/payment_queries.py` | Runtime query wrapper | Payment SQL | `backend/domains/payments/queries.py` | compatibility wrappers/tests | Medium | Payments slice |
-| `database/queries/teacher_queries.py` | Runtime query wrapper | Teacher account/profile SQL | `backend/domains/teachers/queries.py` | teacher tests and services still import legacy path | Medium | Teacher slice |
+Their responsibilities moved to:
 
-## Completed Slice
+- connection/pool: `backend/core/database.py`;
+- academic canonical helpers/services/queries: `backend/domains/academics`;
+- identity SQL: `backend/domains/identity/queries.py`;
+- role/domain SQL: matching `backend/domains/*/queries.py` modules;
+- table/index/constraint creation: Alembic migrations.
 
-Announcement query wrapper cleanup:
+## Migration Inventory
 
-- Kept SQL ownership in `backend/domains/announcements/queries.py`.
-- Deleted `database/queries/announcement_queries.py`; it was only a re-export compatibility wrapper.
-- Removed `from .announcement_queries import *` from `database/queries/__init__.py`.
-- Updated tests so active code imports announcement query functions from the domain module.
+| Revision | State |
+| --- | --- |
+| `0001_msi_v2_baseline` | retained frozen baseline |
+| `0002_lesson_source_meta` | retained |
+| `0003_shared_accounts` | retained |
+| `0004_hod_subject_scopes` | retained |
+| `0005_canonical_identity` | canonical account/password cutover |
+| `0006_secure_parent_invites` | hash-only single-use parent invites |
+| `0007_lms_integrity` | identity and academic/office-hour constraints |
 
-Student/parent page and small query wrapper cleanup:
+## Enforcement
 
-- Moved `database/queries/complaint_queries.py` to `backend/domains/complaints/queries.py`.
-- Moved `database/queries/office_hours.py` to `backend/domains/office_hours/queries.py`.
-- Moved `database/queries/resource_queries.py` to `backend/domains/resources/queries.py`.
-- Removed those three re-exports from `database/queries/__init__.py`.
-- Updated `backend/domains/complaints/service.py`, `backend/domains/office_hours/service.py`, `backend/domains/resources/service.py`, and `backend/domains/resources/comments_service.py` to import domain query modules directly.
-- Updated `backend/identity/storage.py` so default resource types come from `backend.domains.resources.queries`; the file still imports the query barrel for owner admin seeding and remains a later identity cleanup target.
+Architecture tests should keep these invariants true:
 
-Core DB wrapper and academic helper cleanup:
+- backend/tgbot code has no imports from `database.queries`, `database.cross_queries`, or `database.tables`;
+- runtime Python contains no request-time schema/table/index creation;
+- migrations are the only DDL owner;
+- domain services import focused domain query modules rather than a global barrel.
 
-- Deleted `database/database.py` after `database.database` imports reached zero; runtime connection helpers remain in `backend/core/database.py`.
-- Moved academic helper modules from `database/academics/*` into `backend/domains/academics/*`.
-- Updated backend and Telegram bot imports to use `backend.domains.academics`.
-- Moved subject-summary SQL from `database/queries/subject_summary_queries.py` into `backend/domains/academics/summary_queries.py`.
-- Updated `backend/domains/academics/performance_summary.py` to use `backend.core.database.connect_auth_db` and domain summary queries directly.
-- Removed the subject-summary re-export from `database/queries/__init__.py`.
+Useful audit commands:
 
-## Next Recommended Database Slices
+```bash
+rg "database\\.(queries|cross_queries|tables)|from database import queries" backend tgbot main.py
+rg "CREATE TABLE|CREATE INDEX|ALTER TABLE" backend tgbot main.py
+python3 -m pytest tests/test_architecture_cleanup.py tests/test_phase1d_structure_safety.py
+```
 
-1. Parent query wrappers: migrate only after parent invite/link tests remain green for this page move.
-2. Payments: move remaining schema/table helper usage out of `database.tables`.
-3. Teacher/lesson catalog query wrappers: migrate with the teacher/student service cleanup slices.
-4. Cross-query wrappers: move student/bot identity lookups into `backend/domains/students`, `backend/domains/identity`, or `tgbot`.
-5. Admin/reporting query wrappers: migrate panel-by-panel with admin route cleanup.
-
-Do not delete `database/queries/__init__.py` until every `from database import queries`
-runtime import is gone.
+No physical schema rename was performed. `msi_v2` remains intentionally active.

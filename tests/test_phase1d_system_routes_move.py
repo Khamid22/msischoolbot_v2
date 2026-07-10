@@ -57,9 +57,9 @@ def test_system_routes_remain_registered(app):
 
 
 def test_old_and_new_system_route_import_paths_work():
-    import backend.routes.system as legacy_system_routes
-    from backend.api.v1.auth import routes as auth_routes
-    from backend.api.v1.system import routes as system_routes
+    import backend.modules.system.web as legacy_system_routes
+    import backend.modules.identity.api as auth_routes
+    import backend.modules.system.status_api as system_routes
 
     assert legacy_system_routes.router is not None
     assert auth_routes.router is not None
@@ -90,7 +90,14 @@ def test_auth_me_response_shape_is_unchanged(client):
     assert response.status_code == 200
     assert set(payload.keys()) == {"status", "data"}
     assert payload["status"] == "success"
-    assert set(payload["data"].keys()) == {"login", "role", "permissions"}
+    assert set(payload["data"].keys()) == {
+        "account_id",
+        "login",
+        "role",
+        "must_change_password",
+        "session_version",
+        "permissions",
+    }
     assert payload["data"]["login"] == "MSI00001"
     assert payload["data"]["role"] == "student"
     assert isinstance(payload["data"]["permissions"], dict)

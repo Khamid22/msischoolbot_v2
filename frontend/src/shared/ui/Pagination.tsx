@@ -24,19 +24,19 @@ export function Pagination({ page, totalPages, onPageChange, label }: Pagination
           type="button"
           disabled={current <= 1}
           onClick={() => onPageChange(Math.max(1, current - 1))}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+          className="inline-flex h-11 min-h-11 items-center gap-1 rounded-md border border-foreground/10 px-3 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
           Prev
         </button>
-        <span className="min-w-8 rounded-md bg-primary px-2 py-1 text-center text-[11px] font-bold text-primary-foreground">
+        <span className="inline-flex h-11 min-h-11 min-w-11 items-center justify-center rounded-md bg-primary px-2 text-center text-[11px] font-bold text-primary-foreground">
           {current}
         </span>
         <button
           type="button"
           disabled={current >= totalPages}
           onClick={() => onPageChange(Math.min(totalPages, current + 1))}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-foreground/10 px-2 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
+          className="inline-flex h-11 min-h-11 items-center gap-1 rounded-md border border-foreground/10 px-3 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           Next
           <ChevronRight className="h-3.5 w-3.5" />

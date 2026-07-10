@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.domains.teacher_academy.notifications import notify_academy_teacher_event
-from backend.roles.teacher.workspace_cards import build_teacher_workspace_cards
+from backend.modules.teacher_academy.notifications import notify_academy_teacher_event
+from backend.modules.teachers.cards import build_teacher_workspace_cards
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -252,8 +252,8 @@ def _minimal_academic_context():
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
-    import backend.pages.academic_director as academic_director_routes
+    import backend.modules.admin.page as admin_page
+    import backend.modules.academics.director_page as academic_director_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -315,8 +315,8 @@ def test_academy_workspace_cards_show_required_counts():
 
 
 def test_teacher_route_exposes_academy_overview_lessons_timetable_and_updates(client, monkeypatch):
-    import backend.domains.teachers.service as teacher_service
-    import backend.pages.teacher as teacher_routes
+    import backend.modules.teachers.service as teacher_service
+    import backend.modules.teachers.page as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _academy_workspace())
@@ -373,7 +373,7 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
 
 
 def test_academic_director_can_create_academy_teacher_through_api_v1(client, monkeypatch):
-    import backend.api.v1.teacher_academy.responses as academy_api
+    import backend.modules.teacher_academy.http_responses as academy_api
 
     calls = []
     monkeypatch.setattr(
@@ -406,7 +406,7 @@ def test_academic_director_can_create_academy_teacher_through_api_v1(client, mon
 
 
 def test_next_teacher_code_uses_four_digit_tch_format():
-    from database.queries.teacher_queries import get_next_teacher_code
+    from backend.modules.teachers.repository import get_next_teacher_code
 
     class _OneRow:
         def fetchone(self):
@@ -436,7 +436,7 @@ def test_notification_does_not_crash_without_telegram_link(monkeypatch):
 
 
 def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
-    from backend.domains.teacher_academy import notifications
+    from backend.modules.teacher_academy import notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -468,7 +468,7 @@ def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
 
 
 def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
-    from backend.domains.teacher_academy import notifications
+    from backend.modules.teacher_academy import notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -497,7 +497,7 @@ def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
 
 
 def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
-    from backend.domains.teacher_academy import notifications
+    from backend.modules.teacher_academy import notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")

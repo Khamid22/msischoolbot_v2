@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from backend.domains.academics.exam_filters import is_exam_performance_row
-from backend.roles.admin.services.insights_service import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
+from backend.modules.academics.exam_filters import is_exam_performance_row
+from backend.modules.academics.insights import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
 
 
 def test_audit_settings_placeholder_card_is_not_rendered():

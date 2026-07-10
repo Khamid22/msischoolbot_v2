@@ -1,6 +1,6 @@
 import pytest
 
-from backend.identity import account_telegram_auth as account_telegram_auth
+from backend.modules.identity import telegram_auth as account_telegram_auth
 
 
 class _Result:
@@ -242,7 +242,7 @@ def _authenticate(telegram_user_id):
 
 def test_previous_account_telegram_auth_import_path_is_gone():
     with pytest.raises(ModuleNotFoundError):
-        import backend.identity.account_telegram_auth_v2  # noqa: F401
+        import backend.identity.account_telegram_auth  # noqa: F401
 
 
 def test_active_parent_telegram_link_authenticates():
@@ -265,7 +265,8 @@ def test_active_student_telegram_link_authenticates():
     assert result["account"]["role"] == "student"
     assert result["session"]["auth_role"] == "student"
     assert result["session"]["auth_login"] == "MSI00001"
-    assert result["session"]["student_db_id"] == 1001
+    assert result["session"]["student_db_id"] == 101
+    assert "student_legacy_row_id" not in result["session"]
     assert result["session"]["student_enrollment_id"] == 321
     assert result["session"]["telegram_user_id"] == 9002
 

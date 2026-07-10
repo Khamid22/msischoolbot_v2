@@ -1,4 +1,4 @@
-from backend.domains.teachers.service import subject_teacher_login_prefix
+from backend.modules.teachers.service import subject_teacher_login_prefix
 
 
 def test_subject_teacher_login_prefix_examples():
@@ -8,7 +8,7 @@ def test_subject_teacher_login_prefix_examples():
 
 
 def test_teacher_workspace_includes_academy_payload(monkeypatch):
-    from backend.roles.teacher import services
+    from backend.modules.teachers import workspace as services
 
     monkeypatch.setattr(
         services,

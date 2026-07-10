@@ -15,8 +15,8 @@ class _FakeConn:
 
 @pytest.fixture
 def sync_env(monkeypatch):
-    from backend.domains.teacher_academy import service
-    from backend.domains.teacher_academy import queries
+    from backend.modules.teacher_academy import service
+    from backend.modules.teacher_academy import repository
 
     conn = _FakeConn()
     calls = {
@@ -31,10 +31,9 @@ def sync_env(monkeypatch):
     def fake_connect():
         yield conn
 
-    monkeypatch.setattr(queries, "connect_auth_db", fake_connect)
-    monkeypatch.setattr(service, "_ensure_schema", lambda _conn: None)
+    monkeypatch.setattr(repository, "connect_auth_db", fake_connect)
     monkeypatch.setattr(
-        queries,
+        repository,
         "get_academy_teacher_program_row",
         lambda _conn, teacher_id: {
             "id": teacher_id,
@@ -47,12 +46,12 @@ def sync_env(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "get_subject_program",
         lambda _conn, program_id: {"id": program_id, "subject_id": 2, "subject_name": "Mathematics"},
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "list_curriculum_lessons",
         lambda _conn, _program_id: [
             {"id": 101, "lesson_number": "Lesson 1", "title": "Fractions"},
@@ -61,7 +60,7 @@ def sync_env(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "list_assignment_rows",
         lambda _conn, _teacher_id: [
             {"id": 501, "curriculum_item_id": 101},
@@ -69,22 +68,22 @@ def sync_env(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "delete_assignment_rows_with_assessments",
         lambda _conn, assignment_ids: calls["deleted"].extend(assignment_ids),
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "update_assignment_sequence",
         lambda _conn, **kwargs: calls["sequenced"].append(kwargs),
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "insert_academy_lesson_assignment",
         lambda _conn, **kwargs: calls["inserted"].append(kwargs),
     )
     monkeypatch.setattr(
-        queries,
+        repository,
         "touch_academy_teacher",
         lambda _conn, **kwargs: calls["touched"].append(kwargs),
     )

@@ -197,6 +197,13 @@ describe("IconButton / ActionMenu", () => {
     assert.match(src, /uiLayers\.popover/);
   });
 
+  it("keeps icon-only triggers at least 44px square", () => {
+    assert.match(source("IconButton.tsx"), /h-11 min-h-11 w-11 min-w-11/);
+    const actionMenu = source("ActionMenu.tsx");
+    assert.match(actionMenu, /h-11 min-h-11 w-11 min-w-11/);
+    assert.match(actionMenu, /flex min-h-11 w-full/);
+  });
+
   it("ActionMenu clamps its popover to the viewport and can flip above the trigger", () => {
     const src = source("ActionMenu.tsx");
     assert.match(src, /spaceBelow/);
@@ -204,5 +211,37 @@ describe("IconButton / ActionMenu", () => {
     assert.match(src, /placement: opensAbove \? "top" : "bottom"/);
     assert.match(src, /maxHeight/);
     assert.match(src, /overflow-y-auto/);
+  });
+});
+
+describe("Shared touch targets", () => {
+  it("keeps modal and drawer close actions at least 44px square", () => {
+    assert.match(source("Modal.tsx"), /h-11 w-11/);
+    assert.match(source("Drawer.tsx"), /h-11 w-11/);
+  });
+
+  it("keeps pagination actions and the shared touch utility at least 44px", () => {
+    const pagination = source("Pagination.tsx");
+    assert.match(pagination, /h-11 min-h-11/);
+
+    const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
+    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-height:\s*2\.75rem;/);
+    assert.match(css, /\.miniapp-touch-target\s*\{[\s\S]*?min-width:\s*2\.75rem;/);
+  });
+
+  it("keeps role navigation and account actions reachable and touch-sized", () => {
+    const sidebar = source("RoleSidebar.tsx");
+    const shell = source("RoleWorkspaceShell.tsx");
+    assert.match(sidebar, /routes\.accountSecurity/);
+    assert.match(sidebar, /min-h-11/);
+    assert.match(sidebar, /h-11 w-11/);
+    assert.match(shell, /routes\.accountSecurity/);
+    assert.match(shell, /h-11 w-11/);
+  });
+
+  it("keeps browser pinch zoom available", () => {
+    const html = readFileSync(new URL("../../../index.html", import.meta.url), "utf8");
+    assert.doesNotMatch(html, /maximum-scale/);
+    assert.doesNotMatch(html, /user-scalable\s*=\s*no/);
   });
 });

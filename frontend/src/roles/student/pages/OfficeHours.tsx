@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Calendar, Clock, MapPin, User, ChevronDown, Check, X, AlertCircle, Plus } from "lucide-react";
 import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
+import { isFutureInstant, officeHoursStartFrom, SCHOOL_TIME_ZONE } from "@/shared/lib/schoolTime";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type SubjectOption = {
@@ -100,37 +101,38 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const availabilityRequestId = useRef(0);
 
   useEffect(() => {
     fetchMyBookings();
   }, []);
 
   useEffect(() => {
-    fetchAvailabilities();
+    const controller = new AbortController();
+    void fetchAvailabilities(controller.signal);
+    return () => controller.abort();
   }, [subjectFilter, teacherFilter, dateFilter]);
 
-  const fetchAvailabilities = async () => {
+  const fetchAvailabilities = async (signal?: AbortSignal) => {
+    const requestId = ++availabilityRequestId.current;
     try {
       const params = new URLSearchParams();
       if (teacherFilter !== "all") params.set("teacher_id", teacherFilter);
       if (subjectFilter !== "all") params.set("subject_id", subjectFilter);
-      if (dateFilter) {
-        // Starts at from selected date at 00:00
-        const d = new Date(dateFilter);
-        params.set("starts_at_from", d.toISOString());
-      } else {
-        // Default starts_at_from to current time
-        params.set("starts_at_from", new Date().toISOString());
-      }
+      params.set("starts_at_from", officeHoursStartFrom(dateFilter));
 
       const res = await fetch(`/api/v1/student/office-hours/availability?${params.toString()}`, {
-        headers: XHR_HEADERS
+        headers: XHR_HEADERS,
+        signal,
       });
       if (res.ok) {
         const data = await res.json();
-        setAvailabilities(data.data?.availabilities || []);
+        if (requestId === availabilityRequestId.current && !signal?.aborted) {
+          setAvailabilities(data.data?.availabilities || []);
+        }
       }
     } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
       console.error("Failed to fetch office hours availabilities", e);
     }
   };
@@ -212,15 +214,17 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
 
   const formatDate = (isoStr: string) => {
     const d = new Date(isoStr);
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { timeZone: SCHOOL_TIME_ZONE, weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const formatTime = (isoStr: string) => {
     const d = new Date(isoStr);
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(undefined, { timeZone: SCHOOL_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
   };
 
+  const nowForDisplay = new Date();
   const visibleAvailabilities = availabilities.filter((slot) => {
+    if (!isFutureInstant(slot.starts_at, nowForDisplay)) return false;
     if (!slot.subject_id && !slot.subject_name) return true;
     if (slot.subject_id && enrolledSubjectIds.size > 0) {
       return enrolledSubjectIds.has(Number(slot.subject_id));
@@ -228,6 +232,9 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
     const subjectName = String(slot.subject_name || "").trim().toLowerCase();
     return subjectName ? enrolledSubjectNames.has(subjectName) : true;
   });
+  const upcomingBookings = myBookings.filter(
+    (booking) => booking.status === "booked" && isFutureInstant(booking.starts_at, nowForDisplay),
+  );
 
   const content = (
     <div className="space-y-6">
@@ -360,7 +367,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       {/* My Bookings Section */}
       <ChartCard
         title="My Bookings"
-        subtitle={`${myBookings.filter(b => b.status === 'booked').length} upcoming sessions`}
+        subtitle={`${upcomingBookings.length} upcoming sessions`}
         icon={<Calendar className="h-4 w-4 text-info" />}
       >
         <div className="miniapp-table-scroll rounded-lg border border-foreground/10">
@@ -380,6 +387,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
             <tbody className="divide-y divide-foreground/5 bg-background">
               {myBookings.map((booking) => {
                 const isBooked = booking.status === "booked";
+                const canCancel = isBooked && isFutureInstant(booking.starts_at, nowForDisplay);
                 return (
                   <tr key={booking.id} className="hover:bg-foreground/[0.015]">
                     <td className="px-4 py-3 font-semibold text-sm whitespace-nowrap">{booking.teacher_name}</td>
@@ -406,7 +414,7 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {isBooked && (
+                      {canCancel && (
                         <button
                           type="button"
                           onClick={() => handleCancelBooking(booking.id)}

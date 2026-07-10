@@ -180,7 +180,8 @@
     @apply rounded-lg border border-foreground/10 bg-surface shadow-card;
   }
   .miniapp-touch-target {
-    min-height: 2.5rem;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
   }
   .safe-x {
     padding-left: max(0.75rem, calc(var(--app-left-inset) + 0.5rem));

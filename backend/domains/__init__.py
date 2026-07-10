@@ -1,2 +1,0 @@
-"""Web-backend business domains."""
-

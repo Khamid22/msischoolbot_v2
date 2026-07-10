@@ -1,5 +1,5 @@
 def test_assessment_sections_collect_marking_criteria_scores_and_remarks():
-    from backend.api.v1.teacher_academy.responses import assessment_sections_from_form
+    from backend.modules.teacher_academy.http_responses import assessment_sections_from_form
 
     form_data = {
         "teacher_guidance_compliance_score": "8",

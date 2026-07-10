@@ -1,154 +1,192 @@
-# Engineering Auth And Roles
+# Engineering Authentication and Roles
 
-Audience: senior engineers.
+Audience: engineers working on identity, authorization, and role workspaces.
 
-Project: MSI LMS Portal.
+## Implemented Identity Model
 
-## Current Implementation
-
-Current auth uses:
-
-- Starlette session cookie.
-- FastAPI middleware for authentication and same-origin checks.
-- Role helpers in `backend/identity/roles.py`.
-- Guard helpers in `backend/utils/guards.py`.
-- Additional security helpers in `backend/security`.
-
-Current issue:
-
-- role and permission logic is duplicated.
-- current `admin` naming mixes internal operator and LMS business management.
-- parent linking has both web and bot logic.
-
-## Target Decisions
-
-- One user has exactly one role.
-- `system_admin` is internal operator/superuser, not an LMS business role.
-- Real LMS roles are `ceo`, `hr_manager`, `customer_support`, `student`, `teacher`, `parent`, `academic_director`.
-- Students login with MSI code plus password.
-- Teachers login with `TCH0001`, `TCH0002`, etc.
-- Parents are Telegram-first in v1.
-- Parent password login is future.
-
-## Role Workspace Flow
+`msi_v2.accounts` is the sole password authority. Password authentication must not read `students`, `student_auth`, `msi_staff`, or role-specific profile tables for a competing hash.
 
 ```mermaid
-flowchart TD
-    Start[Request]
-    Session{Valid session?}
-    Role{Role}
-    Deny[Login or Unauthorized]
+flowchart LR
+    Account["accounts\nlogin, password_hash, role, status\nmust_change_password, session_version"]
+    Student[student_profiles]
+    Teacher[teacher_profiles]
+    Parent[parent_profiles]
+    Staff[staff_profiles]
+    Telegram[account_telegram_links]
 
-    Start --> Session
-    Session -->|No| Deny
-    Session -->|Yes| Role
-
-    Role --> CEO[ceo workspace]
-    Role --> AD[academic_director workspace]
-    Role --> HR[hr_manager workspace]
-    Role --> CS[customer_support workspace]
-    Role --> T[teacher workspace]
-    Role --> S[student workspace]
-    Role --> P[parent workspace]
-    Role --> SA[system_admin workspace]
+    Account --> Student
+    Account --> Teacher
+    Account --> Parent
+    Account --> Staff
+    Account --> Telegram
 ```
 
-## Login/Auth Flow
+The role profile proves which business entity the account represents. An account and its profile must both be active before a session is issued.
+
+Canonical password and Telegram code lives in:
+
+- `backend/domains/identity/accounts.py`
+- `backend/domains/identity/queries.py`
+- `backend/domains/identity/telegram_auth.py`
+- `backend/api/v1/auth/routes.py`
+
+The former `backend/identity/account_auth.py`, `account_telegram_auth.py`, `parent_accounts.py`, `parent_invites.py`, and `telegram_links.py` facades have been removed.
+
+## Roles
+
+Each account has one canonical role:
+
+| Role | Current identity/profile | Workspace scope |
+| --- | --- | --- |
+| `system_admin` | staff profile | internal platform administration |
+| `ceo` | staff profile | executive workspace |
+| `academic_director` | staff profile | full academic management |
+| `head_of_department` | staff profile plus subject scopes | subject-scoped academic management |
+| `hr_manager` | staff profile | HR workspace |
+| `customer_support` | staff profile | parent/support operations |
+| `teacher` | teacher profile | assigned teaching and office hours |
+| `student` | student profile | own academic dashboard and tools |
+| `parent` | parent profile | linked children only |
+
+`system_admin` may still be represented as `auth_role="admin"` inside presentation compatibility code. Its canonical account role remains `system_admin`; the compatibility value must not grant business roles equivalent privileges.
+
+## Password Lifecycle
+
+New student, teacher, Teacher Academy, and staff provisioners use the canonical login as the initial password and set `must_change_password=true`. The migration does not blindly reset existing independently changed credentials:
+
+- student/staff hashes that already verify their login are marked for change;
+- independently changed canonical hashes are preserved;
+- a teacher hash copied from a legacy staff login is repaired only when it is the exact copied hash and does not authenticate the canonical `TCH####` login;
+- owner bootstrap preserves an existing independent owner password instead of rotating it on every startup.
+
+Parents are Telegram-first. A parent always receives a canonical account/profile, but a Telegram-only or manual-invite parent can legitimately have no password login. If a parent is later given a password credential, the same canonical password lifecycle and self-service endpoint apply.
+
+### First Sign-in
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Frontend
-    participant Backend
+    participant Web as FastAPI
+    participant Identity as Identity domain
     participant DB as PostgreSQL
 
-    User->>Frontend: enter login or open Telegram Mini App
-    Frontend->>Backend: submit credentials or initData
-    Backend->>DB: verify account and role
-    DB-->>Backend: account profile
-    Backend->>Backend: create session
-    Backend-->>Frontend: redirect to role workspace
+    User->>Web: POST /login
+    Web->>Identity: authenticate canonical login/password
+    Identity->>DB: load account and role profile
+    DB-->>Identity: active account/profile
+    Identity-->>Web: versioned session payload
+    alt must_change_password
+        Web-->>User: redirect /account/security
+    else private password already set
+        Web-->>User: redirect to role workspace
+    end
 ```
 
-## Role Access Summary
+While `must_change_password` is true, middleware allows only the security page, auth endpoints, static assets, and logout. Other API calls return `428 password_change_required`; page requests redirect to `/account/security`.
 
-| Role | Target access |
-|---|---|
-| `system_admin` | internal operation, diagnostics, recovery |
-| `ceo` | broad company visibility, audited drilldown |
-| `academic_director` | full academic access for v1 |
-| `hr_manager` | hiring and teacher development |
-| `customer_support` | B2C parents, payments, warnings, support |
-| `teacher` | assigned teaching work, multiple subjects possible |
-| `student` | own dashboard and resources |
-| `parent` | linked children only |
+### Self-service Change
 
-## Target Session Data
+`PATCH /api/v1/auth/password` is available to every signed-in, password-enabled canonical account. It:
 
-Session should contain only minimal durable identity:
+1. requires the current password;
+2. validates confirmation and minimum length;
+3. locks the account row;
+4. writes a new hash to `accounts.password_hash`;
+5. clears `must_change_password`;
+6. increments `session_version`;
+7. records an `account.password_changed` audit event;
+8. updates the current cookie to the new version.
 
-- `account_id`.
-- `role`.
-- role profile id when needed.
-- `telegram_user_id` when verified and linked.
-- created/updated timestamps.
+Administrator student resets use the same account authority, set `must_change_password=true`, increment `session_version`, and audit `account.password_reset`.
 
-Avoid storing broad business state in session.
+## Versioned Sessions
 
-## Policy Checks
+The Starlette session contains only identity/routing facts required by the current application. Canonical fields include:
 
-Authentication answers:
+- `account_id`
+- `account_role` / `canonical_role`
+- `auth_login`
+- `must_change_password`
+- `session_version`
+- one role profile identifier, such as `student_db_id`, `teacher_id`, `parent_id`, or `staff_id`
+
+Student sessions use canonical `students.id` as `student_db_id`. A public enrollment/dashboard ID can be included separately as `student_enrollment_id`; it is never the authorization identity.
+
+On authenticated requests, middleware reloads the canonical account and verifies:
+
+- account status is active;
+- cookie `session_version` matches the database;
+- cookie canonical role matches the account role.
+
+A mismatch clears the cookie and returns `401 session_expired` for APIs or redirects page requests to login. This invalidates old cookies after password changes/resets, role changes, and account disablement.
+
+## Telegram Authentication
+
+Telegram is another authentication method for the same account, not a parallel user database:
+
+1. the server verifies raw Mini App `initData` using the bot-token HMAC and configured age window;
+2. the verified Telegram user ID resolves an active `account_telegram_links` row;
+3. identity loads the same active account and role profile used by password login;
+4. identity builds the same versioned session payload.
+
+Never trust `initDataUnsafe`, a query-string Telegram ID, or a username as identity proof.
+
+## Parent Invite Authentication
+
+Parent invites are public capabilities with strict storage and transaction rules:
+
+- raw invite codes are never stored;
+- `account_invites.token_hash` contains a SHA-256 digest;
+- invites expire and parent invites are limited to one use;
+- `/parent/invite/{code}` replaces the deleted `/parent/link/{token}` flow;
+- claiming uses a row lock and atomically creates/updates the parent, child link, canonical account, optional Telegram link, and invite-consumption record;
+- parent access still requires an active `parent_student_links` row.
+
+Telegram claims require verified Mini App identity. The manual fallback form can claim the same code without creating a Telegram link; it still receives a canonical account/profile and versioned session.
+
+## Authorization Layers
 
 ```text
-Who are you?
-```
-
-Authorization answers:
-
-```text
-What role do you have?
-```
-
-Policy answers:
-
-```text
-Can this role/account perform this action on this object right now?
+authentication -> normalized role -> permission guard -> object policy -> domain mutation
 ```
 
 Examples:
 
-- parent can view only linked children.
-- teacher can manage only assigned groups.
-- customer support can manage B2C support but not academic structure by default.
-- customer support can request B2C access restrictions from CEO or Academic Director.
-- customer support cannot approve B2C access restrictions directly.
-- CEO drilldown should audit sensitive access.
-- payment/access restrictions are checked through policy service.
+- students can operate only as their canonical `student_db_id`;
+- parents can open only linked children;
+- teachers can use only assigned groups/subjects;
+- HOD actions are restricted to assigned subject scopes;
+- student chat membership is verified before room reads/writes;
+- group moves cannot cross school or subject-program boundaries;
+- payment writes resolve a canonical student before mutation.
 
-## Target Account Model
+Routes must not replace object policy with a role-only check.
 
-Confirmed decision:
+## Migration
 
-- use one physical `accounts` table for every login identity.
-- keep role-specific data in separate profile/domain tables.
-- enforce exactly one role per account.
+Alembic `0005_canonical_identity`:
 
-Plain-language meaning:
+- adds password lifecycle/session-version fields to `accounts`;
+- backfills accounts and profiles for students, teachers, staff, and parents;
+- preserves independent credentials and repairs only defined initial-login cases;
+- links existing verified Telegram identities to canonical accounts;
+- removes `msi_v2.student_auth` and `students.password_plain`;
+- adds account actors to audit events.
 
-- One shared login table contains every login account, including staff, teachers, students, and future parent password accounts.
-- Student, teacher, parent, and staff-specific details stay in their own profile/domain tables.
+Alembic `0007_lms_integrity` enforces credential requirements for active password roles while explicitly allowing Telegram-first parents without a password.
 
-Engineering direction:
+## Required Tests
 
-- create a unified account abstraction around the shared `accounts` table.
-- link each account to exactly one role-specific profile where needed.
-- migrate carefully to preserve current access.
+Identity changes should cover:
 
-## Migration Notes
-
-Current `admin` code should migrate to:
-
-- `system_admin` for internal platform operation.
-- real workspaces for CEO, Academic Director, HR Manager, and Customer Support.
-
-Do not implement role aliases that make business users silently share system admin privileges.
+- canonical password login for each password role;
+- initial-password redirect and API blocking;
+- successful and rejected self-service changes;
+- session-version invalidation;
+- administrator reset and forced change;
+- owner bootstrap preservation;
+- canonical Telegram account resolution;
+- expired, reused, or concurrent parent invite claims;
+- parent child-object authorization;
+- migration upgrade on a representative pre-`0005` database clone.

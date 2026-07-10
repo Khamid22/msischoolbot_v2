@@ -1,38 +1,46 @@
-# Database migrations (Alembic)
+# Database Migrations
 
-The `msi_v2` schema is owned by Alembic. `versions/0001_msi_v2_baseline.sql` is
-the frozen **baseline snapshot** for migration `0001_msi_v2_baseline`; do **not**
-edit it for new changes — add a migration instead.
+Alembic is the only owner of PostgreSQL schema DDL. Runtime services must not create tables, indexes, or constraints.
 
-The DB URL is read from `DATABASE_URL` (`.env` locally, injected on Railway) by
-`alembic/env.py`. Migrations are plain SQL via `op.execute(...)` (this project
-uses raw psycopg, not the SQLAlchemy ORM).
+The physical schema remains `msi_v2`. `versions/0001_msi_v2_baseline.sql` is the frozen baseline snapshot for `0001_msi_v2_baseline`; never edit it for a new change.
 
-## Everyday commands (run from the repo root)
+## Current Revision Chain
+
+```text
+0001_msi_v2_baseline
+  -> 0002_lesson_source_meta
+  -> 0003_shared_accounts
+  -> 0004_hod_subject_scopes
+  -> 0005_canonical_identity
+  -> 0006_secure_parent_invites
+  -> 0007_lms_integrity
+```
+
+Important migration properties:
+
+- `0005` makes `accounts` the sole password authority and removes legacy student credential storage.
+- `0006` hashes existing invite values, deletes plaintext invite storage, and is intentionally irreversible.
+- `0007` adds identity, invite, office-hour, enrollment, grade, attendance, and coin integrity constraints.
+
+## Commands
+
+Run from the repository root:
 
 ```bash
-# where is the DB now / what's the latest?
 python -m alembic current
 python -m alembic heads
-
-# apply all pending migrations (also runs automatically on Railway deploy)
 python -m alembic upgrade head
-
-# create a new migration, then edit its upgrade()/downgrade() with op.execute(SQL)
-python -m alembic revision -m "add X to Y"
-
-# undo the last migration
+python -m alembic revision -m "describe change"
 python -m alembic downgrade -1
 ```
 
-## Setting up a fresh database
-```bash
-python -m alembic upgrade head    # builds the whole msi_v2 schema
-python main.py web                # seeds owner + default resource types on startup
-```
+`DATABASE_URL` is read by `database/alembic/env.py`. Railway applies `python -m alembic upgrade head` in `scripts/railway_start.sh` before starting the application.
 
-## Notes
-- Deploys apply migrations in `scripts/railway_start.sh` (`alembic upgrade head`)
-  before the app starts; a failed migration aborts the deploy (no downtime).
-- To point at production, set `DATABASE_URL` to the Railway **public** URL for the
-  command, e.g. `DATABASE_URL="postgresql://…proxy.rlwy.net:PORT/railway" python -m alembic current`.
+## Verification Rules
+
+- Test upgrades on a disposable database or clone containing representative pre-migration data.
+- Back up before destructive or irreversible migrations.
+- Verify `current` equals `heads` after upgrade.
+- Run backend tests and application smoke checks after migration.
+- Do not run a downgrade for `0006`; restore a pre-`0006` backup or regenerate invites.
+- Never point ad hoc local verification commands at production.

@@ -1,170 +1,105 @@
 # Engineering Testing
 
-Audience: senior engineers.
+Audience: engineers verifying the LMS rewrite.
 
-Project: MSI LMS Portal.
-
-## Testing Goals
-
-Testing must protect:
-
-- migrated PostgreSQL academic data behavior.
-- auth and role routing.
-- parent Telegram linking.
-- payment/access policy.
-- role workspace permissions.
-- frontend rendering.
-- no private data leakage.
-
-## Current Test Areas
-
-Existing tests include coverage for:
-
-- student dashboard service.
-- teacher accounts.
-- ratings.
-- auth gates.
-- pages/rendering.
-- role routing.
-- teacher academy.
-- request context.
-- route snapshots.
-
-## Backend Checks
-
-Compile/import:
+## Release-level Checks
 
 ```bash
 python3 -m compileall -q backend database tgbot scripts main.py
-python3 - <<'PY'
-from backend.server import app
-print(app.name)
-PY
+python3 -m pytest
+npm --prefix frontend run test:logic
+npm --prefix frontend run test:schedule
+npm --prefix frontend run test:teacher-nav
+npm --prefix frontend run test:shared-ui
+npm --prefix frontend run test:academic
+npm --prefix frontend run check-types
+npm --prefix frontend run build
+git diff --check
 ```
 
-Tests:
+Use focused tests while editing, then run the full suite before release.
+
+## Architecture Contracts
+
+Tests and source audits should protect:
+
+- no imports from deleted `database.queries`, `database.cross_queries`, or identity facades;
+- no runtime DDL outside Alembic;
+- `/api/v1` route ownership and the checked-in route snapshot;
+- canonical `accounts` password authentication;
+- canonical `students.id` authorization;
+- domain-owned SQL and transaction boundaries.
+
+## Identity Coverage
+
+Verify:
+
+- login for every password-enabled role;
+- initial login-equals-password forced-change flow;
+- current-password, confirmation, and minimum-length failures;
+- self-service change increments `session_version` and audits the event;
+- administrator reset invalidates old sessions and forces another change;
+- disabled/role-changed/version-mismatched accounts lose access;
+- owner startup seeding does not overwrite an independent password;
+- Telegram HMAC and replay-window validation;
+- Telegram links resolve the same canonical account/profile as password login;
+- parent invite expiry, single use, hashing, concurrency, and child access.
+
+## Authorization Coverage
+
+Verify role and object policy independently:
+
+- student APIs use the signed-in canonical student, not a caller-supplied ID;
+- parent dashboards require an active child link;
+- teacher actions require assignment;
+- HOD actions require subject scope;
+- chat messages require room membership;
+- academic group moves stay within school and subject program;
+- payments resolve a canonical student;
+- office hours enforce future time, interval, overlap, capacity, ownership, and one active booking.
+
+## Migration Verification
+
+Do not validate identity/integrity migrations directly against production.
+
+1. create a disposable database or clone of representative pre-`0005` data;
+2. run `python -m alembic upgrade head`;
+3. verify `python -m alembic current` equals `python -m alembic heads`;
+4. inspect account/profile backfill and invite state with sanitized aggregate checks;
+5. run identity, parent invite, office-hour, and academic integrity tests;
+6. smoke-import the FastAPI app.
+
+`0006_secure_parent_invites` is intentionally irreversible; test restoration from backup or invite regeneration rather than a downgrade.
+
+## Workbook Reconciliation
+
+Use the explicit reconciliation tool in report/dry-run mode before any writer:
 
 ```bash
-pytest
+python3 scripts/reconcile_academic_workbooks.py --help
 ```
 
-Use targeted tests while working, then broader tests before handoff.
+Review ambiguous identities, group/enrollment resolution, lesson/date/source ordering, attendance, homework, exams, and student-wide coins. Parsing successfully or matching aggregate counts does not prove parity. Never invent a date/time or silently merge uncertain students to make the report pass.
 
-## Frontend Checks
+## Frontend and Browser Verification
 
-```bash
-cd frontend
-npm run check-types
-npm run build
-```
+In addition to automated tests, verify at representative phone, tablet, laptop, and desktop widths:
 
-If UI is changed, verify:
+- role navigation, drawers, dialogs, menus, buttons, pagination, tables, cards, and charts;
+- keyboard focus order, Escape/close behavior, and visible focus;
+- 200% zoom and minimum touch targets;
+- reduced-motion mode;
+- Telegram safe areas and viewport resizing;
+- valid zero metrics and empty/error/loading states;
+- `Asia/Tashkent` date/week and office-hour behavior from a different browser timezone;
+- no console errors or failed API requests in primary role flows.
 
-- desktop layout.
-- mobile layout.
-- Telegram Mini App safe-area behavior.
-- no text overlap.
-- no broken role page bootstraps.
+## Telegram Verification
 
-## Database Validation
+Current Telegram tests cover web/Mini App integration: initData verification, canonical account resolution, start-parameter handling, invite claim, and linked-child access.
 
-Validation categories:
+Do not require `/start`, `/whoami`, or callback smoke tests yet: the inbound `tgbot` router registry is intentionally empty. Add bot command tests when product-approved handlers are implemented.
 
-- orphan attendance records.
-- orphan homework records.
-- orphan exam records.
-- lesson sessions without group/subject.
-- duplicate attendance keys.
-- duplicate homework keys.
-- duplicate exam keys.
-- counts by school.
-- counts by subject.
-- counts by source import.
+## Documentation Privacy
 
-Known:
-
-- duplicate exam keys exist and should be investigated later, not silently cleaned.
-
-## Auth And Role Tests
-
-Test:
-
-- unauthenticated users cannot access workspaces.
-- each role lands in correct workspace.
-- parent sees only linked children.
-- teacher sees only assigned groups.
-- customer support cannot change academic structure by default.
-- CEO drilldown creates audit event where required.
-- `system_admin` is not treated as normal LMS business role.
-
-## Payment/Access Policy Tests
-
-Test:
-
-- invoice state calculation.
-- warning creation.
-- B2C follow-up workflow.
-- B2B CEO escalation.
-- access restriction activation/removal.
-- route checks consult policy service.
-- no route hardcodes unpaid blocking.
-
-Payment/access decision flow:
-
-```mermaid
-flowchart TD
-    Action[User Action]
-    Auth[Auth and Role Check]
-    Policy[Access Policy Service]
-    Restriction{Active restriction?}
-    Allow[Allow]
-    Deny[Deny with reason]
-    Audit[Audit if sensitive]
-
-    Action --> Auth --> Policy --> Restriction
-    Restriction -->|No| Allow
-    Restriction -->|Yes| Deny
-    Policy --> Audit
-```
-
-## Telegram Tests
-
-Test:
-
-- `/start`.
-- `/start parent_{code}`.
-- parent invite validation.
-- Telegram initData validation.
-- parent-child link creation.
-- parent child access.
-- `/whoami`.
-- unlink behavior.
-
-Never use real parent/student private data in test docs.
-
-## Documentation Privacy Test
-
-Before publishing docs, scan for:
-
-- database URLs.
-- tokens.
-- `.env` values.
-- student names.
-- parent phone numbers.
-- Telegram IDs.
-- raw grades.
-- row-level data.
-
-Docs should contain only sanitized architecture, aggregate counts, and generic examples.
-
-## CI Target
-
-Longer-term CI should run:
-
-- Python compile.
-- backend tests.
-- frontend typecheck.
-- frontend build.
-- route snapshot.
-- migration lint/dry-run.
-- private data pattern scan for docs.
+Before publishing reports, scan for database URLs, secrets, hashes, invite codes, names, phone numbers, Telegram IDs, raw grades, source workbook rows, dumps, and backups. Commit only sanitized architecture and test evidence.

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import backend.domains.teacher_academy.service as academy_service
+import backend.modules.teacher_academy.service as academy_service
 
 
 class _Rows:
@@ -109,11 +109,10 @@ def _curriculum_rows():
 
 def _patch_create_dependencies(monkeypatch, curriculum_rows=None):
     conn = _AcademyCreateConnection(curriculum_rows or _curriculum_rows())
-    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
-    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: None)
-    monkeypatch.setattr(academy_service.queries, "insert_teacher_profile_row", lambda *args, **kwargs: 44)
-    monkeypatch.setattr(academy_service.queries, "get_next_teacher_code", lambda conn: "TCH0004")
-    monkeypatch.setattr(academy_service.queries, "insert_teacher_auth", lambda *args, **kwargs: 55)
+    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_service.repository, "insert_teacher_profile_row", lambda *args, **kwargs: 44)
+    monkeypatch.setattr(academy_service.repository, "get_next_teacher_code", lambda conn: "TCH0004")
+    monkeypatch.setattr(academy_service.repository, "insert_teacher_auth", lambda *args, **kwargs: 55)
     monkeypatch.setattr(academy_service, "_provision_teacher_account_v2", lambda *args, **kwargs: 0)
     monkeypatch.setattr(
         academy_service,

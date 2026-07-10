@@ -1,2 +1,0 @@
-"""Student role entry points."""
-

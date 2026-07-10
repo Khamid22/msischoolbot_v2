@@ -1,4 +1,4 @@
-import { Menu, X } from "lucide-react";
+import { KeyRound, Menu, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isTelegramMiniApp } from "@/shared/lib/telegram";
 import { RoleMobileNav } from "@/shared/ui/RoleMobileNav";
@@ -119,7 +119,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
               aria-label={`Open ${roleLabel} navigation`}
               aria-expanded={drawerOpen}
             >
@@ -182,7 +182,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 aria-label="Close navigation drawer"
               >
                 <X className="h-5 w-5" />
@@ -232,11 +232,19 @@ export function RoleWorkspaceShell<Key extends string = string>({
                   <span className="block truncate text-sm font-medium text-white">{login}</span>
                   <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
                 </div>
+                <a
+                  href={routes.accountSecurity}
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  aria-label="Account security"
+                >
+                  <KeyRound className="h-4 w-4" />
+                </a>
                 <form action={resolvedLogoutAction} method="post" className="shrink-0">
                   <input type="hidden" name="csrf_token" value={csrfToken || ""} />
                   <button
                     type="submit"
-                    className="rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    className="min-h-11 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-slate-300 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   >
                     Logout
                   </button>

@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { averageRecordedMetrics } from "@/shared/lib/metricMath";
 
 type Lesson = {
   id: number;
@@ -69,7 +70,7 @@ function homeworkByGroupRows(groups: GroupGradebook[]) {
       });
       return { name: group.group.name, rate: Math.round((checked / (students * lessons)) * 100) };
     })
-    .filter((row): row is { name: string; rate: number } => row !== null && row.rate > 0);
+    .filter((row): row is { name: string; rate: number } => row !== null);
 }
 
 function aapTrendRows(groups: GroupGradebook[]) {
@@ -77,8 +78,10 @@ function aapTrendRows(groups: GroupGradebook[]) {
   groups.forEach((group) => {
     group.lessons.forEach((lesson) => {
       group.enrollments.forEach((enrollment) => {
-        const value = Number(enrollment.homework?.[lesson.lessonNumber]);
-        if (!Number.isFinite(value) || value <= 0) return;
+        const recordedValue = enrollment.homework?.[lesson.lessonNumber];
+        if (recordedValue === null || recordedValue === undefined) return;
+        const value = Number(recordedValue);
+        if (!Number.isFinite(value)) return;
         const bucket = byLesson.get(lesson.lessonNumber) || { sum: 0, count: 0, order: lesson.order };
         bucket.sum += value;
         bucket.count += 1;
@@ -94,11 +97,11 @@ function aapTrendRows(groups: GroupGradebook[]) {
 function groupComparisonRows(groups: GroupGradebook[]) {
   return groups
     .map((group) => {
-      const grades = group.enrollments.map((enrollment) => enrollment.averageGrade).filter((value) => value > 0);
-      if (!grades.length) return null;
+      const averageGrade = averageRecordedMetrics(group.enrollments.map((enrollment) => enrollment.averageGrade));
+      if (averageGrade === null) return null;
       return {
         name: group.group.name,
-        avg: Number((grades.reduce((sum, value) => sum + value, 0) / grades.length).toFixed(1)),
+        avg: Number(averageGrade.toFixed(1)),
       };
     })
     .filter((row): row is { name: string; avg: number } => row !== null);

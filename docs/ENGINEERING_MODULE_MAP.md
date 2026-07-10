@@ -1,219 +1,81 @@
 # Engineering Module Map
 
-Audience: senior engineers.
+Audience: engineers locating the current owner of a change.
 
-Project: MSI LMS Portal.
-
-## Current Implementation Module Map
+## Repository Map
 
 ```text
 backend/
-  server.py
-  main.py
-  routes/
-  roles/
-  domains/
-  identity/
-  security/
-  utils/
-  static/
+  api/v1/                         versioned JSON/action routes
+  pages/                          role and dashboard page bootstraps
+  domains/                        business services and domain SQL
+  core/                           config and PostgreSQL connection
+  integrations/                   Telegram, Excel, storage adapters
+  security/                       CurrentUser, roles, permissions
+  identity/                       shared startup/connection plumbing only
+  roles/                          remaining admin/workspace compatibility helpers
+  server.py                       app and middleware composition
 
 database/
-  database.py
-  tables.py
-  queries/
-  cross_queries/
-  academics/
-  alembic/
+  __init__.py                     narrow core-connection compatibility export
+  alembic/                        all schema DDL and migration history
 
 frontend/src/
-  app/
-  roles/
-  shared/
+  app/                            bootstrap and lazy page registry
+  roles/                          role-owned pages/panels
+  shared/api/                     route definitions
+  shared/lib/                     time, metrics, motion, Telegram, bootstrap
+  shared/ui/                      accessible/responsive UI primitives
 
 tgbot/
-  handlers/
-  keyboards/
-  helpers.py
+  routing.py                      explicit empty inbound router registry
+  keyboards/                      retained keyboard primitives
+  settings.py                     bot settings
 
 scripts/
+  railway_start.sh                migrate then start deployment process
+  reconcile_academic_workbooks.py explicit workbook reconciliation entrypoint
 ```
 
-## Current Backend Modules
+## Change Routing
 
-### `backend/server.py`
+| Change | Primary owner |
+| --- | --- |
+| account/password/session | `backend/domains/identity`, `backend/api/v1/auth`, `backend/security` |
+| Telegram Mini App verification | `backend/integrations/telegram` |
+| parent invite/link/access | `backend/domains/parents`, `backend/pages/parent.py` |
+| schools/groups/programs/gradebook | `backend/domains/academics` |
+| schedules/lesson sessions | `backend/domains/timetable` |
+| office-hour rules | `backend/domains/office_hours` |
+| students | `backend/domains/students` |
+| teachers | `backend/domains/teachers` |
+| Teacher Academy | `backend/domains/teacher_academy` |
+| payments | `backend/domains/payments` |
+| chat | `backend/domains/communication` |
+| complaints/support tickets | `backend/domains/complaints` |
+| announcements | `backend/domains/announcements` |
+| resources/comments | `backend/domains/resources` |
+| schema/constraint/index | new revision under `database/alembic/versions` |
+| role UI | matching `frontend/src/roles` page/panel |
+| reusable UI behavior | `frontend/src/shared/ui` or `shared/lib` |
+| workbook reconciliation | `backend/integrations/excel`, `scripts` |
 
-Current implementation:
+## Removed Owners
 
-- FastAPI app creation.
-- middleware.
-- static files.
-- route registration.
-- session setup.
+Do not import or recreate these as compatibility shortcuts:
 
-Target:
+- `database/queries`
+- `database/cross_queries`
+- `database/tables.py`
+- identity account/password/Telegram/parent facade modules under `backend/identity`
+- `backend/roles/parent/services.py`
+- `tgbot/helpers.py` and retired handler modules
 
-- Keep app composition thin.
-- Move business decisions out of server wiring.
+## Remaining Compatibility Owners
 
-### `backend/roles`
+- `backend/roles/admin`: existing admin page registry, HTML forms, and workspace helpers.
+- selected `backend/roles/*/services.py` and workspace-card modules: page composition helpers pending domain/page migration.
+- `backend/identity/storage.py`: owner/default startup seeding, using canonical account/domain APIs.
+- legacy ID fields: migration/public-contract correlation only.
 
-Current implementation:
-
-- role route folders exist.
-- admin is mature but overloaded.
-- CEO, HR, Customer Support, and Academic Director are mostly shell workspaces.
-
-Target:
-
-- each real role gets a real workspace.
-- `system_admin` replaces current business use of admin.
-
-### `backend/domains`
-
-Current implementation:
-
-- partial domains exist for academics, payments, resources, complaints, communication, office hours, announcements.
-
-Target:
-
-- domains own business rules and are reused by workspaces and integrations.
-
-### `backend/identity`
-
-Current implementation:
-
-- credentials.
-- roles.
-- parent invites.
-- Telegram links.
-- student accounts.
-- teacher helpers.
-
-Target:
-
-- one account/auth architecture.
-- one role per user.
-- `system_admin` separated from LMS business roles.
-
-### `database`
-
-Current implementation:
-
-- PostgreSQL connection wrapper.
-- Alembic.
-- raw query modules.
-- academic normalization helpers.
-
-Target:
-
-- repositories own SQL.
-- domain services consume repositories.
-- canonical helpers stay reusable.
-
-### `frontend/src`
-
-Current implementation:
-
-- React bootstrap by backend payload.
-- role-specific pages.
-- shared UI primitives.
-- admin panel is largest UI.
-
-Target:
-
-- real role workspaces.
-- shared design system.
-- avoid role preview as production mechanism.
-
-### `tgbot`
-
-Current implementation:
-
-- `/start`.
-- parent invite start parameter.
-- quick summary.
-- contact support.
-- account link/unlink helpers.
-
-Target:
-
-- bot acts as integration adapter.
-- no direct import from web backend modules.
-- shared domain services own parent linking rules.
-
-## Responsibility Leakage
-
-Current leakage:
-
-- admin owns business workflows that should belong to CEO, Academic Director, HR, Customer Support, and System Admin.
-- payment access policy is not separated from payment records.
-- parent linking exists in web and bot flows instead of one shared domain.
-- permissions exist in more than one module.
-- SQL appears in routes and services.
-- README/project docs still describe a future folder layout that is not the actual layout.
-
-## What To Keep
-
-- PostgreSQL `msi_v2` academic data.
-- Alembic setup.
-- canonical school/subject/date/text helpers.
-- parent invite concept.
-- Telegram HMAC validation.
-- shared React UI primitives.
-- academic dashboard calculations where verified.
-
-## What To Rewrite
-
-- auth/account model.
-- role workspaces.
-- payment/access policy.
-- parent linking ownership.
-- teacher login provisioning.
-- route guards and permissions.
-- repository ownership.
-
-## What To Delete Later
-
-Delete only after replacement and verification:
-
-- live spreadsheet runtime paths.
-- admin preview mode as production role architecture.
-- plaintext password compatibility.
-- duplicate permission system.
-- direct bot/backend coupling.
-- dead compatibility shims.
-
-## Target Module Ownership
-
-```mermaid
-flowchart TD
-    Workspaces[Role Workspaces]
-    Workspaces --> CEO[ceo]
-    Workspaces --> AD[academic_director]
-    Workspaces --> HR[hr_manager]
-    Workspaces --> CS[customer_support]
-    Workspaces --> T[teacher]
-    Workspaces --> S[student]
-    Workspaces --> P[parent]
-    Workspaces --> SA[system_admin]
-
-    Domains[Domain Services]
-    Domains --> People[people]
-    Domains --> Academic[academics]
-    Domains --> Payments[payments]
-    Domains --> Support[support]
-    Domains --> Reports[reports]
-
-    Workspaces --> Domains
-```
-
-## First Engineering Rule
-
-Before adding a feature, identify:
-
-- role workspace.
-- domain owner.
-- repository/query owner.
-- frontend or Telegram surface.
-- verification command.
+Before adding a feature, identify its page/API boundary, object policy, domain service, domain query owner, migration need, frontend owner, and verification command.

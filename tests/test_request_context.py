@@ -2,7 +2,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.testclient import TestClient
 
-from backend.utils.context import (
+from backend.core.request_context import (
     RequestContextMiddleware,
     prime_body_state,
     request as legacy_request,

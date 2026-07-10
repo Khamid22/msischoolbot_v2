@@ -2,7 +2,7 @@ import pytest
 
 from werkzeug.security import generate_password_hash
 
-from backend.identity import account_auth
+from backend.modules.identity import accounts as account_auth
 
 
 class _Result:
@@ -197,7 +197,7 @@ def test_account_auth_is_unconditional():
 
 def test_previous_account_auth_import_path_is_gone():
     with pytest.raises(ModuleNotFoundError):
-        import backend.identity.account_auth_v2  # noqa: F401
+        import backend.identity.account_auth  # noqa: F401
 
 
 def test_active_student_authenticates():
@@ -210,8 +210,10 @@ def test_active_student_authenticates():
         "account_role": "student",
         "canonical_role": "student",
         "auth_login": "MSI00001",
+        "must_change_password": False,
+        "session_version": 1,
         "auth_role": "student",
-        "student_db_id": 1001,
+        "student_db_id": 101,
         "student_id": "MSI00001",
         "student_full_name": "Student User",
         "student_enrollment_id": 321,

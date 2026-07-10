@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { CalendarDays, Clock, Plus, Trash, Check, X, Users, AlertCircle } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
+import {
+  SCHOOL_TIME_ZONE,
+  schoolDateKey,
+  schoolDateKeyFromValue,
+  schoolLocalDateTimeToIso,
+  schoolWeekBounds,
+} from "@/shared/lib/schoolTime";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
 type Availability = {
@@ -181,11 +188,12 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
     }
 
     const slotMinutes = Math.max(1, Number(newSlotMinutes) || 30);
-    const startsAtDate = new Date(`${newSessionDate}T${newStartTime}`);
-    if (Number.isNaN(startsAtDate.getTime())) {
+    const startsAt = schoolLocalDateTimeToIso(newSessionDate, newStartTime);
+    if (!startsAt) {
       setErrorMsg("Please enter a valid date and start time.");
       return;
     }
+    const startsAtDate = new Date(startsAt);
     const endsAtDate = new Date(startsAtDate.getTime() + slotMinutes * 60_000);
 
     try {
@@ -196,8 +204,8 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
           teacher_id: Number(newTeacherId),
           subject_id: Number(newSubjectId),
           planned_topic: newPlannedTopic,
-          starts_at: `${newSessionDate}T${newStartTime}`,
-          ends_at: endsAtDate.toISOString().slice(0, 16),
+          starts_at: startsAt,
+          ends_at: endsAtDate.toISOString(),
           slot_minutes: slotMinutes,
           room: newRoom,
           capacity: Number(newCapacity),
@@ -266,19 +274,15 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
   };
 
   // Filtering logic
+  const todayKey = schoolDateKey();
+  const currentWeek = schoolWeekBounds();
   const filteredSlots = availabilities.filter((slot) => {
     // 1. Date filter
-    const starts = new Date(slot.starts_at);
-    const now = new Date();
+    const startsKey = schoolDateKeyFromValue(slot.starts_at);
     if (dateFilter === "today") {
-      const isToday = starts.getDate() === now.getDate() &&
-                      starts.getMonth() === now.getMonth() &&
-                      starts.getFullYear() === now.getFullYear();
-      if (!isToday) return false;
+      if (startsKey !== todayKey) return false;
     } else if (dateFilter === "week") {
-      const oneWeekFromNow = new Date();
-      oneWeekFromNow.setDate(now.getDate() + 7);
-      if (starts < now || starts > oneWeekFromNow) return false;
+      if (startsKey < currentWeek.start || startsKey > currentWeek.end) return false;
     }
 
     // 2. Teacher filter
@@ -296,12 +300,12 @@ export default function OfficeHoursPanel({ state }: { state: any }) {
 
   const formatDate = (isoStr: string) => {
     const d = new Date(isoStr);
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { timeZone: SCHOOL_TIME_ZONE, weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const formatTime = (isoStr: string) => {
     const d = new Date(isoStr);
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(undefined, { timeZone: SCHOOL_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
   };
 
   return (

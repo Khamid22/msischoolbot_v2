@@ -7,8 +7,8 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.security.permissions import has_permission
-from backend.security.roles import (
+from backend.core.access.permissions import has_permission
+from backend.core.access.roles import (
     dashboard_path_for_role,
     normalize_role,
     role_display_name,
@@ -34,11 +34,11 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.pages.academic_director as academic_director_routes
-    import backend.pages.head_of_department as head_of_department_routes
-    import backend.pages.ceo as ceo_page
-    import backend.pages.customer_support as customer_support_page
-    import backend.pages.hr_manager as hr_manager_page
+    import backend.modules.academics.director_page as academic_director_routes
+    import backend.modules.academics.hod_page as head_of_department_routes
+    import backend.modules.staff.ceo_page as ceo_page
+    import backend.modules.staff.support_page as customer_support_page
+    import backend.modules.staff.hr_page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,

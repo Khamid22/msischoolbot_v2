@@ -1,152 +1,73 @@
 # Engineering Overview
 
-Audience: senior engineers and implementation team.
+Audience: engineers joining or reviewing the MSI LMS rewrite.
 
-Project: MSI LMS Portal.
+## Current System
 
-Status: engineering planning documentation. This document distinguishes current implementation from target architecture.
-
-## Current Implementation
-
-Current branch: `FastAPI-Run-System`.
-
-Production branch: `main`.
-
-Current stack:
-
-- Backend: FastAPI.
-- Frontend: React/Vite.
-- Telegram bot: aiogram.
-- Database: PostgreSQL schema `msi_v2`.
-- Imports: Excel import script for academic statistics.
-
-Current source layout:
-
-```text
-backend/
-frontend/
-database/
-tgbot/
-scripts/
-tests/
-docs/
-```
-
-PostgreSQL is the source of truth. Excel and Google Sheets are import/export sources only.
-
-## Current System Architecture
+MSI LMS is a PostgreSQL-first, multi-role web portal. FastAPI owns HTTP/security orchestration, React owns role UI, domain modules own business rules and SQL, and Alembic owns DDL.
 
 ```mermaid
 flowchart LR
-    React[React/Vite Frontend]
-    FastAPI[FastAPI Backend]
-    Bot[Telegram Bot<br/>aiogram]
-    Scripts[Import Scripts]
-    DB[(PostgreSQL<br/>msi_v2)]
+    React[React/Vite]
+    Telegram[Telegram Mini App]
+    FastAPI[FastAPI]
+    Domains[Domain services and queries]
+    DB[(PostgreSQL msi_v2)]
+    Import[Explicit Excel reconciliation]
+    Bot[aiogram worker shell]
 
     React --> FastAPI
-    Bot --> FastAPI
-    Scripts --> DB
-    FastAPI --> DB
+    Telegram --> FastAPI
+    FastAPI --> Domains --> DB
+    Import --> Domains
+    Bot -. no inbound routers .-> Domains
 ```
 
-Current caveat:
+Google Sheets is not a live runtime backend. Telegram authentication and Mini App linking remain, but the retired bot handlers and Google-Sheets-driven mini-app architecture do not.
 
-- Some bot code imports backend identity modules directly.
-- Admin routes currently mix several LMS business responsibilities.
-- CEO, HR Manager, Customer Support, and Academic Director are not yet full production workspaces.
+## Implemented Architecture Decisions
 
-## Target Architecture
+- One canonical `accounts` row owns login, password hash, role, status, forced-change state, and session version.
+- Role data lives in student, teacher, parent, or staff profiles.
+- Every password-enabled role can change its own password through one v1 endpoint.
+- Initial login-equals-password credentials are blocked from workspaces until changed.
+- Telegram links authenticate through the same canonical account.
+- Parent invites are hash-only, expiring, single-use, and atomically consumed.
+- `students.id` is the internal student identity; legacy/public IDs are compatibility boundaries only.
+- Runtime SQL is domain-owned; the old database query barrels are removed.
+- Runtime DDL is removed; Alembic repository head is `0007_lms_integrity`.
+- APIs are versioned under `/api/v1`; old role API namespaces are gone.
+- React uses server bootstrap payloads, role-owned pages, shared accessible UI, and explicit `Asia/Tashkent` time helpers.
 
-Target architecture is domain-first:
-
-```mermaid
-flowchart LR
-    UI[React and Telegram UI]
-    Workspaces[Role Workspaces]
-    Domains[Domain Services]
-    Repos[Repositories]
-    DB[(PostgreSQL)]
-    Imports[Excel/Sheets Import and Export]
-
-    UI --> Workspaces
-    Workspaces --> Domains
-    Domains --> Repos
-    Repos --> DB
-    Imports --> Domains
-```
-
-Target rules:
-
-- Routes should be thin.
-- Workspaces answer what a role can do.
-- Domains own business rules.
-- Repositories own SQL.
-- PostgreSQL stores canonical state.
-- Bot and web should not import each other.
-
-## Confirmed Roles
-
-Internal platform role:
+## Current Roles
 
 - `system_admin`
-
-Real LMS roles:
-
 - `ceo`
+- `academic_director`
+- `head_of_department`
 - `hr_manager`
 - `customer_support`
-- `student`
 - `teacher`
+- `student`
 - `parent`
-- `academic_director`
 
-One user has exactly one role.
+One account has one canonical role. Role checks do not replace object checks such as linked child, assigned group, subject scope, chat membership, or canonical student ownership.
 
-## Current Data Status
+## Important Remaining Compatibility
 
-Academic Excel migration is complete and verified.
+- physical schema name `msi_v2`;
+- selected legacy correlation and public dashboard ID columns;
+- remaining `/admin/*` HTML form actions and workspace helper services;
+- `admin` presentation/session compatibility for `system_admin`;
+- Telegram-first parent accounts without password credentials;
+- an empty bot router registry until new inbound commands are product-approved and implemented.
 
-Migrated academic runtime tables:
+## Data Reconciliation Position
 
-- `lesson_sessions`
-- `attendance_records`
-- `homework_scores`
-- `exam_results`
+The repository contains an explicit workbook reconciler for School 5 and Sehriyo source files. Documentation does not claim exact workbook/database parity. Only a completed, reviewed reconciliation report with resolved identities, dates, scores, and coin differences can support that claim.
 
-Known issue:
+Never invent lesson times or silently merge ambiguous people to make a report pass.
 
-- Duplicate exam keys exist historically.
-- Do not clean yet.
-- Investigate later with a dedicated report.
+## Release Boundary
 
-## Target Engineering Priorities
-
-1. Preserve verified PostgreSQL academic data.
-2. Split `system_admin` from LMS business roles.
-3. Build real role workspaces.
-4. Normalize auth, sessions, and permissions.
-5. Introduce payment invoices, warnings, agreements, and access restrictions.
-6. Move parent Telegram linking into a shared domain service.
-7. Remove live spreadsheet dependencies.
-8. Keep future AI, Google Slides, and adaptive learning outside current implementation.
-
-## Non-Goals For Current Rebuild
-
-- AI module.
-- Google Slides module.
-- Adaptive learning module.
-- Parent password login.
-- Automatic B2B whole-school blocking.
-- Duplicate exam cleanup.
-
-## Verification Philosophy
-
-Every phase should verify:
-
-- database integrity.
-- route guards.
-- role access.
-- frontend build.
-- Telegram parent linking.
-- no private data leakage in docs or logs.
+Production branch `main` is reference-only during rewrite work. Validate migrations on a disposable clone, run backend/frontend verification, and use an explicitly approved merge/deploy process before production changes.

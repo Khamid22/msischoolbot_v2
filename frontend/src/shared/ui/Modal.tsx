@@ -56,7 +56,7 @@ export function ModalHeader({
         <button
           type="button"
           onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
           aria-label="Close"
         >
           <X className="h-4 w-4" />

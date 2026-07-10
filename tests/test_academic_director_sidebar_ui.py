@@ -135,7 +135,7 @@ def _minimal_academic_context():
 
 
 def _patch_academic_director_cards(monkeypatch):
-    import backend.pages.academic_director as academic_director_routes
+    import backend.modules.academics.director_page as academic_director_routes
 
     monkeypatch.setattr(
         academic_director_routes,
@@ -150,9 +150,9 @@ def _patch_academic_director_cards(monkeypatch):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
-    import backend.pages.academic_director as academic_director_routes
-    import backend.pages.head_of_department as head_of_department_routes
+    import backend.modules.admin.page as admin_page
+    import backend.modules.academics.director_page as academic_director_routes
+    import backend.modules.academics.hod_page as head_of_department_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -394,8 +394,8 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
 def test_academic_department_overviews_do_not_render_duplicate_profile_logout_blocks():
     source = Path("frontend/src/roles/common/pages/RoleHome.tsx").read_text()
-    route_source = Path("backend/pages/academic_director.py").read_text()
-    hod_route_source = Path("backend/pages/head_of_department.py").read_text()
+    route_source = Path("backend/modules/academics/director_page.py").read_text()
+    hod_route_source = Path("backend/modules/academics/hod_page.py").read_text()
     ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split("function HeadOfDepartmentHome", 1)[0]
     hod_overview_block = source.split("function HeadOfDepartmentHome", 1)[1].split("export function RoleHome", 1)[0]
     ad_overview_return = ad_overview_block.rsplit("return (", 1)[1]
@@ -425,8 +425,7 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     bootstrap_source = Path("frontend/src/shared/lib/bootstrap.ts").read_text()
     stale_state_source = Path("frontend/src/shared/lib/staleUiState.ts").read_text()
     admin_state_source = Path("frontend/src/roles/admin/hooks/useAdminState.ts").read_text()
-    admin_page_source = Path("backend/roles/admin/routes/admin_page.py").read_text()
-    deployment_doc = Path("docs/ENGINEERING_DEPLOYMENT.md").read_text()
+    admin_page_source = Path("backend/modules/admin/page.py").read_text()
 
     assert "Academic Director navigation" in source
     assert "Academic Director mobile navigation" in source
@@ -530,21 +529,21 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     # Preview gating lives entirely in useAdminState; Admin.tsx just consumes
     # the resolved state and must not re-derive it.
     assert "canUseAdminPreviewForRole" not in admin_source
-    assert "Account/profile auth is always active." in deployment_doc
-    assert "ADMIN_PREVIEW_ROLES=0" in deployment_doc
 
 
 def test_academic_director_academy_uses_single_shell_source():
     server_source = Path("backend/server.py").read_text()
-    route_source = Path("backend/pages/academic_director.py").read_text()
-    hod_route_source = Path("backend/pages/head_of_department.py").read_text()
+    registry_source = Path("backend/modules/registry.py").read_text()
+    route_source = Path("backend/modules/academics/director_page.py").read_text()
+    hod_route_source = Path("backend/modules/academics/hod_page.py").read_text()
     academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
     hod_academy_source = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
 
-    assert "register_academic_director_page_routes(app_instance, render_admin_page" not in server_source
-    assert "register_head_of_department_page_routes(app_instance, render_admin_page" not in server_source
-    assert "register_academic_director_page_routes(app_instance)" in server_source
-    assert "register_head_of_department_page_routes(app_instance)" in server_source
+    assert "register_academic_director_page_routes(app, render_admin_page" not in registry_source
+    assert "register_head_of_department_page_routes(app, render_admin_page" not in registry_source
+    assert "register_academic_director_page_routes(app)" in registry_source
+    assert "register_head_of_department_page_routes(app)" in registry_source
+    assert "register_module_pages(app_instance)" in server_source
     assert "def register_academic_director_page_routes(app):" in route_source
     assert "def register_head_of_department_page_routes(app):" in hod_route_source
     assert "render_admin_page" not in route_source

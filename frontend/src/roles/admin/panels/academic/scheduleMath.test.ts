@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   lessonDurationMinutesForSchoolCode,
-  randomLessonStartMinutesForSeed,
   snappedStartMinutes,
 } from "./scheduleMath.ts";
 
@@ -47,13 +47,15 @@ test("lessonDurationMinutesForSchoolCode follows school-specific class lengths",
   assert.equal(lessonDurationMinutesForSchoolCode("Sehriyo"), 40);
   assert.equal(lessonDurationMinutesForSchoolCode("school 5"), 80);
   assert.equal(lessonDurationMinutesForSchoolCode("School_5"), 80);
+  assert.equal(lessonDurationMinutesForSchoolCode("5"), 80);
   assert.equal(lessonDurationMinutesForSchoolCode("unknown"), 80);
+  assert.equal(lessonDurationMinutesForSchoolCode("school 15", 55), 55);
+  assert.equal(lessonDurationMinutesForSchoolCode("grade 5", 55), 55);
 });
 
-test("randomLessonStartMinutesForSeed is deterministic, snapped, and inside the day", () => {
-  const start = randomLessonStartMinutesForSeed(77, 3, 8 * 60, 20 * 60, 40);
-  assert.equal(start, randomLessonStartMinutesForSeed(77, 3, 8 * 60, 20 * 60, 40));
-  assert.equal(start % 10, 0);
-  assert.ok(start >= 8 * 60);
-  assert.ok(start <= 20 * 60 - 40);
+test("untimed lessons stay outside the clock grid until a real time is assigned", () => {
+  const panel = readFileSync(new URL("./SchedulePanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(panel, /randomLessonStartMinutes/);
+  assert.match(panel, />\s*Unscheduled\s*</);
+  assert.match(panel, /Time not assigned/);
 });

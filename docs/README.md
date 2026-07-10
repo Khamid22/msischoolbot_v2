@@ -1,123 +1,60 @@
 # MSI LMS Portal Documentation
 
-This directory contains the planning and architecture documentation for MSI LMS Portal.
+This directory contains product history, migration reports, and the current engineering documentation for MSI LMS Portal.
 
-Status: active documentation index. Historical phase plans live in `docs/archive/`.
+## Current Source of Truth
 
-## Project Context
-
-- Project name: MSI LMS Portal.
-- Production branch: `main`.
-- Planning/rewrite branch: `FastAPI-Run-System`.
-- Backend: FastAPI.
-- Frontend: React/Vite.
-- Telegram bot: aiogram.
-- Database: PostgreSQL schema `msi_v2`.
-- Excel and Google Sheets are import/export sources only.
-- Current schools: School 5 and Sehriyo.
-- More schools will be added later.
-
-## Reading Order
-
-### CEO Package
-
-Start here for business and leadership review:
-
-1. [CEO Overview](./CEO_OVERVIEW.md)
-2. [CEO Product Vision](./CEO_PRODUCT_VISION.md)
-3. [CEO Roadmap](./CEO_ROADMAP.md)
-4. [CEO Risks And Decisions](./CEO_RISKS_AND_DECISIONS.md)
-
-### Engineering Package
-
-Start here for senior engineer review:
+Read these first. They describe the implemented rewrite rather than an earlier target design:
 
 1. [Current Architecture](./CURRENT_ARCHITECTURE.md)
-2. [Engineering Overview](./ENGINEERING_OVERVIEW.md)
-3. [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
-4. [Engineering Module Map](./ENGINEERING_MODULE_MAP.md)
-5. [Engineering Database](./ENGINEERING_DATABASE.md)
-6. [Engineering Auth And Roles](./ENGINEERING_AUTH_AND_ROLES.md)
-7. [Engineering Route Map](./ENGINEERING_ROUTE_MAP.md)
-8. [Engineering Telegram Flow](./ENGINEERING_TELEGRAM_FLOW.md)
-9. [Engineering Payment Access Policy](./ENGINEERING_PAYMENT_ACCESS_POLICY.md)
-10. [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
-11. [Engineering Testing](./ENGINEERING_TESTING.md)
-12. [Engineering Technical Debt](./ENGINEERING_TECHNICAL_DEBT.md)
+2. [Authentication and Roles](./ENGINEERING_AUTH_AND_ROLES.md)
+3. [Database Architecture](./ENGINEERING_DATABASE.md)
+4. [API Migration Status](./API_MIGRATION_STATUS.md)
+5. [Route Map](./ENGINEERING_ROUTE_MAP.md)
+6. [Telegram Integration](./ENGINEERING_TELEGRAM_FLOW.md)
+7. [Module Map](./ENGINEERING_MODULE_MAP.md)
+8. [Architecture Cleanup Report](./ARCHITECTURE_CLEANUP_2026-07-10.md)
 
-### Existing Architecture Notes
+The physical PostgreSQL schema remains `msi_v2`, and Alembic migration head is `0007_lms_integrity`.
 
-These planning files contain earlier detailed architecture notes:
+## Current Project Facts
 
-- [MSI LMS Architecture](./MSI_LMS_ARCHITECTURE.md)
-- [MSI LMS Modules](./MSI_LMS_MODULES.md)
-- [MSI LMS Target Schema](./MSI_LMS_TARGET_SCHEMA.md)
-- [MSI LMS Auth And Roles](./MSI_LMS_AUTH_AND_ROLES.md)
-- [MSI LMS Payment Access Policy](./MSI_LMS_PAYMENT_ACCESS_POLICY.md)
-- [MSI LMS Telegram Parent Linking](./MSI_LMS_TELEGRAM_PARENT_LINKING.md)
+- Production branch `main` is read-only during rewrite work.
+- PostgreSQL is the canonical runtime data store.
+- `msi_v2.accounts` is the sole password authority.
+- Runtime SQL belongs to domain query modules under `backend/domains`.
+- Runtime DDL is prohibited; `database/alembic` owns schema changes.
+- Google Sheets is no longer a live runtime source.
+- Telegram authentication and Mini App parent linking remain active web integrations.
+- `tgbot` has an explicit empty inbound router registry while new bot handlers are not yet implemented.
+- Spreadsheet reconciliation is explicit and report-driven. These docs make no unverified claim that source workbooks and PostgreSQL are in exact parity.
 
-### Cleanup Reports
+## Supporting Engineering Docs
 
-- [API V1 Old Route Deletion Report](./API_V1_OLD_ROUTE_DELETION_REPORT.md)
-- [Role Page-Only Cleanup Report](./ROLE_PAGE_ONLY_CLEANUP_REPORT.md)
-- [Domain Query Migration Report](./DOMAIN_QUERY_MIGRATION_REPORT.md)
-- [Database Folder Cleanup Report](./DATABASE_FOLDER_CLEANUP_REPORT.md)
-- [Identity Naming Cleanup Report](./IDENTITY_NAMING_CLEANUP_REPORT.md)
-- [Frontend API Route Cleanup Report](./FRONTEND_API_ROUTE_CLEANUP_REPORT.md)
-- [Frontend UI Legacy Cleanup Report](./FRONTEND_UI_LEGACY_CLEANUP_REPORT.md)
-- [Backend Cleanliness Report](./BACKEND_CLEANLINESS_REPORT.md)
-- [Frontend Cleanliness Report](./FRONTEND_CLEANLINESS_REPORT.md)
-- [Database Architecture Cleanup Report](./DATABASE_ARCHITECTURE_CLEANUP_REPORT.md)
+- [Engineering Overview](./ENGINEERING_OVERVIEW.md)
+- [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
+- [Engineering Deployment](./ENGINEERING_DEPLOYMENT.md)
+- [Engineering Testing](./ENGINEERING_TESTING.md)
+- [Payment Access Policy](./ENGINEERING_PAYMENT_ACCESS_POLICY.md)
+- [Database Folder Migration Status](./DATABASE_FOLDER_MIGRATION_STATUS.md)
+- [Glossary](./GLOSSARY.md)
 
-### Historical Plans
+## Product and Leadership Docs
 
-Phase-era implementation plans are archived under [docs/archive](./archive/). Keep them for history, but use `docs/CURRENT_ARCHITECTURE.md` and the engineering docs above as the current source of truth.
+- [CEO Overview](./CEO_OVERVIEW.md)
+- [CEO Product Vision](./CEO_PRODUCT_VISION.md)
+- [CEO Roadmap](./CEO_ROADMAP.md)
+- [CEO Risks and Decisions](./CEO_RISKS_AND_DECISIONS.md)
 
-## Review Workflow
+## Historical Material
 
-```mermaid
-flowchart TD
-    Codex[Codex Documentation Draft]
-    Review1[Codex Review]
-    Review2[Senior Engineer Review]
-    Review3[CEO/User Review]
-    Decisions[Final Architecture Decisions]
-    Implementation[Implementation]
+Files named as blueprints, phase plans, target schemas, or dated cleanup reports record earlier decisions and migration states. They are useful history but can mention modules or wrappers that have since been deleted. The current-source list above takes precedence.
 
-    Codex --> Review1 --> Review2 --> Review3 --> Decisions --> Implementation
-```
+Historical phase plans are under [docs/archive](./archive/).
 
 ## Documentation Rules
 
-- CEO documents are business-friendly and non-technical.
-- Engineering documents are technical and implementation-oriented.
-- Current implementation and target architecture are labeled separately.
-- Future modules are clearly marked as future.
-- No secrets, tokens, database URLs, private student data, parent phone numbers, Telegram IDs, raw grades, or row-level private data should appear in these docs.
-
-## Confirmed Decisions
-
-- PostgreSQL is the source of truth.
-- One user has exactly one role.
-- `system_admin` is an internal operator, not an LMS business role.
-- Real LMS roles are `ceo`, `hr_manager`, `customer_support`, `student`, `teacher`, `parent`, and `academic_director`.
-- Teacher login format is `TCH0001`.
-- Student login is MSI code plus password.
-- Parents are Telegram-first in the first rebuild.
-- Customer Support is B2C support.
-- B2B unpaid school contracts escalate to CEO only.
-- Academic Director has full academic access.
-- CEO has broad company visibility.
-- AI, Google Slides, and adaptive learning are future modules.
-
-## Open Decisions
-
-- Which CEO drilldowns require audit events in v1?
-
-## Recently Confirmed Decisions
-
-- Account model is approved: one shared account record for every login user, with separate role-specific profiles.
-- Parent invite links can be generated by CEO, Academic Director, and Customer Support.
-- Customer Support can request B2C access restrictions from CEO or Academic Director.
-- After approval, Customer Support can continue the B2C payment/support workflow.
-- B2C payment restriction uses two warnings: incoming payment warning, then final few-days warning, then restriction until payment is completed.
+- Do not include credentials, connection strings, tokens, student names, phone numbers, Telegram IDs, grades, or other row-level private data.
+- Distinguish implemented behavior from a proposed future design.
+- Treat migration output and workbook parity as evidence, not assumptions.
+- Keep production `main` read-only unless an explicitly approved release process says otherwise.

@@ -2,6 +2,7 @@ import { FormEvent, ReactNode } from "react";
 import { Activity, BookOpen, CreditCard, GraduationCap, LogOut, TrendingUp, UserRound } from "lucide-react";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { csrfHeaders } from "@/shared/lib/api";
+import { averageRecordedMetrics, finiteMetricOrNull } from "@/shared/lib/metricMath";
 
 function asArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
@@ -53,13 +54,11 @@ function childRecentLessons(child: Record<string, unknown>) {
 }
 
 function averageMetric(rows: Array<Record<string, unknown>>, key: string) {
-  const values = rows.map((row) => asNumber(row[key])).filter((value) => value > 0);
-  if (!values.length) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return averageRecordedMetrics(rows.map((row) => row[key]));
 }
 
-function formatScore(value: number, digits = 1) {
-  if (!Number.isFinite(value) || value <= 0) return "-";
+function formatScore(value: number | null, digits = 1) {
+  if (value === null || !Number.isFinite(value)) return "-";
   return Number.isInteger(value) ? String(value) : value.toFixed(digits);
 }
 
@@ -102,7 +101,8 @@ function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
   const aap = averageMetric(indicators, "aap");
   const ar = averageMetric(indicators, "ar");
   const ep = averageMetric(indicators, "ep");
-  const progress = asNumber(summary.program_completion_rate) || averageMetric(indicators, "program_completion_rate");
+  const progress = finiteMetricOrNull(summary.program_completion_rate)
+    ?? averageMetric(indicators, "program_completion_rate");
   const debt = Number(summary.debt_total || 0);
   const due = Number(summary.due_total || 0);
   const subjects = indicators.map((indicator) => asString(indicator.subject_display_name) || asString(indicator.subject_name)).filter(Boolean);
@@ -135,9 +135,9 @@ function ChildStatsCard({ child }: { child: Record<string, unknown> }) {
 
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
         <Metric icon={<GraduationCap className="h-4 w-4" />} label="AAP" value={`${formatScore(aap)} / 9`} />
-        <Metric icon={<Activity className="h-4 w-4" />} label="Attendance" value={ar > 0 ? `${Math.round(ar)}%` : "-"} />
+        <Metric icon={<Activity className="h-4 w-4" />} label="Attendance" value={ar !== null ? `${Math.round(ar)}%` : "-"} />
         <Metric icon={<TrendingUp className="h-4 w-4" />} label="Exam" value={`${formatScore(ep, 0)} / 9`} />
-        <Metric icon={<BookOpen className="h-4 w-4" />} label="Progress" value={progress > 0 ? `${Math.round(progress)}%` : "-"} />
+        <Metric icon={<BookOpen className="h-4 w-4" />} label="Progress" value={progress !== null ? `${Math.round(progress)}%` : "-"} />
       </div>
 
       <div className="grid gap-3 border-t border-foreground/8 p-4 lg:grid-cols-[minmax(0,1fr),minmax(16rem,0.55fr)]">
@@ -238,7 +238,7 @@ export default function ParentHome(props: Record<string, unknown>) {
         <form onSubmit={handleLogout}>
           <button
             type="submit"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-foreground/10 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:w-auto sm:gap-1.5 sm:px-3"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:w-auto sm:gap-1.5 sm:px-3"
             aria-label="Chiqish / Выйти"
           >
             <LogOut className="h-3.5 w-3.5" />

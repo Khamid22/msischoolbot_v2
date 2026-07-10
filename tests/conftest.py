@@ -19,7 +19,9 @@ from starlette.testclient import TestClient
 def app():
     from backend.server import create_app
 
-    return create_app()
+    test_app = create_app()
+    test_app.state.testing = True
+    return test_app
 
 
 @pytest.fixture()

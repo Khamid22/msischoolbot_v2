@@ -26,6 +26,7 @@ export type ReactPageName =
   | "head-of-department-academy"
   | "head-of-department-timetable"
   | "head-of-department-announcements"
+  | "account-security"
   | "unauthorized"
   | "student-not-found";
 
@@ -62,6 +63,7 @@ const REACT_PAGES = new Set<ReactPageName>([
   "head-of-department-academy",
   "head-of-department-timetable",
   "head-of-department-announcements",
+  "account-security",
   "unauthorized",
   "student-not-found",
 ]);

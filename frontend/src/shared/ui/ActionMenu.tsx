@@ -165,7 +165,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
             setOpen(true);
           }
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
+        className="flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
       >
         {trigger ?? <MoreVertical className="h-4 w-4" />}
       </button>
@@ -219,7 +219,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
                     moveFocus(index, -1);
                   }
                 }}
-                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none ${
+                className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-medium transition-colors focus:outline-none ${
                   item.disabled
                     ? "cursor-not-allowed text-muted-foreground/50"
                     : item.danger

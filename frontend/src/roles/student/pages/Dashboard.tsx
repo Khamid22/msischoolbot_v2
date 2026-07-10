@@ -63,6 +63,7 @@ interface DashboardPageProps {
   attendanceRate?: number;
   examPerformance?: number;
   programCompletedLessons?: number;
+  programTotalLessons?: number;
   programCompletedRate?: number;
   ratingBoardUrl?: string;
   resourcesUrl?: string;
@@ -179,7 +180,6 @@ export default function DashboardPage(props: DashboardPageProps) {
   const [subjectOpen, setSubjectOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
   const announcementsRef = useDismissibleLayer<HTMLDivElement>({
     enabled: announcementsOpen,
     onDismiss: () => setAnnouncementsOpen(false),
@@ -191,10 +191,6 @@ export default function DashboardPage(props: DashboardPageProps) {
   const logoutModalRef = useDismissibleLayer<HTMLDivElement>({
     enabled: logoutOpen,
     onDismiss: () => setLogoutOpen(false),
-  });
-  const passwordModalRef = useDismissibleLayer<HTMLDivElement>({
-    enabled: passwordOpen,
-    onDismiss: () => setPasswordOpen(false),
   });
   const { ref: chartsRef, visible: chartsVisible } = useLazyVisible({ rootMargin: "180px" });
 
@@ -210,6 +206,11 @@ export default function DashboardPage(props: DashboardPageProps) {
   const attendanceRate = Math.round(Number(props.attendanceRate || 0));
   const examPerformance = Math.round(Number(props.examPerformance || 0));
   const completionRate = Math.round(Number(props.programCompletedRate || 0));
+  const completedLessons = Math.max(0, Math.round(Number(props.programCompletedLessons || 0)));
+  const rawProgramTotal = Number(props.programTotalLessons);
+  const programTotalLabel = Number.isFinite(rawProgramTotal) && rawProgramTotal > 0
+    ? String(Math.round(rawProgramTotal))
+    : "—";
   const announcements = Array.isArray(props.announcements) ? props.announcements : [];
   const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const aapLessonsUrl = isAdminEmbed ? withEmbedMode(props.aapLessonsUrl) : props.aapLessonsUrl;
@@ -254,7 +255,7 @@ export default function DashboardPage(props: DashboardPageProps) {
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Program Progress</p>
               <p className="mt-0.5 text-sm font-semibold">
-                {props.programCompletedLessons || 0}/180 lessons completed
+                {completedLessons}/{programTotalLabel} lessons completed
               </p>
             </div>
             <p className="font-display text-xl font-bold sm:text-2xl">{completionRate}%</p>
@@ -526,20 +527,16 @@ export default function DashboardPage(props: DashboardPageProps) {
               ) : null}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setProfileModalOpen(false);
-                  setPasswordOpen(true);
-                }}
-                className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted"
+              <a
+                href={props.changePasswordUrl || "/account/security"}
+                className="inline-flex min-h-11 items-center rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
               >
                 Change Password
-              </button>
+              </a>
               <button
                 type="button"
                 onClick={() => setProfileModalOpen(false)}
-                className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted"
+                className="min-h-11 rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
               >
                 Close
               </button>
@@ -572,63 +569,6 @@ export default function DashboardPage(props: DashboardPageProps) {
         </div>
       ) : null}
 
-      {passwordOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50" style={modalInsetStyle} role="dialog" aria-modal="true">
-          <div ref={passwordModalRef} className={`max-h-full w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-5 shadow-card-hover ${motion.modal}`}>
-            <h3 className="font-display text-base font-bold">Change Password</h3>
-            <form action={props.changePasswordUrl} method="post" className="mt-4 space-y-4">
-              <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
-              <input type="hidden" name="student_id" value={String(student.id || "")} />
-              <input type="hidden" name="subject" value={props.currentSubjectName || ""} />
-              <input type="hidden" name="group" value={currentGroup} />
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Password</span>
-                <input
-                  type="password"
-                  name="current_password"
-                  autoComplete="current-password"
-                  required
-                  className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-3 text-sm outline-none focus:border-foreground/30"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">New Password</span>
-                <input
-                  type="password"
-                  name="new_password"
-                  minLength={6}
-                  autoComplete="new-password"
-                  required
-                  className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-3 text-sm outline-none focus:border-foreground/30"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confirm Password</span>
-                <input
-                  type="password"
-                  name="confirm_password"
-                  minLength={6}
-                  autoComplete="new-password"
-                  required
-                  className="w-full rounded-xl border-2 border-foreground/10 bg-surface px-4 py-3 text-sm outline-none focus:border-foreground/30"
-                />
-              </label>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPasswordOpen(false)}
-                  className="rounded-lg border-2 border-foreground/10 px-4 py-2 text-sm font-bold hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
     </TelegramLayout>
   );
 }

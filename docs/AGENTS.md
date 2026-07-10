@@ -18,14 +18,19 @@ The system supports:
 - HR Manager
 - Customer Support
 - Academic Director
+- Head of Department
 - Internal System Admin
 
 ## Current Important Decisions
 
 - Production branch is `main`.
 - Rewrite/planning branch is `FastAPI-Run-System`.
+- Treat production `main` as read-only during rewrite work unless the user explicitly approves a release action.
 - PostgreSQL is the source of truth.
-- Excel/Google Sheets are import/export sources only, not live runtime dependencies.
+- Google Sheets is retired as a live runtime dependency. Excel is used only through explicit import/reconciliation tooling.
+- `msi_v2.accounts` is the sole password authority; role tables must not provide fallback password hashes.
+- PostgreSQL DDL is Alembic-only. The current repository migration head is `0007_lms_integrity`.
+- Runtime SQL belongs to `backend/domains/*/queries.py`; the old database query barrels are deleted.
 - Current schools: School 5 and Sehriyo.
 - More schools will be added later.
 - One user has exactly one role.
@@ -38,9 +43,12 @@ The system supports:
   - `teacher`
   - `parent`
   - `academic_director`
+  - `head_of_department`
 - Teacher login format should be `TCH0001`, `TCH0002`, etc.
 - Students login with MSI code + password.
+- Login-equals-password credentials must force self-service password change before workspace access.
 - Parents are Telegram-first in the first rebuild.
+- Telegram auth resolves canonical accounts; inbound bot handlers are currently empty.
 - Customer Support is B2C support: parents, payments, warnings, follow-up, support tickets.
 - B2B unpaid school contract issues escalate to CEO only.
 - Academic Director has full academic access.

@@ -1,73 +1,67 @@
 # Naming Glossary
 
-Use these names when adding or renaming code. The goal is simple: one concept,
-one name.
+Use one explicit name per identity or boundary. Do not use a generic `user_id` or `student_id` when two different identifiers could fit.
 
-## People and Accounts
+## Accounts and People
 
-| Preferred name | Meaning | Avoid / old names |
-|---|---|---|
-| `account_id` | Primary key from `admins.id`; any staff/admin-style login account. | vague `user_id`, sometimes `admin_id` |
-| `admin_account_id` | Staff/admin account id when the admin role matters. | `admin_id` when the value is not clearly an admin |
-| `parent_account_id` | Parent account id from `admins.id` when role is parent. | `parent_admin_id` in new code |
-| `teacher_id` | Primary key for a teacher row. | no change |
-| `telegram_user_id` | Telegram numeric user id. This is not a password or proof of identity by itself. | `tg_user_id`, `user_id` |
-| `role` | Account role, such as `owner`, `admin`, `ceo`, `customer_support`, `teacher`, `parent`, `student`. | mixed booleans when a role string is clearer |
+| Preferred name | Meaning | Avoid in new code |
+| --- | --- | --- |
+| `account_id` | primary key from `msi_v2.accounts`; canonical authentication identity | old admin/staff row ID called an account |
+| `canonical_role` | normalized `accounts.role` | inferring business role only from presentation `auth_role` |
+| `staff_id` | primary key from `msi_staff`, connected through `staff_profiles` | `account_id` when the value is a staff profile entity |
+| `teacher_id` | primary key from `teachers`, connected through `teacher_profiles` | staff row ID or teacher login code |
+| `parent_id` | primary key from `parents`, connected through `parent_profiles` | `parent_admin_id`, `parent_account_id` when the entity ID is intended |
+| `telegram_user_id` | Telegram numeric identifier; trusted only after HMAC verification or an active canonical link | `tg_user_id`, unsigned query/form identity |
+| `session_version` | account version stored in DB and cookie to invalidate older sessions | treating a valid cookie signature as sufficient after account changes |
 
 ## Students
 
-| Preferred name | Meaning | Avoid / old names |
-|---|---|---|
-| `student_row_id` | Primary key from `students.id`. | `student_id` when it means DB row id |
-| `student_code` | Public/login student code, for example `MSI00001`. | `student_id` when it means login code |
-| `student_full_name` | Student display name. | vague `name` |
-| `enrollment_id` | Imported/public dashboard id, historically from Google Sheets. Used by several dashboard URLs. | `sheet_student_id`, route `student_id` when it means enrollment |
-| `school_code` | Normalized school code, for example `school5`. | `school_key` outside DB/query layer |
+| Preferred name | Meaning | Avoid in new code |
+| --- | --- | --- |
+| `student_db_id` or `canonical_student_id` | primary key from `msi_v2.students.id`; authorization and foreign-key identity | ambiguous `student_id` |
+| `legacy_student_row_id` | value from `students.legacy_student_row_id` used at old admin/parent compatibility boundaries | treating it as the canonical primary key |
+| `student_code` | canonical login/display code, for example `MSI00001` | `student_id` when it means a login |
+| `enrollment_id` | canonical `group_students.id` when the relational enrollment row is intended | public dashboard ID |
+| `legacy_enrollment_id` | imported correlation value in `group_students.legacy_enrollment_id` | canonical enrollment primary key |
+| `public_dashboard_id` or `student_enrollment_id` in session compatibility | `group_students.legacy_public_dashboard_id`, used by `/dashboard/{student_id}` | canonical student identity |
 
-Important: old route parameters like `/dashboard/<int:student_id>` often mean
-`enrollment_id`, not `students.id`. Rename carefully and verify behavior before
-changing URL names.
+Existing route parameter names such as `student_row_id` and `/dashboard/{student_id}` are compatibility contracts. Resolve them at the HTTP boundary and use `students.id` inside authorization and domain writes.
 
 ## Academics
 
-| Preferred name | Meaning | Avoid / old names |
-|---|---|---|
-| `subject_name` | Canonical full subject name, for example `IGCSE Mathematics A`. | raw sheet subject names |
-| `subject_short` | Display short name, for example `Math`, `Chem`, `Eng`. | ad hoc abbreviations |
-| `subject_key` | Stable lowercase key used for matching/filtering, for example `math`, `chem`, `eng`. | raw lowercased subject names |
-| `group_name` | Class/group label. | vague `group` |
-| `lesson_number` | Human-facing lesson number. | mixed `lesson_order` unless order specifically matters |
-| `aap_score` | Average academic performance score. | bare `aap` in new service internals |
-| `attendance_rate` | AR percentage. | bare `ar` in new service internals |
-| `exam_performance` | EP score. | bare `ep` in new service internals |
+| Preferred name | Meaning | Avoid in new code |
+| --- | --- | --- |
+| `school_id` | canonical `schools.id` foreign key | matching only by display text |
+| `school_code` | normalized external/UI key such as `school5` | raw workbook school label |
+| `subject_id` | canonical `subjects.id` | subject display name as identity |
+| `subject_program_id` | canonical program used to constrain group/enrollment moves | assuming subject name alone proves program equality |
+| `group_id` | canonical `groups.id` | group label as identity |
+| `lesson_session_id` | canonical lesson delivery record | lesson number/order without group/program context |
+| `lesson_number` | human-facing/source lesson label | `lesson_order` unless actual sort order is meant |
+| `source_order` | source-defined ordering metadata when verified | an inferred sequence substituted for source truth |
+| `attendance_rate` | percentage derived from attendance records | ambiguous `ar` in new service code |
+| `exam_performance` | exam metric derived from results | ambiguous `ep` in new service code |
 
 ## Dates and Time
 
-| Preferred name | Meaning | Avoid / old names |
-|---|---|---|
-| `lesson_date` | Date of a lesson. Store/display canonically as `dd/mm/yyyy` where the existing app expects text dates. | mixed date strings |
-| `created_at` | Creation timestamp. | no change |
-| `updated_at` | Last update timestamp. | no change |
-| `last_seen_at` | Last user activity timestamp. | vague `activity` |
+| Preferred name | Meaning | Avoid in new code |
+| --- | --- | --- |
+| `lesson_date` | database date for a lesson | locale-formatted string as storage identity |
+| `starts_at`, `ends_at` | timezone-aware instants | timezone-less browser strings |
+| `school_date_key` | `YYYY-MM-DD` calendar day in `Asia/Tashkent` | browser-local day when filtering school data |
+| `created_at`, `updated_at` | timezone-aware audit timestamps | display-formatted timestamps in persistence code |
 
-## Files and Resources
+If a workbook supplies a date but no start time, retain the date and leave time unknown. Do not manufacture a timetable time.
 
-| Preferred name | Meaning | Avoid / old names |
-|---|---|---|
-| `resource_id` | Primary key from `resources.id`. | vague `id` across service boundaries |
-| `resource_type` | Category such as video, PDF, worksheet. | vague `type` across service boundaries |
-| `storage_key` | Cloud/R2 object key. | vague `key` |
-| `public_url` | URL usable by the frontend/user. | vague `url` when multiple URLs exist |
+## Invites and Telegram
 
-## Migration Notes
+| Preferred name | Meaning | Avoid in new code |
+| --- | --- | --- |
+| `invite_code` | raw random capability held by the user/URL only | persisting it |
+| `invite_code_hash` / `token_hash` at the DB boundary | SHA-256 digest stored in `account_invites` | plaintext token/code storage |
+| `init_data` | raw Telegram Mini App payload verified server-side | `initDataUnsafe` as trusted identity |
+| `account_telegram_link` | canonical account mapping after verified Telegram identity | a second Telegram-owned account model |
 
-Do not rename everything at once. Rename at boundaries first:
+## Migration Rule
 
-1. route parameter names and payload builders
-2. service function arguments
-3. query function arguments
-4. database columns only with explicit migrations
-
-Database columns can keep old names temporarily if changing them risks data
-loss. Use clear Python variable names around them so reviewers understand what
-the old column represents.
+Keep legacy database columns only while they serve a documented migration/public compatibility boundary. New code should translate at the edge, name the canonical value explicitly, and add a reviewed Alembic migration for physical schema changes.

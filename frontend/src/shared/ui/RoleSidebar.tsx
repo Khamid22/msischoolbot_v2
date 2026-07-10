@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import { routes } from "@/shared/lib/routes";
 import { uiLayers } from "@/shared/ui/layers";
 import type { RoleNavItem } from "@/shared/ui/roleNav";
@@ -78,7 +78,7 @@ export function RoleSidebar<Key extends string = string>({
                   key={item.key}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`relative flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 pl-3 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                  className={`relative flex min-h-11 w-full items-center gap-2 rounded-lg px-2.5 py-2 pl-3 text-left text-[13px] font-semibold transition-all duration-150 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none motion-reduce:active:scale-100 ${
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -108,11 +108,19 @@ export function RoleSidebar<Key extends string = string>({
             <span className="block truncate text-sm font-medium text-white">{login}</span>
             <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
           </div>
+          <a
+            href={routes.accountSecurity}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            aria-label="Account security"
+            title="Account security"
+          >
+            <KeyRound className="h-4 w-4" />
+          </a>
           <form action={logoutAction} method="post" className="shrink-0">
             <input type="hidden" name="csrf_token" value={csrfToken || ""} />
             <button
               type="submit"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               aria-label="Logout"
               title="Logout"
             >

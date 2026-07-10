@@ -2,197 +2,103 @@
 
 Audience: senior engineers.
 
-Project: MSI LMS Portal.
-
-## Current Implementation
-
-The current branch has useful modules but blurred boundaries.
-
-Current runtime:
-
-```text
-React/Vite frontend -> FastAPI backend -> PostgreSQL
-Telegram bot --------^
-Excel imports -----------------------> PostgreSQL
-```
-
-Current implementation issues:
-
-- `backend/roles/admin` is a large mixed management area.
-- The current code name `admin` mixes internal operator and LMS management.
-- `system_admin` is the target documentation/architecture name.
-- Bot imports backend identity services directly.
-- Permissions are duplicated across identity/security modules.
-- Some SQL still appears too close to route logic.
-
-## Target Architecture Layers
+## Implemented Layers
 
 ```mermaid
 flowchart TD
-    Presentation[Presentation<br/>React, Telegram Mini App, Bot]
-    Workspace[Workspace Layer<br/>Role-specific use cases]
-    Domain[Domain Layer<br/>Business rules]
-    Repository[Repository Layer<br/>SQL and persistence]
-    DB[(PostgreSQL)]
-    Integrations[Integrations<br/>Excel, Telegram, Storage]
+    Presentation["Presentation\nReact pages, Mini App, future bot handlers"]
+    HTTP["HTTP boundary\nbackend/pages and backend/api/v1"]
+    Security["Security\nsession, role, permission, object policy"]
+    Domain["Domain services\nbusiness rules and transactions"]
+    Query["Domain queries\nSQL and row mapping"]
+    Core["Core PostgreSQL connection"]
+    DB[("PostgreSQL msi_v2")]
+    Integrations["Integrations\nTelegram, Excel, storage"]
+    Migrations["Alembic migrations"]
 
-    Presentation --> Workspace
-    Workspace --> Domain
-    Domain --> Repository
-    Repository --> DB
+    Presentation --> HTTP --> Security --> Domain --> Query --> Core --> DB
     Integrations --> Domain
+    Migrations --> DB
 ```
 
-## Layer Responsibilities
-
-### Presentation
-
-Owns:
-
-- React pages.
-- Telegram Mini App rendering.
-- Telegram bot messages/buttons.
-
-Does not own:
-
-- authorization policy.
-- payment restriction rules.
-- SQL.
-
-### Workspace
-
-Owns role-specific workflows:
-
-- CEO workspace.
-- Academic Director workspace.
-- HR Manager workspace.
-- Customer Support workspace.
-- Teacher workspace.
-- Student workspace.
-- Parent workspace.
-- System Admin workspace.
-
-### Domain
-
-Owns business rules:
-
-- organization.
-- people.
-- staff and hiring.
-- academic structure.
-- learning delivery.
-- assessment and progress.
-- learning resources.
-- operations.
-- communication and support.
-- analytics and reports.
-
-### Repository
-
-Owns:
-
-- SQL statements.
-- mapping database rows to domain objects.
-- transaction boundaries where appropriate.
-
-### Database
-
-Owns:
-
-- canonical persisted state.
-- constraints.
-- foreign keys.
-- audit records.
-
-## Domain Block Map
-
-```mermaid
-flowchart TD
-    LMS[MSI LMS Portal Domains]
-    LMS --> Org[Organization]
-    LMS --> People[People]
-    LMS --> Staff[Staff and Hiring]
-    LMS --> Academic[Academic Structure]
-    LMS --> Delivery[Learning Delivery]
-    LMS --> Assessment[Assessment and Progress]
-    LMS --> Resources[Learning Resources]
-    LMS --> Ops[Operations]
-    LMS --> Support[Communication and Support]
-    LMS --> Reports[Analytics and Reports]
-```
-
-## Target Dependency Rules
+## Dependency Rules
 
 Allowed:
 
 ```text
-frontend -> HTTP -> backend
-tgbot -> domain service adapter -> domain
-workspace -> domain
-domain -> repository
-repository -> PostgreSQL
-scripts/imports -> import service -> domain/repository
+frontend -> HTTP
+pages/API -> security and domain services
+domain services -> same-domain or explicitly shared domain services
+domain services -> domain query modules
+domain queries -> backend.core.database -> PostgreSQL
+integrations/import scripts -> domain services
+Alembic -> schema DDL
 ```
 
 Forbidden:
 
 ```text
-tgbot -> backend web routes
-backend web routes -> tgbot
-frontend -> Python imports
-domain -> FastAPI Request/session
-domain -> React/browser code
-route -> complex raw SQL
+frontend -> Python modules or database
+route -> runtime CREATE/ALTER/DROP
+domain -> React/browser state
+domain -> ambient FastAPI Request/session
+tgbot -> web route functions
+password authentication -> role-table legacy hashes
+new code -> deleted database/identity facades
 ```
 
-## Target Folder Structure
+## Layer Responsibilities
 
-Proposed:
+### Pages and API
 
-```text
-backend/
-  app/
-    core/
-    api/
-    domains/
-    workspaces/
-    integrations/
+- authenticate and validate request shape;
+- enforce role/permission dependencies;
+- resolve explicit compatibility identifiers;
+- call domain services;
+- render React bootstrap data or return API envelopes.
 
-database/
-  alembic/
-  repositories/
+Routes do not own academic, payment, invite, or password transactions.
 
-frontend/src/
-  app/
-  design-system/
-  roles/
-  shared/
+### Domain Services
 
-tgbot/
-  handlers/
-  keyboards/
-  services/
+- enforce object policy and business invariants;
+- coordinate transactions;
+- compose payloads for pages/APIs;
+- call query modules and integration adapters.
 
-scripts/
-  imports/
-  reports/
-```
+### Domain Queries
 
-The folder move is not required before all decisions are approved. Ownership can be improved before physical moves.
+- own raw SQL for their domain;
+- map database rows;
+- expose focused persistence operations;
+- never create schema objects during a request.
 
-## Current To Target Mapping
+### Core and Alembic
 
-| Current area | Target owner |
-|---|---|
-| `backend/roles/admin` | split into workspaces and domains |
-| `backend/domains/academics` | Academic Structure, Delivery, Assessment |
-| `backend/domains/payments` | Operations |
-| `backend/domains/resources` | Learning Resources |
-| `backend/domains/complaints` | Communication and Support |
-| `backend/identity` | Identity and Access domain |
-| `database/queries` | Repository layer |
-| `tgbot` parent linking | Telegram integration + Parent Linking domain |
+`backend/core/database.py` owns PostgreSQL connections/pooling. `database/alembic` owns the frozen baseline and every DDL revision. `database/__init__.py` is only a narrow connection compatibility export.
 
-## Target Architecture Rule
+## Cross-cutting Architecture
 
-Do not build new features by extending the current mixed admin workspace unless explicitly part of a transition phase.
+### Identity
+
+`accounts` is the single password/session authority. Profile tables attach business entities. Telegram links resolve to the same account. Session versions make account changes immediately invalidate old cookies.
+
+### Student Data
+
+Internal policy uses canonical `students.id`. Public enrollment IDs and legacy row IDs are resolved at HTTP/import boundaries and never substituted for ownership.
+
+### Time
+
+Database instants are timezone-aware. UI calendar/week logic uses `Asia/Tashkent`. Date-only source data remains date-only, and missing lesson times remain missing.
+
+### Frontend
+
+FastAPI embeds a typed bootstrap payload; React lazy-loads the named page. Shared UI components own accessible dialogs, menus, drawers, navigation, tables/cards, chart containers, touch targets, responsive safe areas, and reduced-motion behavior.
+
+### Integrations
+
+Telegram protocol verification belongs in integration adapters; parent/account policy belongs in domains. Excel parsing/reconciliation is explicit tooling, not an alternate runtime repository.
+
+## Transitional Boundaries
+
+`backend/roles` still contains admin page/form and workspace helper code. Move each slice only after routes, domain ownership, frontend behavior, and tests have an equivalent destination. Do not create speculative folder churn solely to make the tree look pure.

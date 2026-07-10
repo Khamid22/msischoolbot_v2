@@ -134,7 +134,7 @@ def _minimal_academic_context(**_kwargs):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
+    import backend.modules.admin.page as admin_page
 
     monkeypatch.setattr(
         admin_page,
@@ -179,7 +179,7 @@ def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeyp
 
 
 def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
+    import backend.modules.admin.page as admin_page
 
     _patch_admin_page_context(monkeypatch)
     monkeypatch.setenv("APP_ENV", "production")
@@ -205,7 +205,7 @@ def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, mo
 
 
 def test_admin_preview_can_be_explicitly_enabled_for_true_admin(client, monkeypatch):
-    import backend.roles.admin.routes.admin_page as admin_page
+    import backend.modules.admin.page as admin_page
 
     _patch_admin_page_context(monkeypatch)
     monkeypatch.setenv("ADMIN_PREVIEW_ROLES", "1")

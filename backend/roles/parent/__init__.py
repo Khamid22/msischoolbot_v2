@@ -1,2 +1,0 @@
-"""Parent role entry points."""
-

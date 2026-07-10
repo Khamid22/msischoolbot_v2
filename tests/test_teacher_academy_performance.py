@@ -1,6 +1,6 @@
 """Teacher Academy performance-oriented service coverage."""
 
-import backend.domains.teacher_academy.service as academy_service
+import backend.modules.teacher_academy.service as academy_service
 
 
 class _Rows:
@@ -131,8 +131,7 @@ class _SingleAcademyTeacherConnection:
 
 
 def test_list_academy_teachers_does_not_backfill_on_read(monkeypatch):
-    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: _EmptyAcademyConnection())
-    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: None)
+    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: _EmptyAcademyConnection())
     monkeypatch.setattr(
         academy_service,
         "_backfill_academy_teacher_accounts",
@@ -144,8 +143,7 @@ def test_list_academy_teachers_does_not_backfill_on_read(monkeypatch):
 
 def test_lightweight_teacher_academy_lookup_returns_matching_teacher(monkeypatch):
     conn = _SingleAcademyTeacherConnection()
-    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
-    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: None)
+    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
 
     teacher = academy_service.get_academy_teacher_for_teacher_account(12, staff_id=44)
 
@@ -249,10 +247,9 @@ def test_delete_academy_teacher_removes_generated_academy_identity(monkeypatch):
             calls.append(("commit",))
 
     conn = Conn()
-    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
-    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: calls.append(("ensure",)))
+    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
     monkeypatch.setattr(
-        academy_service.queries,
+        academy_service.repository,
         "get_academy_teacher_delete_row",
         lambda conn, academy_teacher_id: {
             "id": academy_teacher_id,
@@ -263,21 +260,21 @@ def test_delete_academy_teacher_removes_generated_academy_identity(monkeypatch):
         },
     )
     monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: True)
-    monkeypatch.setattr(academy_service.queries, "list_teacher_account_ids_for_staff", lambda conn, staff_id: [88])
-    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(academy_service.repository, "list_teacher_account_ids_for_staff", lambda conn, staff_id: [88])
+    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
     monkeypatch.setattr(
-        academy_service.queries,
+        academy_service.repository,
         "delete_teacher_profiles_for_delete",
         lambda conn, teacher_id, account_ids: calls.append(("teacher_profiles", teacher_id, account_ids)),
     )
     monkeypatch.setattr(
-        academy_service.queries,
+        academy_service.repository,
         "delete_staff_profiles_for_delete",
         lambda conn, staff_id, account_ids: calls.append(("staff_profiles", staff_id, account_ids)),
     )
-    monkeypatch.setattr(academy_service.queries, "delete_teacher_accounts_for_delete", lambda conn, account_ids: calls.append(("accounts", account_ids)))
-    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_staff_row", lambda conn, staff_id: calls.append(("staff", staff_id)))
-    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_profile_row", lambda conn, teacher_id: calls.append(("teacher", teacher_id)))
+    monkeypatch.setattr(academy_service.repository, "delete_teacher_accounts_for_delete", lambda conn, account_ids: calls.append(("accounts", account_ids)))
+    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_staff_row", lambda conn, staff_id: calls.append(("staff", staff_id)))
+    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_profile_row", lambda conn, teacher_id: calls.append(("teacher", teacher_id)))
 
     deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
 
@@ -306,10 +303,9 @@ def test_delete_academy_teacher_preserves_non_academy_identity(monkeypatch):
             calls.append(("commit",))
 
     conn = Conn()
-    monkeypatch.setattr(academy_service.queries, "connect_auth_db", lambda: conn)
-    monkeypatch.setattr(academy_service.queries, "ensure_teacher_academy_schema", lambda conn: None)
+    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
     monkeypatch.setattr(
-        academy_service.queries,
+        academy_service.repository,
         "get_academy_teacher_delete_row",
         lambda conn, academy_teacher_id: {
             "id": academy_teacher_id,
@@ -320,9 +316,9 @@ def test_delete_academy_teacher_preserves_non_academy_identity(monkeypatch):
         },
     )
     monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: (_ for _ in ()).throw(AssertionError("identity cleanup should be skipped")))
-    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
-    monkeypatch.setattr(academy_service.queries, "delete_teacher_profiles_for_delete", lambda *args, **kwargs: calls.append(("unexpected", "teacher_profiles")))
-    monkeypatch.setattr(academy_service.queries, "delete_academy_teacher_staff_row", lambda *args, **kwargs: calls.append(("unexpected", "staff")))
+    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(academy_service.repository, "delete_teacher_profiles_for_delete", lambda *args, **kwargs: calls.append(("unexpected", "teacher_profiles")))
+    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_staff_row", lambda *args, **kwargs: calls.append(("unexpected", "staff")))
 
     deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
 

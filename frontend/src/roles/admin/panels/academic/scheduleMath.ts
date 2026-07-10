@@ -1,6 +1,12 @@
 export const SCHEDULE_SNAP_MINUTES = 10;
 export const DEFAULT_CLASS_MINUTES = 80;
 
+const SCHOOL_CLASS_MINUTES: Readonly<Record<string, number>> = {
+  sehriyo: 40,
+  school5: 80,
+  "5": 80,
+};
+
 export type SnappedStartInput = {
   clientY: number;
   rectTop: number;
@@ -38,21 +44,5 @@ export function snappedStartMinutes({
 
 export function lessonDurationMinutesForSchoolCode(value: unknown, defaultMinutes = DEFAULT_CLASS_MINUTES) {
   const schoolCode = String(value || "").toLowerCase().replace(/[\s_-]+/g, "");
-  if (schoolCode.includes("sehriyo")) return 40;
-  if (schoolCode.includes("school5") || schoolCode.includes("5")) return 80;
-  return defaultMinutes;
-}
-
-export function randomLessonStartMinutesForSeed(
-  id: unknown,
-  index: number,
-  startMin: number,
-  endMin: number,
-  durationMin: number,
-  snapMinutes = SCHEDULE_SNAP_MINUTES,
-) {
-  const available = Math.max(snapMinutes, endMin - startMin - durationMin);
-  const slots = Math.max(1, Math.floor(available / snapMinutes));
-  const seed = Math.abs((Number(id) || index + 1) * 37 + index * 19);
-  return startMin + (seed % slots) * snapMinutes;
+  return SCHOOL_CLASS_MINUTES[schoolCode] ?? defaultMinutes;
 }

@@ -1,187 +1,172 @@
 # Current Architecture
 
-## Backend Structure
+Date: 2026-07-10
+
+Branch documented: `FastAPI-Run-System`
+
+Production reference: `main` (read-only)
+
+## System Shape
+
+```mermaid
+flowchart LR
+    Browser["Browser / React"]
+    MiniApp["Telegram Mini App"]
+    API["FastAPI pages and API v1"]
+    Domains["Domain services"]
+    Queries["Domain-owned queries"]
+    DB[("PostgreSQL msi_v2")]
+    Excel["Explicit Excel reconciliation"]
+    Bot["aiogram worker shell\nno inbound routers"]
+
+    Browser --> API
+    MiniApp --> API
+    API --> Domains --> Queries --> DB
+    Excel --> Domains
+    Bot -. future adapters .-> Domains
+```
+
+The LMS is a web portal with Telegram integration, not a Telegram mini app backed by Google Sheets. PostgreSQL is the canonical runtime store. Excel files enter only through explicit import/reconciliation code, and the bot worker currently starts with an empty router registry.
+
+## Backend Ownership
 
 ```text
 backend/
-  server.py                         FastAPI app composition
-  api/
-    v1/
-      router.py                     JSON/action API router registry
-      academic_director/            AD JSON actions migrated where safe
-      head_of_department/           HOD JSON actions migrated where safe
-      teacher/                      teacher office-hours API slice
-      student/                      student chat/comments/office-hours/activity API slices
-      parent/                       placeholder for future safe API migrations
-      admin/                        admin API slices for announcements, resources, complaints,
-                                    office hours, payments, parents, students, academic, chat
-      ceo/                          placeholder for future safe API migrations
-      hr_manager/                   placeholder for future safe API migrations
-      customer_support/             placeholder for future safe API migrations
+  server.py                         app composition and security middleware
+  api/v1/                           versioned JSON/action routes and schemas
+  pages/                            HTML/React bootstrap routes
   domains/
-    academics/                      academic dashboard, programs, groups, enrollments
-    announcements/                  announcements query/service layer
-    identity/                       login and Telegram authentication routes
-    parents/                        parent invites, links, dashboard access
-    students/                       student profile, dashboard, account helpers
-    teacher_academy/                academy teacher, lesson assignment, schedule, assessment flows,
-                                    explicit HOD subject-scope permissions, and notifications
-    teachers/                       teacher profiles, auth helpers, subject assignments
-    timetable/                      schedule rules and lesson sessions
-  roles/
-    academic_director/              AD staff-registration compatibility service
-    head_of_department/             HOD workspace-card/bootstrap helpers
-    admin/                          system/admin workspace
-    teacher/                        teacher cabinet bootstrap services
-    student/                        student dashboard routes
-    parent/                         parent portal routes
-  pages/
-    academic_director.py            Academic Director page shell
-    ceo.py                          CEO page shell
-    head_of_department.py           HOD page shell
-    hr_manager.py                   HR Manager page shell
-    teacher.py                      Teacher page shell
-    customer_support.py             Customer Support page shell
-  identity/                         temporary compatibility wrappers and shared identity plumbing
-  utils/                            request/session/render helpers
+    identity/                       canonical accounts, Telegram auth, SQL
+    academics/                      schools, programs, groups, gradebook, dashboards
+    students/                       student profile and access services/queries
+    teachers/                       teacher profile and assignment services/queries
+    parents/                        invite, linking, parent access services/queries
+    timetable/                      schedules and lesson sessions
+    office_hours/                   slot and booking rules/queries
+    teacher_academy/                assignments, assessments, permissions, notifications
+    announcements/                  announcement rules/queries
+    communication/                  chat rules/queries
+    complaints/                     support ticket rules/queries
+    payments/                       payment records and student access boundaries
+    resources/                      resources, comments, and storage-facing rules
+  core/                             configuration and PostgreSQL connection pool
+  integrations/                     Telegram, Excel, and storage adapters
+  security/                         current-user, role, permission, and auth helpers
+  roles/                            remaining workspace/page compatibility helpers
 ```
 
-Role routes should render pages and provide lightweight bootstrap context. API v1 routes should own JSON/action endpoints and permission guards. Domain services own business workflows. Domain query modules own SQL for their area.
+The dependency rule is routes/pages -> services -> domain query modules -> PostgreSQL. Domain code does not use the deleted `database.queries` or `database.cross_queries` barrels. `database/__init__.py` is now only a small stable re-export of core connection helpers; schema history lives under `database/alembic`.
 
-## Frontend Structure
+`backend/identity` contains only shared connection/bootstrap plumbing still used during application startup. The old password-auth, Telegram-auth, parent-account, parent-invite, and Telegram-link facade modules have been removed; canonical identity logic lives in `backend/domains/identity`.
+
+## Authentication Boundary
+
+`msi_v2.accounts` is the canonical login record for all roles. Separate `student_profiles`, `teacher_profiles`, `parent_profiles`, and `staff_profiles` connect an account to its business entity.
+
+Password-enabled accounts use:
+
+1. canonical login lookup;
+2. password-hash verification from `accounts.password_hash`;
+3. active account and active profile checks;
+4. a minimal, versioned session;
+5. a forced `/account/security` flow when `must_change_password` is true.
+
+Changing or resetting a password increments `session_version`. Middleware checks the current account status, role, and version on authenticated requests so older cookies are rejected.
+
+Telegram sign-in resolves a verified `account_telegram_links` row to the same canonical account/profile/session model. Telegram does not maintain a second account authority.
+
+## Student Identifier Rules
+
+Three student identifiers can appear, and they are not interchangeable:
+
+| Identifier | Purpose |
+| --- | --- |
+| `students.id` / `student_db_id` | canonical internal identity used for authorization and relational writes |
+| `legacy_student_row_id` / route name `student_row_id` | compatibility value at older admin/parent HTTP boundaries |
+| `group_students.legacy_public_dashboard_id` / enrollment ID | public dashboard route compatibility |
+
+Routes that still accept a legacy row ID must resolve it to `students.id` before applying policy or writing relational data. New domain APIs should accept canonical IDs unless they are explicitly maintaining a public compatibility contract.
+
+## Parent Invite Boundary
+
+`/parent/invite/{code}` is the only public invite route. The raw code exists only in the URL/user handoff; PostgreSQL stores its SHA-256 digest. Loading requires a pending, unexpired invite. Claiming locks the invite row, creates or updates the parent and child link, provisions the canonical account and optional Telegram link, consumes the invite, and returns a versioned session in one database transaction.
+
+The old signed `/parent/link/{token}` routes and plaintext invite-token storage are gone. A manual form claim remains available from the invite page; Telegram claims additionally require verified, fresh Mini App `initData`.
+
+## API and Page Boundaries
+
+- JSON/action endpoints live under `/api/v1/*`.
+- Page routes live under `backend/pages` or the remaining admin page registry.
+- The runtime has no `/admin/api`, `/teacher/api`, `/student/api`, `/academic-director/api`, `/head-of-department/api`, or bare non-versioned `/api/*` endpoints.
+- Some old HTML form actions remain under `/admin/*`. They are page compatibility routes, not a second JSON API.
+- `tests/route_snapshot.txt` is the checked-in runtime route contract.
+
+## Frontend Architecture
 
 ```text
 frontend/src/
-  app/                              React bootstrap and page map
-  roles/
-    admin/                          system/admin workspace panels
-    academic_director/              AD-specific pages
-    head_of_department/             HOD-specific pages
-    common/                         shared role workspaces
-    teacher/                        teacher cabinet
-    student/                        student dashboard pages
-    parent/                         parent portal
-  shared/
-    api/                            canonical API route helpers
-    ui/                             RoleWorkspaceShell, Modal, ActionMenu, MetricCard, tables
-    lib/                            page routes, bootstrap, Telegram helpers
+  app/                              bootstrap parsing and lazy page registry
+  roles/                            role-owned pages and panels
+  shared/api/                       canonical API route helpers
+  shared/lib/                       bootstrap, timezone, metric, motion, Telegram helpers
+  shared/ui/                        accessible shells, dialogs, cards, charts, tables, navigation
 ```
 
-Shared UI components are the preferred place for shells, modals, responsive cards/tables, nav, toasts, badges, and action menus.
+The backend embeds a JSON bootstrap payload; React resolves a lazy-loaded page instead of inferring business authorization in the browser. Server role and object guards remain authoritative.
 
-## Domains
+Shared UI behavior includes:
 
-- Authentication: password and Telegram auth live under `backend/domains/identity` plus clean identity modules. Old account-auth import paths remain wrappers during migration.
-- Academics: operational academic queries are in `backend/domains/academics/queries.py`; service modules shape dashboard and admin payloads.
-- Timetable: schedule/session SQL lives in `backend/domains/timetable/queries.py`.
-- Announcements: CRUD SQL lives in `backend/domains/announcements/queries.py`.
-- Teacher Academy: business logic and SQL live in `backend/domains/teacher_academy`. Permission helpers accept `CurrentUser` or explicit `role`/`account_id`/`staff_id` values; legacy session lookups stay in page-layer compatibility code.
-- Teachers, students, and parents: role-owned queries and services live in their matching domain packages.
+- responsive desktop sidebar, mobile drawer/bottom navigation, and Telegram safe areas;
+- minimum 44px touch targets for interactive primitives;
+- keyboard-accessible dialogs, menus, drawers, and pagination;
+- reduced-motion fallbacks for transitions and chart/page animations;
+- responsive tables/cards and Recharts containers;
+- metric helpers that preserve valid zero values;
+- `Asia/Tashkent` calendar/week/office-hour conversion independent of browser timezone;
+- no invented lesson start times when source data has none.
 
-## API V1
+## Database and Migration Boundary
 
-`backend/api/v1/router.py` is registered by `backend/server.py` before role page routes. The active migrated endpoints are:
+Alembic is the only DDL owner. The current chain is:
 
-- `POST /api/v1/academic-director/head-of-departments`
-- `POST /api/v1/academic-director/teacher-academy`
-- `POST /api/v1/academic-director/teacher-academy/assignments/{assignment_id}`
-- `POST /api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments`
-- `POST /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status`
-- `POST /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote`
-- `POST /api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete`
-- `POST /api/v1/head-of-department/teacher-academy/assignments/{assignment_id}`
-- `POST /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments`
-- `POST /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status`
-- admin v1 slices under `/api/v1/admin/*`
-- student v1 slices under `/api/v1/student/*`
-- teacher office-hours under `/api/v1/teacher/office-hours/*`
-
-`GET /api/v1/auth/me` and `GET /api/v1/system/status` remain in the existing system/auth API modules. Other role API folders exist as placeholders until their current endpoints can move without changing behavior.
-
-Runtime inventory on 2026-07-09: 145 registered routes; 76 are `/api/v1/*`, 57 are page/form routes, and 12 are static/docs/public routes. No runtime route is currently registered under `/admin/api`, `/teacher/api`, `/student/api`, `/academic-director/api`, `/head-of-department/api`, or a bare non-v1 `/api/*` path.
-
-## Roles
-
-- `system_admin` / `admin`: admin workspace and operational compatibility.
-- `academic_director`: full academic workspace and Teacher Academy management.
-- `head_of_department`: subject-scoped academic workspace and Teacher Academy management.
-- `teacher`: active teacher or academy teacher cabinet.
-- `student`: student dashboard and learning tools.
-- `parent`: linked-child parent portal.
-- `academic_director`, `head_of_department`, `teacher`, `ceo`, `hr_manager`, and `customer_support`: page shells now live in `backend/pages/*`; matching `backend/roles/*/routes.py` files have been deleted. The role package `__init__.py` files remain compatibility exports.
-
-## Request Flow Examples
-
-AD creates academy teacher: the frontend submits through `frontend/src/shared/api/routes.ts` to `/api/v1/academic-director/teacher-academy`; the API route uses schemas from `backend/api/v1/teacher_academy/schemas.py` and response adapters from `backend/api/v1/teacher_academy/responses.py`; the helper calls `backend/domains/teacher_academy/service.py`; the service uses `backend/domains/teacher_academy/queries.py`.
-
-HOD schedules or assesses: the frontend submits to `/api/v1/head-of-department/teacher-academy...`; the API route passes `CurrentUser` into `backend/domains/teacher_academy/permissions.py`; the permission helper delegates SQL to `backend/domains/teacher_academy/queries.py`; the shared API response adapter calls the Teacher Academy domain service and filters the returned academy list to the same subject scope.
-
-Teacher sees academy progress: `/teacher` renders from `backend/pages/teacher.py` and receives bootstrap props from temporary role helpers in `backend/roles/teacher/services.py` and `backend/roles/teacher/workspace_cards.py`. Future JSON endpoints should move under `/api/v1/teacher` only after equivalent tests cover the flow.
-
-Student dashboard: `/student` and `/dashboard/{student_id}` currently render from student role routes and domain-backed services. Existing student JSON endpoints remain in their current paths until a no-behavior-change API migration is reviewed.
-
-Parent children dashboard: `/parent` and `/parent/dashboard/{student_row_id}` render from parent role routes backed by the parent/student domains. Parent invite and Telegram linking behavior is unchanged.
-
-## Database Note
-
-The physical PostgreSQL schema is still `msi_v2`. Runtime code may still reference `msi_v2` inside domain query modules and migrations. Do not rename the schema until `SCHEMA_RENAME_MSI_V2_TO_LMS_PLAN.md` is reviewed and scheduled.
-
-Compatibility wrappers remain temporarily in:
-
-- `database/queries/`
-- `database/cross_queries/`
-- selected `backend/identity/` modules
-- selected role service facades
-
-These wrappers should be removed only after import references are eliminated and tests confirm all roles still load.
-`docs/DATABASE_FOLDER_MIGRATION_STATUS.md` tracks file-by-file database cleanup. `database/queries/announcement_queries.py` has been deleted because announcement SQL is owned by `backend/domains/announcements/queries.py`.
-
-## Legacy Remaining
-
-- `database/` remains because Alembic history, compatibility query wrappers, and active imports still depend on it.
-- The physical schema remains `msi_v2`; the `lms` rename is only planned.
-- Many old page and form routes still live in `backend/roles/`, including `/admin/*` form actions plus student and parent route modules. AD, HOD, teacher, CEO, HR Manager, and Customer Support page shells have moved to `backend/pages`, and their old role `routes.py` files are deleted.
-- Admin page routes still use `render_admin_page` because the system/admin workspace has not been moved to `backend/pages/admin.py` yet.
-- API v1 still has temporary imports from role services for a few admin/AD slices (`staff_registration`, `academic_service`, upload progress/storage helpers). These are tracked for later domain moves.
-
-## Local Run
-
-```bash
-pip install -r requirements.txt
-python main.py
+```text
+0001 baseline -> 0002 lesson source metadata -> 0003 shared accounts
+-> 0004 HOD subject scopes -> 0005 canonical identity
+-> 0006 secure parent invites -> 0007 LMS integrity constraints
 ```
 
-Frontend checks:
+Runtime table/index bootstrap functions have been removed. Deployment applies `python -m alembic upgrade head` before starting the web process.
 
-```bash
-npm --prefix frontend run check-types
-npm --prefix frontend run build
-```
+## Integrations
 
-Backend checks:
+- Telegram web authentication: active, HMAC-verified, replay-limited, canonical-account based.
+- Telegram Mini App parent linking: active through `/parent/invite/{code}` and the `parent_` start parameter.
+- Telegram inbound bot commands: not implemented; `tgbot.routing.BOT_ROUTERS` is empty.
+- Teacher Academy outbound Telegram notifications: best-effort integration and independent of inbound handlers.
+- Google Sheets runtime access: retired.
+- Excel: explicit curriculum/reconciliation/import boundary only.
+- Object storage: adapter used by resource workflows where configured.
+
+## Deliberately Retained Compatibility
+
+- Physical schema name `msi_v2`.
+- Legacy source columns used to correlate migrated records.
+- Public dashboard/enrollment IDs and a few `student_row_id` HTTP parameters.
+- Remaining admin HTML form routes and workspace helper services.
+- `auth_role="admin"` session compatibility for `system_admin` presentation routing.
+
+These are named boundaries, not alternate sources of truth.
+
+## Current Verification Commands
 
 ```bash
 python3 -m pytest
+python3 -m compileall -q backend database tgbot scripts main.py
+python -m alembic current
+python -m alembic heads
+npm --prefix frontend run check-types
+npm --prefix frontend run build
+git diff --check
 ```
 
-## Railway Deployment Notes
-
-- Set `DATABASE_URL`, `BOT_TOKEN`, `MINI_APP_URL`, and `APP_SECRET_KEY`.
-- Keep the current database schema as `msi_v2` until the schema rename is reviewed.
-- Run migrations only through reviewed Alembic/database scripts.
-- Build frontend before deploy if generated React assets are expected in the deployment artifact.
-- Never test destructive database cleanup directly on Railway production.
-
-## Smoke Checklist
-
-| Area | Check |
-| --- | --- |
-| Auth | system/admin, Academic Director, HOD, teacher, student, and parent login work. |
-| Academic Director | Overview, Teacher Academy, HOD management, timetable, announcements, and profile/logout load. |
-| HOD | Overview, Teacher Academy, timetable, announcements, and profile/logout load with subject scope. |
-| Teacher Academy | Create teacher, selected lesson count, Schedule, Assess, Review/Promote flows work. |
-| Teacher | Academy and active teacher cabinets work on desktop and mobile. |
-| Student | Dashboard opens, subject dashboards resolve, no parent/admin data leaks. |
-| Parent | Invite link, Telegram linking, linked child dashboard, and parent portal work. |
-| Responsive | Desktop, laptop, tablet, phone, and Telegram Mini App layouts remain usable. |
-| Data safety | No password hashes in props; no schema rename; no dummy data invented. |
+Workbook parity is intentionally not asserted here. Use the reconciliation report and investigate every ambiguous or mismatched identity/date/result before any transactional apply.

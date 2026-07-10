@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.api.v1.teacher_academy.responses as academy_api
+    import backend.modules.teacher_academy.http_responses as academy_api
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
@@ -269,7 +269,7 @@ def test_academic_director_lessons_sync_route_calls_domain_service(client, monke
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
-    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
+    import backend.modules.teacher_academy.hod_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {"update": 0}
@@ -313,7 +313,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):
-    import backend.api.v1.head_of_department.teacher_academy as hod_api_routes
+    import backend.modules.teacher_academy.hod_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}

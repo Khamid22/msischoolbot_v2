@@ -30,6 +30,7 @@ const pageMap = {
   "head-of-department-academy": lazy(() => import("@/roles/head_of_department/pages/TeacherAcademy")),
   "head-of-department-timetable": lazy(() => import("@/roles/common/pages/AcademicDepartmentWorkspace")),
   "head-of-department-announcements": lazy(() => import("@/roles/common/pages/AcademicDepartmentWorkspace")),
+  "account-security": lazy(() => import("@/roles/common/pages/AccountSecurity")),
   unauthorized: lazy(() => import("@/roles/common/pages/Unauthorized")),
   "admin-edit-student": lazy(() => import("@/roles/admin/pages/EditStudentProfile")),
   "student-chat": lazy(() => import("@/roles/student/pages/Chat")),

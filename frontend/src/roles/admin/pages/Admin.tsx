@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Layers,
+  KeyRound,
   LogOut,
   Phone,
   Megaphone,
@@ -817,7 +818,7 @@ function AdminSidebar({
                     type="button"
                     onClick={() => state.switchAdminTab(tab.key)}
                     aria-current={isActive ? "page" : undefined}
-                    className={`flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
+                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-all active:scale-[0.98] duration-150 motion-reduce:active:scale-100 ${
                       isActive
                         ? "bg-sidebar-primary text-sidebar-primary-foreground"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -844,11 +845,19 @@ function AdminSidebar({
               {activeAdminProfile.label} mode
             </span>
           </div>
+          <a
+            href={routes.accountSecurity}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            aria-label="Account security"
+            title="Account security"
+          >
+            <KeyRound className="h-4 w-4" />
+          </a>
           <form action={routes.logout} method="post" className="shrink-0">
             <input type="hidden" name="csrf_token" value={csrfToken || ""} />
             <button
               type="submit"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               aria-label="Exit"
             >
               <LogOut className="h-4 w-4" />
@@ -953,7 +962,7 @@ export default function AdminPage(props: AdminPageProps) {
           <button
             type="button"
             onClick={() => state.setMobileNavOpen((current: boolean) => !current)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground hover:bg-muted lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 lg:hidden"
             aria-label={state.mobileNavOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={state.mobileNavOpen}
             aria-controls="admin-mobile-nav"
@@ -966,11 +975,18 @@ export default function AdminPage(props: AdminPageProps) {
             <p className="truncate text-[11px] text-muted-foreground">Admin Console</p>
           </div>
 
-          <form action={routes.logout} method="post" className="ml-auto shrink-0">
+          <a
+            href={routes.accountSecurity}
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            aria-label="Account security"
+          >
+            <KeyRound className="h-4 w-4" />
+          </a>
+          <form action={routes.logout} method="post" className="shrink-0">
             <input type="hidden" name="csrf_token" value={props.csrfToken || ""} />
             <button
               type="submit"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-destructive hover:bg-muted"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-destructive hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
               aria-label="Exit"
             >
               <LogOut className="h-4 w-4" />

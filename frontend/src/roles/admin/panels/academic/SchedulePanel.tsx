@@ -8,7 +8,7 @@ import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "../../shared";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
-import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, randomLessonStartMinutesForSeed, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
+import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
@@ -122,10 +122,6 @@ function ScheduleFilterSelect({
 
 function lessonDurationMinutes(lesson: LessonHistoryRow) {
   return lessonDurationMinutesForSchoolCode(lesson.school_code);
-}
-
-function randomLessonStartMinutes(lesson: LessonHistoryRow, index: number, startMin: number, endMin: number, durationMin: number) {
-  return randomLessonStartMinutesForSeed(lesson.id, index, startMin, endMin, durationMin);
 }
 
 function overlapGridFor(count: number) {
@@ -309,14 +305,6 @@ export function SchedulePanel({ state }: { state: any }) {
     });
     return next;
   }, [timetableBlocks, weekDays]);
-  const allDayUntimedLessons = useMemo(() => {
-    const next: Record<string, LessonHistoryRow[]> = {};
-    weekDays.forEach((day) => {
-      const dayIso = isoDate(day);
-      next[dayIso] = untimedLessons.filter((lesson) => lessonDateToIso(lesson.lesson_date) === dayIso);
-    });
-    return next;
-  }, [untimedLessons, weekDays]);
   const filterOptions = useMemo(() => {
     const groupMap = new Map<string, string>();
     const subjectSet = new Set<string>();
@@ -386,9 +374,9 @@ export function SchedulePanel({ state }: { state: any }) {
   const busiestDayLoad = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
-      return Math.max(max, (allDayTimetableBlocks[dayIso] || []).length + (allDayUntimedLessons[dayIso] || []).length);
+      return Math.max(max, (allDayTimetableBlocks[dayIso] || []).length);
     }, 0);
-  }, [allDayTimetableBlocks, allDayUntimedLessons, weekDays]);
+  }, [allDayTimetableBlocks, weekDays]);
   const busiestOverlap = useMemo(() => {
     return weekDays.reduce((max, day) => {
       const dayIso = isoDate(day);
@@ -915,7 +903,6 @@ export function SchedulePanel({ state }: { state: any }) {
               {weekDays.map((day) => {
                   const dayIso = isoDate(day);
                   const daySessions = dayTimetableBlocks[dayIso] || [];
-                  const looseLessons = dayUntimedLessons[dayIso] || [];
                   const hint = dropHint && dropHint.day === dayIso ? dropHint : null;
                   return (
                     <div
@@ -1014,39 +1001,6 @@ export function SchedulePanel({ state }: { state: any }) {
                           </div>
                         );
                       })}
-                      {looseLessons.map((lesson, index) => {
-                        const durationMin = lessonDurationMinutes(lesson);
-                        const startMin = randomLessonStartMinutes(lesson, index, dayStartMin, dayEndMin, durationMin);
-                        const endMin = startMin + durationMin;
-                        const top = ((startMin - dayStartMin) / 60) * hourPx;
-                        const height = Math.max(34, (durationMin / 60) * hourPx - 2);
-                        const status = lessonStatus(lesson);
-                        const toneLabel = status === "cancelled" ? "Cancelled" : "Unplaced";
-                        const compactCard = height < 52;
-                        return (
-                          <div
-                            key={`schedule-loose-${lesson.id}`}
-                            onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), asString(lesson.group_name)) : undefined}
-                            onPointerMove={canDrag ? movePointerDrag : undefined}
-                            onPointerUp={canDrag ? endPointerDrag : undefined}
-                            onPointerCancel={canDrag ? cancelPointerDrag : undefined}
-                            data-schedule-interactive="true"
-                            role="button"
-                            tabIndex={0}
-                            aria-label={`Place ${asString(lesson.group_name)} ${minutesToLabel(startMin)} to ${minutesToLabel(endMin)}`}
-                            className={`absolute left-1 right-1 touch-none select-none overflow-hidden rounded-md border px-1.5 py-1 text-[10px] shadow-md transition-[box-shadow,filter] hover:brightness-105 focus:outline-none ${scheduleCardClass(lesson.subject_name, status)} ${canDrag ? "cursor-grab active:cursor-grabbing" : ""}`}
-                            style={{
-                              top: `${Math.max(0, top)}px`,
-                              height: `${height}px`,
-                              zIndex: 18,
-                            }}
-                          >
-                            <p className="truncate text-[clamp(0.56rem,0.8vw,0.68rem)] font-black leading-tight tracking-wide">{asString(lesson.group_name)}</p>
-                            <p className="truncate text-[clamp(0.52rem,0.74vw,0.62rem)] font-semibold leading-tight text-white/90">{minutesToLabel(startMin)}–{minutesToLabel(endMin)}</p>
-                            {!compactCard ? <p className="mt-0.5 inline-flex w-fit rounded-full bg-white/15 px-1 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-white/85 ring-1 ring-white/20">{toneLabel}</p> : null}
-                          </div>
-                        );
-                      })}
                       {hint ? (
                         <div
                           className="pointer-events-none absolute left-1 right-1 z-10 rounded-md border border-dashed border-primary/60 bg-primary/5 px-1.5 py-1"
@@ -1066,6 +1020,84 @@ export function SchedulePanel({ state }: { state: any }) {
             </div>
           </div>
         </div>
+
+        {visibleUntimedLessons.length ? (
+          <section
+            className="mt-3 rounded-xl border border-dashed border-amber-300/80 bg-amber-50/70 p-3 text-amber-950"
+            aria-labelledby="unscheduled-lessons-title"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-amber-700" />
+                  <h3 id="unscheduled-lessons-title" className="text-sm font-black">
+                    Unscheduled
+                  </h3>
+                  <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-black tabular-nums">
+                    {visibleUntimedLessons.length}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-amber-900/80">
+                  These lessons have a date but no real start or end time, so they are not shown on the timed grid.
+                </p>
+              </div>
+              <p className="text-[11px] font-bold text-amber-800">
+                {canDrag ? "Drag a card onto the timetable to assign its real time." : "Awaiting an assigned class time."}
+              </p>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {weekDays.flatMap((day, dayIndex) => {
+                const dayIso = isoDate(day);
+                return (dayUntimedLessons[dayIso] || []).map((lesson) => {
+                  const status = lessonStatus(lesson);
+                  const selected = selectedLessonId === Number(lesson.id);
+                  const groupName = asString(lesson.group_name) || "Group not set";
+                  const subjectName = asString(lesson.subject_name) || "Subject not set";
+                  return (
+                    <article
+                      key={`schedule-unscheduled-${lesson.id}`}
+                      onPointerDown={canDrag ? (event) => startPointerDrag(event, lessonDragPayload(lesson), groupName) : undefined}
+                      onPointerMove={canDrag ? movePointerDrag : undefined}
+                      onPointerUp={canDrag ? endPointerDrag : undefined}
+                      onPointerCancel={canDrag ? cancelPointerDrag : undefined}
+                      onKeyDown={canDrag ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelectedLessonId(Number(lesson.id));
+                        }
+                      } : undefined}
+                      role={canDrag ? "button" : undefined}
+                      tabIndex={canDrag ? 0 : undefined}
+                      aria-label={`Unscheduled ${groupName}, ${subjectName}, ${dayIso}${canDrag ? ". Drag onto the timetable to assign a time." : "."}`}
+                      className={`rounded-lg border bg-background p-3 text-foreground shadow-sm transition-[border-color,box-shadow] duration-150 motion-reduce:transition-none ${
+                        status === "cancelled" ? "border-destructive/35" : "border-amber-300/80"
+                      } ${selected ? "ring-2 ring-primary/40" : ""} ${canDrag ? "touch-none cursor-grab select-none hover:border-amber-500 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:cursor-grabbing" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black">{groupName}</p>
+                          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{subjectName}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                          status === "cancelled" ? "bg-destructive/10 text-destructive" : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {status === "cancelled" ? "Cancelled" : "No time"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] font-bold text-muted-foreground">
+                        {weekdayLabels[dayIndex]} · {dayIso} · Time not assigned
+                      </p>
+                      {asString(lesson.lesson_topic) ? (
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{asString(lesson.lesson_topic)}</p>
+                      ) : null}
+                    </article>
+                  );
+                });
+              })}
+            </div>
+          </section>
+        ) : null}
       </ChartCard>
 
       {createOpen ? (

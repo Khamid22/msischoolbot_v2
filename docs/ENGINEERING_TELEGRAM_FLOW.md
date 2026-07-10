@@ -1,165 +1,102 @@
-# Engineering Telegram Flow
+# Engineering Telegram Integration
 
-Audience: senior engineers.
+Audience: engineers working on Mini App authentication, parent linking, notifications, or the bot worker.
 
-Project: MSI LMS Portal.
+## Current State
 
-## Current Implementation
+Telegram remains an integration surface for the LMS web application:
 
-Telegram bot:
+- `/auth/telegram` validates Mini App `initData` and creates a canonical account session;
+- the React bootstrap reads a `parent_{code}` start parameter and opens `/parent/invite/{code}` once per Mini App session;
+- the parent invite page can submit verified Mini App identity;
+- Teacher Academy can send best-effort outbound notifications.
 
-- aiogram.
-- runtime router registry in `tgbot/routing.py`.
-- keyboards in `tgbot/keyboards`.
-- legacy handlers were removed; new command/callback handlers should be added
-  through the new bot architecture and registered in `tgbot/routing.py`.
+The old inbound bot implementation is retired. `tgbot/routing.py` intentionally defines `BOT_ROUTERS = ()`; `main.py bot` can start the dispatcher, but no `/start`, callback, account-link, or support command handlers are currently registered. Do not document those commands as implemented.
 
-Current parent linking:
+## Mini App Authentication
 
-- admin route creates invite token and code.
-- bot handles `/start parent_{code}`.
-- Mini App validates invite and Telegram initData.
-- parent is linked to student.
-- parent can access linked children.
+```mermaid
+sequenceDiagram
+    participant MiniApp as Telegram Mini App
+    participant Web as FastAPI
+    participant Verify as Telegram adapter
+    participant Identity as Identity domain
+    participant DB as PostgreSQL
 
-Current issue:
+    MiniApp->>Web: POST /auth/telegram with raw initData
+    Web->>Verify: verify HMAC and auth_date age
+    Verify-->>Web: verified Telegram user/start parameter
+    Web->>Identity: resolve account_telegram_links
+    Identity->>DB: load active canonical account/profile
+    DB-->>Identity: identity and session_version
+    Identity-->>Web: canonical session payload
+    Web-->>MiniApp: role redirect/session
+```
 
-- bot imports backend identity modules directly.
-- target should move parent linking into a shared domain service.
+Security rules:
 
-## Parent Telegram Linking Flow
+- trust only the raw `window.Telegram.WebApp.initData` after server-side HMAC verification;
+- enforce `WEBAPP_INIT_DATA_TTL` replay protection unless a reviewed test explicitly overrides it;
+- never trust `initDataUnsafe`, a Telegram ID query parameter, or a username;
+- resolve Telegram identity through `account_telegram_links` to the same canonical account/profile used by password auth;
+- apply account status, profile status, role, and session-version rules after Telegram verification.
+
+## Parent Invite Flow
 
 ```mermaid
 sequenceDiagram
     participant Staff
-    participant Backend
+    participant API as Admin API
     participant DB as PostgreSQL
     participant Parent
-    participant Bot
     participant MiniApp
+    participant Domain as Parent domain
 
-    Staff->>Backend: create parent invite for student
-    Backend->>DB: store invite
-    Backend-->>Staff: Telegram invite link
-    Parent->>Bot: /start parent_code
-    Bot->>Backend: link request through domain service
-    Backend->>DB: validate invite and create parent link
-    Bot-->>Parent: open Mini App
-    Parent->>MiniApp: opens parent portal
-    MiniApp->>Backend: Telegram initData
-    Backend->>DB: verify linked parent and children
-    Backend-->>MiniApp: parent workspace payload
+    Staff->>API: create invite for compatibility student row id
+    API->>Domain: resolve canonical student and create code
+    Domain->>DB: store SHA-256 digest, expiry, max_uses=1
+    API-->>Staff: /parent/invite/code and parent_code start value
+    Parent->>MiniApp: open invite
+    MiniApp->>Domain: POST code plus verified initData
+    Domain->>DB: lock pending invite
+    Domain->>DB: parent + child link + account + Telegram link + consume
+    DB-->>Domain: committed canonical identity/session
+    Domain-->>MiniApp: parent workspace
 ```
 
-## Target Service Ownership
+The raw invite code is a user-held capability and is never persisted. Lookup uses its SHA-256 digest. Claim validates status/expiry, locks the invite row, and consumes it in the same transaction as parent linking and canonical-account provisioning.
 
-Parent linking domain should own:
+The manual fallback form uses the same invite transaction but has no Telegram identity to link. It creates a Telegram-first canonical parent account without a password credential and issues a versioned web session.
 
-- invite creation.
-- invite validation.
-- Telegram identity verification result handling.
-- parent creation/update.
-- parent-child link creation.
-- audit events.
+The deleted `/parent/link/{token}` signed-token flow must not be restored.
 
-Bot should own:
+## Ownership Boundary
 
-- Telegram command parsing.
-- Telegram messages.
-- keyboard buttons.
+| Layer | Owns |
+| --- | --- |
+| `backend/integrations/telegram` | HMAC parsing and Telegram protocol details |
+| `backend/domains/identity` | Telegram-link to canonical-account authentication |
+| `backend/domains/parents` | invite creation/claim, parent-child linking, transaction |
+| `backend/pages/parent.py` | parent invite/page UX |
+| `frontend/src/shared/lib/telegram.ts` | Mini App viewport/start-param client adapter |
+| `tgbot` | future inbound commands/messages/keyboards only |
 
-## Teacher Academy Outbound Notifications
+Bot handlers must call domain services through an adapter. They must not duplicate invite, account, academic, payment, or authorization rules.
 
-Teacher Academy domain events send best-effort outbound Telegram messages
-without depending on inbound bot handlers.
+## Outbound Teacher Academy Notifications
 
-Required environment:
+Outbound notifications are independent of inbound bot routers. They use `BOT_TOKEN` and optionally:
 
-- `BOT_TOKEN`: Telegram bot token used for `sendMessage`.
-- `TEACHER_ACADEMY_CHANNEL_CHAT_ID`: default Teacher Academy channel chat id.
+- `TEACHER_ACADEMY_CHANNEL_CHAT_ID`
+- `TEACHER_ACADEMY_<SUBJECT>_CHAT_ID`
 
-Optional department channel overrides:
+A Telegram username is display metadata; the Bot API cannot initiate a private chat from a username alone. Direct messages require a known numeric Telegram user ID. Welcome messages must not leak assigned lesson names, schedules, or lesson counts into channels.
 
-- `TEACHER_ACADEMY_<SUBJECT>_CHAT_ID`: subject-specific channel chat id, where
-  the subject name is uppercased and non-alphanumeric characters become `_`.
-  Example: `TEACHER_ACADEMY_MATHEMATICS_CHAT_ID`.
+## Before Adding Inbound Bot Handlers
 
-Teacher direct messages require a numeric `msi_staff.telegram_user_id`. A
-stored `telegram_username` is useful for display, but Telegram Bot API cannot
-start a private chat from a username alone.
-
-New Teacher Academy welcome notifications must be greeting-only. They must not
-include assigned lesson names, schedules, or lesson counts in the channel or in
-the teacher direct message.
-
-Web should own:
-
-- session creation.
-- rendering parent invite/portal pages.
-- calling parent linking domain.
-
-## Target Data Tables
-
-- `parents`.
-- `parent_student_links`.
-- `account_invites`.
-- `telegram_accounts`.
-- `account_telegram_links`.
-- `audit_events`.
-
-## Security Rules
-
-- Never trust raw Telegram user id from client input.
-- Verify Telegram Mini App initData.
-- Signed invite token is not identity proof by itself.
-- Parent access requires active parent-child link.
-- Link/unlink actions must be audited.
-
-## Parent Cross-School Rule
-
-Parent portal must support children across:
-
-- School 5.
-- Sehriyo.
-- future schools.
-
-Do not assume one parent belongs to one school.
-
-## Bot Command Scope
-
-Current/future bot flows:
-
-- `/start`.
-- `/start parent_{code}`.
-- `/whoami`.
-- `/unlink_me`.
-- quick summary.
-- contact support.
-
-Bot must not own payment policy or academic rules.
-
-## Target Integration Boundary
-
-```mermaid
-flowchart LR
-    Bot[Telegram Bot]
-    Adapter[Telegram Integration Adapter]
-    Domain[Parent Linking Domain]
-    Repo[Repositories]
-    DB[(PostgreSQL)]
-
-    Bot --> Adapter --> Domain --> Repo --> DB
-```
-
-## Open Decisions
-
-- Should manual fallback remain in v1?
-- How should expired/revoked invite UX look in Telegram?
-
-## Confirmed Parent Invite Roles
-
-Parent invite links can be generated by:
-
-- CEO.
-- Academic Director.
-- Customer Support.
+- define the exact command/product scope;
+- keep `tgbot/routing.py` as the explicit registry;
+- use Telegram adapters plus existing domain services;
+- test HMAC/start-parameter and replay behavior independently of real users;
+- enforce the same canonical account and object policies as the web app;
+- add deployment and smoke coverage before describing the bot as active.

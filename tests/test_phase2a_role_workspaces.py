@@ -69,10 +69,10 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.pages.academic_director as academic_director_routes
-    import backend.pages.ceo as ceo_page
-    import backend.pages.customer_support as customer_support_page
-    import backend.pages.hr_manager as hr_manager_page
+    import backend.modules.academics.director_page as academic_director_routes
+    import backend.modules.staff.ceo_page as ceo_page
+    import backend.modules.staff.support_page as customer_support_page
+    import backend.modules.staff.hr_page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -224,14 +224,12 @@ def test_existing_critical_routes_remain_registered(app, method, path):
     assert method in routes[path]
 
 
-def test_small_role_route_modules_are_deleted_after_page_move():
+def test_staff_role_pages_are_owned_by_one_staff_module():
+    assert not Path("backend/roles").exists()
     for path in [
-        Path("backend/roles/ceo/routes.py"),
-        Path("backend/roles/hr_manager/routes.py"),
-        Path("backend/roles/customer_support/routes.py"),
+        Path("backend/modules/staff/ceo_page.py"),
+        Path("backend/modules/staff/hr_page.py"),
+        Path("backend/modules/staff/support_page.py"),
+        Path("backend/modules/staff/workspace.py"),
     ]:
-        assert not path.exists()
-
-    assert "backend.pages.ceo" in Path("backend/roles/ceo/__init__.py").read_text()
-    assert "backend.pages.hr_manager" in Path("backend/roles/hr_manager/__init__.py").read_text()
-    assert "backend.pages.customer_support" in Path("backend/roles/customer_support/__init__.py").read_text()
+        assert path.is_file()

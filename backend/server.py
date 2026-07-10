@@ -8,25 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from slowapi.errors import RateLimitExceeded
-from backend.utils.limiter import limiter
+from backend.core.rate_limit import limiter
 
 from fastapi import Depends
-from backend.utils.context import RequestContextMiddleware, prime_body_state
-from backend.utils.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
-from backend.utils.guards import install_guard_handler
-from backend.security.roles import is_valid_role, normalize_role, role_display_name
+from backend.core.request_context import RequestContextMiddleware, prime_body_state
+from backend.core.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
+from backend.core.guards import install_guard_handler
+from backend.core.access.roles import is_valid_role, normalize_role, role_display_name
 from backend.core.config import get_web_settings
-from backend.domains.academics.rating_service import clear_group_cache
-from backend.roles.admin.routes import register_admin_page_routes
-from backend.pages.academic_director import register_academic_director_page_routes
-from backend.pages.ceo import register_ceo_page_routes
-from backend.pages.customer_support import register_customer_support_page_routes
-from backend.pages.head_of_department import register_head_of_department_page_routes
-from backend.pages.hr_manager import register_hr_manager_page_routes
-from backend.pages.parent import register_parent_invite_routes
-from backend.pages.parent import register_parent_page_routes
-from backend.pages.student import register_student_page_routes
-from backend.pages.teacher import register_teacher_page_routes
+from backend.modules.registry import register_module_pages
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
@@ -56,6 +46,7 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
         "/parent",
         "/student",
         "/head-of-department",
+        "/account",
     )
     if request_path in role_page_prefixes or request_path.startswith(
         tuple(f"{prefix}/" for prefix in role_page_prefixes)
@@ -105,6 +96,12 @@ _STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # nothing because the request must itself carry a server-verified signature.
 # /auth/telegram only trusts HMAC-validated Telegram initData.
 _SAME_ORIGIN_EXEMPT_PATHS = {"/auth/telegram"}
+_PASSWORD_CHANGE_ALLOWED_PATHS = {
+    "/account/security",
+    "/logout",
+    "/auth/telegram",
+    "/login",
+}
 
 class AuthAndSecurityMiddleware:
     def __init__(self, app):
@@ -150,10 +147,8 @@ class AuthAndSecurityMiddleware:
         is_public = (
             path in PUBLIC_PATHS
             or path.startswith("/static/")
-            # Parent invite links are reached by a logged-out parent. Auth is the
-            # signed, server-verified token in the URL itself (same trust model as
-            # /auth/telegram), so the path must bypass the session-cookie gate.
-            or path.startswith("/parent/link/")
+            # Parent invite codes are random, hashed at rest, expiring, and
+            # atomically consumed. Logged-out parents must be able to claim one.
             or path.startswith("/parent/invite/")
         )
 
@@ -188,6 +183,87 @@ class AuthAndSecurityMiddleware:
                     await response(scope, receive, send)
                     return
                 response = RedirectResponse(url="/unauthorized", status_code=302)
+                await response(scope, receive, send)
+                return
+
+            # Canonical account cookies are versioned. Password changes/resets,
+            # disabled accounts, and role changes invalidate every older signed
+            # cookie even though its HMAC remains cryptographically valid.
+            raw_account_id = request_obj.session.get("account_id")
+            app_state = getattr(scope.get("app"), "state", None)
+            account_validation_enabled = not bool(
+                app_state and getattr(app_state, "testing", False)
+            )
+            if raw_account_id and path != "/logout" and account_validation_enabled:
+                try:
+                    account_id = int(raw_account_id)
+                    cookie_version = int(request_obj.session.get("session_version") or 0)
+                except (TypeError, ValueError):
+                    account_id = 0
+                    cookie_version = 0
+                account = None
+                if account_id > 0 and cookie_version > 0:
+                    try:
+                        from backend.modules.identity.accounts import get_account_by_id
+
+                        account = get_account_by_id(account_id)
+                    except Exception:
+                        account = None
+                canonical_session_role = normalize_role(
+                    request_obj.session.get("canonical_role")
+                    or request_obj.session.get("account_role")
+                )
+                account_role = normalize_role(account.get("role")) if account else ""
+                account_valid = bool(
+                    account
+                    and account.get("status") == "active"
+                    and int(account.get("session_version") or 0) == cookie_version
+                    and account_role
+                    and account_role == canonical_session_role
+                )
+                if not account_valid:
+                    request_obj.session.clear()
+                    if path.startswith("/api/") or request_obj.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        response = JSONResponse(
+                            {
+                                "status": "error",
+                                "message": "Your session expired. Please sign in again.",
+                                "code": "session_expired",
+                            },
+                            status_code=401,
+                        )
+                    else:
+                        response = RedirectResponse(url="/", status_code=302)
+                    await response(scope, receive, send)
+                    return
+                request_obj.session["must_change_password"] = bool(
+                    account.get("must_change_password")
+                )
+
+            # Accounts issued with login == password must choose a private
+            # password before using any workspace. Auth endpoints and logout
+            # remain available so the user can complete or abandon the flow.
+            password_change_required = bool(
+                request_obj.session.get("account_id")
+                and request_obj.session.get("must_change_password")
+            )
+            password_change_path_allowed = (
+                path in _PASSWORD_CHANGE_ALLOWED_PATHS
+                or path.startswith("/api/v1/auth/")
+                or path.startswith("/static/")
+            )
+            if password_change_required and not password_change_path_allowed:
+                if path.startswith("/api/") or request_obj.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    response = JSONResponse(
+                        {
+                            "status": "error",
+                            "message": "Change your initial password to continue.",
+                            "code": "password_change_required",
+                        },
+                        status_code=428,
+                    )
+                else:
+                    response = RedirectResponse(url="/account/security", status_code=302)
                 await response(scope, receive, send)
                 return
 
@@ -315,7 +391,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
 
 @app.get("/unauthorized")
 def unauthorized_page(request_obj: Request):
-    from backend.render import render_react_page
+    from backend.core.rendering import render_react_page
 
     auth_role = normalize_role(request_obj.session.get("auth_role"))
     return render_react_page(
@@ -337,9 +413,9 @@ def unauthorized_page(request_obj: Request):
 
 def _build_default_asset_version():
     candidate_paths = [
-        os.path.join(_BACKEND_DIR, "js_bundles.py"),
+        os.path.join(_BACKEND_DIR, "core", "assets.py"),
         os.path.join(_BACKEND_DIR, "server.py"),
-        os.path.join(_BACKEND_DIR, "render.py"),
+        os.path.join(_BACKEND_DIR, "core", "rendering.py"),
         os.path.join(_REACT_DIR, "manifest.json"),
         os.path.join(_REACT_DIR, "app.css"),
         os.path.join(_REACT_DIR, "app.js"),
@@ -405,43 +481,30 @@ def _bootstrap_app(app_instance):
             " (APP_ENV=production!)" if _is_prod else "",
         )
 
-    # Set static files dependencies in render.py
-    import backend.render as render
+    # Set static asset dependencies in the rendering boundary.
+    import backend.core.rendering as render
     render.ASSET_VERSION = _ASSET_VERSION
     render.STATIC_FOLDER = _STATIC_DIR
 
     # Set static files dependencies in system.py
-    import backend.routes.system as system_routes
+    import backend.modules.system.web as system_routes
     system_routes.STATIC_FOLDER = _STATIC_DIR
 
     # Build small legacy Telegram helper bundles at startup. Some deploy
     # environments start from source without generated bundle artifacts, and
     # render_react_page still loads this helper when Telegram support is enabled.
-    from backend.js_bundles import ensure_js_bundles
+    from backend.core.assets import ensure_js_bundles
     ensure_js_bundles(_STATIC_DIR)
 
     # Include system router
-    from backend.routes.system import router as system_router
+    from backend.modules.system.web import router as system_router
     app_instance.include_router(system_router)
 
     # Include JSON/action API router before page routes.
-    from backend.api.v1.router import router as api_v1_router
+    from backend.modules.router import router as api_v1_router
     app_instance.include_router(api_v1_router)
 
-    # Register admin and student page routes
-    render_admin_page = register_admin_page_routes(
-        app_instance,
-        clear_group_cache=clear_group_cache,
-    )
-    register_student_page_routes(app_instance, render_admin_page=render_admin_page)
-    register_teacher_page_routes(app_instance)
-    register_parent_page_routes(app_instance)
-    register_ceo_page_routes(app_instance)
-    register_hr_manager_page_routes(app_instance)
-    register_customer_support_page_routes(app_instance)
-    register_academic_director_page_routes(app_instance)
-    register_head_of_department_page_routes(app_instance)
-    register_parent_invite_routes(app_instance)
+    register_module_pages(app_instance)
 
     _APP_BOOTSTRAPPED = True
     return app_instance

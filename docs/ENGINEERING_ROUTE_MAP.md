@@ -1,173 +1,127 @@
 # Engineering Route Map
 
-Audience: senior engineers.
+Audience: engineers changing HTTP contracts or authorization.
 
-Project: MSI LMS Portal.
+The checked-in canonical inventory is `tests/route_snapshot.txt`. This document groups the routes by responsibility; it is not a replacement for the snapshot.
 
-## Current Implementation
-
-Routes are registered from FastAPI modules under `backend/`.
-
-Important note:
-
-- Some current route ownership is transitional.
-- Current `admin` route paths are not the final role architecture.
-- Do not expose private row-level data when testing routes.
-
-## Current Public/System Routes
+## Public and Identity Routes
 
 | Method | Path | Purpose |
-|---|---|---|
-| GET | `/` | home/login redirect based on session |
-| POST | `/login` | credential login |
-| POST | `/logout` | logout |
-| POST | `/auth/telegram` | Telegram Mini App auth |
-| GET | `/unauthorized` | unauthorized page |
-| GET | `/manifest.webmanifest` | PWA manifest |
-| GET | `/sw.js` | service worker |
-| GET | `/api/v1/system/status` | system status |
-| GET | `/api/v1/auth/me` | current user metadata |
+| --- | --- | --- |
+| `GET` | `/` | login or role-aware home redirect |
+| `POST` | `/login` | canonical account password login |
+| `POST` | `/logout` | clear session |
+| `POST` | `/auth/telegram` | HMAC-verified Telegram Mini App sign-in/start-param claim |
+| `GET` | `/account/security` | forced or voluntary password-change page |
+| `GET` | `/api/v1/auth/me` | canonical account, role, and permissions |
+| `PATCH` | `/api/v1/auth/password` | self-service canonical password change |
+| `GET` | `/api/v1/system/status` | system status |
+| `GET|POST` | `/parent/invite/{code}` | expiring, hash-backed parent invite claim |
 
-## Current Student Routes
+`/parent/invite/{code}` is public so a logged-out parent can claim it. The code is still checked against a pending, unexpired digest and consumed transactionally. The former `/parent/link/{token}` routes no longer exist.
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/student` | student entry |
-| POST | `/profile/password` | student password change |
-| POST | `/search` | student dashboard search |
-| GET | `/api/metadata` | student metadata |
-| GET | `/api/students/search` | student search |
-| GET | `/api/activity/ping` | student activity heartbeat |
-| GET | `/dashboard/{student_id}` | dashboard |
-| GET | `/dashboard/{student_id}/resources` | resources |
-| GET | `/dashboard/{student_id}/chat` | chat page |
-| GET | `/dashboard/{student_id}/rating-board` | rating |
-| GET | `/dashboard/{student_id}/aap-lessons` | AAP |
-| GET | `/dashboard/{student_id}/ar-lessons` | AR |
-| GET | `/dashboard/{student_id}/office-hours` | office hours |
-| GET | `/api/students/{student_id}/dashboard` | dashboard API |
-| GET/POST/PUT/DELETE | `/api/chat/messages` | student chat APIs |
-| GET/POST | `/api/resources/{resource_id}/comments` | resource comments |
-| GET/POST/PATCH | `/api/office-hours/*` | student office hours |
+## Role Pages
 
-Current caveat:
+| Role | Primary page paths |
+| --- | --- |
+| student | `/student`, `/dashboard/{public_id}` and dashboard subpages |
+| parent | `/parent`, `/parent/dashboard/{student_row_id}` |
+| teacher | `/teacher` |
+| Academic Director | `/academic-director` and academic subpages |
+| HOD | `/head-of-department` and scoped subpages |
+| CEO | `/ceo` |
+| HR Manager | `/hr`, `/hr-manager` |
+| Customer Support | `/support`, `/customer-support` |
+| System Admin | `/admin` and remaining admin form/page routes |
 
-- Some `{student_id}` route params represent public dashboard/enrollment ids, not internal database row ids.
+Student dashboard route values are public enrollment/dashboard IDs. Parent `student_row_id` paths are compatibility contracts. Neither is the canonical authorization identity; services resolve them to `students.id`.
 
-## Current Parent Routes
+## API v1 Families
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/parent` | parent home |
-| GET | `/parent/invite/{code}` | invite code landing |
-| GET | `/parent/link/{token}` | signed token landing |
-| POST | `/parent/link/{token}` | parent link submit |
-| GET | `/parent/dashboard/{student_row_id}` | linked child dashboard redirect |
+### Academic Director
 
-## Current Teacher Routes
+- `/api/v1/academic-director/academic/*`
+- `/api/v1/academic-director/head-of-departments`
+- `/api/v1/academic-director/teacher-academy/*`
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/teacher` | teacher home |
-| GET/POST | `/teacher/api/office-hours/availability` | availability |
-| PATCH | `/teacher/api/office-hours/availability/{availability_id}` | cancel availability |
-| GET | `/teacher/api/office-hours/bookings` | bookings |
-| PATCH | `/teacher/api/office-hours/bookings/{booking_id}` | booking status |
+Academic enrollment group moves are constrained to the same school and subject program. HOD management and Teacher Academy actions are role guarded.
 
-## Current Business Role Shell Routes
+### Head of Department
 
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/ceo` | CEO shell |
-| GET | `/hr` | HR shell |
-| GET | `/hr-manager` | HR alias |
-| GET | `/support` | Customer Support shell |
-| GET | `/customer-support` | Customer Support alias |
-| GET | `/academic-director` | Academic Director shell |
-| GET | `/academic_director` | Academic Director alias |
+- `/api/v1/head-of-department/teacher-academy/*`
 
-## Current Admin/Management Routes
+These routes require explicit assigned-subject scope in addition to the HOD role.
 
-Current admin routes include:
+### System/Admin Operations
 
-- `/admin`.
-- `/admin/continue`.
-- `/admin/api/students`.
-- `/admin/api/students/{student_row_id}/parent-invite`.
-- `/admin/students/{student_row_id}`.
-- `/admin/students/{student_row_id}/dashboard`.
-- `/admin/api/students/{student_row_id}/payments`.
-- `/admin/api/student-payments/{payment_id}`.
-- `/admin/academic/*`.
-- `/admin/api/academic/*`.
-- `/admin/api/announcements`.
-- `/admin/api/complaints`.
-- `/admin/api/chat/*`.
-- `/admin/api/resources`.
-- `/admin/resources/*`.
-- `/admin/api/office-hours/*`.
-- `/admin/teachers/*`.
-- `/admin/teacher-candidates/*`.
-- `/admin/parents/*`.
-- Teacher Academy mutations are owned by Academic Director and HOD role APIs;
-  admin/system admin keeps read-only page compatibility where needed.
+- `/api/v1/admin/academic/*`
+- `/api/v1/admin/announcements/*`
+- `/api/v1/admin/chat/*`
+- `/api/v1/admin/complaints/*`
+- `/api/v1/admin/office-hours/*`
+- `/api/v1/admin/parents/*` and `/parent-children/*`
+- `/api/v1/admin/resources/*`
+- `/api/v1/admin/students/*`
+- `/api/v1/admin/student-payments/*`
 
-Target:
+Some older HTML form actions remain under `/admin/*` for students, teachers, candidates, academic setup, and resources. They are protected by the same middleware and must migrate slice-by-slice without creating another JSON namespace.
 
-- split these by role workspace and domain ownership.
-- keep compatibility redirects only while required.
+### Teacher
 
-## Target Route Structure
+- `/api/v1/teacher/office-hours/availability`
+- `/api/v1/teacher/office-hours/availability/{availability_id}`
+- `/api/v1/teacher/office-hours/bookings`
+- `/api/v1/teacher/office-hours/bookings/{booking_id}`
 
-Proposed:
+Teacher identity, assigned subject, future time, slot interval, overlap, duration, and capacity are checked server-side.
+
+### Student
+
+- `/api/v1/student/activity/ping`
+- `/api/v1/student/chat/messages*`
+- `/api/v1/student/resources/{resource_id}/comments`
+- `/api/v1/student/office-hours/availability`
+- `/api/v1/student/office-hours/bookings*`
+
+The backend takes student identity from the canonical session, not a caller-supplied student ID. Chat room membership and booking ownership are object policies.
+
+## Removed Namespaces
+
+Do not add routes under:
 
 ```text
-/api/v1/auth/*
-/api/v1/system/*
-/api/v1/ceo/*
-/api/v1/academic-director/*
-/api/v1/hr/*
-/api/v1/support/*
-/api/v1/teacher/*
-/api/v1/student/*
-/api/v1/parent/*
-/api/v1/system-admin/*
+/admin/api
+/teacher/api
+/student/api
+/academic-director/api
+/head-of-department/api
+/api/* without /v1
 ```
 
-Workspace pages can remain separate from APIs:
-
-```text
-/ceo
-/academic-director
-/hr
-/support
-/teacher
-/student
-/parent
-/system-admin
-```
-
-## Route Guard Rules
-
-- Authenticate first.
-- Normalize role.
-- Enforce workspace role.
-- Enforce object policy.
-- Audit sensitive drilldown.
-- Never make payment/access decisions directly inside route functions.
-
-## Target Route Flow
+## Guard Order
 
 ```mermaid
-flowchart TD
-    Request[HTTP Request]
-    Auth[Authenticate Session]
-    Role[Role Guard]
-    Policy[Object/Access Policy]
-    Workspace[Workspace Handler]
-    Domain[Domain Service]
-    Repo[Repository]
-    DB[(PostgreSQL)]
+flowchart LR
+    Request[Request]
+    Origin[Same-origin check]
+    Session[Versioned session validation]
+    Change[Forced password-change gate]
+    Role[Role/permission dependency]
+    Object[Object policy]
+    Domain[Domain service]
 
-    Request --> Auth --> Role --> Policy --> Workspace --> Domain --> Repo --> DB
+    Request --> Origin --> Session --> Change --> Role --> Object --> Domain
 ```
+
+Public signed/HMAC flows have narrowly defined middleware exceptions. An exception to same-origin checks is not an exception to payload verification.
+
+## Route Change Checklist
+
+- Add or update FastAPI schemas.
+- Use canonical account/student identifiers internally.
+- Enforce role and object policy on the server.
+- Use a domain service and domain query owner.
+- Update `frontend/src/shared/api/routes.ts` where applicable.
+- Update `tests/route_snapshot.txt` intentionally.
+- Add authorization and error-contract tests.
+- Do not create runtime DDL or import a deleted compatibility facade.

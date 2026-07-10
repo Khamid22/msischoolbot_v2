@@ -1,175 +1,71 @@
 # Engineering Deployment
 
-Audience: senior engineers.
+Audience: engineers preparing a reviewed release.
 
-Project: MSI LMS Portal.
+## Runtime Processes
 
-## Current Implementation
-
-Current deployment-related files:
-
-- `Dockerfile`
-- `Procfile`
-- `railway.json`
-- `scripts/railway_start.sh`
-- `main.py`
-- `backend/server.py`
-- `frontend/package.json`
-
-Current runtime modes:
-
-- web only.
-- bot only.
-- both web and bot in one process for development or constrained deployments.
-
-## Current Services
-
-```mermaid
-flowchart LR
-    Web[FastAPI Web Service]
-    Bot[Telegram Bot Worker]
-    DB[(PostgreSQL)]
-    Static[Built React Static Assets]
-
-    Web --> DB
-    Bot --> DB
-    Web --> Static
-```
-
-Recommended target:
-
-- web and bot should be deployable as separate processes.
-- both should use the same PostgreSQL database.
-- frontend builds into backend static assets or deploys separately if architecture changes later.
-
-## Required Environment Variables
-
-Do not write actual values in docs.
-
-Expected categories:
-
-- database connection.
-- app secret/session signing.
-- bot token.
-- Mini App URL.
-- web host/port.
-- admin preview feature flag.
-- optional storage settings.
-- optional Redis/rate-limit/cache settings.
-
-Never commit:
-
-- `.env`.
-- tokens.
-- database URLs.
-- private keys.
-- dumps.
-- backups.
-
-## Production Auth And Preview Flags
-
-For real LMS usage:
-
-```bash
-ADMIN_PREVIEW_ROLES=0
-```
-
-Account/profile auth is always active. There is no legacy password-auth fallback
-or account-auth feature flag.
-
-`ADMIN_PREVIEW_ROLES` is a development/admin preview helper only. It should stay disabled in real usage so CEO, Academic Director, Customer Support, teacher, parent, and student sessions use their server-provided roles and cannot inherit stale browser preview state.
-
-## Current Startup
-
-Current entrypoint:
+`main.py` supports:
 
 ```bash
 python3 main.py
-```
-
-Modes:
-
-```bash
 python3 main.py web
 python3 main.py bot
 ```
 
-Backend app import:
+The web process serves FastAPI and built React assets. The bot process currently starts aiogram with an empty inbound router registry; Telegram Mini App authentication and parent linking are web flows and remain active without bot command handlers.
 
-```bash
-python3 - <<'PY'
-from backend.server import app
-print(app.name)
-PY
-```
-
-## Frontend Build
-
-Current frontend:
-
-```bash
-cd frontend
-npm run check-types
-npm run build
-```
-
-Generated assets should not be manually edited.
+Web and bot can be separated into independent services later while sharing PostgreSQL.
 
 ## Database Deployment
 
-Schema changes should use Alembic.
+`scripts/railway_start.sh` runs:
 
-Rules:
-
-- no manual production schema edits unless approved.
-- no destructive migrations without backup and rollback plan.
-- migration reports for data changes.
-- PostgreSQL remains source of truth.
-
-## Target Deployment Model
-
-```mermaid
-flowchart TD
-    CI[CI/CD]
-    BuildFrontend[Build React]
-    TestBackend[Backend Tests]
-    Migrate[Alembic Migration]
-    DeployWeb[Deploy FastAPI Web]
-    DeployBot[Deploy Bot Worker]
-    DB[(PostgreSQL)]
-
-    CI --> BuildFrontend
-    CI --> TestBackend
-    CI --> Migrate
-    Migrate --> DB
-    CI --> DeployWeb
-    CI --> DeployBot
+```bash
+python -m alembic upgrade head
+python main.py "$RUN_MODE"
 ```
 
-## Deployment Checks
+Repository migration head is `0007_lms_integrity`. A failed migration stops startup. Test the entire chain on a disposable representative clone before release, especially the intentionally irreversible `0006_secure_parent_invites` revision.
 
-Before deploy:
+Never substitute manual production DDL for a migration.
 
-- backend import check.
-- Python compile check.
-- frontend typecheck.
-- frontend build.
-- route guard tests.
-- database migration dry-run where possible.
-- no private files staged.
+## Frontend Build
 
-After deploy:
+```bash
+npm --prefix frontend run check-types
+npm --prefix frontend run build
+```
 
-- health endpoint.
-- login smoke checks.
-- role workspace smoke checks.
-- Telegram `/start` smoke check.
-- parent invite smoke check in non-production or controlled test.
+Vite writes generated files under `backend/static/react`. Do not manually edit generated assets.
+
+## Environment Categories
+
+Do not place values in documentation or Git.
+
+Required deployed settings include:
+
+- PostgreSQL connection (`DATABASE_URL`);
+- application/session secret (`APP_SECRET_KEY`);
+- Telegram bot token and Mini App URL;
+- host/port/runtime mode.
+
+Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache configuration, object storage, Teacher Academy notification chat IDs, and owner bootstrap credentials.
+
+`ADMIN_PREVIEW_ROLES` is development-only and should be disabled for real role sessions.
+
+## Pre-release Gate
+
+- full backend tests and Python compile;
+- Alembic upgrade on a disposable clone;
+- route/architecture/identity tests;
+- frontend tests, typecheck, and production build;
+- browser responsive/accessibility/timezone smoke checks;
+- Telegram Mini App login and parent invite smoke in a controlled environment;
+- reviewed workbook reconciliation evidence if academic data changes are included;
+- no `.env`, credentials, source workbooks, dumps, backups, or private reports staged.
+
+Do not require an inbound bot-command smoke until handlers exist.
 
 ## Production Branch Rule
 
-Production branch is `main`.
-
-Rewrite/planning branch is `FastAPI-Run-System`.
-
-Do not merge rewrite work to `main` until approved and verified.
+Production branch `main` is read-only during rewrite work. Do not merge, push, migrate, or deploy production as part of architecture cleanup without explicit release approval.

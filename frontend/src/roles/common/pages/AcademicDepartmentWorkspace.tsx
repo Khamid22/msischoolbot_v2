@@ -15,6 +15,12 @@ import {
   HeadOfDepartmentPageShell,
 } from "@/roles/common/components/AcademicDirectorShell";
 import { routes } from "@/shared/lib/routes";
+import {
+  SCHOOL_TIME_ZONE,
+  schoolDateKey,
+  schoolDateKeyFromValue,
+  schoolWeekBounds,
+} from "@/shared/lib/schoolTime";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { MetricCard } from "@/shared/ui/MetricCard";
 import { PageHeader } from "@/shared/ui/PageHeader";
@@ -84,40 +90,16 @@ function workspaceRole(value: unknown) {
   return asText(value).replace(/-/g, "_").toLowerCase();
 }
 
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function dateKeyFromDate(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
 function parseDateKey(value: unknown) {
-  const raw = asText(value);
-  if (!raw) return "";
-
-  const ddmmyyyy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (ddmmyyyy) {
-    return `${ddmmyyyy[3]}-${pad2(Number(ddmmyyyy[2]))}-${pad2(Number(ddmmyyyy[1]))}`;
-  }
-
-  const iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) {
-    return `${iso[1]}-${pad2(Number(iso[2]))}-${pad2(Number(iso[3]))}`;
-  }
-
-  const parsed = Date.parse(raw);
-  if (Number.isFinite(parsed)) {
-    return dateKeyFromDate(new Date(parsed));
-  }
-  return "";
+  return schoolDateKeyFromValue(value);
 }
 
 function displayDateFromKey(key: string, fallback = "Date not set") {
   if (!key) return fallback;
-  const parsed = new Date(`${key}T00:00:00`);
+  const parsed = new Date(`${key}T00:00:00+05:00`);
   if (Number.isNaN(parsed.getTime())) return fallback;
   return new Intl.DateTimeFormat("en-GB", {
+    timeZone: SCHOOL_TIME_ZONE,
     weekday: "short",
     day: "2-digit",
     month: "short",
@@ -153,7 +135,7 @@ function timetableLocation(row: Row) {
 }
 
 function sortTimetableItems(items: TimetableItem[]) {
-  const todayKey = dateKeyFromDate(new Date());
+  const todayKey = schoolDateKey();
   return [...items].sort((a, b) => {
     const dateA = timetableDateKey(a) || "9999-99-99";
     const dateB = timetableDateKey(b) || "9999-99-99";
@@ -252,7 +234,8 @@ function TimetableContent({
   const sourceRows = items.map((item) => item.row);
   const subjectOptions = uniqueOptions(sourceRows, ["subject_name"]);
   const teacherOptions = uniqueOptions(sourceRows, ["teacher_name"]);
-  const todayKey = dateKeyFromDate(new Date());
+  const todayKey = schoolDateKey();
+  const weekBounds = schoolWeekBounds();
   const todayCount = items.filter((item) => timetableDateKey(item) === todayKey).length;
   const upcomingCount = items.filter((item) => timetableDateKey(item) >= todayKey).length;
   const passedCount = items.filter((item) => asText(item.row.status).toLowerCase() === "passed").length;
@@ -263,6 +246,10 @@ function TimetableContent({
     items.filter((item) => {
       const row = item.row;
       if (range === "today" && timetableDateKey(item) !== todayKey) return false;
+      if (
+        range === "week"
+        && (timetableDateKey(item) < weekBounds.start || timetableDateKey(item) > weekBounds.end)
+      ) return false;
       if (subjectFilter !== "all" && asText(row.subject_name) !== subjectFilter) return false;
       if (teacherFilter !== "all" && asText(row.teacher_name) !== teacherFilter) return false;
       return true;

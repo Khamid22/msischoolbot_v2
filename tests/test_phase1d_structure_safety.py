@@ -54,6 +54,7 @@ def _account_auth_result(role, *, account_role=None, **session_overrides):
         "account_role": account_role,
         "canonical_role": account_role,
         "auth_role": role,
+        "session_version": 1,
         "auth_login": session_overrides.pop("auth_login", f"{account_role}@test"),
         **session_overrides,
     }
@@ -113,7 +114,7 @@ def test_critical_routes_remain_registered(app, method, path):
 
 
 def test_account_login_path_is_always_available(app, monkeypatch):
-    import backend.domains.identity.routes as identity_routes
+    import backend.modules.portal.web as identity_routes
 
     client = _rate_limit_isolated_client(app, "account-login")
     calls = {"auth": 0}
@@ -144,11 +145,10 @@ def test_account_login_path_is_always_available(app, monkeypatch):
 @pytest.mark.parametrize(
     "module_name",
     [
-        "backend.api.v1",
+        "backend.modules",
         "backend.core",
         "backend.integrations",
         "backend.integrations.telegram",
-        "backend.integrations.excel",
         "backend.integrations.storage",
     ],
 )

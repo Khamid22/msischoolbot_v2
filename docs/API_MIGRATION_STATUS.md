@@ -1,217 +1,119 @@
 # API Migration Status
 
-Date: 2026-07-09
-Branch: `FastAPI-Run-System`
+Date: 2026-07-10
 
-## Phase 0 Inventory
+Branch documented: `FastAPI-Run-System`
 
-Runtime route inventory:
+## Current Result
 
-| Category | Count | Notes |
-| --- | ---: | --- |
-| `/api/v1/*` JSON routes | 76 | AD/HOD Teacher Academy, admin slices, student chat/comments/office-hours/activity, teacher office hours, auth, system |
-| Page/form routes | 57 | Still registered mostly from `backend/roles/*`; includes old admin form mutation URLs under `/admin/*` |
-| Static/docs/public routes | 12 | `/`, login/logout, auth handoff, docs, manifest, service worker, unauthorized, static mount |
-| Legacy API namespaces | 0 | No runtime routes under `/admin/api`, `/teacher/api`, `/student/api`, `/academic-director/api`, `/head-of-department/api`, or bare non-v1 `/api/*` |
-| Total registered routes | 145 | Counted by walking FastAPI included routers recursively |
+The JSON/action API is versioned under `/api/v1`. There are no runtime routes in the deleted legacy namespaces:
 
-Remaining legacy API namespace routes:
+- `/admin/api/*`
+- `/teacher/api/*`
+- `/student/api/*`
+- `/academic-director/api/*`
+- `/head-of-department/api/*`
+- bare non-versioned `/api/*`
 
-| Namespace | Runtime routes |
+`tests/route_snapshot.txt` is the executable route inventory. Avoid copying a route count into architecture decisions because generated documentation routes and ongoing slices can change the total.
+
+## Versioned API Ownership
+
+| Namespace | Current responsibility |
 | --- | --- |
-| `/admin/api` | none |
-| `/teacher/api` | none |
-| `/student/api` | none |
-| `/academic-director/api` | none |
-| `/head-of-department/api` | none |
-| bare non-v1 `/api/*` | none |
+| `/api/v1/auth/*` | current account and self-service password lifecycle |
+| `/api/v1/system/*` | status/health-facing system information |
+| `/api/v1/academic-director/*` | academic structure, gradebook, HOD, and Teacher Academy actions |
+| `/api/v1/head-of-department/*` | subject-scoped Teacher Academy actions |
+| `/api/v1/admin/*` | system/admin operational slices during workspace separation |
+| `/api/v1/teacher/*` | teacher office-hour availability and bookings |
+| `/api/v1/student/*` | activity, chat, resource comments, and office hours |
 
-Legacy import inventory still active:
+API v1 routes use FastAPI schemas/dependencies, call domain services, and return the shared API success/error envelope. Object authorization belongs in dependencies/domain policy, not in frontend visibility rules.
 
-| Area | Current state |
-| --- | --- |
-| `backend/api/v1 -> backend.roles.*` | Remaining in AD HOD creation and some admin slices (`staff_registration`, `academic_service`, upload progress helpers) |
-| `backend/domains -> backend.roles.*` | Remaining in resources storage helper only after this slice |
-| `database.queries` / `database.cross_queries` runtime imports | Still active in identity, communication/chat, parents, Teacher Academy compatibility, demo auth, and some role services |
-| `database.database` / `database.academics` runtime imports | 0; connection helpers live in `backend.core.database`, academic helpers live in `backend.domains.academics` |
-| `backend.utils.context` runtime imports | Still active in server, identity routes, render helper, and legacy role page/services. Teacher Academy domain permissions no longer import it. |
-| `jsonify` | 0 backend Python hits |
+## Page and Public Routes
 
-Import counts on 2026-07-09:
+These are intentionally outside the JSON API:
 
-| Import family | Hits | Files | Main blockers |
-| --- | ---: | ---: | --- |
-| `from database import queries` | 8 | 8 | identity storage/links, communication chat, parent service, Teacher Academy compatibility, demo auth, role services |
-| `database.queries` | 1 | 1 | compatibility mention/re-export in teacher domain queries |
-| `database.cross_queries` | 1 | 1 | compatibility mention/re-export in student domain queries |
-| `database.database` | 0 | 0 | deleted after imports reached zero |
-| `database.academics` | 0 | 0 | moved to `backend.domains.academics` |
-| `backend.utils.context` | 20 | 20 | legacy page routes, server middleware, identity routes, render/session helpers |
-| `backend.roles.*` | 46 | 27 | admin route/service slices, page helper imports, API v1 admin/AD slices, role services |
-| `jsonify` | 0 | 0 | none |
+- role pages such as `/student`, `/teacher`, `/parent`, `/academic-director`, `/head-of-department`, `/ceo`, `/hr`, and `/support`;
+- student dashboard compatibility pages under `/dashboard/{public_enrollment_id}`;
+- `/account/security`;
+- credential login/logout and `/auth/telegram`;
+- hashed parent invite pages at `GET|POST /parent/invite/{code}`;
+- remaining admin HTML form actions under `/admin/*`.
 
-## Role Route File Classification
+The existence of an `/admin/*` form action does not make it a second JSON API. New JSON mutations must use `/api/v1/*`.
 
-| File | Classification | Deletion status / blocker |
-| --- | --- | --- |
-| `backend/roles/academic_director/routes.py` | Deleted page shell route | Moved to `backend/pages/academic_director.py` and deleted 2026-07-09; package `__init__.py` keeps lazy compatibility export |
-| `backend/roles/admin/routes/__init__.py` | Route registry compatibility | Blocked until admin page shell and old form route slices move |
-| `backend/roles/admin/routes/academic_routes.py` | JSON/form action route helper | Blocked until remaining old `/admin/academic/*` form posts move to API/page split |
-| `backend/roles/admin/routes/admin_page.py` | Mixed page shell + route aggregation | Blocked until `backend/pages/admin.py` exists and admin form mutations move panel-by-panel |
-| `backend/roles/admin/routes/admins.py` | Route aggregation compatibility | Blocked by admin resource/student/teacher route modules |
-| `backend/roles/admin/routes/resource_routes.py` | Form mutation routes | Blocked until resource mutations move to API v1/domain services |
-| `backend/roles/admin/routes/student_routes.py` | Mixed page shell + form mutation routes | Blocked until admin student pages/actions are split |
-| `backend/roles/admin/routes/teacher_routes.py` | Form mutation routes | Blocked until admin teacher/candidate panel migration |
-| `backend/roles/ceo/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.ceo.routes` reached zero |
-| `backend/roles/customer_support/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.customer_support.routes` reached zero |
-| `backend/roles/head_of_department/routes.py` | Deleted page shell route | Moved to `backend/pages/head_of_department.py` and deleted 2026-07-09; package `__init__.py` keeps lazy compatibility export |
-| `backend/roles/hr_manager/routes.py` | Deleted compatibility re-export | Deleted 2026-07-08 after imports from `backend.roles.hr_manager.routes` reached zero |
-| `backend/roles/parent/routes.py` | Compatibility wrapper only | Parent page/invite/dashboard routes moved to `backend/pages/parent.py`; delete wrapper after imports are zero |
-| `backend/roles/student/routes/__init__.py` | Compatibility wrapper only | Points to `backend.pages.student`; delete after imports are zero |
-| `backend/roles/student/routes/chat_page.py` | Compatibility wrapper only | Points to `backend.pages.student_chat`; delete after imports are zero |
-| `backend/roles/student/routes/dashboard.py` | Compatibility wrapper only | Points to `backend.pages.student_dashboard`; delete after imports are zero |
-| `backend/roles/student/routes/office_hours_routes.py` | Compatibility wrapper only | Points to `backend.pages.student_office_hours`; delete after imports are zero |
-| `backend/roles/student/routes/rating_board.py` | Compatibility wrapper only | Points to `backend.pages.student_rating_board`; delete after imports are zero |
-| `backend/roles/student/routes/resources.py` | Compatibility wrapper only | Points to `backend.pages.student_resources`; delete after imports are zero |
-| `backend/roles/student/routes/student_page.py` | Compatibility wrapper only | Points to `backend.pages.student`; delete after imports are zero |
-| `backend/roles/student/routes/students.py` | Compatibility wrapper only | Points to `backend.pages.student_forms`; delete after imports are zero |
-| `backend/roles/teacher/routes.py` | Deleted page shell route | Moved to `backend/pages/teacher.py` and deleted 2026-07-09; package `__init__.py` keeps lazy compatibility export |
+## Completed Migration Work
 
-## Non-Route Role File Classification
+### Routes and pages
 
-| Area | Classification | Deletion status / blocker |
-| --- | --- | --- |
-| `backend/roles/*/__init__.py` | Compatibility package exports | Delete only after imports from matching role packages are zero |
-| `backend/roles/academic_director/staff_registration.py` | Business service + SQL | Move to domain/identity service before deleting |
-| `backend/roles/admin/services/academic_service.py` | Business service + SQL | API v1 admin/AD slices still import it; move by admin academic/student slice |
-| `backend/roles/admin/services/insights_service.py` | Business/reporting service | Move to domains/academics or admin reporting service after page split |
-| `backend/roles/admin/services/page_service.py` | Page bootstrap service + SQL | Move page bootstrap to domains/pages support after admin page split |
-| `backend/roles/admin/services/parent_service.py` | Compatibility service facade | Replace with `domains/parents` imports when import count permits |
-| `backend/roles/admin/services/r2_storage_service.py` | Storage integration helper | Domain resources still import it; move to integrations/storage or resources domain |
-| `backend/roles/admin/services/route_service.py` | Route/page helper + SQL | Move helper logic to relevant domain services |
-| `backend/roles/admin/services/teacher_candidate_service.py` | Business service + SQL/query barrel import | Move to teachers/teacher_academy or HR domain slice |
-| `backend/roles/admin/services/upload_progress_service.py` | Upload progress helper | API v1 resources still imports it; move with resources slice |
-| `backend/roles/head_of_department/workspace_cards.py` | Page card/bootstrap helper | Move with HOD pages layer |
-| `backend/roles/parent/services.py` | Compatibility facade | Replace with domains/parents imports |
-| `backend/roles/parent/workspace_cards.py` | Page card/bootstrap helper | Move with parent pages layer |
-| `backend/roles/role_home.py` | Shared page render helper | Move to `backend/pages/shared` or keep until all role pages move |
-| `backend/roles/student/services/*` | Student page/business compatibility services | Move remaining business logic to domains/students/resources as slices land |
-| `backend/roles/teacher/services.py` | Teacher business/page service + SQL | Move to domains/teachers/teacher_academy/timetable |
-| `backend/roles/teacher/workspace_cards.py` | Page card/bootstrap helper | Move with teacher pages layer |
-| `backend/roles/workspace_counts.py` | Page card/bootstrap helper with SQL | Move to domains/reporting or page bootstrap support |
+- Central `backend/api/v1/router.py` registration is installed before page routers.
+- Academic Director and HOD Teacher Academy JSON mutations use v1 routes, shared schemas, response adapters, and explicit HOD subject-scope policy.
+- Admin announcements, complaints, chat, resources, payments, parents, students, office hours, and academic slices use v1 endpoints where migrated.
+- Student chat, comments, activity, and office hours use `/api/v1/student/*`.
+- Teacher office hours use `/api/v1/teacher/*`.
+- Student, parent, teacher, Academic Director, HOD, CEO, HR, and support page shells live under `backend/pages`.
+- The old signed `/parent/link/{token}` routes are deleted; only `/parent/invite/{code}` remains.
 
-## Phase 1 Completed
+### Domain ownership
 
-Teacher Academy cleanup:
+- SQL moved out of the former `database/queries` and `database/cross_queries` barrels into domain query modules.
+- Runtime schema/table bootstrap was removed; DDL is Alembic-only.
+- Canonical password and Telegram auth moved to `backend/domains/identity`.
+- Parent linking moved into one parent-domain transaction used by web and Telegram-start flows.
+- Payment, office-hours, chat, academic group movement, and student dashboard flows resolve canonical identity and enforce object boundaries in the backend.
 
-- Replaced `backend/api/v1/teacher_academy_actions.py` with:
-  - `backend/api/v1/teacher_academy/schemas.py`
-  - `backend/api/v1/teacher_academy/responses.py`
-- Moved HOD Teacher Academy subject-scope logic from `backend/roles/head_of_department/academy_scope.py` to `backend/domains/teacher_academy/permissions.py`.
-- Moved Teacher Academy notification helpers from `backend/roles/admin/services/teacher_academy_notifications.py` to `backend/domains/teacher_academy/notifications.py`.
-- Moved admin page-cache invalidation backing store into `backend/domains/admin/page_cache.py` and rewired API v1 cache invalidation imports away from `backend.roles.admin.services.page_service`.
-- Deleted the obsolete Teacher Academy action, scope, and notification wrapper files after imports were removed.
-- Removed remaining session/context coupling from `backend/domains/teacher_academy/permissions.py`; core checks now accept `CurrentUser` or explicit `role/account_id/staff_id`.
-- Updated HOD Teacher Academy API routes to pass `CurrentUser` into permission checks and scoped response payloads.
-- Tightened `backend/api/v1/teacher_academy/responses.py.__all__` so it exports only response adapters/helpers, not raw domain service functions.
+### Deleted compatibility surfaces
 
-## Phase 2 Completed
+- `database/queries/*`
+- `database/cross_queries/*`
+- `database/tables.py`
+- legacy account/password and Telegram identity facades under `backend/identity`
+- parent service/invite facades superseded by `backend/domains/parents`
+- legacy Telegram bot helper/handler code
 
-Page-shell migration:
+## Current Request Flow
 
-- Added `backend/pages/__init__.py`.
-- Moved page-only CEO, HR Manager, and Customer Support route bodies into:
-  - `backend/pages/ceo.py`
-  - `backend/pages/hr_manager.py`
-  - `backend/pages/customer_support.py`
-- Updated `backend/server.py` to register those page routers from `backend.pages`.
-- Deleted `backend/roles/{ceo,hr_manager,customer_support}/routes.py` after import checks showed zero remaining importers.
-- Kept `backend/roles/{ceo,hr_manager,customer_support}/__init__.py` as package-level compatibility exports pointing directly to `backend.pages`.
+```mermaid
+flowchart LR
+    Client[React or Mini App]
+    Route[FastAPI API v1 route]
+    Auth[CurrentUser role/object policy]
+    Service[Domain service]
+    Query[Domain query module]
+    DB[(PostgreSQL)]
 
-## Phase 3 Started
+    Client --> Route --> Auth --> Service --> Query --> DB
+```
 
-Page-shell route separation:
+For pages, the route authenticates and builds a bootstrap payload; subsequent mutations still follow the API v1 flow.
 
-- Moved `backend/roles/academic_director/routes.py` to `backend/pages/academic_director.py`.
-- Moved `backend/roles/head_of_department/routes.py` to `backend/pages/head_of_department.py`.
-- Moved `backend/roles/teacher/routes.py` to `backend/pages/teacher.py`.
-- Updated `backend/server.py` to import those page route registrations from `backend.pages`.
-- Deleted the old AD/HOD/Teacher role route files after source/test import checks showed zero importers.
-- Kept `backend/roles/{academic_director,head_of_department,teacher}/__init__.py` as lazy compatibility exports to avoid circular imports while page modules still use role service/helper modules.
-- Teacher page bootstrap still temporarily imports `backend.roles.teacher.services` and `backend.roles.teacher.workspace_cards`.
-- Academic Director pages still temporarily import `backend.roles.academic_director.staff_registration` and `backend.roles.workspace_counts`.
-- HOD pages still temporarily import `backend.roles.head_of_department.workspace_cards`.
+## Canonical Student Boundary
 
-Database folder cleanup:
+`CurrentUser.student_db_id` is `msi_v2.students.id`. It is the identity used for student-scoped API authorization and relational writes.
 
-- Created `docs/DATABASE_FOLDER_MIGRATION_STATUS.md`.
-- Deleted generated `database/**/__pycache__/` and `database/**/*.pyc` files.
-- Deleted `database/queries/announcement_queries.py`; announcement SQL ownership already lives in `backend/domains/announcements/queries.py`.
-- Removed the announcement query wrapper import from `database/queries/__init__.py`.
+Some older admin/parent route parameters retain the name `student_row_id`, and student dashboard URLs use a public enrollment/dashboard ID. These compatibility values must be resolved to the canonical student before authorization or mutation. New APIs should not copy the ambiguity.
 
-Student/Parent page route separation:
+## Remaining Transitional Work
 
-- Moved Student page, dashboard, resources, chat, rating, office-hours, search, and profile form routes into `backend/pages/student*.py`.
-- Moved Parent portal, invite, Telegram linking, signed token handoff, and linked child dashboard routes into `backend/pages/parent.py`.
-- Updated `backend/server.py` to import Student and Parent page route registration from `backend.pages`.
-- Kept `backend/roles/student/routes/*` and `backend/roles/parent/routes.py` as compatibility-only shims with no route definitions or rendering logic.
+- The system/admin workspace still has HTML form actions under `/admin/*` and helper code under `backend/roles/admin`.
+- A few page/workspace helper services remain under `backend/roles`; they should move only with equivalent behavior and tests.
+- Some external payload fields and route parameter names expose legacy IDs for compatibility.
+- Physical schema name `msi_v2` and legacy correlation columns remain intentionally.
+- Empty placeholder API directories can be removed or populated only as real role functionality is implemented.
 
-Database folder cleanup:
-
-- Moved `database/queries/complaint_queries.py` to `backend/domains/complaints/queries.py`.
-- Moved `database/queries/office_hours.py` to `backend/domains/office_hours/queries.py`.
-- Moved `database/queries/resource_queries.py` to `backend/domains/resources/queries.py`.
-- Updated complaints, office-hours, resources, resource comments, and identity storage code to import the domain query modules directly where this slice touched them.
-- Removed the complaint, office-hours, and resource query wrapper exports from `database/queries/__init__.py`.
-- Deleted `database/database.py`; `backend/core/database.py` is now the only runtime DB connection implementation.
-- Moved `database/academics/*` helper modules into `backend/domains/academics/*`.
-- Moved `database/queries/subject_summary_queries.py` into `backend/domains/academics/summary_queries.py`.
-
-## Migration Map
-
-| Old owner | New owner | Status |
-| --- | --- | --- |
-| `api/v1/teacher_academy_actions.py` schemas | `api/v1/teacher_academy/schemas.py` | Done |
-| `api/v1/teacher_academy_actions.py` response adapters | `api/v1/teacher_academy/responses.py` | Done |
-| `roles/head_of_department/academy_scope.py` | `domains/teacher_academy/permissions.py` | Done |
-| `roles/admin/services/teacher_academy_notifications.py` | `domains/teacher_academy/notifications.py` | Done |
-| `roles/admin/services/page_service.py` cache store | `domains/admin/page_cache.py` | Done |
-| CEO/HR/Support page shells | `backend/pages/*` | Done |
-| `roles/{ceo,hr_manager,customer_support}/routes.py` compatibility re-exports | deleted; package `__init__.py` exports page registration functions | Done |
-| AD/HOD/Teacher page shells | `backend/pages/{academic_director,head_of_department,teacher}.py` | Done |
-| `roles/{academic_director,head_of_department,teacher}/routes.py` page routes | deleted; package `__init__.py` keeps lazy compatibility exports | Done |
-| Student page/form route modules | `backend/pages/student*.py`; old role files are compatibility shims | Done |
-| Parent page/invite/link route module | `backend/pages/parent.py`; old role file is a compatibility shim | Done |
-| `database/queries/announcement_queries.py` | deleted after domain query imports were verified | Done |
-| `database/queries/{complaint_queries,office_hours,resource_queries}.py` | moved to matching `backend/domains/*/queries.py` modules | Done |
-| Remaining role page shells | `backend/pages/*` | Admin pending |
-| Remaining role business services | matching `backend/domains/*` packages | Pending |
-| Remaining database wrappers | matching `backend/domains/*/queries.py` | Pending |
+These are explicit compatibility boundaries. They do not justify reintroducing old API namespaces or database query barrels.
 
 ## Verification
 
-Focused backend checks passed:
-
 ```bash
-python3 -m pytest tests/test_teacher_academy.py tests/test_teacher_academy_clean_api_routes.py tests/test_academic_director_staff_registration.py tests/test_teacher_academy_tomorrow_ready.py tests/test_api_v1_architecture.py tests/test_database_restructure_db2_teachers.py tests/test_database_restructure_db5_academics.py
-python3 -m pytest tests/test_architecture_cleanup.py tests/test_phase1d_structure_safety.py tests/test_route_snapshot.py
-python3 -m pytest tests/test_role_routing.py tests/test_phase2a_role_workspaces.py tests/test_pages.py tests/test_route_snapshot.py
-```
-
-Most recent full verification for this architecture cleanup slice:
-
-```bash
-python3 -m pytest
+python3 -m pytest tests/test_route_snapshot.py tests/test_api_v1_architecture.py
+python3 -m pytest tests/test_architecture_cleanup.py tests/test_phase1d_structure_safety.py
+python3 -m compileall -q backend database tgbot scripts main.py
 npm --prefix frontend run check-types
 npm --prefix frontend run build
+git diff --check
 ```
 
-## Next Safe Deletion Candidates
-
-| Candidate | Why next | Blocker |
-| --- | --- | --- |
-| `backend/roles/student/routes/*` compatibility shims | Active code now imports `backend.pages.student*` | Delete after import count is verified zero in a dedicated cleanup |
-| `backend/roles/parent/routes.py` compatibility shim | Active code now imports `backend.pages.parent` | Delete after import count is verified zero in a dedicated cleanup |
-| Remaining `database/queries/*` wrappers | Several domain query modules now own SQL directly | Continue with parent, payment, teacher, lesson catalog, and admin/reporting wrappers slice-by-slice |
-
-Admin route files are not next deletion candidates. They still contain form mutation routes and should be migrated panel-by-panel.
+Run the full backend suite before release. Production `main` remains read-only until an explicitly approved release/merge process.

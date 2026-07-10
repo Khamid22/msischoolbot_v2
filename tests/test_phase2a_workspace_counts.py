@@ -1,6 +1,7 @@
 """Read-only role workspace count cards."""
 
-from backend.roles import workspace_counts
+from backend.modules.staff import workspace as workspace_counts
+from backend.modules.staff import repository as staff_repository
 
 
 class _Result:
@@ -39,7 +40,7 @@ class _Connection:
 
 def _patch_counts_connection(monkeypatch, values, failing_markers=None):
     connection = _Connection(values, failing_markers=failing_markers)
-    monkeypatch.setattr(workspace_counts, "connect", lambda: connection)
+    monkeypatch.setattr(staff_repository, "connect", lambda: connection)
     return connection
 
 

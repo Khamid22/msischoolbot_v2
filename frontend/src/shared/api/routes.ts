@@ -1,4 +1,5 @@
 export const apiRoutes = {
+  accountPassword: "/api/v1/auth/password",
   academicDirectorHeadOfDepartmentCreate: "/api/v1/academic-director/head-of-departments",
   academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy",
   academicDirectorTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
