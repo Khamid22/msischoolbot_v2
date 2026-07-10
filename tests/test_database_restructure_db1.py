@@ -28,8 +28,8 @@ def test_legacy_database_module_is_removed_after_core_migration():
 
 
 def test_teacher_academy_domain_modules_import_successfully():
-    import backend.modules.teacher_academy.repository as academy_repository
-    import backend.modules.teacher_academy.service as academy_service
+    import backend.repositories.teacher_academy as academy_repository
+    import backend.services.teacher_academy.core as academy_service
 
     assert callable(academy_repository.list_academy_teacher_rows)
     assert callable(academy_repository.insert_academy_lesson_assignment)
@@ -39,17 +39,17 @@ def test_teacher_academy_domain_modules_import_successfully():
 
 
 def test_old_admin_teacher_academy_service_path_is_removed():
-    page_service_source = Path("backend/modules/admin/workspace.py").read_text()
+    page_service_source = Path("backend/services/admin/workspace.py").read_text()
 
     assert not Path("backend/roles/admin/services/teacher_academy_service.py").exists()
-    assert "from backend.modules.teacher_academy.service import list_academy_teachers" in page_service_source
+    assert "from backend.services.teacher_academy.core import list_academy_teachers" in page_service_source
     assert "teacher_academy_service" not in page_service_source
 
 
 def test_teacher_academy_service_uses_module_repository_not_inline_sql():
-    service_source = Path("backend/modules/teacher_academy/service.py").read_text()
+    service_source = Path("backend/services/teacher_academy/core.py").read_text()
 
-    assert "from backend.modules.teacher_academy import repository" in service_source
+    assert "from backend.repositories import teacher_academy as repository" in service_source
     assert "from database import queries" not in service_source
     assert "conn.execute" not in service_source
     assert "FROM msi_v2" not in service_source
@@ -59,13 +59,13 @@ def test_teacher_academy_service_uses_module_repository_not_inline_sql():
 
 def test_page_and_role_edges_import_teacher_academy_domain_service_where_safe():
     role_sources = [
-        Path("backend/modules/academics/director_page.py").read_text(),
-        Path("backend/modules/academics/hod_page.py").read_text(),
-        Path("backend/modules/academics/hod_cards.py").read_text(),
-        Path("backend/modules/teachers/workspace.py").read_text(),
-        Path("backend/modules/admin/workspace.py").read_text(),
+        Path("backend/pages/academics/director.py").read_text(),
+        Path("backend/pages/academics/hod.py").read_text(),
+        Path("backend/services/academics/hod_cards.py").read_text(),
+        Path("backend/services/teachers/workspace.py").read_text(),
+        Path("backend/services/admin/workspace.py").read_text(),
     ]
 
     for source in role_sources:
-        assert "backend.modules.teacher_academy.service" in source
+        assert "backend.services.teacher_academy.core" in source
         assert "backend.roles.admin.services.teacher_academy_service" not in source

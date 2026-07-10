@@ -1,2 +1,0 @@
-"""Teacher Academy domain package."""
-

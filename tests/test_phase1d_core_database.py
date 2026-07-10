@@ -1,5 +1,5 @@
 from backend.core import database as core_database
-from backend.modules.identity import database as identity_common
+from backend.services.identity import database as identity_common
 from pathlib import Path
 
 
@@ -27,5 +27,5 @@ def test_core_database_owns_connection_implementation():
     assert "def connect_auth_db" in core_source
     assert "class _PostgresConnectionWrapper" in core_source
     assert legacy_database_import not in core_source
-    assert "from backend.modules.identity.database import connect" not in core_source
+    assert "from backend.services.identity.database import connect" not in core_source
     assert not removed_database_module.exists()

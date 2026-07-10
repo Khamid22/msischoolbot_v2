@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def test_api_v1_router_registry_includes_role_routers():
-    source = Path("backend/modules/router.py").read_text()
+    source = Path("backend/api/v1/router.py").read_text()
 
     assert 'APIRouter(prefix="/api/v1")' in source
     for router_name in [
@@ -22,9 +22,10 @@ def test_api_v1_router_registry_includes_role_routers():
 
 
 def test_module_api_adapters_are_not_page_rendering_layers():
-    api_paths = list(Path("backend/modules").rglob("api.py")) + list(
-        Path("backend/modules").rglob("*_api.py")
-    )
+    api_paths = [
+        path for path in Path("backend/api/v1").rglob("*.py")
+        if path.name not in {"__init__.py", "registry.py"}
+    ]
     assert api_paths
     for path in api_paths:
         source = path.read_text()
@@ -35,15 +36,15 @@ def test_module_api_adapters_are_not_page_rendering_layers():
 
 def test_server_registers_api_v1_before_role_pages():
     source = Path("backend/server.py").read_text()
-    registry = Path("backend/modules/registry.py").read_text()
+    registry = Path("backend/api/v1/registry.py").read_text()
 
-    assert "from backend.modules.router import router as api_v1_router" in source
-    assert "from backend.modules.registry import register_module_pages" in source
-    assert "from backend.modules.academics.director_page import register_academic_director_page_routes" in registry
-    assert "from backend.modules.academics.hod_page import register_head_of_department_page_routes" in registry
-    assert "from backend.modules.teachers.page import register_teacher_page_routes" in registry
-    assert "from backend.modules.students.page import register_student_page_routes" in registry
-    assert "from backend.modules.parents.page import register_parent_invite_routes, register_parent_page_routes" in registry
+    assert "from backend.api.v1.router import router as api_v1_router" in source
+    assert "from backend.api.v1.registry import register_module_pages" in source
+    assert "from backend.pages.academics.director import register_academic_director_page_routes" in registry
+    assert "from backend.pages.academics.hod import register_head_of_department_page_routes" in registry
+    assert "from backend.pages.teachers.home import register_teacher_page_routes" in registry
+    assert "from backend.pages.students.home import register_student_page_routes" in registry
+    assert "from backend.pages.parents.home import register_parent_invite_routes, register_parent_page_routes" in registry
     assert "from backend.roles.academic_director.routes" not in source
     assert "from backend.roles.head_of_department.routes" not in source
     assert "from backend.roles.teacher.routes" not in source
@@ -57,14 +58,14 @@ def test_server_registers_api_v1_before_role_pages():
 
 def test_student_and_parent_page_routes_live_in_their_modules():
     for path in [
-        Path("backend/modules/students/page.py"),
-        Path("backend/modules/students/dashboard_page.py"),
-        Path("backend/modules/students/forms.py"),
-        Path("backend/modules/students/resources_page.py"),
-        Path("backend/modules/students/chat_page.py"),
-        Path("backend/modules/students/office_hours_page.py"),
-        Path("backend/modules/students/rating_page.py"),
-        Path("backend/modules/parents/page.py"),
+        Path("backend/pages/students/home.py"),
+        Path("backend/pages/students/dashboard.py"),
+        Path("backend/pages/students/forms.py"),
+        Path("backend/pages/students/resources.py"),
+        Path("backend/pages/students/chat.py"),
+        Path("backend/pages/students/office_hours.py"),
+        Path("backend/pages/students/rating.py"),
+        Path("backend/pages/parents/home.py"),
     ]:
         assert path.exists(), f"Expected page route module to exist: {path}"
         source = path.read_text()
@@ -72,10 +73,18 @@ def test_student_and_parent_page_routes_live_in_their_modules():
         assert "from database import queries" not in source
 
 
-def test_scattered_technical_and_role_layers_are_removed():
+def test_layered_architecture_folders_exist_and_legacy_layers_are_removed():
     for path in [
-        Path("backend/api"),
+        Path("backend/api/v1"),
         Path("backend/pages"),
+        Path("backend/schemas"),
+        Path("backend/services"),
+        Path("backend/repositories"),
+        Path("backend/core"),
+    ]:
+        assert path.is_dir(), f"Layered architecture folder must exist: {path}"
+    for path in [
+        Path("backend/modules"),
         Path("backend/roles"),
         Path("backend/domains"),
         Path("backend/identity"),
@@ -83,17 +92,20 @@ def test_scattered_technical_and_role_layers_are_removed():
         Path("backend/utils"),
         Path("backend/security"),
     ]:
-        assert not path.exists(), f"Ownership must live under backend/modules or backend/core: {path}"
+        assert not path.exists(), f"Legacy layout must not return: {path}"
 
 
 def test_http_pages_and_workspaces_do_not_own_sql():
-    candidates = []
-    for path in Path("backend/modules").rglob("*.py"):
-        name = path.name
-        if name in {"api.py", "page.py", "workspace.py", "cards.py"} or any(
-            marker in name for marker in ("_api.py", "_page.py", "_forms.py")
-        ):
-            candidates.append(path)
+    candidates = [
+        path
+        for top in ("backend/api/v1", "backend/pages")
+        for path in Path(top).rglob("*.py")
+        if path.name != "__init__.py"
+    ] + [
+        path for path in Path("backend/services").rglob("workspace.py")
+    ] + [
+        path for path in Path("backend/services").rglob("cards.py")
+    ]
 
     assert candidates
     for path in candidates:
@@ -104,7 +116,7 @@ def test_http_pages_and_workspaces_do_not_own_sql():
 
 
 def test_services_do_not_call_other_role_http_adapters():
-    for path in Path("backend/modules").rglob("*service.py"):
+    for path in Path("backend/services").rglob("*.py"):
         source = path.read_text()
         assert "_api import" not in source
         assert ".page import" not in source
@@ -113,29 +125,32 @@ def test_services_do_not_call_other_role_http_adapters():
 
 def test_academic_role_adapters_are_owned_by_academic_modules():
     for path in [
-        Path("backend/modules/academics/director_page.py"),
-        Path("backend/modules/academics/director_router.py"),
-        Path("backend/modules/academics/hod_page.py"),
-        Path("backend/modules/academics/hod_router.py"),
+        Path("backend/pages/academics/director.py"),
+        Path("backend/api/v1/academics/director_router.py"),
+        Path("backend/pages/academics/hod.py"),
+        Path("backend/api/v1/academics/hod_router.py"),
     ]:
         assert path.is_file()
 
 
-def test_teacher_http_and_domain_ownership_is_one_module():
-    teacher_module = Path("backend/modules/teachers")
-    assert teacher_module.is_dir()
-    for file_name in ["api.py", "page.py", "schemas.py", "service.py", "repository.py", "workspace.py", "cards.py"]:
-        assert (teacher_module / file_name).is_file()
-    assert not Path("backend/api/v1/teacher").exists()
-    assert not Path("backend/pages/teacher.py").exists()
+def test_teacher_feature_is_present_in_every_layer():
+    for path in [
+        Path("backend/api/v1/teachers/routes.py"),
+        Path("backend/pages/teachers/home.py"),
+        Path("backend/schemas/teachers.py"),
+        Path("backend/services/teachers/core.py"),
+        Path("backend/repositories/teachers.py"),
+    ]:
+        assert path.is_file(), f"Teacher layer file missing: {path}"
+    assert not Path("backend/modules").exists()
     assert not Path("backend/roles/teacher").exists()
     assert not Path("backend/domains/teachers").exists()
 
 
 def test_academic_director_and_hod_role_routes_are_page_only_for_migrated_actions():
     for path in [
-        Path("backend/modules/academics/director_page.py"),
-        Path("backend/modules/academics/hod_page.py"),
+        Path("backend/pages/academics/director.py"),
+        Path("backend/pages/academics/hod.py"),
     ]:
         source = path.read_text()
         assert "@router.post" not in source
@@ -145,12 +160,12 @@ def test_academic_director_and_hod_role_routes_are_page_only_for_migrated_action
 
 
 def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
-    schemas_source = Path("backend/modules/teacher_academy/schemas.py").read_text()
-    responses_source = Path("backend/modules/teacher_academy/http_responses.py").read_text()
+    schemas_source = Path("backend/schemas/teacher_academy.py").read_text()
+    responses_source = Path("backend/services/teacher_academy/http_responses.py").read_text()
 
     for path in [
-        Path("backend/modules/teacher_academy/director_api.py"),
-        Path("backend/modules/teacher_academy/hod_api.py"),
+        Path("backend/api/v1/teacher_academy/director.py"),
+        Path("backend/api/v1/teacher_academy/hod.py"),
     ]:
         source = path.read_text()
         assert "response_model=ApiSuccess[" in source
@@ -166,7 +181,7 @@ def test_teacher_academy_v1_routes_use_native_fastapi_contracts():
 
 
 def test_teacher_academy_domain_permissions_do_not_import_legacy_session_context():
-    source = Path("backend/modules/teacher_academy/permissions.py").read_text()
+    source = Path("backend/services/teacher_academy/permissions.py").read_text()
 
     assert "backend.core.request_context" not in source
     assert "backend.core.session" not in source
@@ -174,7 +189,7 @@ def test_teacher_academy_domain_permissions_do_not_import_legacy_session_context
 
 
 def test_teacher_academy_responses_do_not_export_raw_domain_services():
-    import backend.modules.teacher_academy.http_responses as responses
+    import backend.services.teacher_academy.http_responses as responses
 
     raw_service_exports = {
         "add_assessment",
@@ -193,7 +208,7 @@ def test_teacher_academy_responses_do_not_export_raw_domain_services():
 
 
 def test_hod_teacher_academy_api_passes_current_user_to_scope_checks():
-    source = Path("backend/modules/teacher_academy/hod_api.py").read_text()
+    source = Path("backend/api/v1/teacher_academy/hod.py").read_text()
 
     assert "user: CurrentUser = Depends(get_current_user)" in source
     assert "can_user_manage_academy_assignment(user, assignment_id)" in source
@@ -213,13 +228,13 @@ def test_frontend_teacher_academy_api_helpers_use_api_v1_namespace():
 
 
 def test_teacher_academy_routes_live_in_role_specific_modules():
-    academic_director_router = Path("backend/modules/academics/director_router.py").read_text()
-    hod_router = Path("backend/modules/academics/hod_router.py").read_text()
-    academic_director_academy = Path("backend/modules/teacher_academy/director_api.py").read_text()
-    hod_academy = Path("backend/modules/teacher_academy/hod_api.py").read_text()
+    academic_director_router = Path("backend/api/v1/academics/director_router.py").read_text()
+    hod_router = Path("backend/api/v1/academics/hod_router.py").read_text()
+    academic_director_academy = Path("backend/api/v1/teacher_academy/director.py").read_text()
+    hod_academy = Path("backend/api/v1/teacher_academy/hod.py").read_text()
 
-    assert "from backend.modules.teacher_academy.director_api import register_teacher_academy_routes" in academic_director_router
-    assert "from backend.modules.teacher_academy.hod_api import register_teacher_academy_routes" in hod_router
+    assert "from backend.api.v1.teacher_academy.director import register_teacher_academy_routes" in academic_director_router
+    assert "from backend.api.v1.teacher_academy.hod import register_teacher_academy_routes" in hod_router
     assert "register_teacher_academy_routes(router)" in academic_director_router
     assert "register_teacher_academy_routes(router)" in hod_router
     assert "api_v1_academic_director_create_academy_teacher" in academic_director_academy

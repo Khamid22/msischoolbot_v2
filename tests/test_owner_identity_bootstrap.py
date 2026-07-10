@@ -1,4 +1,4 @@
-from backend.modules.identity import bootstrap as storage
+from backend.services.identity import bootstrap as storage
 
 
 class _Cursor:

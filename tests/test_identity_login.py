@@ -55,7 +55,7 @@ def _auth_result(role, *, account_role=None, **session_overrides):
 
 
 def test_student_login_uses_accounts(client, monkeypatch):
-    import backend.modules.portal.web as identity_routes
+    import backend.pages.portal.home as identity_routes
 
     _set_csrf_session(client)
     calls = {"activity": []}
@@ -92,7 +92,7 @@ def test_student_login_uses_accounts(client, monkeypatch):
 
 
 def test_teacher_tch0001_login_uses_accounts(client, monkeypatch):
-    import backend.modules.portal.web as identity_routes
+    import backend.pages.portal.home as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
@@ -115,7 +115,7 @@ def test_teacher_tch0001_login_uses_accounts(client, monkeypatch):
 
 
 def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
-    import backend.modules.portal.web as identity_routes
+    import backend.pages.portal.home as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
@@ -155,7 +155,7 @@ def test_protected_account_session_must_match_database_account(
     monkeypatch,
     database_account,
 ):
-    from backend.modules.identity import accounts
+    from backend.services.identity import accounts
 
     client.cookies.set(
         "session",
@@ -193,7 +193,7 @@ def test_protected_account_session_must_match_database_account(
     ],
 )
 def test_rejected_account_returns_401(client, monkeypatch, login):
-    import backend.modules.portal.web as identity_routes
+    import backend.pages.portal.home as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(identity_routes, "authenticate_account_password", lambda login_value, password: None)

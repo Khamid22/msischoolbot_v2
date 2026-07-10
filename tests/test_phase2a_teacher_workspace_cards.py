@@ -7,7 +7,7 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.modules.teachers.cards import build_teacher_workspace_cards
+from backend.services.teachers.cards import build_teacher_workspace_cards
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -159,8 +159,8 @@ def test_teacher_workspace_card_provider_returns_placeholders(teacher_id, worksp
 
 
 def test_teacher_route_loads_and_shows_mocked_cards(client, monkeypatch):
-    import backend.modules.teachers.service as teacher_service
-    import backend.modules.teachers.page as teacher_routes
+    import backend.services.teachers.core as teacher_service
+    import backend.pages.teachers.home as teacher_routes
     import database
 
     monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _teacher_workspace())
@@ -201,8 +201,8 @@ def test_wrong_role_is_denied_from_teacher_workspace(client):
 
 
 def test_teacher_route_db_failure_returns_placeholder_cards(client, monkeypatch):
-    import backend.modules.teachers.service as teacher_service
-    import backend.modules.teachers.page as teacher_routes
+    import backend.services.teachers.core as teacher_service
+    import backend.pages.teachers.home as teacher_routes
     import database
 
     def fail_workspace(teacher_id, staff_id=None):

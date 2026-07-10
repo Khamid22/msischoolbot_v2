@@ -61,7 +61,7 @@ def test_teacher_api_denies_other_roles(client):
 
 
 def test_teacher_cancel_availability_scopes_to_current_teacher(client, monkeypatch):
-    import backend.modules.teachers.api as teacher_office_hours
+    import backend.api.v1.teachers.routes as teacher_office_hours
 
     calls = {}
     _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
@@ -84,7 +84,7 @@ def test_teacher_cancel_availability_scopes_to_current_teacher(client, monkeypat
 
 
 def test_teacher_update_booking_status_scopes_to_current_teacher(client, monkeypatch):
-    import backend.modules.teachers.api as teacher_office_hours
+    import backend.api.v1.teachers.routes as teacher_office_hours
 
     calls = {}
     _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})

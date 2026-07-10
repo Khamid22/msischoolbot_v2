@@ -6,8 +6,8 @@ import pytest
 
 
 def test_parent_domain_modules_import_successfully():
-    import backend.modules.parents.repository as parent_repository
-    import backend.modules.parents.service as parent_service
+    import backend.repositories.parents as parent_repository
+    import backend.services.parents.core as parent_service
 
     assert callable(parent_repository.link_parent_from_invite)
     assert callable(parent_repository.get_parent_by_telegram_id)
@@ -46,34 +46,34 @@ def test_parent_module_is_canonical_and_legacy_facades_are_gone():
 
 
 def test_parent_domain_imports_are_used_where_safe():
-    identity_routes_source = Path("backend/modules/portal/web.py").read_text()
-    parent_routes_source = Path("backend/modules/parents/page.py").read_text()
-    admin_parent_routes_source = Path("backend/modules/parents/admin_api.py").read_text()
-    admin_student_routes_source = Path("backend/modules/students/admin_api.py").read_text()
-    admin_page_source = Path("backend/modules/admin/page.py").read_text()
-    admin_page_service_source = Path("backend/modules/admin/workspace.py").read_text()
-    student_payload_source = Path("backend/modules/students/payload.py").read_text()
+    identity_routes_source = Path("backend/pages/portal/home.py").read_text()
+    parent_routes_source = Path("backend/pages/parents/home.py").read_text()
+    admin_parent_routes_source = Path("backend/api/v1/parents/admin.py").read_text()
+    admin_student_routes_source = Path("backend/api/v1/students/admin.py").read_text()
+    admin_page_source = Path("backend/pages/admin/home.py").read_text()
+    admin_page_service_source = Path("backend/services/admin/workspace.py").read_text()
+    student_payload_source = Path("backend/services/students/payload.py").read_text()
 
-    assert "from backend.modules.parents.service import (" in identity_routes_source
-    assert "from backend.modules.parents.service import (" in parent_routes_source
-    assert "from backend.modules.parents.service import (" in admin_parent_routes_source
-    assert "from backend.modules.parents.service import create_parent_invite_code" in admin_student_routes_source
-    assert "from backend.modules.parents.service import list_linked_parents_for_student" in admin_page_source
-    assert "from backend.modules.parents.service import list_parent_accounts, list_parent_children" in admin_page_service_source
-    assert "from backend.modules.parents.service import parent_can_access_dashboard" in student_payload_source
+    assert "from backend.services.parents.core import (" in identity_routes_source
+    assert "from backend.services.parents.core import (" in parent_routes_source
+    assert "from backend.services.parents.core import (" in admin_parent_routes_source
+    assert "from backend.services.parents.core import create_parent_invite_code" in admin_student_routes_source
+    assert "from backend.services.parents.core import list_linked_parents_for_student" in admin_page_source
+    assert "from backend.services.parents.core import list_parent_accounts, list_parent_children" in admin_page_service_source
+    assert "from backend.services.parents.core import parent_can_access_dashboard" in student_payload_source
     assert not Path("backend/identity/telegram_links.py").exists()
 
 
 def test_parent_query_sql_is_owned_by_the_domain():
-    source = Path("backend/modules/parents/repository.py").read_text()
+    source = Path("backend/repositories/parents.py").read_text()
 
     assert "def get_parent_child_row" in source
     assert "FROM msi_v2" in source
 
 
 def test_parent_invite_and_dashboard_logic_live_in_parent_domain():
-    parent_service_source = Path("backend/modules/parents/service.py").read_text()
-    parent_query_source = Path("backend/modules/parents/repository.py").read_text()
+    parent_service_source = Path("backend/services/parents/core.py").read_text()
+    parent_query_source = Path("backend/repositories/parents.py").read_text()
 
     assert "def create_parent_invite_code" in parent_service_source
     assert "def claim_parent_invite_code" in parent_service_source

@@ -16,7 +16,7 @@ from backend.core.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from backend.core.guards import install_guard_handler
 from backend.core.access.roles import is_valid_role, normalize_role, role_display_name
 from backend.core.config import get_web_settings
-from backend.modules.registry import register_module_pages
+from backend.api.v1.registry import register_module_pages
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
@@ -204,7 +204,7 @@ class AuthAndSecurityMiddleware:
                 account = None
                 if account_id > 0 and cookie_version > 0:
                     try:
-                        from backend.modules.identity.accounts import get_account_by_id
+                        from backend.services.identity.accounts import get_account_by_id
 
                         account = get_account_by_id(account_id)
                     except Exception:
@@ -487,7 +487,7 @@ def _bootstrap_app(app_instance):
     render.STATIC_FOLDER = _STATIC_DIR
 
     # Set static files dependencies in system.py
-    import backend.modules.system.web as system_routes
+    import backend.pages.system.home as system_routes
     system_routes.STATIC_FOLDER = _STATIC_DIR
 
     # Build small legacy Telegram helper bundles at startup. Some deploy
@@ -497,11 +497,11 @@ def _bootstrap_app(app_instance):
     ensure_js_bundles(_STATIC_DIR)
 
     # Include system router
-    from backend.modules.system.web import router as system_router
+    from backend.pages.system.home import router as system_router
     app_instance.include_router(system_router)
 
     # Include JSON/action API router before page routes.
-    from backend.modules.router import router as api_v1_router
+    from backend.api.v1.router import router as api_v1_router
     app_instance.include_router(api_v1_router)
 
     register_module_pages(app_instance)

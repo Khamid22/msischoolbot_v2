@@ -1,6 +1,6 @@
 """Payment repository regression tests for canonical student foreign keys."""
 
-from backend.modules.payments import repository
+from backend.repositories import payments as repository
 
 
 class _Result:

@@ -69,10 +69,10 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.modules.academics.director_page as academic_director_routes
-    import backend.modules.staff.ceo_page as ceo_page
-    import backend.modules.staff.support_page as customer_support_page
-    import backend.modules.staff.hr_page as hr_manager_page
+    import backend.pages.academics.director as academic_director_routes
+    import backend.pages.staff.ceo as ceo_page
+    import backend.pages.staff.support as customer_support_page
+    import backend.pages.staff.hr as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -227,9 +227,9 @@ def test_existing_critical_routes_remain_registered(app, method, path):
 def test_staff_role_pages_are_owned_by_one_staff_module():
     assert not Path("backend/roles").exists()
     for path in [
-        Path("backend/modules/staff/ceo_page.py"),
-        Path("backend/modules/staff/hr_page.py"),
-        Path("backend/modules/staff/support_page.py"),
-        Path("backend/modules/staff/workspace.py"),
+        Path("backend/pages/staff/ceo.py"),
+        Path("backend/pages/staff/hr.py"),
+        Path("backend/pages/staff/support.py"),
+        Path("backend/services/staff/workspace.py"),
     ]:
         assert path.is_file()

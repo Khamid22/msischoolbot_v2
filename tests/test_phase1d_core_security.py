@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 
 from backend.core.passwords import verify_password_hash
-from backend.modules.identity.accounts import verify_account_password
+from backend.services.identity.accounts import verify_account_password
 
 
 def test_verify_password_hash_valid_password_returns_true():

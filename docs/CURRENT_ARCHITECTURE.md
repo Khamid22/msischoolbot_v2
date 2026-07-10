@@ -32,32 +32,36 @@ The LMS is a web portal with Telegram integration, not a Telegram mini app backe
 
 ```text
 backend/
+  main.py                           entrypoint: app = create_app()
   server.py                         app composition and security middleware
-  api/v1/                           versioned JSON/action routes and schemas
-  pages/                            HTML/React bootstrap routes
-  domains/
-    identity/                       canonical accounts, Telegram auth, SQL
-    academics/                      schools, programs, groups, gradebook, dashboards
-    students/                       student profile and access services/queries
-    teachers/                       teacher profile and assignment services/queries
-    parents/                        invite, linking, parent access services/queries
-    timetable/                      schedules and lesson sessions
-    office_hours/                   slot and booking rules/queries
-    teacher_academy/                assignments, assessments, permissions, notifications
-    announcements/                  announcement rules/queries
-    communication/                  chat rules/queries
-    complaints/                     support ticket rules/queries
-    payments/                       payment records and student access boundaries
-    resources/                      resources, comments, and storage-facing rules
-  core/                             configuration and PostgreSQL connection pool
+  core/                             cross-cutting infrastructure only
+    config, database, session       settings, PostgreSQL pool, session helpers
+    access/                         roles, permissions, CurrentUser dependencies
+    api_schemas, api_responses      ApiSuccess/ApiError envelope
+    request_context, rendering      request contextvar + prime_body_state, React page rendering
+    passwords, rate_limit, assets   werkzeug-quarantined hashing, limiter, asset versioning
+  api/v1/                           ALL JSON routes, one package per feature
+    router.py                       aggregates every feature router under /api/v1
+    registry.py                     page-route registration for server.py
+    students/  teachers/  admin/    academics/  staff/  parents/  identity/
+    payments/  complaints/  resources/  announcements/  communication/
+    office_hours/  teacher_academy/  system/
+  pages/                            ALL HTML/React bootstrap routes, per feature
+  schemas/                          ALL Pydantic request/response models, one file per feature
+  services/                         ALL business logic, one package per feature
+  repositories/                     ALL SQL, one file per feature
   integrations/                     Telegram, Excel, and storage adapters
-  security/                         current-user, role, permission, and auth helpers
-  roles/                            remaining workspace/page compatibility helpers
+  static/                           built frontend artifacts
 ```
 
-The dependency rule is routes/pages -> services -> domain query modules -> PostgreSQL. Domain code does not use the deleted `database.queries` or `database.cross_queries` barrels. `database/__init__.py` is now only a small stable re-export of core connection helpers; schema history lives under `database/alembic`.
+The dependency rule is api/pages -> services -> repositories -> PostgreSQL, with
+`core` importable from every layer and importing none of them. Schemas are shared
+by api and services. Feature names line up across layers: the students feature is
+`api/v1/students/*`, `pages/students/*`, `schemas/students.py`,
+`services/students/*`, `repositories/students.py`.
 
-`backend/identity` contains only shared connection/bootstrap plumbing still used during application startup. The old password-auth, Telegram-auth, parent-account, parent-invite, and Telegram-link facade modules have been removed; canonical identity logic lives in `backend/domains/identity`.
+`database/__init__.py` is only a small stable re-export of core connection
+helpers; schema history lives under `database/alembic`.
 
 ## Authentication Boundary
 

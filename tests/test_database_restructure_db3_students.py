@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 def test_student_domain_modules_import_successfully():
-    import backend.modules.students.repository as student_repository
-    import backend.modules.students.service as student_service
+    import backend.repositories.students as student_repository
+    import backend.services.students.core as student_service
 
     assert not hasattr(student_repository, "get_student_login_row")
     assert callable(student_repository.get_students_sheet_map_row)
@@ -42,38 +42,38 @@ def test_student_identity_wrappers_are_gone():
 
 
 def test_student_domain_imports_are_used_where_safe():
-    dashboard_service_source = Path("backend/modules/students/dashboard.py").read_text()
-    student_page_source = Path("backend/modules/students/page.py").read_text()
-    student_routes_source = Path("backend/modules/students/forms.py").read_text()
-    auth_routes_source = Path("backend/modules/identity/api.py").read_text()
-    admin_student_routes_source = Path("backend/modules/students/admin_forms.py").read_text()
-    admin_page_service_source = Path("backend/modules/admin/workspace.py").read_text()
-    parent_service_source = Path("backend/modules/parents/service.py").read_text()
-    office_hours_source = Path("backend/modules/students/office_hours_page.py").read_text()
+    dashboard_service_source = Path("backend/services/students/dashboard.py").read_text()
+    student_page_source = Path("backend/pages/students/home.py").read_text()
+    student_routes_source = Path("backend/pages/students/forms.py").read_text()
+    auth_routes_source = Path("backend/api/v1/identity/routes.py").read_text()
+    admin_student_routes_source = Path("backend/pages/students/admin_forms.py").read_text()
+    admin_page_service_source = Path("backend/services/admin/workspace.py").read_text()
+    parent_service_source = Path("backend/services/parents/core.py").read_text()
+    office_hours_source = Path("backend/pages/students/office_hours.py").read_text()
 
-    assert "from backend.modules.students.service import (" in dashboard_service_source
-    assert "from backend.modules.students.service import (" in student_page_source
+    assert "from backend.services.students.core import (" in dashboard_service_source
+    assert "from backend.services.students.core import (" in student_page_source
     assert "change_student_password" not in student_routes_source
-    assert "from backend.modules.identity.accounts import change_own_password" in auth_routes_source
-    assert "from backend.modules.students.service import (" in admin_student_routes_source
-    assert "from backend.modules.students.service import get_admin_student_profile, list_students_for_admin" in admin_page_service_source
-    assert "from backend.modules.students.service import resolve_public_dashboard_for_student_row" in parent_service_source
-    assert "from backend.modules.students.service import list_enrolled_subject_options" in office_hours_source
-    assert "from backend.modules.teachers.service import list_teachers" in office_hours_source
+    assert "from backend.services.identity.accounts import change_own_password" in auth_routes_source
+    assert "from backend.services.students.core import (" in admin_student_routes_source
+    assert "from backend.services.students.core import get_admin_student_profile, list_students_for_admin" in admin_page_service_source
+    assert "from backend.services.students.core import resolve_public_dashboard_for_student_row" in parent_service_source
+    assert "from backend.services.students.core import list_enrolled_subject_options" in office_hours_source
+    assert "from backend.services.teachers.core import list_teachers" in office_hours_source
 
 
 def test_student_query_sql_is_owned_by_the_domain():
-    source = Path("backend/modules/students/repository.py").read_text()
+    source = Path("backend/repositories/students.py").read_text()
 
     assert "def get_students_sheet_map_row" in source
     assert "FROM msi_v2" in source
 
 
 def test_student_public_dashboard_resolution_uses_student_domain():
-    route_service_source = Path("backend/modules/admin/compatibility.py").read_text()
-    parent_service_source = Path("backend/modules/parents/service.py").read_text()
-    academic_dashboard_source = Path("backend/modules/academics/internal_dashboard_service.py").read_text()
-    office_hours_source = Path("backend/modules/students/office_hours_page.py").read_text()
+    route_service_source = Path("backend/services/admin/compatibility.py").read_text()
+    parent_service_source = Path("backend/services/parents/core.py").read_text()
+    academic_dashboard_source = Path("backend/services/academics/internal_dashboard.py").read_text()
+    office_hours_source = Path("backend/pages/students/office_hours.py").read_text()
 
     assert "resolve_sheet_student_for_admin" in route_service_source
     assert "list_public_dashboard_targets_for_student_row" not in route_service_source
@@ -85,7 +85,7 @@ def test_student_public_dashboard_resolution_uses_student_domain():
 
 
 def test_direct_dashboard_lookup_allows_public_dashboard_without_legacy_enrollment():
-    academic_queries_source = Path("backend/modules/academics/repository.py").read_text()
+    academic_queries_source = Path("backend/repositories/academics.py").read_text()
     dashboard_lookup_source = academic_queries_source.split("def get_enrollment_dashboard_row", 1)[1].split(
         "\ndef list_enrollment_attendance_rows",
         1,
@@ -96,7 +96,7 @@ def test_direct_dashboard_lookup_allows_public_dashboard_without_legacy_enrollme
 
 
 def test_student_public_dashboard_resolution_uses_canonical_subject_order(monkeypatch):
-    from backend.modules.students import service as student_service
+    from backend.services.students import core as student_service
 
     class NullConnection:
         def __enter__(self):

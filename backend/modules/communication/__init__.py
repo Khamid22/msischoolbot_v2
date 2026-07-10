@@ -1,2 +1,0 @@
-"""Communication/chat domain services."""
-

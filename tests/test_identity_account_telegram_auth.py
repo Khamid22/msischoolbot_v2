@@ -1,6 +1,6 @@
 import pytest
 
-from backend.modules.identity import telegram_auth as account_telegram_auth
+from backend.services.identity import telegram_auth as account_telegram_auth
 
 
 class _Result:

@@ -24,7 +24,7 @@ DELETED_WRAPPER_IMPORTS = [
     "backend.identity.telegram_links",
     "backend.identity.profiles",
     "backend.roles.parent.services",
-    "backend.modules.identity.service",
+    "backend.services.identity.core",
     "backend.roles.common.teacher_academy_api",
     "backend.roles.admin.services.teacher_academy_service",
     "database.cross_queries",
@@ -53,12 +53,12 @@ def _active_source_text() -> str:
 
 def test_new_real_architecture_folders_remain():
     for path in [
-        Path("backend/modules/router.py"),
-        Path("backend/modules/admin/api.py"),
-        Path("backend/modules/teacher_academy/director_api.py"),
-        Path("backend/modules/teacher_academy/hod_api.py"),
-        Path("backend/modules/teacher_academy/service.py"),
-        Path("backend/modules/teacher_academy/repository.py"),
+        Path("backend/api/v1/router.py"),
+        Path("backend/api/v1/admin/routes.py"),
+        Path("backend/api/v1/teacher_academy/director.py"),
+        Path("backend/api/v1/teacher_academy/hod.py"),
+        Path("backend/services/teacher_academy/core.py"),
+        Path("backend/repositories/teacher_academy.py"),
         Path("backend/core/database.py"),
         Path("backend/core/config.py"),
         Path("backend/core/access/dependencies.py"),
@@ -69,11 +69,10 @@ def test_new_real_architecture_folders_remain():
 
 def test_empty_unused_placeholder_folders_are_removed():
     for path in [
-        Path("backend/api"),
-        Path("backend/pages"),
+        Path("backend/modules"),
         Path("backend/roles"),
         Path("backend/domains"),
-        Path("backend/modules/people"),
+        Path("backend/services/people"),
     ]:
         assert not path.exists(), f"Unused empty placeholder should be removed: {path}"
 
@@ -120,7 +119,7 @@ def test_database_generated_caches_are_deleted_and_alembic_remains():
 def test_announcement_database_query_wrapper_is_removed_after_domain_migration():
     active_source = _active_source_text()
 
-    assert Path("backend/modules/announcements/repository.py").exists()
+    assert Path("backend/repositories/announcements.py").exists()
     assert not Path("database/queries").exists()
     assert "database.queries.announcement_queries" not in active_source
 
@@ -129,9 +128,9 @@ def test_complaint_office_hours_and_resource_query_wrappers_moved_to_domains():
     active_source = _active_source_text()
 
     for path in [
-        Path("backend/modules/complaints/repository.py"),
-        Path("backend/modules/office_hours/repository.py"),
-        Path("backend/modules/resources/repository.py"),
+        Path("backend/repositories/complaints.py"),
+        Path("backend/repositories/office_hours.py"),
+        Path("backend/repositories/resources.py"),
     ]:
         assert path.exists(), f"Expected domain query module to exist: {path}"
 
@@ -155,17 +154,17 @@ def test_academic_helpers_moved_out_of_database_folder():
     old_academic_import = "database." + "academics"
 
     for path in [
-        Path("backend/modules/academics/canonical.py"),
-        Path("backend/modules/academics/dates.py"),
-        Path("backend/modules/academics/performance_summary.py"),
-        Path("backend/modules/academics/schools.py"),
-        Path("backend/modules/academics/subjects.py"),
-        Path("backend/modules/academics/summary_repository.py"),
-        Path("backend/modules/academics/text.py"),
+        Path("backend/services/academics/canonical.py"),
+        Path("backend/services/academics/dates.py"),
+        Path("backend/services/academics/performance_summary.py"),
+        Path("backend/services/academics/schools.py"),
+        Path("backend/services/academics/subjects.py"),
+        Path("backend/repositories/academics_summary.py"),
+        Path("backend/services/academics/text.py"),
     ]:
         assert path.exists(), f"Expected moved academic helper to exist: {path}"
 
-    assert not Path("backend/modules/academics/curriculum.py").exists()
+    assert not Path("backend/services/academics/curriculum.py").exists()
     assert not Path("backend/integrations/excel").exists()
 
     assert not (Path("database") / "academics").exists()
@@ -176,7 +175,7 @@ def test_academic_helpers_moved_out_of_database_folder():
 
 def test_excel_is_not_an_lms_integration_or_upload_format():
     assert not Path("backend/integrations/excel").exists()
-    assert not Path("backend/modules/academics/curriculum.py").exists()
+    assert not Path("backend/services/academics/curriculum.py").exists()
     assert not Path("scripts/reconcile_academic_workbooks.py").exists()
     assert "openpyxl" not in Path("requirements.txt").read_text().casefold()
 
@@ -189,10 +188,10 @@ def test_excel_is_not_an_lms_integration_or_upload_format():
 
 def test_complaint_office_hours_and_resource_services_use_module_repositories():
     expected_sources = {
-        Path("backend/modules/complaints/service.py"): "from backend.modules.complaints import repository",
-        Path("backend/modules/office_hours/service.py"): "from backend.modules.office_hours import repository",
-        Path("backend/modules/resources/service.py"): "from backend.modules.resources import repository",
-        Path("backend/modules/resources/comments_service.py"): "from backend.modules.resources import repository",
+        Path("backend/services/complaints/core.py"): "from backend.repositories import complaints as repository",
+        Path("backend/services/office_hours/core.py"): "from backend.repositories import office_hours as repository",
+        Path("backend/services/resources/core.py"): "from backend.repositories import resources as repository",
+        Path("backend/services/resources/comments.py"): "from backend.repositories import resources as repository",
     }
 
     for path, expected_import in expected_sources.items():
@@ -204,8 +203,8 @@ def test_complaint_office_hours_and_resource_services_use_module_repositories():
 def test_main_startup_imports_storage_not_account_service():
     main_source = Path("main.py").read_text()
 
-    assert "from backend.modules.identity.bootstrap import init_storage" in main_source
+    assert "from backend.services.identity.bootstrap import init_storage" in main_source
     assert "from backend.core.config import get_web_settings" in main_source
     assert "backend.identity.account_service" not in main_source
-    assert callable(importlib.import_module("backend.modules.identity.bootstrap").init_storage)
+    assert callable(importlib.import_module("backend.services.identity.bootstrap").init_storage)
     importlib.import_module("main")

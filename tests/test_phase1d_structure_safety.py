@@ -114,7 +114,7 @@ def test_critical_routes_remain_registered(app, method, path):
 
 
 def test_account_login_path_is_always_available(app, monkeypatch):
-    import backend.modules.portal.web as identity_routes
+    import backend.pages.portal.home as identity_routes
 
     client = _rate_limit_isolated_client(app, "account-login")
     calls = {"auth": 0}
@@ -145,7 +145,11 @@ def test_account_login_path_is_always_available(app, monkeypatch):
 @pytest.mark.parametrize(
     "module_name",
     [
-        "backend.modules",
+        "backend.api.v1",
+        "backend.pages",
+        "backend.schemas",
+        "backend.services",
+        "backend.repositories",
         "backend.core",
         "backend.integrations",
         "backend.integrations.telegram",

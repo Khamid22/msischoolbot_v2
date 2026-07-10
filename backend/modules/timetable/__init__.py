@@ -1,1 +1,0 @@
-"""Timetable domain package."""

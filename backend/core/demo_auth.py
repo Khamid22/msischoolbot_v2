@@ -7,9 +7,9 @@ DEMO_AUTH_ENABLED=1, so production behavior stays unchanged when the flag is off
 import os
 import re
 
-from backend.modules.academics import canonical
+from backend.services.academics import canonical
 from backend.core.database import connect_auth_db
-from backend.modules.identity.accounts import (
+from backend.services.identity.accounts import (
     build_session_payload,
     get_account_by_id,
     load_account_profile,
