@@ -176,7 +176,8 @@ def _normalize_weekdays(value):
         "sun": 6, "sunday": 6,
     }
     for item in raw:
-        text = str(item or "").strip().casefold()
+        # Monday is represented by integer 0, which is valid but falsy.
+        text = str(item if item is not None else "").strip().casefold()
         if not text:
             continue
         if text in names:
