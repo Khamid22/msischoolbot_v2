@@ -299,6 +299,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         groupId={openGroupId}
         csrf={csrf}
         groups={groups}
+        teachers={Array.isArray(state.teachers) ? state.teachers : Array.isArray(props.adminTeachers) ? props.adminTeachers : []}
         academicRoutes={academicRoutes}
         onClose={() => setOpenGroupId(null)}
       />

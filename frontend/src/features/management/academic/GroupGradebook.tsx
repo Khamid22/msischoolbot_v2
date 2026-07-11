@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, CalendarDays, ChevronLeft, Layers, Users, X } from "lucide-react";
+import { BookMarked, CalendarDays, ChevronLeft, Layers, Settings, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -19,6 +19,7 @@ type AcademicGradebookRoutes = Pick<
   | "adminAcademicEnrollmentStatusApi"
   | "adminAcademicEnrollmentGroupApi"
   | "adminAcademicLessonApi"
+  | "adminAcademicScheduleCreate"
 >;
 
 type CompactTooltipItem = {
@@ -73,12 +74,14 @@ export function GroupGradebook({
   groupId,
   csrf,
   groups,
+  teachers,
   academicRoutes = routes,
   onClose,
 }: {
   groupId: number;
   csrf: string;
   groups: Array<Record<string, unknown>>;
+  teachers: Array<Record<string, unknown>>;
   academicRoutes?: AcademicGradebookRoutes;
   onClose: () => void;
 }) {
@@ -101,7 +104,13 @@ export function GroupGradebook({
   const [activeExam, setActiveExam] = useState<ActiveExamCell | null>(null);
   const [examInput, setExamInput] = useState("");
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep" | "timetable">("gradebook");
+  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep" | "timetable" | "setup">("gradebook");
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupSuccess, setSetupSuccess] = useState("");
+  const [setupForm, setSetupForm] = useState({
+    teacherId: "", startDate: "", weekdays: [0, 2], startTime: "14:00",
+    duration: "90", predictedEndDate: "", room: "", onlineUrl: "",
+  });
   const [indicatorMonth, setIndicatorMonth] = useState("all");
   const [indicatorYear, setIndicatorYear] = useState("all");
   const [examType, setExamType] = useState("all");
@@ -166,6 +175,60 @@ export function GroupGradebook({
       setError("Network error.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function updateSetupField(key: string, value: string) {
+    setSetupForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleSetupWeekday(day: number) {
+    setSetupForm((current) => ({
+      ...current,
+      weekdays: current.weekdays.includes(day)
+        ? current.weekdays.filter((value) => value !== day)
+        : [...current.weekdays, day].sort(),
+    }));
+  }
+
+  async function saveGroupSetup(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (setupSaving || setupForm.weekdays.length === 0) return;
+    setSetupSaving(true);
+    setError("");
+    setSetupSuccess("");
+    try {
+      const response = await fetch(academicRoutes.adminAcademicScheduleCreate, {
+        method: "POST",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify({
+          group_id: groupId,
+          teacher_id: Number(setupForm.teacherId || 0),
+          weekdays: setupForm.weekdays,
+          start_time: setupForm.startTime,
+          lesson_duration_minutes: Number(setupForm.duration),
+          start_date: setupForm.startDate,
+          end_date: setupForm.predictedEndDate,
+          room: setupForm.room,
+          online_url: setupForm.onlineUrl,
+          title: "Regular class",
+        }),
+      });
+      const json = await response.json();
+      if (!apiSucceeded(response, json)) {
+        setError(apiErrorMessage(json, "Unable to save group setup."));
+        return;
+      }
+      const result = apiData<{ schedule?: Record<string, unknown> }>(json).schedule || {};
+      setSetupForm((current) => ({
+        ...current,
+        predictedEndDate: asString(result.predictedEndDate) || current.predictedEndDate,
+      }));
+      setSetupSuccess("Group details saved. Timetable sessions were generated.");
+    } catch {
+      setError("Network error while saving group setup.");
+    } finally {
+      setSetupSaving(false);
     }
   }
 
@@ -812,12 +875,13 @@ export function GroupGradebook({
       {/* 2. View Switcher Buttons */}
       {data && (
         <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
-          {(["gradebook", "academic", "ep", "timetable"] as const).map((view) => {
+          {(["gradebook", "academic", "ep", "timetable", "setup"] as const).map((view) => {
             const labels: Record<string, string> = {
               gradebook: "Gradebook",
               academic: "Academic Indicators",
               ep: "Exam Performance",
               timetable: "Timetable",
+              setup: "Group Setup",
             };
             const isActive = activeView === view;
             return (
@@ -1359,6 +1423,36 @@ export function GroupGradebook({
           onOpenTime={openTimeEdit}
           onOpenRoom={openRoomEdit}
         />
+      )}
+
+      {data && activeView === "setup" && (
+        <form onSubmit={saveGroupSetup} className="max-w-3xl space-y-5 rounded-xl border border-foreground/8 bg-surface p-5 shadow-card">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Settings className="h-5 w-5" /></span>
+            <div><h3 className="text-base font-bold">Group Setup</h3><p className="text-xs text-muted-foreground">Configure the teacher and recurring lesson schedule for this subject group.</p></div>
+          </div>
+          {setupSuccess ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{setupSuccess}</p> : null}
+          <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Teacher</span>
+            <Select value={setupForm.teacherId} onChange={(event) => updateSetupField("teacherId", event.target.value)}>
+              <option value="">No teacher yet</option>
+              {teachers.map((teacher) => <option key={asNumber(teacher.id)} value={asString(teacher.id)}>{asString(teacher.full_name)}</option>)}
+            </Select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Start Date</span><input type="date" required value={setupForm.startDate} onChange={(event) => updateSetupField("startDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Start Time</span><input type="time" required value={setupForm.startTime} onChange={(event) => updateSetupField("startTime", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
+          </div>
+          <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Days of the week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[11px] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson Duration</span><Select value={setupForm.duration} onChange={(event) => updateSetupField("duration", event.target.value)}>{[45, 60, 75, 90, 120].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</Select></label>
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Predicted End Date</span><input type="date" value={setupForm.predictedEndDate} onChange={(event) => updateSetupField("predictedEndDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /><span className="mt-1 block text-[11px] text-muted-foreground">Leave blank to calculate it from the scheme of work.</span></label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Online Link</span><input type="url" value={setupForm.onlineUrl} onChange={(event) => updateSetupField("onlineUrl", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="https://..." /></label>
+          </div>
+          <button type="submit" disabled={setupSaving || !setupForm.startDate || setupForm.weekdays.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Group Details"}</button>
+        </form>
       )}
 
       {selectedStudent ? (
