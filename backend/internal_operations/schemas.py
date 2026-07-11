@@ -148,7 +148,8 @@ class AdminCreateAcademicSchoolRequest(BaseModel):
 
 class AdminCreateAcademicGroupRequest(BaseModel):
     school_code: str
-    program_subject_key: str
+    program_subject_key: str = ""
+    program_subject_keys: list[str] = Field(default_factory=list)
     group_name: str
     group_code: str = ""
     class_id: int = 0

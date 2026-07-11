@@ -206,10 +206,14 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   }
 
   function payloadFromForm(form: HTMLFormElement) {
-    const payload: Record<string, string> = {};
+    const payload: Record<string, string | string[]> = {};
     new FormData(form).forEach((value, key) => {
       if (key !== "csrf_token") {
-        payload[key] = String(value);
+        const text = String(value);
+        const current = payload[key];
+        payload[key] = current === undefined
+          ? text
+          : Array.isArray(current) ? [...current, text] : [current, text];
       }
     });
     return payload;
@@ -233,6 +237,14 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     if (!url) return;
     event.preventDefault();
     clearGroupToast();
+    const subjectCheckboxes = event.currentTarget.querySelectorAll<HTMLInputElement>(
+      'input[name="program_subject_keys"]',
+    );
+    if (subjectCheckboxes.length > 0 && !Array.from(subjectCheckboxes).some((input) => input.checked)) {
+      showGroupToast("Select at least one subject.", "danger");
+      subjectCheckboxes[0]?.focus();
+      return;
+    }
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -503,20 +515,28 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                       </Select>
                     </label>
                   )}
-                  <label className="block">
-                    <FieldLabel>Subject Program</FieldLabel>
-                    <Select name="program_subject_key" required>
-                      {curriculumPrograms.length === 0 ? (
-                        <option value="" disabled>No programs imported yet</option>
-                      ) : (
-                        curriculumPrograms.map((program: Record<string, unknown>) => (
-                          <option key={asString(program.subject_key)} value={asString(program.subject_key)}>
-                            {asString(program.subject_name)}
-                          </option>
-                        ))
-                      )}
-                    </Select>
-                  </label>
+                  <fieldset className="block">
+                    <legend><FieldLabel>Subjects (select at least one)</FieldLabel></legend>
+                    {curriculumPrograms.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-foreground/15 px-3 py-4 text-xs font-semibold text-muted-foreground">
+                        No subject programs imported yet.
+                      </p>
+                    ) : (
+                      <div className="grid max-h-48 gap-2 overflow-y-auto rounded-lg border border-foreground/10 bg-background p-2 sm:grid-cols-2">
+                        {curriculumPrograms.map((program: Record<string, unknown>) => (
+                          <label key={asString(program.subject_key)} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-foreground/8 px-3 py-2 text-sm font-semibold hover:bg-muted/60">
+                            <input
+                              type="checkbox"
+                              name="program_subject_keys"
+                              value={asString(program.subject_key)}
+                              className="h-4 w-4 rounded border-foreground/20 accent-primary"
+                            />
+                            <span>{asString(program.subject_name)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </fieldset>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
                       <FieldLabel>Group Name</FieldLabel>

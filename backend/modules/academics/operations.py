@@ -34,16 +34,25 @@ def create_subject_from_payload(payload):
 def create_group_from_payload(payload):
     school_code = str(payload.get("school_code", "") or "").strip()
     program_subject_key = str(payload.get("program_subject_key", "") or "").strip()
+    raw_program_keys = payload.get("program_subject_keys", [])
+    if isinstance(raw_program_keys, str):
+        raw_program_keys = [raw_program_keys]
+    program_subject_keys = [
+        str(key or "").strip() for key in raw_program_keys if str(key or "").strip()
+    ]
+    if program_subject_key and program_subject_key not in program_subject_keys:
+        program_subject_keys.append(program_subject_key)
     group_name = str(payload.get("group_name", "") or "").strip()
     group_code = str(payload.get("group_code", "") or "").strip()
     class_id = int(payload.get("class_id", 0) or 0)
     set_name = str(payload.get("set_name", "Set 1") or "Set 1").strip()
-    if not school_code or not program_subject_key or not group_name:
-        raise ValueError("Client school, subject program, and group name are required.")
-    create_group_from_program(
-        school_code, program_subject_key, group_name, group_code,
-        class_id=class_id, set_name=set_name,
-    )
+    if not school_code or not program_subject_keys or not group_name:
+        raise ValueError("Client school, at least one subject program, and group name are required.")
+    for subject_key in dict.fromkeys(program_subject_keys):
+        create_group_from_program(
+            school_code, subject_key, group_name, group_code,
+            class_id=class_id, set_name=set_name,
+        )
     return {"school_code": school_code}
 
 
