@@ -34,11 +34,11 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.pages.academics.director as academic_director_routes
-    import backend.pages.academics.hod as head_of_department_routes
-    import backend.pages.staff.ceo as ceo_page
-    import backend.pages.staff.support as customer_support_page
-    import backend.pages.staff.hr as hr_manager_page
+    import backend.workspaces.academic_director.page as academic_director_routes
+    import backend.workspaces.head_of_departments.page as head_of_department_routes
+    import backend.workspaces.ceo.page as ceo_page
+    import backend.workspaces.customer_support.page as customer_support_page
+    import backend.workspaces.hr_manager.page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -70,13 +70,12 @@ def _patch_workspace_cards(monkeypatch):
 @pytest.mark.parametrize(
     ("raw_role", "normalized", "path", "label"),
     [
-        ("owner", "admin", "/admin", "Admin"),
-        ("system_admin", "system_admin", "/admin", "System Admin"),
-        ("hr", "hr_manager", "/hr", "HR Manager"),
-        ("sales", "customer_support", "/support", "Customer Support"),
+        ("owner", "admin", "/internal/operations", "Admin"),
+        ("system_admin", "system_admin", "/internal/operations", "System Admin"),
+        ("hr", "hr_manager", "/hr-manager", "HR Manager"),
+        ("sales", "customer_support", "/customer-support", "Customer Support"),
         ("academic-director", "academic_director", "/academic-director", "Academic Director"),
-        ("hod", "head_of_department", "/head-of-department", "Head of Department"),
-        ("teacher", "teacher", "/teacher", "Teacher"),
+        ("hod", "head_of_department", "/head-of-departments", "Head of Departments"),
         ("parent", "parent", "/parent", "Parent"),
     ],
 )
@@ -84,6 +83,12 @@ def test_role_aliases_normalize_to_dashboard_paths(raw_role, normalized, path, l
     assert normalize_role(raw_role) == normalized
     assert dashboard_path_for_role(raw_role) == path
     assert role_display_name(raw_role) == label
+
+
+def test_teacher_is_not_a_portal_destination():
+    assert normalize_role("teacher") == "teacher"
+    assert dashboard_path_for_role("teacher") == "/"
+    assert role_display_name("teacher") == "Unknown Role"
 
 
 def test_admin_has_all_permissions():
@@ -102,10 +107,10 @@ def test_customer_support_permission_alias():
     ("role", "path", "page"),
     [
         ("ceo", "/ceo", "ceo-home"),
-        ("hr_manager", "/hr", "hr-home"),
-        ("customer_support", "/support", "support-home"),
+        ("hr_manager", "/hr-manager", "hr-manager-home"),
+        ("customer_support", "/customer-support", "customer-support-home"),
         ("academic_director", "/academic-director", "academic-director-home"),
-        ("head_of_department", "/head-of-department", "head-of-department-home"),
+        ("head_of_department", "/head-of-departments", "head-of-departments-home"),
         ("parent", "/parent", "parent-home"),
     ],
 )
@@ -145,7 +150,7 @@ def test_student_role_entry_redirects_to_own_dashboard(client):
 def test_wrong_role_route_returns_403_json(client):
     _set_session(client, {"auth_role": "ceo", "auth_login": "ceo@test"})
 
-    response = client.get("/hr", headers=XHR)
+    response = client.get("/hr-manager", headers=XHR)
 
     assert response.status_code == 403
     assert response.json()["message"] == "This page requires HR Manager access."

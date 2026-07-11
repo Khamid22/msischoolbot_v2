@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from backend.services.academics.exam_filters import is_exam_performance_row
-from backend.services.academics.insights import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
+from backend.modules.academics.exam_filters import is_exam_performance_row
+from backend.modules.reporting.insights import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
 
 
 def test_audit_settings_placeholder_card_is_not_rendered():
-    admin_source = Path("frontend/src/roles/admin/pages/Admin.tsx").read_text()
+    admin_source = Path("frontend/src/internal_operations/pages/InternalOperations.tsx").read_text()
 
     assert "Audit / Settings" not in admin_source
     assert "xl:grid-cols-4" in admin_source
@@ -149,8 +149,49 @@ def test_subject_performance_exam_series_ignores_lesson_like_exam_rows():
     assert subject_rows[0]["exam_series"] == [{"label": "7A", "values": [7.0, 8.0]}]
 
 
+def test_subject_performance_keeps_every_group_when_series_data_is_sparse():
+    metrics = [
+        {
+            "school_key": "sehriyo",
+            "school_name": "Sehriyo",
+            "student_key": str(index),
+            "full_name": f"Learner {index}",
+            "subject": "IGCSE Chemistry",
+            "group": group_name,
+            "aap": 7.0,
+            "ar": 80.0,
+        }
+        for index, group_name in enumerate(["8A", "8B", "8D", "8G"], start=1)
+    ]
+    dataset = {
+        "dashboards_by_id": {
+            "37:1": {
+                "student": {
+                    "schoolCode": "sehriyo",
+                    "schoolName": "Sehriyo",
+                    "subject": "IGCSE Chemistry",
+                    "group": "8A",
+                },
+                "homeworkGrades": [{"date": "2026-02-01", "score": 8}],
+                "attendanceLessons": [],
+                "examResults": [
+                    {"label": "Half-term Test 1", "examName": "Half-term Test 1", "score": 7}
+                ],
+            }
+        }
+    }
+
+    subject_row = build_admin_subject_info(metrics, dataset=dataset)[0]
+
+    assert [row["label"] for row in subject_row["groups"]] == ["8A", "8B", "8D", "8G"]
+    assert [row["label"] for row in subject_row["monthly_series"]] == ["8A", "8B", "8D", "8G"]
+    assert [row["label"] for row in subject_row["exam_series"]] == ["8A", "8B", "8D", "8G"]
+    assert any(value is not None for value in subject_row["monthly_series"][0]["values"])
+    assert all(value is None for value in subject_row["monthly_series"][1]["values"])
+
+
 def test_performance_graph_uses_responsive_full_width_layout():
-    source = Path("frontend/src/roles/admin/panels/overview/SchoolOverviewPanel.tsx").read_text()
+    source = Path("frontend/src/features/management/overview/SchoolOverviewPanel.tsx").read_text()
 
     assert "graphLineSeries.length * 70" not in source
     # The chart fills the available vertical space instead of forcing tall

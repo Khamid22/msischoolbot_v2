@@ -12,6 +12,21 @@ ROLE_STUDENT = "student"
 ROLE_ACADEMIC_DIRECTOR = "academic_director"
 ROLE_HEAD_OF_DEPARTMENT = "head_of_department"
 
+WORKSPACE_ROLES = {
+    ROLE_CEO,
+    ROLE_ACADEMIC_DIRECTOR,
+    ROLE_HEAD_OF_DEPARTMENT,
+    ROLE_CUSTOMER_SUPPORT,
+    ROLE_HR_MANAGER,
+    ROLE_STUDENT,
+    ROLE_PARENT,
+}
+
+# Teachers are staff records managed by HR and Academic workspaces. The value
+# remains normalizable for persisted data, but it is intentionally not a portal
+# session role.
+NON_PORTAL_STAFF_ROLES = {ROLE_TEACHER}
+
 ALL_ROLES = {
     ROLE_OWNER,
     ROLE_SYSTEM_ADMIN,
@@ -34,23 +49,21 @@ VALID_ROLES = {
     ROLE_HR_MANAGER,
     ROLE_CUSTOMER_SUPPORT,
     ROLE_STUDENT,
-    ROLE_TEACHER,
     ROLE_PARENT,
     ROLE_ACADEMIC_DIRECTOR,
     ROLE_HEAD_OF_DEPARTMENT,
 }
 
 ROLE_DASHBOARD_PATHS = {
-    "admin": "/admin",
-    "system_admin": "/admin",
+    "admin": "/internal/operations",
+    "system_admin": "/internal/operations",
     "ceo": "/ceo",
-    "hr_manager": "/hr",
-    "customer_support": "/support",
+    "hr_manager": "/hr-manager",
+    "customer_support": "/customer-support",
     "student": "/student",
-    "teacher": "/teacher",
     "parent": "/parent",
     "academic_director": "/academic-director",
-    "head_of_department": "/head-of-department",
+    "head_of_department": "/head-of-departments",
 }
 
 ROLE_DISPLAY_NAMES = {
@@ -60,10 +73,9 @@ ROLE_DISPLAY_NAMES = {
     "hr_manager": "HR Manager",
     "customer_support": "Customer Support",
     "student": "Student",
-    "teacher": "Teacher",
     "parent": "Parent",
     "academic_director": "Academic Director",
-    "head_of_department": "Head of Department",
+    "head_of_department": "Head of Departments",
 }
 
 _ROLE_ALIASES = {
@@ -145,6 +157,8 @@ __all__ = [
     "ROLE_STUDENT",
     "ROLE_ACADEMIC_DIRECTOR",
     "ROLE_HEAD_OF_DEPARTMENT",
+    "WORKSPACE_ROLES",
+    "NON_PORTAL_STAFF_ROLES",
     "ALL_ROLES",
     "VALID_ROLES",
     "ROLE_DASHBOARD_PATHS",

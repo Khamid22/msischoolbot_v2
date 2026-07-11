@@ -12,11 +12,10 @@ from backend.core.rate_limit import limiter
 
 from fastapi import Depends
 from backend.core.request_context import RequestContextMiddleware, prime_body_state
-from backend.core.demo_auth import is_demo_auth_enabled, maybe_apply_demo_auth
 from backend.core.guards import install_guard_handler
 from backend.core.access.roles import is_valid_role, normalize_role, role_display_name
 from backend.core.config import get_web_settings
-from backend.api.v1.registry import register_module_pages
+from backend.application.registry import register_application_pages
 
 _BACKEND_DIR = os.path.dirname(__file__)
 _STATIC_DIR = os.path.join(_BACKEND_DIR, "static")
@@ -41,11 +40,14 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
         "/admin",
         "/ceo",
         "/hr",
+        "/hr-manager",
         "/support",
-        "/teacher",
+        "/customer-support",
         "/parent",
         "/student",
         "/head-of-department",
+        "/head-of-departments",
+        "/internal/operations",
         "/account",
     )
     if request_path in role_page_prefixes or request_path.startswith(
@@ -114,8 +116,6 @@ class AuthAndSecurityMiddleware:
 
         request_obj = Request(scope, receive=receive)
         path = request_obj.url.path
-        maybe_apply_demo_auth(request_obj)
-
         # 1. Reject cross-origin state changes (Same-Origin check). Applies to
         # every mutating method on every path (not just /api/), so plain admin
         # form posts like /admin/teachers are covered too.
@@ -204,7 +204,7 @@ class AuthAndSecurityMiddleware:
                 account = None
                 if account_id > 0 and cookie_version > 0:
                     try:
-                        from backend.services.identity.accounts import get_account_by_id
+                        from backend.modules.accounts.service import get_account_by_id
 
                         account = get_account_by_id(account_id)
                     except Exception:
@@ -463,31 +463,13 @@ def _bootstrap_app(app_instance):
     if _APP_BOOTSTRAPPED:
         return app_instance
 
-    # Loudly flag demo auth at startup. When DEMO_AUTH_ENABLED is on, anyone who
-    # reaches the app is auto-logged-in (owner-level for /admin) with no
-    # credentials. That is intentional for team testing, but must never be left
-    # on for real users — this banner makes it impossible to forget.
-    import logging as _logging
-
-    if is_demo_auth_enabled():
-        _is_prod = os.environ.get("APP_ENV", "").strip().lower() in {
-            "prod",
-            "production",
-        }
-        _logging.getLogger("uvicorn.error").warning(
-            "DEMO_AUTH_ENABLED is ON — all visitors are auto-authenticated WITHOUT "
-            "a password%s. Set DEMO_AUTH_ENABLED=0 before exposing this to real "
-            "users.",
-            " (APP_ENV=production!)" if _is_prod else "",
-        )
-
     # Set static asset dependencies in the rendering boundary.
     import backend.core.rendering as render
     render.ASSET_VERSION = _ASSET_VERSION
     render.STATIC_FOLDER = _STATIC_DIR
 
     # Set static files dependencies in system.py
-    import backend.pages.system.home as system_routes
+    import backend.application.system_page as system_routes
     system_routes.STATIC_FOLDER = _STATIC_DIR
 
     # Build small legacy Telegram helper bundles at startup. Some deploy
@@ -497,14 +479,14 @@ def _bootstrap_app(app_instance):
     ensure_js_bundles(_STATIC_DIR)
 
     # Include system router
-    from backend.pages.system.home import router as system_router
+    from backend.application.system_page import router as system_router
     app_instance.include_router(system_router)
 
     # Include JSON/action API router before page routes.
-    from backend.api.v1.router import router as api_v1_router
+    from backend.application.api import router as api_v1_router
     app_instance.include_router(api_v1_router)
 
-    register_module_pages(app_instance)
+    register_application_pages(app_instance)
 
     _APP_BOOTSTRAPPED = True
     return app_instance

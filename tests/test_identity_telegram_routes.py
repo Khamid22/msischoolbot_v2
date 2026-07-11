@@ -52,7 +52,7 @@ def _auth_result(role, *, account_role=None, **session_overrides):
 
 
 def test_uses_account_telegram_links_service(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     calls = {}
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9002))
@@ -81,7 +81,7 @@ def test_uses_account_telegram_links_service(client, monkeypatch):
 
 
 def test_active_parent_telegram_link_returns_parent(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9001))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
@@ -112,7 +112,7 @@ def test_active_student_telegram_link_returns_dashboard_and_records_activity(
     client,
     monkeypatch,
 ):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     activity_calls = []
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9002))
@@ -149,23 +149,15 @@ def test_active_student_telegram_link_returns_dashboard_and_records_activity(
     assert activity_calls == [1001]
 
 
-def test_active_teacher_telegram_link_returns_teacher(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+def test_active_teacher_telegram_link_is_not_a_portal_login(client, monkeypatch):
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9003))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
     monkeypatch.setattr(
         identity_routes,
         "authenticate_account_telegram",
-        lambda telegram_user_id: _auth_result(
-            "teacher",
-            auth_login="TCH0001",
-            teacher_id=10,
-            teacher_staff_id=2,
-            teacher_full_name="Teacher User",
-            teacher_group="IGCSE",
-            telegram_user_id=telegram_user_id,
-        ),
+        lambda telegram_user_id: None,
     )
 
     response = _post_telegram_auth(client)
@@ -173,14 +165,12 @@ def test_active_teacher_telegram_link_returns_teacher(client, monkeypatch):
     assert response.status_code == 200
     assert response.json() == {
         "ok": True,
-        "linked": True,
-        "role": "teacher",
-        "redirect": "/teacher",
+        "linked": False,
     }
 
 
 def test_system_admin_telegram_link_returns_admin_compatibility(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9004))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
@@ -209,7 +199,7 @@ def test_system_admin_telegram_link_returns_admin_compatibility(client, monkeypa
         "ok": True,
         "linked": True,
         "role": "system_admin",
-        "redirect": "/admin",
+        "redirect": "/internal/operations",
     }
     session_payload = _decode_session(client)
     assert session_payload["auth_role"] == "admin"
@@ -219,7 +209,7 @@ def test_system_admin_telegram_link_returns_admin_compatibility(client, monkeypa
 
 
 def test_missing_link_returns_safe_shape(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9999))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
@@ -245,7 +235,7 @@ def test_rejected_account_link_returns_safe_shape(
     case_name,
     telegram_user_id,
 ):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     assert case_name
     monkeypatch.setattr(
@@ -263,7 +253,7 @@ def test_rejected_account_link_returns_safe_shape(
 
 
 def test_parent_invite_start_param_still_runs_before_account_auth(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(
         identity_routes,
@@ -306,7 +296,7 @@ def test_parent_invite_start_param_still_runs_before_account_auth(client, monkey
 
 
 def test_success_json_shape_does_not_expose_raw_account_auth_objects(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9001))
     monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)

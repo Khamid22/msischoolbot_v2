@@ -75,9 +75,9 @@ The deleted `/parent/link/{token}` signed-token flow must not be restored.
 | Layer | Owns |
 | --- | --- |
 | `backend/integrations/telegram` | HMAC parsing and Telegram protocol details |
-| `backend/domains/identity` | Telegram-link to canonical-account authentication |
-| `backend/domains/parents` | invite creation/claim, parent-child linking, transaction |
-| `backend/pages/parent.py` | parent invite/page UX |
+| `backend/modules/accounts` | Telegram-link to canonical-account authentication |
+| `backend/modules/parent_access` | invite creation/claim, parent-child linking, transaction |
+| `backend/workspaces/parent` | parent invite/page UX |
 | `frontend/src/shared/lib/telegram.ts` | Mini App viewport/start-param client adapter |
 | `tgbot` | future inbound commands/messages/keyboards only |
 

@@ -39,78 +39,29 @@ def test_unauthenticated_admin_api_returns_401_json(client):
     assert response.json() == {"status": "error", "message": "Authentication required."}
 
 
-def test_teacher_page_redirects_without_session(client):
+def test_removed_teacher_page_redirects_logged_out_visitors_to_login(client):
     response = client.get("/teacher")
     assert response.status_code == 302
     assert response.headers["location"] == "/"
 
 
-def test_teacher_api_requires_session(client):
-    # No session at all: the middleware gate answers before the router guard.
+def test_removed_teacher_api_requires_session_before_route_resolution(client):
     response = client.get("/api/v1/teacher/office-hours/availability", headers=XHR)
     assert response.status_code == 401
     assert response.json() == {"status": "error", "message": "Authentication required."}
 
 
-def test_teacher_api_denies_other_roles(client):
-    # Authenticated as a student: middleware passes, require_role denies.
+def test_removed_teacher_api_is_not_registered_for_other_roles(client):
     _set_session(client, {"auth_role": "student", "auth_login": "MSI00001"})
     response = client.get("/api/v1/teacher/office-hours/availability", headers=XHR)
+    assert response.status_code == 404
+
+
+def test_teacher_session_role_is_rejected(client):
+    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
+    response = client.get("/api/v1/auth/me", headers=XHR)
     assert response.status_code == 403
-    assert response.json() == {"status": "error", "message": "Action not allowed for this role."}
-
-
-def test_teacher_cancel_availability_scopes_to_current_teacher(client, monkeypatch):
-    import backend.api.v1.teachers.routes as teacher_office_hours
-
-    calls = {}
-    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
-
-    def fake_cancel(availability_id, *, teacher_id=None):
-        calls["availability_id"] = availability_id
-        calls["teacher_id"] = teacher_id
-
-    monkeypatch.setattr(teacher_office_hours.oh_service, "cancel_availability", fake_cancel)
-
-    response = client.patch(
-        "/api/v1/teacher/office-hours/availability/7",
-        json={"status": "cancelled"},
-        headers=XHR,
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "success", "data": None}
-    assert calls == {"availability_id": 7, "teacher_id": 42}
-
-
-def test_teacher_update_booking_status_scopes_to_current_teacher(client, monkeypatch):
-    import backend.api.v1.teachers.routes as teacher_office_hours
-
-    calls = {}
-    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
-
-    def fake_update(booking_id, status, teacher_note, *, teacher_id=None):
-        calls["booking_id"] = booking_id
-        calls["status"] = status
-        calls["teacher_note"] = teacher_note
-        calls["teacher_id"] = teacher_id
-
-    monkeypatch.setattr(teacher_office_hours.oh_service, "update_booking_status", fake_update)
-
-    response = client.patch(
-        "/api/v1/teacher/office-hours/bookings/11",
-        json={"status": "completed", "teacher_note": "Done"},
-        headers=XHR,
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"status": "success", "data": None}
-    assert calls == {
-        "booking_id": 11,
-        "status": "completed",
-        "teacher_note": "Done",
-        "teacher_id": 42,
-    }
+    assert response.json() == {"status": "error", "message": "Invalid session role."}
 
 
 def test_cross_origin_post_rejected(client):

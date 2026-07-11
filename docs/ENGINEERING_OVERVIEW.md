@@ -11,31 +11,29 @@ flowchart LR
     React[React/Vite]
     Telegram[Telegram Mini App]
     FastAPI[FastAPI]
-    Domains[Domain services and queries]
+    Modules[Independent business modules]
     DB[(PostgreSQL msi_v2)]
-    Import[Explicit Excel reconciliation]
     Bot[aiogram worker shell]
 
     React --> FastAPI
     Telegram --> FastAPI
-    FastAPI --> Domains --> DB
-    Import --> Domains
-    Bot -. no inbound routers .-> Domains
+    FastAPI --> Modules --> DB
+    Bot -. no inbound routers .-> Modules
 ```
 
-Google Sheets is not a live runtime backend. Telegram authentication and Mini App linking remain, but the retired bot handlers and Google-Sheets-driven mini-app architecture do not.
+PostgreSQL is the only LMS data source. Google Sheets and Excel are not integrations. Telegram authentication and Mini App linking remain, but the retired bot-handler/Sheets architecture does not.
 
 ## Implemented Architecture Decisions
 
 - One canonical `accounts` row owns login, password hash, role, status, forced-change state, and session version.
-- Role data lives in student, teacher, parent, or staff profiles.
+- Role data lives in Student, Parent, or staff profiles; teachers remain staff records without portal access.
 - Every password-enabled role can change its own password through one v1 endpoint.
 - Initial login-equals-password credentials are blocked from workspaces until changed.
 - Telegram links authenticate through the same canonical account.
 - Parent invites are hash-only, expiring, single-use, and atomically consumed.
 - `students.id` is the internal student identity; legacy/public IDs are compatibility boundaries only.
-- Runtime SQL is domain-owned; the old database query barrels are removed.
-- Runtime DDL is removed; Alembic repository head is `0007_lms_integrity`.
+- Runtime SQL is module-owned; the old technical-layer trees are removed.
+- Runtime DDL is removed; Alembic repository head is `0008_remove_teacher_portal`.
 - APIs are versioned under `/api/v1`; old role API namespaces are gone.
 - React uses server bootstrap payloads, role-owned pages, shared accessible UI, and explicit `Asia/Tashkent` time helpers.
 
@@ -47,11 +45,10 @@ Google Sheets is not a live runtime backend. Telegram authentication and Mini Ap
 - `head_of_department`
 - `hr_manager`
 - `customer_support`
-- `teacher`
 - `student`
 - `parent`
 
-One account has one canonical role. Role checks do not replace object checks such as linked child, assigned group, subject scope, chat membership, or canonical student ownership.
+The seven roles other than `system_admin` own business workspaces. `system_admin` is protected internal operations. Teacher is staff data, not an authenticatable role or workspace. Role checks do not replace object checks such as linked child, subject scope, chat membership, or canonical student ownership.
 
 ## Important Remaining Compatibility
 
@@ -61,12 +58,6 @@ One account has one canonical role. Role checks do not replace object checks suc
 - `admin` presentation/session compatibility for `system_admin`;
 - Telegram-first parent accounts without password credentials;
 - an empty bot router registry until new inbound commands are product-approved and implemented.
-
-## Data Reconciliation Position
-
-The repository contains an explicit workbook reconciler for School 5 and Sehriyo source files. Documentation does not claim exact workbook/database parity. Only a completed, reviewed reconciliation report with resolved identities, dates, scores, and coin differences can support that claim.
-
-Never invent lesson times or silently merge ambiguous people to make a report pass.
 
 ## Release Boundary
 

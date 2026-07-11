@@ -126,7 +126,7 @@ def _dashboard_context(student_id=321):
 
 
 def _patch_student_home(monkeypatch):
-    import backend.pages.students.home as student_page
+    import backend.workspaces.student.page as student_page
 
     monkeypatch.setattr(
         student_page,
@@ -142,7 +142,7 @@ def _patch_student_home(monkeypatch):
 
 
 def _patch_valid_dashboard(monkeypatch, student_id=321):
-    import backend.pages.students.dashboard as dashboard_routes
+    import backend.workspaces.student.dashboard as dashboard_routes
 
     monkeypatch.setattr(
         dashboard_routes.payload_service,
@@ -195,7 +195,7 @@ def test_dashboard_renders_with_mocked_valid_payload(client, monkeypatch):
 
 
 def test_student_cannot_access_another_dashboard(client, monkeypatch):
-    import backend.services.students.payload as payload_service
+    import backend.modules.student_records.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -211,8 +211,8 @@ def test_student_cannot_access_another_dashboard(client, monkeypatch):
     assert "Access denied: you can open only your own dashboard." in response.text
 
 
-def test_teacher_cannot_fall_through_to_an_unscoped_student_dashboard(client, monkeypatch):
-    import backend.services.students.payload as payload_service
+def test_removed_teacher_role_cannot_open_student_dashboard(client, monkeypatch):
+    import backend.modules.student_records.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -230,12 +230,12 @@ def test_teacher_cannot_fall_through_to_an_unscoped_student_dashboard(client, mo
 
     response = client.get("/dashboard/321")
 
-    assert response.status_code == 403
-    assert "this role cannot open student dashboards" in response.text
+    assert response.status_code == 302
+    assert response.headers["location"] == "/unauthorized"
 
 
 def test_parent_child_dashboard_redirects_to_public_dashboard(client, monkeypatch):
-    import backend.pages.parents.home as parent_routes
+    import backend.workspaces.parent.page as parent_routes
 
     monkeypatch.setattr(parent_routes, "parent_can_access_student", lambda parent_id, student_row_id: True)
     monkeypatch.setattr(
@@ -262,7 +262,7 @@ def test_parent_child_dashboard_redirects_to_public_dashboard(client, monkeypatc
 
 
 def test_unlinked_parent_child_dashboard_returns_access_denied(client, monkeypatch):
-    import backend.pages.parents.home as parent_routes
+    import backend.workspaces.parent.page as parent_routes
 
     monkeypatch.setattr(parent_routes, "parent_can_access_student", lambda parent_id, student_row_id: False)
     _set_session(client, {"auth_role": "parent", "auth_login": "parent@example", "parent_id": 50})
@@ -275,8 +275,8 @@ def test_unlinked_parent_child_dashboard_returns_access_denied(client, monkeypat
 
 
 def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypatch):
-    import backend.pages.students.dashboard as dashboard_routes
-    import backend.services.students.payload as payload_service
+    import backend.workspaces.student.dashboard as dashboard_routes
+    import backend.modules.student_records.payload as payload_service
 
     calls = []
     monkeypatch.setattr(
@@ -305,11 +305,11 @@ def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypat
 
 
 def test_admin_student_dashboard_redirects_to_embed_dashboard(client, monkeypatch):
-    import backend.pages.students.admin_forms as student_routes
+    import backend.internal_operations.student_records_forms as student_routes
 
     monkeypatch.setattr(
         student_routes,
-        "resolve_sheet_student_for_admin",
+        "resolve_student_for_internal_operations",
         lambda student_row_id, get_profile: (
             {
                 "student_id": 654,
@@ -343,11 +343,11 @@ def test_admin_student_dashboard_redirects_to_embed_dashboard(client, monkeypatc
 
 
 def test_admin_student_dashboard_target_preserves_embed_admin(client, monkeypatch):
-    import backend.pages.students.admin_forms as student_routes
+    import backend.internal_operations.student_records_forms as student_routes
 
     monkeypatch.setattr(
         student_routes,
-        "resolve_sheet_student_for_admin",
+        "resolve_student_for_internal_operations",
         lambda student_row_id, get_profile: (
             {
                 "student_id": 654,

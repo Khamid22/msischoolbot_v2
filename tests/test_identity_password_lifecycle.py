@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from backend.services.identity import accounts
+from backend.modules.accounts import service as accounts
 
 
 class _Conn:

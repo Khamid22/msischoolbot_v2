@@ -9,25 +9,24 @@ Read these first. They describe the implemented rewrite rather than an earlier t
 1. [Current Architecture](./CURRENT_ARCHITECTURE.md)
 2. [Authentication and Roles](./ENGINEERING_AUTH_AND_ROLES.md)
 3. [Database Architecture](./ENGINEERING_DATABASE.md)
-4. [API Migration Status](./API_MIGRATION_STATUS.md)
-5. [Route Map](./ENGINEERING_ROUTE_MAP.md)
-6. [Telegram Integration](./ENGINEERING_TELEGRAM_FLOW.md)
-7. [Module Map](./ENGINEERING_MODULE_MAP.md)
-8. [Architecture Cleanup Report](./ARCHITECTURE_CLEANUP_2026-07-10.md)
+4. [Engineering Architecture](./ENGINEERING_ARCHITECTURE.md)
+5. [Module Map](./ENGINEERING_MODULE_MAP.md)
+6. [Route Map](./ENGINEERING_ROUTE_MAP.md)
+7. [Telegram Integration](./ENGINEERING_TELEGRAM_FLOW.md)
 
-The physical PostgreSQL schema remains `msi_v2`, and Alembic migration head is `0007_lms_integrity`.
+The physical PostgreSQL schema remains `msi_v2`, and Alembic migration head is `0008_remove_teacher_portal`.
 
 ## Current Project Facts
 
 - Production branch `main` is read-only during rewrite work.
 - PostgreSQL is the canonical runtime data store.
 - `msi_v2.accounts` is the sole password authority.
-- Runtime SQL belongs to domain query modules under `backend/domains`.
+- Runtime SQL belongs to its owning package under `backend/modules`.
 - Runtime DDL is prohibited; `database/alembic` owns schema changes.
-- Google Sheets is no longer a live runtime source.
+- Google Sheets and Excel are not LMS integrations.
 - Telegram authentication and Mini App parent linking remain active web integrations.
 - `tgbot` has an explicit empty inbound router registry while new bot handlers are not yet implemented.
-- Spreadsheet reconciliation is explicit and report-driven. These docs make no unverified claim that source workbooks and PostgreSQL are in exact parity.
+- The portal has exactly seven business workspaces; Teacher is staff data and System Admin is internal operations.
 
 ## Supporting Engineering Docs
 
@@ -56,5 +55,4 @@ Historical phase plans are under [docs/archive](./archive/).
 
 - Do not include credentials, connection strings, tokens, student names, phone numbers, Telegram IDs, grades, or other row-level private data.
 - Distinguish implemented behavior from a proposed future design.
-- Treat migration output and workbook parity as evidence, not assumptions.
 - Keep production `main` read-only unless an explicitly approved release process says otherwise.

@@ -7,7 +7,7 @@ import logging
 import threading
 
 from backend.core.config import get_web_settings
-from backend.services.identity.bootstrap import init_storage
+from backend.modules.accounts.bootstrap import init_storage
 
 
 _ADDRESS_IN_USE_ERRNOS = {

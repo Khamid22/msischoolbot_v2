@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.services.teacher_academy.http_responses as academy_api
+    import backend.modules.staff_records.development_responses as academy_api
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
@@ -116,9 +116,9 @@ def test_old_role_teacher_academy_api_routes_are_absent(app):
         "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/promote",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/delete",
-        "/head-of-department/api/teacher-academy/assignments/{assignment_id}",
-        "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
-        "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
+        "/head-of-departments/api/teacher-academy/assignments/{assignment_id}",
+        "/head-of-departments/api/teacher-academy/{academy_teacher_id}/assessments",
+        "/head-of-departments/api/teacher-academy/{academy_teacher_id}/status",
     ]:
         assert "POST" not in routes.get(path, set())
 
@@ -269,7 +269,7 @@ def test_academic_director_lessons_sync_route_calls_domain_service(client, monke
 
 
 def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monkeypatch):
-    import backend.api.v1.teacher_academy.hod as hod_api_routes
+    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {"update": 0}
@@ -313,7 +313,7 @@ def test_hod_schedule_own_scope_succeeds_and_out_of_scope_is_denied(client, monk
     ],
 )
 def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, service_name, expected_key):
-    import backend.api.v1.teacher_academy.hod as hod_api_routes
+    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
 
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}
@@ -347,11 +347,11 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
 
 
 def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fallback():
-    panel_source = Path("frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx").read_text()
+    panel_source = Path("frontend/src/features/management/teachers/TeacherAcademyPanel.tsx").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     api_routes_source = Path("frontend/src/shared/api/routes.ts").read_text()
-    ad_page = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_page = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
+    ad_page = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
+    hod_page = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
 
     assert "routes.academicDirectorTeacherAcademyCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssignmentUpdate" in panel_source
@@ -374,9 +374,9 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "adminTeacherAcademy" not in routes_source
     assert "/admin/teacher-academy" not in routes_source
     assert "/academic-director/api" not in routes_source
-    assert "/head-of-department/api" not in routes_source
+    assert "/head-of-departments/api" not in routes_source
     assert "/academic-director/api" not in api_routes_source
-    assert "/head-of-department/api" not in api_routes_source
+    assert "/head-of-departments/api" not in api_routes_source
     assert "adminMode: props.adminMode || \"academic_director\"" in ad_page
     assert "adminMode: \"head_of_department\"" in hod_page
 

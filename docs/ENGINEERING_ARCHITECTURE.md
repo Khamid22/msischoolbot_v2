@@ -2,103 +2,99 @@
 
 Audience: senior engineers.
 
-## Implemented Layers
+## Implemented Dependency Graph
 
 ```mermaid
 flowchart TD
-    Presentation["Presentation\nReact pages, Mini App, future bot handlers"]
-    HTTP["HTTP boundary\nbackend/pages and backend/api/v1"]
-    Security["Security\nsession, role, permission, object policy"]
-    Domain["Domain services\nbusiness rules and transactions"]
-    Query["Domain queries\nSQL and row mapping"]
-    Core["Core PostgreSQL connection"]
-    DB[("PostgreSQL msi_v2")]
-    Integrations["Integrations\nTelegram, Excel, storage"]
-    Migrations["Alembic migrations"]
+    React[React workspace UI]
+    Application[backend/application]
+    Workspaces[backend/workspaces]
+    Internal[backend/internal_operations]
+    Contracts[Public module services and contracts]
+    Repositories[Module-owned repositories]
+    Core[backend/core database infrastructure]
+    DB[(PostgreSQL msi_v2)]
+    Alembic[database/alembic]
 
-    Presentation --> HTTP --> Security --> Domain --> Query --> Core --> DB
-    Integrations --> Domain
-    Migrations --> DB
+    React --> Application
+    Application --> Workspaces
+    Application --> Internal
+    Workspaces --> Contracts
+    Internal --> Contracts
+    Contracts --> Repositories --> Core --> DB
+    Alembic --> DB
 ```
 
-## Dependency Rules
+## Ownership Rules
 
 Allowed:
 
 ```text
-frontend -> HTTP
-pages/API -> security and domain services
-domain services -> same-domain or explicitly shared domain services
-domain services -> domain query modules
-domain queries -> backend.core.database -> PostgreSQL
-integrations/import scripts -> domain services
+frontend workspace -> versioned HTTP/page contract
+application -> workspace, module API, or internal-operations registration
+workspace/internal adapter -> public module service or contract
+module service -> same-module repository
+module service -> another module's public contract
+module repository -> backend.core.database -> PostgreSQL
 Alembic -> schema DDL
 ```
 
 Forbidden:
 
 ```text
-frontend -> Python modules or database
-route -> runtime CREATE/ALTER/DROP
-domain -> React/browser state
-domain -> ambient FastAPI Request/session
-tgbot -> web route functions
-password authentication -> role-table legacy hashes
-new code -> deleted database/identity facades
+workspace/application -> raw SQL
+module -> another module's repository
+frontend -> Python module or database
+runtime request -> CREATE/ALTER/DROP
+business module -> React/browser state
+password authentication -> role-profile legacy hash
+new code -> backend/api, pages, services, repositories, or schemas
 ```
 
 ## Layer Responsibilities
 
-### Pages and API
+### Application
 
-- authenticate and validate request shape;
-- enforce role/permission dependencies;
-- resolve explicit compatibility identifiers;
-- call domain services;
-- render React bootstrap data or return API envelopes.
+`backend/application` is the composition root. It registers module APIs, the exact seven workspace APIs/pages, protected internal operations, and system endpoints. It contains no business rules or persistence.
 
-Routes do not own academic, payment, invite, or password transactions.
+### Workspaces
 
-### Domain Services
+`backend/workspaces` contains role and object-aware page/API adapters for CEO, Academic Director, Head of Departments, Customer Support, HR Manager, Student, and Parent. A workspace orchestrates public module contracts; it does not own shared business logic or SQL.
 
-- enforce object policy and business invariants;
-- coordinate transactions;
-- compose payloads for pages/APIs;
-- call query modules and integration adapters.
+### Business Modules
 
-### Domain Queries
+Each package in `backend/modules` owns one capability as a complete puzzle piece: schemas, business rules, repository code, and public API/contract functions. Repository modules are private to their owner. Cross-module reads use explicit contracts such as the Academics-to-Reporting contract.
 
-- own raw SQL for their domain;
-- map database rows;
-- expose focused persistence operations;
-- never create schema objects during a request.
+### Internal Operations
+
+`backend/internal_operations` contains System Admin page/form/API adapters. It reuses business modules and reporting contracts. It is not a business workspace and cannot impersonate or preview a business role.
 
 ### Core and Alembic
 
-`backend/core/database.py` owns PostgreSQL connections/pooling. `database/alembic` owns the frozen baseline and every DDL revision. `database/__init__.py` is only a narrow connection compatibility export.
+`backend/core` owns technical infrastructure: settings, PostgreSQL connections, sessions, guards, rendering, rate limiting, and response helpers. `database/alembic` is the only owner of schema changes. The active migration chain ends at `0008_remove_teacher_portal`.
 
-## Cross-cutting Architecture
+## Cross-cutting Boundaries
 
 ### Identity
 
-`accounts` is the single password/session authority. Profile tables attach business entities. Telegram links resolve to the same account. Session versions make account changes immediately invalidate old cookies.
+`backend/modules/accounts` owns the canonical account, password, Telegram-login, and session-version lifecycle. Teacher profiles remain staff data, but Teacher is not an authenticatable portal role.
 
-### Student Data
+### Students and Parents
 
-Internal policy uses canonical `students.id`. Public enrollment IDs and legacy row IDs are resolved at HTTP/import boundaries and never substituted for ownership.
+Authorization uses canonical `students.id`. Legacy row/public enrollment IDs are resolved at compatibility routes. Parent access always checks the active child link.
+
+### Academics and Reporting
+
+Academics owns schools, subjects, programs, groups, schedules, attendance, homework, exams, and coin-event rules. Reporting owns read models and summaries. Reporting accesses academic data through `backend.modules.academics.reporting_contract`, not the academic repository.
 
 ### Time
 
-Database instants are timezone-aware. UI calendar/week logic uses `Asia/Tashkent`. Date-only source data remains date-only, and missing lesson times remain missing.
+Database instants are timezone-aware. Browser date/week logic uses `Asia/Tashkent`. Missing source times remain missing; the UI never invents lesson times.
 
 ### Frontend
 
-FastAPI embeds a typed bootstrap payload; React lazy-loads the named page. Shared UI components own accessible dialogs, menus, drawers, navigation, tables/cards, chart containers, touch targets, responsive safe areas, and reduced-motion behavior.
+The backend embeds a typed bootstrap payload and React lazy-loads a named page. Workspace entry pages live under `frontend/src/workspaces`, reusable workflows under `features`, internal administration under `internal_operations`, and accessibility/responsive primitives under `shared`.
 
 ### Integrations
 
-Telegram protocol verification belongs in integration adapters; parent/account policy belongs in domains. Excel parsing/reconciliation is explicit tooling, not an alternate runtime repository.
-
-## Transitional Boundaries
-
-`backend/roles` still contains admin page/form and workspace helper code. Move each slice only after routes, domain ownership, frontend behavior, and tests have an equivalent destination. Do not create speculative folder churn solely to make the tree look pure.
+Telegram verification and notifications belong in integration adapters. PostgreSQL is the only academic data source; there is no Excel or Google Sheets integration.

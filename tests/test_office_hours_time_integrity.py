@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from backend.services.office_hours import core as service
-from backend.repositories import office_hours as repository
+from backend.modules.academics import office_hours_service as service
+from backend.modules.academics import office_hours_repository as repository
 
 
 def test_naive_office_hour_times_are_interpreted_in_tashkent():

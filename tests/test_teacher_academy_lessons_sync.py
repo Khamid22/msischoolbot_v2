@@ -15,8 +15,8 @@ class _FakeConn:
 
 @pytest.fixture
 def sync_env(monkeypatch):
-    from backend.services.teacher_academy import core as service
-    from backend.repositories import teacher_academy as repository
+    from backend.modules.staff_records import development_service as service
+    from backend.modules.staff_records import development_repository as repository
 
     conn = _FakeConn()
     calls = {

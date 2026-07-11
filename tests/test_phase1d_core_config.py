@@ -19,7 +19,7 @@ def test_core_config_owns_runtime_settings_and_root_config_is_wrapper():
 
 
 def test_account_auth_module_does_not_export_legacy_flag():
-    import backend.services.identity.accounts as account_auth
+    import backend.modules.accounts.service as account_auth
 
     assert "account_auth_enabled" not in account_auth.__all__
     assert not hasattr(account_auth, "account_auth_enabled")

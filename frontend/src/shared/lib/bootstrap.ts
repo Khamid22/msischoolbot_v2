@@ -8,13 +8,12 @@ export type ReactPageName =
   | "student-aap"
   | "student-ar"
   | "student-office-hours"
-  | "admin-home"
-  | "admin-edit-student"
-  | "teacher-home"
+  | "internal-operations-home"
+  | "internal-edit-student"
   | "parent-home"
   | "ceo-home"
-  | "hr-home"
-  | "support-home"
+  | "hr-manager-home"
+  | "customer-support-home"
   | "academic-director-home"
   | "academic-director-academy"
   | "academic-director-head-of-departments"
@@ -22,10 +21,10 @@ export type ReactPageName =
   | "academic-director-subjects"
   | "academic-director-timetable"
   | "academic-director-announcements"
-  | "head-of-department-home"
-  | "head-of-department-academy"
-  | "head-of-department-timetable"
-  | "head-of-department-announcements"
+  | "head-of-departments-home"
+  | "head-of-departments-academy"
+  | "head-of-departments-timetable"
+  | "head-of-departments-announcements"
   | "account-security"
   | "unauthorized"
   | "student-not-found";
@@ -45,13 +44,12 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-aap",
   "student-ar",
   "student-office-hours",
-  "admin-home",
-  "admin-edit-student",
-  "teacher-home",
+  "internal-operations-home",
+  "internal-edit-student",
   "parent-home",
   "ceo-home",
-  "hr-home",
-  "support-home",
+  "hr-manager-home",
+  "customer-support-home",
   "academic-director-home",
   "academic-director-academy",
   "academic-director-head-of-departments",
@@ -59,10 +57,10 @@ const REACT_PAGES = new Set<ReactPageName>([
   "academic-director-subjects",
   "academic-director-timetable",
   "academic-director-announcements",
-  "head-of-department-home",
-  "head-of-department-academy",
-  "head-of-department-timetable",
-  "head-of-department-announcements",
+  "head-of-departments-home",
+  "head-of-departments-academy",
+  "head-of-departments-timetable",
+  "head-of-departments-announcements",
   "account-security",
   "unauthorized",
   "student-not-found",
@@ -103,6 +101,14 @@ function normalizePageName(page: unknown): ReactPageName | null {
   }
 
   const aliases: Record<string, ReactPageName> = {
+    "admin-home": "internal-operations-home",
+    "admin-edit-student": "internal-edit-student",
+    "hr-home": "hr-manager-home",
+    "support-home": "customer-support-home",
+    "head-of-department-home": "head-of-departments-home",
+    "head-of-department-academy": "head-of-departments-academy",
+    "head-of-department-timetable": "head-of-departments-timetable",
+    "head-of-department-announcements": "head-of-departments-announcements",
     "chat": "student-chat",
     "student-chat-room": "student-chat",
     "student-ar-lessons": "student-ar",

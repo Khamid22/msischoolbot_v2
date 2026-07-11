@@ -26,10 +26,10 @@ The role profile proves which business entity the account represents. An account
 
 Canonical password and Telegram code lives in:
 
-- `backend/domains/identity/accounts.py`
-- `backend/domains/identity/queries.py`
-- `backend/domains/identity/telegram_auth.py`
-- `backend/api/v1/auth/routes.py`
+- `backend/modules/accounts/service.py`
+- `backend/modules/accounts/repository.py`
+- `backend/modules/accounts/telegram_auth.py`
+- `backend/modules/accounts/api.py`
 
 The former `backend/identity/account_auth.py`, `account_telegram_auth.py`, `parent_accounts.py`, `parent_invites.py`, and `telegram_links.py` facades have been removed.
 
@@ -39,25 +39,26 @@ Each account has one canonical role:
 
 | Role | Current identity/profile | Workspace scope |
 | --- | --- | --- |
-| `system_admin` | staff profile | internal platform administration |
+| `system_admin` | staff profile | protected internal operations (not a business workspace) |
 | `ceo` | staff profile | executive workspace |
 | `academic_director` | staff profile | full academic management |
 | `head_of_department` | staff profile plus subject scopes | subject-scoped academic management |
 | `hr_manager` | staff profile | HR workspace |
 | `customer_support` | staff profile | parent/support operations |
-| `teacher` | teacher profile | assigned teaching and office hours |
 | `student` | student profile | own academic dashboard and tools |
 | `parent` | parent profile | linked children only |
 
 `system_admin` may still be represented as `auth_role="admin"` inside presentation compatibility code. Its canonical account role remains `system_admin`; the compatibility value must not grant business roles equivalent privileges.
 
+Teacher profiles remain active staff records, but `teacher` is not a valid portal session role. Teacher password/Telegram authentication and the former Teacher workspace are disabled. Migration `0008_remove_teacher_portal` disables existing teacher accounts and increments their session versions.
+
 ## Password Lifecycle
 
-New student, teacher, Teacher Academy, and staff provisioners use the canonical login as the initial password and set `must_change_password=true`. The migration does not blindly reset existing independently changed credentials:
+New Student and staff provisioners use the canonical login as the initial password and set `must_change_password=true`. Teacher provisioning creates staff/profile records without active portal credentials. The migration does not blindly reset existing independently changed credentials:
 
 - student/staff hashes that already verify their login are marked for change;
 - independently changed canonical hashes are preserved;
-- a teacher hash copied from a legacy staff login is repaired only when it is the exact copied hash and does not authenticate the canonical `TCH####` login;
+- existing teacher credentials are disabled by `0008_remove_teacher_portal`;
 - owner bootstrap preserves an existing independent owner password instead of rotating it on every startup.
 
 Parents are Telegram-first. A parent always receives a canonical account/profile, but a Telegram-only or manual-invite parent can legitimately have no password login. If a parent is later given a password credential, the same canonical password lifecycle and self-service endpoint apply.
@@ -109,7 +110,7 @@ The Starlette session contains only identity/routing facts required by the curre
 - `auth_login`
 - `must_change_password`
 - `session_version`
-- one role profile identifier, such as `student_db_id`, `teacher_id`, `parent_id`, or `staff_id`
+- one role profile identifier, such as `student_db_id`, `parent_id`, or `staff_id`
 
 Student sessions use canonical `students.id` as `student_db_id`. A public enrollment/dashboard ID can be included separately as `student_enrollment_id`; it is never the authorization identity.
 
@@ -155,7 +156,6 @@ Examples:
 
 - students can operate only as their canonical `student_db_id`;
 - parents can open only linked children;
-- teachers can use only assigned groups/subjects;
 - HOD actions are restricted to assigned subject scopes;
 - student chat membership is verified before room reads/writes;
 - group moves cannot cross school or subject-program boundaries;
@@ -174,13 +174,14 @@ Alembic `0005_canonical_identity`:
 - removes `msi_v2.student_auth` and `students.password_plain`;
 - adds account actors to audit events.
 
-Alembic `0007_lms_integrity` enforces credential requirements for active password roles while explicitly allowing Telegram-first parents without a password.
+Alembic `0007_lms_integrity` enforces credential requirements for active password roles while explicitly allowing Telegram-first parents without a password. Alembic `0008_remove_teacher_portal` removes Teacher portal access without deleting teacher staff records.
 
 ## Required Tests
 
 Identity changes should cover:
 
-- canonical password login for each password role;
+- canonical password login for each of the seven business roles and System Admin;
+- rejected password and Telegram login for Teacher records;
 - initial-password redirect and API blocking;
 - successful and rejected self-service changes;
 - session-version invalidation;

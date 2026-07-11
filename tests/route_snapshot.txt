@@ -119,11 +119,6 @@
 /api/v1/student/resources/{resource_id}/comments | GET
 /api/v1/student/resources/{resource_id}/comments | POST
 /api/v1/system/status | GET
-/api/v1/teacher/office-hours/availability | GET
-/api/v1/teacher/office-hours/availability | POST
-/api/v1/teacher/office-hours/availability/{availability_id} | PATCH
-/api/v1/teacher/office-hours/bookings | GET
-/api/v1/teacher/office-hours/bookings/{booking_id} | PATCH
 /auth/telegram | POST
 /ceo | GET
 /customer-support | GET
@@ -137,12 +132,15 @@
 /docs | GET,HEAD
 /docs/oauth2-redirect | GET,HEAD
 /head-of-department | GET
-/head-of-department/announcements | GET
-/head-of-department/profile | GET
-/head-of-department/teacher-academy | GET
-/head-of-department/timetable | GET
+/head-of-department/{legacy_path:path} | GET
+/head-of-departments | GET
+/head-of-departments/announcements | GET
+/head-of-departments/profile | GET
+/head-of-departments/teacher-academy | GET
+/head-of-departments/timetable | GET
 /hr | GET
 /hr-manager | GET
+/internal/operations | GET
 /login | POST
 /logout | POST
 /manifest.webmanifest | GET
@@ -157,5 +155,4 @@
 /student | GET
 /support | GET
 /sw.js | GET
-/teacher | GET
 /unauthorized | GET

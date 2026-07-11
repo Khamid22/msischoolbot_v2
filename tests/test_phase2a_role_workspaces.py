@@ -33,8 +33,8 @@ ROLE_WORKSPACES = [
     ),
     (
         "customer_support",
-        "/support",
-        "support-home",
+        "/customer-support",
+        "customer-support-home",
         "Customer Support Dashboard",
         "Customer Support",
         "Parents",
@@ -42,8 +42,8 @@ ROLE_WORKSPACES = [
     ),
     (
         "hr_manager",
-        "/hr",
-        "hr-home",
+        "/hr-manager",
+        "hr-manager-home",
         "HR Manager Dashboard",
         "HR Manager",
         "Teachers",
@@ -69,10 +69,10 @@ def _set_session(client, data):
 
 
 def _patch_workspace_cards(monkeypatch):
-    import backend.pages.academics.director as academic_director_routes
-    import backend.pages.staff.ceo as ceo_page
-    import backend.pages.staff.support as customer_support_page
-    import backend.pages.staff.hr as hr_manager_page
+    import backend.workspaces.academic_director.page as academic_director_routes
+    import backend.workspaces.ceo.page as ceo_page
+    import backend.workspaces.customer_support.page as customer_support_page
+    import backend.workspaces.hr_manager.page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -177,7 +177,7 @@ def test_wrong_role_cannot_access_role_workspace(
     count_label,
     count_value,
 ):
-    _set_session(client, {"auth_role": "teacher", "auth_login": "teacher@test"})
+    _set_session(client, {"auth_role": "student", "auth_login": "student@test"})
 
     response = client.get(path, headers=XHR)
 
@@ -212,7 +212,7 @@ def test_unauthenticated_user_cannot_access_role_workspace(
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
         ("GET", "/admin"),
-        ("GET", "/teacher"),
+        ("GET", "/internal/operations"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],
@@ -227,9 +227,9 @@ def test_existing_critical_routes_remain_registered(app, method, path):
 def test_staff_role_pages_are_owned_by_one_staff_module():
     assert not Path("backend/roles").exists()
     for path in [
-        Path("backend/pages/staff/ceo.py"),
-        Path("backend/pages/staff/hr.py"),
-        Path("backend/pages/staff/support.py"),
-        Path("backend/services/staff/workspace.py"),
+        Path("backend/workspaces/ceo/page.py"),
+        Path("backend/workspaces/hr_manager/page.py"),
+        Path("backend/workspaces/customer_support/page.py"),
+        Path("backend/modules/reporting/service.py"),
     ]:
         assert path.is_file()

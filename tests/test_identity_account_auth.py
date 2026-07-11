@@ -2,7 +2,7 @@ import pytest
 
 from werkzeug.security import generate_password_hash
 
-from backend.services.identity import accounts as account_auth
+from backend.modules.accounts import service as account_auth
 
 
 class _Result:
@@ -225,16 +225,8 @@ def test_disabled_student_rejected():
     assert _authenticate("MSI00002") is None
 
 
-def test_active_teacher_tch0001_authenticates():
-    result = _authenticate("TCH0001")
-
-    assert result is not None
-    assert result["account"]["role"] == "teacher"
-    assert result["session"]["auth_role"] == "teacher"
-    assert result["session"]["auth_login"] == "TCH0001"
-    assert result["session"]["teacher_id"] == 10
-    assert result["session"]["teacher_staff_id"] == 2
-    assert result["session"]["teacher_full_name"] == "Teacher User"
+def test_active_teacher_account_is_rejected_as_non_portal_staff():
+    assert _authenticate("TCH0001") is None
 
 
 def test_system_admin_authenticates_with_legacy_admin_compatibility():

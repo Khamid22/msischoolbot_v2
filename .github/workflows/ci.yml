@@ -14,7 +14,6 @@ jobs:
       BOT_TOKEN: "123456:ci-placeholder"
       MINI_APP_URL: "https://example.com"
       DATABASE_URL: "postgresql://user:pass@localhost:5432/ci"
-      DEMO_AUTH_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

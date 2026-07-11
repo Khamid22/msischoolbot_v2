@@ -20,7 +20,7 @@ export const routes = {
   adminTeacherUpdate: (teacherId: number | string) => `/admin/teachers/${teacherId}`,
   adminTeacherDelete: (teacherId: number | string) => `/admin/teachers/${teacherId}/delete`,
   adminTeacherEdit: (teacherId: number | string, school = "all", mode = "") =>
-    `/?panel=teachers&school=${encodeURIComponent(String(school || "all"))}${
+    `/internal/operations?panel=teachers&school=${encodeURIComponent(String(school || "all"))}${
       mode ? `&mode=${encodeURIComponent(String(mode))}` : ""
     }&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
   adminTeacherCandidateCreate: "/admin/teacher-candidates",
@@ -47,11 +47,11 @@ export const routes = {
   academicDirectorTeacherAcademyLessonsSync: apiRoutes.academicDirectorTeacherAcademyLessonsSync,
   academicDirectorTeacherAcademyPromote: apiRoutes.academicDirectorTeacherAcademyPromote,
   academicDirectorTeacherAcademyDelete: apiRoutes.academicDirectorTeacherAcademyDelete,
-  headOfDepartmentOverview: "/head-of-department",
-  headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy",
-  headOfDepartmentTimetable: "/head-of-department/timetable",
-  headOfDepartmentAnnouncements: "/head-of-department/announcements",
-  headOfDepartmentProfile: "/head-of-department/profile",
+  headOfDepartmentOverview: "/head-of-departments",
+  headOfDepartmentTeacherAcademy: "/head-of-departments/teacher-academy",
+  headOfDepartmentTimetable: "/head-of-departments/timetable",
+  headOfDepartmentAnnouncements: "/head-of-departments/announcements",
+  headOfDepartmentProfile: "/head-of-departments/profile",
   headOfDepartmentTeacherAcademyAssignmentUpdate: apiRoutes.headOfDepartmentTeacherAcademyAssignmentUpdate,
   headOfDepartmentTeacherAcademyAssessmentCreate: apiRoutes.headOfDepartmentTeacherAcademyAssessmentCreate,
   headOfDepartmentTeacherAcademyAssessmentDelete: apiRoutes.headOfDepartmentTeacherAcademyAssessmentDelete,

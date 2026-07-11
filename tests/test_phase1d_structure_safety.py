@@ -101,7 +101,6 @@ def test_backend_server_create_app_imports_and_title_stays_expected():
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
         ("GET", "/admin"),
-        ("GET", "/teacher"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],
@@ -114,7 +113,7 @@ def test_critical_routes_remain_registered(app, method, path):
 
 
 def test_account_login_path_is_always_available(app, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     client = _rate_limit_isolated_client(app, "account-login")
     calls = {"auth": 0}
@@ -145,18 +144,17 @@ def test_account_login_path_is_always_available(app, monkeypatch):
 @pytest.mark.parametrize(
     "module_name",
     [
-        "backend.api.v1",
-        "backend.pages",
-        "backend.schemas",
-        "backend.services",
-        "backend.repositories",
+        "backend.application",
+        "backend.workspaces",
+        "backend.modules",
+        "backend.internal_operations",
         "backend.core",
         "backend.integrations",
         "backend.integrations.telegram",
         "backend.integrations.storage",
     ],
 )
-def test_future_empty_packages_import_safely(module_name):
+def test_active_architecture_packages_import_safely(module_name):
     module = importlib.import_module(module_name)
 
     assert module is not None

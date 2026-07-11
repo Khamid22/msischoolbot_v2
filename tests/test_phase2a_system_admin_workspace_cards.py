@@ -134,7 +134,7 @@ def _minimal_academic_context(**_kwargs):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.pages.admin.home as admin_page
+    import backend.internal_operations.page as admin_page
 
     monkeypatch.setattr(
         admin_page,
@@ -145,7 +145,7 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
 
 
-def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeypatch):
+def test_system_admin_can_access_internal_operations_with_overview_stats(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
     _set_session(
         client,
@@ -159,10 +159,10 @@ def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeyp
         },
     )
 
-    response = client.get("/admin")
+    response = client.get("/internal/operations")
 
     assert response.status_code == 200
-    assert 'data-react-page="admin-home"' in response.text
+    assert 'data-react-page="internal-operations-home"' in response.text
     # The account-identity cards are gone; the overview stat cards read
     # from the quick stats shipped with the page props.
     assert "Total Accounts" not in response.text
@@ -178,9 +178,7 @@ def test_system_admin_admin_can_access_admin_with_overview_stats(client, monkeyp
     assert "School 5" in response.text
 
 
-def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, monkeypatch):
-    import backend.pages.admin.home as admin_page
-
+def test_internal_operations_does_not_preview_business_workspaces(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.delenv("ADMIN_PREVIEW_ROLES", raising=False)
@@ -196,17 +194,15 @@ def test_admin_preview_is_disabled_in_production_even_with_mode_param(client, mo
         },
     )
 
-    response = client.get("/admin?mode=student")
+    response = client.get("/internal/operations?mode=student")
 
     assert response.status_code == 200
-    assert '"devPreviewEnabled":false' in response.text
-    assert '"previewRole":"admin"' in response.text
+    assert '"devPreviewEnabled"' not in response.text
+    assert '"previewRole"' not in response.text
     assert '"adminMode":"admin"' in response.text
 
 
-def test_admin_preview_can_be_explicitly_enabled_for_true_admin(client, monkeypatch):
-    import backend.pages.admin.home as admin_page
-
+def test_preview_environment_flag_cannot_turn_internal_operations_into_student_workspace(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
     monkeypatch.setenv("ADMIN_PREVIEW_ROLES", "1")
     _set_session(
@@ -221,16 +217,16 @@ def test_admin_preview_can_be_explicitly_enabled_for_true_admin(client, monkeypa
         },
     )
 
-    response = client.get("/admin?mode=student")
+    response = client.get("/internal/operations?mode=student")
 
     assert response.status_code == 200
-    assert '"devPreviewEnabled":true' in response.text
-    assert '"previewRole":"student"' in response.text
-    assert '"adminMode":"student"' in response.text
+    assert '"devPreviewEnabled"' not in response.text
+    assert '"previewRole"' not in response.text
+    assert '"adminMode":"admin"' in response.text
 
 
 def test_wrong_role_is_denied_from_admin(client):
-    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 1})
+    _set_session(client, {"auth_role": "student", "auth_login": "MSI0001", "student_db_id": 1})
 
     response = client.get("/admin", headers=XHR)
 
@@ -242,6 +238,7 @@ def test_wrong_role_is_denied_from_admin(client):
         ("method", "path"),
     [
         ("GET", "/admin"),
+        ("GET", "/internal/operations"),
         ("GET", "/api/v1/admin/students"),
         ("GET", "/api/v1/admin/academic/gradebook"),
         ("GET", "/api/v1/admin/announcements"),
@@ -266,7 +263,6 @@ def test_existing_admin_routes_remain_registered(app, method, path):
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
         ("GET", "/admin"),
-        ("GET", "/teacher"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],

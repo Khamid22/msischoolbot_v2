@@ -7,7 +7,7 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.services.parents.cards import build_parent_workspace_cards
+from backend.modules.parent_access.cards import build_parent_workspace_cards
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -80,7 +80,7 @@ def _parent_children():
 
 
 def _patch_parent_dependencies(monkeypatch, children):
-    import backend.pages.parents.home as parent_routes
+    import backend.workspaces.parent.page as parent_routes
 
     if isinstance(children, Exception):
         def raise_children(parent_id):
@@ -159,7 +159,7 @@ def test_parent_route_loads_for_parent(client, monkeypatch):
 
 
 def test_wrong_role_is_denied_from_parent_workspace(client):
-    _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 1})
+    _set_session(client, {"auth_role": "student", "auth_login": "MSI0001", "student_db_id": 1})
 
     response = client.get("/parent", headers=XHR)
 
@@ -212,7 +212,6 @@ def test_parent_route_db_failure_returns_placeholder_cards(client, monkeypatch):
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
         ("GET", "/admin"),
-        ("GET", "/teacher"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],

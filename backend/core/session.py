@@ -2,7 +2,7 @@
 
 from backend.core.access.roles import dashboard_path_for_role, is_valid_role, normalize_role
 from backend.core.request_context import session
-from backend.services.academics.canonical import normalize_school_code
+from backend.modules.academics.canonical import normalize_school_code
 
 
 def current_auth_role():
@@ -10,38 +10,6 @@ def current_auth_role():
     if is_valid_role(role):
         return role
     return ""
-
-
-def current_teacher_id():
-    if current_auth_role() != "teacher":
-        return None
-    try:
-        parsed_value = int(session.get("teacher_id"))
-    except (TypeError, ValueError):
-        return None
-    return parsed_value if parsed_value > 0 else None
-
-
-def current_teacher_staff_id():
-    if current_auth_role() != "teacher":
-        return None
-    try:
-        parsed_value = int(session.get("teacher_staff_id"))
-    except (TypeError, ValueError):
-        return None
-    return parsed_value if parsed_value > 0 else None
-
-
-def current_teacher_full_name():
-    if current_auth_role() != "teacher":
-        return ""
-    return str(session.get("teacher_full_name", "")).strip()
-
-
-def current_teacher_group():
-    if current_auth_role() != "teacher":
-        return ""
-    return str(session.get("teacher_group", "")).strip()
 
 
 def current_auth_login():
@@ -179,7 +147,12 @@ def set_account_session(auth_result):
         session_payload.get("canonical_role") or session_payload.get("account_role")
     )
     auth_role = str(session_payload.get("auth_role") or "").strip()
-    if account_id <= 0 or session_version <= 0 or not canonical_role or not auth_role:
+    if (
+        account_id <= 0
+        or session_version <= 0
+        or not is_valid_role(canonical_role)
+        or not is_valid_role(auth_role)
+    ):
         return False
 
     session.clear()
@@ -227,33 +200,6 @@ def set_student_session(student, telegram_user_id=None):
         session["telegram_user_id"] = parsed_telegram_user_id
     else:
         session.pop("telegram_user_id", None)
-    session.permanent = True
-    return True
-
-
-def set_teacher_session(teacher):
-    if not isinstance(teacher, dict) or not teacher.get("id"):
-        return False
-
-    try:
-        teacher_id = int(teacher["id"])
-    except (KeyError, TypeError, ValueError):
-        return False
-    if teacher_id <= 0:
-        return False
-
-    session.clear()
-    session["auth_role"] = "teacher"
-    session["auth_login"] = str(teacher.get("login", "")).strip()
-    session["teacher_id"] = teacher_id
-    try:
-        teacher_staff_id = int(teacher.get("staff_id") or 0)
-    except (TypeError, ValueError):
-        teacher_staff_id = 0
-    if teacher_staff_id > 0:
-        session["teacher_staff_id"] = teacher_staff_id
-    session["teacher_full_name"] = str(teacher.get("full_name", "")).strip()
-    session["teacher_group"] = str(teacher.get("assigned_group", "")).strip()
     session.permanent = True
     return True
 
@@ -383,10 +329,6 @@ __all__ = [
     "current_admin_role",
     "current_auth_login",
     "current_staff_id",
-    "current_teacher_id",
-    "current_teacher_staff_id",
-    "current_teacher_full_name",
-    "current_teacher_group",
     "current_parent_id",
     "current_student_enrollment_id",
     "current_student_db_id",

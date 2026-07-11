@@ -1,6 +1,6 @@
 """Teacher Academy performance-oriented service coverage."""
 
-import backend.services.teacher_academy.core as academy_service
+import backend.modules.staff_records.development_service as academy_service
 
 
 class _Rows:

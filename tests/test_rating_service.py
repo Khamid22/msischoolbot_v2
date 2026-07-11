@@ -1,6 +1,6 @@
 """Unit tests for the academic rating/leaderboard math (no database)."""
 
-from backend.services.academics.rating import (
+from backend.modules.academics.rating import (
     attendance_rate_to_score,
     build_subject_leaderboard,
     extract_attendance_rate,

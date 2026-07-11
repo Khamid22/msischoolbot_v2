@@ -1,6 +1,6 @@
 import pytest
 
-from backend.services.identity import telegram_auth as account_telegram_auth
+from backend.modules.accounts import telegram_auth as account_telegram_auth
 
 
 class _Result:
@@ -271,16 +271,8 @@ def test_active_student_telegram_link_authenticates():
     assert result["session"]["telegram_user_id"] == 9002
 
 
-def test_active_teacher_telegram_link_authenticates():
-    result = _authenticate(9003)
-
-    assert result is not None
-    assert result["account"]["role"] == "teacher"
-    assert result["session"]["auth_role"] == "teacher"
-    assert result["session"]["auth_login"] == "TCH0001"
-    assert result["session"]["teacher_id"] == 10
-    assert result["session"]["teacher_staff_id"] == 2
-    assert result["session"]["telegram_user_id"] == 9003
+def test_active_teacher_telegram_link_is_rejected_as_non_portal_staff():
+    assert _authenticate(9003) is None
 
 
 def test_system_admin_telegram_link_authenticates_with_admin_compatibility():

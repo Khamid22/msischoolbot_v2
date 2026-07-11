@@ -8,8 +8,7 @@ from pathlib import Path
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.services.teacher_academy.notifications import notify_academy_teacher_event
-from backend.services.teachers.cards import build_teacher_workspace_cards
+from backend.modules.staff_records.development_notifications import notify_academy_teacher_event
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -74,10 +73,6 @@ def _route_methods(app):
 
     walk(app.routes)
     return routes
-
-
-def _teacher_home_source():
-    return Path("frontend/src/roles/teacher/pages/TeacherHome.tsx").read_text()
 
 
 def _academy_workspace():
@@ -252,8 +247,8 @@ def _minimal_academic_context():
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.pages.admin.home as admin_page
-    import backend.pages.academics.director as academic_director_routes
+    import backend.internal_operations.page as admin_page
+    import backend.workspaces.academic_director.page as academic_director_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -273,92 +268,6 @@ def _patch_admin_page_context(monkeypatch):
     monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
 
 
-def test_academy_teacher_source_limits_tabs_to_required_set():
-    source = _teacher_home_source()
-
-    academy_tabs_block = source.split("const academyTabs", 1)[1].split("];", 1)[0]
-    assert 'label: "Overview"' in academy_tabs_block
-    assert 'label: "Lessons"' in academy_tabs_block
-    assert 'label: "Timetable"' in academy_tabs_block
-    assert 'label: "Updates"' in academy_tabs_block
-    assert "Career Growth" not in academy_tabs_block
-
-
-def test_active_teacher_source_keeps_normal_workspace_tabs():
-    source = _teacher_home_source()
-
-    active_tabs_block = source.split("const activeTeacherTabs", 1)[1].split("];", 1)[0]
-    assert 'label: "Home"' in active_tabs_block
-    assert 'label: "Lesson Reports"' in active_tabs_block
-    assert 'label: "Timetable"' in active_tabs_block
-    assert 'label: "Career Growth"' in active_tabs_block
-    assert 'label: "Updates"' in active_tabs_block
-
-
-def test_academy_workspace_cards_show_required_counts():
-    cards = build_teacher_workspace_cards(
-        teacher_id=42,
-        teacher_staff_id=9,
-        workspace=_academy_workspace(),
-    )
-
-    assert [card["label"] for card in cards] == [
-        "Assigned Lessons",
-        "Completed/Assessed",
-        "Remaining Lessons",
-        "Average Score",
-    ]
-    assert cards[0]["value"] == "12"
-    assert cards[1]["value"] == "3"
-    assert cards[2]["value"] == "9"
-    assert cards[3]["value"] == "8.2"
-
-
-def test_teacher_route_exposes_academy_overview_lessons_timetable_and_updates(client, monkeypatch):
-    import backend.services.teachers.core as teacher_service
-    import backend.pages.teachers.home as teacher_routes
-    import database
-
-    monkeypatch.setattr(teacher_routes, "build_teacher_workspace", lambda teacher_id, staff_id=None: _academy_workspace())
-    monkeypatch.setattr(teacher_service, "get_teacher_by_id", lambda teacher_id: {"assigned_group": ""})
-    monkeypatch.setattr(database, "connect_auth_db", lambda: _SubjectConnection())
-    _set_session(
-        client,
-        {
-            "auth_role": "teacher",
-            "auth_login": "TCH0004",
-            "teacher_id": 42,
-            "teacher_staff_id": 9,
-        },
-    )
-
-    response = client.get("/teacher")
-
-    assert response.status_code == 200
-    assert 'data-react-page="teacher-home"' in response.text
-    assert "Assigned Lessons" in response.text
-    assert "Completed/Assessed" in response.text
-    assert "Remaining Lessons" in response.text
-    assert "Average Score" in response.text
-    assert "3 assessed lessons; latest 8.7/10." in response.text
-    assert "Proceed to the next academy lesson." in response.text
-    assert "Academic Department" in response.text
-    assert "2026-07-07T09:00:00Z" in response.text
-
-
-def test_academy_teacher_page_source_shows_report_timetable_and_update_fallbacks():
-    source = _teacher_home_source()
-
-    assert "Written report from Academic Department" in source
-    assert "Strengths" in source
-    assert "Areas for improvement" in source
-    assert "Final recommendation" in source
-    assert "Start time" in source
-    assert "End time" in source
-    assert "Evaluator / Academic Director" in source
-    assert "No academy updates yet" in source
-
-
 def test_academic_director_can_access_academy_management_route(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
@@ -369,11 +278,11 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
     assert 'data-react-page="academic-director-academy"' in response.text
     assert "academic_director" in response.text
     assert "adminTeacherAcademy" in response.text
-    assert 'data-react-page="admin-home"' not in response.text
+    assert 'data-react-page="internal-operations-home"' not in response.text
 
 
 def test_academic_director_can_create_academy_teacher_through_api_v1(client, monkeypatch):
-    import backend.services.teacher_academy.http_responses as academy_api
+    import backend.modules.staff_records.development_responses as academy_api
 
     calls = []
     monkeypatch.setattr(
@@ -406,7 +315,7 @@ def test_academic_director_can_create_academy_teacher_through_api_v1(client, mon
 
 
 def test_next_teacher_code_uses_four_digit_tch_format():
-    from backend.repositories.teachers import get_next_teacher_code
+    from backend.modules.staff_records.teachers_repository import get_next_teacher_code
 
     class _OneRow:
         def fetchone(self):
@@ -436,7 +345,7 @@ def test_notification_does_not_crash_without_telegram_link(monkeypatch):
 
 
 def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
-    from backend.services.teacher_academy import notifications
+    from backend.modules.staff_records import development_notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -468,7 +377,7 @@ def test_notification_posts_new_teacher_to_subject_channel(monkeypatch):
 
 
 def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
-    from backend.services.teacher_academy import notifications
+    from backend.modules.staff_records import development_notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -497,7 +406,7 @@ def test_notification_sends_direct_message_to_linked_teacher(monkeypatch):
 
 
 def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
-    from backend.services.teacher_academy import notifications
+    from backend.modules.staff_records import development_notifications as notifications
 
     sent_messages = []
     monkeypatch.setenv("BOT_TOKEN", "test-token")
@@ -530,7 +439,6 @@ def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("GET", "/teacher"),
         ("GET", "/admin"),
         ("GET", "/parent"),
         ("GET", "/student"),
@@ -566,8 +474,8 @@ def test_old_admin_teacher_academy_action_routes_are_removed(app):
         "/academic-director/api/teacher-academy/assignments/{assignment_id}",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/assessments",
         "/academic-director/api/teacher-academy/{academy_teacher_id}/status",
-        "/head-of-department/api/teacher-academy/assignments/{assignment_id}",
-        "/head-of-department/api/teacher-academy/{academy_teacher_id}/assessments",
-        "/head-of-department/api/teacher-academy/{academy_teacher_id}/status",
+        "/head-of-departments/api/teacher-academy/assignments/{assignment_id}",
+        "/head-of-departments/api/teacher-academy/{academy_teacher_id}/assessments",
+        "/head-of-departments/api/teacher-academy/{academy_teacher_id}/status",
     ]:
         assert path not in routes

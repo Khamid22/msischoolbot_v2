@@ -46,7 +46,7 @@ def test_shared_modal_component_uses_portal_backdrop_scroll_lock_and_top_z_index
 
 
 def test_teacher_academy_modals_use_shared_modal_system_and_keep_assignment_selectors():
-    source = Path("frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx").read_text()
+    source = Path("frontend/src/features/management/teachers/TeacherAcademyPanel.tsx").read_text()
 
     assert 'import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";' in source
     assert "function ModalShell" in source
@@ -81,7 +81,7 @@ def test_teacher_academy_modals_use_shared_modal_system_and_keep_assignment_sele
 
 
 def test_announcement_composer_uses_shared_modal_system():
-    source = Path("frontend/src/roles/admin/panels/AnnouncementsPanel.tsx").read_text()
+    source = Path("frontend/src/features/management/AnnouncementsPanel.tsx").read_text()
 
     assert 'import { Modal } from "@/shared/ui/Modal";' in source
     assert "<Modal" in source

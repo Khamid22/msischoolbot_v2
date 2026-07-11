@@ -55,7 +55,7 @@ def _auth_result(role, *, account_role=None, **session_overrides):
 
 
 def test_student_login_uses_accounts(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     _set_csrf_session(client)
     calls = {"activity": []}
@@ -91,31 +91,24 @@ def test_student_login_uses_accounts(client, monkeypatch):
     }
 
 
-def test_teacher_tch0001_login_uses_accounts(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+def test_teacher_login_is_rejected(client, monkeypatch):
+    import backend.modules.accounts.page as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
         identity_routes,
         "authenticate_account_password",
-        lambda login, password: _auth_result(
-            "teacher",
-            auth_login="TCH0001",
-            teacher_id=10,
-            teacher_staff_id=2,
-            teacher_full_name="Teacher User",
-            teacher_group="IGCSE",
-        ),
+        lambda login, password: None,
     )
 
     response = _post_login(client, "TCH0001")
 
-    assert response.status_code == 302
-    assert response.headers["location"] == "/teacher"
+    assert response.status_code == 401
+    assert "Invalid login or password" in response.text
 
 
 def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
@@ -138,7 +131,7 @@ def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
     response = _post_login(client, "admin")
 
     assert response.status_code == 302
-    assert response.headers["location"] == "/admin"
+    assert response.headers["location"] == "/internal/operations"
 
 
 @pytest.mark.parametrize(
@@ -155,7 +148,7 @@ def test_protected_account_session_must_match_database_account(
     monkeypatch,
     database_account,
 ):
-    from backend.services.identity import accounts
+    from backend.modules.accounts import service as accounts
 
     client.cookies.set(
         "session",
@@ -193,7 +186,7 @@ def test_protected_account_session_must_match_database_account(
     ],
 )
 def test_rejected_account_returns_401(client, monkeypatch, login):
-    import backend.pages.portal.home as identity_routes
+    import backend.modules.accounts.page as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(identity_routes, "authenticate_account_password", lambda login_value, password: None)

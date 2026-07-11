@@ -7,7 +7,7 @@ from base64 import b64encode
 from itsdangerous import TimestampSigner
 from werkzeug.security import check_password_hash
 
-from backend.services.staff import registration as staff_registration
+from backend.modules.staff_records import registration as staff_registration
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -192,7 +192,7 @@ def test_list_head_of_department_accounts_warns_when_scope_table_missing():
 
 
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
-    import backend.api.v1.academics.director_router as academic_director_api
+    import backend.workspaces.academic_director.api as academic_director_api
 
     monkeypatch.setattr(
         academic_director_api,
@@ -246,7 +246,7 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
 
 
 def test_head_of_department_workspace_route_loads(client, monkeypatch):
-    import backend.pages.academics.hod as hod_routes
+    import backend.workspaces.head_of_departments.page as hod_routes
 
     monkeypatch.setattr(
         hod_routes,
@@ -263,16 +263,16 @@ def test_head_of_department_workspace_route_loads(client, monkeypatch):
         },
     )
 
-    response = client.get("/head-of-department")
+    response = client.get("/head-of-departments")
 
     assert response.status_code == 200
-    assert 'data-react-page="head-of-department-home"' in response.text
-    assert "Head of Department Dashboard" in response.text
+    assert 'data-react-page="head-of-departments-home"' in response.text
+    assert "Head of Departments Dashboard" in response.text
     assert "Subject Scope" in response.text
 
 
 def test_head_of_department_can_access_subject_scoped_academy_page(client, monkeypatch):
-    import backend.pages.academics.hod as hod_routes
+    import backend.workspaces.head_of_departments.page as hod_routes
 
     monkeypatch.setattr(
         hod_routes,
@@ -296,11 +296,11 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
         },
     )
 
-    response = client.get("/head-of-department/teacher-academy")
+    response = client.get("/head-of-departments/teacher-academy")
 
     assert response.status_code == 200
-    assert 'data-react-page="head-of-department-academy"' in response.text
-    assert 'data-react-page="admin-home"' not in response.text
+    assert 'data-react-page="head-of-departments-academy"' in response.text
+    assert 'data-react-page="internal-operations-home"' not in response.text
     assert "head_of_department" in response.text
     assert "adminTeacherAcademy" in response.text
     assert "Math Teacher" in response.text
@@ -308,7 +308,7 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
 
 
 def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
-    import backend.api.v1.teacher_academy.hod as hod_api_routes
+    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_teacher", lambda user, teacher_id: False)
     _set_session(
@@ -332,7 +332,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.services.teacher_academy.http_responses as academy_api
+    import backend.modules.staff_records.development_responses as academy_api
 
     captured = {}
 
@@ -361,7 +361,7 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
 
 
 def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
-    import backend.api.v1.teacher_academy.hod as hod_api_routes
+    import backend.workspaces.head_of_departments.staff_records_api as hod_api_routes
 
     monkeypatch.setattr(hod_api_routes, "can_user_manage_academy_assignment", lambda user, assignment_id: False)
     _set_session(
@@ -385,7 +385,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
 
 
 def test_hod_filters_academy_rows_by_assigned_subject():
-    from backend.services.teacher_academy.permissions import filter_rows_by_subject_scope
+    from backend.modules.staff_records.development_permissions import filter_rows_by_subject_scope
 
     rows = [
         {"id": 1, "subject_id": 5, "full_name": "Math Teacher"},

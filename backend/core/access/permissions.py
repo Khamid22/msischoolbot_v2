@@ -51,11 +51,6 @@ ROLE_PERMISSIONS = {
         PERMISSION_MANAGE_PAYMENTS,
         PERMISSION_MANAGE_ACADEMICS,
     },
-    roles.ROLE_TEACHER: {
-        PERMISSION_VIEW_DASHBOARD,
-        PERMISSION_MANAGE_RESOURCES,
-        PERMISSION_MANAGE_ACADEMICS,
-    },
     roles.ROLE_HR_MANAGER: {
         PERMISSION_VIEW_DASHBOARD,
         PERMISSION_MANAGE_TEACHERS,
@@ -123,13 +118,6 @@ ROLE_FEATURE_PERMISSIONS = {
         "view_own_grades",
         "view_resources",
         "use_student_chat",
-    },
-    "teacher": {
-        "view_assigned_groups",
-        "manage_attendance",
-        "submit_grades",
-        "view_resources",
-        "write_student_comments",
     },
     "parent": {
         "view_child_progress",

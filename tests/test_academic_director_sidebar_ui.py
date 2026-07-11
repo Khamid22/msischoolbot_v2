@@ -135,7 +135,7 @@ def _minimal_academic_context():
 
 
 def _patch_academic_director_cards(monkeypatch):
-    import backend.pages.academics.director as academic_director_routes
+    import backend.workspaces.academic_director.page as academic_director_routes
 
     monkeypatch.setattr(
         academic_director_routes,
@@ -150,9 +150,9 @@ def _patch_academic_director_cards(monkeypatch):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.pages.admin.home as admin_page
-    import backend.pages.academics.director as academic_director_routes
-    import backend.pages.academics.hod as head_of_department_routes
+    import backend.internal_operations.page as admin_page
+    import backend.workspaces.academic_director.page as academic_director_routes
+    import backend.workspaces.head_of_departments.page as head_of_department_routes
 
     def fake_teacher_academy_page_context():
         admin_context = _minimal_admin_page_context()
@@ -281,7 +281,7 @@ def test_academic_director_home_bootstrap_keeps_cards_and_profile_context(client
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store, max-age=0"
     assert 'data-react-page="academic-director-home"' in response.text
-    assert 'data-react-page="admin-home"' not in response.text
+    assert 'data-react-page="internal-operations-home"' not in response.text
     assert "Academic Director Dashboard" in response.text
     assert "AD0001" in response.text
     assert "Student mode" not in response.text
@@ -303,7 +303,7 @@ def test_academic_director_teacher_academy_route_still_loads(client, monkeypatch
     assert 'data-react-page="academic-director-academy"' in response.text
     assert "academic_director" in response.text
     assert "Student mode" not in response.text
-    assert 'data-react-page="admin-home"' not in response.text
+    assert 'data-react-page="internal-operations-home"' not in response.text
 
 
 def test_academic_director_head_of_departments_route_loads_safe_page(client, monkeypatch):
@@ -320,13 +320,13 @@ def test_academic_director_head_of_departments_route_loads_safe_page(client, mon
     assert "Mathematics" in response.text
     assert "password_hash" not in response.text
     assert "Student mode" not in response.text
-    assert 'data-react-page="admin-home"' not in response.text
+    assert 'data-react-page="internal-operations-home"' not in response.text
 
 
 def test_academic_department_timetable_announcements_and_profile_routes_load(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
-    ad_workspace_source = Path("frontend/src/roles/academic_director/pages/AcademicWorkspace.tsx").read_text()
-    department_workspace_source = Path("frontend/src/roles/common/pages/AcademicDepartmentWorkspace.tsx").read_text()
+    ad_workspace_source = Path("frontend/src/workspaces/academic_director/pages/AcademicWorkspace.tsx").read_text()
+    department_workspace_source = Path("frontend/src/features/academic_workspace/AcademicDepartmentWorkspace.tsx").read_text()
 
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
     ad_groups = client.get("/academic-director/groups")
@@ -360,19 +360,19 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
     assert "adminAcademyLessonEvents" not in ad_workspace_source
     assert "adminAcademicSessions" not in department_workspace_source
     assert "adminAcademicSchedules" not in department_workspace_source
-    assert 'data-react-page="admin-home"' not in ad_announcements.text
+    assert 'data-react-page="internal-operations-home"' not in ad_announcements.text
     assert ad_profile.status_code == 200
     assert 'data-react-page="academic-director-home"' in ad_profile.text
     assert "Academic Director Profile" in ad_profile.text
 
     client.cookies.clear()
     _set_session(client, {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80})
-    hod_timetable = client.get("/head-of-department/timetable")
-    hod_announcements = client.get("/head-of-department/announcements")
-    hod_profile = client.get("/head-of-department/profile")
+    hod_timetable = client.get("/head-of-departments/timetable")
+    hod_announcements = client.get("/head-of-departments/announcements")
+    hod_profile = client.get("/head-of-departments/profile")
 
     assert hod_timetable.status_code == 200
-    assert 'data-react-page="head-of-department-timetable"' in hod_timetable.text
+    assert 'data-react-page="head-of-departments-timetable"' in hod_timetable.text
     # Subject scope keeps only the Mathematics academy lesson; gradebook
     # sessions are no longer part of the timetable.
     assert "Math 10A" not in hod_timetable.text
@@ -385,17 +385,17 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
     assert "AdminSidebar" not in hod_timetable.text
     assert "Student mode" not in hod_timetable.text
     assert hod_announcements.status_code == 200
-    assert 'data-react-page="head-of-department-announcements"' in hod_announcements.text
+    assert 'data-react-page="head-of-departments-announcements"' in hod_announcements.text
     assert "Term Update" in hod_announcements.text
     assert hod_profile.status_code == 200
-    assert 'data-react-page="head-of-department-home"' in hod_profile.text
-    assert "Head of Department Profile" in hod_profile.text
+    assert 'data-react-page="head-of-departments-home"' in hod_profile.text
+    assert "Head of Departments Profile" in hod_profile.text
 
 
 def test_academic_department_overviews_do_not_render_duplicate_profile_logout_blocks():
-    source = Path("frontend/src/roles/common/pages/RoleHome.tsx").read_text()
-    route_source = Path("backend/pages/academics/director.py").read_text()
-    hod_route_source = Path("backend/pages/academics/hod.py").read_text()
+    source = Path("frontend/src/features/workspace_home/RoleHome.tsx").read_text()
+    route_source = Path("backend/workspaces/academic_director/page.py").read_text()
+    hod_route_source = Path("backend/workspaces/head_of_departments/page.py").read_text()
     ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split("function HeadOfDepartmentHome", 1)[0]
     hod_overview_block = source.split("function HeadOfDepartmentHome", 1)[1].split("export function RoleHome", 1)[0]
     ad_overview_return = ad_overview_block.rsplit("return (", 1)[1]
@@ -415,22 +415,20 @@ def test_academic_department_overviews_do_not_render_duplicate_profile_logout_bl
 
 
 def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobile_nav():
-    source = Path("frontend/src/roles/common/components/AcademicDirectorShell.tsx").read_text()
-    nav_source = Path("frontend/src/roles/common/components/academicNav.ts").read_text()
+    source = Path("frontend/src/features/academic_workspace/AcademicDirectorShell.tsx").read_text()
+    nav_source = Path("frontend/src/features/academic_workspace/academicNav.ts").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
-    admin_source = Path("frontend/src/roles/admin/pages/Admin.tsx").read_text()
-    academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_academy_source = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
+    admin_source = Path("frontend/src/internal_operations/pages/InternalOperations.tsx").read_text()
+    academy_source = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
+    hod_academy_source = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
     app_source = Path("frontend/src/app/App.tsx").read_text()
     bootstrap_source = Path("frontend/src/shared/lib/bootstrap.ts").read_text()
-    stale_state_source = Path("frontend/src/shared/lib/staleUiState.ts").read_text()
-    admin_state_source = Path("frontend/src/roles/admin/hooks/useAdminState.ts").read_text()
-    admin_page_source = Path("backend/pages/admin/home.py").read_text()
+    admin_page_source = Path("backend/internal_operations/page.py").read_text()
 
     assert "Academic Director navigation" in source
     assert "Academic Director mobile navigation" in source
-    assert "Head of Department navigation" in source
-    assert "Head of Department mobile navigation" in source
+    assert "Head of Departments navigation" in source
+    assert "Head of Departments mobile navigation" in source
     # Nav item definitions moved to the pure academicNav.ts config so they can
     # run under node --test; the shell attaches icons and renders them.
     assert 'label: "Overview"' in nav_source
@@ -453,11 +451,11 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'academicDirectorAnnouncements: "/academic-director/announcements"' in routes_source
     assert 'academicDirectorProfile: "/academic-director/profile"' in routes_source
     assert "academicDirectorProfileSection" not in routes_source
-    assert 'headOfDepartmentOverview: "/head-of-department"' in routes_source
-    assert 'headOfDepartmentTeacherAcademy: "/head-of-department/teacher-academy"' in routes_source
-    assert 'headOfDepartmentTimetable: "/head-of-department/timetable"' in routes_source
-    assert 'headOfDepartmentAnnouncements: "/head-of-department/announcements"' in routes_source
-    assert 'headOfDepartmentProfile: "/head-of-department/profile"' in routes_source
+    assert 'headOfDepartmentOverview: "/head-of-departments"' in routes_source
+    assert 'headOfDepartmentTeacherAcademy: "/head-of-departments/teacher-academy"' in routes_source
+    assert 'headOfDepartmentTimetable: "/head-of-departments/timetable"' in routes_source
+    assert 'headOfDepartmentAnnouncements: "/head-of-departments/announcements"' in routes_source
+    assert 'headOfDepartmentProfile: "/head-of-departments/profile"' in routes_source
     assert "headOfDepartmentProfileSection" not in routes_source
     assert "href: routes.academicDirectorTeacherAcademy" in nav_source
     assert "href: routes.academicDirectorHeadOfDepartments" in nav_source
@@ -476,18 +474,18 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert "headOfDepartmentActiveNavFromPath" in source
     assert 'mobileNavItemsFrom(academicDirectorNavConfig, ["departments", "subjects", "announcements"])' in nav_source
     assert "pointer-events-none" not in source
-    assert "AdminSidebar" not in source
+    assert "InternalOperationsSidebar" not in source
     assert "action={routes.logout}" in source
     assert 'name="csrf_token"' in source
     assert "AcademicDirectorMobileNav active=\"academy\"" not in admin_source
-    assert "AdminSidebar" not in academy_source
+    assert "InternalOperationsSidebar" not in academy_source
     assert "AcademicDirectorPageShell" in academy_source
     assert 'active="academy"' in academy_source
     assert "HeadOfDepartmentPageShell" in hod_academy_source
     assert 'active="academy"' in hod_academy_source
     assert "allowTeacherPreview={false}" in academy_source
     assert "if (!allowTeacherPreview)" in Path(
-        "frontend/src/roles/admin/panels/teachers/TeacherAcademyPanel.tsx"
+        "frontend/src/features/management/teachers/TeacherAcademyPanel.tsx"
     ).read_text()
     assert '"academic-director-academy"' in app_source
     assert '"academic-director-head-of-departments"' in app_source
@@ -495,55 +493,38 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert '"academic-director-subjects"' in app_source
     assert '"academic-director-timetable"' in app_source
     assert '"academic-director-announcements"' in app_source
-    assert '"head-of-department-home"' in app_source
-    assert '"head-of-department-academy"' in app_source
-    assert '"head-of-department-timetable"' in app_source
-    assert '"head-of-department-announcements"' in app_source
+    assert '"head-of-departments-home"' in app_source
+    assert '"head-of-departments-academy"' in app_source
+    assert '"head-of-departments-timetable"' in app_source
+    assert '"head-of-departments-announcements"' in app_source
     assert '"academic-director-academy"' in bootstrap_source
     assert '"academic-director-head-of-departments"' in bootstrap_source
     assert '"academic-director-groups"' in bootstrap_source
     assert '"academic-director-subjects"' in bootstrap_source
     assert '"academic-director-timetable"' in bootstrap_source
     assert '"academic-director-announcements"' in bootstrap_source
-    assert '"head-of-department-home"' in bootstrap_source
-    assert '"head-of-department-academy"' in bootstrap_source
-    assert '"head-of-department-timetable"' in bootstrap_source
-    assert '"head-of-department-announcements"' in bootstrap_source
-    assert "clearStaleRolePreviewStorage(" in app_source
-    assert "bootstrap.props.authRole || bootstrap.props.role || bootstrap.props.adminMode" in app_source
-    for key in [
-        "devPreviewRole",
-        "msi_admin_mode",
-        "msi_teacher_preview_key",
-        "msi_teacher_preview_id",
-    ]:
-        assert key in stale_state_source
-    assert "canUseAdminPreviewForRole" in admin_state_source
-    assert "Boolean(props.devPreviewEnabled) && canUseAdminPreviewForRole(realRole)" in admin_state_source
-    assert "clearRolePreviewStorage()" in admin_state_source
-    assert "modeParam && allowPreviewMode" in admin_state_source
-    assert "urlAdminMode() || storedAdminMode()" in admin_state_source
-    assert 'buildAdminTabUrl(nextTab, currentSchool, allowPreviewMode ? adminMode : "")' in admin_state_source
-    assert 'buildAdminTabUrl(fallbackTab, currentSchool, allowPreviewMode ? adminMode : "")' in admin_state_source
-    assert 'preview_enabled = current_auth_role() == "admin" and _dev_preview_enabled()' in admin_page_source
-    # Preview gating lives entirely in useAdminState; Admin.tsx just consumes
-    # the resolved state and must not re-derive it.
-    assert "canUseAdminPreviewForRole" not in admin_source
+    assert '"head-of-departments-home"' in bootstrap_source
+    assert '"head-of-departments-academy"' in bootstrap_source
+    assert '"head-of-departments-timetable"' in bootstrap_source
+    assert '"head-of-departments-announcements"' in bootstrap_source
+    assert '"previewRole"' not in admin_page_source
+    assert '"devPreviewEnabled"' not in admin_page_source
+    assert 'resolved_admin_mode = "admin"' in admin_page_source
 
 
 def test_academic_director_academy_uses_single_shell_source():
     server_source = Path("backend/server.py").read_text()
-    registry_source = Path("backend/api/v1/registry.py").read_text()
-    route_source = Path("backend/pages/academics/director.py").read_text()
-    hod_route_source = Path("backend/pages/academics/hod.py").read_text()
-    academy_source = Path("frontend/src/roles/academic_director/pages/TeacherAcademy.tsx").read_text()
-    hod_academy_source = Path("frontend/src/roles/head_of_department/pages/TeacherAcademy.tsx").read_text()
+    registry_source = Path("backend/application/registry.py").read_text()
+    route_source = Path("backend/workspaces/academic_director/page.py").read_text()
+    hod_route_source = Path("backend/workspaces/head_of_departments/page.py").read_text()
+    academy_source = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
+    hod_academy_source = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
 
     assert "register_academic_director_page_routes(app, render_admin_page" not in registry_source
     assert "register_head_of_department_page_routes(app, render_admin_page" not in registry_source
     assert "register_academic_director_page_routes(app)" in registry_source
     assert "register_head_of_department_page_routes(app)" in registry_source
-    assert "register_module_pages(app_instance)" in server_source
+    assert "register_application_pages(app_instance)" in server_source
     assert "def register_academic_director_page_routes(app):" in route_source
     assert "def register_head_of_department_page_routes(app):" in hod_route_source
     assert "render_admin_page" not in route_source
@@ -553,14 +534,14 @@ def test_academic_director_academy_uses_single_shell_source():
     assert "devPreviewEnabled" not in route_source
     assert "devPreviewEnabled" not in hod_route_source
     assert '"academic-director-academy"' in route_source
-    assert '"admin-home"' not in route_source
+    assert '"internal-operations-home"' not in route_source
     assert academy_source.count("AcademicDirectorPageShell") >= 1
-    assert "AdminSidebar" not in academy_source
+    assert "InternalOperationsSidebar" not in academy_source
     assert "AcademicDirectorSidebar" not in academy_source
     assert "AcademicDirectorMobileNav" not in academy_source
     assert "TeacherAcademyPanel" in academy_source
     assert "HeadOfDepartmentPageShell" in hod_academy_source
-    assert "AdminSidebar" not in hod_academy_source
+    assert "InternalOperationsSidebar" not in hod_academy_source
     assert "HeadOfDepartmentSidebar" not in hod_academy_source
     assert "HeadOfDepartmentMobileNav" not in hod_academy_source
     assert "TeacherAcademyPanel" in hod_academy_source
@@ -585,14 +566,13 @@ def test_academic_director_critical_routes_remain_registered(app):
         ("POST", "/api/v1/academic-director/academic/groups"),
         ("POST", "/api/v1/academic-director/academic/schools"),
         ("POST", "/api/v1/academic-director/academic/schedules"),
-        ("GET", "/head-of-department"),
-        ("GET", "/head-of-department/teacher-academy"),
-        ("GET", "/head-of-department/timetable"),
-        ("GET", "/head-of-department/announcements"),
-        ("GET", "/head-of-department/profile"),
+        ("GET", "/head-of-departments"),
+        ("GET", "/head-of-departments/teacher-academy"),
+        ("GET", "/head-of-departments/timetable"),
+        ("GET", "/head-of-departments/announcements"),
+        ("GET", "/head-of-departments/profile"),
         ("POST", "/logout"),
         ("GET", "/admin"),
-        ("GET", "/teacher"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ]:
