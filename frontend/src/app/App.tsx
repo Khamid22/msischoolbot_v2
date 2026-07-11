@@ -1,5 +1,5 @@
-import { Component, Suspense, lazy, useEffect, type ComponentType } from "react";
-import { readBootstrap } from "@/shared/lib/bootstrap";
+import { Component, Suspense, lazy, useEffect, useState, type ComponentType } from "react";
+import { parseBootstrapDocument, readBootstrap, type ReactBootstrap } from "@/shared/lib/bootstrap";
 import { clearStaleRolePreviewStorage } from "@/shared/lib/staleUiState";
 import { getTelegramStartParam, initTelegramViewport } from "@/shared/lib/telegram";
 
@@ -37,9 +37,10 @@ const pageMap = {
   "student-not-found": lazy(() => import("@/workspaces/student/pages/StudentNotFound")),
 } as const;
 
-const ResolvedPage = (pageMap[bootstrap.page] || pageMap["student-not-found"]) as ComponentType<
-  Record<string, unknown>
->;
+function isWorkspacePath(pathname: string) {
+  return pathname === "/academic-director" || pathname.startsWith("/academic-director/") ||
+    pathname === "/head-of-departments" || pathname.startsWith("/head-of-departments/");
+}
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -109,6 +110,8 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
 }
 
 const App = () => {
+  const [currentBootstrap, setCurrentBootstrap] = useState<ReactBootstrap>(bootstrap);
+
   useEffect(() => {
     initTelegramViewport();
     clearStaleRolePreviewStorage(
@@ -139,7 +142,61 @@ const App = () => {
     }
   }, []);
 
-  useStudentActivityHeartbeat(bootstrap.page, bootstrap.props);
+  useEffect(() => {
+    if (!isWorkspacePath(window.location.pathname)) return;
+    let navigationId = 0;
+
+    const loadPage = async (url: URL, push: boolean) => {
+      const requestId = ++navigationId;
+      try {
+        const response = await fetch(url, {
+          credentials: "same-origin",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (!response.ok || response.redirected) {
+          window.location.assign(response.url || url.href);
+          return;
+        }
+        const source = await response.text();
+        const nextBootstrap = parseBootstrapDocument(source);
+        if (!nextBootstrap || requestId !== navigationId) {
+          if (!nextBootstrap) window.location.assign(url.href);
+          return;
+        }
+        if (push) window.history.pushState({}, "", url);
+        window.__MSI_BOOTSTRAP__ = nextBootstrap;
+        setCurrentBootstrap(nextBootstrap);
+        window.scrollTo({ top: 0, behavior: "auto" });
+      } catch (_error) {
+        window.location.assign(url.href);
+      }
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(target instanceof HTMLAnchorElement) || target.target || target.hasAttribute("download")) return;
+      const url = new URL(target.href, window.location.href);
+      if (url.origin !== window.location.origin || !isWorkspacePath(url.pathname)) return;
+      event.preventDefault();
+      if (url.href !== window.location.href) void loadPage(url, true);
+    };
+    const handlePopState = () => void loadPage(new URL(window.location.href), false);
+
+    document.addEventListener("click", handleClick);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      navigationId += 1;
+      document.removeEventListener("click", handleClick);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useStudentActivityHeartbeat(currentBootstrap.page, currentBootstrap.props);
+
+  const ResolvedPage = (pageMap[currentBootstrap.page] || pageMap["student-not-found"]) as ComponentType<
+    Record<string, unknown>
+  >;
 
   return (
     <AppErrorBoundary>
@@ -152,7 +209,7 @@ const App = () => {
           </div>
         }
       >
-        <ResolvedPage {...bootstrap.props} />
+        <ResolvedPage {...currentBootstrap.props} />
       </Suspense>
     </AppErrorBoundary>
   );

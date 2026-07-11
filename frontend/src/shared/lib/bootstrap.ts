@@ -91,7 +91,7 @@ function inferPageFromPath(pathname: string): ReactPageName | null {
   return null;
 }
 
-function normalizePageName(page: unknown): ReactPageName | null {
+export function normalizePageName(page: unknown): ReactPageName | null {
   const rawPage = typeof page === "string" ? page.trim() : "";
   if (!rawPage) {
     return null;
@@ -120,6 +120,22 @@ function normalizePageName(page: unknown): ReactPageName | null {
   };
 
   return aliases[rawPage] || null;
+}
+
+export function parseBootstrapDocument(source: string): ReactBootstrap | null {
+  const documentNode = new DOMParser().parseFromString(source, "text/html");
+  const bootstrapNode = documentNode.getElementById("msi-react-bootstrap");
+  if (!bootstrapNode) return null;
+
+  try {
+    const parsed = JSON.parse(bootstrapNode.textContent || "");
+    if (!parsed || typeof parsed !== "object") return null;
+    const page = normalizePageName((parsed as ReactBootstrap).page);
+    if (!page) return null;
+    return { page, props: (parsed as ReactBootstrap).props || {} };
+  } catch (_error) {
+    return null;
+  }
 }
 
 declare global {
