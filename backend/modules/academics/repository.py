@@ -125,7 +125,7 @@ def list_class_rows(conn):
         JOIN msi_v2.schools s ON s.id = c.school_id
         LEFT JOIN msi_v2.groups g ON g.class_id = c.id
         LEFT JOIN msi_v2.class_students cs ON cs.class_id = c.id
-        GROUP BY c.id, s.school_key
+        GROUP BY c.id, s.school_key, s.school_name
         ORDER BY s.school_name, c.class_name
         """
     ).fetchall()
