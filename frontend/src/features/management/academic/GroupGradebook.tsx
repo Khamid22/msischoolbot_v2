@@ -11,6 +11,7 @@ import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL
 import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./Timetable";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
+import { lessonDurationMinutesForSchoolCode } from "./scheduleMath";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
@@ -104,7 +105,6 @@ export function GroupGradebook({
   });
   const [moveGroupId, setMoveGroupId] = useState("");
   const [moveSaving, setMoveSaving] = useState(false);
-  const [lessonDateSavingId, setLessonDateSavingId] = useState<number | null>(null);
   const [activeExam, setActiveExam] = useState<ActiveExamCell | null>(null);
   const [examInput, setExamInput] = useState("");
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
@@ -115,8 +115,9 @@ export function GroupGradebook({
   const [setupError, setSetupError] = useState("");
   const [setupForm, setSetupForm] = useState({
     teacherId: "", startDate: "", weekdays: [0, 2], startTime: "14:00",
-    duration: "90", predictedEndDate: "", room: "", onlineUrl: "",
+    room: "", changeScope: "", effectiveDate: "",
   });
+  const [scheduleRows, setScheduleRows] = useState(schedules);
   const [setupInitial, setSetupInitial] = useState("");
   const [hasSavedSetup, setHasSavedSetup] = useState(false);
   const { toast: setupToast, showToast: showSetupToast } = useFloatingToast();
@@ -207,17 +208,12 @@ export function GroupGradebook({
   }
 
   function openGroupSetup() {
-    const existing = schedules.find((row) => asNumber(row.group_id) === groupId && asString(row.status) !== "cancelled");
+    const existing = scheduleRows.find((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active");
     const start = asString(existing?.start_time) || "14:00";
-    const end = asString(existing?.end_time);
-    const [sh, sm] = start.split(":").map(Number);
-    const [eh, em] = end.split(":").map(Number);
-    const duration = end && Number.isFinite(sh + sm + eh + em) ? String((eh * 60 + em) - (sh * 60 + sm)) : "90";
     const next = {
       teacherId: asString(existing?.teacher_id), startDate: dateInput(existing?.start_date),
       weekdays: asString(existing?.weekdays).split(",").map(Number).filter((day) => day >= 0 && day <= 6),
-      startTime: start, duration, predictedEndDate: dateInput(existing?.end_date),
-      room: asString(existing?.room), onlineUrl: asString(existing?.online_url),
+      startTime: start, room: asString(existing?.room), changeScope: "", effectiveDate: "",
     };
     if (!next.weekdays.length) next.weekdays = [0, 2];
     setSetupForm(next);
@@ -247,13 +243,12 @@ export function GroupGradebook({
           group_id: groupId,
           teacher_id: Number(setupForm.teacherId || 0),
           weekdays: setupForm.weekdays,
-          start_time: setupForm.startTime,
-          lesson_duration_minutes: Number(setupForm.duration),
-          start_date: setupForm.startDate,
-          predicted_end_date: setupForm.predictedEndDate,
+          lesson_time: setupForm.startTime,
+          lesson_duration_minutes: lessonDurationMinutesForSchoolCode(data?.group.schoolCode),
+          course_launch_date: setupForm.startDate,
           room: setupForm.room,
-          online_url: setupForm.onlineUrl,
-          title: "Regular class",
+          change_scope: setupForm.changeScope,
+          effective_date: setupForm.effectiveDate,
         }),
       });
       const json = await response.json();
@@ -262,16 +257,14 @@ export function GroupGradebook({
         return;
       }
       const result = apiData<{ schedule?: Record<string, unknown> }>(json).schedule || {};
-      setSetupForm((current) => ({
-        ...current,
-        predictedEndDate: asString(result.predictedEndDate) || current.predictedEndDate,
-      }));
-      setSetupSuccess("Group details saved. Timetable sessions were generated.");
-      setSetupInitial(JSON.stringify({ ...setupForm, predictedEndDate: asString(result.predictedEndDate) || setupForm.predictedEndDate }));
+      const responseData = apiData<{ schedule?: Record<string, unknown>; schedules?: Array<Record<string, unknown>> }>(json);
+      setSetupSuccess(`${asNumber(result.affectedLessonCount)} lessons scheduled.`);
+      setSetupInitial(JSON.stringify(setupForm));
+      if (Array.isArray(responseData.schedules)) setScheduleRows(responseData.schedules);
       setHasSavedSetup(true);
       await load(groupId);
       setSetupOpen(false);
-      showSetupToast("Group details saved.");
+      showSetupToast(`${asNumber(result.affectedLessonCount)} lessons scheduled.`);
     } catch {
       setSetupError("Network error while saving group setup.");
     } finally {
@@ -565,52 +558,6 @@ export function GroupGradebook({
       return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year.slice(-2)}`;
     }
     return text;
-  }
-
-  async function editLessonDate(lesson: Lesson) {
-    if (lessonDateSavingId) return;
-    const current = lessonDateToInputValue(lesson.date);
-    const next = window.prompt("Conducted date (YYYY-MM-DD). Leave empty to clear.", current);
-    if (next === null) return;
-    const trimmed = next.trim();
-    if (trimmed && !/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      setError("Use YYYY-MM-DD for lesson dates.");
-      return;
-    }
-    setLessonDateSavingId(lesson.id);
-    setError("");
-    try {
-      const res = await fetch(academicRoutes.adminAcademicLessonApi(lesson.id), {
-        method: "PATCH",
-        headers: jsonCsrfHeaders(csrf),
-        body: JSON.stringify({ lesson_date: trimmed }),
-      });
-      const json = await res.json();
-      if (!apiSucceeded(res, json)) {
-        setError(apiErrorMessage(json, "Unable to update lesson date."));
-        return;
-      }
-      const updated = apiData<{ lesson?: Partial<Lesson> }>(json).lesson || {};
-      setData((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          lessons: prev.lessons.map((item) =>
-            item.id === lesson.id
-              ? {
-                  ...item,
-                  date: asString(updated.date),
-                  status: asString(updated.status) || item.status,
-                }
-              : item,
-          ),
-        };
-      });
-    } catch {
-      setError("Network error while updating the lesson date.");
-    } finally {
-      setLessonDateSavingId(null);
-    }
   }
 
   function patchLessonSchedule(lessonId: number, patch: Partial<Lesson>) {
@@ -912,12 +859,6 @@ export function GroupGradebook({
             </span>
           </div>
         </div>
-        {data ? (
-          <button type="button" onClick={openGroupSetup} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <Settings className="h-4 w-4" />
-            {hasSavedSetup || schedules.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? "Edit Setup" : "Complete Setup"}
-          </button>
-        ) : null}
       </div>
 
       {error ? (
@@ -1027,20 +968,15 @@ export function GroupGradebook({
                           title={`${lesson.lessonNumber} - ${lesson.topic}`}
                           className="flex min-h-[6.25rem] w-full flex-col items-center justify-start px-2.5 py-2"
                         >
-                          <button
-                            type="button"
-                            disabled={lessonDateSavingId === lesson.id}
-                            onClick={() => editLessonDate(lesson)}
-                            className={`inline-flex max-w-full items-center justify-center gap-1 rounded-md border border-transparent px-1.5 py-0.5 text-[10px] font-bold leading-tight transition-colors hover:border-foreground/10 hover:bg-foreground/5 disabled:opacity-60 ${
+                          <span
+                            className={`inline-flex max-w-full items-center justify-center gap-1 px-1.5 py-0.5 text-[10px] font-bold leading-tight ${
                               isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"
                             }`}
-                            title="Change conducted lesson date"
+                            title="Date supplied by the timetable"
                           >
                             <CalendarDays className="h-2.5 w-2.5 shrink-0" />
-                            <span className="whitespace-nowrap">
-                              {lessonDateSavingId === lesson.id ? "Saving..." : formatGradebookDate(lesson.date) || "Set date"}
-                            </span>
-                          </button>
+                            <span className="whitespace-nowrap">{formatGradebookDate(lesson.date) || "Unscheduled"}</span>
+                          </span>
                           <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>
                             {lesson.lessonNumber}
                           </span>
@@ -1470,46 +1406,52 @@ export function GroupGradebook({
       )}
 
       {data && activeView === "timetable" && (
-        <TimetableCard
-          groups={timetableGroups}
-          isLessonCancelled={isCancelledLesson}
-          onOpenTime={openTimeEdit}
-          onOpenRoom={openRoomEdit}
-        />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/8 bg-surface px-4 py-3 shadow-card">
+            <div><h3 className="text-sm font-bold">Lesson Timetable</h3><p className="text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
+            <button type="button" onClick={openGroupSetup} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              <Settings className="h-4 w-4" />
+              {hasSavedSetup || scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? "Change Schedule" : "Set Up Timetable"}
+            </button>
+          </div>
+          {timetableGroups.length ? (
+            <TimetableCard groups={timetableGroups} isLessonCancelled={isCancelledLesson} onOpenTime={openTimeEdit} onOpenRoom={openRoomEdit} />
+          ) : (
+            <div className="rounded-xl border border-dashed border-foreground/15 bg-surface px-6 py-16 text-center">
+              <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
+              <p className="mt-3 text-sm font-bold">Timetable not configured</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">Set the launch date, teaching days, and lesson time to place every program lesson automatically.</p>
+              <button type="button" onClick={openGroupSetup} className="mt-4 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Set Up Timetable</button>
+            </div>
+          )}
+        </div>
       )}
 
-      <Modal open={setupOpen} onClose={closeGroupSetup} title="Group Setup" subtitle="Configure the teacher and recurring lesson schedule." size="lg" mobileMode="fullscreen" closeOnOutsideClick={!setupSaving} closeOnEscape={!setupSaving}>
+      <Modal open={setupOpen} onClose={closeGroupSetup} title={<span className="inline-flex items-center gap-2"><Settings className="h-5 w-5 text-primary" />Group Timetable</span>} subtitle="Set when and where this group studies." size="lg" mobileMode="sheet" closeOnOutsideClick={!setupSaving} closeOnEscape={!setupSaving} panelClassName="sm:h-auto">
         <form onSubmit={saveGroupSetup} className="flex min-h-0 flex-1 flex-col">
           <ModalBody className="space-y-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Settings className="h-5 w-5" /></span>
-            <div><h3 className="text-base font-bold">Group Setup</h3><p className="text-xs text-muted-foreground">Configure the teacher and recurring lesson schedule for this subject group.</p></div>
-          </div>
           {setupSuccess ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{setupSuccess}</p> : null}
           {setupError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{setupError}</p> : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">School</span><input readOnly value={asString(data?.group.schoolCode)} className="h-10 w-full rounded-lg border border-foreground/10 bg-muted px-3 text-sm font-semibold text-muted-foreground" /></label>
           <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Teacher</span>
             <Select value={setupForm.teacherId} onChange={(event) => updateSetupField("teacherId", event.target.value)}>
               <option value="">No teacher yet</option>
               {teachers.map((teacher) => <option key={asNumber(teacher.id)} value={asString(teacher.id)}>{asString(teacher.full_name)}</option>)}
             </Select>
           </label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Start Date</span><input type="date" required value={setupForm.startDate} onChange={(event) => updateSetupField("startDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Start Time</span><input type="time" required value={setupForm.startTime} onChange={(event) => updateSetupField("startTime", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
-          </div>
-          <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Days of the week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[11px] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson Duration</span><Select value={setupForm.duration} onChange={(event) => updateSetupField("duration", event.target.value)}>{[45, 60, 75, 90, 120].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</Select></label>
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Predicted End Date</span><input type="date" value={setupForm.predictedEndDate} onChange={(event) => updateSetupField("predictedEndDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /><span className="mt-1 block text-[11px] text-muted-foreground">Leave blank to calculate it from the scheme of work.</span></label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
-            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Online Link</span><input type="url" value={setupForm.onlineUrl} onChange={(event) => updateSetupField("onlineUrl", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="https://..." /></label>
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Course Launch Date</span><input type="date" required value={setupForm.startDate} onChange={(event) => updateSetupField("startDate", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
+            <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson Time</span><input type="time" required value={setupForm.startTime} onChange={(event) => updateSetupField("startTime", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label>
           </div>
+          <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Lesson Days · {setupForm.weekdays.length} per week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[11px] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
+          <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
+          {scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? <fieldset className="space-y-2 rounded-lg border border-foreground/10 bg-muted/30 p-3"><legend className="px-1 text-xs font-bold uppercase text-muted-foreground">Apply this change to</legend>{[["all","All lesson dates"],["from_date","Lessons from a specific date"],["remaining","Remaining scheduled lessons"]].map(([value,label]) => <label key={value} className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="changeScope" checked={setupForm.changeScope===value} onChange={() => updateSetupField("changeScope",value)} />{label}</label>)}{setupForm.changeScope==="from_date" ? <input type="date" required value={setupForm.effectiveDate} onChange={(event) => updateSetupField("effectiveDate",event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /> : null}</fieldset> : null}
           </ModalBody>
           <ModalFooter className="flex justify-end gap-2">
             <button type="button" onClick={closeGroupSetup} disabled={setupSaving} className="min-h-11 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">Cancel</button>
-            <button type="submit" disabled={setupSaving || !setupForm.startDate || !setupForm.startTime || setupForm.weekdays.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Group Details"}</button>
+            <button type="submit" disabled={setupSaving || !setupForm.startDate || !setupForm.startTime || setupForm.weekdays.length === 0 || (scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") && !setupForm.changeScope)} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Timetable"}</button>
           </ModalFooter>
         </form>
       </Modal>

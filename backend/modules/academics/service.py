@@ -600,3 +600,90 @@ def create_schedule(
         "endDateWasPredicted": predicted,
         "sessionIds": [session_id for session_id in session_ids if session_id],
     }
+
+
+def schedule_group_curriculum(
+    group_id, *, teacher_id=0, course_launch_date="", weekdays=None,
+    lesson_time="", lesson_duration_minutes=80, room="", change_scope="", effective_date="",
+):
+    """Version a group timetable and assign dates to its existing curriculum lessons."""
+    group_id = int(group_id or 0)
+    weekdays = _normalize_weekdays(weekdays)
+    launch_date = _parse_date_input(course_launch_date, "Course launch date")
+    start_minutes = _time_to_minutes(lesson_time, "Lesson time")
+    duration = int(lesson_duration_minutes or 0)
+    if duration < 15 or duration > 240 or start_minutes + duration >= 24 * 60:
+        raise ValueError("The school lesson duration produces an invalid lesson time.")
+    end_minutes = start_minutes + duration
+    end_time = f"{end_minutes // 60:02d}:{end_minutes % 60:02d}"
+    start_time_obj = _parse_time(lesson_time, "Lesson time")
+    end_time_obj = _parse_time(end_time, "End time")
+    scope = str(change_scope or "").strip().casefold()
+    if scope and scope not in {"all", "from_date", "remaining"}:
+        raise ValueError("Unsupported timetable change scope.")
+    effective = _parse_date_input(effective_date, "Effective date") if scope == "from_date" else None
+
+    with _connect() as conn:
+        group = _resolve_group(conn, group_id)
+        if not group:
+            raise ValueError("Group was not found.")
+        v2_group_id = int(group["id"])
+        teacher_v2_id = _resolve_teacher_id(conn, teacher_id)
+        timetable_repository.ensure_curriculum_lesson_sessions(conn, v2_group_id)
+        all_lessons = list(timetable_repository.list_curriculum_lesson_sessions(conn, v2_group_id))
+        if not all_lessons:
+            raise ValueError("The subject program has no lessons to schedule.")
+        existing = timetable_repository.get_active_group_schedule(conn, v2_group_id)
+        if existing and not scope:
+            raise ValueError("Choose how this timetable change should apply to existing lessons.")
+        if scope == "from_date":
+            selected = [row for row in all_lessons if row["session_date"] is None or row["session_date"] >= effective]
+            anchor = effective
+        elif scope == "remaining":
+            selected = [row for row in all_lessons if str(row["status"] or "").casefold() == "scheduled"]
+            anchor = launch_date
+        else:
+            selected = all_lessons
+            anchor = launch_date
+        if not selected:
+            raise ValueError("No lessons match the selected timetable change scope.")
+
+        dates = []
+        cursor = anchor
+        wanted = set(weekdays)
+        while len(dates) < len(selected):
+            if cursor.weekday() in wanted:
+                dates.append(cursor)
+            cursor += timedelta(days=1)
+        final_date = dates[-1]
+        existing_id = int(existing["id"]) if existing else 0
+        conflict = _schedule_conflict_message(
+            conn, group_v2_id=v2_group_id, teacher_v2_id=teacher_v2_id,
+            weekdays=weekdays, start_date=anchor, end_date=final_date,
+            start_time=lesson_time, end_time=end_time, exclude_schedule_id=existing_id,
+        )
+        if conflict:
+            raise ValueError(conflict)
+        inserted = timetable_repository.insert_schedule_rule(
+            conn, group_v2_id=v2_group_id, teacher_v2_id=teacher_v2_id,
+            title="Regular class", weekdays_text=",".join(str(day) for day in weekdays),
+            start_time=start_time_obj, end_time=end_time_obj, start_date=launch_date,
+            end_date=final_date, room=str(room or "").strip(), online_url="",
+        )
+        schedule_id = int(inserted["id"])
+        for lesson, session_date in zip(selected, dates):
+            timetable_repository.schedule_curriculum_lesson(
+                conn, int(lesson["id"]), schedule_id=schedule_id,
+                teacher_v2_id=teacher_v2_id, session_date=session_date,
+                start_time=start_time_obj, end_time=end_time_obj,
+                room=str(room or "").strip(),
+            )
+        if existing_id:
+            timetable_repository.cancel_schedule_rule(conn, existing_id)
+        timetable_repository.delete_unrecorded_generic_group_sessions(conn, v2_group_id)
+        conn.commit()
+    return {
+        "scheduleId": schedule_id, "affectedLessonCount": len(selected),
+        "firstLessonDate": dates[0].isoformat(), "predictedEndDate": final_date.isoformat(),
+        "lessonDurationMinutes": duration, "changeScope": scope or "initial",
+    }

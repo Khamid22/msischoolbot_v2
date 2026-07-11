@@ -205,6 +205,10 @@ class AdminUpdateGroupScheduleRequest(BaseModel):
     room: str = ""
     online_url: str = ""
     title: str = "Regular class"
+    course_launch_date: str = ""
+    lesson_time: str = ""
+    change_scope: str = ""
+    effective_date: str = ""
 
 
 class AdminScheduleCreated(BaseModel):

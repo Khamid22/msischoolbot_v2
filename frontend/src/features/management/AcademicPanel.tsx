@@ -868,7 +868,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                               const studentsCount = asNumber(group.students_count);
                               const disqualifiedCount = asNumber(group.disqualified_count);
                               const isActive = studentsCount > 0;
-                              const isNewGroup = asString(group.setup_status) !== "active";
+                              const isNewGroup = asString(group.setup_status) === "new";
                               const swatch = programColor(subjectName);
                               const isDeleting = deletingGroupId === id;
                               return (

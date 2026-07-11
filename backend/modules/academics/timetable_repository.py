@@ -114,6 +114,65 @@ def delete_unrecorded_schedule_sessions(conn, schedule_id):
     )
 
 
+def ensure_curriculum_lesson_sessions(conn, group_v2_id):
+    conn.execute(
+        """INSERT INTO msi_v2.lesson_sessions (
+             group_id, program_item_id, status, source_key, source_kind,
+             source_label, source_topic, source_order, source_file, source_sheet,
+             created_at, updated_at
+           )
+           SELECT g.id, spi.id, 'scheduled', concat('curriculum:', g.id, ':', spi.id),
+                  'lesson', spi.lesson_number, spi.title, spi.item_order,
+                  spi.source_file, spi.sheet_name, now(), now()
+           FROM msi_v2.groups g
+           JOIN msi_v2.subject_program_items spi ON spi.program_id=g.program_id
+           WHERE g.id=%s AND spi.item_type='lesson'
+             AND NOT EXISTS (SELECT 1 FROM msi_v2.lesson_sessions ls
+                             WHERE ls.group_id=g.id AND ls.program_item_id=spi.id)
+           ON CONFLICT (source_key) WHERE source_key <> '' DO NOTHING""",
+        (int(group_v2_id),),
+    )
+
+
+def list_curriculum_lesson_sessions(conn, group_v2_id):
+    return conn.execute(
+        """SELECT ls.id, ls.status, ls.session_date, spi.item_order
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+           WHERE ls.group_id=%s AND spi.item_type='lesson'
+           ORDER BY spi.item_order, ls.id""",
+        (int(group_v2_id),),
+    ).fetchall()
+
+
+def schedule_curriculum_lesson(conn, lesson_session_id, *, schedule_id, teacher_v2_id,
+                               session_date, start_time, end_time, room):
+    conn.execute(
+        """UPDATE msi_v2.lesson_sessions SET schedule_rule_id=%s, teacher_id=%s,
+             session_date=%s, start_time=%s, end_time=%s, room=%s, updated_at=now()
+           WHERE id=%s""",
+        (int(schedule_id), int(teacher_v2_id) or None, session_date, start_time,
+         end_time, room, int(lesson_session_id)),
+    )
+
+
+def cancel_schedule_rule(conn, schedule_id):
+    conn.execute(
+        "UPDATE msi_v2.group_schedule_rules SET status='cancelled', updated_at=now() WHERE id=%s",
+        (int(schedule_id),),
+    )
+
+
+def delete_unrecorded_generic_group_sessions(conn, group_v2_id):
+    conn.execute(
+        """DELETE FROM msi_v2.lesson_sessions ls
+           WHERE ls.group_id=%s AND ls.program_item_id IS NULL AND ls.status='scheduled'
+             AND NOT EXISTS (SELECT 1 FROM msi_v2.attendance_records ar WHERE ar.lesson_session_id=ls.id)
+             AND NOT EXISTS (SELECT 1 FROM msi_v2.homework_scores hw WHERE hw.lesson_session_id=ls.id)""",
+        (int(group_v2_id),),
+    )
+
+
 def insert_schedule_rule(
     conn,
     *,
@@ -194,5 +253,10 @@ __all__ = [
     "get_active_group_schedule",
     "update_schedule_rule",
     "delete_unrecorded_schedule_sessions",
+    "ensure_curriculum_lesson_sessions",
+    "list_curriculum_lesson_sessions",
+    "schedule_curriculum_lesson",
+    "cancel_schedule_rule",
+    "delete_unrecorded_generic_group_sessions",
     "list_session_rows",
 ]

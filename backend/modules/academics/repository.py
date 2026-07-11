@@ -88,13 +88,16 @@ def list_group_rows(conn):
                subj.id AS subject_id, subj.subject_name AS subject_name,
                g.class_id, c.class_name, g.group_name AS name, g.group_code AS code,
                g.set_name,
+               (g.legacy_group_id IS NOT NULL AND g.legacy_group_id < 9000000000) AS is_imported,
                CASE WHEN EXISTS (
                  SELECT 1 FROM msi_v2.group_schedule_rules rule
                  WHERE rule.group_id = g.id AND rule.status = 'active'
                ) AND EXISTS (
                  SELECT 1 FROM msi_v2.group_students member
                  WHERE member.group_id = g.id AND member.enrollment_status = 'active'
-               ) THEN 'active' ELSE 'new' END AS setup_status,
+               ) THEN 'active'
+                 WHEN g.legacy_group_id IS NOT NULL AND g.legacy_group_id < 9000000000 THEN 'imported'
+                 ELSE 'new' END AS setup_status,
                count(*) FILTER (WHERE gs.enrollment_status = 'active') AS students_count,
                count(*) FILTER (WHERE gs.enrollment_status = 'disqualified') AS disqualified_count
         FROM msi_v2.groups g

@@ -12,6 +12,7 @@ from backend.modules.academics.service import (
     create_schedule,
     create_school,
     create_student_with_enrollment,
+    schedule_group_curriculum,
     create_subject,
     list_academic_admin_rows,
 )
@@ -157,18 +158,15 @@ def create_schedule_from_payload(payload):
 
 
 def upsert_group_schedule_from_payload(group_id, payload):
-    shaped = dict(payload)
-    shaped["group_id"] = group_id
-    result = create_schedule(
-        int(group_id), teacher_id=int(shaped.get("teacher_id", 0) or 0),
-        weekdays=shaped.get("weekdays", []), start_time=shaped.get("start_time", ""),
-        lesson_duration_minutes=int(shaped.get("lesson_duration_minutes", 0) or 0),
-        start_date=shaped.get("start_date", ""),
-        end_date=shaped.get("predicted_end_date", shaped.get("end_date", "")),
-        room=shaped.get("room", ""), online_url=shaped.get("online_url", ""),
-        title=shaped.get("title", "Regular class"), replace_existing=True,
+    return schedule_group_curriculum(
+        int(group_id), teacher_id=int(payload.get("teacher_id", 0) or 0),
+        course_launch_date=payload.get("course_launch_date", payload.get("start_date", "")),
+        weekdays=payload.get("weekdays", []),
+        lesson_time=payload.get("lesson_time", payload.get("start_time", "")),
+        lesson_duration_minutes=int(payload.get("lesson_duration_minutes", 80) or 80),
+        room=payload.get("room", ""), change_scope=payload.get("change_scope", ""),
+        effective_date=payload.get("effective_date", ""),
     )
-    return result
 
 
 def _now():
