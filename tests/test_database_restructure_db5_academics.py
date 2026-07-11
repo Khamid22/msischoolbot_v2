@@ -45,7 +45,7 @@ def test_academic_services_use_module_repositories():
     assert "academic_data.list_overview_enrollments" in dashboard_service_source
     assert "academic_data.get_enrollment_dashboard" in dashboard_service_source
     assert "from backend.modules.communications import announcements_repository" in announcement_service_source
-    assert "announcement_repository.list_announcement_rows" in announcement_service_source
+    assert "announcements_repository.list_announcement_rows" in announcement_service_source
 
 
 def test_internal_overview_queries_do_not_require_legacy_enrollment_ids():

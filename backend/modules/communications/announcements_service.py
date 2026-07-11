@@ -53,7 +53,7 @@ def _row_to_dict(row):
 
 def list_announcements(include_drafts=True):
     with _connect() as conn:
-        rows = announcement_repository.list_announcement_rows(conn, include_drafts=include_drafts)
+        rows = announcements_repository.list_announcement_rows(conn, include_drafts=include_drafts)
     return [_row_to_dict(row) for row in rows]
 
 
@@ -79,7 +79,7 @@ def create_announcement(
     normalized_status = _normalize_choice(status, STATUSES, "draft")
     published_at = now if normalized_status == "published" else ""
     with _connect() as conn:
-        inserted = announcement_repository.insert_announcement_row(
+        inserted = announcements_repository.insert_announcement_row(
             conn,
             title=normalized_title,
             body=normalized_body,
@@ -93,14 +93,14 @@ def create_announcement(
         )
         announcement_id = int(inserted["id"] or 0) if inserted else 0
         conn.commit()
-        row = announcement_repository.get_announcement_row(conn, announcement_id)
+        row = announcements_repository.get_announcement_row(conn, announcement_id)
     return _row_to_dict(row)
 
 
 def update_announcement(announcement_id, **values):
     now = _utc_now_iso()
     with _connect() as conn:
-        existing = announcement_repository.get_announcement_row(conn, announcement_id)
+        existing = announcements_repository.get_announcement_row(conn, announcement_id)
         if not existing:
             raise ValueError("Announcement not found.")
 
@@ -122,7 +122,7 @@ def update_announcement(announcement_id, **values):
         if status != "published":
             published_at = ""
 
-        announcement_repository.update_announcement_row(
+        announcements_repository.update_announcement_row(
             conn,
             announcement_id,
             title=title,
@@ -143,12 +143,12 @@ def update_announcement(announcement_id, **values):
             updated_at=now,
         )
         conn.commit()
-        row = announcement_repository.get_announcement_row(conn, announcement_id)
+        row = announcements_repository.get_announcement_row(conn, announcement_id)
     return _row_to_dict(row)
 
 
 def delete_announcement(announcement_id):
     with _connect() as conn:
-        cur = announcement_repository.delete_announcement_row(conn, announcement_id)
+        cur = announcements_repository.delete_announcement_row(conn, announcement_id)
         conn.commit()
     return cur.rowcount > 0
