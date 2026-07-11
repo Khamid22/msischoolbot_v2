@@ -479,6 +479,7 @@ def get_enrollment_dashboard(public_dashboard_id, school_code="", subject_name="
             "subjectCode": enrollment["subject_code"] or "",
             "schoolCode": enrollment["school_code"],
             "schoolName": _school_display_name(enrollment["school_code"]),
+            "programLessonCount": int(enrollment["program_lesson_count"] or 0),
             "coins": coins,
         }
 

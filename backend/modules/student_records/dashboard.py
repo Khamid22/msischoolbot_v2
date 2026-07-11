@@ -410,7 +410,7 @@ def build_dashboard_page_context(
     )
     program_total_lessons = extract_program_total_lessons(
         payload,
-        dataset,
+        dataset_for_subject_switch or dataset,
         current_subject_name,
         current_group_name,
     )

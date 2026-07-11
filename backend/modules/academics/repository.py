@@ -651,7 +651,8 @@ def get_enrollment_dashboard_row(
                g.group_name,
                g.group_code,
                gs.group_id,
-               gs.student_id
+               gs.student_id,
+               sp.lesson_count AS program_lesson_count
         FROM msi_v2.group_students gs
         JOIN msi_v2.students st ON st.id = gs.student_id
         JOIN msi_v2.groups g ON g.id = gs.group_id
