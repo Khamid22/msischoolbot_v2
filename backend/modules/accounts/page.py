@@ -297,11 +297,16 @@ def register_portal_routes(app):
         return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("admin"))
 
     @portal.get("/")
-    def home():
+    def home(request_obj: Request):
         role = current_auth_role()
 
         if role == "admin":
-            return redirect(dashboard_path_for_role("admin"))
+            # Keep panel/school/student params so old /?panel=... links
+            # still open the right admin console view.
+            destination = dashboard_path_for_role("admin")
+            if request_obj.url.query:
+                destination = f"{destination}?{request_obj.url.query}"
+            return redirect(destination)
 
         if role == "student":
             enrollment_id = current_student_enrollment_id()

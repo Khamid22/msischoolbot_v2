@@ -111,7 +111,7 @@ export const routes = {
   parentStudentDashboard: (studentRowId: number | string) => `/parent/dashboard/${studentRowId}`,
   adminStudentProfile: (studentRowId: number | string) => `/admin/students/${studentRowId}`,
   adminStudentPanel: (studentRowId: number | string, school = "all", panel = "student_dashboard") =>
-    `/?panel=${encodeURIComponent(String(panel || "student_dashboard"))}&school=${encodeURIComponent(String(school || "all"))}&student=${encodeURIComponent(String(studentRowId))}`,
+    `/internal/operations?panel=${encodeURIComponent(String(panel || "student_dashboard"))}&school=${encodeURIComponent(String(school || "all"))}&student=${encodeURIComponent(String(studentRowId))}`,
   adminStudentDashboard: (studentRowId: number | string, school = "all") =>
     `/admin/students/${studentRowId}/dashboard?${adminStudentQuery(school)}`,
   adminStudentDashboardTarget: (studentRowId: number | string, target: string, school = "all") =>
