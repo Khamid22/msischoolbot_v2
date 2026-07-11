@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, CalendarDays, ChevronLeft, Layers, Settings, Users, X } from "lucide-react";
+import { BookMarked, CalendarDays, ChevronLeft, Layers, Plus, Settings, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -23,6 +23,7 @@ type AcademicGradebookRoutes = Pick<
   | "adminAcademicEnrollmentGroupApi"
   | "adminAcademicLessonApi"
   | "adminAcademicGroupSchedule"
+  | "adminAcademicGroupStudents"
 >;
 
 type CompactTooltipItem = {
@@ -118,6 +119,11 @@ export function GroupGradebook({
     room: "", changeScope: "", effectiveDate: "",
   });
   const [scheduleRows, setScheduleRows] = useState(schedules);
+  const [studentOpen, setStudentOpen] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentSaving, setStudentSaving] = useState(false);
+  const [studentError, setStudentError] = useState("");
+  const [createdStudent, setCreatedStudent] = useState<Record<string, unknown> | null>(null);
   const [setupInitial, setSetupInitial] = useState("");
   const [hasSavedSetup, setHasSavedSetup] = useState(false);
   const { toast: setupToast, showToast: showSetupToast } = useFloatingToast();
@@ -209,9 +215,11 @@ export function GroupGradebook({
 
   function openGroupSetup() {
     const existing = scheduleRows.find((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active");
-    const start = asString(existing?.start_time) || "14:00";
+    const scheduledLessons = (data?.lessons || []).filter((lesson) => Boolean(lesson.date));
+    const firstLesson = [...scheduledLessons].sort((left, right) => asString(left.date).localeCompare(asString(right.date)))[0];
+    const start = asString(existing?.start_time) || asString(firstLesson?.startTime) || "14:00";
     const next = {
-      teacherId: asString(existing?.teacher_id), startDate: dateInput(existing?.start_date),
+      teacherId: asString(existing?.teacher_id), startDate: dateInput(existing?.start_date) || lessonDateToInputValue(firstLesson?.date || ""),
       weekdays: asString(existing?.weekdays).split(",").map(Number).filter((day) => day >= 0 && day <= 6),
       startTime: start, room: asString(existing?.room), changeScope: "", effectiveDate: "",
     };
@@ -221,6 +229,12 @@ export function GroupGradebook({
     setSetupSuccess("");
     setSetupError("");
     setSetupOpen(true);
+  }
+
+  function hasExistingTimetable() {
+    return hasSavedSetup
+      || scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active")
+      || Boolean(data?.lessons?.some((lesson) => Boolean(lesson.date && lesson.startTime)));
   }
 
   function closeGroupSetup() {
@@ -269,6 +283,31 @@ export function GroupGradebook({
       setSetupError("Network error while saving group setup.");
     } finally {
       setSetupSaving(false);
+    }
+  }
+
+  async function addStudent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!studentName.trim() || studentSaving) return;
+    setStudentSaving(true);
+    setStudentError("");
+    try {
+      const response = await fetch(academicRoutes.adminAcademicGroupStudents(groupId), {
+        method: "POST", headers: jsonCsrfHeaders(csrf), body: JSON.stringify({ full_name: studentName.trim() }),
+      });
+      const json = await response.json();
+      if (!apiSucceeded(response, json)) {
+        setStudentError(apiErrorMessage(json, "Unable to add student."));
+        return;
+      }
+      const student = apiData<{ student?: Record<string, unknown> }>(json).student || {};
+      setCreatedStudent(student);
+      await load(groupId);
+      showSetupToast(`${studentName.trim()} added to the group.`);
+    } catch {
+      setStudentError("Network error while adding the student.");
+    } finally {
+      setStudentSaving(false);
     }
   }
 
@@ -911,9 +950,9 @@ export function GroupGradebook({
               minHeight: "26rem",
             }}
           >
-            <div className="shrink-0 border-b border-foreground/8 px-4 py-3">
-              <p className="text-sm font-bold">Gradebook</p>
-              <p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/8 px-4 py-3">
+              <div><p className="text-sm font-bold">Gradebook</p><p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p></div>
+              <button type="button" onClick={() => { setStudentOpen(true); setStudentName(""); setStudentError(""); setCreatedStudent(null); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground"><Plus className="h-4 w-4" /> New Student</button>
             </div>
             <div className="miniapp-table-scroll min-h-0 flex-1 pb-8 [scrollbar-gutter:stable]">
               <table
@@ -1447,12 +1486,22 @@ export function GroupGradebook({
           </div>
           <fieldset><legend className="mb-1 text-xs font-bold uppercase text-muted-foreground">Lesson Days · {setupForm.weekdays.length} per week</legend><div className="grid grid-cols-7 gap-1">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, day) => <button key={label} type="button" onClick={() => toggleSetupWeekday(day)} className={`h-10 rounded-lg text-[11px] font-bold ${setupForm.weekdays.includes(day) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 2)}</button>)}</div></fieldset>
           <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
-          {scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? <fieldset className="space-y-2 rounded-lg border border-foreground/10 bg-muted/30 p-3"><legend className="px-1 text-xs font-bold uppercase text-muted-foreground">Apply this change to</legend>{[["all","All lesson dates"],["from_date","Lessons from a specific date"],["remaining","Remaining scheduled lessons"]].map(([value,label]) => <label key={value} className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="changeScope" checked={setupForm.changeScope===value} onChange={() => updateSetupField("changeScope",value)} />{label}</label>)}{setupForm.changeScope==="from_date" ? <input type="date" required value={setupForm.effectiveDate} onChange={(event) => updateSetupField("effectiveDate",event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /> : null}</fieldset> : null}
+          {hasExistingTimetable() ? <fieldset className="space-y-2 rounded-lg border border-foreground/10 bg-muted/30 p-3"><legend className="px-1 text-xs font-bold uppercase text-muted-foreground">Apply this change to</legend>{[["all","All lesson dates"],["from_date","Lessons from a specific date"],["remaining","Remaining scheduled lessons"]].map(([value,label]) => <label key={value} className="flex items-center gap-2 rounded-md p-2 text-sm font-semibold hover:bg-background"><input type="radio" name="changeScope" checked={setupForm.changeScope===value} onChange={() => updateSetupField("changeScope",value)} />{label}</label>)}{setupForm.changeScope==="from_date" ? <label className="block"><span className="mb-1 block text-xs font-bold text-muted-foreground">Effective from</span><input type="date" required value={setupForm.effectiveDate} onChange={(event) => updateSetupField("effectiveDate",event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label> : null}</fieldset> : null}
           </ModalBody>
           <ModalFooter className="flex justify-end gap-2">
             <button type="button" onClick={closeGroupSetup} disabled={setupSaving} className="min-h-11 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">Cancel</button>
-            <button type="submit" disabled={setupSaving || !setupForm.startDate || !setupForm.startTime || setupForm.weekdays.length === 0 || (scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") && !setupForm.changeScope)} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Timetable"}</button>
+            <button type="submit" disabled={setupSaving || !setupForm.startDate || !setupForm.startTime || setupForm.weekdays.length === 0 || (hasExistingTimetable() && !setupForm.changeScope)} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Timetable"}</button>
           </ModalFooter>
+        </form>
+      </Modal>
+
+      <Modal open={studentOpen} onClose={() => !studentSaving && setStudentOpen(false)} title="Add Student" subtitle={`Register a student directly in ${asString(data?.group.name)}.`} size="sm" mobileMode="sheet" closeOnOutsideClick={!studentSaving} closeOnEscape={!studentSaving}>
+        <form onSubmit={addStudent} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody className="space-y-4">
+            {studentError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{studentError}</p> : null}
+            {createdStudent ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><p className="font-bold">Student added</p><p className="mt-1 text-xs">Code: {asString(createdStudent.studentCode)}{asString(createdStudent.password) ? ` · Initial password: ${asString(createdStudent.password)}` : " · Existing account reused"}</p></div> : <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Full Name</span><input autoFocus required value={studentName} onChange={(event) => setStudentName(event.target.value)} className="h-11 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Student full name" /></label>}
+          </ModalBody>
+          <ModalFooter className="flex justify-end gap-2"><button type="button" onClick={() => setStudentOpen(false)} disabled={studentSaving} className="min-h-10 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">{createdStudent ? "Done" : "Cancel"}</button>{!createdStudent ? <button type="submit" disabled={studentSaving || !studentName.trim()} className="min-h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-50">{studentSaving ? "Adding..." : "Add Student"}</button> : null}</ModalFooter>
         </form>
       </Modal>
 

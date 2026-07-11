@@ -141,6 +141,10 @@ class AdminCreateStudentRequest(BaseModel):
     group_id: int
 
 
+class AdminCreateGroupStudentRequest(BaseModel):
+    full_name: str
+
+
 class AdminCreateAcademicSchoolRequest(BaseModel):
     school_name: str
     school_code: str = ""

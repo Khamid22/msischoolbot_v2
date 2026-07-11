@@ -22,6 +22,8 @@ from backend.internal_operations.schemas import (
     AdminScheduleCreated,
     AdminCreateAcademicClassRequest,
     AdminUpdateGroupScheduleRequest,
+    AdminCreateGroupStudentRequest,
+    AdminStudentCreated,
 )
 from backend.modules.academics.operations import (
     create_schedule_from_payload,
@@ -37,6 +39,7 @@ from backend.modules.academics.operations import (
     update_lesson_session_from_payload,
     create_class_from_payload,
     upsert_group_schedule_from_payload,
+    create_student_with_enrollment_from_payload,
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 
@@ -92,6 +95,16 @@ def upsert_group_schedule(group_id: int, payload: AdminUpdateGroupScheduleReques
     invalidate_admin_page_context_cache()
     context = list_admin_academic_context()
     return api_success({"schedule": result, "schedules": context.get("schedules", []), "sessions": context.get("sessions", []), "lessons": context.get("lessons", [])})
+
+
+@router.post("/groups/{group_id}/students", operation_id="api_v1_admin_create_group_student", response_model=ApiSuccess[AdminStudentCreated])
+def create_group_student(group_id: int, payload: AdminCreateGroupStudentRequest):
+    try:
+        student = create_student_with_enrollment_from_payload({"full_name": payload.full_name, "group_id": group_id})
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success({"student": student})
 
 
 @router.get(
