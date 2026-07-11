@@ -9,6 +9,8 @@ import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../grade
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
 import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./Timetable";
+import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
+import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
@@ -19,7 +21,7 @@ type AcademicGradebookRoutes = Pick<
   | "adminAcademicEnrollmentStatusApi"
   | "adminAcademicEnrollmentGroupApi"
   | "adminAcademicLessonApi"
-  | "adminAcademicScheduleCreate"
+  | "adminAcademicGroupSchedule"
 >;
 
 type CompactTooltipItem = {
@@ -75,6 +77,7 @@ export function GroupGradebook({
   csrf,
   groups,
   teachers,
+  schedules,
   academicRoutes = routes,
   onClose,
 }: {
@@ -82,6 +85,7 @@ export function GroupGradebook({
   csrf: string;
   groups: Array<Record<string, unknown>>;
   teachers: Array<Record<string, unknown>>;
+  schedules: Array<Record<string, unknown>>;
   academicRoutes?: AcademicGradebookRoutes;
   onClose: () => void;
 }) {
@@ -104,13 +108,18 @@ export function GroupGradebook({
   const [activeExam, setActiveExam] = useState<ActiveExamCell | null>(null);
   const [examInput, setExamInput] = useState("");
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep" | "timetable" | "setup">("gradebook");
+  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep" | "timetable">("gradebook");
+  const [setupOpen, setSetupOpen] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState("");
+  const [setupError, setSetupError] = useState("");
   const [setupForm, setSetupForm] = useState({
     teacherId: "", startDate: "", weekdays: [0, 2], startTime: "14:00",
     duration: "90", predictedEndDate: "", room: "", onlineUrl: "",
   });
+  const [setupInitial, setSetupInitial] = useState("");
+  const [hasSavedSetup, setHasSavedSetup] = useState(false);
+  const { toast: setupToast, showToast: showSetupToast } = useFloatingToast();
   const [indicatorMonth, setIndicatorMonth] = useState("all");
   const [indicatorYear, setIndicatorYear] = useState("all");
   const [examType, setExamType] = useState("all");
@@ -191,15 +200,48 @@ export function GroupGradebook({
     }));
   }
 
+  function dateInput(value: unknown) {
+    const text = asString(value);
+    const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return match ? `${match[3]}-${match[2]}-${match[1]}` : text.slice(0, 10);
+  }
+
+  function openGroupSetup() {
+    const existing = schedules.find((row) => asNumber(row.group_id) === groupId && asString(row.status) !== "cancelled");
+    const start = asString(existing?.start_time) || "14:00";
+    const end = asString(existing?.end_time);
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+    const duration = end && Number.isFinite(sh + sm + eh + em) ? String((eh * 60 + em) - (sh * 60 + sm)) : "90";
+    const next = {
+      teacherId: asString(existing?.teacher_id), startDate: dateInput(existing?.start_date),
+      weekdays: asString(existing?.weekdays).split(",").map(Number).filter((day) => day >= 0 && day <= 6),
+      startTime: start, duration, predictedEndDate: dateInput(existing?.end_date),
+      room: asString(existing?.room), onlineUrl: asString(existing?.online_url),
+    };
+    if (!next.weekdays.length) next.weekdays = [0, 2];
+    setSetupForm(next);
+    setSetupInitial(JSON.stringify(next));
+    setSetupSuccess("");
+    setSetupError("");
+    setSetupOpen(true);
+  }
+
+  function closeGroupSetup() {
+    if (setupSaving) return;
+    if (setupInitial && JSON.stringify(setupForm) !== setupInitial && !window.confirm("Discard unsaved group setup changes?")) return;
+    setSetupOpen(false);
+  }
+
   async function saveGroupSetup(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (setupSaving || setupForm.weekdays.length === 0) return;
     setSetupSaving(true);
-    setError("");
+    setSetupError("");
     setSetupSuccess("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicScheduleCreate, {
-        method: "POST",
+      const response = await fetch(academicRoutes.adminAcademicGroupSchedule(groupId), {
+        method: "PUT",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
           group_id: groupId,
@@ -208,7 +250,7 @@ export function GroupGradebook({
           start_time: setupForm.startTime,
           lesson_duration_minutes: Number(setupForm.duration),
           start_date: setupForm.startDate,
-          end_date: setupForm.predictedEndDate,
+          predicted_end_date: setupForm.predictedEndDate,
           room: setupForm.room,
           online_url: setupForm.onlineUrl,
           title: "Regular class",
@@ -216,7 +258,7 @@ export function GroupGradebook({
       });
       const json = await response.json();
       if (!apiSucceeded(response, json)) {
-        setError(apiErrorMessage(json, "Unable to save group setup."));
+        setSetupError(apiErrorMessage(json, "Unable to save group setup."));
         return;
       }
       const result = apiData<{ schedule?: Record<string, unknown> }>(json).schedule || {};
@@ -225,8 +267,13 @@ export function GroupGradebook({
         predictedEndDate: asString(result.predictedEndDate) || current.predictedEndDate,
       }));
       setSetupSuccess("Group details saved. Timetable sessions were generated.");
+      setSetupInitial(JSON.stringify({ ...setupForm, predictedEndDate: asString(result.predictedEndDate) || setupForm.predictedEndDate }));
+      setHasSavedSetup(true);
+      await load(groupId);
+      setSetupOpen(false);
+      showSetupToast("Group details saved.");
     } catch {
-      setError("Network error while saving group setup.");
+      setSetupError("Network error while saving group setup.");
     } finally {
       setSetupSaving(false);
     }
@@ -828,6 +875,7 @@ export function GroupGradebook({
   const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
   return (
     <div className={`space-y-3 ${motion.panel}`}>
+      <FloatingToast toast={setupToast} />
       {/* 1. Summary Header */}
       <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-surface px-4 py-3 shadow-card ${motion.card}`}>
         <div className="flex flex-wrap items-center gap-4">
@@ -864,6 +912,12 @@ export function GroupGradebook({
             </span>
           </div>
         </div>
+        {data ? (
+          <button type="button" onClick={openGroupSetup} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+            <Settings className="h-4 w-4" />
+            {hasSavedSetup || schedules.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? "Edit Setup" : "Complete Setup"}
+          </button>
+        ) : null}
       </div>
 
       {error ? (
@@ -875,13 +929,12 @@ export function GroupGradebook({
       {/* 2. View Switcher Buttons */}
       {data && (
         <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
-          {(["gradebook", "academic", "ep", "timetable", "setup"] as const).map((view) => {
+          {(["gradebook", "academic", "ep", "timetable"] as const).map((view) => {
             const labels: Record<string, string> = {
               gradebook: "Gradebook",
               academic: "Academic Indicators",
               ep: "Exam Performance",
               timetable: "Timetable",
-              setup: "Group Setup",
             };
             const isActive = activeView === view;
             return (
@@ -1425,13 +1478,15 @@ export function GroupGradebook({
         />
       )}
 
-      {data && activeView === "setup" && (
-        <form onSubmit={saveGroupSetup} className="max-w-3xl space-y-5 rounded-xl border border-foreground/8 bg-surface p-5 shadow-card">
+      <Modal open={setupOpen} onClose={closeGroupSetup} title="Group Setup" subtitle="Configure the teacher and recurring lesson schedule." size="lg" mobileMode="fullscreen" closeOnOutsideClick={!setupSaving} closeOnEscape={!setupSaving}>
+        <form onSubmit={saveGroupSetup} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody className="space-y-5">
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Settings className="h-5 w-5" /></span>
             <div><h3 className="text-base font-bold">Group Setup</h3><p className="text-xs text-muted-foreground">Configure the teacher and recurring lesson schedule for this subject group.</p></div>
           </div>
           {setupSuccess ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{setupSuccess}</p> : null}
+          {setupError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{setupError}</p> : null}
           <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Teacher</span>
             <Select value={setupForm.teacherId} onChange={(event) => updateSetupField("teacherId", event.target.value)}>
               <option value="">No teacher yet</option>
@@ -1451,9 +1506,13 @@ export function GroupGradebook({
             <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Room</span><input value={setupForm.room} onChange={(event) => updateSetupField("room", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="Room 2" /></label>
             <label><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Online Link</span><input type="url" value={setupForm.onlineUrl} onChange={(event) => updateSetupField("onlineUrl", event.target.value)} className="h-10 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" placeholder="https://..." /></label>
           </div>
-          <button type="submit" disabled={setupSaving || !setupForm.startDate || setupForm.weekdays.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Group Details"}</button>
+          </ModalBody>
+          <ModalFooter className="flex justify-end gap-2">
+            <button type="button" onClick={closeGroupSetup} disabled={setupSaving} className="min-h-11 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">Cancel</button>
+            <button type="submit" disabled={setupSaving || !setupForm.startDate || !setupForm.startTime || setupForm.weekdays.length === 0} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground disabled:opacity-50">{setupSaving ? "Saving..." : "Save Group Details"}</button>
+          </ModalFooter>
         </form>
-      )}
+      </Modal>
 
       {selectedStudent ? (
         <div className="fixed inset-0 z-50 bg-foreground/45 animate-in fade-in duration-150 motion-reduce:animate-none" onClick={() => setSelectedStudent(null)} role="presentation">

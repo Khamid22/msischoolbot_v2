@@ -213,9 +213,10 @@ def _generated_schedule_dates(start_date, end_date, weekdays):
 
 
 def _schedule_conflict_message(
-    conn, *, group_v2_id, teacher_v2_id, weekdays, start_date, end_date, start_time, end_time
+    conn, *, group_v2_id, teacher_v2_id, weekdays, start_date, end_date, start_time, end_time,
+    exclude_schedule_id=0,
 ):
-    rows = timetable_repository.list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id)
+    rows = timetable_repository.list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id, exclude_schedule_id)
     wanted_days = set(weekdays)
     wanted_start = _time_to_minutes(start_time, "Start time")
     wanted_end = _time_to_minutes(end_time, "End time")
@@ -483,6 +484,7 @@ def create_schedule(
     room="",
     online_url="",
     title="",
+    replace_existing=False,
 ):
     group_id = int(group_id or 0)
     weekdays = _normalize_weekdays(weekdays)
@@ -545,6 +547,8 @@ def create_schedule(
             raise ValueError("Group was not found.")
         v2_group_id = int(group["id"])
         teacher_v2_id = _resolve_teacher_id(conn, teacher_id)
+        existing_rule = timetable_repository.get_active_group_schedule(conn, v2_group_id) if replace_existing else None
+        existing_schedule_id = int(existing_rule["id"]) if existing_rule else 0
 
         conflict = _schedule_conflict_message(
             conn,
@@ -555,24 +559,21 @@ def create_schedule(
             end_date=end_date_obj,
             start_time=start_time,
             end_time=end_time,
+            exclude_schedule_id=existing_schedule_id,
         )
         if conflict:
             raise ValueError(conflict)
 
-        inserted_rule = timetable_repository.insert_schedule_rule(
-            conn,
-            group_v2_id=v2_group_id,
-            teacher_v2_id=teacher_v2_id,
-            title=title,
-            weekdays_text=weekdays_text,
-            start_time=start_time_obj,
-            end_time=end_time_obj,
-            start_date=start_date_obj,
-            end_date=end_date_obj,
-            room=room,
-            online_url=online_url,
-        )
-        schedule_id = int(inserted_rule["id"]) if inserted_rule else 0
+        rule_values = dict(teacher_v2_id=teacher_v2_id, title=title, weekdays_text=weekdays_text,
+                           start_time=start_time_obj, end_time=end_time_obj, start_date=start_date_obj,
+                           end_date=end_date_obj, room=room, online_url=online_url)
+        if existing_schedule_id:
+            timetable_repository.update_schedule_rule(conn, existing_schedule_id, **rule_values)
+            timetable_repository.delete_unrecorded_schedule_sessions(conn, existing_schedule_id)
+            schedule_id = existing_schedule_id
+        else:
+            inserted_rule = timetable_repository.insert_schedule_rule(conn, group_v2_id=v2_group_id, **rule_values)
+            schedule_id = int(inserted_rule["id"]) if inserted_rule else 0
 
         session_ids = []
         for session_date in generated_dates:

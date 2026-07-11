@@ -195,6 +195,18 @@ class AdminCreateScheduleRequest(BaseModel):
     title: str = ""
 
 
+class AdminUpdateGroupScheduleRequest(BaseModel):
+    teacher_id: int = 0
+    weekdays: list[int] = Field(default_factory=list)
+    start_time: str = ""
+    lesson_duration_minutes: int = 0
+    start_date: str = ""
+    predicted_end_date: str = ""
+    room: str = ""
+    online_url: str = ""
+    title: str = "Regular class"
+
+
 class AdminScheduleCreated(BaseModel):
     schedule: dict[str, Any]
     schedules: list[dict[str, Any]]

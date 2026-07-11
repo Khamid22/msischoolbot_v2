@@ -156,6 +156,21 @@ def create_schedule_from_payload(payload):
     return result
 
 
+def upsert_group_schedule_from_payload(group_id, payload):
+    shaped = dict(payload)
+    shaped["group_id"] = group_id
+    result = create_schedule(
+        int(group_id), teacher_id=int(shaped.get("teacher_id", 0) or 0),
+        weekdays=shaped.get("weekdays", []), start_time=shaped.get("start_time", ""),
+        lesson_duration_minutes=int(shaped.get("lesson_duration_minutes", 0) or 0),
+        start_date=shaped.get("start_date", ""),
+        end_date=shaped.get("predicted_end_date", shaped.get("end_date", "")),
+        room=shaped.get("room", ""), online_url=shaped.get("online_url", ""),
+        title=shaped.get("title", "Regular class"), replace_existing=True,
+    )
+    return result
+
+
 def _now():
     return datetime.now(UTC)
 

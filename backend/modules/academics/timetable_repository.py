@@ -58,7 +58,7 @@ def list_session_rows(conn):
     ).fetchall()
 
 
-def list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id):
+def list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id, exclude_schedule_id=0):
     return conn.execute(
         """
         SELECT sch.id, sch.group_id, sch.teacher_id, sch.weekdays,
@@ -73,9 +73,45 @@ def list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id):
         LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
         WHERE sch.status = 'active'
           AND (sch.group_id = %s OR (%s > 0 AND sch.teacher_id = %s))
+          AND sch.id <> %s
         """,
-        (int(group_v2_id), int(teacher_v2_id or 0), int(teacher_v2_id or 0)),
+        (int(group_v2_id), int(teacher_v2_id or 0), int(teacher_v2_id or 0), int(exclude_schedule_id or 0)),
     ).fetchall()
+
+
+def get_active_group_schedule(conn, group_v2_id):
+    return conn.execute(
+        """SELECT id, group_id, teacher_id, title, weekdays,
+                  to_char(start_time, 'HH24:MI') AS start_time,
+                  to_char(end_time, 'HH24:MI') AS end_time,
+                  start_date, end_date, room, online_url
+           FROM msi_v2.group_schedule_rules
+           WHERE group_id = %s AND status = 'active'
+           ORDER BY id DESC LIMIT 1""",
+        (int(group_v2_id),),
+    ).fetchone()
+
+
+def update_schedule_rule(conn, schedule_id, **values):
+    conn.execute(
+        """UPDATE msi_v2.group_schedule_rules SET
+             teacher_id=%s, title=%s, weekdays=%s, start_time=%s, end_time=%s,
+             start_date=%s, end_date=%s, room=%s, online_url=%s, updated_at=now()
+           WHERE id=%s""",
+        (values["teacher_v2_id"] or None, values["title"], values["weekdays_text"],
+         values["start_time"], values["end_time"], values["start_date"], values["end_date"],
+         values["room"], values["online_url"], int(schedule_id)),
+    )
+
+
+def delete_unrecorded_schedule_sessions(conn, schedule_id):
+    conn.execute(
+        """DELETE FROM msi_v2.lesson_sessions ls
+           WHERE ls.schedule_rule_id = %s AND ls.status = 'scheduled'
+             AND NOT EXISTS (SELECT 1 FROM msi_v2.attendance_records ar WHERE ar.lesson_session_id=ls.id)
+             AND NOT EXISTS (SELECT 1 FROM msi_v2.homework_scores hw WHERE hw.lesson_session_id=ls.id)""",
+        (int(schedule_id),),
+    )
 
 
 def insert_schedule_rule(
@@ -155,5 +191,8 @@ __all__ = [
     "insert_schedule_rule",
     "list_schedule_conflict_rows",
     "list_schedule_rows",
+    "get_active_group_schedule",
+    "update_schedule_rule",
+    "delete_unrecorded_schedule_sessions",
     "list_session_rows",
 ]

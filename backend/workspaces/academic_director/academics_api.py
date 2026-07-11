@@ -25,6 +25,7 @@ from backend.internal_operations.schemas import (
     AdminRecordExamRequest,
     AdminRecordHomeworkRequest,
     AdminScheduleCreated,
+    AdminUpdateGroupScheduleRequest,
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.operations import (
@@ -42,6 +43,7 @@ from backend.modules.academics.operations import (
     record_homework_from_payload,
     update_enrollment_status_from_payload,
     update_lesson_session_from_payload,
+    upsert_group_schedule_from_payload,
 )
 
 router = APIRouter(prefix="/academic")
@@ -122,6 +124,17 @@ def create_schedule(payload: AdminCreateScheduleRequest):
             "lessons": academic_context.get("lessons", []),
         }
     )
+
+
+@router.put("/groups/{group_id}/schedule", operation_id="api_v1_academic_director_upsert_group_schedule", response_model=ApiSuccess[AdminScheduleCreated])
+def upsert_group_schedule(group_id: int, payload: AdminUpdateGroupScheduleRequest):
+    try:
+        result = upsert_group_schedule_from_payload(group_id, _payload(payload))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    context = list_admin_academic_context()
+    return api_success({"schedule": result, "schedules": context.get("schedules", []), "sessions": context.get("sessions", []), "lessons": context.get("lessons", [])})
 
 
 @router.get(

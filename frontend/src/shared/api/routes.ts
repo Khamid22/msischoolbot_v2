@@ -22,6 +22,7 @@ export const apiRoutes = {
   academicDirectorAcademicGroupApi: (groupId: number | string) =>
     `/api/v1/academic-director/academic/groups/${groupId}`,
   academicDirectorAcademicScheduleCreate: "/api/v1/academic-director/academic/schedules",
+  academicDirectorAcademicGroupSchedule: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/schedule`,
   academicDirectorAcademicGradebookApi: (groupId: number | string) =>
     `/api/v1/academic-director/academic/gradebook?group_id=${groupId}`,
   academicDirectorAcademicAttendanceApi: "/api/v1/academic-director/academic/attendance",
