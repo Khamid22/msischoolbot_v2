@@ -104,6 +104,13 @@ def update_schedule_rule(conn, schedule_id, **values):
     )
 
 
+def update_schedule_end_date(conn, schedule_id, end_date):
+    conn.execute(
+        "UPDATE msi_v2.group_schedule_rules SET end_date=%s, updated_at=now() WHERE id=%s",
+        (end_date, int(schedule_id)),
+    )
+
+
 def delete_unrecorded_schedule_sessions(conn, schedule_id):
     conn.execute(
         """DELETE FROM msi_v2.lesson_sessions ls
@@ -153,6 +160,75 @@ def schedule_curriculum_lesson(conn, lesson_session_id, *, schedule_id, teacher_
            WHERE id=%s""",
         (int(schedule_id), int(teacher_v2_id) or None, session_date, start_time,
          end_time, room, int(lesson_session_id)),
+    )
+
+
+def get_curriculum_lesson_for_exception(conn, lesson_session_id):
+    return conn.execute(
+        """SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
+                  ls.session_date, ls.start_time, ls.end_time, ls.room,
+                  spi.item_order
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+           WHERE ls.id=%s AND spi.item_type='lesson'""",
+        (int(lesson_session_id),),
+    ).fetchone()
+
+
+def list_curriculum_lessons_from_order(conn, group_v2_id, item_order):
+    return conn.execute(
+        """SELECT ls.id, spi.item_order
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+           WHERE ls.group_id=%s AND spi.item_type='lesson' AND spi.item_order >= %s
+           ORDER BY spi.item_order, ls.id""",
+        (int(group_v2_id), int(item_order)),
+    ).fetchall()
+
+
+def list_active_lesson_exceptions(conn, group_v2_id):
+    return conn.execute(
+        """SELECT e.id, e.group_id, e.lesson_session_id, e.schedule_rule_id,
+                  e.original_session_date, e.original_start_time, e.original_end_time,
+                  e.reason, e.status
+           FROM msi_v2.lesson_schedule_exceptions e
+           WHERE e.group_id=%s AND e.status='cancelled'
+           ORDER BY e.original_session_date, e.id""",
+        (int(group_v2_id),),
+    ).fetchall()
+
+
+def get_active_lesson_exception(conn, lesson_session_id):
+    return conn.execute(
+        """SELECT id, group_id, lesson_session_id, schedule_rule_id,
+                  original_session_date, original_start_time, original_end_time, reason
+           FROM msi_v2.lesson_schedule_exceptions
+           WHERE lesson_session_id=%s AND status='cancelled'
+           ORDER BY id DESC LIMIT 1""",
+        (int(lesson_session_id),),
+    ).fetchone()
+
+
+def insert_lesson_exception(conn, lesson, reason, cancelled_by_staff_id=None):
+    return conn.execute(
+        """INSERT INTO msi_v2.lesson_schedule_exceptions (
+                  group_id, lesson_session_id, schedule_rule_id,
+                  original_session_date, original_start_time, original_end_time,
+                  reason, cancelled_by_staff_id
+              ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+              RETURNING id""",
+        (int(lesson["group_id"]), int(lesson["id"]), lesson["schedule_rule_id"],
+         lesson["session_date"], lesson["start_time"], lesson["end_time"],
+         str(reason).strip(), cancelled_by_staff_id),
+    ).fetchone()
+
+
+def recover_lesson_exception(conn, exception_id, recovered_by_staff_id=None):
+    conn.execute(
+        """UPDATE msi_v2.lesson_schedule_exceptions
+           SET status='recovered', recovered_at=now(), recovered_by_staff_id=%s, updated_at=now()
+           WHERE id=%s AND status='cancelled'""",
+        (recovered_by_staff_id, int(exception_id)),
     )
 
 
@@ -252,10 +328,17 @@ __all__ = [
     "list_schedule_rows",
     "get_active_group_schedule",
     "update_schedule_rule",
+    "update_schedule_end_date",
     "delete_unrecorded_schedule_sessions",
     "ensure_curriculum_lesson_sessions",
     "list_curriculum_lesson_sessions",
     "schedule_curriculum_lesson",
+    "get_curriculum_lesson_for_exception",
+    "list_curriculum_lessons_from_order",
+    "list_active_lesson_exceptions",
+    "get_active_lesson_exception",
+    "insert_lesson_exception",
+    "recover_lesson_exception",
     "cancel_schedule_rule",
     "delete_unrecorded_generic_group_sessions",
     "list_session_rows",

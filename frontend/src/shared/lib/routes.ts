@@ -84,6 +84,8 @@ export const routes = {
   adminAcademicHomeworkApi: "/api/v1/admin/academic/homework",
   adminAcademicExamApi: "/api/v1/admin/academic/exams",
   adminAcademicLessonApi: (lessonSessionId: number | string) => `/api/v1/admin/academic/lessons/${lessonSessionId}`,
+  adminAcademicLessonCancelApi: (lessonSessionId: number | string) => `/api/v1/admin/academic/lessons/${lessonSessionId}/cancel`,
+  adminAcademicLessonRecoverApi: (lessonSessionId: number | string) => `/api/v1/admin/academic/lessons/${lessonSessionId}/recover`,
   adminAcademicEnrollmentStatusApi: (enrollmentId: number | string) =>
     `/api/v1/admin/academic/enrollments/${enrollmentId}/status`,
   adminAcademicEnrollmentGroupApi: (enrollmentId: number | string) =>
@@ -100,6 +102,8 @@ export const routes = {
   academicDirectorAcademicHomeworkApi: apiRoutes.academicDirectorAcademicHomeworkApi,
   academicDirectorAcademicExamApi: apiRoutes.academicDirectorAcademicExamApi,
   academicDirectorAcademicLessonApi: apiRoutes.academicDirectorAcademicLessonApi,
+  academicDirectorAcademicLessonCancelApi: apiRoutes.academicDirectorAcademicLessonCancelApi,
+  academicDirectorAcademicLessonRecoverApi: apiRoutes.academicDirectorAcademicLessonRecoverApi,
   academicDirectorAcademicEnrollmentStatusApi: apiRoutes.academicDirectorAcademicEnrollmentStatusApi,
   academicDirectorAcademicEnrollmentGroupApi: apiRoutes.academicDirectorAcademicEnrollmentGroupApi,
   adminAnnouncementsApi: "/api/v1/admin/announcements",

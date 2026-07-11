@@ -47,6 +47,8 @@
 /api/v1/academic-director/academic/groups/{group_id}/students | POST
 /api/v1/academic-director/academic/homework | POST
 /api/v1/academic-director/academic/lessons/{lesson_session_id} | PATCH
+/api/v1/academic-director/academic/lessons/{lesson_session_id}/cancel | POST
+/api/v1/academic-director/academic/lessons/{lesson_session_id}/recover | POST
 /api/v1/academic-director/academic/schedules | POST
 /api/v1/academic-director/academic/schools | POST
 /api/v1/academic-director/head-of-departments | POST
@@ -71,6 +73,8 @@
 /api/v1/admin/academic/groups/{group_id}/students | POST
 /api/v1/admin/academic/homework | POST
 /api/v1/admin/academic/lessons/{lesson_session_id} | PATCH
+/api/v1/admin/academic/lessons/{lesson_session_id}/cancel | POST
+/api/v1/admin/academic/lessons/{lesson_session_id}/recover | POST
 /api/v1/admin/academic/schedules | POST
 /api/v1/admin/announcements | GET
 /api/v1/admin/announcements | POST

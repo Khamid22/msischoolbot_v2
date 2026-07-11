@@ -31,6 +31,10 @@ export const apiRoutes = {
   academicDirectorAcademicExamApi: "/api/v1/academic-director/academic/exams",
   academicDirectorAcademicLessonApi: (lessonSessionId: number | string) =>
     `/api/v1/academic-director/academic/lessons/${lessonSessionId}`,
+  academicDirectorAcademicLessonCancelApi: (lessonSessionId: number | string) =>
+    `/api/v1/academic-director/academic/lessons/${lessonSessionId}/cancel`,
+  academicDirectorAcademicLessonRecoverApi: (lessonSessionId: number | string) =>
+    `/api/v1/academic-director/academic/lessons/${lessonSessionId}/recover`,
   academicDirectorAcademicEnrollmentStatusApi: (enrollmentId: number | string) =>
     `/api/v1/academic-director/academic/enrollments/${enrollmentId}/status`,
   academicDirectorAcademicEnrollmentGroupApi: (enrollmentId: number | string) =>

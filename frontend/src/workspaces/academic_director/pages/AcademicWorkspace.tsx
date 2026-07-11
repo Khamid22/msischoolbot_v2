@@ -64,6 +64,8 @@ const academicDirectorAcademicRoutes = {
   adminAcademicHomeworkApi: routes.academicDirectorAcademicHomeworkApi,
   adminAcademicExamApi: routes.academicDirectorAcademicExamApi,
   adminAcademicLessonApi: routes.academicDirectorAcademicLessonApi,
+  adminAcademicLessonCancelApi: routes.academicDirectorAcademicLessonCancelApi,
+  adminAcademicLessonRecoverApi: routes.academicDirectorAcademicLessonRecoverApi,
   adminAcademicEnrollmentStatusApi: routes.academicDirectorAcademicEnrollmentStatusApi,
   adminAcademicEnrollmentGroupApi: routes.academicDirectorAcademicEnrollmentGroupApi,
 };

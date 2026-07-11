@@ -306,6 +306,12 @@ class AdminLessonUpdateRequest(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
     room: str | None = None
+    lesson_name: str | None = None
+    topic: str | None = None
+
+
+class AdminLessonCancelRequest(BaseModel):
+    reason: str
 
 
 class AdminLessonUpdated(BaseModel):

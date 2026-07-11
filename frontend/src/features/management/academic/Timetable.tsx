@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useMemo, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import { ChevronLeft, ChevronRight, Clock, MapPin, X } from "lucide-react";
+import { Ban, ChevronLeft, ChevronRight, Clock, MapPin, Pencil, RotateCcw, X } from "lucide-react";
 import { motion } from "@/shared/lib/motion";
 import { Lesson, addDays, isoDate, startOfWeek, timeToMinutes, timetableEndHour, timetableStartHour, weekdayLabels } from "./shared";
 
@@ -176,6 +176,9 @@ function GridLessonCard({
   canEdit,
   onOpenTime,
   onOpenRoom,
+  onEditLesson,
+  onCancelLesson,
+  onRecoverLesson,
 }: {
   lesson: Lesson;
   top: number;
@@ -186,6 +189,9 @@ function GridLessonCard({
   canEdit: boolean;
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>) => void;
+  onEditLesson: () => void;
+  onCancelLesson: () => void;
+  onRecoverLesson: () => void;
 }) {
   const compact = height < 56;
   const hasTime = Boolean(lesson.startTime && lesson.endTime);
@@ -205,7 +211,10 @@ function GridLessonCard({
         </p>
       ) : null}
       {cancelled ? (
-        <p className="mt-auto text-[9px] font-bold uppercase tracking-wide">Cancelled</p>
+        <div className="mt-auto flex items-center justify-between gap-1">
+          <p className="truncate text-[9px] font-bold uppercase tracking-wide">Cancelled</p>
+          {canEdit && lesson.canRecover ? <button type="button" onClick={onRecoverLesson} title="Recover lesson" className="rounded p-1 hover:bg-white/20"><RotateCcw className="h-3 w-3" /></button> : null}
+        </div>
       ) : (
         <div className="mt-auto flex flex-wrap items-center gap-x-1.5 gap-y-0.5 pt-0.5">
           {canEdit ? (
@@ -240,6 +249,7 @@ function GridLessonCard({
               <span className="min-w-0 truncate">{lesson.room}</span>
             </span>
           ) : null}
+          {canEdit ? <span className="ml-auto inline-flex gap-0.5"><button type="button" onClick={onEditLesson} title="Edit lesson content" className="rounded p-0.5 hover:bg-primary/20"><Pencil className="h-2.5 w-2.5" /></button><button type="button" onClick={onCancelLesson} title="Cancel lesson" className="rounded p-0.5 text-red-700 hover:bg-red-100"><Ban className="h-2.5 w-2.5" /></button></span> : null}
         </div>
       )}
     </div>
@@ -254,6 +264,9 @@ function TimetableDayColumn({
   canEdit,
   onOpenTime,
   onOpenRoom,
+  onEditLesson,
+  onCancelLesson,
+  onRecoverLesson,
 }: {
   group: TimetableDateGroup | undefined;
   dayStartMin: number;
@@ -262,6 +275,9 @@ function TimetableDayColumn({
   canEdit: boolean;
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onEditLesson: (lesson: Lesson) => void;
+  onCancelLesson: (lesson: Lesson) => void;
+  onRecoverLesson: (lesson: Lesson) => void;
 }) {
   const timed = (group?.lessons ?? []).filter((lesson) => lesson.startTime && lesson.endTime);
   const positioned = useMemo(() => layoutTimedLessons(timed), [timed]);
@@ -290,6 +306,9 @@ function TimetableDayColumn({
             canEdit={canEdit}
             onOpenTime={(e) => onOpenTime(e, lesson)}
             onOpenRoom={(e) => onOpenRoom(e, lesson)}
+            onEditLesson={() => onEditLesson(lesson)}
+            onCancelLesson={() => onCancelLesson(lesson)}
+            onRecoverLesson={() => onRecoverLesson(lesson)}
           />
         );
       })}
@@ -353,6 +372,9 @@ function TimetableTimeGrid({
   canEdit,
   onOpenTime,
   onOpenRoom,
+  onEditLesson,
+  onCancelLesson,
+  onRecoverLesson,
 }: {
   days: Date[];
   groupsByIso: Map<string, TimetableDateGroup>;
@@ -360,6 +382,9 @@ function TimetableTimeGrid({
   canEdit: boolean;
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onEditLesson: (lesson: Lesson) => void;
+  onCancelLesson: (lesson: Lesson) => void;
+  onRecoverLesson: (lesson: Lesson) => void;
 }) {
   const dayStartMin = timetableStartHour * 60;
   const dayEndMin = timetableEndHour * 60;
@@ -434,6 +459,9 @@ function TimetableTimeGrid({
               canEdit={canEdit}
               onOpenTime={onOpenTime}
               onOpenRoom={onOpenRoom}
+              onEditLesson={onEditLesson}
+              onCancelLesson={onCancelLesson}
+              onRecoverLesson={onRecoverLesson}
             />
           ))}
         </div>
@@ -541,12 +569,18 @@ export function TimetableCard({
   canEdit = true,
   onOpenTime,
   onOpenRoom,
+  onEditLesson,
+  onCancelLesson,
+  onRecoverLesson,
 }: {
   groups: TimetableDateGroup[];
   isLessonCancelled: (lesson: Lesson) => boolean;
   canEdit?: boolean;
   onOpenTime: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
   onOpenRoom: (e: ReactMouseEvent<HTMLButtonElement>, lesson: Lesson) => void;
+  onEditLesson: (lesson: Lesson) => void;
+  onCancelLesson: (lesson: Lesson) => void;
+  onRecoverLesson: (lesson: Lesson) => void;
 }) {
   const [view, setView] = useState<ViewMode>("week");
   const [cursor, setCursor] = useState<Date>(() => new Date());
@@ -627,6 +661,9 @@ export function TimetableCard({
           canEdit={canEdit}
           onOpenTime={onOpenTime}
           onOpenRoom={onOpenRoom}
+          onEditLesson={onEditLesson}
+          onCancelLesson={onCancelLesson}
+          onRecoverLesson={onRecoverLesson}
         />
       )}
     </div>

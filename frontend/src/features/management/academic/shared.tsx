@@ -598,6 +598,11 @@ export type Lesson = {
   status?: string;
   sourceKind?: string;
   hasHomework?: boolean;
+  lessonSessionId?: number;
+  isCancellation?: boolean;
+  cancellationReason?: string;
+  exceptionId?: number | null;
+  canRecover?: boolean;
 };
 
 export type Enrollment = {

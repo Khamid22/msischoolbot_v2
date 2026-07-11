@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from "react";
-import { BookMarked, CalendarDays, ChevronLeft, Layers, Plus, Settings, Users, X } from "lucide-react";
+import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, Layers, Pencil, Plus, RotateCcw, Settings, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -22,6 +22,8 @@ type AcademicGradebookRoutes = Pick<
   | "adminAcademicEnrollmentStatusApi"
   | "adminAcademicEnrollmentGroupApi"
   | "adminAcademicLessonApi"
+  | "adminAcademicLessonCancelApi"
+  | "adminAcademicLessonRecoverApi"
   | "adminAcademicGroupSchedule"
   | "adminAcademicGroupStudents"
 >;
@@ -138,6 +140,12 @@ export function GroupGradebook({
   const [roomInput, setRoomInput] = useState("");
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const schedulePopRef = useRef<HTMLDivElement>(null);
+  const [lessonAction, setLessonAction] = useState<{ kind: "edit" | "cancel" | "recover"; lesson: Lesson } | null>(null);
+  const [lessonActionSaving, setLessonActionSaving] = useState(false);
+  const [lessonActionError, setLessonActionError] = useState("");
+  const [lessonNameInput, setLessonNameInput] = useState("");
+  const [lessonTopicInput, setLessonTopicInput] = useState("");
+  const [cancellationReason, setCancellationReason] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,6 +163,7 @@ export function GroupGradebook({
     setActiveExam(null);
     setExamInput("");
     setScheduleEdit(null);
+    setLessonAction(null);
   }, [groupId]);
 
   useEffect(() => {
@@ -191,6 +200,59 @@ export function GroupGradebook({
       setError("Network error.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function openLessonAction(kind: "edit" | "cancel" | "recover", lesson: Lesson) {
+    setLessonAction({ kind, lesson });
+    setLessonActionError("");
+    setLessonNameInput(lesson.lessonNumber.replace(/ \(Cancelled\)$/, ""));
+    setLessonTopicInput(lesson.isCancellation ? "" : lesson.topic);
+    setCancellationReason("");
+  }
+
+  async function submitLessonAction(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lessonAction || lessonActionSaving) return;
+    const targetId = lessonAction.lesson.lessonSessionId || lessonAction.lesson.id;
+    setLessonActionSaving(true);
+    setLessonActionError("");
+    try {
+      const isEdit = lessonAction.kind === "edit";
+      const endpoint = isEdit
+        ? academicRoutes.adminAcademicLessonApi(targetId)
+        : lessonAction.kind === "cancel"
+          ? academicRoutes.adminAcademicLessonCancelApi(targetId)
+          : academicRoutes.adminAcademicLessonRecoverApi(targetId);
+      const body = isEdit
+        ? { lesson_name: lessonNameInput.trim(), topic: lessonTopicInput.trim() }
+        : lessonAction.kind === "cancel"
+          ? { reason: cancellationReason.trim() }
+          : undefined;
+      const response = await fetch(endpoint, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: jsonCsrfHeaders(csrf),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!apiSucceeded(response, json)) {
+        setLessonActionError(apiErrorMessage(json, "Unable to update this lesson."));
+        return;
+      }
+      const payload = apiData<{ gradebook?: GradebookData }>(json);
+      if (payload.gradebook) setData(payload.gradebook);
+      else await load(groupId);
+      const message = isEdit
+        ? "Lesson content updated. Its timetable date was kept."
+        : lessonAction.kind === "cancel"
+          ? "Lesson cancelled and the remaining program moved forward."
+          : "Lesson recovered and the remaining program moved back.";
+      setLessonAction(null);
+      showSetupToast(message);
+    } catch {
+      setLessonActionError("Network error while updating the lesson.");
+    } finally {
+      setLessonActionSaving(false);
     }
   }
 
@@ -1454,7 +1516,7 @@ export function GroupGradebook({
             </button>
           </div>
           {timetableGroups.length ? (
-            <TimetableCard groups={timetableGroups} isLessonCancelled={isCancelledLesson} onOpenTime={openTimeEdit} onOpenRoom={openRoomEdit} />
+            <TimetableCard groups={timetableGroups} isLessonCancelled={isCancelledLesson} onOpenTime={openTimeEdit} onOpenRoom={openRoomEdit} onEditLesson={(lesson) => openLessonAction("edit", lesson)} onCancelLesson={(lesson) => openLessonAction("cancel", lesson)} onRecoverLesson={(lesson) => openLessonAction("recover", lesson)} />
           ) : (
             <div className="rounded-xl border border-dashed border-foreground/15 bg-surface px-6 py-16 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
@@ -1465,6 +1527,17 @@ export function GroupGradebook({
           )}
         </div>
       )}
+
+      <Modal open={Boolean(lessonAction)} onClose={() => !lessonActionSaving && setLessonAction(null)} title={lessonAction?.kind === "edit" ? <span className="inline-flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" />Edit Lesson</span> : lessonAction?.kind === "recover" ? <span className="inline-flex items-center gap-2"><RotateCcw className="h-5 w-5 text-emerald-600" />Recover Lesson</span> : <span className="inline-flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-600" />Cancel Lesson</span>} subtitle={lessonAction?.kind === "edit" ? "Change this group's lesson content without moving its date." : lessonAction?.kind === "recover" ? "Restore the original slot and move following lessons back." : "Leave a cancelled slot and move this lesson plus following lessons forward."} size="sm" mobileMode="sheet" closeOnOutsideClick={!lessonActionSaving} closeOnEscape={!lessonActionSaving}>
+        <form onSubmit={submitLessonAction} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody className="space-y-4">
+            {lessonActionError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{lessonActionError}</p> : null}
+            {lessonAction ? <div className="rounded-lg border border-foreground/10 bg-muted/30 p-3"><p className="text-sm font-bold">{lessonAction.lesson.lessonNumber}</p><p className="mt-1 text-xs text-muted-foreground">{formatGradebookDate(lessonAction.lesson.date)}{lessonAction.lesson.startTime ? ` · ${lessonAction.lesson.startTime}` : ""}</p></div> : null}
+            {lessonAction?.kind === "edit" ? <><label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson name</span><input autoFocus required value={lessonNameInput} onChange={(event) => setLessonNameInput(event.target.value)} className="h-11 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label><label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Topic</span><textarea value={lessonTopicInput} onChange={(event) => setLessonTopicInput(event.target.value)} rows={3} className="w-full resize-none rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm" /></label></> : lessonAction?.kind === "cancel" ? <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Cancellation reason</span><textarea autoFocus required minLength={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} rows={3} placeholder="For example: school closed" className="w-full resize-none rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm" /><span className="mt-1 block text-xs text-muted-foreground">Required and shown on the cancelled slot.</span></label> : <p className="text-sm text-muted-foreground">The cancellation remains in audit history, while its active placeholder is removed.</p>}
+          </ModalBody>
+          <ModalFooter className="flex justify-end gap-2"><button type="button" onClick={() => setLessonAction(null)} disabled={lessonActionSaving} className="min-h-11 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">Keep unchanged</button><button type="submit" disabled={lessonActionSaving || (lessonAction?.kind === "edit" && !lessonNameInput.trim()) || (lessonAction?.kind === "cancel" && cancellationReason.trim().length < 3)} className={`min-h-11 rounded-lg px-5 text-sm font-bold text-white disabled:opacity-50 ${lessonAction?.kind === "cancel" ? "bg-red-600" : lessonAction?.kind === "recover" ? "bg-emerald-600" : "bg-primary"}`}>{lessonActionSaving ? "Saving..." : lessonAction?.kind === "cancel" ? "Cancel & Move Forward" : lessonAction?.kind === "recover" ? "Recover & Restore" : "Save Content"}</button></ModalFooter>
+        </form>
+      </Modal>
 
       <Modal open={setupOpen} onClose={closeGroupSetup} title={<span className="inline-flex items-center gap-2"><Settings className="h-5 w-5 text-primary" />Group Timetable</span>} subtitle="Set when and where this group studies." size="lg" mobileMode="sheet" closeOnOutsideClick={!setupSaving} closeOnEscape={!setupSaving} panelClassName="sm:h-auto">
         <form onSubmit={saveGroupSetup} className="flex min-h-0 flex-1 flex-col">

@@ -1,11 +1,12 @@
 """Admin-facing academic operations and payload shaping."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from backend.core.database import connect_auth_db
 from backend.modules.academics.exam_filters import is_exam_performance_row
 from backend.modules.academics import canonical
+from backend.modules.academics import timetable_repository
 from backend.modules.academics.service import (
     create_group_from_program,
     create_class,
@@ -407,6 +408,25 @@ def get_group_gradebook(group_id):
             (int(group_row["id"]),),
         ).fetchall()
 
+        exception_rows = conn.execute(
+            """
+            SELECT e.id, e.lesson_session_id,
+                   COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, 'Lesson') AS lesson_number,
+                   to_char(e.original_session_date, 'DD/MM/YYYY') AS lesson_date,
+                   COALESCE(to_char(e.original_start_time, 'HH24:MI'), '') AS start_time,
+                   COALESCE(to_char(e.original_end_time, 'HH24:MI'), '') AS end_time,
+                   COALESCE(ls.room, '') AS room,
+                   COALESCE(NULLIF(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
+                   e.reason
+            FROM msi_v2.lesson_schedule_exceptions e
+            JOIN msi_v2.lesson_sessions ls ON ls.id=e.lesson_session_id
+            LEFT JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+            WHERE e.group_id=%s AND e.status='cancelled'
+            ORDER BY e.original_session_date, e.id
+            """,
+            (int(group_row["id"]),),
+        ).fetchall()
+
         enrollment_rows = conn.execute(
             """
             SELECT gs.group_id, gs.student_id, gs.legacy_enrollment_id,
@@ -549,6 +569,58 @@ def get_group_gradebook(group_id):
                 if label not in exam_labels:
                     exam_labels.append(label)
 
+    lesson_payload = [
+        {
+            "id": int(row["id"]),
+            "lessonNumber": str(row["lesson_number"]),
+            "topic": str(row["topic"] or ""),
+            "date": str(row["lesson_date"] or ""),
+            "startTime": str(row["start_time"] or ""),
+            "endTime": str(row["end_time"] or ""),
+            "room": str(row["room"] or ""),
+            "order": int(row["lesson_order"] or 0),
+            "status": str(row["status"] or "scheduled"),
+            "sourceKind": str(row["source_kind"] or ""),
+            "hasHomework": bool(row["has_homework"]),
+            "isCancellation": False,
+            "cancellationReason": "",
+            "exceptionId": None,
+            "canRecover": False,
+        }
+        for row in lesson_rows
+    ]
+    lesson_payload.extend(
+        {
+            "id": -int(row["id"]),
+            "lessonSessionId": int(row["lesson_session_id"]),
+            "lessonNumber": f"{str(row['lesson_number'])} (Cancelled)",
+            "topic": str(row["reason"] or ""),
+            "date": str(row["lesson_date"] or ""),
+            "startTime": str(row["start_time"] or ""),
+            "endTime": str(row["end_time"] or ""),
+            "room": str(row["room"] or ""),
+            "order": int(row["lesson_order"] or 0),
+            "status": "cancelled",
+            "sourceKind": "cancellation",
+            "hasHomework": False,
+            "isCancellation": True,
+            "cancellationReason": str(row["reason"] or ""),
+            "exceptionId": int(row["id"]),
+            "canRecover": True,
+        }
+        for row in exception_rows
+    )
+
+    def lesson_sort_key(item):
+        raw = str(item.get("date") or "")
+        try:
+            parsed = datetime.strptime(raw, "%d/%m/%Y").date()
+        except ValueError:
+            parsed = datetime.max.date()
+        return (parsed, str(item.get("startTime") or ""), 0 if item.get("isCancellation") else 1, int(item.get("order") or 0))
+
+    lesson_payload.sort(key=lesson_sort_key)
+
     return {
         "ok": True,
         "group": {
@@ -558,22 +630,7 @@ def get_group_gradebook(group_id):
             "schoolCode": str(group_row["school_key"]),
             "subjectName": str(group_row["subject_name"]),
         },
-        "lessons": [
-            {
-                "id": int(row["id"]),
-                "lessonNumber": str(row["lesson_number"]),
-                "topic": str(row["topic"] or ""),
-                "date": str(row["lesson_date"] or ""),
-                "startTime": str(row["start_time"] or ""),
-                "endTime": str(row["end_time"] or ""),
-                "room": str(row["room"] or ""),
-                "order": int(row["lesson_order"] or 0),
-                "status": str(row["status"] or "scheduled"),
-                "sourceKind": str(row["source_kind"] or ""),
-                "hasHomework": bool(row["has_homework"]),
-            }
-            for row in lesson_rows
-        ],
+        "lessons": lesson_payload,
         "examLabels": exam_labels,
         "examDates": exam_dates_by_label,
         "enrollments": [
@@ -829,6 +886,14 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
     raw_room = payload.get("room", None)
     should_update_room = raw_room is not None
     next_room = str(raw_room or "").strip()
+    raw_lesson_name = payload.get("lesson_name", None)
+    should_update_lesson_name = raw_lesson_name is not None
+    next_lesson_name = str(raw_lesson_name or "").strip()
+    raw_topic = payload.get("topic", None)
+    should_update_topic = raw_topic is not None
+    next_topic = str(raw_topic or "").strip()
+    if should_update_lesson_name and not next_lesson_name:
+        raise ValueError("Lesson name is required.")
 
     with connect_auth_db() as conn:
         row = conn.execute(
@@ -852,6 +917,8 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
                 start_time = CASE WHEN %s THEN %s::time ELSE start_time END,
                 end_time = CASE WHEN %s THEN %s::time ELSE end_time END,
                 room = CASE WHEN %s THEN %s ELSE room END,
+                source_label = CASE WHEN %s THEN %s ELSE source_label END,
+                source_topic = CASE WHEN %s THEN %s ELSE source_topic END,
                 status = COALESCE(NULLIF(%s, ''), status),
                 updated_at = now()
             WHERE id = %s
@@ -865,6 +932,10 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
                 next_end_time,
                 bool(should_update_room),
                 next_room,
+                bool(should_update_lesson_name),
+                next_lesson_name,
+                bool(should_update_topic),
+                next_topic,
                 next_status if next_status is not None else "",
                 lesson_session_id,
             ),
@@ -874,14 +945,118 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
     display_date = canonical.format_date(next_date if should_update_date else row["session_date"])
     return {
         "id": lesson_session_id,
-        "lessonNumber": str(row["lesson_number"] or "Session"),
-        "topic": str(row["topic"] or ""),
+        "lessonNumber": next_lesson_name if should_update_lesson_name else str(row["lesson_number"] or "Session"),
+        "topic": next_topic if should_update_topic else str(row["topic"] or ""),
         "date": display_date,
         "room": next_room if should_update_room else str(row["room"] or ""),
         "startTime": next_start_time or "",
         "endTime": next_end_time or "",
         "status": next_status or str(row["status"] or "scheduled"),
     }
+
+
+def _schedule_weekdays(schedule):
+    values = []
+    for value in str(schedule["weekdays"] or "").split(","):
+        try:
+            day = int(value.strip())
+        except (TypeError, ValueError):
+            continue
+        if 0 <= day <= 6 and day not in values:
+            values.append(day)
+    if not values:
+        raise ValueError("The group timetable has no teaching days.")
+    return set(values)
+
+
+def _reflow_lesson_sequence(conn, lesson, *, first_date, include_first_date, ignored_exception_id=0):
+    schedule = timetable_repository.get_active_group_schedule(conn, int(lesson["group_id"]))
+    if not schedule:
+        raise ValueError("Set up the group timetable before changing lessons.")
+    weekdays = _schedule_weekdays(schedule)
+    active_exceptions = timetable_repository.list_active_lesson_exceptions(conn, int(lesson["group_id"]))
+    blocked = {
+        row["original_session_date"]
+        for row in active_exceptions
+        if int(row["id"]) != int(ignored_exception_id or 0)
+    }
+    lessons = timetable_repository.list_curriculum_lessons_from_order(
+        conn, int(lesson["group_id"]), int(lesson["item_order"])
+    )
+    cursor = first_date if include_first_date else first_date + timedelta(days=1)
+    dates = []
+    while len(dates) < len(lessons):
+        if cursor.weekday() in weekdays and cursor not in blocked:
+            dates.append(cursor)
+        cursor += timedelta(days=1)
+    for row, session_date in zip(lessons, dates):
+        timetable_repository.schedule_curriculum_lesson(
+            conn,
+            int(row["id"]),
+            schedule_id=int(schedule["id"]),
+            teacher_v2_id=int(schedule["teacher_id"] or 0),
+            session_date=session_date,
+            start_time=schedule["start_time"],
+            end_time=schedule["end_time"],
+            room=str(schedule["room"] or ""),
+        )
+    if dates:
+        timetable_repository.update_schedule_end_date(conn, int(schedule["id"]), dates[-1])
+    return len(lessons)
+
+
+def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
+    lesson_session_id = int(lesson_session_id or 0)
+    reason = str(reason or "").strip()
+    if lesson_session_id <= 0:
+        raise ValueError("Lesson session id is required.")
+    if not reason:
+        raise ValueError("Cancellation reason is required.")
+    with connect_auth_db() as conn:
+        lesson = timetable_repository.get_curriculum_lesson_for_exception(conn, lesson_session_id)
+        if not lesson:
+            raise ValueError("Curriculum lesson was not found.")
+        if lesson["session_date"] is None:
+            raise ValueError("Only a scheduled lesson can be cancelled.")
+        if timetable_repository.get_active_lesson_exception(conn, lesson_session_id):
+            raise ValueError("This lesson is already cancelled.")
+        exception = timetable_repository.insert_lesson_exception(conn, lesson, reason, actor_staff_id)
+        affected = _reflow_lesson_sequence(
+            conn, lesson, first_date=lesson["session_date"], include_first_date=False
+        )
+        conn.commit()
+        return {
+            "groupId": int(lesson["group_id"]),
+            "exceptionId": int(exception["id"]),
+            "affectedLessonCount": affected,
+        }
+
+
+def recover_lesson_session(lesson_session_id, actor_staff_id=None):
+    lesson_session_id = int(lesson_session_id or 0)
+    if lesson_session_id <= 0:
+        raise ValueError("Lesson session id is required.")
+    with connect_auth_db() as conn:
+        lesson = timetable_repository.get_curriculum_lesson_for_exception(conn, lesson_session_id)
+        if not lesson:
+            raise ValueError("Curriculum lesson was not found.")
+        exception = timetable_repository.get_active_lesson_exception(conn, lesson_session_id)
+        if not exception:
+            raise ValueError("This lesson has no active cancellation to recover.")
+        timetable_repository.recover_lesson_exception(conn, int(exception["id"]), actor_staff_id)
+        affected = _reflow_lesson_sequence(
+            conn,
+            lesson,
+            first_date=exception["original_session_date"],
+            include_first_date=True,
+            ignored_exception_id=int(exception["id"]),
+        )
+        conn.commit()
+        return {
+            "groupId": int(lesson["group_id"]),
+            "exceptionId": int(exception["id"]),
+            "affectedLessonCount": affected,
+        }
 
 
 def record_exam_from_payload(payload):

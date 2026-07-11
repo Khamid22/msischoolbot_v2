@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from backend.core.access import CurrentUser, get_current_user
 from backend.core.http import ApiSuccess, api_success
 from backend.internal_operations.schemas import (
     AdminAcademicContextDelta,
@@ -18,6 +19,7 @@ from backend.internal_operations.schemas import (
     AdminEnrollmentStatusRequest,
     AdminEnrollmentUpdated,
     AdminLessonUpdateRequest,
+    AdminLessonCancelRequest,
     AdminLessonUpdated,
     AdminRecordAttendanceRequest,
     AdminRecordCoinRequest,
@@ -45,6 +47,8 @@ from backend.modules.academics.operations import (
     record_homework_from_payload,
     update_enrollment_status_from_payload,
     update_lesson_session_from_payload,
+    cancel_lesson_session,
+    recover_lesson_session,
     upsert_group_schedule_from_payload,
     create_student_with_enrollment_from_payload,
 )
@@ -260,6 +264,36 @@ def update_lesson(lesson_session_id: int, payload: AdminLessonUpdateRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
     return api_success({"lesson": lesson})
+
+
+@router.post(
+    "/lessons/{lesson_session_id}/cancel",
+    operation_id="api_v1_academic_director_cancel_academic_lesson",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, user: CurrentUser = Depends(get_current_user)):
+    try:
+        result = cancel_lesson_session(lesson_session_id, payload.reason, user.staff_id)
+        gradebook = get_group_gradebook(result["groupId"])
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success({**result, "gradebook": gradebook})
+
+
+@router.post(
+    "/lessons/{lesson_session_id}/recover",
+    operation_id="api_v1_academic_director_recover_academic_lesson",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def recover_lesson(lesson_session_id: int, user: CurrentUser = Depends(get_current_user)):
+    try:
+        result = recover_lesson_session(lesson_session_id, user.staff_id)
+        gradebook = get_group_gradebook(result["groupId"])
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success({**result, "gradebook": gradebook})
 
 
 @router.post(
