@@ -235,3 +235,12 @@
     }
   }
 }
+
+/* Scrollable but with the scrollbar hidden (admin sidebar nav). */
+.no-scrollbar {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* legacy Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome, Safari, Telegram WebView */
+}

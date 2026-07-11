@@ -507,7 +507,7 @@ function InternalOperationsSidebar({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
         <nav className="space-y-3" aria-label="Admin navigation">
           {groupTabsBySection(state.visibleTabs as Array<{ key: string; label: string }>).map((section) => (
             <div key={section.label} className="space-y-1">
