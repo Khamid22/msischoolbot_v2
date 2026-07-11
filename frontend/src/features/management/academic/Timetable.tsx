@@ -625,12 +625,6 @@ export function TimetableCard({
         minHeight: "26rem",
       }}
     >
-      <div className="shrink-0 px-4 pt-4">
-        <p className="text-sm font-bold">Timetable</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {canEdit ? "Scheduled program lessons with class time and room · tap to edit" : "Scheduled program lessons with class time and room"}
-        </p>
-      </div>
       <TimetableToolbar view={view} onViewChange={setView} cursor={cursor} onCursorChange={setCursor} />
       {undatedCount > 0 ? (
         <p className="shrink-0 border-b border-foreground/8 bg-amber-50 px-4 py-1.5 text-[11px] font-semibold text-amber-800">
