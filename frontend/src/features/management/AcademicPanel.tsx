@@ -527,6 +527,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                       <TextInput name="group_code" placeholder="7D-Math" />
                     </label>
                   </div>
+                  <label className="block">
+                    <FieldLabel>Subject Set</FieldLabel>
+                    <TextInput name="set_name" defaultValue="Set 1" required placeholder="Set 1" />
+                  </label>
                   <div className="flex justify-end gap-2 border-t border-foreground/8 pt-3">
                     <button
                       type="button"
@@ -842,6 +846,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                               const studentsCount = asNumber(group.students_count);
                               const disqualifiedCount = asNumber(group.disqualified_count);
                               const isActive = studentsCount > 0;
+                              const isNewGroup = asString(group.setup_status) !== "active";
                               const swatch = programColor(subjectName);
                               const isDeleting = deletingGroupId === id;
                               return (
@@ -873,6 +878,14 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                                   <div className="mt-3 flex items-center gap-1.5">
                                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${swatch}`} aria-hidden="true" />
                                     <span className="truncate text-xs font-semibold">{subjectName || "No program"}</span>
+                                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                                      {asString(group.set_name) || "Set 1"}
+                                    </span>
+                                    {isNewGroup ? (
+                                      <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">
+                                        New Group
+                                      </span>
+                                    ) : null}
                                   </div>
 
                                   <div className="mt-3 flex items-center justify-between border-t border-foreground/8 pt-3">

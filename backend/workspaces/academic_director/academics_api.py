@@ -11,6 +11,7 @@ from backend.internal_operations.schemas import (
     AdminAcademicContextDelta,
     AdminAcademicContextPayload,
     AdminCreateAcademicGroupRequest,
+    AdminCreateAcademicClassRequest,
     AdminCreateAcademicSchoolRequest,
     AdminCreateScheduleRequest,
     AdminEnrollmentGroupRequest,
@@ -28,6 +29,7 @@ from backend.internal_operations.schemas import (
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.operations import (
     create_group_from_payload,
+    create_class_from_payload,
     create_schedule_from_payload,
     create_school_from_payload,
     delete_group,
@@ -66,6 +68,20 @@ def academic_context():
 def create_academic_school(payload: AdminCreateAcademicSchoolRequest):
     try:
         create_school_from_payload(_payload(payload))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success(list_admin_academic_context(include_heavy=True))
+
+
+@router.post(
+    "/classes",
+    operation_id="api_v1_academic_director_create_academic_class",
+    response_model=ApiSuccess[AdminAcademicContextPayload],
+)
+def create_academic_class(payload: AdminCreateAcademicClassRequest):
+    try:
+        create_class_from_payload(_payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()

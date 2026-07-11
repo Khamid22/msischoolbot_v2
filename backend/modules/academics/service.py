@@ -244,6 +244,7 @@ def _schedule_conflict_message(
 def list_academic_admin_rows(*, include_heavy=True):
     with _connect() as conn:
         schools = [dict(row) for row in academic_repository.list_school_rows(conn)]
+        classes = [dict(row) for row in academic_repository.list_class_rows(conn)]
         subjects = [dict(row) for row in academic_repository.list_subject_rows(conn)]
         groups = [dict(row) for row in academic_repository.list_group_rows(conn)]
         enrollment_summary = dict(academic_repository.get_enrollment_summary_row(conn) or {})
@@ -266,6 +267,7 @@ def list_academic_admin_rows(*, include_heavy=True):
             curriculum_items = [dict(row) for row in academic_repository.list_curriculum_item_rows(conn)]
         return {
             "schools": schools,
+            "classes": classes,
             "subjects": subjects,
             "groups": groups,
             "enrollments": enrollments,
@@ -309,7 +311,30 @@ def create_subject(school_code, name, code=""):
         conn.commit()
 
 
-def create_group_from_program(school_code, program_subject_key, group_name, group_code=""):
+def create_class(school_code, class_name, class_code=""):
+    class_name = str(class_name or "").strip()
+    class_code = str(class_code or "").strip()
+    if not class_name:
+        raise ValueError("Class name is required.")
+    with _connect() as conn:
+        school = academic_repository.get_school_by_key(conn, school_code)
+        if not school:
+            raise ValueError("Client school was not found.")
+        existing = academic_repository.get_class_by_school_and_name(
+            conn, int(school["id"]), class_name
+        )
+        if existing:
+            raise ValueError("A class with this name already exists in the selected school.")
+        row = academic_repository.insert_class(
+            conn, int(school["id"]), class_name, class_code
+        )
+        conn.commit()
+        return dict(row)
+
+
+def create_group_from_program(
+    school_code, program_subject_key, group_name, group_code="", *, class_id=0, set_name="Set 1"
+):
     group_name = str(group_name or "Group").strip() or "Group"
     with _connect() as conn:
         school = academic_repository.get_school_by_key(conn, school_code)
@@ -318,9 +343,26 @@ def create_group_from_program(school_code, program_subject_key, group_name, grou
         program = academic_repository.get_subject_program_by_subject_key(conn, program_subject_key)
         if not program:
             raise ValueError("Subject program was not found.")
+        selected_class = None
+        if int(class_id or 0) > 0:
+            selected_class = academic_repository.get_class(conn, int(class_id))
+            if not selected_class or int(selected_class["school_id"]) != int(school["id"]):
+                raise ValueError("Class was not found in the selected school.")
+            group_name = str(selected_class["class_name"])
+        else:
+            selected_class = academic_repository.get_class_by_school_and_name(
+                conn, int(school["id"]), group_name
+            )
+            if not selected_class:
+                selected_class = academic_repository.insert_class(
+                    conn, int(school["id"]), group_name, group_code
+                )
         existing = academic_repository.get_existing_group(conn, int(school["id"]), int(program["id"]), group_name)
         if existing:
             academic_repository.update_group_code(conn, int(existing["id"]), group_code)
+            academic_repository.update_group_class(
+                conn, int(existing["id"]), int(selected_class["id"]), set_name
+            )
         else:
             legacy_group_id = _mint_legacy_id(conn, "groups", "legacy_group_id")
             academic_repository.insert_group(
@@ -330,6 +372,8 @@ def create_group_from_program(school_code, program_subject_key, group_name, grou
                 group_name,
                 group_code,
                 legacy_group_id,
+                class_id=int(selected_class["id"]),
+                set_name=set_name,
             )
         conn.commit()
 
@@ -408,6 +452,8 @@ def create_student_with_enrollment(full_name, group_id):
             legacy_enrollment_id=next_enrollment_id,
             legacy_public_dashboard_id=next_dashboard_id,
         )
+        if group.get("class_id"):
+            academic_repository.upsert_class_student(conn, int(group["class_id"]), student_id)
         enrollment_id = int(enrollment["legacy_enrollment_id"] or next_enrollment_id) if enrollment else next_enrollment_id
         conn.commit()
 
@@ -431,6 +477,7 @@ def create_schedule(
     weekdays=None,
     start_time="",
     end_time="",
+    lesson_duration_minutes=0,
     start_date="",
     end_date="",
     room="",
@@ -440,13 +487,44 @@ def create_schedule(
     group_id = int(group_id or 0)
     weekdays = _normalize_weekdays(weekdays)
     start_date_obj = _parse_date_input(start_date, "Start date")
-    end_date_obj = _parse_date_input(end_date, "End date")
+    start_minutes = _time_to_minutes(start_time, "Start time")
+    duration = int(lesson_duration_minutes or 0)
+    if duration:
+        if duration < 15 or duration > 240:
+            raise ValueError("Lesson duration must be between 15 and 240 minutes.")
+        end_minutes = start_minutes + duration
+        if end_minutes >= 24 * 60:
+            raise ValueError("Lesson duration cannot continue past midnight.")
+        end_time = f"{end_minutes // 60:02d}:{end_minutes % 60:02d}"
+    else:
+        end_minutes = _time_to_minutes(end_time, "End time")
+
+    predicted = not str(end_date or "").strip()
+    if predicted:
+        with _connect() as prediction_conn:
+            prediction_group = _resolve_group(prediction_conn, group_id)
+            if not prediction_group:
+                raise ValueError("Group was not found.")
+            session_count = academic_repository.get_program_teaching_session_count(
+                prediction_conn, int(prediction_group["program_id"])
+            )
+        if session_count <= 0:
+            raise ValueError("The subject program has no lessons to schedule.")
+        current = start_date_obj
+        remaining = session_count
+        selected_days = set(weekdays)
+        while remaining > 0:
+            if current.weekday() in selected_days:
+                remaining -= 1
+            if remaining > 0:
+                current += timedelta(days=1)
+        end_date_obj = current
+    else:
+        end_date_obj = _parse_date_input(end_date, "End date")
     if end_date_obj < start_date_obj:
         raise ValueError("End date cannot be earlier than start date.")
     if (end_date_obj - start_date_obj).days > 366:
         raise ValueError("Schedule range cannot be longer than one year.")
-    start_minutes = _time_to_minutes(start_time, "Start time")
-    end_minutes = _time_to_minutes(end_time, "End time")
     if end_minutes <= start_minutes:
         raise ValueError("End time must be after start time.")
 
@@ -516,5 +594,8 @@ def create_schedule(
     return {
         "scheduleId": schedule_id,
         "sessionCount": len(generated_dates),
+        "lessonDurationMinutes": end_minutes - start_minutes,
+        "predictedEndDate": end_date_obj.isoformat(),
+        "endDateWasPredicted": predicted,
         "sessionIds": [session_id for session_id in session_ids if session_id],
     }

@@ -180,6 +180,7 @@ export function SchedulePanel({ state }: { state: any }) {
     teacherId: "",
     title: "",
     weekdays: ["1", "3"],
+    lessonDurationMinutes: "90",
     startTime: "17:00",
     endTime: "18:30",
     startDate: today,
@@ -696,6 +697,7 @@ export function SchedulePanel({ state }: { state: any }) {
           weekdays: form.weekdays.map(Number),
           start_time: form.startTime,
           end_time: form.endTime,
+          lesson_duration_minutes: Number(form.lessonDurationMinutes),
           start_date: form.startDate,
           end_date: form.endDate,
           room: form.room,
@@ -1175,8 +1177,10 @@ export function SchedulePanel({ state }: { state: any }) {
                   <TextInput type="time" value={form.startTime} onChange={(event) => updateField("startTime", event.target.value)} required />
                 </label>
                 <label className="block">
-                  <FieldLabel>End Time</FieldLabel>
-                  <TextInput type="time" value={form.endTime} onChange={(event) => updateField("endTime", event.target.value)} required />
+                  <FieldLabel>Lesson Duration</FieldLabel>
+                  <Select value={form.lessonDurationMinutes} onChange={(event) => updateField("lessonDurationMinutes", event.target.value)} required>
+                    {[45, 60, 75, 90, 120].map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}
+                  </Select>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -1185,8 +1189,9 @@ export function SchedulePanel({ state }: { state: any }) {
                   <TextInput type="date" value={form.startDate} onChange={(event) => updateField("startDate", event.target.value)} required />
                 </label>
                 <label className="block">
-                  <FieldLabel>End Date</FieldLabel>
-                  <TextInput type="date" value={form.endDate} onChange={(event) => updateField("endDate", event.target.value)} required />
+                  <FieldLabel>Predicted End Date</FieldLabel>
+                  <TextInput type="date" value={form.endDate} onChange={(event) => updateField("endDate", event.target.value)} />
+                  <span className="mt-1 block text-[11px] text-muted-foreground">Leave blank to calculate from the scheme of work.</span>
                 </label>
               </div>
               <label className="block">

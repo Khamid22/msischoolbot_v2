@@ -20,6 +20,7 @@ from backend.internal_operations.schemas import (
     AdminRecordExamRequest,
     AdminRecordHomeworkRequest,
     AdminScheduleCreated,
+    AdminCreateAcademicClassRequest,
 )
 from backend.modules.academics.operations import (
     create_schedule_from_payload,
@@ -33,6 +34,7 @@ from backend.modules.academics.operations import (
     record_homework_from_payload,
     update_enrollment_status_from_payload,
     update_lesson_session_from_payload,
+    create_class_from_payload,
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 
@@ -41,6 +43,20 @@ router = APIRouter(prefix="/academic")
 
 def _payload(model) -> dict[str, Any]:
     return model.model_dump(exclude_none=True)
+
+
+@router.post(
+    "/classes",
+    operation_id="api_v1_admin_create_academic_class",
+    response_model=ApiSuccess[AdminAcademicContextPayload],
+)
+def create_academic_class(payload: AdminCreateAcademicClassRequest):
+    try:
+        create_class_from_payload(_payload(payload))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success(list_admin_academic_context(include_heavy=True))
 
 
 @router.post(

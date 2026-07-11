@@ -151,6 +151,14 @@ class AdminCreateAcademicGroupRequest(BaseModel):
     program_subject_key: str
     group_name: str
     group_code: str = ""
+    class_id: int = 0
+    set_name: str = "Set 1"
+
+
+class AdminCreateAcademicClassRequest(BaseModel):
+    school_code: str
+    class_name: str
+    class_code: str = ""
 
 
 class AdminStudentsList(BaseModel):
@@ -178,6 +186,7 @@ class AdminCreateScheduleRequest(BaseModel):
     weekdays: list[int] = Field(default_factory=list)
     start_time: str = ""
     end_time: str = ""
+    lesson_duration_minutes: int = 0
     start_date: str = ""
     end_date: str = ""
     room: str = ""
@@ -203,6 +212,7 @@ class AdminAcademicContextDelta(BaseModel):
 
 class AdminAcademicContextPayload(BaseModel):
     schools: list[dict[str, Any]] = Field(default_factory=list)
+    classes: list[dict[str, Any]] = Field(default_factory=list)
     subjects: list[dict[str, Any]] = Field(default_factory=list)
     groups: list[dict[str, Any]] = Field(default_factory=list)
     enrollments: list[dict[str, Any]] = Field(default_factory=list)

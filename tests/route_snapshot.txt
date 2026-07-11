@@ -34,6 +34,7 @@
 /admin/teachers/{teacher_id} | POST
 /admin/teachers/{teacher_id}/delete | POST
 /api/v1/academic-director/academic/attendance | POST
+/api/v1/academic-director/academic/classes | POST
 /api/v1/academic-director/academic/coins | POST
 /api/v1/academic-director/academic/context | GET
 /api/v1/academic-director/academic/enrollments/{enrollment_id}/group | PATCH
@@ -56,6 +57,7 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/admin/academic/attendance | POST
+/api/v1/admin/academic/classes | POST
 /api/v1/admin/academic/coins | POST
 /api/v1/admin/academic/context | GET
 /api/v1/admin/academic/enrollments/{enrollment_id}/group | PATCH

@@ -8,6 +8,7 @@ from backend.modules.academics.exam_filters import is_exam_performance_row
 from backend.modules.academics import canonical
 from backend.modules.academics.service import (
     create_group_from_program,
+    create_class,
     create_schedule,
     create_school,
     create_student_with_enrollment,
@@ -35,10 +36,24 @@ def create_group_from_payload(payload):
     program_subject_key = str(payload.get("program_subject_key", "") or "").strip()
     group_name = str(payload.get("group_name", "") or "").strip()
     group_code = str(payload.get("group_code", "") or "").strip()
+    class_id = int(payload.get("class_id", 0) or 0)
+    set_name = str(payload.get("set_name", "Set 1") or "Set 1").strip()
     if not school_code or not program_subject_key or not group_name:
         raise ValueError("Client school, subject program, and group name are required.")
-    create_group_from_program(school_code, program_subject_key, group_name, group_code)
+    create_group_from_program(
+        school_code, program_subject_key, group_name, group_code,
+        class_id=class_id, set_name=set_name,
+    )
     return {"school_code": school_code}
+
+
+def create_class_from_payload(payload):
+    school_code = str(payload.get("school_code", "") or "").strip()
+    class_name = str(payload.get("class_name", "") or "").strip()
+    class_code = str(payload.get("class_code", "") or "").strip()
+    if not school_code or not class_name:
+        raise ValueError("Client school and class name are required.")
+    return create_class(school_code, class_name, class_code)
 
 
 def delete_group(group_id):
@@ -122,6 +137,7 @@ def create_schedule_from_payload(payload):
         weekdays=payload.get("weekdays", []),
         start_time=payload.get("start_time", ""),
         end_time=payload.get("end_time", ""),
+        lesson_duration_minutes=int(payload.get("lesson_duration_minutes", 0) or 0),
         start_date=payload.get("start_date", ""),
         end_date=payload.get("end_date", ""),
         room=payload.get("room", ""),
