@@ -616,19 +616,30 @@ export type Enrollment = {
   disqualificationReason?: string;
   disqualifiedAt?: string;
   attendance: Record<string, string>;
+  attendanceByLessonId?: Record<string, string>;
   homework: Record<string, number>;
+  homeworkByLessonId?: Record<string, number>;
   exams?: Record<string, number>;
   examAttempts?: Record<string, string>;
   examDates?: Record<string, string>;
 };
 
 export type GradebookData = {
-  group: { id: number; name: string; subjectName: string; schoolCode: string };
+  group: { id: number; name: string; subjectName: string; schoolCode: string; examCount?: number };
   lessons: Lesson[];
   enrollments: Enrollment[];
   examLabels?: string[];
   examDates?: Record<string, string>;
   allEnrollments?: Enrollment[];
+  pageInfo?: {
+    totalLessons: number;
+    startIndex: number;
+    endIndex: number;
+    previousCursor?: string | null;
+    nextCursor?: string | null;
+    hasPrevious: boolean;
+    hasNext: boolean;
+  };
 };
 
 

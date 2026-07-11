@@ -1,5 +1,5 @@
-import { Fragment, useState, useEffect, useRef } from "react";
-import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, Layers, Pencil, Plus, RotateCcw, Settings, Users, X } from "lucide-react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
+import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Search, Settings, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -39,6 +39,15 @@ type ActiveExamCell = {
   examLabel: string;
   attempt: string;
 };
+
+type GradebookView = "gradebook" | "academic" | "ep" | "timetable";
+type GradebookLoadOptions = { view?: GradebookView; cursor?: string; anchorDate?: string; force?: boolean };
+
+const GRADEBOOK_LESSON_WINDOW = 12;
+
+function gradebookSection(view: GradebookView) {
+  return view === "ep" ? "exams" : view;
+}
 
 function CompactChartTooltip({
   active,
@@ -99,6 +108,7 @@ export function GroupGradebook({
   const [active, setActive] = useState<ActiveCell | null>(null);
   const [hwInput, setHwInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [cellError, setCellError] = useState("");
   const [statusSavingId, setStatusSavingId] = useState<number | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Enrollment | null>(null);
   useDismissibleLayer({
@@ -111,7 +121,11 @@ export function GroupGradebook({
   const [activeExam, setActiveExam] = useState<ActiveExamCell | null>(null);
   const [examInput, setExamInput] = useState("");
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"gradebook" | "academic" | "ep" | "timetable">("gradebook");
+  const [activeView, setActiveView] = useState<GradebookView>("gradebook");
+  const [loadedView, setLoadedView] = useState<GradebookView>("gradebook");
+  const [lessonCursor, setLessonCursor] = useState("");
+  const [lessonJumpInput, setLessonJumpInput] = useState("");
+  const [lessonDateInput, setLessonDateInput] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState("");
@@ -146,15 +160,19 @@ export function GroupGradebook({
   const [lessonNameInput, setLessonNameInput] = useState("");
   const [lessonTopicInput, setLessonTopicInput] = useState("");
   const [cancellationReason, setCancellationReason] = useState("");
+  const gradebookCacheRef = useRef(new Map<string, GradebookData>());
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    load(groupId, controller.signal);
+    load(groupId, controller.signal, { view: "gradebook", cursor: "", force: true });
     return () => controller.abort();
   }, [groupId]);
 
   useEffect(() => {
     setActiveView("gradebook");
+    setLoadedView("gradebook");
+    setData(null);
     setSelectedStudent(null);
     setIndicatorMonth("all");
     setIndicatorYear("all");
@@ -164,6 +182,10 @@ export function GroupGradebook({
     setExamInput("");
     setScheduleEdit(null);
     setLessonAction(null);
+    setLessonCursor("");
+    setLessonJumpInput("");
+    setLessonDateInput("");
+    gradebookCacheRef.current.clear();
   }, [groupId]);
 
   useEffect(() => {
@@ -186,21 +208,103 @@ export function GroupGradebook({
     return () => document.removeEventListener("mousedown", handler);
   }, [scheduleEdit, scheduleSaving]);
 
-  async function load(id: number, signal?: AbortSignal) {
+  async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", signal?: AbortSignal) {
+    const section = gradebookSection(view);
+    const response = await fetch(academicRoutes.adminAcademicGradebookApi(id, {
+      lessonLimit: section === "gradebook" ? GRADEBOOK_LESSON_WINDOW : undefined,
+      cursor: section === "gradebook" ? cursor : undefined,
+      anchorDate: section === "gradebook" ? anchorDate : undefined,
+      section,
+    }), { signal });
+    const json = await response.json();
+    if (!apiSucceeded(response, json)) throw new Error(apiErrorMessage(json, "Failed to load."));
+    return apiData<GradebookData>(json);
+  }
+
+  async function load(id: number, signal?: AbortSignal, options: GradebookLoadOptions = {}) {
+    const view = options.view ?? activeView;
+    const cursor = options.cursor ?? (view === "gradebook" ? lessonCursor : "");
+    const anchorDate = options.anchorDate ?? "";
+    const cacheKey = `${id}:${view}:${cursor || `anchor:${anchorDate || "today"}`}`;
+    const cached = options.force ? undefined : gradebookCacheRef.current.get(cacheKey);
+    if (cached) {
+      loadRequestRef.current += 1;
+      setLoading(false);
+      setError("");
+      setData(cached);
+      setLoadedView(view);
+      if (view === "gradebook") setLessonCursor(`o${cached.pageInfo?.startIndex ?? 0}`);
+      return;
+    }
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     setError("");
     setActive(null);
     try {
-      const res = await fetch(academicRoutes.adminAcademicGradebookApi(id), { signal });
-      const json = await res.json();
-      if (apiSucceeded(res, json)) setData(apiData<GradebookData>(json));
-      else setError(apiErrorMessage(json, "Failed to load."));
+      const nextData = await fetchGradebookData(id, view, cursor, anchorDate, signal);
+      if (requestId !== loadRequestRef.current) return;
+      gradebookCacheRef.current.set(cacheKey, nextData);
+      setData(nextData);
+      setLoadedView(view);
+      if (view === "gradebook") {
+        const resolvedCursor = `o${nextData.pageInfo?.startIndex ?? 0}`;
+        gradebookCacheRef.current.set(`${id}:gradebook:${resolvedCursor}`, nextData);
+        setLessonCursor(resolvedCursor);
+        for (const adjacentCursor of [nextData.pageInfo?.previousCursor, nextData.pageInfo?.nextCursor]) {
+          if (!adjacentCursor) continue;
+          const adjacentKey = `${id}:gradebook:${adjacentCursor}`;
+          if (gradebookCacheRef.current.has(adjacentKey)) continue;
+          void fetchGradebookData(id, "gradebook", adjacentCursor)
+            .then((page) => gradebookCacheRef.current.set(adjacentKey, page))
+            .catch(() => undefined);
+        }
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
-      setError("Network error.");
+      if (requestId === loadRequestRef.current) setError(err instanceof Error ? err.message : "Network error.");
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
+  }
+
+  function changeView(view: GradebookView) {
+    setActiveView(view);
+    void load(groupId, undefined, { view, cursor: view === "gradebook" ? lessonCursor : "" });
+  }
+
+  function openLessonWindow(cursor: string | null | undefined) {
+    if (!cursor || loading) return;
+    setLessonCursor(cursor);
+    void load(groupId, undefined, { view: "gradebook", cursor });
+  }
+
+  function jumpToLessonWindow(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const lessonNumber = Math.max(1, Number.parseInt(lessonJumpInput, 10) || 1);
+    const total = data?.pageInfo?.totalLessons || lessonNumber;
+    const start = Math.max(0, Math.min(lessonNumber - 1, Math.max(0, total - GRADEBOOK_LESSON_WINDOW)));
+    openLessonWindow(`o${start}`);
+  }
+
+  function jumpToLessonDate() {
+    if (!lessonDateInput || loading) return;
+    setLessonCursor("");
+    void load(groupId, undefined, { view: "gradebook", cursor: "", anchorDate: lessonDateInput, force: true });
+  }
+
+  function jumpToToday() {
+    setLessonCursor("");
+    setLessonDateInput("");
+    void load(groupId, undefined, { view: "gradebook", cursor: "", force: true });
+  }
+
+  async function refreshCurrentView() {
+    gradebookCacheRef.current.clear();
+    await load(groupId, undefined, {
+      view: activeView,
+      cursor: activeView === "gradebook" ? lessonCursor : "",
+      force: true,
+    });
   }
 
   function openLessonAction(kind: "edit" | "cancel" | "recover", lesson: Lesson) {
@@ -240,8 +344,12 @@ export function GroupGradebook({
         return;
       }
       const payload = apiData<{ gradebook?: GradebookData }>(json);
-      if (payload.gradebook) setData(payload.gradebook);
-      else await load(groupId);
+      if (payload.gradebook) {
+        gradebookCacheRef.current.clear();
+        setData(payload.gradebook);
+        setLoadedView(activeView);
+      }
+      else await refreshCurrentView();
       const message = isEdit
         ? "Lesson content updated. Its timetable date was kept."
         : lessonAction.kind === "cancel"
@@ -338,7 +446,7 @@ export function GroupGradebook({
       setSetupInitial(JSON.stringify(setupForm));
       if (Array.isArray(responseData.schedules)) setScheduleRows(responseData.schedules);
       setHasSavedSetup(true);
-      await load(groupId);
+      await refreshCurrentView();
       setSetupOpen(false);
       showSetupToast(`${asNumber(result.affectedLessonCount)} lessons scheduled.`);
     } catch {
@@ -364,7 +472,7 @@ export function GroupGradebook({
       }
       const student = apiData<{ student?: Record<string, unknown> }>(json).student || {};
       setCreatedStudent(student);
-      await load(groupId);
+      await refreshCurrentView();
       showSetupToast(`${studentName.trim()} added to the group.`);
     } catch {
       setStudentError("Network error while adding the student.");
@@ -384,6 +492,7 @@ export function GroupGradebook({
     if (kind === "hw" && !lessonCanHaveHomework(lesson)) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setActiveExam(null);
+    setCellError("");
     setActive({ enrollmentId, lesson, kind, anchorRect: rect });
     setHwInput(currentHw !== undefined ? String(currentHw) : "");
   }
@@ -391,6 +500,7 @@ export function GroupGradebook({
   function close() {
     setActive(null);
     setSaving(false);
+    setCellError("");
   }
 
   async function saveAtt(status: AttValue) {
@@ -412,11 +522,13 @@ export function GroupGradebook({
       });
       const json = await res.json().catch(() => ({}));
       if (!apiSucceeded(res, json)) {
-        setError(apiErrorMessage(json, "Unable to update attendance."));
+        setCellError(apiErrorMessage(json, "Unable to update attendance."));
         return;
       }
-      patchAtt(active.enrollmentId, active.lesson.lessonNumber, status);
+      patchAtt(active.enrollmentId, active.lesson.id, active.lesson.lessonNumber, status);
       close();
+    } catch {
+      setCellError("Network error. Check the connection and try this cell again.");
     } finally {
       setSaving(false);
     }
@@ -427,11 +539,11 @@ export function GroupGradebook({
     const score = parseFloat(hwInput);
     if (isNaN(score)) return;
     if (score < 1 || score > 9) {
-      setError("Homework score must be between 1 and 9.");
+      setCellError("Homework score must be between 1 and 9.");
       return;
     }
     setSaving(true);
-    setError("");
+    setCellError("");
     try {
       const res = await fetch(academicRoutes.adminAcademicHomeworkApi, {
         method: "POST",
@@ -448,17 +560,21 @@ export function GroupGradebook({
       });
       const json = await res.json();
       if (!apiSucceeded(res, json)) {
-        setError(apiErrorMessage(json, "Unable to update homework score."));
+        setCellError(apiErrorMessage(json, "Unable to update homework score."));
         return;
       }
-      patchHw(active.enrollmentId, active.lesson.lessonNumber, score);
+      const result = apiData<{ studentSummary?: { averageGrade?: number } }>(json);
+      patchHw(active.enrollmentId, active.lesson.id, active.lesson.lessonNumber, score, result.studentSummary?.averageGrade);
       close();
+    } catch {
+      setCellError("Network error. Check the connection and try this cell again.");
     } finally {
       setSaving(false);
     }
   }
 
-  function patchAtt(enrollmentId: number, lessonNumber: string, status: AttValue) {
+  function patchAtt(enrollmentId: number, lessonId: number, lessonNumber: string, status: AttValue) {
+    gradebookCacheRef.current.clear();
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -466,15 +582,19 @@ export function GroupGradebook({
         enrollments: prev.enrollments.map((en) => {
           if (en.enrollmentId !== enrollmentId) return en;
           const att = { ...en.attendance };
+          const byLessonId = { ...(en.attendanceByLessonId || {}) };
           if (status) att[lessonNumber] = status;
           else delete att[lessonNumber];
-          return { ...en, attendance: att };
+          if (status) byLessonId[String(lessonId)] = status;
+          else delete byLessonId[String(lessonId)];
+          return { ...en, attendance: att, attendanceByLessonId: byLessonId };
         }),
       };
     });
   }
 
-  function patchHw(enrollmentId: number, lessonNumber: string, score: number) {
+  function patchHw(enrollmentId: number, lessonId: number, lessonNumber: string, score: number, averageGrade?: number) {
+    gradebookCacheRef.current.clear();
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -482,13 +602,19 @@ export function GroupGradebook({
         enrollments: prev.enrollments.map((en) =>
           en.enrollmentId !== enrollmentId
             ? en
-            : { ...en, homework: { ...en.homework, [lessonNumber]: score } },
+            : {
+                ...en,
+                averageGrade: averageGrade ?? en.averageGrade,
+                homework: { ...en.homework, [lessonNumber]: score },
+                homeworkByLessonId: { ...(en.homeworkByLessonId || {}), [String(lessonId)]: score },
+              },
         ),
       };
     });
   }
 
   function patchExam(enrollmentId: number, examLabel: string, score: number) {
+    gradebookCacheRef.current.clear();
     setData((prev) => {
       if (!prev) return prev;
       const update = (en: Enrollment) =>
@@ -581,7 +707,7 @@ export function GroupGradebook({
         return;
       }
       setSelectedStudent(null);
-      await load(groupId);
+      await refreshCurrentView();
     } catch {
       setError("Network error.");
     } finally {
@@ -606,7 +732,7 @@ export function GroupGradebook({
       }
       setSelectedStudent(null);
       setMoveGroupId("");
-      await load(groupId);
+      await refreshCurrentView();
     } catch {
       setError("Network error.");
     } finally {
@@ -623,6 +749,23 @@ export function GroupGradebook({
 
   function lessonCanHaveHomework(lesson: Lesson) {
     return !isCancelledLesson(lesson) && lesson.hasHomework !== false;
+  }
+
+  function moveGradebookCellFocus(event: React.KeyboardEvent<HTMLButtonElement>, row: number, column: number) {
+    const offsets: Record<string, [number, number]> = {
+      ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+    };
+    if (event.key === "Escape") {
+      close();
+      return;
+    }
+    const offset = offsets[event.key];
+    if (!offset) return;
+    event.preventDefault();
+    const target = document.querySelector<HTMLButtonElement>(
+      `[data-gradebook-cell="${row + offset[0]}:${column + offset[1]}"]`,
+    );
+    target?.focus();
   }
 
   function lessonDateToInputValue(value: string) {
@@ -812,13 +955,16 @@ export function GroupGradebook({
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
   const timetableGroups = groupLessonsByDate(lessons);
 
-  const academicPeriodOptions = collectPeriodOptions(lessons.map((lesson) => lesson.date));
+  const academicPeriodOptions = useMemo(() => collectPeriodOptions(lessons.map((lesson) => lesson.date)), [lessons]);
   const indicatorFilterActive = indicatorMonth !== "all" || indicatorYear !== "all";
-  const metricLessons = lessons.filter((lesson) => !isCancelledLesson(lesson));
-  const indicatorLessons = indicatorFilterActive
-    ? metricLessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
-    : metricLessons;
-  const examTypeOptions = collectExamTypeOptions(examLabels);
+  const metricLessons = useMemo(() => lessons.filter((lesson) => !isCancelledLesson(lesson)), [lessons]);
+  const indicatorLessons = useMemo(
+    () => indicatorFilterActive
+      ? metricLessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
+      : metricLessons,
+    [indicatorFilterActive, indicatorMonth, indicatorYear, metricLessons],
+  );
+  const examTypeOptions = useMemo(() => collectExamTypeOptions(examLabels), [examLabels]);
   const selectedExamType = examType === "all" ? null : examTypeOptions.find((option) => option.key === examType) || null;
   const selectedExamTypeValue = selectedExamType ? selectedExamType.key : "all";
   const selectedExamLabels = selectedExamType ? selectedExamType.labels : examLabels;
@@ -827,14 +973,14 @@ export function GroupGradebook({
     EXAM_TABLE_STUDENT_COL_WIDTH + selectedExamLabels.length * EXAM_TABLE_SCORE_COL_WIDTH,
   );
 
-  const academicIndicatorData = enrollments.map(en => {
+  const academicIndicatorData = useMemo(() => enrollments.map(en => {
     const homeworkScores = indicatorLessons
-      .map((lesson) => scoreOutOfNine(en.homework[lesson.lessonNumber]))
+      .map((lesson) => scoreOutOfNine(en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber]))
       .filter((score) => score > 0);
     const filteredAAP = averageScore(homeworkScores);
     const aap = filteredAAP ?? (indicatorFilterActive ? null : scoreOutOfNine(en.averageGrade) || null);
     const attendanceValues = indicatorLessons
-      .map((lesson) => en.attendance[lesson.lessonNumber])
+      .map((lesson) => en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber])
       .filter((status) => ["present", "absent", "justified"].includes(status));
     const present = attendanceValues.filter((status) => status === "present").length;
     const total = attendanceValues.length;
@@ -852,7 +998,7 @@ export function GroupGradebook({
       present,
       total,
     };
-  });
+  }), [enrollments, indicatorFilterActive, indicatorLessons]);
   const hasAcademicIndicatorData = academicIndicatorData.some((row) => row.AAP !== null || row.AR !== null);
   const academicAverageAAP = averageScore(academicIndicatorData.map((row) => row.AAP));
   const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
@@ -945,7 +1091,7 @@ export function GroupGradebook({
           )}
           {data && (
             <span className="text-xs text-muted-foreground">
-              {enrollments.length} active · {disqualifiedEnrollments.length} disqualified · {bannedEnrollments.length} banned · {lessons.length} lessons · {examLabels.length} exams
+              {enrollments.length} active · {disqualifiedEnrollments.length} disqualified · {bannedEnrollments.length} banned · {data.pageInfo?.totalLessons ?? lessons.length} lessons · {data.group.examCount ?? examLabels.length} exams
             </span>
           )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -983,7 +1129,7 @@ export function GroupGradebook({
               <button
                 key={view}
                 type="button"
-                onClick={() => setActiveView(view)}
+                onClick={() => changeView(view)}
                 className={`border-b-2 px-4 py-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${motion.button} ${
                   isActive
                     ? "border-primary text-primary"
@@ -998,7 +1144,7 @@ export function GroupGradebook({
       )}
 
       {/* 4. Active Panel Content */}
-      {data && activeView === "gradebook" && (
+      {data && activeView === "gradebook" && loadedView === "gradebook" && (
         lessons.length === 0 ? (
           <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">
             No lessons found for this group.
@@ -1014,8 +1160,28 @@ export function GroupGradebook({
           >
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/8 px-4 py-3">
               <div><p className="text-sm font-bold">Gradebook</p><p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p></div>
-              <button type="button" onClick={() => { setStudentOpen(true); setStudentName(""); setStudentError(""); setCreatedStudent(null); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground"><Plus className="h-4 w-4" /> New Student</button>
+              <button type="button" onClick={() => { setStudentOpen(true); setStudentName(""); setStudentError(""); setCreatedStudent(null); }} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground sm:min-h-9"><Plus className="h-4 w-4" /> New Student</button>
             </div>
+            {data.pageInfo ? (
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/20 px-3 py-2">
+                <div className="flex items-center gap-1.5">
+                  <button type="button" aria-label="Previous lessons" disabled={!data.pageInfo.hasPrevious || loading} onClick={() => openLessonWindow(data.pageInfo?.previousCursor)} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronLeft className="h-4 w-4" /></button>
+                  <span className="min-w-32 text-center text-xs font-bold tabular-nums">Lessons {data.pageInfo.startIndex + 1}–{data.pageInfo.endIndex} of {data.pageInfo.totalLessons}</span>
+                  <button type="button" aria-label="Next lessons" disabled={!data.pageInfo.hasNext || loading} onClick={() => openLessonWindow(data.pageInfo?.nextCursor)} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronRight className="h-4 w-4" /></button>
+                  <button type="button" disabled={loading} onClick={jumpToToday} className="h-11 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary disabled:opacity-50 sm:h-9">Today</button>
+                </div>
+                <div className="flex flex-1 flex-wrap items-center justify-end gap-1.5">
+                  <form onSubmit={jumpToLessonWindow} className="flex items-center gap-1">
+                    <label className="sr-only" htmlFor="gradebook-lesson-jump">Jump to lesson number</label>
+                    <input id="gradebook-lesson-jump" type="number" min={1} max={data.pageInfo.totalLessons} value={lessonJumpInput} onChange={(event) => setLessonJumpInput(event.target.value)} placeholder="Lesson #" className="h-11 w-24 rounded-lg border border-foreground/10 bg-background px-2 text-sm sm:h-9" />
+                    <button type="submit" disabled={!lessonJumpInput || loading} className="h-11 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold disabled:opacity-40 sm:h-9">Go</button>
+                  </form>
+                  <label className="sr-only" htmlFor="gradebook-date-jump">Jump to lesson date</label>
+                  <input id="gradebook-date-jump" type="date" value={lessonDateInput} onChange={(event) => setLessonDateInput(event.target.value)} className="h-11 rounded-lg border border-foreground/10 bg-background px-2 text-sm sm:h-9" />
+                  <button type="button" aria-label="Find lessons by date" disabled={!lessonDateInput || loading} onClick={jumpToLessonDate} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background disabled:opacity-40 sm:h-9 sm:w-9"><Search className="h-4 w-4" /></button>
+                </div>
+              </div>
+            ) : null}
             <div className="miniapp-table-scroll min-h-0 flex-1 pb-8 [scrollbar-gutter:stable]">
               <table
                 className="table-fixed border-collapse text-left text-[11px] sm:text-xs"
@@ -1090,7 +1256,7 @@ export function GroupGradebook({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-foreground/5 bg-surface">
-                  {enrollments.map((en) => (
+                  {enrollments.map((en, enrollmentIndex) => (
                     <tr key={en.enrollmentId} className="transition-colors hover:bg-primary/[0.025]">
                       <td
                         className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
@@ -1123,9 +1289,9 @@ export function GroupGradebook({
                       >
                         {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
                       </td>
-                      {lessons.map((lesson) => {
-                        const att = (en.attendance[lesson.lessonNumber] || "") as AttValue;
-                        const hw = en.homework[lesson.lessonNumber];
+                      {lessons.map((lesson, lessonIndex) => {
+                        const att = (en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber] ?? "") as AttValue;
+                        const hw = en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber];
                         const cancelled = isCancelledLesson(lesson);
                         const canEditHomework = lessonCanHaveHomework(lesson);
                         const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
@@ -1149,9 +1315,11 @@ export function GroupGradebook({
                             <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_ATT_COL_WIDTH }}>
                               <button
                                 type="button"
+                                data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2}`}
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
+                                onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                                className={`mx-auto flex h-8 w-9 items-center justify-center rounded-lg text-[11px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-9 sm:text-[10px] ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
+                                className={`mx-auto flex h-11 w-11 items-center justify-center rounded-lg text-[11px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-9 sm:text-[10px] ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
                               >
                                 {att ? attLabel(att) : "·"}
                               </button>
@@ -1159,10 +1327,12 @@ export function GroupGradebook({
                             <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_HW_COL_WIDTH }}>
                               <button
                                 type="button"
+                                data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2 + 1}`}
                                 disabled={!canEditHomework}
                                 onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
+                                onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2 + 1)}
                                 title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`mx-auto flex h-8 min-w-10 items-center justify-center rounded-lg px-2 text-[11px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-10 sm:text-[10px] ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
+                                className={`mx-auto flex h-11 min-w-11 items-center justify-center rounded-lg px-2 text-[11px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-10 sm:text-[10px] ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
                               >
                                 {canEditHomework && hw !== undefined ? hw : "·"}
                               </button>
@@ -1179,7 +1349,7 @@ export function GroupGradebook({
         )
       )}
 
-      {data && activeView === "academic" && (
+      {data && activeView === "academic" && loadedView === "academic" && (
         <div className={`${panelCardClass} p-4`}>
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1288,7 +1458,7 @@ export function GroupGradebook({
         </div>
       )}
 
-      {data && activeView === "ep" && (
+      {data && activeView === "ep" && loadedView === "ep" && (
         <div className={`overflow-hidden ${panelCardClass}`}>
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-foreground/8 px-4 py-3">
             <div>
@@ -1506,7 +1676,7 @@ export function GroupGradebook({
         </div>
       )}
 
-      {data && activeView === "timetable" && (
+      {data && activeView === "timetable" && loadedView === "timetable" && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/8 bg-surface px-4 py-3 shadow-card">
             <div><h3 className="text-sm font-bold">Lesson Timetable</h3><p className="text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
@@ -1689,6 +1859,7 @@ export function GroupGradebook({
             </button>
           </div>
           <div className="p-3">
+            {cellError ? <p role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700">{cellError}</p> : null}
             {active.kind === "att" ? (
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Attendance</p>
@@ -1696,7 +1867,8 @@ export function GroupGradebook({
                   {(["present", "absent", "justified", ""] as AttValue[]).map((v) => {
                     const lbl = v ? attLabel(v) : "–";
                     const cls = v ? attCls(v) : "bg-muted text-muted-foreground";
-                    const currentAtt = data?.enrollments.find((e) => e.enrollmentId === active.enrollmentId)?.attendance[active.lesson.lessonNumber] ?? "";
+                    const currentEnrollment = data?.enrollments.find((e) => e.enrollmentId === active.enrollmentId);
+                    const currentAtt = currentEnrollment?.attendanceByLessonId?.[String(active.lesson.id)] ?? currentEnrollment?.attendance[active.lesson.lessonNumber] ?? "";
                     return (
                       <button
                         key={v}
@@ -1715,7 +1887,8 @@ export function GroupGradebook({
               <div className="space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Homework Score</p>
                 {(() => {
-                  const curHw = data?.enrollments.find((e) => e.enrollmentId === active.enrollmentId)?.homework[active.lesson.lessonNumber];
+                  const currentEnrollment = data?.enrollments.find((e) => e.enrollmentId === active.enrollmentId);
+                  const curHw = currentEnrollment?.homeworkByLessonId?.[String(active.lesson.id)] ?? currentEnrollment?.homework[active.lesson.lessonNumber];
                   return curHw !== undefined ? (
                     <p className="text-[10px] text-muted-foreground">Current: <span className="font-bold text-foreground">{curHw}</span></p>
                   ) : null;

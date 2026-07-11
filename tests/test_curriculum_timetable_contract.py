@@ -36,4 +36,4 @@ def test_timetable_opens_on_first_scheduled_lesson():
 
     assert "firstScheduledIso" in source
     assert "setCursor(firstLessonDate)" in source
-    assert "Scheduled program lessons" in source
+    assert "TimetableToolbar" in source

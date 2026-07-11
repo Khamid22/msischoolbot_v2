@@ -365,9 +365,10 @@ def create_group_from_program(
             academic_repository.update_group_class(
                 conn, int(existing["id"]), int(selected_class["id"]), set_name
             )
+            group_v2_id = int(existing["id"])
         else:
             legacy_group_id = _mint_legacy_id(conn, "groups", "legacy_group_id")
-            academic_repository.insert_group(
+            inserted_group = academic_repository.insert_group(
                 conn,
                 int(school["id"]),
                 int(program["id"]),
@@ -377,6 +378,8 @@ def create_group_from_program(
                 class_id=int(selected_class["id"]),
                 set_name=set_name,
             )
+            group_v2_id = int(inserted_group["id"])
+        timetable_repository.ensure_curriculum_lesson_sessions(conn, group_v2_id)
         conn.commit()
 
 

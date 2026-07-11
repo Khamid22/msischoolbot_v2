@@ -39,6 +39,7 @@ from backend.modules.academics.operations import (
     create_school_from_payload,
     delete_group,
     get_group_gradebook,
+    get_enrollment_gradebook_summary,
     list_admin_academic_context,
     move_enrollment_group_from_payload,
     record_attendance_from_payload,
@@ -159,9 +160,23 @@ def create_group_student(group_id: int, payload: AdminCreateGroupStudentRequest)
     operation_id="api_v1_academic_director_academic_gradebook",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def gradebook(group_id: int = 0):
+def gradebook(
+    group_id: int = 0,
+    lesson_limit: int = 0,
+    cursor: str = "",
+    direction: str = "",
+    anchor_date: str = "",
+    section: str = "all",
+):
     try:
-        result = get_group_gradebook(group_id)
+        result = get_group_gradebook(
+            group_id,
+            lesson_limit=lesson_limit,
+            lesson_cursor=cursor,
+            lesson_direction=direction,
+            anchor_date=anchor_date,
+            section=section,
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not result:
@@ -229,27 +244,29 @@ def move_enrollment_group(enrollment_id: int, payload: AdminEnrollmentGroupReque
 @router.post(
     "/attendance",
     operation_id="api_v1_academic_director_record_academic_attendance",
-    response_model=ApiSuccess[AdminRecordCreated],
+    response_model=ApiSuccess[dict[str, Any]],
 )
-def record_attendance(payload: AdminRecordAttendanceRequest):
+def record_attendance(payload: AdminRecordAttendanceRequest, user: CurrentUser = Depends(get_current_user)):
     try:
-        record_id = record_attendance_from_payload(_payload(payload))
+        record_id = record_attendance_from_payload(_payload(payload), user.staff_id)
+        summary = get_enrollment_gradebook_summary(payload.enrollment_id)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return api_success({"id": record_id})
+    return api_success({"id": record_id, "studentSummary": summary, "actorStaffId": user.staff_id})
 
 
 @router.post(
     "/homework",
     operation_id="api_v1_academic_director_record_academic_homework",
-    response_model=ApiSuccess[AdminRecordCreated],
+    response_model=ApiSuccess[dict[str, Any]],
 )
-def record_homework(payload: AdminRecordHomeworkRequest):
+def record_homework(payload: AdminRecordHomeworkRequest, user: CurrentUser = Depends(get_current_user)):
     try:
-        record_id = record_homework_from_payload(_payload(payload))
+        record_id = record_homework_from_payload(_payload(payload), user.staff_id)
+        summary = get_enrollment_gradebook_summary(payload.enrollment_id)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return api_success({"id": record_id})
+    return api_success({"id": record_id, "studentSummary": summary, "actorStaffId": user.staff_id})
 
 
 @router.patch(
@@ -274,7 +291,7 @@ def update_lesson(lesson_session_id: int, payload: AdminLessonUpdateRequest):
 def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, user: CurrentUser = Depends(get_current_user)):
     try:
         result = cancel_lesson_session(lesson_session_id, payload.reason, user.staff_id)
-        gradebook = get_group_gradebook(result["groupId"])
+        gradebook = get_group_gradebook(result["groupId"], section="timetable")
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
@@ -289,7 +306,7 @@ def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, use
 def recover_lesson(lesson_session_id: int, user: CurrentUser = Depends(get_current_user)):
     try:
         result = recover_lesson_session(lesson_session_id, user.staff_id)
-        gradebook = get_group_gradebook(result["groupId"])
+        gradebook = get_group_gradebook(result["groupId"], section="timetable")
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
@@ -299,14 +316,15 @@ def recover_lesson(lesson_session_id: int, user: CurrentUser = Depends(get_curre
 @router.post(
     "/exams",
     operation_id="api_v1_academic_director_record_academic_exam",
-    response_model=ApiSuccess[AdminRecordCreated],
+    response_model=ApiSuccess[dict[str, Any]],
 )
-def record_exam(payload: AdminRecordExamRequest):
+def record_exam(payload: AdminRecordExamRequest, user: CurrentUser = Depends(get_current_user)):
     try:
-        record_id = record_exam_from_payload(_payload(payload))
+        record_id = record_exam_from_payload(_payload(payload), user.staff_id)
+        summary = get_enrollment_gradebook_summary(payload.enrollment_id)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return api_success({"id": record_id})
+    return api_success({"id": record_id, "studentSummary": summary, "actorStaffId": user.staff_id})
 
 
 @router.post(

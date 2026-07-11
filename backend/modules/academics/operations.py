@@ -1,7 +1,7 @@
 """Admin-facing academic operations and payload shaping."""
 
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from backend.core.database import connect_auth_db
 from backend.modules.academics.exam_filters import is_exam_performance_row
@@ -282,54 +282,118 @@ def _parse_optional_lesson_time(value):
     return text.zfill(5)
 
 
-def _ensure_group_curriculum_lesson_sessions(conn, group_id):
-    """Materialize missing curriculum lessons so gradebooks show the full program."""
-    conn.execute(
-        """
-        INSERT INTO msi_v2.lesson_sessions (
-            group_id,
-            program_item_id,
-            status,
-            source_key,
-            source_kind,
-            source_label,
-            source_topic,
-            source_order,
-            source_file,
-            source_sheet,
-            created_at,
-            updated_at
-        )
-        SELECT
-            g.id,
-            spi.id,
-            'scheduled',
-            concat('curriculum:', g.id, ':', spi.id),
-            'lesson',
-            spi.lesson_number,
-            spi.title,
-            spi.item_order,
-            spi.source_file,
-            spi.sheet_name,
-            now(),
-            now()
-        FROM msi_v2.groups g
-        JOIN msi_v2.subject_program_items spi ON spi.program_id = g.program_id
-        WHERE g.id = %s
-          AND spi.item_type = 'lesson'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM msi_v2.lesson_sessions existing
-              WHERE existing.group_id = g.id
-                AND existing.program_item_id = spi.id
-          )
-        ON CONFLICT (source_key) WHERE source_key <> '' DO NOTHING
-        """,
-        (int(group_id),),
+def _gradebook_lesson_payload(lesson_rows, exception_rows):
+    items = [
+        {
+            "id": int(row["id"]),
+            "lessonNumber": str(row["lesson_number"]),
+            "topic": str(row["topic"] or ""),
+            "date": str(row["lesson_date"] or ""),
+            "startTime": str(row["start_time"] or ""),
+            "endTime": str(row["end_time"] or ""),
+            "room": str(row["room"] or ""),
+            "order": int(row["lesson_order"] or 0),
+            "status": str(row["status"] or "scheduled"),
+            "sourceKind": str(row["source_kind"] or ""),
+            "hasHomework": bool(row["has_homework"]),
+            "isCancellation": False,
+            "cancellationReason": "",
+            "exceptionId": None,
+            "canRecover": False,
+        }
+        for row in lesson_rows
+    ]
+    items.extend(
+        {
+            "id": -int(row["id"]),
+            "lessonSessionId": int(row["lesson_session_id"]),
+            "lessonNumber": f"{str(row['lesson_number'])} (Cancelled)",
+            "topic": str(row["reason"] or ""),
+            "date": str(row["lesson_date"] or ""),
+            "startTime": str(row["start_time"] or ""),
+            "endTime": str(row["end_time"] or ""),
+            "room": str(row["room"] or ""),
+            "order": int(row["lesson_order"] or 0),
+            "status": "cancelled",
+            "sourceKind": "cancellation",
+            "hasHomework": False,
+            "isCancellation": True,
+            "cancellationReason": str(row["reason"] or ""),
+            "exceptionId": int(row["id"]),
+            "canRecover": True,
+        }
+        for row in exception_rows
     )
 
+    def sort_key(item):
+        raw = str(item.get("date") or "")
+        try:
+            parsed = datetime.strptime(raw, "%d/%m/%Y").date()
+        except ValueError:
+            parsed = datetime.max.date()
+        return (parsed, str(item.get("startTime") or ""), 0 if item.get("isCancellation") else 1, int(item.get("order") or 0))
 
-def get_group_gradebook(group_id):
+    items.sort(key=sort_key)
+    return items
+
+
+def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_date=""):
+    total = len(items)
+    limit = max(0, min(int(limit or 0), 40))
+    if limit <= 0 or total <= limit:
+        return items, {
+            "totalLessons": total,
+            "startIndex": 0,
+            "endIndex": total,
+            "previousCursor": None,
+            "nextCursor": None,
+            "hasPrevious": False,
+            "hasNext": False,
+        }
+    start = None
+    cursor_text = str(cursor or "").strip().lower()
+    if cursor_text:
+        raw_offset = cursor_text[1:] if cursor_text.startswith("o") else cursor_text
+        try:
+            start = max(0, min(int(raw_offset), max(0, total - limit)))
+        except ValueError:
+            raise ValueError("Invalid Gradebook lesson cursor.")
+        normalized_direction = str(direction or "").strip().casefold()
+        if normalized_direction == "previous":
+            start = max(0, start - limit)
+        elif normalized_direction == "next":
+            start = min(max(0, total - limit), start + limit)
+        elif normalized_direction not in {"", "current"}:
+            raise ValueError("Invalid Gradebook lesson direction.")
+    if start is None:
+        anchor = canonical.parse_date(anchor_date) if str(anchor_date or "").strip() else date.today()
+        if not anchor:
+            raise ValueError("anchor_date must be a valid date.")
+        anchor_index = 0
+        for index, item in enumerate(items):
+            parsed = canonical.parse_date(item.get("date"))
+            if parsed and parsed >= anchor:
+                anchor_index = index
+                break
+        start = max(0, min(anchor_index - (limit // 2), max(0, total - limit)))
+    end = min(total, start + limit)
+    previous_start = max(0, start - limit)
+    next_start = min(max(0, total - limit), start + limit)
+    return items[start:end], {
+        "totalLessons": total,
+        "startIndex": start,
+        "endIndex": end,
+        "previousCursor": f"o{previous_start}" if start > 0 else None,
+        "nextCursor": f"o{next_start}" if end < total else None,
+        "hasPrevious": start > 0,
+        "hasNext": end < total,
+    }
+
+
+def get_group_gradebook(
+    group_id, *, lesson_limit=0, lesson_cursor="", lesson_direction="",
+    anchor_date="", section="all"
+):
     group_id = int(group_id or 0)
     if group_id <= 0:
         raise ValueError("group_id is required")
@@ -338,7 +402,16 @@ def get_group_gradebook(group_id):
         group_row = conn.execute(
             """
             SELECT g.id, g.legacy_group_id, g.group_name, g.group_code,
-                   s.school_key, subj.subject_name
+                   s.school_key, subj.subject_name,
+                   (SELECT count(*) FROM (
+                      SELECT lower(btrim(exam_item.title)) AS exam_key
+                      FROM msi_v2.subject_program_items exam_item
+                      WHERE exam_item.program_id = g.program_id AND exam_item.item_type = 'exam'
+                      UNION
+                      SELECT lower(btrim(result.exam_name)) AS exam_key
+                      FROM msi_v2.exam_results result
+                      WHERE result.group_id = g.id AND btrim(result.exam_name) <> ''
+                    ) known_exams) AS exam_count
             FROM msi_v2.groups g
             JOIN msi_v2.schools s ON s.id = g.school_id
             JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
@@ -349,9 +422,6 @@ def get_group_gradebook(group_id):
         ).fetchone()
         if not group_row:
             return None
-
-        _ensure_group_curriculum_lesson_sessions(conn, int(group_row["id"]))
-        conn.commit()
 
         lesson_rows = conn.execute(
             """
@@ -427,6 +497,22 @@ def get_group_gradebook(group_id):
             (int(group_row["id"]),),
         ).fetchall()
 
+        full_lesson_payload = _gradebook_lesson_payload(lesson_rows, exception_rows)
+        normalized_section = str(section or "all").strip().casefold()
+        if normalized_section not in {"all", "gradebook", "academic", "exams", "timetable"}:
+            raise ValueError("Unsupported Gradebook section.")
+        if normalized_section == "gradebook" or int(lesson_limit or 0) > 0:
+            lesson_payload, page_info = _gradebook_lesson_window(
+                full_lesson_payload,
+                limit=lesson_limit,
+                cursor=lesson_cursor,
+                direction=lesson_direction,
+                anchor_date=anchor_date,
+            )
+        else:
+            lesson_payload, page_info = _gradebook_lesson_window(full_lesson_payload, limit=0)
+        record_lesson_ids = [int(item["id"]) for item in lesson_payload if int(item["id"]) > 0]
+
         enrollment_rows = conn.execute(
             """
             SELECT gs.group_id, gs.student_id, gs.legacy_enrollment_id,
@@ -440,11 +526,13 @@ def get_group_gradebook(group_id):
             LEFT JOIN (
                 SELECT group_id, student_id, round(avg(score)::numeric, 1) AS average_grade
                 FROM msi_v2.homework_scores
+                WHERE group_id = %s
                 GROUP BY group_id, student_id
             ) hw ON hw.group_id = gs.group_id AND hw.student_id = gs.student_id
             LEFT JOIN (
                 SELECT student_id, sum(amount)::int AS total_coins
                 FROM msi_v2.coin_events
+                WHERE group_id = %s
                 GROUP BY student_id
             ) coins ON coins.student_id = gs.student_id
             WHERE gs.group_id = %s
@@ -457,7 +545,7 @@ def get_group_gradebook(group_id):
               END,
               s.full_name
             """,
-            (int(group_row["id"]),),
+            (int(group_row["id"]), int(group_row["id"]), int(group_row["id"])),
         ).fetchall()
 
         active_enrollment_rows = [
@@ -467,17 +555,22 @@ def get_group_gradebook(group_id):
         ]
         enrollment_ids = [int(row["legacy_enrollment_id"] or 0) for row in enrollment_rows if row["legacy_enrollment_id"]]
         attendance_by_enrollment = {}
+        attendance_by_lesson_id = {}
         homework_by_enrollment = {}
+        homework_by_lesson_id = {}
         exams_by_enrollment = {}
         exam_attempts_by_enrollment = {}
         exam_dates_by_enrollment = {}
         exam_dates_by_label = {}
         exam_labels = []
-        if enrollment_ids:
+        needs_lesson_records = normalized_section in {"all", "gradebook", "academic"}
+        needs_exam_records = normalized_section in {"all", "exams"}
+        if enrollment_ids and needs_lesson_records and record_lesson_ids:
             placeholders = ",".join(["%s"] * len(enrollment_ids))
+            lesson_placeholders = ",".join(["%s"] * len(record_lesson_ids))
             for row in conn.execute(
                 f"""
-                SELECT gs.legacy_enrollment_id AS enrollment_id,
+                SELECT gs.legacy_enrollment_id AS enrollment_id, ls.id AS lesson_session_id,
                        COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') AS lesson_label,
                        ar.attendance_status AS status
                 FROM msi_v2.attendance_records ar
@@ -486,20 +579,24 @@ def get_group_gradebook(group_id):
                 JOIN msi_v2.lesson_sessions ls ON ls.id = ar.lesson_session_id
                 LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
                 WHERE gs.legacy_enrollment_id IN ({placeholders})
+                  AND ar.lesson_session_id IN ({lesson_placeholders})
                   AND (
                     spi.item_type = 'lesson'
                     OR (ls.program_item_id IS NULL AND ls.source_key <> '')
                   )
                   AND COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') <> ''
                 """,
-                enrollment_ids,
+                [*enrollment_ids, *record_lesson_ids],
             ).fetchall():
                 attendance_by_enrollment.setdefault(int(row["enrollment_id"]), {})[
                     str(row["lesson_label"])
                 ] = str(row["status"])
+                attendance_by_lesson_id.setdefault(int(row["enrollment_id"]), {})[
+                    str(int(row["lesson_session_id"]))
+                ] = str(row["status"])
             for row in conn.execute(
                 f"""
-                SELECT gs.legacy_enrollment_id AS enrollment_id,
+                SELECT gs.legacy_enrollment_id AS enrollment_id, ls.id AS lesson_session_id,
                        COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') AS lesson_label,
                        hw.score
                 FROM msi_v2.homework_scores hw
@@ -508,17 +605,23 @@ def get_group_gradebook(group_id):
                 JOIN msi_v2.lesson_sessions ls ON ls.id = hw.lesson_session_id
                 LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
                 WHERE gs.legacy_enrollment_id IN ({placeholders})
+                  AND hw.lesson_session_id IN ({lesson_placeholders})
                   AND (
                     spi.item_type = 'lesson'
                     OR (ls.program_item_id IS NULL AND ls.source_key <> '')
                   )
                   AND COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, '') <> ''
                 """,
-                enrollment_ids,
+                [*enrollment_ids, *record_lesson_ids],
             ).fetchall():
                 homework_by_enrollment.setdefault(int(row["enrollment_id"]), {})[
                     str(row["lesson_label"])
                 ] = float(row["score"])
+                homework_by_lesson_id.setdefault(int(row["enrollment_id"]), {})[
+                    str(int(row["lesson_session_id"]))
+                ] = float(row["score"])
+        if enrollment_ids and needs_exam_records:
+            placeholders = ",".join(["%s"] * len(enrollment_ids))
             for row in conn.execute(
                 f"""
                 SELECT gs.legacy_enrollment_id AS enrollment_id,
@@ -569,58 +672,6 @@ def get_group_gradebook(group_id):
                 if label not in exam_labels:
                     exam_labels.append(label)
 
-    lesson_payload = [
-        {
-            "id": int(row["id"]),
-            "lessonNumber": str(row["lesson_number"]),
-            "topic": str(row["topic"] or ""),
-            "date": str(row["lesson_date"] or ""),
-            "startTime": str(row["start_time"] or ""),
-            "endTime": str(row["end_time"] or ""),
-            "room": str(row["room"] or ""),
-            "order": int(row["lesson_order"] or 0),
-            "status": str(row["status"] or "scheduled"),
-            "sourceKind": str(row["source_kind"] or ""),
-            "hasHomework": bool(row["has_homework"]),
-            "isCancellation": False,
-            "cancellationReason": "",
-            "exceptionId": None,
-            "canRecover": False,
-        }
-        for row in lesson_rows
-    ]
-    lesson_payload.extend(
-        {
-            "id": -int(row["id"]),
-            "lessonSessionId": int(row["lesson_session_id"]),
-            "lessonNumber": f"{str(row['lesson_number'])} (Cancelled)",
-            "topic": str(row["reason"] or ""),
-            "date": str(row["lesson_date"] or ""),
-            "startTime": str(row["start_time"] or ""),
-            "endTime": str(row["end_time"] or ""),
-            "room": str(row["room"] or ""),
-            "order": int(row["lesson_order"] or 0),
-            "status": "cancelled",
-            "sourceKind": "cancellation",
-            "hasHomework": False,
-            "isCancellation": True,
-            "cancellationReason": str(row["reason"] or ""),
-            "exceptionId": int(row["id"]),
-            "canRecover": True,
-        }
-        for row in exception_rows
-    )
-
-    def lesson_sort_key(item):
-        raw = str(item.get("date") or "")
-        try:
-            parsed = datetime.strptime(raw, "%d/%m/%Y").date()
-        except ValueError:
-            parsed = datetime.max.date()
-        return (parsed, str(item.get("startTime") or ""), 0 if item.get("isCancellation") else 1, int(item.get("order") or 0))
-
-    lesson_payload.sort(key=lesson_sort_key)
-
     return {
         "ok": True,
         "group": {
@@ -629,8 +680,10 @@ def get_group_gradebook(group_id):
             "code": str(group_row["group_code"] or ""),
             "schoolCode": str(group_row["school_key"]),
             "subjectName": str(group_row["subject_name"]),
+            "examCount": int(group_row["exam_count"] or 0),
         },
         "lessons": lesson_payload,
+        "pageInfo": page_info,
         "examLabels": exam_labels,
         "examDates": exam_dates_by_label,
         "enrollments": [
@@ -640,7 +693,9 @@ def get_group_gradebook(group_id):
                 "averageGrade": float(row["average_grade"] or 0),
                 "coins": int(row["coins"] or 0),
                 "attendance": attendance_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "attendanceByLessonId": attendance_by_lesson_id.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "homework": homework_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
+                "homeworkByLessonId": homework_by_lesson_id.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "exams": exams_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "examAttempts": exam_attempts_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
                 "examDates": exam_dates_by_enrollment.get(int(row["legacy_enrollment_id"] or 0), {}),
@@ -779,7 +834,7 @@ def move_enrollment_group(enrollment_id, group_id):
     return {"id": enrollment_id, "groupId": group_id}
 
 
-def record_attendance_from_payload(payload):
+def record_attendance_from_payload(payload, actor_staff_id=None):
     enrollment_id = int(payload.get("enrollment_id", 0))
     status = str(payload.get("status", "") or "").strip().casefold()
     status_aliases = {
@@ -819,21 +874,24 @@ def record_attendance_from_payload(payload):
         row = conn.execute(
             """
             INSERT INTO msi_v2.attendance_records (
-                lesson_session_id, group_id, student_id, attendance_status, created_at, updated_at
+                lesson_session_id, group_id, student_id, attendance_status,
+                recorded_by_staff_id, created_at, updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (lesson_session_id, student_id) DO UPDATE SET
                 attendance_status = excluded.attendance_status,
+                recorded_by_staff_id = excluded.recorded_by_staff_id,
                 updated_at = excluded.updated_at
             RETURNING id
             """,
-            (lesson["id"], enrollment["group_id"], enrollment["student_id"], status, _now(), _now()),
+            (lesson["id"], enrollment["group_id"], enrollment["student_id"], status,
+             int(actor_staff_id) if actor_staff_id else None, _now(), _now()),
         ).fetchone()
         conn.commit()
         return int(row["id"])
 
 
-def record_homework_from_payload(payload):
+def record_homework_from_payload(payload, actor_staff_id=None):
     enrollment_id = int(payload.get("enrollment_id", 0))
     score = float(payload.get("score", 0))
     if score < 1 or score > 9:
@@ -850,18 +908,57 @@ def record_homework_from_payload(payload):
         row = conn.execute(
             """
             INSERT INTO msi_v2.homework_scores (
-                lesson_session_id, group_id, student_id, score, score_scale, created_at, updated_at
+                lesson_session_id, group_id, student_id, score, score_scale,
+                recorded_by_staff_id, created_at, updated_at
             )
-            VALUES (%s, %s, %s, %s, 9, %s, %s)
+            VALUES (%s, %s, %s, %s, 9, %s, %s, %s)
             ON CONFLICT (lesson_session_id, student_id) DO UPDATE SET
                 score = excluded.score,
+                recorded_by_staff_id = excluded.recorded_by_staff_id,
                 updated_at = excluded.updated_at
             RETURNING id
             """,
-            (lesson["id"], enrollment["group_id"], enrollment["student_id"], score, _now(), _now()),
+            (lesson["id"], enrollment["group_id"], enrollment["student_id"], score,
+             int(actor_staff_id) if actor_staff_id else None, _now(), _now()),
         ).fetchone()
         conn.commit()
         return int(row["id"])
+
+
+def get_enrollment_gradebook_summary(enrollment_id):
+    with connect_auth_db() as conn:
+        enrollment = _get_v2_enrollment(conn, int(enrollment_id or 0))
+        if not enrollment:
+            raise ValueError("Enrollment not found.")
+        row = conn.execute(
+            """
+            SELECT
+              (SELECT COALESCE(round(avg(hw.score)::numeric, 1), 0)
+               FROM msi_v2.homework_scores hw
+               WHERE hw.group_id = %s AND hw.student_id = %s) AS average_grade,
+              (SELECT count(*)
+               FROM msi_v2.attendance_records ar
+               WHERE ar.group_id = %s AND ar.student_id = %s
+                 AND ar.attendance_status IN ('present', 'absent', 'justified')) AS attendance_total,
+              (SELECT count(*)
+               FROM msi_v2.attendance_records ar
+               WHERE ar.group_id = %s AND ar.student_id = %s
+                 AND ar.attendance_status = 'present') AS attendance_present
+            """,
+            (
+                int(enrollment["group_id"]), int(enrollment["student_id"]),
+                int(enrollment["group_id"]), int(enrollment["student_id"]),
+                int(enrollment["group_id"]), int(enrollment["student_id"]),
+            ),
+        ).fetchone()
+    total = int(row["attendance_total"] or 0)
+    present = int(row["attendance_present"] or 0)
+    return {
+        "averageGrade": float(row["average_grade"] or 0),
+        "attendancePresent": present,
+        "attendanceTotal": total,
+        "attendanceRate": round((present / total) * 100) if total else None,
+    }
 
 
 def update_lesson_session_from_payload(lesson_session_id, payload):
@@ -1059,7 +1156,7 @@ def recover_lesson_session(lesson_session_id, actor_staff_id=None):
         }
 
 
-def record_exam_from_payload(payload):
+def record_exam_from_payload(payload, actor_staff_id=None):
     enrollment_id = int(payload.get("enrollment_id", 0))
     exam_name = str(payload.get("exam_name") or payload.get("label") or "").strip()
     if not exam_name:
@@ -1088,9 +1185,9 @@ def record_exam_from_payload(payload):
             """
             INSERT INTO msi_v2.exam_results (
                 group_id, program_item_id, student_id, exam_name, attempt, score,
-                score_scale, created_at, updated_at
+                score_scale, recorded_by_staff_id, created_at, updated_at
             )
-            SELECT %s, %s, %s, %s, %s, %s, 9, %s, %s
+            SELECT %s, %s, %s, %s, %s, %s, 9, %s, %s, %s
             WHERE NOT EXISTS (
                 SELECT 1 FROM msi_v2.exam_results er
                 WHERE er.group_id = %s
@@ -1107,6 +1204,7 @@ def record_exam_from_payload(payload):
                 exam_name,
                 attempt,
                 score,
+                int(actor_staff_id) if actor_staff_id else None,
                 _now(),
                 _now(),
                 enrollment["group_id"],
@@ -1119,7 +1217,8 @@ def record_exam_from_payload(payload):
             row = conn.execute(
                 """
                 UPDATE msi_v2.exam_results
-                SET score = %s, program_item_id = COALESCE(%s, program_item_id), updated_at = %s
+                SET score = %s, program_item_id = COALESCE(%s, program_item_id),
+                    recorded_by_staff_id = %s, updated_at = %s
                 WHERE group_id = %s
                   AND student_id = %s
                   AND lower(exam_name) = lower(%s)
@@ -1129,6 +1228,7 @@ def record_exam_from_payload(payload):
                 (
                     score,
                     program_item["id"] if program_item else None,
+                    int(actor_staff_id) if actor_staff_id else None,
                     _now(),
                     enrollment["group_id"],
                     enrollment["student_id"],

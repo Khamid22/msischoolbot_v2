@@ -348,16 +348,17 @@ def update_group_class(conn, group_id, class_id, set_name):
 
 
 def insert_group(conn, school_id, program_id, group_name, group_code, legacy_group_id, *, class_id=None, set_name="Set 1"):
-    conn.execute(
+    return conn.execute(
         """
         INSERT INTO msi_v2.groups (
           school_id, program_id, group_name, group_code, status, legacy_group_id,
           class_id, set_name
         ) VALUES (%s, %s, %s, %s, 'active', %s, %s, %s)
+        RETURNING id
         """,
         (int(school_id), int(program_id), group_name, str(group_code or ""),
          int(legacy_group_id), int(class_id) if class_id else None, str(set_name or "Set 1")),
-    )
+    ).fetchone()
 
 
 def list_students_by_school_id(conn, school_id):

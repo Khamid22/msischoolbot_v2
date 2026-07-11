@@ -1,5 +1,17 @@
 import { apiRoutes } from "../api/routes.ts";
 
+type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; section?: string };
+
+const gradebookUrl = (base: string, groupId: number | string, query: GradebookQuery = {}) => {
+  const params = new URLSearchParams({ group_id: String(groupId) });
+  if (query.lessonLimit) params.set("lesson_limit", String(query.lessonLimit));
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.direction) params.set("direction", query.direction);
+  if (query.anchorDate) params.set("anchor_date", query.anchorDate);
+  if (query.section) params.set("section", query.section);
+  return `${base}?${params.toString()}`;
+};
+
 const adminStudentQuery = (school = "all") =>
   `school=${encodeURIComponent(String(school || "all"))}&embed=admin`;
 
@@ -79,7 +91,7 @@ export const routes = {
   adminAcademicScheduleCreate: "/api/v1/admin/academic/schedules",
   adminAcademicGroupSchedule: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/schedule`,
   adminAcademicGroupStudents: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/students`,
-  adminAcademicGradebookApi: (groupId: number | string) => `/api/v1/admin/academic/gradebook?group_id=${groupId}`,
+  adminAcademicGradebookApi: (groupId: number | string, query?: GradebookQuery) => gradebookUrl("/api/v1/admin/academic/gradebook", groupId, query),
   adminAcademicAttendanceApi: "/api/v1/admin/academic/attendance",
   adminAcademicHomeworkApi: "/api/v1/admin/academic/homework",
   adminAcademicExamApi: "/api/v1/admin/academic/exams",

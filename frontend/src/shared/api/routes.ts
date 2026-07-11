@@ -1,3 +1,15 @@
+type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; section?: string };
+
+function gradebookUrl(base: string, groupId: number | string, query: GradebookQuery = {}) {
+  const params = new URLSearchParams({ group_id: String(groupId) });
+  if (query.lessonLimit) params.set("lesson_limit", String(query.lessonLimit));
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.direction) params.set("direction", query.direction);
+  if (query.anchorDate) params.set("anchor_date", query.anchorDate);
+  if (query.section) params.set("section", query.section);
+  return `${base}?${params.toString()}`;
+}
+
 export const apiRoutes = {
   accountPassword: "/api/v1/auth/password",
   academicDirectorHeadOfDepartmentCreate: "/api/v1/academic-director/head-of-departments",
@@ -24,8 +36,8 @@ export const apiRoutes = {
   academicDirectorAcademicScheduleCreate: "/api/v1/academic-director/academic/schedules",
   academicDirectorAcademicGroupSchedule: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/schedule`,
   academicDirectorAcademicGroupStudents: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/students`,
-  academicDirectorAcademicGradebookApi: (groupId: number | string) =>
-    `/api/v1/academic-director/academic/gradebook?group_id=${groupId}`,
+  academicDirectorAcademicGradebookApi: (groupId: number | string, query?: GradebookQuery) =>
+    gradebookUrl("/api/v1/academic-director/academic/gradebook", groupId, query),
   academicDirectorAcademicAttendanceApi: "/api/v1/academic-director/academic/attendance",
   academicDirectorAcademicHomeworkApi: "/api/v1/academic-director/academic/homework",
   academicDirectorAcademicExamApi: "/api/v1/academic-director/academic/exams",
