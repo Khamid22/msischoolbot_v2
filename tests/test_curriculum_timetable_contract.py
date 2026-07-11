@@ -23,3 +23,11 @@ def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
     assert "Change Schedule" in panel
     assert 'title="Date supplied by the timetable"' in panel
     assert 'asString(group.setup_status) === "new"' in groups
+
+
+def test_timetable_opens_on_first_scheduled_lesson():
+    source = (ROOT / "frontend/src/features/management/academic/Timetable.tsx").read_text(encoding="utf-8")
+
+    assert "firstScheduledIso" in source
+    assert "setCursor(firstLessonDate)" in source
+    assert "Scheduled program lessons" in source

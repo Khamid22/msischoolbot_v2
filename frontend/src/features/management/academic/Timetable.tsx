@@ -551,6 +551,17 @@ export function TimetableCard({
   const [view, setView] = useState<ViewMode>("week");
   const [cursor, setCursor] = useState<Date>(() => new Date());
 
+  const firstScheduledIso = useMemo(
+    () => groups.map((group) => group.iso).filter(Boolean).sort()[0] || "",
+    [groups],
+  );
+
+  useEffect(() => {
+    if (!firstScheduledIso) return;
+    const firstLessonDate = new Date(`${firstScheduledIso}T00:00:00`);
+    if (!Number.isNaN(firstLessonDate.getTime())) setCursor(firstLessonDate);
+  }, [firstScheduledIso]);
+
   const groupsByIso = useMemo(() => {
     const map = new Map<string, TimetableDateGroup>();
     groups.forEach((group) => {
@@ -583,13 +594,13 @@ export function TimetableCard({
       <div className="shrink-0 px-4 pt-4">
         <p className="text-sm font-bold">Timetable</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {canEdit ? "Conducted lesson dates with class time and room · tap to edit" : "Conducted lesson dates with class time and room"}
+          {canEdit ? "Scheduled program lessons with class time and room · tap to edit" : "Scheduled program lessons with class time and room"}
         </p>
       </div>
       <TimetableToolbar view={view} onViewChange={setView} cursor={cursor} onCursorChange={setCursor} />
       {undatedCount > 0 ? (
         <p className="shrink-0 border-b border-foreground/8 bg-amber-50 px-4 py-1.5 text-[11px] font-semibold text-amber-800">
-          {undatedCount} lesson{undatedCount > 1 ? "s" : ""} without a conducted date — set a date from the Gradebook tab.
+          {undatedCount} lesson{undatedCount > 1 ? "s" : ""} not yet placed — configure them from Timetable setup.
         </p>
       ) : null}
       {datedLessonCount === 0 ? (
