@@ -287,7 +287,7 @@ export function ExamTypeFilter({
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
       <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground sm:justify-end">
         <Filter className="h-3.5 w-3.5" />
-        Exam type
+        Show
       </span>
       <select
         value={value}
