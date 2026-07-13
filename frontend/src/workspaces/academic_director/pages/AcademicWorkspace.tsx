@@ -100,15 +100,17 @@ export default function AcademicDirectorAcademicWorkspace(props: AcademicWorkspa
       active={meta.active}
       sectionClassName="gap-4"
     >
-      <PageHeader
-        title={meta.title}
-        subtitle={meta.subtitle}
-        badge={
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
-            Academic Director
-          </span>
-        }
-      />
+      {workspace !== "groups" ? (
+        <PageHeader
+          title={meta.title}
+          subtitle={meta.subtitle}
+          badge={
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-primary">
+              Academic Director
+            </span>
+          }
+        />
+      ) : null}
 
       {props.warning ? (
         <section className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
