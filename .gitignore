@@ -36,3 +36,5 @@ backend/static/react/
 migration_reports/*
 !migration_reports/*.redacted.md
 !migration_reports/README.md
+.env.backup*
+outputs/

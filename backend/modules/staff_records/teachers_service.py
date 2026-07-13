@@ -1,8 +1,3 @@
-"""Teacher application service.
-
-This module owns teacher profile/account helper behavior.
-"""
-
 import re
 import secrets
 
