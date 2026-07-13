@@ -8,10 +8,14 @@ from backend.core.http import ApiSuccess, api_success
 from backend.modules.academics.schemas import (
     CreateHeadOfDepartmentForm,
     HeadOfDepartmentCreated,
+    HeadOfDepartmentPasswordReset,
 )
 from backend.workspaces.academic_director.academics_api import router as academic_router
 from backend.workspaces.academic_director.staff_records_api import register_teacher_academy_routes
-from backend.modules.staff_records.registration import create_head_of_department_account
+from backend.modules.staff_records.registration import (
+    create_head_of_department_account,
+    reset_head_of_department_password,
+)
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.core.access import CurrentUser, get_current_user, require_role
 
@@ -52,6 +56,36 @@ def create_hod(
                 "status": "active",
                 "subject_name": credentials.get("subject_name", ""),
             },
+        }
+    )
+
+
+@router.post(
+    "/head-of-departments/{account_id}/reset-password",
+    operation_id="api_v1_academic_director_reset_hod_password",
+    response_model=ApiSuccess[HeadOfDepartmentPasswordReset],
+)
+def reset_hod_password(
+    account_id: int,
+    user: CurrentUser = Depends(get_current_user),
+):
+    reset, error_message, credentials = reset_head_of_department_password(
+        account_id,
+        actor_account_id=user.account_id,
+        actor_login=user.login,
+    )
+    if not reset:
+        status_code = 404 if "not found" in (error_message or "").casefold() else 400
+        raise HTTPException(status_code=status_code, detail=error_message or "Unable to reset password.")
+    invalidate_admin_page_context_cache()
+    return api_success(
+        {
+            "message": "Temporary password generated.",
+            "login": credentials.get("login", ""),
+            "temporary_password": credentials.get("temporary_password", ""),
+            "display_name": credentials.get("display_name", ""),
+            "must_change_password": True,
+            "updated_at": credentials.get("updated_at", ""),
         }
     )
 

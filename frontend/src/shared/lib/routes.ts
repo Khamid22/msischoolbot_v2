@@ -51,6 +51,7 @@ export const routes = {
   academicDirectorAnnouncements: "/academic-director/announcements",
   academicDirectorProfile: "/academic-director/profile",
   academicDirectorHeadOfDepartmentCreate: apiRoutes.academicDirectorHeadOfDepartmentCreate,
+  academicDirectorHeadOfDepartmentPasswordReset: apiRoutes.academicDirectorHeadOfDepartmentPasswordReset,
   academicDirectorTeacherAcademyCreate: apiRoutes.academicDirectorTeacherAcademyCreate,
   academicDirectorTeacherAcademyAssignmentUpdate: apiRoutes.academicDirectorTeacherAcademyAssignmentUpdate,
   academicDirectorTeacherAcademyAssessmentCreate: apiRoutes.academicDirectorTeacherAcademyAssessmentCreate,

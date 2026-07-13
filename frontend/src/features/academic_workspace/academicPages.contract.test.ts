@@ -71,6 +71,21 @@ describe("Head of Departments page", () => {
   it("opens details in the shared bottom sheet layer", () => {
     assert.match(src, /BottomSheet/);
   });
+
+  it("keeps passwords protected and supports a reveal-once reset flow", () => {
+    for (const token of [
+      "Password access",
+      "current password is protected",
+      "Reset password",
+      "Generate temporary password",
+      "shown once",
+      "Copy temporary password",
+      "academicDirectorHeadOfDepartmentPasswordReset",
+    ]) {
+      assert.match(src, new RegExp(token, "i"));
+    }
+    assert.doesNotMatch(src, /password_hash/);
+  });
 });
 
 describe("KPI grids", () => {

@@ -104,6 +104,38 @@ class _HodListConn:
         raise AssertionError(f"Unexpected SQL: {sql}")
 
 
+class _HodPasswordResetConn:
+    def __init__(self, *, account_status="active"):
+        self.account_status = account_status
+        self.params = []
+        self.committed = False
+
+    def execute(self, sql, params=None):
+        normalized_params = tuple(params or ())
+        self.params.append((sql, normalized_params))
+        if "FROM msi_v2.accounts" in sql and "FOR UPDATE" in sql:
+            return _Result(
+                {
+                    "id": 80,
+                    "login": "HOD0001",
+                    "full_name": "Head of Math Department",
+                    "status": self.account_status,
+                    "legacy_source_table": "msi_staff",
+                    "legacy_source_id": 40,
+                }
+            )
+        if "UPDATE msi_v2.accounts" in sql and "RETURNING session_version" in sql:
+            return _Result({"session_version": 4})
+        if "UPDATE msi_v2.msi_staff" in sql:
+            return _Result(None)
+        if "INSERT INTO msi_v2.audit_events" in sql:
+            return _Result(None)
+        raise AssertionError(f"Unexpected SQL: {sql}")
+
+    def commit(self):
+        self.committed = True
+
+
 def test_academic_director_hod_service_generates_hod_login_and_hashes_password():
     conn = _RegistrationConn()
 
@@ -191,6 +223,59 @@ def test_list_head_of_department_accounts_warns_when_scope_table_missing():
     assert "msi_v2.staff_subject_scopes" in result["warning"]
 
 
+def test_academic_director_password_reset_hashes_both_hod_credentials_and_invalidates_sessions(monkeypatch):
+    conn = _HodPasswordResetConn()
+    monkeypatch.setattr(staff_registration, "_generate_temporary_password", lambda: "SafePass4826")
+
+    reset, error, credentials = staff_registration._reset_head_of_department_password(
+        conn,
+        account_id=80,
+        actor_account_id=12,
+        actor_login="AD0001",
+        commit=True,
+    )
+
+    assert reset is True
+    assert error == ""
+    assert credentials["login"] == "HOD0001"
+    assert credentials["temporary_password"] == "SafePass4826"
+    assert credentials["must_change_password"] is True
+    assert conn.committed is True
+
+    canonical_update = next(item for item in conn.params if "UPDATE msi_v2.accounts" in item[0])
+    legacy_update = next(item for item in conn.params if "UPDATE msi_v2.msi_staff" in item[0])
+    canonical_hash = canonical_update[1][0]
+    legacy_hash = legacy_update[1][0]
+    assert canonical_hash == legacy_hash
+    assert canonical_hash != credentials["temporary_password"]
+    assert check_password_hash(canonical_hash, credentials["temporary_password"])
+    assert "must_change_password = true" in canonical_update[0]
+    assert "session_version = session_version + 1" in canonical_update[0]
+    assert "password_changed_at = NULL" in canonical_update[0]
+
+    audit = next(item for item in conn.params if "INSERT INTO msi_v2.audit_events" in item[0])
+    assert audit[1][0] == 12
+    assert audit[1][1] == 80
+    assert "SafePass4826" not in audit[1][2]
+    assert "account.password_reset" in audit[0]
+
+
+def test_disabled_head_of_department_password_cannot_be_reset(monkeypatch):
+    conn = _HodPasswordResetConn(account_status="disabled")
+    monkeypatch.setattr(staff_registration, "_generate_temporary_password", lambda: "SafePass4826")
+
+    reset, error, credentials = staff_registration._reset_head_of_department_password(
+        conn,
+        account_id=80,
+        actor_account_id=12,
+    )
+
+    assert reset is False
+    assert error == "Head of Department account is disabled."
+    assert credentials == {}
+    assert not any("UPDATE msi_v2.accounts" in sql for sql, _ in conn.params)
+
+
 def test_academic_director_can_create_hod_account_route(client, monkeypatch):
     import backend.workspaces.academic_director.api as academic_director_api
 
@@ -243,6 +328,74 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
     assert "account_id" not in body["headOfDepartment"]
     assert "staff_id" not in body["headOfDepartment"]
     assert "password_hash" not in body["headOfDepartment"]
+
+
+def test_academic_director_can_reset_hod_password_and_receives_it_once(client, monkeypatch):
+    import backend.workspaces.academic_director.api as academic_director_api
+
+    captured = {}
+
+    def fake_reset(account_id, **kwargs):
+        captured["account_id"] = account_id
+        captured.update(kwargs)
+        return (
+            True,
+            "",
+            {
+                "login": "HOD0001",
+                "temporary_password": "SafePass4826",
+                "display_name": "Head of Math Department",
+                "must_change_password": True,
+                "updated_at": "2026-07-13T10:00:00Z",
+            },
+        )
+
+    monkeypatch.setattr(academic_director_api, "reset_head_of_department_password", fake_reset)
+    monkeypatch.setattr(academic_director_api, "invalidate_admin_page_context_cache", lambda: None)
+    _set_session(
+        client,
+        {"auth_role": "academic_director", "auth_login": "AD0001", "account_id": 12},
+    )
+
+    response = client.post(
+        "/api/v1/academic-director/head-of-departments/80/reset-password",
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {
+        "message": "Temporary password generated.",
+        "login": "HOD0001",
+        "temporary_password": "SafePass4826",
+        "display_name": "Head of Math Department",
+        "must_change_password": True,
+        "updated_at": "2026-07-13T10:00:00Z",
+    }
+    assert captured == {
+        "account_id": 80,
+        "actor_account_id": 12,
+        "actor_login": "AD0001",
+    }
+
+
+def test_head_of_department_cannot_reset_another_hod_password(client, monkeypatch):
+    import backend.workspaces.academic_director.api as academic_director_api
+
+    def should_not_reset(*args, **kwargs):
+        raise AssertionError("role dependency must reject this request before password reset")
+
+    monkeypatch.setattr(academic_director_api, "reset_head_of_department_password", should_not_reset)
+    _set_session(
+        client,
+        {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80},
+    )
+
+    response = client.post(
+        "/api/v1/academic-director/head-of-departments/81/reset-password",
+        headers=XHR,
+    )
+
+    assert response.status_code == 403
 
 
 def test_head_of_department_workspace_route_loads(client, monkeypatch):

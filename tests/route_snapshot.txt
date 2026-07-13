@@ -52,6 +52,7 @@
 /api/v1/academic-director/academic/schedules | POST
 /api/v1/academic-director/academic/schools | POST
 /api/v1/academic-director/head-of-departments | POST
+/api/v1/academic-director/head-of-departments/{account_id}/reset-password | POST
 /api/v1/academic-director/teacher-academy | POST
 /api/v1/academic-director/teacher-academy/assignments/{assignment_id} | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments | POST

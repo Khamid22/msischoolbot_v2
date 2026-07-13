@@ -13,6 +13,8 @@ function gradebookUrl(base: string, groupId: number | string, query: GradebookQu
 export const apiRoutes = {
   accountPassword: "/api/v1/auth/password",
   academicDirectorHeadOfDepartmentCreate: "/api/v1/academic-director/head-of-departments",
+  academicDirectorHeadOfDepartmentPasswordReset: (accountId: number | string) =>
+    `/api/v1/academic-director/head-of-departments/${accountId}/reset-password`,
   academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy",
   academicDirectorTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
     `/api/v1/academic-director/teacher-academy/assignments/${assignmentId}`,

@@ -30,3 +30,12 @@ class HeadOfDepartmentCreated(BaseModel):
     message: str
     credentials: HeadOfDepartmentCredentials
     headOfDepartment: HeadOfDepartmentAccount
+
+
+class HeadOfDepartmentPasswordReset(BaseModel):
+    message: str
+    login: str
+    temporary_password: str
+    display_name: str = ""
+    must_change_password: bool = True
+    updated_at: str = ""

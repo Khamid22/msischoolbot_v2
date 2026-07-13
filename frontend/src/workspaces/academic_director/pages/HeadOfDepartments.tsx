@@ -5,7 +5,9 @@ import {
   CheckCircle2,
   Copy,
   Eye,
+  KeyRound,
   Plus,
+  RefreshCw,
   ShieldCheck,
   UserRoundCheck,
   UsersRound,
@@ -56,6 +58,14 @@ type GeneratedHodCredentials = {
   temporary_password?: string;
   display_name?: string;
   subject_name?: string;
+};
+
+type PasswordResetCredentials = {
+  login?: string;
+  temporary_password?: string;
+  display_name?: string;
+  must_change_password?: boolean;
+  updated_at?: string;
 };
 
 function asText(value: unknown) {
@@ -143,11 +153,22 @@ function DepartmentCard({
 
 function AccountDetailSheet({
   account,
+  resetting,
+  resetError,
+  resetCredentials,
+  onResetPassword,
+  onCopy,
   onClose,
 }: {
   account: HeadOfDepartmentAccount;
+  resetting: boolean;
+  resetError: string;
+  resetCredentials: PasswordResetCredentials | null;
+  onResetPassword: () => void;
+  onCopy: (value: string, label: string) => void;
   onClose: () => void;
 }) {
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const fields: Array<[string, string]> = [
     ["Name", accountName(account)],
     ["Account Login", asText(account.login) || "-"],
@@ -160,7 +181,12 @@ function AccountDetailSheet({
   ];
 
   return (
-    <BottomSheet title={accountName(account)} subtitle="Head of Department account" onClose={onClose}>
+    <BottomSheet
+      title={accountName(account)}
+      subtitle="Head of Department account"
+      onClose={onClose}
+      closeOnOutsideClick={!resetCredentials}
+    >
       <ModalBody>
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           {fields.map(([label, value]) => (
@@ -172,9 +198,82 @@ function AccountDetailSheet({
             </div>
           ))}
         </dl>
-        <p className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-bold leading-5 text-muted-foreground">
-          Read-only account record. Access changes are managed by the system administrators.
-        </p>
+
+        <section className="mt-4 rounded-xl border border-border bg-muted/60 p-3" aria-labelledby="hod-password-access-title">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h3 id="hod-password-access-title" className="text-sm font-black text-foreground">Password access</h3>
+              <p className="mt-0.5 text-xs font-semibold leading-5 text-muted-foreground">
+                The current password is protected and cannot be viewed. Generate a temporary password when this account needs access restored.
+              </p>
+            </div>
+          </div>
+
+          {resetCredentials ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" aria-live="polite">
+              <p className="text-xs font-black text-amber-900">Temporary password — shown once</p>
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2">
+                <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">
+                  {asText(resetCredentials.temporary_password)}
+                </p>
+                <IconButton
+                  label="Copy temporary password"
+                  onClick={() => onCopy(asText(resetCredentials.temporary_password), "Temporary password")}
+                >
+                  <Copy className="h-4 w-4" />
+                </IconButton>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
+                Share it securely. The account must choose a new password at the next sign-in, and previous sessions have been signed out.
+              </p>
+            </div>
+          ) : confirmingReset ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-black text-amber-900">Reset this account password?</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-amber-800">
+                This immediately replaces the current password and signs the account out on other devices.
+              </p>
+              <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(false)}
+                  disabled={resetting}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-60"
+                >
+                  Keep current password
+                </button>
+                <button
+                  type="button"
+                  onClick={onResetPassword}
+                  disabled={resetting}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${resetting ? "animate-spin" : ""}`} aria-hidden="true" />
+                  {resetting ? "Generating..." : "Generate temporary password"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(true)}
+              disabled={!asText(account.account_id)}
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-background px-3 text-sm font-black text-primary transition-colors duration-150 hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none sm:w-auto"
+            >
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
+              Reset password
+            </button>
+          )}
+
+          {resetError ? (
+            <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" role="alert">
+              {resetError}
+            </p>
+          ) : null}
+        </section>
       </ModalBody>
     </BottomSheet>
   );
@@ -388,6 +487,9 @@ export default function HeadOfDepartmentsPage({
   const [submitting, setSubmitting] = useState(false);
   const [createError, setCreateError] = useState("");
   const [credentials, setCredentials] = useState<GeneratedHodCredentials | null>(null);
+  const [passwordResetting, setPasswordResetting] = useState(false);
+  const [passwordResetError, setPasswordResetError] = useState("");
+  const [passwordResetCredentials, setPasswordResetCredentials] = useState<PasswordResetCredentials | null>(null);
   const { toast, showToast, clearToast } = useFloatingToast();
 
   const isDirector = asText(authRole).toLowerCase().replace(/-/g, "_") === "academic_director";
@@ -413,6 +515,54 @@ export default function HeadOfDepartmentsPage({
       setCredentials(result.data.credentials as GeneratedHodCredentials);
     }
     showToast("Head of Department account created.", "success");
+  }
+
+  function openAccountDetails(account: HeadOfDepartmentAccount) {
+    setPasswordResetError("");
+    setPasswordResetCredentials(null);
+    setDetailAccount(account);
+  }
+
+  function closeAccountDetails() {
+    setDetailAccount(null);
+    setPasswordResetError("");
+    setPasswordResetCredentials(null);
+    setPasswordResetting(false);
+  }
+
+  async function handlePasswordReset() {
+    const accountId = asText(detailAccount?.account_id);
+    if (!accountId) {
+      setPasswordResetError("Reload this account record before resetting its password.");
+      return;
+    }
+    setPasswordResetting(true);
+    setPasswordResetError("");
+    const result = await postForm(
+      routes.academicDirectorHeadOfDepartmentPasswordReset(accountId),
+      {},
+      csrfToken,
+    );
+    setPasswordResetting(false);
+    if (!result.ok) {
+      setPasswordResetError(
+        asText(result.data.message) || asText(result.data.detail) || "Unable to reset the password.",
+      );
+      return;
+    }
+    const reset = result.data as PasswordResetCredentials;
+    if (!asText(reset.temporary_password)) {
+      setPasswordResetError("The password was reset, but no temporary password was returned. Please try again.");
+      return;
+    }
+    setPasswordResetCredentials(reset);
+    if (asText(reset.updated_at)) {
+      setAccounts((current) => current.map((account) => (
+        asText(account.account_id) === accountId ? { ...account, updated_at: reset.updated_at } : account
+      )));
+      setDetailAccount((current) => current ? { ...current, updated_at: reset.updated_at } : current);
+    }
+    showToast("Temporary password generated.", "success");
   }
 
   function copyCredential(value: string, label: string) {
@@ -489,7 +639,7 @@ export default function HeadOfDepartmentsPage({
               <DepartmentCard
                 key={accountKey(account, index)}
                 account={account}
-                onView={() => setDetailAccount(account)}
+                onView={() => openAccountDetails(account)}
               />
             ))}
           </MobileCardList>
@@ -541,7 +691,7 @@ export default function HeadOfDepartmentsPage({
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => setDetailAccount(account)}
+                          onClick={() => openAccountDetails(account)}
                           className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-black text-foreground transition-colors duration-150 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 motion-reduce:transition-none"
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -567,7 +717,15 @@ export default function HeadOfDepartmentsPage({
       <SubjectCoverage accounts={accounts} subjects={subjectOptions} />
 
       {detailAccount ? (
-        <AccountDetailSheet account={detailAccount} onClose={() => setDetailAccount(null)} />
+        <AccountDetailSheet
+          account={detailAccount}
+          resetting={passwordResetting}
+          resetError={passwordResetError}
+          resetCredentials={passwordResetCredentials}
+          onResetPassword={handlePasswordReset}
+          onCopy={copyCredential}
+          onClose={closeAccountDetails}
+        />
       ) : null}
       {createOpen ? (
         <NewHodSheet

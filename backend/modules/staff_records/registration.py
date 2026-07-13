@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import secrets
 from typing import Any
 
 from backend.core.database import connect_auth_db
@@ -24,6 +26,42 @@ def _utc_now_iso():
     from datetime import UTC, datetime
 
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _generate_temporary_password(length: int = 12) -> str:
+    """Return an unambiguous, human-shareable one-time password."""
+
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(max(8, length)))
+
+
+def _insert_password_reset_audit_event(
+    conn: Any,
+    *,
+    actor_account_id: int | None,
+    entity_account_id: int,
+    actor_login: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        )
+        VALUES (%s, 'account.password_reset', 'account', %s, %s::jsonb, now())
+        """,
+        (
+            actor_account_id,
+            entity_account_id,
+            json.dumps(
+                {
+                    "role": "head_of_department",
+                    "method": "academic_director",
+                    "actor_login": _text(actor_login),
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    )
 
 
 def _phase1_accounts_available(conn: Any) -> bool:
@@ -429,6 +467,104 @@ def create_head_of_department_account(
         )
 
 
+def reset_head_of_department_password(
+    account_id: Any,
+    *,
+    actor_account_id: Any = None,
+    actor_login: str = "",
+) -> tuple[bool, str, dict[str, Any]]:
+    with connect_auth_db() as conn:
+        return _reset_head_of_department_password(
+            conn,
+            account_id=account_id,
+            actor_account_id=actor_account_id,
+            actor_login=actor_login,
+            commit=True,
+        )
+
+
+def _reset_head_of_department_password(
+    conn: Any,
+    *,
+    account_id: Any,
+    actor_account_id: Any = None,
+    actor_login: str = "",
+    commit: bool = False,
+) -> tuple[bool, str, dict[str, Any]]:
+    parsed_account_id = _to_int(account_id)
+    if not parsed_account_id:
+        return False, "Head of Department account was not found.", {}
+
+    account = conn.execute(
+        """
+        SELECT id, login, full_name, status, legacy_source_table, legacy_source_id
+        FROM msi_v2.accounts
+        WHERE id = %s
+          AND role = 'head_of_department'
+        LIMIT 1
+        FOR UPDATE
+        """,
+        (parsed_account_id,),
+    ).fetchone()
+    if not account:
+        return False, "Head of Department account was not found.", {}
+    if _text(account["status"]).casefold() != "active":
+        return False, "Head of Department account is disabled.", {}
+
+    login = _text(account["login"])
+    if not login:
+        return False, "Head of Department account has no login.", {}
+
+    temporary_password = _generate_temporary_password()
+    password_hash = generate_password_hash(temporary_password)
+    now = _utc_now_iso()
+    updated = conn.execute(
+        """
+        UPDATE msi_v2.accounts
+        SET password_hash = %s,
+            must_change_password = true,
+            password_changed_at = NULL,
+            session_version = session_version + 1,
+            updated_at = %s::timestamptz
+        WHERE id = %s
+          AND role = 'head_of_department'
+        RETURNING session_version
+        """,
+        (password_hash, now, parsed_account_id),
+    ).fetchone()
+    if not updated:
+        return False, "Unable to reset the Head of Department password.", {}
+
+    legacy_staff_id = _to_int(account["legacy_source_id"])
+    conn.execute(
+        """
+        UPDATE msi_v2.msi_staff
+        SET password_hash = %s,
+            updated_at = %s::timestamptz
+        WHERE lower(role) = 'head_of_department'
+          AND (id = %s OR lower(btrim(login)) = lower(btrim(%s)))
+        """,
+        (password_hash, now, legacy_staff_id or -1, login),
+    )
+    _insert_password_reset_audit_event(
+        conn,
+        actor_account_id=_to_int(actor_account_id) or None,
+        entity_account_id=parsed_account_id,
+        actor_login=actor_login,
+    )
+
+    if commit:
+        conn.commit()
+
+    return True, "", {
+        "login": login,
+        "temporary_password": temporary_password,
+        "display_name": _text(account["full_name"]) or login,
+        "must_change_password": True,
+        "updated_at": now,
+    }
+
+
 def _hod_account_payload(row: Any) -> dict[str, Any]:
     return {
         "account_id": _to_int(row["account_id"]),
@@ -661,7 +797,9 @@ __all__ = [
     "create_academic_director_account",
     "create_head_of_department_account",
     "list_head_of_department_accounts",
+    "reset_head_of_department_password",
     "_create_academic_director_account",
     "_create_head_of_department_account",
     "_list_head_of_department_accounts",
+    "_reset_head_of_department_password",
 ]

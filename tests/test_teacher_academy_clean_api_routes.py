@@ -88,6 +88,7 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
 
     for path in [
         "/api/v1/academic-director/head-of-departments",
+        "/api/v1/academic-director/head-of-departments/{account_id}/reset-password",
         "/api/v1/academic-director/teacher-academy",
         "/api/v1/academic-director/teacher-academy/assignments/{assignment_id}",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments",
