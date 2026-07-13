@@ -284,6 +284,28 @@ def _parse_optional_lesson_time(value):
     return text.zfill(5)
 
 
+def _gradebook_lesson_sort_key(item):
+    raw = str(item.get("date") or "")
+    try:
+        parsed = datetime.strptime(raw, "%d/%m/%Y").date()
+    except ValueError:
+        parsed = datetime.max.date()
+    return (
+        parsed,
+        str(item.get("startTime") or ""),
+        0 if _is_gradebook_cancellation(item) else 1,
+        int(item.get("order") or 0),
+    )
+
+
+def _is_gradebook_cancellation(item):
+    return (
+        bool(item.get("isCancellation"))
+        or str(item.get("status") or "").strip().casefold() in {"cancelled", "canceled"}
+        or str(item.get("sourceKind") or "").strip().casefold() in {"cancelled", "canceled", "cancellation"}
+    )
+
+
 def _gradebook_lesson_payload(lesson_rows, exception_rows):
     items = [
         {
@@ -327,20 +349,29 @@ def _gradebook_lesson_payload(lesson_rows, exception_rows):
         for row in exception_rows
     )
 
-    def sort_key(item):
-        raw = str(item.get("date") or "")
-        try:
-            parsed = datetime.strptime(raw, "%d/%m/%Y").date()
-        except ValueError:
-            parsed = datetime.max.date()
-        return (parsed, str(item.get("startTime") or ""), 0 if item.get("isCancellation") else 1, int(item.get("order") or 0))
-
-    items.sort(key=sort_key)
+    items.sort(key=_gradebook_lesson_sort_key)
     return items
 
 
 def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_date=""):
-    total = len(items)
+    def is_cancellation(item):
+        return (
+            bool(item.get("isCancellation"))
+            or str(item.get("status") or "").strip().casefold() in {"cancelled", "canceled"}
+            or str(item.get("sourceKind") or "").strip().casefold() in {"cancelled", "canceled", "cancellation"}
+        )
+
+    def sort_key(item):
+        return (
+            canonical.parse_date(item.get("date")) or date.max,
+            str(item.get("startTime") or ""),
+            0 if is_cancellation(item) else 1,
+            int(item.get("order") or 0),
+        )
+
+    lessons = [item for item in items if not is_cancellation(item)]
+    cancellations = [item for item in items if is_cancellation(item)]
+    total = len(lessons)
     limit = max(0, min(int(limit or 0), 40))
     if limit <= 0 or total <= limit:
         return items, {
@@ -372,16 +403,34 @@ def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_
         if not anchor:
             raise ValueError("anchor_date must be a valid date.")
         anchor_index = 0
-        for index, item in enumerate(items):
+        for index, item in enumerate(lessons):
             parsed = canonical.parse_date(item.get("date"))
             if parsed and parsed >= anchor:
                 anchor_index = index
                 break
         start = max(0, min(anchor_index - (limit // 2), max(0, total - limit)))
     end = min(total, start + limit)
+    selected_lessons = lessons[start:end]
+    selected_dates = [canonical.parse_date(item.get("date")) for item in selected_lessons]
+    selected_dates = [value for value in selected_dates if value]
+    visible_cancellations = []
+    if selected_dates:
+        last_date = max(selected_dates)
+        previous_date = canonical.parse_date(lessons[start - 1].get("date")) if start > 0 else None
+        for item in cancellations:
+            cancellation_date = canonical.parse_date(item.get("date"))
+            if cancellation_date is None:
+                if end == total:
+                    visible_cancellations.append(item)
+            elif (previous_date is None or cancellation_date > previous_date) and (end == total or cancellation_date <= last_date):
+                visible_cancellations.append(item)
+    elif end == total:
+        visible_cancellations = cancellations
+    visible_items = [*selected_lessons, *visible_cancellations]
+    visible_items.sort(key=sort_key)
     previous_start = max(0, start - limit)
     next_start = min(max(0, total - limit), start + limit)
-    return items[start:end], {
+    return visible_items, {
         "totalLessons": total,
         "startIndex": start,
         "endIndex": end,
