@@ -74,12 +74,16 @@ def test_unexpected_error_log_is_one_line_and_identifies_exception(monkeypatch):
         method="GET",
         url=SimpleNamespace(path="/internal/operations"),
         headers={},
+        state=SimpleNamespace(request_id="request-123"),
     )
 
     response = handle_unexpected_error(request, ValueError("line one\nline two"))
 
-    assert response.status_code == 302
+    assert response.status_code == 500
+    assert "request-123" in response.body.decode("utf-8")
     assert len(messages) == 1
+    assert "request_id=%s" in messages[0][0][0]
     assert "ValueError" in messages[0][0]
     assert "line one line two" in messages[0][0]
+    assert "request-123" in messages[0][0]
     assert messages[0][1] == {}

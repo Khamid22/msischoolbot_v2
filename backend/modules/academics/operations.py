@@ -1,5 +1,6 @@
 """Admin-facing academic operations and payload shaping."""
 
+import json
 import re
 from datetime import UTC, date, datetime, timedelta
 
@@ -7,6 +8,7 @@ from backend.core.database import connect_auth_db
 from backend.modules.academics.exam_filters import is_exam_performance_row
 from backend.modules.academics import canonical
 from backend.modules.academics import timetable_repository
+from backend.modules.academics import repository as academic_repository
 from backend.modules.academics.service import (
     create_group_from_program,
     create_class,
@@ -19,8 +21,10 @@ from backend.modules.academics.service import (
 )
 
 
-def list_admin_academic_context(*, include_heavy=True):
-    return list_academic_admin_rows(include_heavy=include_heavy)
+def list_admin_academic_context(*, include_heavy=True, include_groups=True):
+    return list_academic_admin_rows(
+        include_heavy=include_heavy, include_groups=include_groups
+    )
 
 
 def create_subject_from_payload(payload):
@@ -67,48 +71,44 @@ def create_class_from_payload(payload):
     return create_class(school_code, class_name, class_code)
 
 
-def delete_group(group_id):
+def archive_group(group_id, *, actor_staff_id=None, actor_account_id=None):
     group_id = int(group_id or 0)
     if group_id <= 0:
         raise ValueError("group_id is required.")
 
     with connect_auth_db() as conn:
-        group_row = conn.execute(
-            """
-            SELECT g.id, coalesce(g.legacy_group_id, g.id) AS public_id,
-                   g.group_name, g.group_code, s.school_key, subj.subject_name
-            FROM msi_v2.groups g
-            JOIN msi_v2.schools s ON s.id = g.school_id
-            JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
-            JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
-            WHERE """ + _legacy_or_v2_group_where() + """
-            """,
-            (group_id, group_id),
-        ).fetchone()
+        group_row = academic_repository.get_group_archive_candidate(conn, group_id)
         if not group_row:
             return None
 
         group_name = str(group_row["group_name"] or "").strip()
         if group_name.casefold() == "online":
-            raise ValueError("The Online group cannot be deleted.")
+            raise ValueError("The Online group cannot be archived.")
+
+        if str(group_row["status"] or "").strip().lower() == "archived":
+            raise ValueError("This group is already archived.")
 
         v2_group_id = int(group_row["id"])
-        counts = {}
-        for key, table in (
-            ("enrollments", "group_students"),
-            ("schedules", "group_schedule_rules"),
-            ("lessons", "lesson_sessions"),
-            ("attendance", "attendance_records"),
-            ("homework", "homework_scores"),
-            ("exams", "exam_results"),
-        ):
-            row = conn.execute(
-                f"SELECT count(*) AS total FROM msi_v2.{table} WHERE group_id = %s",
-                (v2_group_id,),
-            ).fetchone()
-            counts[key] = int(row["total"] or 0) if row else 0
-
-        conn.execute("DELETE FROM msi_v2.groups WHERE id = %s", (v2_group_id,))
+        counts = academic_repository.count_group_dependencies(conn, v2_group_id)
+        archived = academic_repository.archive_group(conn, v2_group_id)
+        if not archived:
+            raise ValueError("This group could not be archived.")
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.group_archived",
+            entity_type="group",
+            entity_id=v2_group_id,
+            detail_json=json.dumps(
+                {
+                    "public_id": int(group_row["public_id"]),
+                    "group_name": group_name,
+                    "preserved_records": counts,
+                },
+                ensure_ascii=False,
+            ),
+            actor_staff_id=actor_staff_id,
+            actor_account_id=actor_account_id,
+        )
         conn.commit()
 
     return {
@@ -117,8 +117,74 @@ def delete_group(group_id):
         "code": str(group_row["group_code"] or "").strip(),
         "school_code": str(group_row["school_key"] or "").strip(),
         "subject_name": str(group_row["subject_name"] or "").strip(),
-        "deleted": counts,
+        "status": "archived",
+        "preserved": counts,
     }
+
+
+# Compatibility alias: the HTTP DELETE route now performs a reversible archive.
+delete_group = archive_group
+
+
+def preview_group_purge(group_id):
+    group_id = int(group_id or 0)
+    if group_id <= 0:
+        raise ValueError("group_id is required.")
+    with connect_auth_db() as conn:
+        group = academic_repository.get_group_archive_candidate(conn, group_id)
+        if not group:
+            return None
+        if str(group["status"] or "").strip().casefold() != "archived":
+            raise ValueError("Archive this group before permanently purging it.")
+        counts = academic_repository.count_group_dependencies(conn, int(group["id"]))
+    name = str(group["group_name"] or "").strip()
+    return {
+        "id": int(group["public_id"]),
+        "name": name,
+        "dependencies": counts,
+        "required_confirmation": f"PURGE {name}",
+    }
+
+
+def permanently_purge_group(
+    group_id, confirmation, *, actor_staff_id=None, actor_account_id=None
+):
+    group_id = int(group_id or 0)
+    if group_id <= 0:
+        raise ValueError("group_id is required.")
+    with connect_auth_db() as conn:
+        group = academic_repository.get_group_archive_candidate(conn, group_id)
+        if not group:
+            return None
+        if str(group["status"] or "").strip().casefold() != "archived":
+            raise ValueError("Archive this group before permanently purging it.")
+        name = str(group["group_name"] or "").strip()
+        required = f"PURGE {name}"
+        if str(confirmation or "").strip() != required:
+            raise ValueError(f'Type "{required}" to confirm permanent deletion.')
+        v2_group_id = int(group["id"])
+        counts = academic_repository.count_group_dependencies(conn, v2_group_id)
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.group_purged",
+            entity_type="group",
+            entity_id=v2_group_id,
+            detail_json=json.dumps(
+                {
+                    "public_id": int(group["public_id"]),
+                    "group_name": name,
+                    "deleted_dependencies": counts,
+                },
+                ensure_ascii=False,
+            ),
+            actor_staff_id=actor_staff_id,
+            actor_account_id=actor_account_id,
+        )
+        deleted = academic_repository.purge_group(conn, v2_group_id)
+        if not deleted:
+            raise ValueError("The archived group could not be purged.")
+        conn.commit()
+    return {"id": int(group["public_id"]), "name": name, "deleted": counts}
 
 
 def create_school_from_payload(payload):
@@ -138,7 +204,7 @@ def create_student_with_enrollment_from_payload(payload):
     return create_student_with_enrollment(full_name, group_id)
 
 
-def create_schedule_from_payload(payload):
+def create_schedule_from_payload(payload, *, actor_staff_id=None, actor_account_id=None):
     group_id = int(payload.get("group_id", 0) or 0)
     if group_id <= 0:
         raise ValueError("Group is required.")
@@ -154,11 +220,15 @@ def create_schedule_from_payload(payload):
         room=payload.get("room", ""),
         online_url=payload.get("online_url", ""),
         title=payload.get("title", ""),
+        actor_staff_id=actor_staff_id,
+        actor_account_id=actor_account_id,
     )
     return result
 
 
-def upsert_group_schedule_from_payload(group_id, payload):
+def upsert_group_schedule_from_payload(
+    group_id, payload, *, actor_staff_id=None, actor_account_id=None
+):
     return schedule_group_curriculum(
         int(group_id), teacher_id=int(payload.get("teacher_id", 0) or 0),
         course_launch_date=payload.get("course_launch_date", payload.get("start_date", "")),
@@ -169,6 +239,7 @@ def upsert_group_schedule_from_payload(group_id, payload):
         effective_date=payload.get("effective_date", ""),
         change_course_launch_date=bool(payload.get("change_course_launch_date", False)),
         allow_recorded_lesson_changes=bool(payload.get("allow_recorded_lesson_changes", False)),
+        actor_staff_id=actor_staff_id, actor_account_id=actor_account_id,
     )
 
 
@@ -569,11 +640,16 @@ def get_group_gradebook(
             JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
             JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
             WHERE """ + _legacy_or_v2_group_where() + """
+              AND g.status = 'active'
             """,
             (group_id, group_id),
         ).fetchone()
         if not group_row:
             return None
+
+        active_schedule_row = timetable_repository.get_active_group_schedule(
+            conn, int(group_row["id"])
+        )
 
         lesson_rows = conn.execute(
             """
@@ -835,6 +911,18 @@ def get_group_gradebook(
             "subjectName": str(group_row["subject_name"]),
             "examCount": int(group_row["exam_count"] or 0),
         },
+        "schedule": (
+            {
+                **dict(active_schedule_row),
+                "group_id": int(group_row["legacy_group_id"] or group_row["id"]),
+                "group_name": str(group_row["group_name"]),
+                "school_code": str(group_row["school_key"]),
+                "subject_name": str(group_row["subject_name"]),
+                "status": "active",
+            }
+            if active_schedule_row
+            else None
+        ),
         "lessons": lesson_payload,
         "pageInfo": page_info,
         "examLabels": exam_labels,
@@ -944,6 +1032,7 @@ def move_enrollment_group(enrollment_id, group_id):
             SELECT id, school_id, program_id
             FROM msi_v2.groups g
             WHERE """ + _legacy_or_v2_group_where() + """
+              AND g.status = 'active'
             """,
             (group_id, group_id),
         ).fetchone()
@@ -1022,6 +1111,16 @@ def record_attendance_from_payload(payload, actor_staff_id=None):
                 """,
                 (lesson["id"], enrollment["student_id"]),
             ).fetchone()
+            academic_repository.insert_audit_event(
+                conn,
+                event_type="academic.attendance_cleared",
+                entity_type="lesson_session",
+                entity_id=int(lesson["id"]),
+                detail_json=json.dumps(
+                    {"student_id": int(enrollment["student_id"]), "record_id": int(existing["id"]) if existing else None}
+                ),
+                actor_staff_id=actor_staff_id,
+            )
             conn.commit()
             return int(existing["id"] or 0) if existing else 0
         row = conn.execute(
@@ -1040,6 +1139,20 @@ def record_attendance_from_payload(payload, actor_staff_id=None):
             (lesson["id"], enrollment["group_id"], enrollment["student_id"], status,
              int(actor_staff_id) if actor_staff_id else None, _now(), _now()),
         ).fetchone()
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.attendance_recorded",
+            entity_type="attendance_record",
+            entity_id=int(row["id"]),
+            detail_json=json.dumps(
+                {
+                    "lesson_session_id": int(lesson["id"]),
+                    "student_id": int(enrollment["student_id"]),
+                    "status": status,
+                }
+            ),
+            actor_staff_id=actor_staff_id,
+        )
         conn.commit()
         return int(row["id"])
 
@@ -1074,6 +1187,20 @@ def record_homework_from_payload(payload, actor_staff_id=None):
             (lesson["id"], enrollment["group_id"], enrollment["student_id"], score,
              int(actor_staff_id) if actor_staff_id else None, _now(), _now()),
         ).fetchone()
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.homework_recorded",
+            entity_type="homework_score",
+            entity_id=int(row["id"]),
+            detail_json=json.dumps(
+                {
+                    "lesson_session_id": int(lesson["id"]),
+                    "student_id": int(enrollment["student_id"]),
+                    "score": score,
+                }
+            ),
+            actor_staff_id=actor_staff_id,
+        )
         conn.commit()
         return int(row["id"])
 
@@ -1114,7 +1241,7 @@ def get_enrollment_gradebook_summary(enrollment_id):
     }
 
 
-def update_lesson_session_from_payload(lesson_session_id, payload):
+def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_id=None):
     lesson_session_id = int(lesson_session_id or 0)
     if lesson_session_id <= 0:
         raise ValueError("Lesson session id is required.")
@@ -1189,6 +1316,20 @@ def update_lesson_session_from_payload(lesson_session_id, payload):
                 next_status if next_status is not None else "",
                 lesson_session_id,
             ),
+        )
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.lesson_corrected",
+            entity_type="lesson_session",
+            entity_id=lesson_session_id,
+            detail_json=json.dumps(
+                {
+                    "changed_fields": sorted(
+                        key for key in payload if payload.get(key) is not None
+                    )
+                }
+            ),
+            actor_staff_id=actor_staff_id,
         )
         conn.commit()
 
@@ -1274,6 +1415,16 @@ def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
         affected = _reflow_lesson_sequence(
             conn, lesson, first_date=lesson["session_date"], include_first_date=False
         )
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.lesson_cancelled",
+            entity_type="lesson_session",
+            entity_id=lesson_session_id,
+            detail_json=json.dumps(
+                {"exception_id": int(exception["id"]), "reason": reason, "affected": affected}
+            ),
+            actor_staff_id=actor_staff_id,
+        )
         conn.commit()
         return {
             "groupId": int(lesson["group_id"]),
@@ -1300,6 +1451,16 @@ def recover_lesson_session(lesson_session_id, actor_staff_id=None):
             first_date=exception["original_session_date"],
             include_first_date=True,
             ignored_exception_id=int(exception["id"]),
+        )
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.lesson_recovered",
+            entity_type="lesson_session",
+            entity_id=lesson_session_id,
+            detail_json=json.dumps(
+                {"exception_id": int(exception["id"]), "affected": affected}
+            ),
+            actor_staff_id=actor_staff_id,
         )
         conn.commit()
         return {
@@ -1389,6 +1550,21 @@ def record_exam_from_payload(payload, actor_staff_id=None):
                     attempt,
                 ),
             ).fetchone()
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.exam_recorded",
+            entity_type="exam_result",
+            entity_id=int(row["id"]),
+            detail_json=json.dumps(
+                {
+                    "student_id": int(enrollment["student_id"]),
+                    "exam_name": exam_name,
+                    "attempt": attempt,
+                    "score": score,
+                }
+            ),
+            actor_staff_id=actor_staff_id,
+        )
         conn.commit()
         return int(row["id"])
 

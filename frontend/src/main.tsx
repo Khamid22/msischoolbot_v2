@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./app/App";
+import { queryClient } from "@/shared/api/queryClient";
 import "./index.css";
 
 const VITE_CHUNK_RELOAD_KEY = "__msi_vite_chunk_reload_once";
@@ -25,6 +27,8 @@ window.addEventListener("pageshow", () => {
 });
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </StrictMode>
 );

@@ -20,7 +20,7 @@ export default defineConfig(() => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
   build: {
-    // Outputs to web/backend/static/react/ — served by Flask
+    // Outputs to backend/static/react/ — served by FastAPI.
     outDir: "../backend/static/react",
     emptyOutDir: true,
     manifest: "manifest.json",

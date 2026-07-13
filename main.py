@@ -213,7 +213,7 @@ def _resolve_run_mode():
     if len(sys.argv) > 1:
         raw_mode = str(sys.argv[1] or "").strip().lower()
     if not raw_mode:
-        raw_mode = str(os.getenv("RUN_MODE", "both") or "").strip().lower()
+        raw_mode = str(os.getenv("RUN_MODE", "web") or "").strip().lower()
 
     aliases = {
         "both": "both",
@@ -227,10 +227,10 @@ def _resolve_run_mode():
         return resolved
 
     logging.warning(
-        "Unknown run mode %r. Supported: both, web, bot. Falling back to both.",
+        "Unknown run mode %r. Supported: both, web, bot. Falling back to web.",
         raw_mode,
     )
-    return "both"
+    return "web"
 
 
 if __name__ == "__main__":

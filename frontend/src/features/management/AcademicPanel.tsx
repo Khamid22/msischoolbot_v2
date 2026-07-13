@@ -1,14 +1,53 @@
-import { useState, useMemo, type FormEvent } from "react";
+import { Component, useEffect, useRef, useState, useMemo, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, BookMarked, Filter, Layers, Plus, Search, Trash2, Users, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
 import { apiData, apiErrorMessage, apiSucceeded, csrfHeaders, jsonCsrfHeaders } from "@/shared/lib/api";
+import { fetchApiQuery, queryClient } from "@/shared/api/queryClient";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString, AdminTab, normalizeSubjectKey } from "@/features/managementTypes";
 import { FieldLabel, TextInput, Select, Pill, MiniMetric, CompactMetric, subjectSwatches, compareSubjectsByPreferredOrder, programInitials, Lesson } from "./academic/shared";
 import { GroupGradebook } from "./academic/GroupGradebook";
 import { SchedulePanel } from "./academic/SchedulePanel";
+
+class AcademicFeatureErrorBoundary extends Component<
+  { children: ReactNode; resetKey: string },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidUpdate(previous: Readonly<{ children: ReactNode; resetKey: string }>) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error("Academic workspace feature failed:", error);
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-800">
+        <p className="font-bold">This academic panel could not be displayed.</p>
+        <p className="mt-1">Your other workspace data is still available. Reload this panel to try again.</p>
+        <button
+          type="button"
+          onClick={() => this.setState({ failed: false })}
+          className="mt-3 rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white"
+        >
+          Reload panel
+        </button>
+      </div>
+    );
+  }
+}
 
 export default function AcademicPanel({ state, kind }: { state: any; kind: AdminTab }) {
   const props = state.props || {};
@@ -16,10 +55,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const initialSchools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
   const subjects = Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [];
   const initialGroups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
-  const curriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
+  const initialCurriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
     ? props.adminAcademicCurriculumPrograms
     : [];
-  const curriculumItems = Array.isArray(props.adminAcademicCurriculumItems)
+  const initialCurriculumItems = Array.isArray(props.adminAcademicCurriculumItems)
     ? props.adminAcademicCurriculumItems
     : [];
   const csrf: string = asString(props.csrfToken);
@@ -51,6 +90,83 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const { toast: groupToast, showToast: showGroupToast, clearToast: clearGroupToast } = useFloatingToast();
   const schools = schoolRowsOverride ?? initialSchools;
   const groups = groupRowsOverride ?? initialGroups;
+  const [groupNextCursor, setGroupNextCursor] = useState<string | null>(null);
+  const [groupTotal, setGroupTotal] = useState(initialGroups.length);
+  const [groupLoading, setGroupLoading] = useState(false);
+  const [groupLoadError, setGroupLoadError] = useState("");
+  const [curriculumPrograms, setCurriculumPrograms] = useState(initialCurriculumPrograms);
+  const [curriculumItems, setCurriculumItems] = useState(initialCurriculumItems);
+  const [programLoading, setProgramLoading] = useState(false);
+  const [programLoadError, setProgramLoadError] = useState("");
+  const groupRequestRef = useRef(0);
+
+  async function loadGroupPage(cursor = "", append = false) {
+    if (typeof academicRoutes.adminAcademicGroupsApi !== "function") return;
+    const requestId = ++groupRequestRef.current;
+    setGroupLoading(true);
+    setGroupLoadError("");
+    try {
+      const query = new URLSearchParams({ limit: "100" });
+      if (cursor) query.set("cursor", cursor);
+      const selectedSchoolId = asNumber(
+        schools.find((school: Record<string, unknown>) => asString(school.code) === groupSchool)?.id,
+      );
+      const selectedSubjectId = asNumber(
+        subjects.find(
+          (subject: Record<string, unknown>) =>
+            normalizeSubjectKey(subject.name) === normalizeSubjectKey(groupSubject),
+        )?.id,
+      );
+      if (selectedSchoolId > 0) query.set("school_id", String(selectedSchoolId));
+      if (selectedSubjectId > 0) query.set("subject_id", String(selectedSubjectId));
+      if (groupSearch.trim()) query.set("query", groupSearch.trim());
+      const page = await fetchApiQuery<{
+        items?: Array<Record<string, unknown>>;
+        next_cursor?: string | null;
+        total?: number;
+      }>(
+        ["academic", "groups", query.toString()],
+        academicRoutes.adminAcademicGroupsApi(query.toString()),
+      );
+      if (requestId !== groupRequestRef.current) return;
+      const items = Array.isArray(page.items) ? page.items : [];
+      setGroupRowsOverride((current) => append ? [...(current ?? []), ...items] : items);
+      setGroupNextCursor(asString(page.next_cursor) || null);
+      setGroupTotal(asNumber(page.total));
+    } catch (error: unknown) {
+      if (requestId === groupRequestRef.current) {
+        setGroupLoadError(error instanceof Error ? error.message : "Unable to load groups.");
+      }
+    } finally {
+      if (requestId === groupRequestRef.current) setGroupLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (kind !== "groups" && kind !== "schedule") return;
+    const timer = window.setTimeout(
+      () => void loadGroupPage(),
+      kind === "groups" ? 250 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [kind, groupSchool, groupSubject, groupSearch]);
+
+  useEffect(() => {
+    if ((kind !== "subjects" && kind !== "groups") || typeof academicRoutes.adminAcademicProgramsApi !== "function") return;
+    setProgramLoading(true);
+    setProgramLoadError("");
+    void fetchApiQuery<{ items?: Array<Record<string, unknown>> }>(
+      ["academic", "programs"],
+      academicRoutes.adminAcademicProgramsApi("limit=100"),
+    )
+      .then((page) => {
+        setCurriculumPrograms(Array.isArray(page.items) ? page.items : []);
+      })
+      .catch((error: unknown) => {
+        setProgramLoadError(error instanceof Error ? error.message : "Unable to load subject programs.");
+      })
+      .finally(() => setProgramLoading(false));
+  }, [kind]);
 
   const schoolNameByCode = useMemo(() => {
     const result = new Map<string, string>();
@@ -160,7 +276,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     (groupSubject !== "all" ? 1 : 0) +
     (groupSearch.trim() ? 1 : 0);
 
-  async function deleteGroup(group: Record<string, unknown>) {
+  async function archiveGroup(group: Record<string, unknown>) {
     if (isTeacherMode || deletingGroupId !== null) return;
     const id = asNumber(group.id);
     const name = asString(group.name) || "this group";
@@ -169,10 +285,10 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     const studentsCount = asNumber(group.students_count);
     const disqualifiedCount = asNumber(group.disqualified_count);
     const enrollmentSummary = studentsCount + disqualifiedCount > 0
-      ? ` This will remove ${studentsCount} active and ${disqualifiedCount} disqualified enrollment(s) from the group.`
+      ? ` It currently has ${studentsCount} active and ${disqualifiedCount} disqualified enrollment(s).`
       : "";
     const confirmed = window.confirm(
-      `Delete ${name}? This removes the group, schedule, lessons, attendance, homework, exam records, and group enrollments. Student accounts stay in the system.${enrollmentSummary}`,
+      `Archive ${name}? It will disappear from active workspaces, while schedules, lessons, attendance, homework, exams, and enrollments remain safely stored.${enrollmentSummary}`,
     );
     if (!confirmed) return;
 
@@ -185,7 +301,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       });
       const json = await response.json();
       if (!apiSucceeded(response, json)) {
-        showGroupToast(apiErrorMessage(json, "Unable to delete group."), "danger");
+        showGroupToast(apiErrorMessage(json, "Unable to archive group."), "danger");
         return;
       }
       const data = apiData<{ groups?: Array<Record<string, unknown>> }>(json);
@@ -197,9 +313,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         );
       }
       if (openGroupId === id) setOpenGroupId(null);
-      showGroupToast(`${name} deleted.`);
+      await queryClient.invalidateQueries({ queryKey: ["academic", "groups"] });
+      await loadGroupPage();
+      showGroupToast(`${name} archived. Academic records were preserved.`);
     } catch {
-      showGroupToast("Network error while deleting the group.", "danger");
+      showGroupToast("Network error while archiving the group.", "danger");
     } finally {
       setDeletingGroupId(null);
     }
@@ -257,6 +375,8 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         return;
       }
       applyAcademicContextPayload(apiData<Record<string, unknown>>(json));
+      await queryClient.invalidateQueries({ queryKey: ["academic"] });
+      if (kind === "groups") await loadGroupPage();
       onSuccess?.();
       showGroupToast(successMessage);
     } catch {
@@ -269,6 +389,22 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     curriculumPrograms[0] ||
     null;
   const activeProgramId = asNumber(activeProgram?.id);
+  useEffect(() => {
+    if (kind !== "subjects" || !activeProgramId || typeof academicRoutes.adminAcademicProgramItemsApi !== "function") return;
+    setProgramLoading(true);
+    setProgramLoadError("");
+    void fetchApiQuery<{ items?: Array<Record<string, unknown>> }>(
+      ["academic", "programs", activeProgramId, "items"],
+      academicRoutes.adminAcademicProgramItemsApi(activeProgramId, "limit=250"),
+    )
+      .then((page) => {
+        setCurriculumItems(Array.isArray(page.items) ? page.items : []);
+      })
+      .catch((error: unknown) => {
+        setProgramLoadError(error instanceof Error ? error.message : "Unable to load the scheme of work.");
+      })
+      .finally(() => setProgramLoading(false));
+  }, [kind, activeProgramId]);
   const activeProgramItems = useMemo(() => {
     const query = programSearch.trim().toLowerCase();
     return curriculumItems
@@ -294,21 +430,27 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
 
   if (kind === "groups" && openGroupId !== null) {
     return (
-      <GroupGradebook
-        key={openGroupId}
-        groupId={openGroupId}
-        csrf={csrf}
-        groups={groups}
-        teachers={Array.isArray(state.teachers) ? state.teachers : Array.isArray(props.adminTeachers) ? props.adminTeachers : []}
-        schedules={Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : []}
-        academicRoutes={academicRoutes}
-        onClose={() => setOpenGroupId(null)}
-      />
+      <AcademicFeatureErrorBoundary resetKey={`gradebook-${openGroupId}`}>
+        <GroupGradebook
+          key={openGroupId}
+          groupId={openGroupId}
+          csrf={csrf}
+          groups={groups}
+          teachers={Array.isArray(state.teachers) ? state.teachers : Array.isArray(props.adminTeachers) ? props.adminTeachers : []}
+          schedules={Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : []}
+          academicRoutes={academicRoutes}
+          onClose={() => setOpenGroupId(null)}
+        />
+      </AcademicFeatureErrorBoundary>
     );
   }
 
   if (kind === "schedule") {
-    return <SchedulePanel state={state} />;
+    return (
+      <AcademicFeatureErrorBoundary resetKey="timetable">
+        <SchedulePanel state={state} />
+      </AcademicFeatureErrorBoundary>
+    );
   }
 
   return (
@@ -316,6 +458,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
       <FloatingToast toast={groupToast} />
       {kind === "subjects" ? (
         <div className="space-y-3">
+          {programLoadError ? (
+            <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+              {programLoadError}
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex min-w-0 items-center gap-2">
               <BookMarked className="h-4 w-4 shrink-0 text-info" />
@@ -398,7 +545,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               </div>
 
               <div className="miniapp-table-scroll max-h-[62dvh] rounded-lg border border-foreground/8">
-                {activeProgramItems.length ? (
+                {programLoading && activeProgramItems.length === 0 ? (
+                  <p className="px-4 py-12 text-center text-sm font-bold text-muted-foreground">
+                    Loading the selected scheme of work…
+                  </p>
+                ) : activeProgramItems.length ? (
                   <div className="divide-y divide-foreground/6">
                     {activeProgramItems.map((item: Record<string, unknown>) => {
                       const itemType = asString(item.item_type);
@@ -678,7 +829,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                     </div>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown
+                    {selectedSchool ? asString(selectedSchool.name) : "All schools"} · {filteredGroups.length} shown of {groupTotal}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-1.5">
@@ -832,7 +983,16 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
               ) : null}
 
               <div className="mt-2 flex min-h-0 flex-1 flex-col border-t border-foreground/8 pt-2">
-                {filteredGroups.length === 0 ? (
+                {groupLoadError ? (
+                  <div role="alert" className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                    {groupLoadError}
+                  </div>
+                ) : null}
+                {filteredGroups.length === 0 && groupLoading ? (
+                  <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center text-sm font-bold text-muted-foreground">
+                    Loading groups…
+                  </div>
+                ) : filteredGroups.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-foreground/15 bg-background px-4 py-8 text-center">
                   <p className="text-sm font-bold">No groups found</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -932,11 +1092,11 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                                   {!isTeacherMode ? (
                                     <button
                                       type="button"
-                                      onClick={() => deleteGroup(group)}
+                                      onClick={() => archiveGroup(group)}
                                       disabled={isDeleting}
                                       className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-destructive/20 bg-surface text-destructive shadow-sm transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/25 disabled:cursor-not-allowed disabled:opacity-50"
-                                      aria-label={`Delete ${name}`}
-                                      title={`Delete ${name}`}
+                                      aria-label={`Archive ${name}`}
+                                      title={`Archive ${name}`}
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -948,6 +1108,18 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                         </section>
                       );
                     })}
+                    {groupNextCursor ? (
+                      <div className="flex justify-center pt-1">
+                        <button
+                          type="button"
+                          disabled={groupLoading}
+                          onClick={() => void loadGroupPage(groupNextCursor, true)}
+                          className="rounded-lg border border-foreground/10 bg-background px-4 py-2 text-xs font-bold hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {groupLoading ? "Loading…" : `Load more groups (${groups.length} of ${groupTotal})`}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 )}

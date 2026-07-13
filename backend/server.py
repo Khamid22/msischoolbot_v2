@@ -10,6 +10,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from slowapi.errors import RateLimitExceeded
 from backend.core.rate_limit import limiter
+from backend.core.error_pages import internal_server_error_page
+from backend.core.observability import RequestMetricsMiddleware, configure_error_reporting
 
 from fastapi import Depends
 from backend.core.request_context import RequestContextMiddleware, prime_body_state
@@ -32,6 +34,7 @@ _VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
 _VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
 
 LOGGER = logging.getLogger("msi.server")
+configure_error_reporting()
 
 def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     if request_path == "/" or request_path.startswith("/dashboard/"):
@@ -94,6 +97,8 @@ PUBLIC_PATHS = {
     "/redoc",
     "/openapi.json",
     "/api/v1/system/status",
+    "/health/live",
+    "/health/ready",
 }
 _STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # Endpoints authenticated by a signed payload rather than the ambient session
@@ -341,6 +346,7 @@ app.add_middleware(
     same_site=os.environ.get("SESSION_COOKIE_SAMESITE", "lax").lower(),
     https_only=os.environ.get("SESSION_COOKIE_SECURE", "0").strip().lower() not in {"0", "false", "no", "off"},
 )
+app.add_middleware(RequestMetricsMiddleware)
 
 # Mount static files correctly
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
@@ -383,9 +389,13 @@ def handle_http_exception(request_obj: Request, exc: HTTPException):
 # Global unexpected error handler
 @app.exception_handler(Exception)
 def handle_unexpected_error(request_obj: Request, exc: Exception):
+    request_id = str(
+        getattr(getattr(request_obj, "state", None), "request_id", "") or ""
+    )
     error_summary = " ".join(str(exc).splitlines()).strip()[:500]
     LOGGER.error(
-        "Unhandled error method=%s path=%s type=%s detail=%s",
+        "Unhandled error request_id=%s method=%s path=%s type=%s detail=%s",
+        request_id or "unavailable",
         request_obj.method,
         request_obj.url.path,
         type(exc).__name__,
@@ -394,8 +404,15 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith("/api/") or is_xhr:
-        return JSONResponse({"status": "error", "message": "Something went wrong. Please try again."}, status_code=500)
-    return RedirectResponse(url="/", status_code=302)
+        return JSONResponse(
+            {
+                "status": "error",
+                "message": "Something went wrong. Please try again.",
+                "request_id": request_id,
+            },
+            status_code=500,
+        )
+    return internal_server_error_page(request_id)
 
 
 @app.get("/unauthorized")

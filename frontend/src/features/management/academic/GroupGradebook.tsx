@@ -12,6 +12,7 @@ import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./T
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { lessonDurationMinutesForSchoolCode } from "./scheduleMath";
+import { queryClient } from "@/shared/api/queryClient";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
@@ -183,6 +184,14 @@ export function GroupGradebook({
   }, [groupId]);
 
   useEffect(() => {
+    if (!data?.schedule) return;
+    setScheduleRows((current) => [
+      ...current.filter((row) => asNumber(row.group_id) !== groupId),
+      data.schedule as unknown as Record<string, unknown>,
+    ]);
+  }, [data?.schedule, groupId]);
+
+  useEffect(() => {
     setActiveView("gradebook");
     setLoadedView("gradebook");
     setData(null);
@@ -221,15 +230,21 @@ export function GroupGradebook({
 
   async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", month = "", signal?: AbortSignal) {
     const section = gradebookSection(view);
-    const response = await fetch(academicRoutes.adminAcademicGradebookApi(id, {
+    const url = academicRoutes.adminAcademicGradebookApi(id, {
       cursor: section === "gradebook" ? cursor : undefined,
       anchorDate: section === "gradebook" ? anchorDate : undefined,
       month: section === "gradebook" ? month : undefined,
       section,
-    }), { signal });
-    const json = await response.json();
-    if (!apiSucceeded(response, json)) throw new Error(apiErrorMessage(json, "Failed to load."));
-    return apiData<GradebookData>(json);
+    });
+    return queryClient.fetchQuery({
+      queryKey: ["academic", "gradebook", id, section, month, cursor, anchorDate],
+      queryFn: async () => {
+        const response = await fetch(url, { signal });
+        const json = await response.json();
+        if (!apiSucceeded(response, json)) throw new Error(apiErrorMessage(json, "Failed to load."));
+        return apiData<GradebookData>(json);
+      },
+    });
   }
 
   async function load(id: number, signal?: AbortSignal, options: GradebookLoadOptions = {}) {
@@ -298,6 +313,7 @@ export function GroupGradebook({
 
   async function refreshCurrentView() {
     gradebookCacheRef.current.clear();
+    await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] });
     await load(groupId, undefined, {
       view: activeView,
       month: activeView === "gradebook" ? lessonMonth : "",

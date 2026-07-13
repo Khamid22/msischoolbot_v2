@@ -4,6 +4,7 @@ Query modules own the SQL; this service keeps the same return shapes the
 frontend already consumes so nothing on the admin pages breaks.
 """
 
+import json
 from datetime import date, datetime, time, timedelta, timezone
 
 from backend.core.database import connect_auth_db
@@ -243,12 +244,16 @@ def _schedule_conflict_message(
 # ---------------------------------------------------------------------------
 # Admin context (read)
 # ---------------------------------------------------------------------------
-def list_academic_admin_rows(*, include_heavy=True):
+def list_academic_admin_rows(*, include_heavy=True, include_groups=True):
     with _connect() as conn:
         schools = [dict(row) for row in academic_repository.list_school_rows(conn)]
         classes = [dict(row) for row in academic_repository.list_class_rows(conn)]
         subjects = [dict(row) for row in academic_repository.list_subject_rows(conn)]
-        groups = [dict(row) for row in academic_repository.list_group_rows(conn)]
+        groups = (
+            [dict(row) for row in academic_repository.list_group_rows(conn)]
+            if include_groups
+            else []
+        )
         enrollment_summary = dict(academic_repository.get_enrollment_summary_row(conn) or {})
         duplicate_names = int(enrollment_summary.get("active_enrollments") or 0) - int(
             enrollment_summary.get("active_unique_students") or 0
@@ -489,6 +494,8 @@ def create_schedule(
     online_url="",
     title="",
     replace_existing=False,
+    actor_staff_id=None,
+    actor_account_id=None,
 ):
     group_id = int(group_id or 0)
     weekdays = _normalize_weekdays(weekdays)
@@ -594,11 +601,30 @@ def create_schedule(
             )
             if session_cur:
                 session_ids.append(int(session_cur["id"] or 0))
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.schedule_upserted",
+            entity_type="group_schedule_rule",
+            entity_id=schedule_id,
+            detail_json=json.dumps(
+                {
+                    "group_id": v2_group_id,
+                    "start_date": start_date_obj.isoformat(),
+                    "end_date": end_date_obj.isoformat(),
+                    "weekdays": weekdays,
+                    "session_count": len(generated_dates),
+                    "replaced_existing": bool(existing_schedule_id),
+                }
+            ),
+            actor_staff_id=actor_staff_id,
+            actor_account_id=actor_account_id,
+        )
         conn.commit()
 
     return {
         "scheduleId": schedule_id,
         "sessionCount": len(generated_dates),
+        "firstLessonDate": generated_dates[0].isoformat() if generated_dates else "",
         "lessonDurationMinutes": end_minutes - start_minutes,
         "predictedEndDate": end_date_obj.isoformat(),
         "endDateWasPredicted": predicted,
@@ -684,6 +710,7 @@ def schedule_group_curriculum(
     group_id, *, teacher_id=0, course_launch_date="", weekdays=None,
     lesson_time="", lesson_duration_minutes=80, room="", change_scope="", effective_date="",
     change_course_launch_date=False, allow_recorded_lesson_changes=False,
+    actor_staff_id=None, actor_account_id=None,
 ):
     """Version a group timetable and assign dates to its existing curriculum lessons."""
     group_id = int(group_id or 0)
@@ -768,6 +795,25 @@ def schedule_group_curriculum(
         if existing_id:
             timetable_repository.cancel_schedule_rule(conn, existing_id)
         timetable_repository.delete_unrecorded_generic_group_sessions(conn, v2_group_id)
+        academic_repository.insert_audit_event(
+            conn,
+            event_type="academic.schedule_upserted",
+            entity_type="group_schedule_rule",
+            entity_id=schedule_id,
+            detail_json=json.dumps(
+                {
+                    "group_id": v2_group_id,
+                    "change_scope": scope or "initial",
+                    "effective_date": effective.isoformat() if effective else None,
+                    "course_launch_date": launch_date.isoformat(),
+                    "affected_lesson_count": len(selected),
+                    "moved_recorded_lesson_count": moved_protected_count,
+                    "replaced_schedule_id": existing_id or None,
+                }
+            ),
+            actor_staff_id=actor_staff_id,
+            actor_account_id=actor_account_id,
+        )
         conn.commit()
     return {
         "scheduleId": schedule_id, "affectedLessonCount": len(selected),

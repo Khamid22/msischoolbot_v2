@@ -631,6 +631,7 @@ export type GradebookData = {
   examLabels?: string[];
   examDates?: Record<string, string>;
   allEnrollments?: Enrollment[];
+  schedule?: ScheduleRow | null;
   pageInfo?: {
     totalLessons: number;
     startIndex: number;

@@ -28,9 +28,22 @@ def _safe_academy_timetable_context():
     return {"academy_lessons": academy_lessons, "warning": ""}
 
 
-def _safe_academic_workspace_context(*, include_heavy=True):
+def _safe_academic_workspace_context(*, include_heavy=True, include_groups=True):
     try:
-        return {"academic": list_academic_admin_rows(include_heavy=include_heavy), "warning": ""}
+        try:
+            academic = list_academic_admin_rows(
+                include_heavy=include_heavy, include_groups=include_groups
+            )
+        except TypeError as exc:
+            if "include_groups" not in str(exc):
+                raise
+            academic = list_academic_admin_rows(include_heavy=include_heavy)
+            if not include_groups:
+                academic = {**academic, "groups": []}
+        return {
+            "academic": academic,
+            "warning": "",
+        }
     except Exception as exc:
         return {
             "academic": {
@@ -84,7 +97,9 @@ def register_academic_director_page_routes(app):
 
     def _render_academic_workspace(workspace: str, *, title: str, description: str, include_heavy=True):
         timer = PagePerformanceTimer()
-        context = _safe_academic_workspace_context(include_heavy=include_heavy)
+        context = _safe_academic_workspace_context(
+            include_heavy=include_heavy, include_groups=include_heavy
+        )
         academic_context = context.get("academic", {})
         timer.mark("context_build")
         response = render_react_page(
@@ -136,7 +151,7 @@ def register_academic_director_page_routes(app):
             "groups",
             title="Academic Director Groups",
             description="Academic Director group management.",
-            include_heavy=True,
+            include_heavy=False,
         )
 
     @router.get("/academic-director/subjects", operation_id="academic_director_subjects")
@@ -145,7 +160,7 @@ def register_academic_director_page_routes(app):
             "subjects",
             title="Academic Director Subjects",
             description="Academic Director subject and curriculum management.",
-            include_heavy=True,
+            include_heavy=False,
         )
 
     @router.get("/academic-director/timetable", operation_id="academic_director_timetable")
@@ -154,7 +169,7 @@ def register_academic_director_page_routes(app):
             "timetable",
             title="Academic Director Timetable",
             description="Academic Director group timetable workspace.",
-            include_heavy=True,
+            include_heavy=False,
         )
 
     @router.get("/academic-director/announcements", operation_id="academic_director_announcements")

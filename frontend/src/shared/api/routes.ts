@@ -32,10 +32,17 @@ export const apiRoutes = {
   academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/delete`,
   academicDirectorAcademicContextApi: "/api/v1/academic-director/academic/context",
+  academicDirectorAcademicGroupsApi: (query = "") => `/api/v1/academic-director/academic/groups${query ? `?${query}` : ""}`,
+  academicDirectorAcademicProgramsApi: (query = "") => `/api/v1/academic-director/academic/programs${query ? `?${query}` : ""}`,
+  academicDirectorAcademicProgramItemsApi: (programId: number | string, query = "") =>
+    `/api/v1/academic-director/academic/programs/${programId}/items${query ? `?${query}` : ""}`,
+  academicDirectorAcademicTimetableApi: (query: string) => `/api/v1/academic-director/academic/timetable?${query}`,
   academicDirectorAcademicSchoolCreate: "/api/v1/academic-director/academic/schools",
   academicDirectorAcademicGroupCreate: "/api/v1/academic-director/academic/groups",
   academicDirectorAcademicGroupApi: (groupId: number | string) =>
     `/api/v1/academic-director/academic/groups/${groupId}`,
+  academicDirectorAcademicGroupSummaryApi: (groupId: number | string) =>
+    `/api/v1/academic-director/academic/groups/${groupId}/summary`,
   academicDirectorAcademicScheduleCreate: "/api/v1/academic-director/academic/schedules",
   academicDirectorAcademicGroupSchedule: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/schedule`,
   academicDirectorAcademicGroupStudents: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/students`,

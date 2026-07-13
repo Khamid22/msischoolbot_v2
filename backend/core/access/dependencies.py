@@ -25,6 +25,7 @@ class CurrentUser:
     admin_id: int | None = None
     staff_id: int | None = None
     account_id: int | None = None
+    is_owner: bool = False
     must_change_password: bool = False
     session_version: int = 1
 
@@ -75,6 +76,7 @@ def get_current_user(request: Request) -> CurrentUser:
         admin_id=_session_int(session, "admin_id"),
         staff_id=_session_int(session, "staff_id"),
         account_id=_session_int(session, "account_id"),
+        is_owner=bool(session.get("admin_is_owner")),
         must_change_password=bool(session.get("must_change_password")),
         session_version=_session_int(session, "session_version") or 1,
     )

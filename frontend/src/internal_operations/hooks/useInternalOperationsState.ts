@@ -71,9 +71,6 @@ const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
 const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
 const FULL_ACADEMIC_CONTEXT_TABS = new Set<AdminTab>([
   "teachers",
-  "subjects",
-  "groups",
-  "schedule",
   "curriculum",
   "gradebook",
   "office_hours",

@@ -53,6 +53,8 @@ def test_system_routes_remain_registered(app):
     assert "GET" in routes["/manifest.webmanifest"]
     assert "GET" in routes["/sw.js"]
     assert "GET" in routes["/api/v1/system/status"]
+    assert "GET" in routes["/health/live"]
+    assert "GET" in routes["/health/ready"]
     assert "GET" in routes["/api/v1/auth/me"]
 
 
@@ -76,6 +78,40 @@ def test_system_status_response_is_unchanged(client):
         "status": "success",
         "message": "MSI School Backend API is running and operational.",
     }
+
+
+def test_liveness_does_not_require_database(client):
+    response = client.get("/health/live")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["request_id"] == response.headers["x-request-id"]
+
+
+def test_readiness_checks_database(client, monkeypatch):
+    monkeypatch.setattr(
+        "backend.application.system_api.check_database_ready",
+        lambda **_kwargs: True,
+    )
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["database"] == "ready"
+    assert response.json()["request_id"] == response.headers["x-request-id"]
+
+
+def test_readiness_fails_closed_when_database_is_unavailable(client, monkeypatch):
+    def unavailable(**_kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr("backend.application.system_api.check_database_ready", unavailable)
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_ready"
+    assert response.json()["request_id"] == response.headers["x-request-id"]
 
 
 def test_auth_me_response_shape_is_unchanged(client):

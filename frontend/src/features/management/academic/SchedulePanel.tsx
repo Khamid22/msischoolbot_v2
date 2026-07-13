@@ -7,6 +7,7 @@ import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "@/features/managementTypes";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
+import { fetchApiQuery, queryClient } from "@/shared/api/queryClient";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
 import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
 
@@ -174,6 +175,7 @@ export function SchedulePanel({ state }: { state: any }) {
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState("all");
   const { toast, showToast, clearToast } = useFloatingToast();
   const [error, setError] = useState("");
+  const [rangeLoading, setRangeLoading] = useState(false);
   const today = isoDate(new Date());
   const [form, setForm] = useState({
     groupId: asString(groups[0]?.id),
@@ -197,6 +199,28 @@ export function SchedulePanel({ state }: { state: any }) {
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_item, index) => addDays(weekStart, index)), [weekStart]);
   const weekDateSet = useMemo(() => new Set(weekDays.map(isoDate)), [weekDays]);
+
+  useEffect(() => {
+    if (typeof academicRoutes.adminAcademicTimetableApi !== "function") return;
+    const query = new URLSearchParams({
+      date_from: isoDate(weekDays[0]),
+      date_to: isoDate(weekDays[6]),
+    });
+    setRangeLoading(true);
+    setError("");
+    void fetchApiQuery<{ schedules?: ScheduleRow[]; sessions?: SessionRow[] }>(
+      ["academic", "timetable", query.toString()],
+      academicRoutes.adminAcademicTimetableApi(query.toString()),
+    )
+      .then((data) => {
+        setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
+        setSessions(Array.isArray(data.sessions) ? data.sessions : []);
+      })
+      .catch((loadError: unknown) => {
+        setError(loadError instanceof Error ? loadError.message : "Could not load this timetable week.");
+      })
+      .finally(() => setRangeLoading(false));
+  }, [academicRoutes.adminAcademicTimetableApi, weekStart]);
 
   // Any lesson session that already carries explicit times (server sessions or
   // this session's drag placements) must not re-render from lesson history.
@@ -718,6 +742,7 @@ export function SchedulePanel({ state }: { state: any }) {
       setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
       setSessions(Array.isArray(data.sessions) ? data.sessions : []);
       if (Array.isArray(data.lessons)) setLessons(data.lessons);
+      void queryClient.invalidateQueries({ queryKey: ["academic", "timetable"] });
       showToast(`Schedule created. ${asNumber(data.schedule?.sessionCount)} lesson sessions generated.`);
       setCreateOpen(false);
     } catch {
@@ -745,7 +770,9 @@ export function SchedulePanel({ state }: { state: any }) {
       <FloatingToast toast={toast} />
       <ChartCard
         title={isTeacherMode ? "Timetable" : "Academic Timetable"}
-        subtitle={`${filteredSessions.length + placedTimetableBlocks.length} timed sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
+        subtitle={rangeLoading
+          ? "Loading this timetable week…"
+          : `${filteredSessions.length + placedTimetableBlocks.length} timed sessions · ${completedLessonCount} completed classes · ${cancelledLessonCount} cancelled · ${activeSchedules.length} active schedules`}
         icon={<CalendarDays className="h-4 w-4 text-info" />}
         headerActions={
           <div className="flex flex-wrap items-center justify-end gap-1.5">

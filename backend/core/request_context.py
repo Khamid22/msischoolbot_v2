@@ -1,6 +1,7 @@
 import contextvars
 import os
 import shutil
+import uuid
 from fastapi import Request
 from starlette.datastructures import UploadFile
 
@@ -24,11 +25,38 @@ class RequestContextMiddleware:
             await self.app(scope, receive, send)
             return
 
+        request_id = _request_id_from_headers(scope.get("headers", [])) or uuid.uuid4().hex
+        scope.setdefault("state", {})["request_id"] = request_id
         token = _request_context.set(Request(scope, receive=receive))
+
+        async def send_with_request_id(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                if not any(name.lower() == b"x-request-id" for name, _value in headers):
+                    headers.append((b"x-request-id", request_id.encode("ascii")))
+                message["headers"] = headers
+            await send(message)
+
         try:
-            await self.app(scope, receive, send)
+            await self.app(scope, receive, send_with_request_id)
         finally:
             _request_context.reset(token)
+
+
+def _request_id_from_headers(headers) -> str:
+    for raw_name, raw_value in headers:
+        if raw_name.lower() != b"x-request-id":
+            continue
+        try:
+            candidate = raw_value.decode("ascii").strip()
+        except (UnicodeDecodeError, AttributeError):
+            return ""
+        if candidate and len(candidate) <= 128 and all(
+            character.isalnum() or character in "-_." for character in candidate
+        ):
+            return candidate
+        return ""
+    return ""
 
 
 async def prime_body_state(request: Request) -> None:

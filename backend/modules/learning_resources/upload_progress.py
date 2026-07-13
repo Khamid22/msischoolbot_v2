@@ -1,6 +1,9 @@
+import json
 import re
 import threading
 import time
+
+from backend.core.redis_client import get_redis_client
 
 _UPLOAD_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{5,127}$")
 _EVENT_HISTORY_LIMIT = 200
@@ -8,6 +11,11 @@ _UPLOAD_TTL_SECONDS = 30 * 60
 
 _UPLOAD_STATES_LOCK = threading.Lock()
 _UPLOAD_STATES = {}
+
+
+def _redis_keys(upload_id):
+    prefix = f"msi:upload-progress:{upload_id}"
+    return f"{prefix}:events", f"{prefix}:seq"
 
 
 def normalize_upload_id(raw_upload_id):
@@ -92,8 +100,34 @@ def publish_upload_event(
     if not normalized_upload_id:
         return
 
-    state = _ensure_state(normalized_upload_id)
     now = time.time()
+    redis_client = get_redis_client()
+    if redis_client is not None:
+        events_key, seq_key = _redis_keys(normalized_upload_id)
+        try:
+            seq = int(redis_client.incr(seq_key))
+            event = {
+                "seq": seq,
+                "upload_id": normalized_upload_id,
+                "percent": _clamp_percent(percent),
+                "stage": str(stage or "").strip(),
+                "message": str(message or "").strip(),
+                "eta_seconds": _normalize_eta_seconds(eta_seconds),
+                "done": bool(done),
+                "error": bool(error),
+                "timestamp": now,
+            }
+            pipeline = redis_client.pipeline(transaction=False)
+            pipeline.rpush(events_key, json.dumps(event, ensure_ascii=False))
+            pipeline.ltrim(events_key, -_EVENT_HISTORY_LIMIT, -1)
+            pipeline.expire(events_key, _UPLOAD_TTL_SECONDS)
+            pipeline.expire(seq_key, _UPLOAD_TTL_SECONDS)
+            pipeline.execute()
+            return
+        except Exception:
+            pass
+
+    state = _ensure_state(normalized_upload_id)
     with state["condition"]:
         seq = int(state["next_seq"])
         state["next_seq"] = seq + 1
@@ -154,14 +188,25 @@ def wait_for_upload_event(upload_id, *, after_seq=0, timeout_seconds=20.0):
     if not normalized_upload_id:
         return None
 
+    safe_after_seq = int(after_seq or 0)
+    safe_timeout = max(float(timeout_seconds or 0.0), 0.0)
+    deadline = time.time() + safe_timeout
+
+    redis_client = get_redis_client()
+    if redis_client is not None:
+        while True:
+            events = get_upload_events(normalized_upload_id, after_seq=safe_after_seq, limit=1)
+            if events:
+                return events[0]
+            now = time.time()
+            if now >= deadline:
+                return None
+            time.sleep(min(0.2, deadline - now))
+
     with _UPLOAD_STATES_LOCK:
         state = _UPLOAD_STATES.get(normalized_upload_id)
     if state is None:
         return None
-
-    safe_after_seq = int(after_seq or 0)
-    safe_timeout = max(float(timeout_seconds or 0.0), 0.0)
-    deadline = time.time() + safe_timeout
 
     def _next_event_locked():
         for event in state["events"]:
@@ -192,11 +237,6 @@ def get_upload_events(upload_id, *, after_seq=0, limit=100):
     if not normalized_upload_id:
         return []
 
-    with _UPLOAD_STATES_LOCK:
-        state = _UPLOAD_STATES.get(normalized_upload_id)
-    if state is None:
-        return []
-
     try:
         safe_after_seq = int(after_seq or 0)
     except (TypeError, ValueError):
@@ -205,6 +245,25 @@ def get_upload_events(upload_id, *, after_seq=0, limit=100):
         safe_limit = max(int(limit or 0), 1)
     except (TypeError, ValueError):
         safe_limit = 100
+    redis_client = get_redis_client()
+    if redis_client is not None:
+        events_key, _seq_key = _redis_keys(normalized_upload_id)
+        try:
+            decoded = []
+            for raw_event in redis_client.lrange(events_key, 0, -1):
+                event = json.loads(raw_event)
+                if int(event.get("seq", 0)) > safe_after_seq:
+                    decoded.append(event)
+                if len(decoded) >= safe_limit:
+                    break
+            return decoded
+        except Exception:
+            pass
+
+    with _UPLOAD_STATES_LOCK:
+        state = _UPLOAD_STATES.get(normalized_upload_id)
+    if state is None:
+        return []
     with state["condition"]:
         events = [
             dict(event)

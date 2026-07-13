@@ -31,6 +31,7 @@ def test_security_headers_present(client):
     response = client.get("/")
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["x-request-id"]
 
 
 def test_api_responses_are_not_cached(client):

@@ -27,9 +27,6 @@ from backend.modules.communications.announcements_service import list_announceme
 
 FULL_ACADEMIC_BOOTSTRAP_PANELS = {
     "teachers",
-    "subjects",
-    "groups",
-    "schedule",
     "curriculum",
     "gradebook",
     "office_hours",
@@ -106,7 +103,19 @@ def register_internal_operations_page_routes(
             current_auth_role() != "admin"
             or panel in FULL_ACADEMIC_BOOTSTRAP_PANELS
         )
-        academic_context = list_admin_academic_context(include_heavy=academic_context_is_full)
+        try:
+            academic_context = list_admin_academic_context(
+                include_heavy=academic_context_is_full,
+                include_groups=academic_context_is_full,
+            )
+        except TypeError as exc:
+            if "include_groups" not in str(exc):
+                raise
+            academic_context = list_admin_academic_context(
+                include_heavy=academic_context_is_full
+            )
+            if not academic_context_is_full:
+                academic_context = {**academic_context, "groups": []}
         timer.mark("academic_context_build")
         announcements = list_announcements()
         timer.mark("support_context_build")

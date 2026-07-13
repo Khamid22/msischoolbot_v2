@@ -25,7 +25,7 @@ def list_schedule_rows(conn):
         JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
         LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
-        WHERE lower(g.group_name) <> 'online'
+        WHERE lower(g.group_name) <> 'online' AND g.status = 'active'
         ORDER BY s.school_name, subj.subject_name, g.group_name, sch.start_time
         """
     ).fetchall()
@@ -53,8 +53,94 @@ def list_session_rows(conn):
         WHERE (ls.schedule_rule_id IS NOT NULL
                OR (ls.start_time IS NOT NULL AND ls.end_time IS NOT NULL))
           AND lower(g.group_name) <> 'online'
+          AND g.status = 'active'
         ORDER BY ls.session_date, ls.start_time, s.school_name, g.group_name
         """
+    ).fetchall()
+
+
+def list_timetable_rows_in_range(
+    conn,
+    *,
+    start_date,
+    end_date,
+    group_v2_id=0,
+    school_id=0,
+):
+    filters = [
+        "g.status = 'active'",
+        "lower(g.group_name) <> 'online'",
+        "ls.session_date BETWEEN %s AND %s",
+        "(ls.schedule_rule_id IS NOT NULL OR (ls.start_time IS NOT NULL AND ls.end_time IS NOT NULL))",
+    ]
+    params = [start_date, end_date]
+    if int(group_v2_id or 0) > 0:
+        filters.append("g.id = %s")
+        params.append(int(group_v2_id))
+    if int(school_id or 0) > 0:
+        filters.append("g.school_id = %s")
+        params.append(int(school_id))
+    return conn.execute(
+        f"""
+        SELECT ls.id, ls.schedule_rule_id AS schedule_id,
+               ls.program_item_id AS lesson_id,
+               g.school_id, s.school_key AS school_code, s.school_name,
+               subj.id AS subject_id, subj.subject_name,
+               coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+               coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
+               coalesce(t.full_name, '') AS teacher_name,
+               to_char(ls.session_date, 'DD/MM/YYYY') AS session_date,
+               coalesce(to_char(ls.start_time, 'HH24:MI'), '') AS start_time,
+               coalesce(to_char(ls.end_time, 'HH24:MI'), '') AS end_time,
+               ls.room, ls.online_url, ls.status,
+               coalesce(nullif(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
+               coalesce(nullif(ls.source_topic, ''), spi.title, '') AS lesson_topic
+        FROM msi_v2.lesson_sessions ls
+        JOIN msi_v2.groups g ON g.id = ls.group_id
+        JOIN msi_v2.schools s ON s.id = g.school_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+        LEFT JOIN msi_v2.teachers t ON t.id = ls.teacher_id
+        WHERE {' AND '.join(filters)}
+        ORDER BY ls.session_date, ls.start_time, s.school_name, g.group_name, ls.id
+        """,
+        params,
+    ).fetchall()
+
+
+def list_active_schedule_rows_for_scope(conn, *, group_v2_id=0, school_id=0):
+    filters = ["sch.status = 'active'", "g.status = 'active'", "lower(g.group_name) <> 'online'"]
+    params = []
+    if int(group_v2_id or 0) > 0:
+        filters.append("g.id = %s")
+        params.append(int(group_v2_id))
+    if int(school_id or 0) > 0:
+        filters.append("g.school_id = %s")
+        params.append(int(school_id))
+    return conn.execute(
+        f"""
+        SELECT sch.id, g.school_id, s.school_key AS school_code, s.school_name,
+               subj.id AS subject_id, subj.subject_name,
+               coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+               coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
+               coalesce(t.full_name, '') AS teacher_name,
+               sch.title, sch.weekdays,
+               coalesce(to_char(sch.start_time, 'HH24:MI'), '') AS start_time,
+               coalesce(to_char(sch.end_time, 'HH24:MI'), '') AS end_time,
+               coalesce(to_char(sch.start_date, 'DD/MM/YYYY'), '') AS start_date,
+               coalesce(to_char(sch.end_date, 'DD/MM/YYYY'), '') AS end_date,
+               sch.room, sch.online_url, sch.status
+        FROM msi_v2.group_schedule_rules sch
+        JOIN msi_v2.groups g ON g.id = sch.group_id
+        JOIN msi_v2.schools s ON s.id = g.school_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
+        WHERE {' AND '.join(filters)}
+        ORDER BY s.school_name, subj.subject_name, g.group_name, sch.start_time
+        """,
+        params,
     ).fetchall()
 
 
@@ -72,6 +158,7 @@ def list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id, exclude_schedu
         JOIN msi_v2.groups g ON g.id = sch.group_id
         LEFT JOIN msi_v2.teachers t ON t.id = sch.teacher_id
         WHERE sch.status = 'active'
+          AND g.status = 'active'
           AND (sch.group_id = %s OR (%s > 0 AND sch.teacher_id = %s))
           AND sch.id <> %s
         """,

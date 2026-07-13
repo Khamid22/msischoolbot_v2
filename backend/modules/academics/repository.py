@@ -32,7 +32,7 @@ def get_group_by_legacy_or_id(conn, group_id):
         JOIN msi_v2.schools s ON s.id = g.school_id
         JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
-        WHERE {_GROUP_MATCH}
+        WHERE {_GROUP_MATCH} AND g.status = 'active'
         """,
         (int(group_id or 0), int(group_id or 0)),
     ).fetchone()
@@ -106,7 +106,7 @@ def list_group_rows(conn):
         JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
         LEFT JOIN msi_v2.group_students gs ON gs.group_id = g.id
-        WHERE lower(g.group_name) <> 'online'
+        WHERE lower(g.group_name) <> 'online' AND g.status = 'active'
         GROUP BY g.id, g.legacy_group_id, g.school_id, s.school_key, s.school_name,
                  subj.id, subj.subject_name, g.class_id, c.class_name,
                  g.group_name, g.group_code, g.set_name
@@ -184,7 +184,7 @@ def list_enrollment_rows(conn):
         JOIN msi_v2.schools s ON s.id = g.school_id
         JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
-        WHERE lower(g.group_name) <> 'online'
+        WHERE lower(g.group_name) <> 'online' AND g.status = 'active'
           AND gs.enrollment_status = 'active'
           AND gs.legacy_enrollment_id IS NOT NULL
         ORDER BY s.school_name, subj.subject_name, g.group_name, st.full_name
@@ -204,7 +204,7 @@ def get_enrollment_summary_row(conn):
         FROM msi_v2.group_students gs
         JOIN msi_v2.students st ON st.id = gs.student_id
         JOIN msi_v2.groups g ON g.id = gs.group_id
-        WHERE lower(g.group_name) <> 'online'
+        WHERE lower(g.group_name) <> 'online' AND g.status = 'active'
         """
     ).fetchone()
 
@@ -225,6 +225,7 @@ def list_lesson_rows(conn):
         JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
         WHERE spi.item_type = 'lesson' AND lower(g.group_name) <> 'online'
+          AND g.status = 'active'
         ORDER BY s.school_name, subj.subject_name, g.group_name, spi.item_order
         """
     ).fetchall()
@@ -240,6 +241,7 @@ def list_curriculum_program_rows(conn):
                (
                  SELECT count(*) FROM msi_v2.groups g
                  WHERE g.program_id = sp.id AND lower(g.group_name) <> 'online'
+                   AND g.status = 'active'
                ) AS group_count
         FROM msi_v2.subject_programs sp
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
@@ -261,6 +263,142 @@ def list_curriculum_item_rows(conn):
         JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
         ORDER BY subj.subject_name, spi.item_order
         """
+    ).fetchall()
+
+
+def list_group_rows_page(
+    conn,
+    *,
+    school_id=0,
+    subject_id=0,
+    query="",
+    offset=0,
+    limit=50,
+):
+    filters = ["lower(g.group_name) <> 'online'", "g.status = 'active'"]
+    params = []
+    if int(school_id or 0) > 0:
+        filters.append("g.school_id = %s")
+        params.append(int(school_id))
+    if int(subject_id or 0) > 0:
+        filters.append("subj.id = %s")
+        params.append(int(subject_id))
+    normalized_query = str(query or "").strip()
+    if normalized_query:
+        filters.append(
+            "(g.group_name ILIKE %s OR g.group_code ILIKE %s "
+            "OR s.school_name ILIKE %s OR subj.subject_name ILIKE %s)"
+        )
+        pattern = f"%{normalized_query}%"
+        params.extend([pattern, pattern, pattern, pattern])
+    where_sql = " AND ".join(filters)
+    params.extend([int(limit), int(offset)])
+    return conn.execute(
+        f"""
+        WITH group_rows AS (
+          SELECT coalesce(g.legacy_group_id, g.id) AS id,
+                 g.school_id, s.school_key AS school_code, s.school_name,
+                 subj.id AS subject_id, subj.subject_name,
+                 g.class_id, c.class_name, g.group_name AS name,
+                 g.group_code AS code, g.set_name,
+                 (g.legacy_group_id IS NOT NULL AND g.legacy_group_id < 9000000000) AS is_imported,
+                 CASE WHEN EXISTS (
+                   SELECT 1 FROM msi_v2.group_schedule_rules rule
+                   WHERE rule.group_id = g.id AND rule.status = 'active'
+                 ) AND EXISTS (
+                   SELECT 1 FROM msi_v2.group_students member
+                   WHERE member.group_id = g.id AND member.enrollment_status = 'active'
+                 ) THEN 'active'
+                   WHEN g.legacy_group_id IS NOT NULL AND g.legacy_group_id < 9000000000 THEN 'imported'
+                   ELSE 'new' END AS setup_status,
+                 count(*) FILTER (WHERE gs.enrollment_status = 'active') AS students_count,
+                 count(*) FILTER (WHERE gs.enrollment_status = 'disqualified') AS disqualified_count
+          FROM msi_v2.groups g
+          JOIN msi_v2.schools s ON s.id = g.school_id
+          LEFT JOIN msi_v2.classes c ON c.id = g.class_id
+          JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+          JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+          LEFT JOIN msi_v2.group_students gs ON gs.group_id = g.id
+          WHERE {where_sql}
+          GROUP BY g.id, g.legacy_group_id, g.school_id, s.school_key, s.school_name,
+                   subj.id, subj.subject_name, g.class_id, c.class_name,
+                   g.group_name, g.group_code, g.set_name
+        )
+        SELECT group_rows.*, count(*) OVER () AS filtered_total
+        FROM group_rows
+        ORDER BY school_name, subject_name, name, id
+        LIMIT %s OFFSET %s
+        """,
+        params,
+    ).fetchall()
+
+
+def get_group_summary_row(conn, group_id):
+    return conn.execute(
+        f"""
+        SELECT coalesce(g.legacy_group_id, g.id) AS id,
+               g.group_name AS name, g.group_code AS code, g.status,
+               g.school_id, s.school_key AS school_code, s.school_name,
+               subj.id AS subject_id, subj.subject_name,
+               g.class_id, c.class_name, g.set_name,
+               (SELECT count(*) FROM msi_v2.group_students gs
+                WHERE gs.group_id = g.id
+                  AND gs.enrollment_status = 'active') AS students_count,
+               (SELECT count(*) FROM msi_v2.lesson_sessions ls
+                WHERE ls.group_id = g.id) AS lesson_count,
+               (SELECT count(*) FROM msi_v2.exam_results er
+                WHERE er.group_id = g.id) AS exam_result_count,
+               EXISTS (
+                 SELECT 1 FROM msi_v2.group_schedule_rules rule
+                 WHERE rule.group_id = g.id AND rule.status = 'active'
+               ) AS has_active_schedule
+        FROM msi_v2.groups g
+        JOIN msi_v2.schools s ON s.id = g.school_id
+        LEFT JOIN msi_v2.classes c ON c.id = g.class_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE {_GROUP_MATCH} AND g.status = 'active'
+        """,
+        (int(group_id), int(group_id)),
+    ).fetchone()
+
+
+def list_curriculum_program_page(conn, *, offset=0, limit=50):
+    return conn.execute(
+        """
+        SELECT sp.id, subj.subject_key, subj.subject_name, subj.subject_short,
+               sp.source_file, sp.total_items, sp.lesson_count, sp.exam_count,
+               sp.updated_at::text AS updated_at,
+               count(*) OVER () AS filtered_total,
+               (SELECT count(*) FROM msi_v2.groups g
+                WHERE g.program_id = sp.id AND g.status = 'active'
+                  AND lower(g.group_name) <> 'online') AS group_count
+        FROM msi_v2.subject_programs sp
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE sp.status = 'active'
+        ORDER BY subj.subject_name, sp.id
+        LIMIT %s OFFSET %s
+        """,
+        (int(limit), int(offset)),
+    ).fetchall()
+
+
+def list_curriculum_item_page(conn, program_id, *, offset=0, limit=100):
+    return conn.execute(
+        """
+        SELECT spi.id, spi.program_id, subj.subject_key, subj.subject_name,
+               spi.item_order, spi.lesson_number, spi.item_type, spi.title,
+               spi.term_label, spi.week_label, spi.specification_points,
+               spi.book_pages, spi.lesson_count, spi.duration_hours,
+               count(*) OVER () AS filtered_total
+        FROM msi_v2.subject_program_items spi
+        JOIN msi_v2.subject_programs sp ON sp.id = spi.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE spi.program_id = %s AND sp.status = 'active'
+        ORDER BY spi.item_order
+        LIMIT %s OFFSET %s
+        """,
+        (int(program_id), int(limit), int(offset)),
     ).fetchall()
 
 
@@ -312,6 +450,7 @@ def get_existing_group(conn, school_id, program_id, group_name):
         """
         SELECT id FROM msi_v2.groups
         WHERE school_id = %s AND program_id = %s AND lower(group_name) = lower(%s)
+          AND status = 'active'
         """,
         (int(school_id), int(program_id), group_name),
     ).fetchone()
@@ -324,11 +463,91 @@ def group_belongs_to_school(conn, group_name, school_code):
         FROM msi_v2.groups g
         JOIN msi_v2.schools s ON s.id = g.school_id
         WHERE g.group_name = %s
+          AND g.status = 'active'
           AND lower(s.school_key) = lower(%s)
         LIMIT 1
         """,
         (group_name, school_code),
     ).fetchone() is not None
+
+
+def get_group_archive_candidate(conn, group_id):
+    return conn.execute(
+        f"""
+        SELECT g.id, coalesce(g.legacy_group_id, g.id) AS public_id,
+               g.group_name, g.group_code, g.status,
+               s.school_key, subj.subject_name
+        FROM msi_v2.groups g
+        JOIN msi_v2.schools s ON s.id = g.school_id
+        JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        JOIN msi_v2.subjects subj ON subj.id = sp.subject_id
+        WHERE {_GROUP_MATCH}
+        """,
+        (int(group_id), int(group_id)),
+    ).fetchone()
+
+
+def count_group_dependencies(conn, group_id):
+    counts = {}
+    for key, table in (
+        ("enrollments", "group_students"),
+        ("schedules", "group_schedule_rules"),
+        ("lessons", "lesson_sessions"),
+        ("attendance", "attendance_records"),
+        ("homework", "homework_scores"),
+        ("exams", "exam_results"),
+    ):
+        row = conn.execute(
+            f"SELECT count(*) AS total FROM msi_v2.{table} WHERE group_id = %s",
+            (int(group_id),),
+        ).fetchone()
+        counts[key] = int(row["total"] or 0) if row else 0
+    return counts
+
+
+def archive_group(conn, group_id):
+    return conn.execute(
+        """UPDATE msi_v2.groups
+           SET status = 'archived', updated_at = now()
+           WHERE id = %s AND status <> 'archived'
+           RETURNING id""",
+        (int(group_id),),
+    ).fetchone()
+
+
+def purge_group(conn, group_id):
+    return conn.execute(
+        """DELETE FROM msi_v2.groups
+           WHERE id = %s AND status = 'archived'
+           RETURNING id""",
+        (int(group_id),),
+    ).fetchone()
+
+
+def insert_audit_event(
+    conn,
+    *,
+    event_type,
+    entity_type,
+    entity_id,
+    detail_json,
+    actor_staff_id=None,
+    actor_account_id=None,
+):
+    conn.execute(
+        """INSERT INTO msi_v2.audit_events (
+             actor_staff_id, actor_account_id, event_type, entity_type,
+             entity_id, detail_json, created_at
+           ) VALUES (%s, %s, %s, %s, %s, %s::jsonb, now())""",
+        (
+            int(actor_staff_id) if actor_staff_id else None,
+            int(actor_account_id) if actor_account_id else None,
+            str(event_type),
+            str(entity_type),
+            int(entity_id),
+            str(detail_json),
+        ),
+    )
 
 
 def update_group_code(conn, group_id, group_code):

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import threading
+import time
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _PROJECT_DOTENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
@@ -123,6 +125,12 @@ def get_db_backend_for_connection(conn) -> str:
 _PG_POOL = None
 _PG_POOL_URL = ""
 _PG_POOL_LOCK = threading.Lock()
+_POOL_METRICS_LOCK = threading.Lock()
+_POOL_ACQUIRE_COUNT = 0
+_POOL_ACQUIRE_TOTAL_MS = 0.0
+_POOL_ACQUIRE_MAX_MS = 0.0
+_POOL_SLOW_ACQUIRE_COUNT = 0
+LOGGER = logging.getLogger("msi.database")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -149,7 +157,7 @@ def _pool_min() -> int:
 
 
 def _pool_max() -> int:
-    return max(1, _env_int("DB_POOL_MAX", 20))
+    return max(1, _env_int("DB_POOL_MAX", 5))
 
 
 def _pool_timeout() -> float:
@@ -236,13 +244,39 @@ def close_idle_pool_connections() -> None:
             pass
 
 
-def connect_auth_db():
+def _record_pool_wait(elapsed_ms: float) -> None:
+    global _POOL_ACQUIRE_COUNT, _POOL_ACQUIRE_TOTAL_MS, _POOL_ACQUIRE_MAX_MS, _POOL_SLOW_ACQUIRE_COUNT
+    threshold_ms = max(_env_float("DB_POOL_SLOW_WAIT_MS", 25.0), 0.0)
+    with _POOL_METRICS_LOCK:
+        _POOL_ACQUIRE_COUNT += 1
+        _POOL_ACQUIRE_TOTAL_MS += elapsed_ms
+        _POOL_ACQUIRE_MAX_MS = max(_POOL_ACQUIRE_MAX_MS, elapsed_ms)
+        if elapsed_ms >= threshold_ms:
+            _POOL_SLOW_ACQUIRE_COUNT += 1
+    if elapsed_ms >= threshold_ms:
+        LOGGER.warning("database_pool_wait duration_ms=%.1f", elapsed_ms)
+
+
+def get_pool_metrics() -> dict[str, float | int]:
+    with _POOL_METRICS_LOCK:
+        count = _POOL_ACQUIRE_COUNT
+        return {
+            "acquire_count": count,
+            "average_wait_ms": round(_POOL_ACQUIRE_TOTAL_MS / count, 2) if count else 0.0,
+            "max_wait_ms": round(_POOL_ACQUIRE_MAX_MS, 2),
+            "slow_acquire_count": _POOL_SLOW_ACQUIRE_COUNT,
+        }
+
+
+def connect_auth_db(*, timeout: float | None = None):
     database_url = _require_database_url()
     if not _pool_enabled():
         return _PostgresConnectionWrapper(_open_new_connection(database_url))
 
     pool = _get_pool(database_url)
-    connection = pool.getconn()
+    started = time.perf_counter()
+    connection = pool.getconn(timeout=timeout) if timeout is not None else pool.getconn()
+    _record_pool_wait((time.perf_counter() - started) * 1000)
     return _PostgresConnectionWrapper(
         connection, release=lambda conn: _pool_putconn(pool, conn)
     )
@@ -256,14 +290,23 @@ def connect_db():
     return connect_auth_db()
 
 
+def check_database_ready(*, timeout: float = 2.0) -> bool:
+    """Run the bounded database readiness probe outside transport adapters."""
+    with connect_auth_db(timeout=timeout) as conn:
+        row = conn.execute("SELECT 1 AS ready").fetchone()
+        return bool(row and int(row["ready"] or 0) == 1)
+
+
 atexit.register(close_idle_pool_connections)
 
 
 __all__ = [
     "close_idle_pool_connections",
+    "check_database_ready",
     "connect",
     "connect_auth_db",
     "connect_db",
     "get_db_backend",
     "get_db_backend_for_connection",
+    "get_pool_metrics",
 ]

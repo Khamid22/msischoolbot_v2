@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.core.access import CurrentUser, get_current_user
 from backend.core.http import ApiSuccess, api_success
-from backend.internal_operations.schemas import (
+from backend.modules.academics.schemas import (
     AdminAcademicContextPayload,
     AdminAcademicContextDelta,
     AdminCreateScheduleRequest,
@@ -26,6 +27,7 @@ from backend.internal_operations.schemas import (
     AdminUpdateGroupScheduleRequest,
     AdminCreateGroupStudentRequest,
     AdminStudentCreated,
+    AdminPurgeGroupRequest,
 )
 from backend.modules.academics.operations import (
     create_schedule_from_payload,
@@ -45,6 +47,16 @@ from backend.modules.academics.operations import (
     create_class_from_payload,
     upsert_group_schedule_from_payload,
     create_student_with_enrollment_from_payload,
+    permanently_purge_group,
+    preview_group_purge,
+)
+from backend.modules.academics.read_service import (
+    get_group_summary,
+    list_group_page,
+    list_group_schedule_rows,
+    list_program_item_page,
+    list_program_page,
+    list_timetable_range,
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 
@@ -66,7 +78,7 @@ def create_academic_class(payload: AdminCreateAcademicClassRequest):
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    return api_success(list_admin_academic_context(include_heavy=True))
+    return api_success(list_admin_academic_context(include_heavy=False))
 
 
 @router.post(
@@ -74,32 +86,65 @@ def create_academic_class(payload: AdminCreateAcademicClassRequest):
     operation_id="api_v1_admin_create_academic_schedule",
     response_model=ApiSuccess[AdminScheduleCreated],
 )
-def create_schedule(payload: AdminCreateScheduleRequest):
+def create_schedule(
+    payload: AdminCreateScheduleRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
     try:
-        result = create_schedule_from_payload(_payload(payload))
+        result = create_schedule_from_payload(
+            _payload(payload),
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    academic_context = list_admin_academic_context()
+    timetable = list_timetable_range(
+        start_date=result.get("firstLessonDate", ""),
+        end_date=min(
+            date.fromisoformat(result["predictedEndDate"]),
+            date.fromisoformat(result["firstLessonDate"]) + timedelta(days=62),
+        ).isoformat(),
+        group_id=payload.group_id,
+    )
     return api_success(
         {
             "schedule": result,
-            "schedules": academic_context.get("schedules", []),
-            "sessions": academic_context.get("sessions", []),
-            "lessons": academic_context.get("lessons", []),
+            "schedules": timetable.get("schedules", []),
+            "sessions": timetable.get("sessions", []),
+            "lessons": [],
+            "entity": result,
+            "affected_ids": result.get("sessionIds", []),
+            "revision": f"schedule:{result.get('scheduleId', 0)}",
         }
     )
 
 
 @router.put("/groups/{group_id}/schedule", operation_id="api_v1_admin_upsert_group_schedule", response_model=ApiSuccess[AdminScheduleCreated])
-def upsert_group_schedule(group_id: int, payload: AdminUpdateGroupScheduleRequest):
+def upsert_group_schedule(
+    group_id: int,
+    payload: AdminUpdateGroupScheduleRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
     try:
-        result = upsert_group_schedule_from_payload(group_id, _payload(payload))
+        result = upsert_group_schedule_from_payload(
+            group_id,
+            _payload(payload),
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    context = list_admin_academic_context()
-    return api_success({"schedule": result, "schedules": context.get("schedules", []), "sessions": context.get("sessions", []), "lessons": context.get("lessons", [])})
+    return api_success({
+        "schedule": result,
+        "schedules": list_group_schedule_rows(group_id),
+        "sessions": [],
+        "lessons": [],
+        "entity": result,
+        "affected_ids": [int(result.get("scheduleId", 0))],
+        "revision": f"schedule:{result.get('scheduleId', 0)}",
+    })
 
 
 @router.post("/groups/{group_id}/students", operation_id="api_v1_admin_create_group_student", response_model=ApiSuccess[AdminStudentCreated])
@@ -116,9 +161,119 @@ def create_group_student(group_id: int, payload: AdminCreateGroupStudentRequest)
     "/context",
     operation_id="api_v1_admin_academic_context",
     response_model=ApiSuccess[AdminAcademicContextPayload],
+    deprecated=True,
 )
 def academic_context():
     return api_success(list_admin_academic_context(include_heavy=True))
+
+
+@router.get(
+    "/groups",
+    operation_id="api_v1_admin_list_academic_groups",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def list_academic_groups(
+    school_id: int = 0,
+    subject_id: int = 0,
+    query: str = "",
+    cursor: str = "",
+    limit: int = 50,
+):
+    try:
+        return api_success(
+            list_group_page(
+                school_id=school_id,
+                subject_id=subject_id,
+                query=query,
+                cursor=cursor,
+                limit=limit,
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/groups/{group_id}/summary",
+    operation_id="api_v1_admin_academic_group_summary",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def academic_group_summary(group_id: int):
+    try:
+        summary = get_group_summary(group_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not summary:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return api_success(summary)
+
+
+@router.get(
+    "/programs",
+    operation_id="api_v1_admin_list_academic_programs",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def list_academic_programs(cursor: str = "", limit: int = 50):
+    try:
+        return api_success(list_program_page(cursor=cursor, limit=limit))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/programs/{program_id}/items",
+    operation_id="api_v1_admin_list_academic_program_items",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def list_academic_program_items(
+    program_id: int, cursor: str = "", limit: int = 100
+):
+    try:
+        return api_success(
+            list_program_item_page(program_id, cursor=cursor, limit=limit)
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/timetable",
+    operation_id="api_v1_admin_academic_timetable_range",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def academic_timetable_range(
+    date_from: str,
+    date_to: str,
+    group_id: int = 0,
+    school_id: int = 0,
+):
+    try:
+        return api_success(
+            list_timetable_range(
+                start_date=date_from,
+                end_date=date_to,
+                group_id=group_id,
+                school_id=school_id,
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/groups/{group_id}/timetable",
+    operation_id="api_v1_admin_group_timetable_range",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def group_timetable_range(group_id: int, date_from: str, date_to: str):
+    try:
+        return api_success(
+            list_timetable_range(
+                start_date=date_from, end_date=date_to, group_id=group_id
+            )
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get(
@@ -158,24 +313,83 @@ def gradebook(
     operation_id="api_v1_admin_delete_academic_group",
     response_model=ApiSuccess[AdminAcademicContextDelta],
 )
-def delete_academic_group(group_id: int):
+def delete_academic_group(
+    group_id: int,
+    user: CurrentUser = Depends(get_current_user),
+):
     try:
-        deleted = delete_group(group_id)
+        deleted = delete_group(
+            group_id,
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not deleted:
         raise HTTPException(status_code=404, detail="Group not found")
 
     invalidate_admin_page_context_cache()
-    academic_context = list_admin_academic_context()
+    academic_context = list_admin_academic_context(include_heavy=False)
     return api_success(
         {
             "group": deleted,
             "groups": academic_context.get("groups", []),
-            "enrollments": academic_context.get("enrollments", []),
-            "schedules": academic_context.get("schedules", []),
-            "sessions": academic_context.get("sessions", []),
-            "lessons": academic_context.get("lessons", []),
+            "entity": deleted,
+            "affected_ids": [int(deleted["id"])],
+            "revision": f"group:{deleted['id']}:archived",
+        }
+    )
+
+
+@router.get(
+    "/groups/{group_id}/purge-preview",
+    operation_id="api_v1_admin_preview_academic_group_purge",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def preview_academic_group_purge(
+    group_id: int,
+    user: CurrentUser = Depends(get_current_user),
+):
+    if not user.is_owner:
+        raise HTTPException(status_code=403, detail="Owner access is required.")
+    try:
+        preview = preview_group_purge(group_id)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not preview:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return api_success(preview)
+
+
+@router.post(
+    "/groups/{group_id}/purge",
+    operation_id="api_v1_admin_purge_academic_group",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def purge_academic_group(
+    group_id: int,
+    payload: AdminPurgeGroupRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    if not user.is_owner:
+        raise HTTPException(status_code=403, detail="Owner access is required.")
+    try:
+        deleted = permanently_purge_group(
+            group_id,
+            payload.confirmation,
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Group not found")
+    invalidate_admin_page_context_cache()
+    return api_success(
+        {
+            "entity": deleted,
+            "affected_ids": [int(deleted["id"])],
+            "revision": f"group:{deleted['id']}:purged",
         }
     )
 
@@ -205,7 +419,7 @@ def move_enrollment_group(enrollment_id: int, payload: AdminEnrollmentGroupReque
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    academic_context = list_admin_academic_context()
+    academic_context = list_admin_academic_context(include_heavy=False)
     return api_success({"enrollment": result, "groups": academic_context.get("groups", [])})
 
 
@@ -242,9 +456,15 @@ def record_homework(payload: AdminRecordHomeworkRequest, user: CurrentUser = Dep
     operation_id="api_v1_admin_update_academic_lesson",
     response_model=ApiSuccess[AdminLessonUpdated],
 )
-def update_lesson(lesson_session_id: int, payload: AdminLessonUpdateRequest):
+def update_lesson(
+    lesson_session_id: int,
+    payload: AdminLessonUpdateRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
     try:
-        lesson = update_lesson_session_from_payload(lesson_session_id, _payload(payload))
+        lesson = update_lesson_session_from_payload(
+            lesson_session_id, _payload(payload), user.staff_id
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
