@@ -21,6 +21,7 @@ from backend.modules.academics.schemas import (
     AdminEnrollmentUpdated,
     AdminLessonUpdateRequest,
     AdminLessonCancelRequest,
+    AdminLessonRecoverRequest,
     AdminLessonUpdated,
     AdminRecordAttendanceRequest,
     AdminRecordCoinRequest,
@@ -34,6 +35,7 @@ from backend.modules.academics.schemas import (
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.operations import (
+    AcademicConflictError,
     create_group_from_payload,
     create_class_from_payload,
     create_schedule_from_payload,
@@ -443,6 +445,8 @@ def update_lesson(
         lesson = update_lesson_session_from_payload(
             lesson_session_id, _payload(payload), user.staff_id
         )
+    except AcademicConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
@@ -456,12 +460,18 @@ def update_lesson(
 )
 def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, user: CurrentUser = Depends(get_current_user)):
     try:
-        result = cancel_lesson_session(lesson_session_id, payload.reason, user.staff_id)
-        gradebook = get_group_gradebook(result["groupId"], section="timetable")
+        result = cancel_lesson_session(
+            lesson_session_id,
+            payload.reason,
+            user.staff_id,
+            allow_recorded_lesson_changes=payload.allow_recorded_lesson_changes,
+        )
+    except AcademicConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    return api_success({**result, "gradebook": gradebook})
+    return api_success(result)
 
 
 @router.post(
@@ -469,14 +479,25 @@ def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, use
     operation_id="api_v1_academic_director_recover_academic_lesson",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def recover_lesson(lesson_session_id: int, user: CurrentUser = Depends(get_current_user)):
+def recover_lesson(
+    lesson_session_id: int,
+    payload: AdminLessonRecoverRequest | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
     try:
-        result = recover_lesson_session(lesson_session_id, user.staff_id)
-        gradebook = get_group_gradebook(result["groupId"], section="timetable")
+        result = recover_lesson_session(
+            lesson_session_id,
+            user.staff_id,
+            allow_recorded_lesson_changes=bool(
+                payload and payload.allow_recorded_lesson_changes
+            ),
+        )
+    except AcademicConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     invalidate_admin_page_context_cache()
-    return api_success({**result, "gradebook": gradebook})
+    return api_success(result)
 
 
 @router.post(

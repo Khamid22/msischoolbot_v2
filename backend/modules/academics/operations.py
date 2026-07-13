@@ -21,6 +21,10 @@ from backend.modules.academics.service import (
 )
 
 
+class AcademicConflictError(ValueError):
+    """A safe, user-correctable academic scheduling conflict."""
+
+
 def list_admin_academic_context(*, include_heavy=True, include_groups=True):
     return list_academic_admin_rows(
         include_heavy=include_heavy, include_groups=include_groups
@@ -1245,7 +1249,12 @@ def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_i
     if lesson_session_id <= 0:
         raise ValueError("Lesson session id is required.")
     raw_date = payload.get("lesson_date", payload.get("date", None))
-    next_date = _parse_optional_lesson_date(raw_date) if raw_date is not None else None
+    next_date = None
+    if raw_date is not None:
+        try:
+            next_date = date.fromisoformat(str(raw_date or "").strip())
+        except ValueError as exc:
+            raise ValueError("Lesson date must use YYYY-MM-DD.") from exc
     should_update_date = raw_date is not None
     raw_status = payload.get("status", None)
     next_status = _normalize_lesson_status(raw_status) if raw_status is not None else None
@@ -1255,9 +1264,9 @@ def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_i
     next_start_time = _parse_optional_lesson_time(raw_start_time)
     next_end_time = _parse_optional_lesson_time(raw_end_time)
     if should_update_times:
-        if (next_start_time is None) != (next_end_time is None):
-            raise ValueError("Both start and end times are required (or both empty to clear).")
-        if next_start_time is not None and next_end_time <= next_start_time:
+        if raw_start_time is None or raw_end_time is None or not next_start_time or not next_end_time:
+            raise ValueError("Both start and end times are required.")
+        if next_end_time <= next_start_time:
             raise ValueError("End time must be after the start time.")
     raw_room = payload.get("room", None)
     should_update_room = raw_room is not None
@@ -1270,21 +1279,89 @@ def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_i
     next_topic = str(raw_topic or "").strip()
     if should_update_lesson_name and not next_lesson_name:
         raise ValueError("Lesson name is required.")
+    allow_recorded_changes = bool(payload.get("allow_recorded_lesson_changes", False))
+
+    def time_text(value):
+        return str(value or "")[:5]
 
     with connect_auth_db() as conn:
-        row = conn.execute(
-            """
-            SELECT ls.id, ls.status, ls.session_date, ls.room,
-                   COALESCE(NULLIF(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
-                   COALESCE(NULLIF(ls.source_topic, ''), spi.title, '') AS topic
-            FROM msi_v2.lesson_sessions ls
-            LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
-            WHERE ls.id = %s
-            """,
-            (lesson_session_id,),
-        ).fetchone()
+        row = timetable_repository.get_lesson_session_snapshot(conn, lesson_session_id)
         if not row:
             raise ValueError("Lesson session was not found.")
+        timetable_repository.lock_lesson_occurrence_scope(
+            conn, int(row["group_id"]), int(row["teacher_id"] or 0)
+        )
+        row = timetable_repository.get_lesson_session_snapshot(
+            conn, lesson_session_id, for_update=True
+        )
+
+        proposed_date = next_date if should_update_date else row["session_date"]
+        proposed_start = next_start_time if should_update_times else time_text(row["start_time"])
+        proposed_end = next_end_time if should_update_times else time_text(row["end_time"])
+        proposed_room = next_room if should_update_room else str(row["room"] or "")
+        proposed_name = next_lesson_name if should_update_lesson_name else str(row["lesson_number"] or "Session")
+        proposed_topic = next_topic if should_update_topic else str(row["topic"] or "")
+        changed_fields = []
+        comparisons = {
+            "lesson_date": (row["session_date"], proposed_date),
+            "start_time": (time_text(row["start_time"]), proposed_start),
+            "end_time": (time_text(row["end_time"]), proposed_end),
+            "room": (str(row["room"] or ""), proposed_room),
+            "lesson_name": (str(row["lesson_number"] or "Session"), proposed_name),
+            "topic": (str(row["topic"] or ""), proposed_topic),
+        }
+        requested = {
+            "lesson_date": should_update_date,
+            "start_time": should_update_times,
+            "end_time": should_update_times,
+            "room": should_update_room,
+            "lesson_name": should_update_lesson_name,
+            "topic": should_update_topic,
+        }
+        for field, values in comparisons.items():
+            if requested[field] and values[0] != values[1]:
+                changed_fields.append(field)
+
+        if changed_fields and bool(row["has_academic_records"]) and not allow_recorded_changes:
+            raise AcademicConflictError(
+                "This lesson already has attendance or homework. Confirm that you want to change it."
+            )
+
+        schedule_changed = any(
+            field in changed_fields for field in ("lesson_date", "start_time", "end_time")
+        )
+        if schedule_changed:
+            if proposed_date is None or not proposed_start or not proposed_end:
+                raise ValueError("A scheduled lesson requires a date, start time, and end time.")
+            active_exception = timetable_repository.get_active_lesson_exception(
+                conn, lesson_session_id
+            )
+            if active_exception:
+                raise AcademicConflictError(
+                    "Recover this cancelled lesson before moving its scheduled occurrence."
+                )
+            if timetable_repository.group_date_has_active_exception(
+                conn,
+                int(row["group_id"]),
+                proposed_date,
+                exclude_lesson_session_id=lesson_session_id,
+            ):
+                raise AcademicConflictError(
+                    "That date is blocked by an active lesson cancellation."
+                )
+            conflicts = timetable_repository.list_lesson_occurrence_conflicts(
+                conn,
+                lesson_session_id=lesson_session_id,
+                group_v2_id=int(row["group_id"]),
+                teacher_v2_id=int(row["teacher_id"] or 0),
+                session_date=proposed_date,
+                start_time=proposed_start,
+                end_time=proposed_end,
+            )
+            if conflicts:
+                conflict = conflicts[0]
+                label = str(conflict["teacher_name"] or conflict["group_name"] or "another lesson")
+                raise AcademicConflictError(f"This time overlaps with {label}.")
 
         conn.execute(
             """
@@ -1323,25 +1400,46 @@ def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_i
             entity_id=lesson_session_id,
             detail_json=json.dumps(
                 {
-                    "changed_fields": sorted(
-                        key for key in payload if payload.get(key) is not None
-                    )
+                    "changed_fields": sorted(changed_fields),
+                    "before": {
+                        "date": row["session_date"].isoformat() if row["session_date"] else "",
+                        "start_time": time_text(row["start_time"]),
+                        "end_time": time_text(row["end_time"]),
+                        "room": str(row["room"] or ""),
+                        "lesson_name": str(row["lesson_number"] or "Session"),
+                        "topic": str(row["topic"] or ""),
+                    },
+                    "after": {
+                        "date": proposed_date.isoformat() if proposed_date else "",
+                        "start_time": proposed_start,
+                        "end_time": proposed_end,
+                        "room": proposed_room,
+                        "lesson_name": proposed_name,
+                        "topic": proposed_topic,
+                    },
                 }
             ),
             actor_staff_id=actor_staff_id,
         )
         conn.commit()
 
-    display_date = canonical.format_date(next_date if should_update_date else row["session_date"])
+    display_date = canonical.format_date(proposed_date)
     return {
         "id": lesson_session_id,
-        "lessonNumber": next_lesson_name if should_update_lesson_name else str(row["lesson_number"] or "Session"),
-        "topic": next_topic if should_update_topic else str(row["topic"] or ""),
+        "lessonSessionId": lesson_session_id,
+        "groupId": int(row["public_group_id"]),
+        "lessonNumber": proposed_name,
+        "topic": proposed_topic,
         "date": display_date,
-        "room": next_room if should_update_room else str(row["room"] or ""),
-        "startTime": next_start_time or "",
-        "endTime": next_end_time or "",
+        "isoDate": proposed_date.isoformat() if proposed_date else "",
+        "room": proposed_room,
+        "startTime": proposed_start,
+        "endTime": proposed_end,
         "status": next_status or str(row["status"] or "scheduled"),
+        "hasAcademicRecords": bool(row["has_academic_records"]),
+        "affectedIds": [lesson_session_id],
+        "originalDate": row["session_date"].isoformat() if row["session_date"] else "",
+        "revision": f"lesson:{lesson_session_id}:{_now().isoformat()}",
     }
 
 
@@ -1392,10 +1490,16 @@ def _reflow_lesson_sequence(conn, lesson, *, first_date, include_first_date, ign
         )
     if dates:
         timetable_repository.update_schedule_end_date(conn, int(schedule["id"]), dates[-1])
-    return len(lessons)
+    return [int(row["id"]) for row in lessons]
 
 
-def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
+def cancel_lesson_session(
+    lesson_session_id,
+    reason,
+    actor_staff_id=None,
+    *,
+    allow_recorded_lesson_changes=False,
+):
     lesson_session_id = int(lesson_session_id or 0)
     reason = str(reason or "").strip()
     if lesson_session_id <= 0:
@@ -1406,12 +1510,20 @@ def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
         lesson = timetable_repository.get_curriculum_lesson_for_exception(conn, lesson_session_id)
         if not lesson:
             raise ValueError("Curriculum lesson was not found.")
+        timetable_repository.lock_group_timetable_for_reflow(conn, int(lesson["group_id"]))
+        lesson = timetable_repository.get_curriculum_lesson_for_exception(
+            conn, lesson_session_id, for_update=True
+        )
         if lesson["session_date"] is None:
             raise ValueError("Only a scheduled lesson can be cancelled.")
+        if bool(lesson["has_academic_records"]) and not allow_recorded_lesson_changes:
+            raise AcademicConflictError(
+                "This lesson already has attendance or homework. Confirm cancellation to keep those records attached."
+            )
         if timetable_repository.get_active_lesson_exception(conn, lesson_session_id):
             raise ValueError("This lesson is already cancelled.")
         exception = timetable_repository.insert_lesson_exception(conn, lesson, reason, actor_staff_id)
-        affected = _reflow_lesson_sequence(
+        affected_ids = _reflow_lesson_sequence(
             conn, lesson, first_date=lesson["session_date"], include_first_date=False
         )
         academic_repository.insert_audit_event(
@@ -1420,7 +1532,7 @@ def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
             entity_type="lesson_session",
             entity_id=lesson_session_id,
             detail_json=json.dumps(
-                {"exception_id": int(exception["id"]), "reason": reason, "affected": affected}
+                {"exception_id": int(exception["id"]), "reason": reason, "affected": len(affected_ids)}
             ),
             actor_staff_id=actor_staff_id,
         )
@@ -1428,11 +1540,18 @@ def cancel_lesson_session(lesson_session_id, reason, actor_staff_id=None):
         return {
             "groupId": int(lesson["group_id"]),
             "exceptionId": int(exception["id"]),
-            "affectedLessonCount": affected,
+            "affectedLessonCount": len(affected_ids),
+            "affectedIds": affected_ids,
+            "revision": f"lesson-exception:{int(exception['id'])}:{_now().isoformat()}",
         }
 
 
-def recover_lesson_session(lesson_session_id, actor_staff_id=None):
+def recover_lesson_session(
+    lesson_session_id,
+    actor_staff_id=None,
+    *,
+    allow_recorded_lesson_changes=False,
+):
     lesson_session_id = int(lesson_session_id or 0)
     if lesson_session_id <= 0:
         raise ValueError("Lesson session id is required.")
@@ -1440,11 +1559,19 @@ def recover_lesson_session(lesson_session_id, actor_staff_id=None):
         lesson = timetable_repository.get_curriculum_lesson_for_exception(conn, lesson_session_id)
         if not lesson:
             raise ValueError("Curriculum lesson was not found.")
+        timetable_repository.lock_group_timetable_for_reflow(conn, int(lesson["group_id"]))
+        lesson = timetable_repository.get_curriculum_lesson_for_exception(
+            conn, lesson_session_id, for_update=True
+        )
         exception = timetable_repository.get_active_lesson_exception(conn, lesson_session_id)
         if not exception:
             raise ValueError("This lesson has no active cancellation to recover.")
+        if bool(lesson["has_academic_records"]) and not allow_recorded_lesson_changes:
+            raise AcademicConflictError(
+                "This lesson already has attendance or homework. Confirm recovery to keep those records attached."
+            )
         timetable_repository.recover_lesson_exception(conn, int(exception["id"]), actor_staff_id)
-        affected = _reflow_lesson_sequence(
+        affected_ids = _reflow_lesson_sequence(
             conn,
             lesson,
             first_date=exception["original_session_date"],
@@ -1457,7 +1584,7 @@ def recover_lesson_session(lesson_session_id, actor_staff_id=None):
             entity_type="lesson_session",
             entity_id=lesson_session_id,
             detail_json=json.dumps(
-                {"exception_id": int(exception["id"]), "affected": affected}
+                {"exception_id": int(exception["id"]), "affected": len(affected_ids)}
             ),
             actor_staff_id=actor_staff_id,
         )
@@ -1465,7 +1592,9 @@ def recover_lesson_session(lesson_session_id, actor_staff_id=None):
         return {
             "groupId": int(lesson["group_id"]),
             "exceptionId": int(exception["id"]),
-            "affectedLessonCount": affected,
+            "affectedLessonCount": len(affected_ids),
+            "affectedIds": affected_ids,
+            "revision": f"lesson-exception:{int(exception['id'])}:recovered:{_now().isoformat()}",
         }
 
 

@@ -39,13 +39,38 @@ def test_both_management_roles_expose_cancel_and_recover_routes():
 
 
 def test_timetable_actions_and_validation_are_visible_in_the_ui():
-    timetable = source("frontend/src/features/management/academic/Timetable.tsx")
-    gradebook = source("frontend/src/features/management/academic/GroupGradebook.tsx")
+    timetable = source("frontend/src/features/management/academic/ModernGroupTimetable.tsx")
 
-    assert 'title="Cancel lesson"' in timetable
-    assert 'title="Recover lesson"' in timetable
-    assert 'title="Edit lesson content"' in timetable
-    assert "Cancellation reason" in gradebook
-    assert "Cancel & Move Forward" in gradebook
-    assert "Recover & Restore" in gradebook
-    assert 'lesson_name: lessonNameInput.trim()' in gradebook
+    assert "Cancel this lesson" in timetable
+    assert "Recover Lesson" in timetable
+    assert "Lesson details" in timetable
+    assert "Cancellation reason" in timetable
+    assert "Cancel & Move Forward" in timetable
+    assert "allow_recorded_lesson_changes" in timetable
+
+
+def test_range_payload_keeps_exceptions_separate_and_marks_recorded_lessons():
+    repository = source("backend/modules/academics/timetable_repository.py")
+    read_service = source("backend/modules/academics/read_service.py")
+
+    assert "def list_timetable_exceptions_in_range(" in repository
+    assert "AS has_academic_records" in repository
+    assert '"exceptions": exceptions' in read_service
+    assert '"exception_key": f"lesson-exception:' in read_service
+    assert '"hasAcademicRecords"' in read_service
+
+
+def test_reflow_mutations_lock_rows_and_return_deltas_not_gradebook():
+    repository = source("backend/modules/academics/timetable_repository.py")
+    operations = source("backend/modules/academics/operations.py")
+    admin = source("backend/internal_operations/academics_api.py")
+    director = source("backend/workspaces/academic_director/academics_api.py")
+
+    assert "def lock_group_timetable_for_reflow(" in repository
+    assert "ORDER BY id FOR UPDATE" in repository
+    assert "allow_recorded_lesson_changes" in operations
+    assert '"affectedIds": affected_ids' in operations
+    for route_source in (admin, director):
+        cancel_block = route_source.split("def cancel_lesson", 1)[1].split("@router.post", 1)[0]
+        assert "get_group_gradebook" not in cancel_block
+        assert "AcademicConflictError" in cancel_block

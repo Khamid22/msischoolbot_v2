@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
-import { AlertTriangle, BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Settings, Table2, Users, X } from "lucide-react";
+import { BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Plus, Settings, Table2, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -8,7 +8,7 @@ import { asNumber, asString } from "@/features/managementTypes";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
-import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./Timetable";
+import { ModernGroupTimetable } from "./ModernGroupTimetable";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { lessonDurationMinutesForSchoolCode } from "./scheduleMath";
@@ -17,6 +17,7 @@ import { queryClient } from "@/shared/api/queryClient";
 type AcademicGradebookRoutes = Pick<
   typeof routes,
   | "adminAcademicGradebookApi"
+  | "adminAcademicGroupTimetableApi"
   | "adminAcademicAttendanceApi"
   | "adminAcademicHomeworkApi"
   | "adminAcademicExamApi"
@@ -172,18 +173,6 @@ export function GroupGradebook({
   const [examType, setExamType] = useState("all");
   const [examDisplay, setExamDisplay] = useState<"chart" | "table">("chart");
   const popRef = useRef<HTMLDivElement>(null);
-  const [scheduleEdit, setScheduleEdit] = useState<{ lesson: Lesson; kind: "time" | "room"; anchorRect: DOMRect } | null>(null);
-  const [timeStartInput, setTimeStartInput] = useState("");
-  const [timeEndInput, setTimeEndInput] = useState("");
-  const [roomInput, setRoomInput] = useState("");
-  const [scheduleSaving, setScheduleSaving] = useState(false);
-  const schedulePopRef = useRef<HTMLDivElement>(null);
-  const [lessonAction, setLessonAction] = useState<{ kind: "edit" | "cancel" | "recover"; lesson: Lesson } | null>(null);
-  const [lessonActionSaving, setLessonActionSaving] = useState(false);
-  const [lessonActionError, setLessonActionError] = useState("");
-  const [lessonNameInput, setLessonNameInput] = useState("");
-  const [lessonTopicInput, setLessonTopicInput] = useState("");
-  const [cancellationReason, setCancellationReason] = useState("");
   const gradebookCacheRef = useRef(new Map<string, GradebookData>());
   const loadRequestRef = useRef(0);
   const gradebookScrollRef = useRef<HTMLDivElement | null>(null);
@@ -213,8 +202,6 @@ export function GroupGradebook({
     setExamDisplay("chart");
     setActiveExam(null);
     setExamInput("");
-    setScheduleEdit(null);
-    setLessonAction(null);
     setLessonMonth(currentMonthKey());
     gradebookCacheRef.current.clear();
   }, [groupId]);
@@ -227,17 +214,6 @@ export function GroupGradebook({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [active]);
-
-  useEffect(() => {
-    if (!scheduleEdit) return;
-    const handler = (e: MouseEvent) => {
-      // Don't let a stray outside click drop an in-flight save silently.
-      if (scheduleSaving) return;
-      if (schedulePopRef.current && !schedulePopRef.current.contains(e.target as Node)) closeScheduleEdit();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [scheduleEdit, scheduleSaving]);
 
   async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", month = "", signal?: AbortSignal) {
     const section = gradebookSection(view);
@@ -309,6 +285,13 @@ export function GroupGradebook({
 
   function changeView(view: GradebookView) {
     setActiveView(view);
+    if (view === "timetable") {
+      loadRequestRef.current += 1;
+      setLoading(false);
+      setError("");
+      setLoadedView("timetable");
+      return;
+    }
     void load(groupId, undefined, { view, month: view === "gradebook" ? lessonMonth : "" });
   }
 
@@ -363,63 +346,6 @@ export function GroupGradebook({
     setStudentName("");
     setStudentError("");
     setCreatedStudent(null);
-  }
-
-  function openLessonAction(kind: "edit" | "cancel" | "recover", lesson: Lesson) {
-    setLessonAction({ kind, lesson });
-    setLessonActionError("");
-    setLessonNameInput(lesson.lessonNumber.replace(/ \(Cancelled\)$/, ""));
-    setLessonTopicInput(lesson.isCancellation ? "" : lesson.topic);
-    setCancellationReason("");
-  }
-
-  async function submitLessonAction(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!lessonAction || lessonActionSaving) return;
-    const targetId = lessonAction.lesson.lessonSessionId || lessonAction.lesson.id;
-    setLessonActionSaving(true);
-    setLessonActionError("");
-    try {
-      const isEdit = lessonAction.kind === "edit";
-      const endpoint = isEdit
-        ? academicRoutes.adminAcademicLessonApi(targetId)
-        : lessonAction.kind === "cancel"
-          ? academicRoutes.adminAcademicLessonCancelApi(targetId)
-          : academicRoutes.adminAcademicLessonRecoverApi(targetId);
-      const body = isEdit
-        ? { lesson_name: lessonNameInput.trim(), topic: lessonTopicInput.trim() }
-        : lessonAction.kind === "cancel"
-          ? { reason: cancellationReason.trim() }
-          : undefined;
-      const response = await fetch(endpoint, {
-        method: isEdit ? "PATCH" : "POST",
-        headers: jsonCsrfHeaders(csrf),
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!apiSucceeded(response, json)) {
-        setLessonActionError(apiErrorMessage(json, "Unable to update this lesson."));
-        return;
-      }
-      const payload = apiData<{ gradebook?: GradebookData }>(json);
-      if (payload.gradebook && activeView === "timetable") {
-        gradebookCacheRef.current.clear();
-        setData(payload.gradebook);
-        setLoadedView(activeView);
-      }
-      else await refreshCurrentView();
-      const message = isEdit
-        ? "Lesson content updated. Its timetable date was kept."
-        : lessonAction.kind === "cancel"
-          ? "Lesson cancelled and the remaining program moved forward."
-          : "Lesson recovered and the remaining program moved back.";
-      setLessonAction(null);
-      showSetupToast(message);
-    } catch {
-      setLessonActionError("Network error while updating the lesson.");
-    } finally {
-      setLessonActionSaving(false);
-    }
   }
 
   function updateSetupField<K extends keyof GroupSetupForm>(key: K, value: GroupSetupForm[K]) {
@@ -533,7 +459,11 @@ export function GroupGradebook({
       setSetupInitial(JSON.stringify(setupForm));
       if (Array.isArray(responseData.schedules)) setScheduleRows(responseData.schedules);
       setHasSavedSetup(true);
-      await refreshCurrentView();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["academic", "timetable", groupId] }),
+        queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] }),
+      ]);
+      if (activeView !== "timetable") await refreshCurrentView();
       setSetupOpen(false);
       showSetupToast(`${asNumber(result.affectedLessonCount)} lessons scheduled.`);
     } catch {
@@ -909,145 +839,6 @@ export function GroupGradebook({
     return text;
   }
 
-  function patchLessonSchedule(lessonId: number, patch: Partial<Lesson>) {
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        lessons: prev.lessons.map((item) => (item.id === lessonId ? { ...item, ...patch } : item)),
-      };
-    });
-  }
-
-  function openTimeEdit(e: React.MouseEvent<HTMLButtonElement>, lesson: Lesson) {
-    if (isCancelledLesson(lesson)) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setScheduleEdit({ lesson, kind: "time", anchorRect: rect });
-    setTimeStartInput(lesson.startTime || "");
-    setTimeEndInput(lesson.endTime || "");
-    setError("");
-  }
-
-  function openRoomEdit(e: React.MouseEvent<HTMLButtonElement>, lesson: Lesson) {
-    if (isCancelledLesson(lesson)) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setScheduleEdit({ lesson, kind: "room", anchorRect: rect });
-    setRoomInput(lesson.room || "");
-    setError("");
-  }
-
-  function closeScheduleEdit() {
-    setScheduleEdit(null);
-    setScheduleSaving(false);
-  }
-
-  async function persistTime(start: string, end: string) {
-    if (!scheduleEdit || scheduleSaving) return;
-    if (start && end && start >= end) {
-      setError("End time must be after the start time.");
-      return;
-    }
-    setScheduleSaving(true);
-    setError("");
-    try {
-      const res = await fetch(academicRoutes.adminAcademicLessonApi(scheduleEdit.lesson.id), {
-        method: "PATCH",
-        headers: jsonCsrfHeaders(csrf),
-        body: JSON.stringify({ start_time: start, end_time: end }),
-      });
-      const json = await res.json();
-      if (!apiSucceeded(res, json)) {
-        setError(apiErrorMessage(json, "Unable to update the lesson time."));
-        return;
-      }
-      patchLessonSchedule(scheduleEdit.lesson.id, { startTime: start, endTime: end });
-      closeScheduleEdit();
-    } catch {
-      setError("Network error while updating the lesson time.");
-    } finally {
-      setScheduleSaving(false);
-    }
-  }
-
-  function saveTime() {
-    const start = timeStartInput.trim();
-    const end = timeEndInput.trim();
-    if (Boolean(start) !== Boolean(end)) {
-      setError("Enter both a start and end time, or leave both empty.");
-      return;
-    }
-    void persistTime(start, end);
-  }
-
-  function clearTime() {
-    // Only resets the fields — Save is the single action that persists.
-    setTimeStartInput("");
-    setTimeEndInput("");
-    setError("");
-  }
-
-  async function persistRoom(room: string) {
-    if (!scheduleEdit || scheduleSaving) return;
-    setScheduleSaving(true);
-    setError("");
-    try {
-      const res = await fetch(academicRoutes.adminAcademicLessonApi(scheduleEdit.lesson.id), {
-        method: "PATCH",
-        headers: jsonCsrfHeaders(csrf),
-        body: JSON.stringify({ room }),
-      });
-      const json = await res.json();
-      if (!apiSucceeded(res, json)) {
-        setError(apiErrorMessage(json, "Unable to update the lesson room."));
-        return;
-      }
-      patchLessonSchedule(scheduleEdit.lesson.id, { room });
-      closeScheduleEdit();
-    } catch {
-      setError("Network error while updating the lesson room.");
-    } finally {
-      setScheduleSaving(false);
-    }
-  }
-
-  function saveRoom() {
-    void persistRoom(roomInput.trim());
-  }
-
-  function clearRoom() {
-    // Only resets the field — Save is the single action that persists.
-    setRoomInput("");
-    setError("");
-  }
-
-  const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  function weekdayName(iso: string) {
-    const parsed = new Date(`${iso}T00:00:00`);
-    return Number.isNaN(parsed.getTime()) ? "" : WEEKDAY_NAMES[parsed.getDay()];
-  }
-
-  function groupLessonsByDate(items: Lesson[]): TimetableDateGroup[] {
-    const groups: TimetableDateGroup[] = [];
-    const indexByKey = new Map<string, number>();
-    items.forEach((lesson) => {
-      const iso = lessonDateToInputValue(lesson.date);
-      const key = iso || "unscheduled";
-      if (!indexByKey.has(key)) {
-        indexByKey.set(key, groups.length);
-        groups.push({
-          key,
-          iso,
-          display: iso ? formatGradebookDate(lesson.date) : "No date set",
-          weekday: iso ? weekdayName(iso) : "",
-          lessons: [],
-        });
-      }
-      groups[indexByKey.get(key)!].lessons.push(lesson);
-    });
-    return groups;
-  }
-
   const lessons = data?.lessons ?? [];
   const examLabels = data?.examLabels ?? [];
   const enrollments = data?.enrollments ?? [];
@@ -1073,8 +864,6 @@ export function GroupGradebook({
     lessons.length * GRADEBOOK_LESSON_COL_WIDTH;
   const disqualifiedEnrollments = allEnrollments.filter((en) => en.status === "disqualified");
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
-  const timetableGroups = groupLessonsByDate(lessons);
-
   const metricLessons = useMemo(() => lessons.filter((lesson) => !isCancelledLesson(lesson)), [lessons]);
   const indicatorLessons = metricLessons;
   const examTypeOptions = useMemo(() => collectExamTypeOptions(examLabels), [examLabels]);
@@ -1166,7 +955,6 @@ export function GroupGradebook({
 
   useEffect(() => {
     setActive(null);
-    setScheduleEdit(null);
   }, [activeView]);
 
   const popTop = active
@@ -1174,12 +962,6 @@ export function GroupGradebook({
     : 0;
   const popLeft = active
     ? Math.min(active.anchorRect.left, window.innerWidth - 220)
-    : 0;
-  const schedulePopTop = scheduleEdit
-    ? Math.min(scheduleEdit.anchorRect.bottom + 8, window.innerHeight - 260)
-    : 0;
-  const schedulePopLeft = scheduleEdit
-    ? Math.max(8, Math.min(scheduleEdit.anchorRect.left, window.innerWidth - 316))
     : 0;
   const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
@@ -1667,38 +1449,9 @@ export function GroupGradebook({
         </div>
       )}
 
-      {data && activeView === "timetable" && loadedView === "timetable" && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/8 bg-surface px-4 py-3 shadow-card">
-            <div><h3 className="text-sm font-bold">Lesson Timetable</h3><p className="text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
-            <button type="button" onClick={openGroupSetup} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-bold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-              <Settings className="h-4 w-4" />
-              {hasSavedSetup || scheduleRows.some((row) => asNumber(row.group_id) === groupId && asString(row.status) === "active") ? "Change Schedule" : "Set Up Timetable"}
-            </button>
-          </div>
-          {timetableGroups.length ? (
-            <TimetableCard groups={timetableGroups} isLessonCancelled={isCancelledLesson} onOpenTime={openTimeEdit} onOpenRoom={openRoomEdit} onEditLesson={(lesson) => openLessonAction("edit", lesson)} onCancelLesson={(lesson) => openLessonAction("cancel", lesson)} onRecoverLesson={(lesson) => openLessonAction("recover", lesson)} />
-          ) : (
-            <div className="rounded-xl border border-dashed border-foreground/15 bg-surface px-6 py-16 text-center">
-              <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
-              <p className="mt-3 text-sm font-bold">Timetable not configured</p>
-              <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">Set the launch date, teaching days, and lesson time to place every program lesson automatically.</p>
-              <button type="button" onClick={openGroupSetup} className="mt-4 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground">Set Up Timetable</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <Modal open={Boolean(lessonAction)} onClose={() => !lessonActionSaving && setLessonAction(null)} title={lessonAction?.kind === "edit" ? <span className="inline-flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" />Edit Lesson</span> : lessonAction?.kind === "recover" ? <span className="inline-flex items-center gap-2"><RotateCcw className="h-5 w-5 text-emerald-600" />Recover Lesson</span> : <span className="inline-flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-600" />Cancel Lesson</span>} subtitle={lessonAction?.kind === "edit" ? "Change this group's lesson content without moving its date." : lessonAction?.kind === "recover" ? "Restore the original slot and move following lessons back." : "Leave a cancelled slot and move this lesson plus following lessons forward."} size="sm" mobileMode="sheet" closeOnOutsideClick={!lessonActionSaving} closeOnEscape={!lessonActionSaving}>
-        <form onSubmit={submitLessonAction} className="flex min-h-0 flex-1 flex-col">
-          <ModalBody className="space-y-4">
-            {lessonActionError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{lessonActionError}</p> : null}
-            {lessonAction ? <div className="rounded-lg border border-foreground/10 bg-muted/30 p-3"><p className="text-sm font-bold">{lessonAction.lesson.lessonNumber}</p><p className="mt-1 text-xs text-muted-foreground">{formatGradebookDate(lessonAction.lesson.date)}{lessonAction.lesson.startTime ? ` · ${lessonAction.lesson.startTime}` : ""}</p></div> : null}
-            {lessonAction?.kind === "edit" ? <><label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Lesson name</span><input autoFocus required value={lessonNameInput} onChange={(event) => setLessonNameInput(event.target.value)} className="h-11 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm" /></label><label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Topic</span><textarea value={lessonTopicInput} onChange={(event) => setLessonTopicInput(event.target.value)} rows={3} className="w-full resize-none rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm" /></label></> : lessonAction?.kind === "cancel" ? <label className="block"><span className="mb-1 block text-xs font-bold uppercase text-muted-foreground">Cancellation reason</span><textarea autoFocus required minLength={3} value={cancellationReason} onChange={(event) => setCancellationReason(event.target.value)} rows={3} placeholder="For example: school closed" className="w-full resize-none rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm" /><span className="mt-1 block text-xs text-muted-foreground">Required and shown on the cancelled slot.</span></label> : <p className="text-sm text-muted-foreground">The cancellation remains in audit history, while its active placeholder is removed.</p>}
-          </ModalBody>
-          <ModalFooter className="flex justify-end gap-2"><button type="button" onClick={() => setLessonAction(null)} disabled={lessonActionSaving} className="min-h-11 rounded-lg bg-muted px-4 text-sm font-bold text-muted-foreground">Keep unchanged</button><button type="submit" disabled={lessonActionSaving || (lessonAction?.kind === "edit" && !lessonNameInput.trim()) || (lessonAction?.kind === "cancel" && cancellationReason.trim().length < 3)} className={`min-h-11 rounded-lg px-5 text-sm font-bold text-white disabled:opacity-50 ${lessonAction?.kind === "cancel" ? "bg-red-600" : lessonAction?.kind === "recover" ? "bg-emerald-600" : "bg-primary"}`}>{lessonActionSaving ? "Saving..." : lessonAction?.kind === "cancel" ? "Cancel & Move Forward" : lessonAction?.kind === "recover" ? "Recover & Restore" : "Save Content"}</button></ModalFooter>
-        </form>
-      </Modal>
+      {data && activeView === "timetable" && loadedView === "timetable" ? (
+        <ModernGroupTimetable groupId={groupId} csrf={csrf} academicRoutes={academicRoutes} onChangeSchedule={openGroupSetup} />
+      ) : null}
 
       <Modal open={setupOpen} onClose={closeGroupSetup} title={<span className="inline-flex items-center gap-2"><Settings className="h-5 w-5 text-primary" />Group Timetable</span>} subtitle="Set when and where this group studies." size="lg" mobileMode="sheet" closeOnOutsideClick={!setupSaving} closeOnEscape={!setupSaving} panelClassName="sm:h-auto">
         <form onSubmit={saveGroupSetup} className="flex min-h-0 flex-1 flex-col">
@@ -1939,37 +1692,6 @@ export function GroupGradebook({
           </div>
         </div>
       )}
-
-      {scheduleEdit && scheduleEdit.kind === "time" ? (
-        <TimePopover
-          ref={schedulePopRef}
-          lesson={scheduleEdit.lesson}
-          dateLabel={formatGradebookDate(scheduleEdit.lesson.date)}
-          position={{ top: schedulePopTop, left: schedulePopLeft }}
-          startValue={timeStartInput}
-          endValue={timeEndInput}
-          onStartChange={setTimeStartInput}
-          onEndChange={setTimeEndInput}
-          onClear={clearTime}
-          onSave={saveTime}
-          onClose={closeScheduleEdit}
-          saving={scheduleSaving}
-        />
-      ) : null}
-      {scheduleEdit && scheduleEdit.kind === "room" ? (
-        <RoomPopover
-          ref={schedulePopRef}
-          lesson={scheduleEdit.lesson}
-          dateLabel={formatGradebookDate(scheduleEdit.lesson.date)}
-          position={{ top: schedulePopTop, left: schedulePopLeft }}
-          value={roomInput}
-          onChange={setRoomInput}
-          onClear={clearRoom}
-          onSave={saveRoom}
-          onClose={closeScheduleEdit}
-          saving={scheduleSaving}
-        />
-      ) : null}
 
     </div>
   );

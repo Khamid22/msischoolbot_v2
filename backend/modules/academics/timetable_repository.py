@@ -90,11 +90,17 @@ def list_timetable_rows_in_range(
                coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
                coalesce(t.full_name, '') AS teacher_name,
                to_char(ls.session_date, 'DD/MM/YYYY') AS session_date,
+               to_char(ls.session_date, 'YYYY-MM-DD') AS iso_date,
                coalesce(to_char(ls.start_time, 'HH24:MI'), '') AS start_time,
                coalesce(to_char(ls.end_time, 'HH24:MI'), '') AS end_time,
                ls.room, ls.online_url, ls.status,
                coalesce(nullif(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
-               coalesce(nullif(ls.source_topic, ''), spi.title, '') AS lesson_topic
+               coalesce(nullif(ls.source_topic, ''), spi.title, '') AS lesson_topic,
+               coalesce(nullif(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
+               (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                        WHERE ar.lesson_session_id=ls.id)
+                OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                           WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
         FROM msi_v2.lesson_sessions ls
         JOIN msi_v2.groups g ON g.id = ls.group_id
         JOIN msi_v2.schools s ON s.id = g.school_id
@@ -104,6 +110,64 @@ def list_timetable_rows_in_range(
         LEFT JOIN msi_v2.teachers t ON t.id = ls.teacher_id
         WHERE {' AND '.join(filters)}
         ORDER BY ls.session_date, ls.start_time, s.school_name, g.group_name, ls.id
+        """,
+        params,
+    ).fetchall()
+
+
+def list_timetable_exceptions_in_range(
+    conn,
+    *,
+    start_date,
+    end_date,
+    group_v2_id=0,
+    school_id=0,
+):
+    filters = [
+        "e.status = 'cancelled'",
+        "g.status = 'active'",
+        "lower(g.group_name) <> 'online'",
+        "e.original_session_date BETWEEN %s AND %s",
+    ]
+    params = [start_date, end_date]
+    if int(group_v2_id or 0) > 0:
+        filters.append("g.id = %s")
+        params.append(int(group_v2_id))
+    if int(school_id or 0) > 0:
+        filters.append("g.school_id = %s")
+        params.append(int(school_id))
+    return conn.execute(
+        f"""
+        SELECT e.id AS exception_id, e.lesson_session_id, e.schedule_rule_id AS schedule_id,
+               g.school_id, s.school_key AS school_code, s.school_name,
+               subj.id AS subject_id, subj.subject_name,
+               coalesce(g.legacy_group_id, g.id) AS group_id, g.group_name,
+               coalesce(t.legacy_teacher_id, t.id) AS teacher_id,
+               coalesce(t.full_name, '') AS teacher_name,
+               to_char(e.original_session_date, 'DD/MM/YYYY') AS session_date,
+               to_char(e.original_session_date, 'YYYY-MM-DD') AS iso_date,
+               coalesce(to_char(e.original_start_time, 'HH24:MI'), '') AS start_time,
+               coalesce(to_char(e.original_end_time, 'HH24:MI'), '') AS end_time,
+               coalesce(ls.room, '') AS room, coalesce(ls.online_url, '') AS online_url,
+               'cancelled' AS status,
+               coalesce(nullif(ls.source_label, ''), spi.lesson_number, 'Lesson') AS lesson_number,
+               coalesce(nullif(ls.source_topic, ''), spi.title, '') AS lesson_topic,
+               coalesce(nullif(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
+               e.reason AS cancellation_reason,
+               (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                        WHERE ar.lesson_session_id=ls.id)
+                OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                           WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
+        FROM msi_v2.lesson_schedule_exceptions e
+        JOIN msi_v2.lesson_sessions ls ON ls.id=e.lesson_session_id
+        JOIN msi_v2.groups g ON g.id=e.group_id
+        JOIN msi_v2.schools s ON s.id=g.school_id
+        JOIN msi_v2.subject_programs sp ON sp.id=g.program_id
+        JOIN msi_v2.subjects subj ON subj.id=sp.subject_id
+        LEFT JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+        LEFT JOIN msi_v2.teachers t ON t.id=ls.teacher_id
+        WHERE {' AND '.join(filters)}
+        ORDER BY e.original_session_date, e.original_start_time, e.id
         """,
         params,
     ).fetchall()
@@ -142,6 +206,18 @@ def list_active_schedule_rows_for_scope(conn, *, group_v2_id=0, school_id=0):
         """,
         params,
     ).fetchall()
+
+
+def count_unscheduled_curriculum_lessons(conn, group_v2_id):
+    row = conn.execute(
+        """SELECT count(*) AS lesson_count
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+           WHERE ls.group_id=%s AND spi.item_type='lesson'
+             AND (ls.session_date IS NULL OR ls.start_time IS NULL OR ls.end_time IS NULL)""",
+        (int(group_v2_id),),
+    ).fetchone()
+    return int(row["lesson_count"] or 0) if row else 0
 
 
 def list_schedule_conflict_rows(conn, group_v2_id, teacher_v2_id, exclude_schedule_id=0):
@@ -275,15 +351,120 @@ def schedule_curriculum_lesson(conn, lesson_session_id, *, schedule_id, teacher_
     )
 
 
-def get_curriculum_lesson_for_exception(conn, lesson_session_id):
+def get_curriculum_lesson_for_exception(conn, lesson_session_id, *, for_update=False):
+    lock_clause = " FOR UPDATE OF ls" if for_update else ""
     return conn.execute(
-        """SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
+        f"""SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
                   ls.session_date, ls.start_time, ls.end_time, ls.room,
-                  spi.item_order
+                  spi.item_order,
+                  (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                           WHERE ar.lesson_session_id=ls.id)
+                   OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                              WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
            FROM msi_v2.lesson_sessions ls
            JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
-           WHERE ls.id=%s AND spi.item_type='lesson'""",
+           WHERE ls.id=%s AND spi.item_type='lesson'{lock_clause}""",
         (int(lesson_session_id),),
+    ).fetchone()
+
+
+def lock_group_timetable_for_reflow(conn, group_v2_id):
+    """Serialize sequence-changing operations for one academic group."""
+    conn.execute(
+        "SELECT pg_advisory_xact_lock(%s, %s)",
+        (7301, int(group_v2_id)),
+    ).fetchone()
+    conn.execute(
+        """SELECT id FROM msi_v2.group_schedule_rules
+           WHERE group_id=%s AND status='active' FOR UPDATE""",
+        (int(group_v2_id),),
+    ).fetchall()
+    conn.execute(
+        """SELECT id FROM msi_v2.lesson_sessions
+           WHERE group_id=%s ORDER BY id FOR UPDATE""",
+        (int(group_v2_id),),
+    ).fetchall()
+    conn.execute(
+        """SELECT id FROM msi_v2.lesson_schedule_exceptions
+           WHERE group_id=%s AND status='cancelled' ORDER BY id FOR UPDATE""",
+        (int(group_v2_id),),
+    ).fetchall()
+
+
+def lock_lesson_occurrence_scope(conn, group_v2_id, teacher_v2_id=0):
+    """Serialize one-off occurrence edits for the group and assigned teacher."""
+    conn.execute(
+        "SELECT pg_advisory_xact_lock(%s, %s)",
+        (7301, int(group_v2_id)),
+    ).fetchone()
+    if int(teacher_v2_id or 0) > 0:
+        conn.execute(
+            "SELECT pg_advisory_xact_lock(%s, %s)",
+            (7302, int(teacher_v2_id)),
+        ).fetchone()
+
+
+def get_lesson_session_snapshot(conn, lesson_session_id, *, for_update=False):
+    lock_clause = " FOR UPDATE OF ls" if for_update else ""
+    return conn.execute(
+        f"""SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
+                  ls.program_item_id, ls.status, ls.session_date, ls.start_time,
+                  ls.end_time, coalesce(ls.room, '') AS room,
+                  coalesce(ls.online_url, '') AS online_url,
+                  coalesce(nullif(ls.source_label, ''), spi.lesson_number, 'Session') AS lesson_number,
+                  coalesce(nullif(ls.source_topic, ''), spi.title, '') AS topic,
+                  coalesce(nullif(ls.source_order, 0), spi.item_order, 999999) AS lesson_order,
+                  coalesce(g.legacy_group_id, g.id) AS public_group_id,
+                  (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                           WHERE ar.lesson_session_id=ls.id)
+                   OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                              WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.groups g ON g.id=ls.group_id
+           LEFT JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
+           WHERE ls.id=%s{lock_clause}""",
+        (int(lesson_session_id),),
+    ).fetchone()
+
+
+def list_lesson_occurrence_conflicts(
+    conn,
+    *,
+    lesson_session_id,
+    group_v2_id,
+    teacher_v2_id,
+    session_date,
+    start_time,
+    end_time,
+):
+    return conn.execute(
+        """SELECT ls.id, ls.group_id, ls.teacher_id,
+                  coalesce(g.group_name, '') AS group_name,
+                  coalesce(t.full_name, '') AS teacher_name
+           FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.groups g ON g.id=ls.group_id
+           LEFT JOIN msi_v2.teachers t ON t.id=ls.teacher_id
+           WHERE ls.id<>%s
+             AND ls.session_date=%s
+             AND ls.start_time IS NOT NULL AND ls.end_time IS NOT NULL
+             AND lower(coalesce(ls.status, 'scheduled')) NOT IN ('cancelled', 'canceled')
+             AND ls.start_time < %s AND %s < ls.end_time
+             AND (ls.group_id=%s OR (%s > 0 AND ls.teacher_id=%s))
+           ORDER BY ls.id LIMIT 5""",
+        (
+            int(lesson_session_id), session_date, end_time, start_time,
+            int(group_v2_id), int(teacher_v2_id or 0), int(teacher_v2_id or 0),
+        ),
+    ).fetchall()
+
+
+def group_date_has_active_exception(conn, group_v2_id, session_date, *, exclude_lesson_session_id=0):
+    return conn.execute(
+        """SELECT id FROM msi_v2.lesson_schedule_exceptions
+           WHERE group_id=%s AND original_session_date=%s AND status='cancelled'
+             AND lesson_session_id<>%s
+           LIMIT 1""",
+        (int(group_v2_id), session_date, int(exclude_lesson_session_id or 0)),
     ).fetchone()
 
 
@@ -455,4 +636,13 @@ __all__ = [
     "cancel_schedule_rule",
     "delete_unrecorded_generic_group_sessions",
     "list_session_rows",
+    "list_timetable_rows_in_range",
+    "list_timetable_exceptions_in_range",
+    "list_active_schedule_rows_for_scope",
+    "count_unscheduled_curriculum_lessons",
+    "lock_group_timetable_for_reflow",
+    "lock_lesson_occurrence_scope",
+    "get_lesson_session_snapshot",
+    "list_lesson_occurrence_conflicts",
+    "group_date_has_active_exception",
 ]

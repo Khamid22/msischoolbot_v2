@@ -95,6 +95,8 @@ export const routes = {
   adminAcademicProgramItemsApi: (programId: number | string, query = "") =>
     `/api/v1/admin/academic/programs/${programId}/items${query ? `?${query}` : ""}`,
   adminAcademicTimetableApi: (query: string) => `/api/v1/admin/academic/timetable?${query}`,
+  adminAcademicGroupTimetableApi: (groupId: number | string, query: string) =>
+    `/api/v1/admin/academic/groups/${groupId}/timetable?${query}`,
   adminAcademicGroupApi: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}`,
   adminAcademicGroupSummaryApi: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/summary`,
   adminAcademicScheduleCreate: "/api/v1/admin/academic/schedules",
@@ -118,6 +120,7 @@ export const routes = {
   academicDirectorAcademicProgramsApi: apiRoutes.academicDirectorAcademicProgramsApi,
   academicDirectorAcademicProgramItemsApi: apiRoutes.academicDirectorAcademicProgramItemsApi,
   academicDirectorAcademicTimetableApi: apiRoutes.academicDirectorAcademicTimetableApi,
+  academicDirectorAcademicGroupTimetableApi: apiRoutes.academicDirectorAcademicGroupTimetableApi,
   academicDirectorAcademicGroupApi: apiRoutes.academicDirectorAcademicGroupApi,
   academicDirectorAcademicGroupSummaryApi: apiRoutes.academicDirectorAcademicGroupSummaryApi,
   academicDirectorAcademicScheduleCreate: apiRoutes.academicDirectorAcademicScheduleCreate,

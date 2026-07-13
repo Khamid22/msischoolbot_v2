@@ -17,10 +17,11 @@ def test_group_timetable_schedules_existing_curriculum_lessons():
 
 def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
     panel = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(encoding="utf-8")
+    timetable = (ROOT / "frontend/src/features/management/academic/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
     groups = (ROOT / "frontend/src/features/management/AcademicPanel.tsx").read_text(encoding="utf-8")
 
-    assert "Set Up Timetable" in panel
-    assert "Change Schedule" in panel
+    assert "Set Up Timetable" in timetable
+    assert "Change Schedule" in timetable
     assert "+ New Student" not in panel  # icon and label are separate JSX nodes
     assert "New Student</button>" not in panel
     assert "Add student</button>" in panel
@@ -34,9 +35,11 @@ def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
     assert 'asString(group.setup_status) === "new"' in groups
 
 
-def test_timetable_opens_on_first_scheduled_lesson():
-    source = (ROOT / "frontend/src/features/management/academic/Timetable.tsx").read_text(encoding="utf-8")
+def test_modern_timetable_opens_on_today_and_fetches_only_the_visible_range():
+    source = (ROOT / "frontend/src/features/management/academic/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
 
-    assert "firstScheduledIso" in source
-    assert "setCursor(firstLessonDate)" in source
-    assert "TimetableToolbar" in source
+    assert "useState(schoolTodayKey)" in source
+    assert "adminAcademicGroupTimetableApi" in source
+    assert 'queryKey: ["academic", "timetable", groupId, range.from, range.to]' in source
+    assert 'type PrimaryMode = "agenda" | "calendar"' in source
+    assert 'type CalendarMode = "week" | "month"' in source

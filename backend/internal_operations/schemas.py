@@ -310,10 +310,16 @@ class AdminLessonUpdateRequest(BaseModel):
     room: str | None = None
     lesson_name: str | None = None
     topic: str | None = None
+    allow_recorded_lesson_changes: bool = False
 
 
 class AdminLessonCancelRequest(BaseModel):
     reason: str
+    allow_recorded_lesson_changes: bool = False
+
+
+class AdminLessonRecoverRequest(BaseModel):
+    allow_recorded_lesson_changes: bool = False
 
 
 class AdminLessonUpdated(BaseModel):

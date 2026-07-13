@@ -39,6 +39,8 @@ export const apiRoutes = {
   academicDirectorAcademicProgramItemsApi: (programId: number | string, query = "") =>
     `/api/v1/academic-director/academic/programs/${programId}/items${query ? `?${query}` : ""}`,
   academicDirectorAcademicTimetableApi: (query: string) => `/api/v1/academic-director/academic/timetable?${query}`,
+  academicDirectorAcademicGroupTimetableApi: (groupId: number | string, query: string) =>
+    `/api/v1/academic-director/academic/groups/${groupId}/timetable?${query}`,
   academicDirectorAcademicSchoolCreate: "/api/v1/academic-director/academic/schools",
   academicDirectorAcademicGroupCreate: "/api/v1/academic-director/academic/groups",
   academicDirectorAcademicGroupApi: (groupId: number | string) =>

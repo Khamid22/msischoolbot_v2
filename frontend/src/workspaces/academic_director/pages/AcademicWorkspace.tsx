@@ -59,6 +59,7 @@ const academicDirectorAcademicRoutes = {
   adminAcademicProgramsApi: routes.academicDirectorAcademicProgramsApi,
   adminAcademicProgramItemsApi: routes.academicDirectorAcademicProgramItemsApi,
   adminAcademicTimetableApi: routes.academicDirectorAcademicTimetableApi,
+  adminAcademicGroupTimetableApi: routes.academicDirectorAcademicGroupTimetableApi,
   adminAcademicGroupApi: routes.academicDirectorAcademicGroupApi,
   adminAcademicGroupSummaryApi: routes.academicDirectorAcademicGroupSummaryApi,
   adminAcademicScheduleCreate: routes.academicDirectorAcademicScheduleCreate,

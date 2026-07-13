@@ -121,6 +121,11 @@ describe("Modal / BottomSheet", () => {
     assert.match(src, /aria-label="Close"/);
   });
 
+  it("traps keyboard focus and restores it to the opening control", () => {
+    assert.match(src, /event\.key !== "Tab"/);
+    assert.match(src, /returnFocusRef\.current\?\.focus/);
+  });
+
   it("is a labelled dialog and exports BottomSheet on the same layer", () => {
     assert.match(src, /aria-modal="true"/);
     assert.match(src, /export function BottomSheet/);

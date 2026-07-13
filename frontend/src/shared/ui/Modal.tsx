@@ -100,6 +100,8 @@ export function Modal({
 }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -109,21 +111,57 @@ export function Modal({
   useBodyScrollLock(open);
 
   useEffect(() => {
-    if (!open || !closeOnEscape) return;
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onClose();
+      if (event.key === "Escape" && closeOnEscape) {
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden"));
+      if (!focusable.length) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      window.setTimeout(() => returnFocusRef.current?.focus(), 0);
     };
-  }, [closeOnEscape, onClose, open]);
+  }, [closeOnEscape, open]);
 
   useEffect(() => {
     if (!open) return;
-    const timer = window.setTimeout(() => panelRef.current?.focus(), 0);
+    const timer = window.setTimeout(() => {
+      const preferred = panelRef.current?.querySelector<HTMLElement>("[autofocus]")
+        || panelRef.current?.querySelector<HTMLElement>(
+          'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])',
+        );
+      (preferred || panelRef.current)?.focus();
+    }, 0);
     return () => {
       window.clearTimeout(timer);
     };

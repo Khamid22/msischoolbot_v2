@@ -127,17 +127,44 @@ def list_timetable_range(*, start_date="", end_date="", group_id=0, school_id=0)
                 school_id=school_id,
             )
         ]
+        exceptions = [
+            {
+                **dict(row),
+                "exception_key": f"lesson-exception:{int(row['exception_id'])}",
+                "is_cancellation": True,
+                "can_recover": True,
+            }
+            for row in timetable_repository.list_timetable_exceptions_in_range(
+                conn,
+                start_date=parsed_start,
+                end_date=parsed_end,
+                group_v2_id=group_v2_id,
+                school_id=school_id,
+            )
+        ]
         schedules = [
             dict(row)
             for row in timetable_repository.list_active_schedule_rows_for_scope(
                 conn, group_v2_id=group_v2_id, school_id=school_id
             )
         ]
+        unscheduled_lesson_count = (
+            timetable_repository.count_unscheduled_curriculum_lessons(conn, group_v2_id)
+            if group_v2_id
+            else 0
+        )
     return {
         "from": parsed_start.isoformat(),
         "to": parsed_end.isoformat(),
+        "range": {"from": parsed_start.isoformat(), "to": parsed_end.isoformat()},
         "schedules": schedules,
+        "activeSchedule": schedules[0] if len(schedules) == 1 else None,
         "sessions": sessions,
+        "exceptions": exceptions,
+        "hasAcademicRecords": any(
+            bool(item.get("has_academic_records")) for item in sessions + exceptions
+        ),
+        "unscheduledLessonCount": unscheduled_lesson_count,
     }
 
 
