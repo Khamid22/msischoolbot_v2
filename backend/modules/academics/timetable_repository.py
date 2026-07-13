@@ -143,12 +143,37 @@ def ensure_curriculum_lesson_sessions(conn, group_v2_id):
 
 def list_curriculum_lesson_sessions(conn, group_v2_id):
     return conn.execute(
-        """SELECT ls.id, ls.status, ls.session_date, spi.item_order
+        """SELECT ls.id, ls.status, ls.session_date, spi.item_order,
+                  (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                           WHERE ar.lesson_session_id=ls.id)
+                   OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                              WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
            FROM msi_v2.lesson_sessions ls
            JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
            WHERE ls.group_id=%s AND spi.item_type='lesson'
            ORDER BY spi.item_order, ls.id""",
         (int(group_v2_id),),
+    ).fetchall()
+
+
+def list_blocked_group_dates(conn, group_v2_id):
+    """Return visible cancellation slots that must not receive a real lesson."""
+    return conn.execute(
+        """SELECT blocked_date
+           FROM (
+             SELECT ls.session_date AS blocked_date
+             FROM msi_v2.lesson_sessions ls
+             WHERE ls.group_id=%s
+               AND ls.program_item_id IS NULL
+               AND lower(COALESCE(ls.status, '')) IN ('cancelled', 'canceled')
+               AND ls.session_date IS NOT NULL
+             UNION
+             SELECT e.original_session_date AS blocked_date
+             FROM msi_v2.lesson_schedule_exceptions e
+             WHERE e.group_id=%s AND e.status='cancelled'
+           ) blocked
+           ORDER BY blocked_date""",
+        (int(group_v2_id), int(group_v2_id)),
     ).fetchall()
 
 
@@ -326,6 +351,7 @@ __all__ = [
     "insert_schedule_rule",
     "list_schedule_conflict_rows",
     "list_schedule_rows",
+    "list_blocked_group_dates",
     "get_active_group_schedule",
     "update_schedule_rule",
     "update_schedule_end_date",

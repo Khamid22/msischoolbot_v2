@@ -4,7 +4,7 @@ Query modules own the SQL; this service keeps the same return shapes the
 frontend already consumes so nothing on the admin pages breaks.
 """
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from backend.core.database import connect_auth_db
 from backend.modules.academics import canonical
@@ -606,14 +606,88 @@ def create_schedule(
     }
 
 
+def _lesson_has_locked_history(lesson):
+    return (
+        bool(lesson.get("has_academic_records"))
+        or str(lesson.get("status") or "").strip().casefold() == "completed"
+    )
+
+
+def _resolve_course_launch_date(existing_schedule, requested_date, *, allow_change=False):
+    if existing_schedule and not allow_change:
+        return existing_schedule["start_date"]
+    return _parse_date_input(requested_date, "Course launch date")
+
+
+def _select_schedule_change_lessons(
+    lessons,
+    *,
+    scope,
+    effective_date,
+    launch_date,
+    allow_recorded_lesson_changes=False,
+    today=None,
+):
+    """Select a safe reflow set and anchor without silently moving history."""
+    today = today or date.today()
+    protected = [row for row in lessons if _lesson_has_locked_history(row)]
+
+    if scope == "from_date":
+        candidates = [
+            row
+            for row in lessons
+            if row.get("session_date") is None or row.get("session_date") >= effective_date
+        ]
+        anchor = effective_date
+    elif scope == "remaining":
+        candidates = [
+            row
+            for row in lessons
+            if str(row.get("status") or "").strip().casefold() == "scheduled"
+        ]
+        candidates = [row for row in candidates if not _lesson_has_locked_history(row)]
+        dated_future = sorted(
+            row["session_date"]
+            for row in candidates
+            if row.get("session_date") is not None and row["session_date"] >= today
+        )
+        anchor = dated_future[0] if dated_future else max(launch_date, today)
+    elif scope == "all":
+        candidates = list(lessons)
+        anchor = launch_date
+    else:
+        # A new group has no history. Imported groups may already have completed
+        # sessions before their first timetable rule; preserve those sessions and
+        # schedule only the unrecorded remainder after the latest known lesson.
+        candidates = list(lessons)
+        if protected:
+            candidates = [row for row in candidates if not _lesson_has_locked_history(row)]
+            dated_history = [row["session_date"] for row in protected if row.get("session_date")]
+            anchor = max(launch_date, max(dated_history) + timedelta(days=1), today) if dated_history else max(launch_date, today)
+        else:
+            anchor = launch_date
+
+    protected_candidates = [row for row in candidates if _lesson_has_locked_history(row)]
+    if protected_candidates and scope in {"all", "from_date"} and not allow_recorded_lesson_changes:
+        count = len(protected_candidates)
+        noun = "lesson" if count == 1 else "lessons"
+        raise ValueError(
+            f"This change would move {count} completed or recorded {noun}. "
+            "Confirm the historical timetable change before saving."
+        )
+
+    moved_protected_count = len(protected_candidates) if allow_recorded_lesson_changes else 0
+    return candidates, anchor, len(protected), moved_protected_count
+
+
 def schedule_group_curriculum(
     group_id, *, teacher_id=0, course_launch_date="", weekdays=None,
     lesson_time="", lesson_duration_minutes=80, room="", change_scope="", effective_date="",
+    change_course_launch_date=False, allow_recorded_lesson_changes=False,
 ):
     """Version a group timetable and assign dates to its existing curriculum lessons."""
     group_id = int(group_id or 0)
     weekdays = _normalize_weekdays(weekdays)
-    launch_date = _parse_date_input(course_launch_date, "Course launch date")
     start_minutes = _time_to_minutes(lesson_time, "Lesson time")
     duration = int(lesson_duration_minutes or 0)
     if duration < 15 or duration > 240 or start_minutes + duration >= 24 * 60:
@@ -640,23 +714,32 @@ def schedule_group_curriculum(
         existing = timetable_repository.get_active_group_schedule(conn, v2_group_id)
         if existing and not scope:
             raise ValueError("Choose how this timetable change should apply to existing lessons.")
-        if scope == "from_date":
-            selected = [row for row in all_lessons if row["session_date"] is None or row["session_date"] >= effective]
-            anchor = effective
-        elif scope == "remaining":
-            selected = [row for row in all_lessons if str(row["status"] or "").casefold() == "scheduled"]
-            anchor = launch_date
-        else:
-            selected = all_lessons
-            anchor = launch_date
+        launch_date = _resolve_course_launch_date(
+            existing,
+            course_launch_date,
+            allow_change=bool(change_course_launch_date),
+        )
+
+        selected, anchor, protected_count, moved_protected_count = _select_schedule_change_lessons(
+            all_lessons,
+            scope=scope,
+            effective_date=effective,
+            launch_date=launch_date,
+            allow_recorded_lesson_changes=bool(allow_recorded_lesson_changes),
+        )
         if not selected:
             raise ValueError("No lessons match the selected timetable change scope.")
 
         dates = []
         cursor = anchor
         wanted = set(weekdays)
+        blocked_dates = {
+            row["blocked_date"]
+            for row in timetable_repository.list_blocked_group_dates(conn, v2_group_id)
+            if row.get("blocked_date") is not None
+        }
         while len(dates) < len(selected):
-            if cursor.weekday() in wanted:
+            if cursor.weekday() in wanted and cursor not in blocked_dates:
                 dates.append(cursor)
             cursor += timedelta(days=1)
         final_date = dates[-1]
@@ -690,4 +773,7 @@ def schedule_group_curriculum(
         "scheduleId": schedule_id, "affectedLessonCount": len(selected),
         "firstLessonDate": dates[0].isoformat(), "predictedEndDate": final_date.isoformat(),
         "lessonDurationMinutes": duration, "changeScope": scope or "initial",
+        "courseLaunchDate": launch_date.isoformat(),
+        "protectedLessonCount": protected_count,
+        "movedRecordedLessonCount": moved_protected_count,
     }

@@ -24,9 +24,11 @@ def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
     assert "+ New Student" not in panel  # icon and label are separate JSX nodes
     assert "New Student</button>" in panel
     assert "hasExistingTimetable()" in panel
-    assert "All lesson dates" in panel
+    assert "Entire timetable history" in panel
     assert "Lessons from a specific date" in panel
-    assert "Remaining scheduled lessons" in panel
+    assert "Future unrecorded lessons" in panel
+    assert "allow_recorded_lesson_changes" in panel
+    assert "change_course_launch_date" in panel
     assert 'title="Date supplied by the timetable"' in panel
     assert 'asString(group.setup_status) === "new"' in groups
 

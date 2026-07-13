@@ -167,6 +167,8 @@ def upsert_group_schedule_from_payload(group_id, payload):
         lesson_duration_minutes=int(payload.get("lesson_duration_minutes", 80) or 80),
         room=payload.get("room", ""), change_scope=payload.get("change_scope", ""),
         effective_date=payload.get("effective_date", ""),
+        change_course_launch_date=bool(payload.get("change_course_launch_date", False)),
+        allow_recorded_lesson_changes=bool(payload.get("allow_recorded_lesson_changes", False)),
     )
 
 

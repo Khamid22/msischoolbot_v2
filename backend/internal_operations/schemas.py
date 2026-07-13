@@ -213,6 +213,8 @@ class AdminUpdateGroupScheduleRequest(BaseModel):
     lesson_time: str = ""
     change_scope: str = ""
     effective_date: str = ""
+    change_course_launch_date: bool = False
+    allow_recorded_lesson_changes: bool = False
 
 
 class AdminScheduleCreated(BaseModel):
