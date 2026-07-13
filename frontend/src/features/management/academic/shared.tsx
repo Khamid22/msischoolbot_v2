@@ -19,10 +19,10 @@ export const monthLabels = [
   { value: "12", label: "December" },
 ];
 
-export const GRADEBOOK_STUDENT_COL_WIDTH = 200;
-export const GRADEBOOK_AAP_COL_WIDTH = 54;
-export const GRADEBOOK_ATT_COL_WIDTH = 48;
-export const GRADEBOOK_HW_COL_WIDTH = 64;
+export const GRADEBOOK_STUDENT_COL_WIDTH = 165;
+export const GRADEBOOK_AAP_COL_WIDTH = 38;
+export const GRADEBOOK_ATT_COL_WIDTH = 30;
+export const GRADEBOOK_HW_COL_WIDTH = 36;
 export const GRADEBOOK_LESSON_COL_WIDTH = GRADEBOOK_ATT_COL_WIDTH + GRADEBOOK_HW_COL_WIDTH;
 export const EXAM_TABLE_STUDENT_COL_WIDTH = 220;
 export const EXAM_TABLE_SCORE_COL_WIDTH = 126;

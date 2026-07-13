@@ -473,9 +473,14 @@ def _gradebook_lesson_window(
             available_months.add(key)
             dated_items.append((item, key))
 
+        # Keep the requested month selected even when it contains no dated
+        # lessons. Silently substituting the nearest populated month made the
+        # Gradebook toolbar and chart appear to ignore the administrator's
+        # selection (especially for "This month").
         month_keys = sorted(available_months)
+        option_month_keys = sorted({*month_keys, month_text})
         month_options = []
-        for key in month_keys:
+        for key in option_month_keys:
             year, month_number = month_parts(key)
             month_options.append({
                 "value": key,
@@ -496,19 +501,13 @@ def _gradebook_lesson_window(
                 "nextCursor": None,
                 "hasPrevious": False,
                 "hasNext": False,
-                "selectedMonth": "",
+                "selectedMonth": month_text,
                 "previousMonth": None,
                 "nextMonth": None,
-                "monthOptions": [],
+                "monthOptions": month_options,
             }
 
-        requested_index = requested_parts[0] * 12 + requested_parts[1]
-        selected_month = min(
-            month_keys,
-            key=lambda key: abs(
-                (month_parts(key)[0] * 12 + month_parts(key)[1]) - requested_index
-            ),
-        )
+        selected_month = month_text
         selected_items = [item for item, key in dated_items if key == selected_month]
         selected_items.sort(key=sort_key)
         selected_lesson_ids = {
@@ -523,11 +522,11 @@ def _gradebook_lesson_window(
         ]
         start = selected_indexes[0] if selected_indexes else 0
         end = selected_indexes[-1] + 1 if selected_indexes else start
-        selected_month_index = month_keys.index(selected_month)
-        previous_month = month_keys[selected_month_index - 1] if selected_month_index > 0 else None
+        selected_month_index = option_month_keys.index(selected_month)
+        previous_month = option_month_keys[selected_month_index - 1] if selected_month_index > 0 else None
         next_month = (
-            month_keys[selected_month_index + 1]
-            if selected_month_index + 1 < len(month_keys)
+            option_month_keys[selected_month_index + 1]
+            if selected_month_index + 1 < len(option_month_keys)
             else None
         )
         return selected_items, {

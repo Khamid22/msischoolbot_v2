@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
-import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Settings, Users, X } from "lucide-react";
+import { AlertTriangle, BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Settings, Table2, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -7,7 +7,7 @@ import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "@/features/managementTypes";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
-import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, matchesPeriod, collectPeriodOptions, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, PeriodFilter, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
+import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
 import { TimetableCard, TimePopover, RoomPopover, TimetableDateGroup } from "./Timetable";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
@@ -33,6 +33,10 @@ type CompactTooltipItem = {
   value?: unknown;
   dataKey?: unknown;
   color?: string;
+  payload?: {
+    recordedAttendance?: number;
+    scheduledLessons?: number;
+  };
 };
 
 type ActiveExamCell = {
@@ -41,7 +45,8 @@ type ActiveExamCell = {
   attempt: string;
 };
 
-type GradebookView = "gradebook" | "academic" | "ep" | "timetable";
+type GradebookView = "gradebook" | "ep" | "timetable";
+type GradebookDisplayMode = "table" | "chart";
 type GradebookLoadOptions = { view?: GradebookView; cursor?: string; anchorDate?: string; month?: string; force?: boolean };
 type GroupSetupForm = {
   teacherId: string;
@@ -77,6 +82,7 @@ function CompactChartTooltip({
 }) {
   const visiblePayload = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined && item.value !== "");
   if (!active || visiblePayload.length === 0) return null;
+  const coverage = visiblePayload[0]?.payload;
   return (
     <div className="rounded-xl border border-foreground/10 bg-popover px-3 py-2 text-popover-foreground shadow-card-hover">
       <p className="max-w-48 truncate text-xs font-bold">{asString(label)}</p>
@@ -96,6 +102,11 @@ function CompactChartTooltip({
           );
         })}
       </div>
+      {typeof coverage?.recordedAttendance === "number" && typeof coverage?.scheduledLessons === "number" ? (
+        <p className="mt-1.5 text-[10px] font-medium text-muted-foreground">
+          Attendance recorded for {coverage.recordedAttendance} of {coverage.scheduledLessons} lessons
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -138,6 +149,7 @@ export function GroupGradebook({
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<GradebookView>("gradebook");
   const [loadedView, setLoadedView] = useState<GradebookView>("gradebook");
+  const [gradebookDisplay, setGradebookDisplay] = useState<GradebookDisplayMode>("table");
   const [lessonMonth, setLessonMonth] = useState(currentMonthKey);
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
@@ -157,8 +169,6 @@ export function GroupGradebook({
   const [setupInitial, setSetupInitial] = useState("");
   const [hasSavedSetup, setHasSavedSetup] = useState(false);
   const { toast: setupToast, showToast: showSetupToast } = useFloatingToast();
-  const [indicatorMonth, setIndicatorMonth] = useState("all");
-  const [indicatorYear, setIndicatorYear] = useState("all");
   const [examType, setExamType] = useState("all");
   const [examDisplay, setExamDisplay] = useState<"chart" | "table">("chart");
   const popRef = useRef<HTMLDivElement>(null);
@@ -176,6 +186,8 @@ export function GroupGradebook({
   const [cancellationReason, setCancellationReason] = useState("");
   const gradebookCacheRef = useRef(new Map<string, GradebookData>());
   const loadRequestRef = useRef(0);
+  const gradebookScrollRef = useRef<HTMLDivElement | null>(null);
+  const gradebookScrollLeftRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -194,10 +206,9 @@ export function GroupGradebook({
   useEffect(() => {
     setActiveView("gradebook");
     setLoadedView("gradebook");
+    setGradebookDisplay("table");
     setData(null);
     setSelectedStudent(null);
-    setIndicatorMonth("all");
-    setIndicatorYear("all");
     setExamType("all");
     setExamDisplay("chart");
     setActiveExam(null);
@@ -301,8 +312,26 @@ export function GroupGradebook({
     void load(groupId, undefined, { view, month: view === "gradebook" ? lessonMonth : "" });
   }
 
+  function changeGradebookDisplay(mode: GradebookDisplayMode) {
+    if (mode === gradebookDisplay) return;
+    if (gradebookDisplay === "table") {
+      gradebookScrollLeftRef.current = gradebookScrollRef.current?.scrollLeft || 0;
+    }
+    setActive(null);
+    setGradebookDisplay(mode);
+    if (mode === "table") {
+      requestAnimationFrame(() => {
+        if (gradebookScrollRef.current) {
+          gradebookScrollRef.current.scrollLeft = gradebookScrollLeftRef.current;
+        }
+      });
+    }
+  }
+
   function openLessonMonth(month: string | null | undefined) {
     if (!month || loading) return;
+    gradebookScrollLeftRef.current = 0;
+    if (gradebookScrollRef.current) gradebookScrollRef.current.scrollLeft = 0;
     setLessonMonth(month);
     void load(groupId, undefined, { view: "gradebook", month });
   }
@@ -312,6 +341,8 @@ export function GroupGradebook({
   }
 
   async function refreshCurrentView() {
+    loadRequestRef.current += 1;
+    await queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] });
     gradebookCacheRef.current.clear();
     await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] });
     await load(groupId, undefined, {
@@ -319,6 +350,19 @@ export function GroupGradebook({
       month: activeView === "gradebook" ? lessonMonth : "",
       force: true,
     });
+  }
+
+  async function prepareGradebookCacheMutation() {
+    loadRequestRef.current += 1;
+    await queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] });
+    gradebookCacheRef.current.clear();
+  }
+
+  function openAddStudent() {
+    setStudentOpen(true);
+    setStudentName("");
+    setStudentError("");
+    setCreatedStudent(null);
   }
 
   function openLessonAction(kind: "edit" | "cancel" | "recover", lesson: Lesson) {
@@ -568,6 +612,7 @@ export function GroupGradebook({
         setCellError(apiErrorMessage(json, "Unable to update attendance."));
         return;
       }
+      await prepareGradebookCacheMutation();
       patchAtt(active.enrollmentId, active.lesson.id, active.lesson.lessonNumber, status);
       close();
     } catch {
@@ -607,6 +652,7 @@ export function GroupGradebook({
         return;
       }
       const result = apiData<{ studentSummary?: { averageGrade?: number } }>(json);
+      await prepareGradebookCacheMutation();
       patchHw(active.enrollmentId, active.lesson.id, active.lesson.lessonNumber, score, result.studentSummary?.averageGrade);
       close();
     } catch {
@@ -617,8 +663,7 @@ export function GroupGradebook({
   }
 
   function patchAtt(enrollmentId: number, lessonId: number, lessonNumber: string, status: AttValue) {
-    gradebookCacheRef.current.clear();
-    setData((prev) => {
+    const update = (prev: GradebookData | null | undefined) => {
       if (!prev) return prev;
       return {
         ...prev,
@@ -633,12 +678,17 @@ export function GroupGradebook({
           return { ...en, attendance: att, attendanceByLessonId: byLessonId };
         }),
       };
-    });
+    };
+    setData((previous) => update(previous) ?? previous);
+    queryClient.setQueriesData<GradebookData>(
+      { queryKey: ["academic", "gradebook", groupId] },
+      (previous) => update(previous) || previous,
+    );
+    void queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId], refetchType: "none" });
   }
 
   function patchHw(enrollmentId: number, lessonId: number, lessonNumber: string, score: number, averageGrade?: number) {
-    gradebookCacheRef.current.clear();
-    setData((prev) => {
+    const update = (prev: GradebookData | null | undefined) => {
       if (!prev) return prev;
       return {
         ...prev,
@@ -653,12 +703,17 @@ export function GroupGradebook({
               },
         ),
       };
-    });
+    };
+    setData((previous) => update(previous) ?? previous);
+    queryClient.setQueriesData<GradebookData>(
+      { queryKey: ["academic", "gradebook", groupId] },
+      (previous) => update(previous) || previous,
+    );
+    void queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId], refetchType: "none" });
   }
 
   function patchExam(enrollmentId: number, examLabel: string, score: number) {
-    gradebookCacheRef.current.clear();
-    setData((prev) => {
+    const update = (prev: GradebookData | null | undefined) => {
       if (!prev) return prev;
       const update = (en: Enrollment) =>
         en.enrollmentId !== enrollmentId
@@ -669,7 +724,13 @@ export function GroupGradebook({
         enrollments: prev.enrollments.map(update),
         allEnrollments: prev.allEnrollments?.map(update) ?? prev.allEnrollments,
       };
-    });
+    };
+    setData((previous) => update(previous) ?? previous);
+    queryClient.setQueriesData<GradebookData>(
+      { queryKey: ["academic", "gradebook", groupId] },
+      (previous) => update(previous) || previous,
+    );
+    void queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId], refetchType: "none" });
   }
 
   function openExamEditor(enrollment: Enrollment, examLabel: string) {
@@ -721,6 +782,7 @@ export function GroupGradebook({
         setError(apiErrorMessage(json, "Unable to update exam score."));
         return;
       }
+      await prepareGradebookCacheMutation();
       patchExam(activeExam.enrollmentId, activeExam.examLabel, score);
       setActiveExam(null);
       setExamInput("");
@@ -992,7 +1054,19 @@ export function GroupGradebook({
   const allEnrollments = data?.allEnrollments ?? enrollments;
   const gradebookMonthOptions = data?.pageInfo?.monthOptions ?? [];
   const selectedLessonMonth = data?.pageInfo?.selectedMonth || lessonMonth;
+  const selectedLessonMonthLabel = gradebookMonthOptions.find(
+    (option) => option.value === selectedLessonMonth,
+  )?.label || selectedLessonMonth;
   const visibleCurriculumLessonCount = lessons.filter((lesson) => !isCancelledLesson(lesson)).length;
+  const visibleCancellationCount = lessons.length - visibleCurriculumLessonCount;
+  const scheduledCurriculumLessonCount = gradebookMonthOptions.reduce(
+    (total, option) => total + asNumber(option.lessonCount),
+    0,
+  );
+  const unscheduledLessonCount = Math.max(
+    0,
+    asNumber(data?.pageInfo?.totalLessons) - scheduledCurriculumLessonCount,
+  );
   const gradebookTableWidth =
     GRADEBOOK_STUDENT_COL_WIDTH +
     GRADEBOOK_AAP_COL_WIDTH +
@@ -1001,15 +1075,8 @@ export function GroupGradebook({
   const bannedEnrollments = allEnrollments.filter((en) => en.status === "banned");
   const timetableGroups = groupLessonsByDate(lessons);
 
-  const academicPeriodOptions = useMemo(() => collectPeriodOptions(lessons.map((lesson) => lesson.date)), [lessons]);
-  const indicatorFilterActive = indicatorMonth !== "all" || indicatorYear !== "all";
   const metricLessons = useMemo(() => lessons.filter((lesson) => !isCancelledLesson(lesson)), [lessons]);
-  const indicatorLessons = useMemo(
-    () => indicatorFilterActive
-      ? metricLessons.filter((lesson) => matchesPeriod(lesson.date, indicatorMonth, indicatorYear))
-      : metricLessons,
-    [indicatorFilterActive, indicatorMonth, indicatorYear, metricLessons],
-  );
+  const indicatorLessons = metricLessons;
   const examTypeOptions = useMemo(() => collectExamTypeOptions(examLabels), [examLabels]);
   const selectedExamType = examType === "all" ? null : examTypeOptions.find((option) => option.key === examType) || null;
   const selectedExamTypeValue = selectedExamType ? selectedExamType.key : "all";
@@ -1024,7 +1091,7 @@ export function GroupGradebook({
       .map((lesson) => scoreOutOfNine(en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber]))
       .filter((score) => score > 0);
     const filteredAAP = averageScore(homeworkScores);
-    const aap = filteredAAP ?? (indicatorFilterActive ? null : scoreOutOfNine(en.averageGrade) || null);
+    const aap = filteredAAP;
     const attendanceValues = indicatorLessons
       .map((lesson) => en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber])
       .filter((status) => ["present", "absent", "justified"].includes(status));
@@ -1035,6 +1102,7 @@ export function GroupGradebook({
     const averagePerformance = averageScore([aap, arScore]);
     return {
       name: en.fullName,
+      enrollmentId: en.enrollmentId,
       AAP: aap,
       AR: arRate,
       arScore,
@@ -1043,12 +1111,15 @@ export function GroupGradebook({
       isLowAR: arRate !== null && arRate < 80,
       present,
       total,
+      recordedAttendance: total,
+      scheduledLessons: indicatorLessons.length,
     };
-  }), [enrollments, indicatorFilterActive, indicatorLessons]);
+  }), [enrollments, indicatorLessons]);
   const hasAcademicIndicatorData = academicIndicatorData.some((row) => row.AAP !== null || row.AR !== null);
   const academicAverageAAP = averageScore(academicIndicatorData.map((row) => row.AAP));
   const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
   const academicAveragePerformance = averageScore(academicIndicatorData.map((row) => row.averagePerformance));
+  const academicChartMinWidth = Math.max(640, academicIndicatorData.length * 84);
 
   let filteredExamScoreSum = 0;
   let filteredExamScoreCount = 0;
@@ -1161,10 +1232,9 @@ export function GroupGradebook({
       {/* 2. View Switcher Buttons */}
       {data && (
         <div className="flex border-b border-foreground/8 gap-2 overflow-x-auto py-1">
-          {(["gradebook", "academic", "ep", "timetable"] as const).map((view) => {
+          {(["gradebook", "ep", "timetable"] as const).map((view) => {
             const labels: Record<string, string> = {
               gradebook: "Gradebook",
-              academic: "Academic Indicators",
               ep: "Exam Performance",
               timetable: "Timetable",
             };
@@ -1189,322 +1259,191 @@ export function GroupGradebook({
 
       {/* 4. Active Panel Content */}
       {data && activeView === "gradebook" && loadedView === "gradebook" && (
-        lessons.length === 0 ? (
-          <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">
-            No lessons found for this group.
+        <div className={`min-w-0 max-w-full overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}>
+          <div className="border-b border-foreground/8 px-4 py-3">
+            <p className="text-sm font-bold">Gradebook</p>
+            <p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p>
           </div>
-        ) : (
-          <div
-            className={`flex min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
-            style={{
-              height: "calc(var(--tg-app-height) - 11rem)",
-              maxHeight: "78dvh",
-              minHeight: "26rem",
-            }}
-          >
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-foreground/8 px-4 py-3">
-              <div><p className="text-sm font-bold">Gradebook</p><p className="text-xs text-muted-foreground">Curriculum lessons with attendance and homework</p></div>
-              <button type="button" onClick={() => { setStudentOpen(true); setStudentName(""); setStudentError(""); setCreatedStudent(null); }} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground sm:min-h-9"><Plus className="h-4 w-4" /> New Student</button>
-            </div>
-            {data.pageInfo ? (
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/20 px-3 py-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <button type="button" aria-label="Previous month" disabled={!data.pageInfo.previousMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.previousMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronLeft className="h-4 w-4" /></button>
-                  <label htmlFor="gradebook-month" className="px-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Show</label>
-                  <div className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 sm:h-9">
-                    <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <select
-                      id="gradebook-month"
-                      aria-label="Show gradebook month"
-                      value={selectedLessonMonth}
-                      disabled={loading || gradebookMonthOptions.length === 0}
-                      onChange={(event) => openLessonMonth(event.target.value)}
-                      className="min-w-0 max-w-[12rem] bg-transparent text-sm font-bold text-foreground outline-none disabled:opacity-50"
-                    >
-                      {gradebookMonthOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="button" aria-label="Next month" disabled={!data.pageInfo.nextMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.nextMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronRight className="h-4 w-4" /></button>
-                  <span className="px-1 text-xs font-semibold tabular-nums text-muted-foreground">
-                    {visibleCurriculumLessonCount} {visibleCurriculumLessonCount === 1 ? "lesson" : "lessons"}
-                  </span>
-                </div>
-                <button type="button" disabled={loading} onClick={jumpToCurrentMonth} className="h-11 shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary disabled:opacity-50 sm:h-9">This month</button>
-              </div>
-            ) : null}
-            <div className="miniapp-table-scroll min-h-0 min-w-0 max-w-full flex-1 pb-8 [scrollbar-gutter:stable]">
-              <table
-                className="table-fixed border-collapse text-left text-[11px] sm:text-xs"
-                style={{ width: gradebookTableWidth, minWidth: gradebookTableWidth, maxWidth: gradebookTableWidth }}
-              >
-                <colgroup>
-                  <col style={{ width: GRADEBOOK_STUDENT_COL_WIDTH }} />
-                  <col style={{ width: GRADEBOOK_AAP_COL_WIDTH }} />
-                  {lessons.map((lesson) => (
-                    <Fragment key={`gradebook-cols-${lesson.id}`}>
-                      <col style={{ width: GRADEBOOK_ATT_COL_WIDTH }} />
-                      <col style={{ width: GRADEBOOK_HW_COL_WIDTH }} />
-                    </Fragment>
-                  ))}
-                </colgroup>
-                <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
-                  <tr className="bg-surface">
-                    <th
-                      className="sticky left-0 z-40 border-b border-r border-foreground/10 bg-surface px-3 py-3 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
-                      style={{
-                        width: GRADEBOOK_STUDENT_COL_WIDTH,
-                        minWidth: GRADEBOOK_STUDENT_COL_WIDTH,
-                        maxWidth: GRADEBOOK_STUDENT_COL_WIDTH,
-                      }}
-                    >
-                      Student
-                    </th>
-                    <th
-                      className="sticky z-40 border-b border-r border-foreground/10 bg-surface px-2 py-3 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
-                      style={{
-                        left: GRADEBOOK_STUDENT_COL_WIDTH,
-                        width: GRADEBOOK_AAP_COL_WIDTH,
-                        minWidth: GRADEBOOK_AAP_COL_WIDTH,
-                        maxWidth: GRADEBOOK_AAP_COL_WIDTH,
-                      }}
-                    >
-                      AAP
-                    </th>
-                    {lessons.map((lesson) => (
-                      <th
-                        key={lesson.id}
-                        colSpan={2}
-                        className={`border-b border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10 bg-surface"}`}
-                        style={{
-                          width: GRADEBOOK_LESSON_COL_WIDTH,
-                          minWidth: GRADEBOOK_LESSON_COL_WIDTH,
-                          maxWidth: GRADEBOOK_LESSON_COL_WIDTH,
-                        }}
-                      >
-                        <div
-                          title={`${lesson.lessonNumber} - ${lesson.topic}`}
-                          className="flex min-h-[6.25rem] w-full flex-col items-center justify-start px-2.5 py-2"
-                        >
-                          <span
-                            className={`inline-flex max-w-full items-center justify-center gap-1 px-1.5 py-0.5 text-[10px] font-bold leading-tight ${
-                              isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"
-                            }`}
-                            title="Date supplied by the timetable"
-                          >
-                            <CalendarDays className="h-2.5 w-2.5 shrink-0" />
-                            <span className="whitespace-nowrap">{formatGradebookDate(lesson.date) || "Unscheduled"}</span>
-                          </span>
-                          <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>
-                            {lesson.lessonNumber}
-                          </span>
-                          <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[9px] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>
-                            {lesson.topic || "—"}
-                          </span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-foreground/5 bg-surface">
-                  {enrollments.map((en, enrollmentIndex) => (
-                    <tr key={en.enrollmentId} className="transition-colors hover:bg-primary/[0.025]">
-                      <td
-                        className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
-                        style={{
-                          width: GRADEBOOK_STUDENT_COL_WIDTH,
-                          minWidth: GRADEBOOK_STUDENT_COL_WIDTH,
-                          maxWidth: GRADEBOOK_STUDENT_COL_WIDTH,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedStudent(en);
-                            setMoveGroupId("");
-                          }}
-                          className="w-full break-words text-left font-semibold text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          title={`Manage ${en.fullName}`}
-                        >
-                          {en.fullName}
-                        </button>
-                      </td>
-                      <td
-                        className="sticky z-20 border-r border-foreground/8 bg-surface px-2 py-1.5 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]"
-                        style={{
-                          left: GRADEBOOK_STUDENT_COL_WIDTH,
-                          width: GRADEBOOK_AAP_COL_WIDTH,
-                          minWidth: GRADEBOOK_AAP_COL_WIDTH,
-                          maxWidth: GRADEBOOK_AAP_COL_WIDTH,
-                        }}
-                      >
-                        {en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}
-                      </td>
-                      {lessons.map((lesson, lessonIndex) => {
-                        const att = (en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber] ?? "") as AttValue;
-                        const hw = en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber];
-                        const cancelled = isCancelledLesson(lesson);
-                        const canEditHomework = lessonCanHaveHomework(lesson);
-                        const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
-                        const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
-                        if (cancelled) {
-                          return (
-                            <td
-                              key={`${en.enrollmentId}-${lesson.id}-cancelled`}
-                              colSpan={2}
-                              className="border-l border-r border-red-100 bg-red-50/40 px-1.5 py-1.5 text-center"
-                              style={{ width: GRADEBOOK_LESSON_COL_WIDTH }}
-                            >
-                              <span className="inline-flex max-w-full rounded-md bg-red-100 px-1.5 py-1 text-[9px] font-bold uppercase tracking-wide text-red-700 shadow-sm">
-                                Cancelled
-                              </span>
-                            </td>
-                          );
-                        }
-                        return (
-                          <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
-                            <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_ATT_COL_WIDTH }}>
-                              <button
-                                type="button"
-                                data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2}`}
-                                onClick={(e) => openCell(e, en.enrollmentId, lesson, "att", hw)}
-                                onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2)}
-                                title={`${en.fullName} · ${lesson.lessonNumber} · attendance`}
-                                className={`mx-auto flex h-11 w-11 items-center justify-center rounded-lg text-[11px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-9 sm:text-[10px] ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
-                              >
-                                {att ? attLabel(att) : "·"}
-                              </button>
-                            </td>
-                            <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_HW_COL_WIDTH }}>
-                              <button
-                                type="button"
-                                data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2 + 1}`}
-                                disabled={!canEditHomework}
-                                onClick={(e) => openCell(e, en.enrollmentId, lesson, "hw", hw)}
-                                onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2 + 1)}
-                                title={`${en.fullName} · ${lesson.lessonNumber} · homework`}
-                                className={`mx-auto flex h-11 min-w-11 items-center justify-center rounded-lg px-2 text-[11px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-10 sm:text-[10px] ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}
-                              >
-                                {canEditHomework && hw !== undefined ? hw : "·"}
-                              </button>
-                            </td>
-                          </Fragment>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      )}
 
-      {data && activeView === "academic" && loadedView === "academic" && (
-        <div className={`${panelCardClass} p-4`}>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h4 className="text-sm font-bold">Academic Indicators</h4>
-              <p className="text-xs text-muted-foreground">AAP score and AR percentage by student</p>
-            </div>
-            <PeriodFilter
-              month={indicatorMonth}
-              year={indicatorYear}
-              months={academicPeriodOptions.months}
-              years={academicPeriodOptions.years}
-              onMonthChange={setIndicatorMonth}
-              onYearChange={setIndicatorYear}
-            />
-          </div>
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className={detailMetricClass}>
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
-              <span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span>
-            </div>
-            <div className={detailMetricClass}>
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
-              <span className="mt-1 block text-lg font-bold text-emerald-600">
-                {academicAverageAR ?? "—"}<span className="text-xs font-normal text-muted-foreground">%</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/20 px-3 py-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <div className="inline-flex h-11 rounded-lg border border-foreground/10 bg-background p-1 sm:h-9">
+                {(["table", "chart"] as GradebookDisplayMode[]).map((mode) => {
+                  const selected = gradebookDisplay === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => changeGradebookDisplay(mode)}
+                      className={`inline-flex min-w-20 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-bold capitalize transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${selected ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                    >
+                      {mode === "table" ? <Table2 className="h-3.5 w-3.5" /> : <BarChart3 className="h-3.5 w-3.5" />}
+                      {mode}
+                    </button>
+                  );
+                })}
+              </div>
+              <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-foreground/10 sm:block" />
+              <button type="button" aria-label="Previous month" disabled={!data.pageInfo?.previousMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.previousMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronLeft className="h-4 w-4" /></button>
+              <div className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 sm:h-9">
+                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <select
+                  id="gradebook-month"
+                  aria-label="Gradebook month"
+                  value={selectedLessonMonth}
+                  disabled={loading || gradebookMonthOptions.length === 0}
+                  onChange={(event) => openLessonMonth(event.target.value)}
+                  className="min-w-0 max-w-[12rem] bg-transparent text-sm font-bold text-foreground outline-none disabled:opacity-50"
+                >
+                  {gradebookMonthOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" aria-label="Next month" disabled={!data.pageInfo?.nextMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.nextMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronRight className="h-4 w-4" /></button>
+              <span className="px-1 text-xs font-semibold tabular-nums text-muted-foreground">
+                {visibleCurriculumLessonCount} {visibleCurriculumLessonCount === 1 ? "lesson" : "lessons"}
+                {visibleCancellationCount > 0 ? ` · ${visibleCancellationCount} cancelled` : ""}
               </span>
             </div>
-            <div className={detailMetricClass}>
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
-              <span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"} <span className="text-xs font-normal text-muted-foreground">/ 9</span></span>
-            </div>
+            <button type="button" disabled={loading} onClick={jumpToCurrentMonth} className="h-11 shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary disabled:opacity-50 sm:h-9">This month</button>
           </div>
-          {hasAcademicIndicatorData ? (
-            <div className={`overflow-hidden pb-1 ${motion.panel}`}>
-              <div className="h-[calc(var(--tg-app-height)-24rem)] min-h-[500px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={academicIndicatorData}
-                    barCategoryGap="18%"
-                    barGap={3}
-                    margin={{ top: 30, right: 10, left: 4, bottom: 44 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
-                    <XAxis
-                      dataKey="name"
-                      interval={0}
-                      height={58}
-                      tick={<StudentNameTick />}
-                      tickLine={false}
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <YAxis domain={[0, 9]} tickCount={10} hide />
-                    <YAxis
-                      yAxisId="ar"
-                      orientation="right"
-                      domain={[0, 100]}
-                      tickCount={6}
-                      hide
-                    />
-                    <Tooltip
-                      cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
-                      wrapperClassName="!outline-none"
-                      content={<CompactChartTooltip percentKeys={["AR"]} />}
-                    />
-                    <Legend verticalAlign="top" height={28} />
-                    <Bar
-                      dataKey="AAP"
-                      name="AAP"
-                      fill="#3b82f6"
-                      radius={[5, 5, 0, 0]}
-                      maxBarSize={28}
-                      isAnimationActive
-                      animationDuration={650}
-                      animationEasing="ease-out"
-                    >
-                      <LabelList dataKey="AAP" position="top" fontSize={11} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
-                      {academicIndicatorData.map((entry, index) => (
-                        <Cell key={`academic-aap-${index}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />
-                      ))}
-                    </Bar>
-                    <Bar
-                      yAxisId="ar"
-                      dataKey="AR"
-                      name="AR"
-                      fill="#10b981"
-                      radius={[5, 5, 0, 0]}
-                      maxBarSize={28}
-                      isAnimationActive
-                      animationBegin={90}
-                      animationDuration={650}
-                      animationEasing="ease-out"
-                    >
-                      <LabelList dataKey="AR" position="top" fontSize={11} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
-                      {academicIndicatorData.map((entry, index) => (
-                        <Cell key={`academic-ar-${index}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+
+          {unscheduledLessonCount > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+              <span className="font-semibold">{unscheduledLessonCount} {unscheduledLessonCount === 1 ? "lesson is" : "lessons are"} not scheduled yet.</span>
+              <button type="button" onClick={() => changeView("timetable")} className="font-bold text-amber-900 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50">Open Timetable</button>
             </div>
+          ) : null}
+
+          {gradebookDisplay === "table" ? (
+            <>
+              {lessons.length === 0 ? (
+                <div className="border-b border-foreground/8 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
+                  No lessons are scheduled in {selectedLessonMonthLabel || "this month"}. Student enrollment remains available below.
+                </div>
+              ) : null}
+              <div
+                ref={gradebookScrollRef}
+                onScroll={(event) => { gradebookScrollLeftRef.current = event.currentTarget.scrollLeft; }}
+                className="miniapp-table-scroll min-w-0 max-w-full overflow-auto [max-height:min(70dvh,calc(var(--tg-app-height)-17rem))] [scrollbar-gutter:stable]"
+              >
+                <table
+                  className="w-full table-fixed border-collapse text-left text-[11px] sm:text-xs"
+                  style={{ minWidth: Math.max(gradebookTableWidth, GRADEBOOK_STUDENT_COL_WIDTH + GRADEBOOK_AAP_COL_WIDTH) }}
+                >
+                  <colgroup>
+                    <col style={{ width: GRADEBOOK_STUDENT_COL_WIDTH }} />
+                    <col style={{ width: GRADEBOOK_AAP_COL_WIDTH }} />
+                    {lessons.map((lesson) => (
+                      <Fragment key={`gradebook-cols-${lesson.id}`}>
+                        <col style={{ width: GRADEBOOK_ATT_COL_WIDTH }} />
+                        <col style={{ width: GRADEBOOK_HW_COL_WIDTH }} />
+                      </Fragment>
+                    ))}
+                  </colgroup>
+                  <thead className="sticky top-0 z-30 shadow-[0_1px_0_hsl(var(--foreground)/0.08)]">
+                    <tr className="bg-surface">
+                      <th className="sticky left-0 z-40 border-b border-r border-foreground/10 bg-surface px-3 py-3 font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]" style={{ width: GRADEBOOK_STUDENT_COL_WIDTH, minWidth: GRADEBOOK_STUDENT_COL_WIDTH, maxWidth: GRADEBOOK_STUDENT_COL_WIDTH }}>Student</th>
+                      <th title="Overall AAP across recorded homework" className="sticky z-40 border-b border-r border-foreground/10 bg-surface px-1 py-3 text-center font-bold uppercase tracking-wide text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)]" style={{ left: GRADEBOOK_STUDENT_COL_WIDTH, width: GRADEBOOK_AAP_COL_WIDTH, minWidth: GRADEBOOK_AAP_COL_WIDTH, maxWidth: GRADEBOOK_AAP_COL_WIDTH }}>AAP</th>
+                      {lessons.map((lesson) => (
+                        <th key={lesson.id} colSpan={2} className={`border-b border-l p-0 text-center align-top ${isCancelledLesson(lesson) ? "border-red-200 bg-red-50/55" : "border-foreground/10 bg-surface"}`} style={{ width: GRADEBOOK_LESSON_COL_WIDTH, minWidth: GRADEBOOK_LESSON_COL_WIDTH }}>
+                          <div title={`${lesson.lessonNumber} - ${lesson.topic}`} className="flex min-h-[6.25rem] w-full flex-col items-center justify-start px-1 py-2">
+                            <span className={`inline-flex max-w-full items-center justify-center gap-1 whitespace-nowrap text-[9px] font-bold leading-tight ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground"}`} title="Date supplied by the timetable">
+                              <CalendarDays className="h-2.5 w-2.5 shrink-0" />
+                              {formatGradebookDate(lesson.date) || "Unscheduled"}
+                            </span>
+                            <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>{lesson.lessonNumber}</span>
+                            <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[9px] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>{lesson.topic || "—"}</span>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-foreground/5 bg-surface">
+                    {enrollments.map((en, enrollmentIndex) => (
+                      <tr key={en.enrollmentId} className="group transition-colors hover:bg-muted/40">
+                        <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-3 py-1.5 font-semibold text-sm shadow-[1px_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ width: GRADEBOOK_STUDENT_COL_WIDTH, minWidth: GRADEBOOK_STUDENT_COL_WIDTH, maxWidth: GRADEBOOK_STUDENT_COL_WIDTH }}>
+                          <button type="button" onClick={() => { setSelectedStudent(en); setMoveGroupId(""); }} className="line-clamp-2 w-full text-left font-semibold text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" title={`Manage ${en.fullName}`}>{en.fullName}</button>
+                        </td>
+                        <td title="Overall AAP across recorded homework" className="sticky z-20 border-r border-foreground/8 bg-surface px-1 py-1.5 text-center font-bold text-muted-foreground shadow-[1px_0_0_hsl(var(--foreground)/0.08)] transition-colors group-hover:bg-muted/40" style={{ left: GRADEBOOK_STUDENT_COL_WIDTH, width: GRADEBOOK_AAP_COL_WIDTH, minWidth: GRADEBOOK_AAP_COL_WIDTH, maxWidth: GRADEBOOK_AAP_COL_WIDTH }}>{en.averageGrade > 0 ? en.averageGrade.toFixed(0) : "–"}</td>
+                        {lessons.map((lesson, lessonIndex) => {
+                          const att = (en.attendanceByLessonId?.[String(lesson.id)] ?? en.attendance[lesson.lessonNumber] ?? "") as AttValue;
+                          const hw = en.homeworkByLessonId?.[String(lesson.id)] ?? en.homework[lesson.lessonNumber];
+                          const cancelled = isCancelledLesson(lesson);
+                          const canEditHomework = lessonCanHaveHomework(lesson);
+                          const isActiveAtt = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "att";
+                          const isActiveHw = active?.enrollmentId === en.enrollmentId && active?.lesson.id === lesson.id && active?.kind === "hw";
+                          if (cancelled) {
+                            return (
+                              <td key={`${en.enrollmentId}-${lesson.id}-cancelled`} colSpan={2} className="border-l border-r border-red-100 bg-red-50/40 px-1 py-1.5 text-center transition-colors group-hover:bg-red-100/60" style={{ width: GRADEBOOK_LESSON_COL_WIDTH }}>
+                                <span className="inline-flex max-w-full rounded-md bg-red-100 px-1 py-1 text-[8px] font-bold uppercase tracking-wide text-red-700 shadow-sm">Cancelled</span>
+                              </td>
+                            );
+                          }
+                          return (
+                            <Fragment key={`${en.enrollmentId}-${lesson.id}`}>
+                              <td className="border-l border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_ATT_COL_WIDTH }}>
+                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2}`} onClick={(event) => openCell(event, en.enrollmentId, lesson, "att", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2)} title={`${en.fullName} · ${lesson.lessonNumber} · attendance`} className={`mx-auto flex h-9 w-8 items-center justify-center rounded-lg text-[10px] font-bold shadow-sm transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 sm:h-7 sm:w-7 ${att ? attCls(att) : "text-foreground/20 shadow-none"} ${isActiveAtt ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{att ? attLabel(att) : "·"}</button>
+                              </td>
+                              <td className="border-r border-foreground/5 p-0.5 text-center" style={{ width: GRADEBOOK_HW_COL_WIDTH }}>
+                                <button type="button" data-gradebook-cell={`${enrollmentIndex}:${lessonIndex * 2 + 1}`} disabled={!canEditHomework} onClick={(event) => openCell(event, en.enrollmentId, lesson, "hw", hw)} onKeyDown={(event) => moveGradebookCellFocus(event, enrollmentIndex, lessonIndex * 2 + 1)} title={`${en.fullName} · ${lesson.lessonNumber} · homework`} className={`mx-auto flex h-9 min-w-9 items-center justify-center rounded-lg px-1 text-[10px] transition-[transform,opacity,box-shadow] hover:-translate-y-px hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-8 ${hw !== undefined ? "bg-blue-50 font-bold text-blue-700 shadow-sm" : "text-foreground/20"} ${isActiveHw ? "ring-2 ring-primary/35 ring-offset-1" : ""}`}>{canEditHomework && hw !== undefined ? hw : "·"}</button>
+                              </td>
+                            </Fragment>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    <tr className="bg-muted/10">
+                      <td className="sticky left-0 z-20 border-r border-foreground/8 bg-surface px-2 py-1.5 shadow-[1px_0_0_hsl(var(--foreground)/0.08)]">
+                        <button type="button" onClick={openAddStudent} className="inline-flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left text-xs font-bold text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"><Plus className="h-4 w-4" /> Add student</button>
+                      </td>
+                      <td colSpan={1 + lessons.length * 2} aria-hidden="true" className="bg-muted/10" />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              No academic indicator data matches this filter.
+            <div className="p-4">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold">Academic Indicators</h4>
+                  <p className="text-xs text-muted-foreground">Monthly AAP and attendance rate · {selectedLessonMonthLabel}</p>
+                </div>
+              </div>
+              <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span><span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span></div>
+                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span><span className="mt-1 block text-lg font-bold text-emerald-600">{academicAverageAR ?? "—"}{academicAverageAR !== null ? <span className="text-xs font-normal text-muted-foreground">%</span> : null}</span></div>
+                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span><span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"}{academicAveragePerformance !== null ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}</span></div>
+              </div>
+              {hasAcademicIndicatorData ? (
+                <div className={`max-w-full overflow-x-auto pb-1 ${motion.panel}`}>
+                  <div className="h-[clamp(22rem,55dvh,42rem)]" style={{ minWidth: academicChartMinWidth }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={academicIndicatorData} barCategoryGap="18%" barGap={3} margin={{ top: 30, right: 10, left: 4, bottom: 44 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                        <XAxis dataKey="name" interval={0} height={58} tick={<StudentNameTick />} tickLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis domain={[0, 9]} tickCount={10} hide />
+                        <YAxis yAxisId="ar" orientation="right" domain={[0, 100]} tickCount={6} hide />
+                        <Tooltip cursor={{ fill: "hsl(var(--primary) / 0.06)" }} wrapperClassName="!outline-none" content={<CompactChartTooltip percentKeys={["AR"]} />} />
+                        <Legend verticalAlign="top" height={28} />
+                        <Bar dataKey="AAP" name="AAP" fill="#3b82f6" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive animationDuration={650} animationEasing="ease-out">
+                          <LabelList dataKey="AAP" position="top" fontSize={11} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
+                          {academicIndicatorData.map((entry) => <Cell key={`academic-aap-${entry.enrollmentId}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />)}
+                        </Bar>
+                        <Bar yAxisId="ar" dataKey="AR" name="AR" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive animationBegin={90} animationDuration={650} animationEasing="ease-out">
+                          <LabelList dataKey="AR" position="top" fontSize={11} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
+                          {academicIndicatorData.map((entry) => <Cell key={`academic-ar-${entry.enrollmentId}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-foreground/15 py-16 text-center text-sm text-muted-foreground">No recorded academic indicator data for {selectedLessonMonthLabel || "this month"}.</div>
+              )}
             </div>
           )}
         </div>

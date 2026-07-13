@@ -83,6 +83,33 @@ def test_gradebook_month_returns_only_that_calendar_month():
     ]
 
 
+def test_gradebook_empty_requested_month_stays_selected():
+    page, info = _window_function()(_lessons(40), month="2026-04")
+
+    assert page == []
+    assert info["selectedMonth"] == "2026-04"
+    assert info["previousMonth"] == "2026-02"
+    assert info["nextMonth"] is None
+    assert info["monthOptions"][-1] == {
+        "value": "2026-04",
+        "label": "April 2026",
+        "lessonCount": 0,
+    }
+
+
+def test_gradebook_empty_month_without_any_dated_lessons_is_selectable():
+    page, info = _window_function()(
+        [{"id": 1, "lessonNumber": "Lesson 1", "date": ""}],
+        month="2026-04",
+    )
+
+    assert page == []
+    assert info["selectedMonth"] == "2026-04"
+    assert info["monthOptions"] == [
+        {"value": "2026-04", "label": "April 2026", "lessonCount": 0}
+    ]
+
+
 def test_gradebook_month_keeps_cancellations_in_their_calendar_month():
     items = _lessons(40)
     items.append({
@@ -131,8 +158,11 @@ def test_frontend_uses_month_navigation_and_stable_lesson_ids():
 
     assert "Previous month" in source
     assert "Next month" in source
-    assert '>Show</label>' in source
+    assert 'type GradebookDisplayMode = "table" | "chart"' in source
+    assert 'aria-pressed={selected}' in source
+    assert "PeriodFilter" not in source
     assert "Lessons {data.pageInfo.startIndex" not in source
     assert ">Loading…</div>" not in source
     assert "attendanceByLessonId" in source
     assert "homeworkByLessonId" in source
+    assert "unscheduledLessonCount" in source
