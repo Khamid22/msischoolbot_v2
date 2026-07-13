@@ -921,6 +921,14 @@ def add_assessment(
             return False, "Assignment not found."
         evaluator = _as_int(evaluator_id) or _as_int(assignment["evaluator_id"])
 
+        # One report per lesson: a re-assessment replaces any prior report for this
+        # assignment so the average score and progress counts stay correct.
+        repository.delete_assessments_for_assignment(
+            conn,
+            academy_teacher_id=parsed_teacher_id,
+            lesson_assignment_id=parsed_assignment_id,
+        )
+
         repository.insert_assessment(
             conn,
             academy_teacher_id=parsed_teacher_id,

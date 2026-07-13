@@ -153,6 +153,14 @@ function decisionTone(value: unknown): "success" | "warning" | "danger" {
   return "success";
 }
 
+/** Saved per-criterion remark for a report, looked up by rubric short code (e.g. "TGC"). */
+function criteriaRemark(report: Record<string, unknown> | undefined, code: string) {
+  const feedback = report?.section_feedback;
+  const criteria = feedback && typeof feedback === "object" ? (feedback as Record<string, unknown>).marking_criteria : undefined;
+  const entry = criteria && typeof criteria === "object" ? (criteria as Record<string, unknown>)[code.toLowerCase()] : undefined;
+  return entry && typeof entry === "object" ? asString((entry as Record<string, unknown>).remarks) : "";
+}
+
 function assignmentTitle(assignment: AcademyAssignment) {
   const sequence = asNumber(assignment.sequence_no);
   const lessonNumber = asString(assignment.lesson_number) || (sequence ? `Lesson ${sequence}` : "Lesson");
@@ -916,6 +924,7 @@ function autoGrowTextarea(event: React.FormEvent<HTMLTextAreaElement>) {
 function AssessmentModal({
   teacher,
   assignment,
+  initialReport,
   submitting,
   error,
   onSubmit,
@@ -923,15 +932,28 @@ function AssessmentModal({
 }: {
   teacher: AcademyTeacher;
   assignment: AcademyAssignment;
+  initialReport?: Record<string, unknown>;
   submitting: boolean;
   error: string;
   onSubmit: (teacherId: number, fields: Record<string, string>) => void;
   onClose: () => void;
 }) {
+  const isEditing = Boolean(initialReport);
   const formRef = useRef<HTMLFormElement>(null);
-  const [assessmentDate] = useState(() => new Date());
-  const [scores, setScores] = useState<Record<string, string>>(
-    Object.fromEntries(rubric.map((item) => [item.key, "7"])),
+  const [assessmentDate] = useState(() => {
+    const raw = asString(initialReport?.assessment_datetime);
+    const parsed = raw ? Date.parse(raw) : NaN;
+    return Number.isFinite(parsed) ? new Date(parsed) : new Date();
+  });
+  const [scores, setScores] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      rubric.map((item) => {
+        const saved = initialReport?.scores && typeof initialReport.scores === "object"
+          ? asNumber((initialReport.scores as Record<string, unknown>)[item.key])
+          : 0;
+        return [item.key, saved > 0 ? String(saved) : "7"];
+      }),
+    ),
   );
   const [confirmDecision, setConfirmDecision] = useState<"passed" | "needs_improvement" | null>(null);
   const weighted = rubric.reduce((sum, item) => {
@@ -1015,6 +1037,7 @@ function AssessmentModal({
                   <textarea
                     name={item.remarksKey}
                     rows={1}
+                    defaultValue={criteriaRemark(initialReport, item.code)}
                     onInput={autoGrowTextarea}
                     placeholder="Remarks"
                     aria-label={`${item.label} remarks`}
@@ -1025,14 +1048,18 @@ function AssessmentModal({
             </div>
           </section>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block">
               <FieldLabel>Strengths</FieldLabel>
-              <textarea name="strengths" rows={3} onInput={autoGrowTextarea} placeholder="What went well?" className={remarksClass} />
+              <textarea name="strengths" rows={3} defaultValue={asString(initialReport?.strengths)} onInput={autoGrowTextarea} placeholder="What went well?" className={remarksClass} />
             </label>
             <label className="block">
               <FieldLabel>Areas for Improvement</FieldLabel>
-              <textarea name="areas_for_improvement" rows={3} onInput={autoGrowTextarea} placeholder="What should improve next?" className={remarksClass} />
+              <textarea name="areas_for_improvement" rows={3} defaultValue={asString(initialReport?.areas_for_improvement)} onInput={autoGrowTextarea} placeholder="What should improve next?" className={remarksClass} />
+            </label>
+            <label className="block">
+              <FieldLabel>Final Recommendation</FieldLabel>
+              <textarea name="final_recommendation" rows={3} defaultValue={asString(initialReport?.final_recommendation)} onInput={autoGrowTextarea} placeholder="Overall recommendation" className={remarksClass} />
             </label>
           </div>
           {error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">{error}</p> : null}
@@ -1082,121 +1109,6 @@ function AssessmentModal({
           if (!submitting) setConfirmDecision(null);
         }}
       />
-    </ModalShell>
-  );
-}
-
-function ReportModal({
-  teacher,
-  assignment,
-  report,
-  onClose,
-}: {
-  teacher: AcademyTeacher;
-  assignment: AcademyAssignment;
-  report: Record<string, unknown>;
-  onClose: () => void;
-}) {
-  const scores = report.scores && typeof report.scores === "object" ? (report.scores as Record<string, unknown>) : {};
-  const markingCriteria = (() => {
-    const feedback = report.section_feedback && typeof report.section_feedback === "object"
-      ? (report.section_feedback as Record<string, unknown>)
-      : {};
-    const criteria = feedback.marking_criteria;
-    return criteria && typeof criteria === "object" ? (criteria as Record<string, unknown>) : {};
-  })();
-  const remarksFor = (code: string) => {
-    const entry = markingCriteria[code.toLowerCase()];
-    return entry && typeof entry === "object" ? asString((entry as Record<string, unknown>).remarks) : "";
-  };
-  const weighted = Number(report.weighted_overall_score || 0);
-  const notes: Array<[string, string]> = [
-    ["Strengths", asString(report.strengths)],
-    ["Areas for Improvement", asString(report.areas_for_improvement)],
-    ["Final Recommendation", asString(report.final_recommendation)],
-  ];
-
-  return (
-    <ModalShell
-      title="Assessment Report"
-      subtitle={`${asString(teacher.full_name)} · ${assignmentTitle(assignment)} · score ${weighted.toFixed(2)}`}
-      onClose={onClose}
-      wide
-      mobileMode="fullscreen"
-    >
-      <ModalBody className="space-y-4">
-        <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher</p>
-            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
-            <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assessed lesson</p>
-            <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{assignmentTitle(assignment)}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Evaluator · Date</p>
-            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(report.evaluator_name) || "Evaluator not set"}</p>
-            <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{dateLabel(report.assessment_datetime)}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Decision</p>
-            <StatusBadge tone={decisionTone(report.decision)} className="mt-1 text-[10px]">
-              {decisionLabel(report.decision)}
-            </StatusBadge>
-          </div>
-        </div>
-
-        <section className="rounded-xl border border-foreground/10">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-              Score {weighted.toFixed(2)}
-            </span>
-          </div>
-          <div className="divide-y divide-foreground/8">
-            {rubric.map((item) => {
-              const remarks = remarksFor(item.code);
-              return (
-                <div key={item.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,14rem)_5.5rem_minmax(0,1fr)] sm:items-center">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-black text-primary">
-                      {item.code}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{item.label}</p>
-                      <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
-                    </div>
-                  </div>
-                  <div className="flex h-10 items-center justify-center rounded-lg border border-foreground/10 bg-background text-center text-sm font-black text-primary">
-                    {asNumber(scores[item.key]).toFixed(1)}
-                  </div>
-                  <p className="min-h-10 whitespace-pre-wrap rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm text-foreground">
-                    {remarks || <span className="text-muted-foreground/70">No remarks</span>}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          {notes.map(([label, value]) => (
-            <div key={label} className="min-w-0">
-              <FieldLabel>{label}</FieldLabel>
-              <p className="min-h-10 whitespace-pre-wrap rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm text-foreground">
-                {value || <span className="text-muted-foreground/70">—</span>}
-              </p>
-            </div>
-          ))}
-        </div>
-      </ModalBody>
-      <ModalFooter className="flex justify-end">
-        <button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-foreground/10 bg-background px-5 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
-          Close
-        </button>
-      </ModalFooter>
     </ModalShell>
   );
 }
@@ -2232,11 +2144,21 @@ export function TeacherAcademyPanel({
         />
       ) : null}
       {reportTarget && !assessmentTarget ? (
-        <ReportModal
+        <AssessmentModal
           teacher={reportTarget.teacher}
           assignment={reportTarget.assignment}
-          report={reportTarget.report}
-          onClose={() => setReportTarget(null)}
+          initialReport={reportTarget.report}
+          submitting={submitting}
+          error={error}
+          onSubmit={async (teacherId, fields) => {
+            if (await submit(academyApi.assessmentCreate(teacherId), fields, "Assessment updated.")) {
+              setReportTarget(null);
+            }
+          }}
+          onClose={() => {
+            setError("");
+            setReportTarget(null);
+          }}
         />
       ) : null}
       {promoteTeacher && academyApi.promote ? (

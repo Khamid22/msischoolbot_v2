@@ -787,6 +787,17 @@ def delete_assessment_row(conn: Any, assessment_id: int) -> None:
     )
 
 
+def delete_assessments_for_assignment(conn: Any, *, academy_teacher_id: int, lesson_assignment_id: int) -> None:
+    """Remove every existing report for one assignment so a re-assessment replaces it."""
+    conn.execute(
+        """
+        DELETE FROM msi_v2.academy_assessments
+        WHERE academy_teacher_id = %s AND lesson_assignment_id = %s
+        """,
+        (academy_teacher_id, lesson_assignment_id),
+    )
+
+
 def get_latest_assessment_for_assignment(conn: Any, *, academy_teacher_id: int, lesson_assignment_id: int) -> Any:
     return conn.execute(
         """
