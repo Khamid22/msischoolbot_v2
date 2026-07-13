@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 
@@ -29,6 +30,8 @@ _CACHE_STATIC_DEFAULT = "public, max-age=2592000, immutable"
 _HASHED_REACT_ASSET_FILE_RE = re.compile(r"-[A-Za-z0-9_-]{8,}\.(js|css)$")
 _VERSIONED_REACT_ENTRY_RE = re.compile(r"^/static/react/app\.(js|css)$")
 _VERSIONED_BUNDLE_RE = re.compile(r"^/static/js/bundles/[^/]+\.js$")
+
+LOGGER = logging.getLogger("msi.server")
 
 def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     if request_path == "/" or request_path.startswith("/dashboard/"):
@@ -380,8 +383,14 @@ def handle_http_exception(request_obj: Request, exc: HTTPException):
 # Global unexpected error handler
 @app.exception_handler(Exception)
 def handle_unexpected_error(request_obj: Request, exc: Exception):
-    import logging
-    logging.exception("Unhandled error on %s %s", request_obj.method, request_obj.url.path)
+    error_summary = " ".join(str(exc).splitlines()).strip()[:500]
+    LOGGER.error(
+        "Unhandled error method=%s path=%s type=%s detail=%s",
+        request_obj.method,
+        request_obj.url.path,
+        type(exc).__name__,
+        error_summary or "(no detail)",
+    )
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith("/api/") or is_xhr:

@@ -17,6 +17,36 @@ _ADDRESS_IN_USE_ERRNOS = {
     10048,  # Windows
 }
 
+_TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+_FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+
+
+def _env_flag(name, *, default):
+    raw_value = str(os.getenv(name, "")).strip().lower()
+    if not raw_value:
+        return bool(default)
+    if raw_value in _TRUE_ENV_VALUES:
+        return True
+    if raw_value in _FALSE_ENV_VALUES:
+        return False
+    return bool(default)
+
+
+def _is_railway_runtime():
+    return any(
+        str(os.getenv(name, "")).strip()
+        for name in (
+            "RAILWAY_PROJECT_ID",
+            "RAILWAY_ENVIRONMENT_ID",
+            "RAILWAY_SERVICE_ID",
+        )
+    )
+
+
+def _uvicorn_access_log_enabled():
+    """Keep local request logs while avoiding high-volume Railway access logs."""
+    return _env_flag("UVICORN_ACCESS_LOG", default=not _is_railway_runtime())
+
 
 def _is_wildcard_host(host):
     normalized = str(host or "").strip()
@@ -116,11 +146,13 @@ def run_web_server():
     _settings = get_web_settings()
     web_port = int(_settings.web_port)
     host, port = _split_listen_target(listen_targets[0], web_port)
+    access_log_enabled = _uvicorn_access_log_enabled()
 
     logging.info(
-        "Starting uvicorn on %s:%s (1 worker process)",
+        "Starting uvicorn on %s:%s (1 worker process, access_log=%s)",
         host,
         port,
+        access_log_enabled,
     )
     try:
         uvicorn.run(
@@ -128,6 +160,7 @@ def run_web_server():
             host=host,
             port=port,
             log_level="info",
+            access_log=access_log_enabled,
         )
     except OSError as exc:
         if _is_address_in_use_error(exc):
