@@ -5,6 +5,7 @@ import {
   Ban,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -150,6 +151,14 @@ function shiftMonth(value: Date, amount: number) {
   return new Date(value.getFullYear(), value.getMonth() + amount, 1, 12);
 }
 
+function monthKey(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(value: Date) {
+  return value.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 function timeMinutes(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : 0;
@@ -166,18 +175,6 @@ function rangeFor(mode: PrimaryMode, calendarMode: CalendarMode, cursorKey: stri
     return { from: dateKey(from), to: dateKey(addDays(from, 41)) };
   }
   return { from: dateKey(startOfMonth(cursor)), to: dateKey(endOfMonth(cursor)) };
-}
-
-function formatPeriod(mode: PrimaryMode, calendarMode: CalendarMode, cursorKey: string) {
-  const cursor = parseDateKey(cursorKey);
-  if (mode === "calendar" && calendarMode === "week") {
-    const first = startOfWeek(cursor);
-    const last = addDays(first, 6);
-    const firstLabel = first.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const lastLabel = last.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${firstLabel} – ${lastLabel}`;
-  }
-  return cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function formatDay(value: string, withYear = false) {
@@ -643,6 +640,11 @@ export function ModernGroupTimetable({
   ].filter((item) => item.isoDate).sort((left, right) => left.isoDate.localeCompare(right.isoDate) || left.startTime.localeCompare(right.startTime) || Number(left.isCancellation) - Number(right.isCancellation) || left.order - right.order), [query.data]);
   const schedule = query.data?.activeSchedule || query.data?.schedules?.[0] || null;
   const summary = scheduleSummary(schedule);
+  const selectedMonth = monthKey(parseDateKey(cursorKey));
+  const monthOptions = useMemo(() => {
+    const center = startOfMonth(parseDateKey(cursorKey));
+    return Array.from({ length: 73 }, (_, index) => shiftMonth(center, index - 36));
+  }, [cursorKey]);
 
   function movePeriod(direction: -1 | 1) {
     const cursor = parseDateKey(cursorKey);
@@ -656,32 +658,45 @@ export function ModernGroupTimetable({
     setCalendarMode("week");
   }
 
+  function selectMonth(value: string) {
+    setCursorKey(`${value}-01`);
+  }
+
   return (
     <>
       <section className="overflow-hidden rounded-2xl border border-foreground/8 bg-surface shadow-card">
         <div className="border-b border-foreground/8 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><h3 className="text-base font-black">Lesson Timetable</h3><p className="mt-0.5 text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
-            <button type="button" onClick={onChangeSchedule} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Settings className="h-4 w-4" />{schedule ? "Change Schedule" : "Set Up Timetable"}</button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5" />{summary.teacher}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5" />{summary.days}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><Clock3 className="h-3.5 w-3.5" />{summary.time}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><MapPin className="h-3.5 w-3.5" />{summary.room}</span>
+          <div><h3 className="text-base font-black">Lesson Timetable</h3><p className="mt-0.5 text-xs text-muted-foreground">Timetable dates flow directly into the Gradebook.</p></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><UserRound className="h-3.5 w-3.5" />{summary.teacher}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><CalendarDays className="h-3.5 w-3.5" />{summary.days}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><Clock3 className="h-3.5 w-3.5" />{summary.time}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><MapPin className="h-3.5 w-3.5" />{summary.room}</span>
+            </div>
+            <button type="button" onClick={onChangeSchedule} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Settings className="h-3.5 w-3.5" />Configure</button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 px-3 py-3 sm:px-5">
-          <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">
-            {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-10 rounded-md px-4 text-xs font-bold capitalize ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
+        <div className="flex flex-col gap-3 border-b border-foreground/8 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><ChevronLeft className="h-4 w-4" /></button>
+            <label className="relative min-w-0">
+              <span className="sr-only">Select timetable month</span>
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <select value={selectedMonth} onChange={(event) => selectMonth(event.target.value)} className="h-11 w-[10.75rem] cursor-pointer appearance-none rounded-xl border border-foreground/10 bg-surface pl-10 pr-9 text-sm font-black text-foreground outline-none transition-colors hover:bg-muted/50 focus:border-primary/30 focus:ring-2 focus:ring-primary/20 sm:w-[13.5rem]">
+                {monthOptions.map((month) => <option key={monthKey(month)} value={monthKey(month)}>{monthLabel(month)}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground" />
+            </label>
+            <button type="button" onClick={() => movePeriod(1)} aria-label="Next period" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><ChevronRight className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className="min-h-11 rounded-lg border border-foreground/10 px-3 text-xs font-bold transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">Today</button>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period" className="flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"><ChevronLeft className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className="min-h-11 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">Today</button>
-            <button type="button" onClick={() => movePeriod(1)} aria-label="Next period" className="flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
-            <span className="min-w-32 px-2 text-center text-xs font-black sm:text-sm">{formatPeriod(mode, calendarMode, cursorKey)}</span>
-            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-10 rounded-md px-3 text-xs font-bold capitalize ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
-            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-10 rounded-lg border px-3 text-xs font-bold ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">
+              {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-11 rounded-md px-4 text-xs font-bold capitalize ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
+            </div>
+            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-11 rounded-md px-3 text-xs font-bold capitalize ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
+            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-11 rounded-lg border px-3 text-xs font-bold ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
           </div>
         </div>
         {Number(query.data?.unscheduledLessonCount || 0) > 0 ? (

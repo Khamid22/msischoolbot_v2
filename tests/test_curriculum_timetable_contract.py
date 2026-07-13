@@ -21,7 +21,9 @@ def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
     groups = (ROOT / "frontend/src/features/management/AcademicPanel.tsx").read_text(encoding="utf-8")
 
     assert "Set Up Timetable" in timetable
-    assert "Change Schedule" in timetable
+    assert "Configure" in timetable
+    assert "Select timetable month" in timetable
+    assert timetable.index('aria-label="Previous period"') < timetable.index('(["agenda", "calendar"]')
     assert "+ New Student" not in panel  # icon and label are separate JSX nodes
     assert "New Student</button>" not in panel
     assert "Add student</button>" in panel
