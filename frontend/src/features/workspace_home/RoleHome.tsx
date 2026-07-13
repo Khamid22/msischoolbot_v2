@@ -94,7 +94,6 @@ function AcademicDirectorHome({
         authLogin={authLogin}
         csrfToken={csrfToken}
         active={activeNav}
-        maxWidthClass="max-w-4xl"
       >
         <PageHeader
           title={title}
@@ -116,7 +115,6 @@ function AcademicDirectorHome({
       authLogin={authLogin}
       csrfToken={csrfToken}
       active={activeNav}
-      maxWidthClass="max-w-6xl"
     >
       <PageHeader
         title={title}
@@ -162,7 +160,6 @@ function HeadOfDepartmentHome({
         authLogin={authLogin}
         csrfToken={csrfToken}
         active={activeNav}
-        maxWidthClass="max-w-4xl"
       >
         <PageHeader
           title={title}
@@ -184,7 +181,6 @@ function HeadOfDepartmentHome({
       authLogin={authLogin}
       csrfToken={csrfToken}
       active={activeNav}
-      maxWidthClass="max-w-6xl"
     >
       <PageHeader
         title={title}

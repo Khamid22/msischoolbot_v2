@@ -134,6 +134,25 @@ function academyAssessments(teacher: AcademyTeacher) {
   return Array.isArray(teacher.assessments) ? teacher.assessments as Record<string, unknown>[] : [];
 }
 
+/** The saved assessment report for a given assignment, or null if not assessed. */
+function assessmentForAssignment(teacher: AcademyTeacher, assignment: AcademyAssignment | null | undefined) {
+  const assignmentId = asNumber(assignment?.id);
+  if (!assignmentId) return null;
+  return (
+    academyAssessments(teacher).find(
+      (assessment) => asNumber(assessment.lesson_assignment_id) === assignmentId,
+    ) || null
+  );
+}
+
+/** Badge tone for an assessment decision: passes are success, needs-improvement is a warning. */
+function decisionTone(value: unknown): "success" | "warning" | "danger" {
+  const decision = asString(value);
+  if (decision === "rejected") return "danger";
+  if (decision === "needs_improvement" || decision === "reassign_lesson") return "warning";
+  return "success";
+}
+
 function assignmentTitle(assignment: AcademyAssignment) {
   const sequence = asNumber(assignment.sequence_no);
   const lessonNumber = asString(assignment.lesson_number) || (sequence ? `Lesson ${sequence}` : "Lesson");
@@ -1067,6 +1086,121 @@ function AssessmentModal({
   );
 }
 
+function ReportModal({
+  teacher,
+  assignment,
+  report,
+  onClose,
+}: {
+  teacher: AcademyTeacher;
+  assignment: AcademyAssignment;
+  report: Record<string, unknown>;
+  onClose: () => void;
+}) {
+  const scores = report.scores && typeof report.scores === "object" ? (report.scores as Record<string, unknown>) : {};
+  const markingCriteria = (() => {
+    const feedback = report.section_feedback && typeof report.section_feedback === "object"
+      ? (report.section_feedback as Record<string, unknown>)
+      : {};
+    const criteria = feedback.marking_criteria;
+    return criteria && typeof criteria === "object" ? (criteria as Record<string, unknown>) : {};
+  })();
+  const remarksFor = (code: string) => {
+    const entry = markingCriteria[code.toLowerCase()];
+    return entry && typeof entry === "object" ? asString((entry as Record<string, unknown>).remarks) : "";
+  };
+  const weighted = Number(report.weighted_overall_score || 0);
+  const notes: Array<[string, string]> = [
+    ["Strengths", asString(report.strengths)],
+    ["Areas for Improvement", asString(report.areas_for_improvement)],
+    ["Final Recommendation", asString(report.final_recommendation)],
+  ];
+
+  return (
+    <ModalShell
+      title="Assessment Report"
+      subtitle={`${asString(teacher.full_name)} · ${assignmentTitle(assignment)} · score ${weighted.toFixed(2)}`}
+      onClose={onClose}
+      wide
+      mobileMode="fullscreen"
+    >
+      <ModalBody className="space-y-4">
+        <div className="grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher</p>
+            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Academy teacher"}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Assessed lesson</p>
+            <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">{assignmentTitle(assignment)}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Evaluator · Date</p>
+            <p className="mt-1 truncate text-sm font-black text-foreground">{asString(report.evaluator_name) || "Evaluator not set"}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{dateLabel(report.assessment_datetime)}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Decision</p>
+            <StatusBadge tone={decisionTone(report.decision)} className="mt-1 text-[10px]">
+              {decisionLabel(report.decision)}
+            </StatusBadge>
+          </div>
+        </div>
+
+        <section className="rounded-xl border border-foreground/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-foreground/8 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Marking Criteria</p>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              Score {weighted.toFixed(2)}
+            </span>
+          </div>
+          <div className="divide-y divide-foreground/8">
+            {rubric.map((item) => {
+              const remarks = remarksFor(item.code);
+              return (
+                <div key={item.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[minmax(0,14rem)_5.5rem_minmax(0,1fr)] sm:items-center">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-black text-primary">
+                      {item.code}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{item.label}</p>
+                      <p className="text-[11px] font-semibold text-muted-foreground">{Math.round(item.weight * 100)}% weight</p>
+                    </div>
+                  </div>
+                  <div className="flex h-10 items-center justify-center rounded-lg border border-foreground/10 bg-background text-center text-sm font-black text-primary">
+                    {asNumber(scores[item.key]).toFixed(1)}
+                  </div>
+                  <p className="min-h-10 whitespace-pre-wrap rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm text-foreground">
+                    {remarks || <span className="text-muted-foreground/70">No remarks</span>}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {notes.map(([label, value]) => (
+            <div key={label} className="min-w-0">
+              <FieldLabel>{label}</FieldLabel>
+              <p className="min-h-10 whitespace-pre-wrap rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm text-foreground">
+                {value || <span className="text-muted-foreground/70">—</span>}
+              </p>
+            </div>
+          ))}
+        </div>
+      </ModalBody>
+      <ModalFooter className="flex justify-end">
+        <button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-xl border border-foreground/10 bg-background px-5 text-sm font-bold transition hover:bg-muted active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100">
+          Close
+        </button>
+      </ModalFooter>
+    </ModalShell>
+  );
+}
+
 function PromoteModal({
   teacher,
   state,
@@ -1289,6 +1423,7 @@ function AcademyDetailModal({
   onClose,
   onPreview,
   onAssess,
+  onReview,
   onDeleteAssessment,
   onPromote,
   onSyncLessons,
@@ -1305,6 +1440,7 @@ function AcademyDetailModal({
   onClose: () => void;
   onPreview: () => void;
   onAssess: (assignment: AcademyAssignment) => void;
+  onReview: (assignment: AcademyAssignment, report: Record<string, unknown>) => void;
   onDeleteAssessment: (assessment: Record<string, unknown>) => void;
   onPromote: () => void;
   onSyncLessons: (selectedIds: number[]) => Promise<boolean>;
@@ -1467,22 +1603,31 @@ function AcademyDetailModal({
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
                           {report ? (
-                            <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
-                              {Number(report.weighted_overall_score || 0).toFixed(2)}
-                            </span>
-                          ) : null}
-                          {report && canDeleteAssessment ? (
-                            <button
-                              type="button"
-                              aria-label="Delete assessment report"
-                              title="Delete report"
-                              onClick={() => onDeleteAssessment(report)}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : null}
-                          {canAssess ? (
+                            <>
+                              <span className="rounded-md bg-primary/10 px-2 py-1 text-xs font-bold text-primary">
+                                {Number(report.weighted_overall_score || 0).toFixed(2)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onReview(assignment, report)}
+                                className="inline-flex items-center gap-1 rounded-md border border-foreground/10 bg-background px-2.5 py-1 text-[11px] font-bold text-foreground hover:bg-muted"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Review
+                              </button>
+                              {canDeleteAssessment ? (
+                                <button
+                                  type="button"
+                                  aria-label="Delete assessment report"
+                                  title="Delete report"
+                                  onClick={() => onDeleteAssessment(report)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
+                            </>
+                          ) : canAssess ? (
                             <button type="button" onClick={() => onAssess(assignment)} className="rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
                               Assess
                             </button>
@@ -1785,6 +1930,7 @@ export function TeacherAcademyPanel({
   const [detailTeacher, setDetailTeacher] = useState<AcademyTeacher | null>(null);
   const [scheduleTarget, setScheduleTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
   const [assessmentTarget, setAssessmentTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment } | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ teacher: AcademyTeacher; assignment: AcademyAssignment; report: Record<string, unknown> } | null>(null);
   const [promoteTeacher, setPromoteTeacher] = useState<AcademyTeacher | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AcademyTeacher | null>(null);
   const [assessmentDeleteTarget, setAssessmentDeleteTarget] = useState<{ teacher: AcademyTeacher; assessment: Record<string, unknown> } | null>(null);
@@ -2019,7 +2165,7 @@ export function TeacherAcademyPanel({
           }}
         />
       ) : null}
-      {detailTeacher && !scheduleTarget && !assessmentTarget && !promoteTeacher ? (
+      {detailTeacher && !scheduleTarget && !assessmentTarget && !reportTarget && !promoteTeacher ? (
         <AcademyDetailModal
           teacher={detailTeacher}
           state={state}
@@ -2031,6 +2177,10 @@ export function TeacherAcademyPanel({
           onAssess={(nextAssignment) => {
             setError("");
             setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
+          }}
+          onReview={(assignment, report) => {
+            setError("");
+            setReportTarget({ teacher: detailTeacher, assignment, report });
           }}
           onDeleteAssessment={(assessment) => {
             setError("");
@@ -2079,6 +2229,14 @@ export function TeacherAcademyPanel({
             setError("");
             setAssessmentTarget(null);
           }}
+        />
+      ) : null}
+      {reportTarget && !assessmentTarget ? (
+        <ReportModal
+          teacher={reportTarget.teacher}
+          assignment={reportTarget.assignment}
+          report={reportTarget.report}
+          onClose={() => setReportTarget(null)}
         />
       ) : null}
       {promoteTeacher && academyApi.promote ? (
@@ -2255,7 +2413,9 @@ export function TeacherAcademyPanel({
             {appointedLessons.length ? (
               <>
                 <MobileCardList className="p-3">
-                  {appointedLessons.map(({ key, teacher, assignment }) => (
+                  {appointedLessons.map(({ key, teacher, assignment }) => {
+                    const report = assessmentForAssignment(teacher, assignment);
+                    return (
                     <article key={key} className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -2264,9 +2424,15 @@ export function TeacherAcademyPanel({
                             {asString(teacher.full_name) || "Academy teacher"} · {asString(teacher.subject) || "Subject not set"}
                           </p>
                         </div>
-                        <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="shrink-0 text-[10px]">
-                          {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
-                        </StatusBadge>
+                        {report ? (
+                          <StatusBadge tone={decisionTone(report.decision)} className="shrink-0 text-[10px]">
+                            {decisionLabel(report.decision)}
+                          </StatusBadge>
+                        ) : (
+                          <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="shrink-0 text-[10px]">
+                            {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
+                          </StatusBadge>
+                        )}
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                         <div>
@@ -2274,37 +2440,49 @@ export function TeacherAcademyPanel({
                           <p className="mt-0.5 font-bold text-foreground">{dateLabel(assignment.session_datetime)}</p>
                         </div>
                         <div>
-                          <p className="font-black uppercase tracking-wide text-muted-foreground">Evaluator</p>
-                          <p className="mt-0.5 truncate font-bold text-foreground">{asString(assignment.evaluator_name) || "Not assigned"}</p>
+                          <p className="font-black uppercase tracking-wide text-muted-foreground">{report ? "Score" : "Evaluator"}</p>
+                          <p className="mt-0.5 truncate font-bold text-foreground">
+                            {report ? Number(report.weighted_overall_score || 0).toFixed(2) : asString(assignment.evaluator_name) || "Not assigned"}
+                          </p>
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {canScheduleAcademyLesson ? (
-                          <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">
-                            <CalendarClock className="h-3.5 w-3.5" />
-                            {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
+                        {report ? (
+                          <button type="button" onClick={() => setReportTarget({ teacher, assignment, report })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
+                            <Eye className="h-3.5 w-3.5" />
+                            Review
                           </button>
-                        ) : null}
-                        {canAssessAcademyLesson ? (
-                          <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
-                            <ClipboardCheck className="h-3.5 w-3.5" />
-                            Assess
-                          </button>
-                        ) : null}
+                        ) : (
+                          <>
+                            {canScheduleAcademyLesson ? (
+                              <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">
+                                <CalendarClock className="h-3.5 w-3.5" />
+                                {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
+                              </button>
+                            ) : null}
+                            {canAssessAcademyLesson ? (
+                              <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                Assess
+                              </button>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     </article>
-                  ))}
+                    );
+                  })}
                 </MobileCardList>
                 <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
                   <table className="w-full min-w-[960px] table-fixed border-collapse text-left">
                     <colgroup>
                       <col className="w-[18%]" />
-                      <col className="w-[14%]" />
-                      <col className="w-[27%]" />
                       <col className="w-[13%]" />
+                      <col className="w-[21%]" />
                       <col className="w-[12%]" />
-                      <col className="w-[8%]" />
-                      <col className="w-[8%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[9%]" />
+                      <col className="w-[16%]" />
                     </colgroup>
                     <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
                       <tr>
@@ -2340,23 +2518,66 @@ export function TeacherAcademyPanel({
                             <span className="block truncate text-xs font-bold text-[#64748B]">{asString(assignment.evaluator_name) || "Not assigned"}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
-                              {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
-                            </StatusBadge>
+                            {(() => {
+                              const report = assessmentForAssignment(teacher, assignment);
+                              if (report) {
+                                return (
+                                  <StatusBadge tone={decisionTone(report.decision)} className="text-[10px]">
+                                    {decisionLabel(report.decision)}
+                                  </StatusBadge>
+                                );
+                              }
+                              return (
+                                <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
+                                  {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
+                                </StatusBadge>
+                              );
+                            })()}
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                              {canScheduleAcademyLesson ? (
-                                <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center justify-center rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted">
-                                  {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
-                                </button>
-                              ) : null}
-                              {canAssessAcademyLesson ? (
-                                <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center justify-center rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white">
-                                  Assess
-                                </button>
-                              ) : null}
-                            </div>
+                            {(() => {
+                              const report = assessmentForAssignment(teacher, assignment);
+                              if (report) {
+                                return (
+                                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                    <span className="inline-flex h-8 items-center rounded-lg bg-primary/10 px-2.5 text-[11px] font-black text-primary">
+                                      {Number(report.weighted_overall_score || 0).toFixed(2)}
+                                    </span>
+                                    <button type="button" onClick={() => setReportTarget({ teacher, assignment, report })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                      <Eye className="h-3.5 w-3.5" />
+                                      Review
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              const rowActions: ActionMenuItem[] = [];
+                              if (canScheduleAcademyLesson && canAssessAcademyLesson) {
+                                rowActions.push({
+                                  key: "schedule",
+                                  label: assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule",
+                                  icon: <CalendarClock className="h-4 w-4" />,
+                                  onClick: () => setScheduleTarget({ teacher, assignment }),
+                                });
+                              }
+                              return (
+                                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                                  {canAssessAcademyLesson ? (
+                                    <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                      <ClipboardCheck className="h-3.5 w-3.5" />
+                                      Assess
+                                    </button>
+                                  ) : canScheduleAcademyLesson ? (
+                                    <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                      <CalendarClock className="h-3.5 w-3.5" />
+                                      {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
+                                    </button>
+                                  ) : null}
+                                  {rowActions.length ? (
+                                    <ActionMenu label={`Actions for ${asString(teacher.full_name) || "academy teacher"}`} items={rowActions} />
+                                  ) : null}
+                                </div>
+                              );
+                            })()}
                           </td>
                         </tr>
                       ))}

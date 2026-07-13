@@ -94,7 +94,6 @@ export default function AcademicDirectorAcademicWorkspace(props: AcademicWorkspa
       csrfToken={props.csrfToken}
       active={meta.active}
       sectionClassName="gap-4"
-      maxWidthClass={workspace === "timetable" ? "max-w-7xl" : "max-w-6xl"}
     >
       <PageHeader
         title={meta.title}

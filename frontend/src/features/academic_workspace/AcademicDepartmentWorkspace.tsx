@@ -618,14 +618,14 @@ export default function AcademicDepartmentWorkspace({
 
   if (isHod) {
     return (
-      <HeadOfDepartmentPageShell authLogin={authLogin} csrfToken={csrfToken} active={active} maxWidthClass="max-w-6xl">
+      <HeadOfDepartmentPageShell authLogin={authLogin} csrfToken={csrfToken} active={active}>
         {content}
       </HeadOfDepartmentPageShell>
     );
   }
 
   return (
-    <AcademicDirectorPageShell authLogin={authLogin} csrfToken={csrfToken} active={active} maxWidthClass="max-w-6xl">
+    <AcademicDirectorPageShell authLogin={authLogin} csrfToken={csrfToken} active={active}>
       {content}
     </AcademicDirectorPageShell>
   );
