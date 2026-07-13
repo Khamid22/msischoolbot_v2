@@ -433,11 +433,12 @@ def _progress_for(assignments, assessments):
         for item in assessments
         if float(item.get("weighted_overall_score") or 0) > 0
     ]
+    # Only passed lessons are "done" — a failed lesson stays next until it passes.
     next_assignment = next(
         (
             assignment
             for assignment in assignments
-            if assignment["id"] not in assessed_assignment_ids
+            if assignment["id"] not in passed_assignment_ids
             and assignment["status"] not in {"cancelled", "passed"}
         ),
         None,

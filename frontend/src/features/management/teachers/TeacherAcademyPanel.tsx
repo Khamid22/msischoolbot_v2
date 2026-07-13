@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
@@ -72,12 +72,26 @@ function decisionLabel(value: unknown) {
   return labels[asString(value)] || asString(value) || "-";
 }
 
+// The Teacher Academy stores session/assessment datetimes as school-local wall
+// clock (Asia/Tashkent) that lands in the DB labelled +00 on the UTC server. We
+// pin every display and input to that same wall clock so times never shift with
+// the viewer's browser or the Railway server timezone.
+const SCHOOL_TIME_ZONE = "Asia/Tashkent";
+const HAS_TZ_OFFSET = /[zZ]|[+-]\d\d:?\d\d$/;
+
+/** Normalize a stored datetime to a UTC-labelled instant so its wall-clock digits are stable. */
+function parseSchoolInstant(raw: string) {
+  const normalized = HAS_TZ_OFFSET.test(raw) ? raw : `${raw.replace(" ", "T")}Z`;
+  return Date.parse(normalized);
+}
+
 function dateLabel(value: unknown) {
-  const raw = asString(value);
+  const raw = asString(value).trim();
   if (!raw) return "-";
-  const parsed = Date.parse(raw);
+  const parsed = parseSchoolInstant(raw);
   if (!Number.isFinite(parsed)) return raw.replace("T", " ").slice(0, 16);
   return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
     month: "short",
     day: "2-digit",
     hour: "2-digit",
@@ -98,14 +112,20 @@ function initialsFromName(value: unknown) {
   return initials || name.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase() || "T";
 }
 
-function toDateTimeLocal(value: unknown) {
-  const raw = asString(value);
+/** Stored datetime -> "YYYY-MM-DDTHH:mm" for a datetime-local input, preserving the school wall clock. */
+function storedToInputValue(value: unknown) {
+  const raw = asString(value).trim();
   if (!raw) return "";
-  const parsed = Date.parse(raw);
+  const parsed = parseSchoolInstant(raw);
   if (!Number.isFinite(parsed)) return raw.slice(0, 16).replace(" ", "T");
-  const date = new Date(parsed);
-  const offset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  return new Date(parsed).toISOString().slice(0, 16);
+}
+
+/** Current time as school-local wall clock ("YYYY-MM-DDTHH:mm"), independent of the assessor's browser. */
+function nowSchoolInputValue() {
+  // "sv-SE" formats as "YYYY-MM-DD HH:mm:ss"; pin it to the school timezone.
+  const stamp = new Date().toLocaleString("sv-SE", { timeZone: SCHOOL_TIME_ZONE });
+  return stamp.slice(0, 16).replace(" ", "T");
 }
 
 function teacherProgress(teacher: AcademyTeacher) {
@@ -172,15 +192,38 @@ function assignmentIsScheduled(assignment: AcademyAssignment | null | undefined)
   return Boolean(asString(assignment?.session_datetime));
 }
 
+/** Decisions that count as a passed lesson (the only ones that advance progress). */
+const PASSED_DECISIONS = new Set(["passed", "ready_for_final_evaluation", "approved_for_active_teacher"]);
+
+function isPassedReport(report: Record<string, unknown> | null | undefined) {
+  return Boolean(report) && PASSED_DECISIONS.has(asString(report?.decision));
+}
+
+/** A failed lesson that has been given a new session date/time since it was last assessed. */
+function rescheduledSinceFail(assignment: AcademyAssignment, report: Record<string, unknown> | null | undefined) {
+  if (!report || isPassedReport(report)) return false;
+  const session = asString(assignment.session_datetime);
+  if (!session) return false;
+  const sessionAt = parseSchoolInstant(session);
+  const assessedAt = parseSchoolInstant(asString(report.assessment_datetime));
+  return Number.isFinite(sessionAt) && (!Number.isFinite(assessedAt) || sessionAt > assessedAt);
+}
+
 function nextAcademyAssignment(teacher: AcademyTeacher) {
   const progress = teacherProgress(teacher);
   const assignments = academyAssignments(teacher);
-  const assessedAssignmentIds = new Set(academyAssessments(teacher).map((assessment) => asNumber(assessment.lesson_assignment_id)).filter(Boolean));
+  // Only passed lessons are "done" — a failed lesson stays next until it passes.
+  const passedAssignmentIds = new Set(
+    academyAssessments(teacher)
+      .filter((assessment) => PASSED_DECISIONS.has(asString(assessment.decision)))
+      .map((assessment) => asNumber(assessment.lesson_assignment_id))
+      .filter(Boolean),
+  );
   return (
     progress.nextAssignment ||
     assignments.find((assignment) => {
       const status = asString(assignment.status);
-      return !assessedAssignmentIds.has(asNumber(assignment.id)) && !["assessed", "passed", "cancelled"].includes(status);
+      return !passedAssignmentIds.has(asNumber(assignment.id)) && !["passed", "cancelled"].includes(status);
     }) ||
     null
   );
@@ -802,7 +845,7 @@ function AssignmentModal({
   const assignments = academyAssignments(teacher);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(asNumber(assignment.id) || asNumber(assignments[0]?.id));
   const selectedAssignment = assignmentById(assignments, selectedAssignmentId);
-  const initialDateTime = toDateTimeLocal(selectedAssignment?.session_datetime);
+  const initialDateTime = storedToInputValue(selectedAssignment?.session_datetime);
   const [sessionDate, setSessionDate] = useState(initialDateTime.slice(0, 10));
   const [sessionTime, setSessionTime] = useState(initialDateTime.slice(11, 16));
   const controlClass = "h-11 w-full rounded-lg border border-foreground/10 bg-background px-3 text-sm font-semibold outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10";
@@ -810,7 +853,7 @@ function AssignmentModal({
   function handleAssignmentChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const nextAssignment = assignmentById(assignments, asNumber(event.target.value));
     setSelectedAssignmentId(asNumber(nextAssignment?.id));
-    const nextDateTime = toDateTimeLocal(nextAssignment?.session_datetime);
+    const nextDateTime = storedToInputValue(nextAssignment?.session_datetime);
     setSessionDate(nextDateTime.slice(0, 10));
     setSessionTime(nextDateTime.slice(11, 16));
   }
@@ -940,11 +983,12 @@ function AssessmentModal({
 }) {
   const isEditing = Boolean(initialReport);
   const formRef = useRef<HTMLFormElement>(null);
-  const [assessmentDate] = useState(() => {
-    const raw = asString(initialReport?.assessment_datetime);
-    const parsed = raw ? Date.parse(raw) : NaN;
-    return Number.isFinite(parsed) ? new Date(parsed) : new Date();
-  });
+  // Correcting a passed report keeps its original school-local timestamp; a fresh
+  // assessment or a re-assessment of a failed lesson stamps the school "now" so the
+  // recorded time is correct regardless of the assessor's browser timezone.
+  const [assessmentStamp] = useState(() =>
+    isEditing && isPassedReport(initialReport) ? storedToInputValue(initialReport?.assessment_datetime) : nowSchoolInputValue(),
+  );
   const [scores, setScores] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       rubric.map((item) => {
@@ -962,6 +1006,15 @@ function AssessmentModal({
   }, 0);
   const remarksClass = "min-h-10 w-full resize-none overflow-hidden rounded-lg border border-foreground/10 bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10";
 
+  // Grow prefilled textareas to fit their saved content on open (they otherwise
+  // stay a single clipped row until the evaluator types).
+  useEffect(() => {
+    formRef.current?.querySelectorAll("textarea").forEach((element) => {
+      element.style.height = "auto";
+      element.style.height = `${element.scrollHeight}px`;
+    });
+  }, []);
+
   function submitDecision(decision: "passed" | "needs_improvement") {
     const fields: Record<string, string> = {};
     if (formRef.current) {
@@ -974,7 +1027,9 @@ function AssessmentModal({
       fields[item.remarksKey] = fields[item.remarksKey] || "";
     });
     fields.lesson_assignment_id = String(asNumber(assignment.id));
-    fields.assessment_datetime = toDateTimeLocal(assessmentDate.toISOString());
+    fields.assessment_datetime = assessmentStamp;
+    // The evaluator is always the teacher's department head (subject HOD).
+    fields.evaluator_id = String(asNumber(teacher.department_head_id) || "");
     fields.decision = decision;
     onSubmit(asNumber(teacher.id), fields);
   }
@@ -1001,7 +1056,7 @@ function AssessmentModal({
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-wide text-primary">Date</p>
-              <p className="mt-1 truncate text-sm font-black text-foreground">{dateLabel(assessmentDate.toISOString())}</p>
+              <p className="mt-1 truncate text-sm font-black text-foreground">{dateLabel(assessmentStamp)}</p>
             </div>
           </div>
 
@@ -1336,12 +1391,14 @@ function AcademyDetailModal({
   onPreview,
   onAssess,
   onReview,
+  onReschedule,
   onDeleteAssessment,
   onPromote,
   onSyncLessons,
   allowTeacherPreview,
   canEditLessons,
   canAssess,
+  canSchedule,
   canDeleteAssessment,
   canPromote,
 }: {
@@ -1353,12 +1410,14 @@ function AcademyDetailModal({
   onPreview: () => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onReview: (assignment: AcademyAssignment, report: Record<string, unknown>) => void;
+  onReschedule: (assignment: AcademyAssignment) => void;
   onDeleteAssessment: (assessment: Record<string, unknown>) => void;
   onPromote: () => void;
   onSyncLessons: (selectedIds: number[]) => Promise<boolean>;
   allowTeacherPreview: boolean;
   canEditLessons: boolean;
   canAssess: boolean;
+  canSchedule: boolean;
   canDeleteAssessment: boolean;
   canPromote: boolean;
 }) {
@@ -1426,8 +1485,8 @@ function AcademyDetailModal({
     <ModalShell title={asString(teacher.full_name)} subtitle={`${asString(teacher.subject)} · ${statusLabel(teacher.academy_status)}`} onClose={onClose} wide>
       <ModalBody>
         <div className="grid gap-2 sm:grid-cols-4">
-          {metric("Progress", `${progress.assessed}/${progress.target}`, "assessed lessons")}
-          {metric("Passed", progress.passed, "lessons accepted")}
+          {metric("Progress", `${progress.passed}/${progress.target}`, "passed lessons")}
+          {metric("Assessed", progress.assessed, "lessons evaluated")}
           {metric("Average", progress.average == null ? "-" : progress.average.toFixed(2), "weighted score")}
           {metric("Latest", progress.latest == null ? "-" : progress.latest.toFixed(2), "last report")}
         </div>
@@ -1510,7 +1569,7 @@ function AcademyDetailModal({
                         <div className="min-w-0">
                           <p className="text-sm font-bold">{asNumber(assignment.sequence_no)}. {asString(assignment.lesson_number)} · {asString(assignment.lesson_topic)}</p>
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            {dateLabel(assignment.session_datetime)} · {asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
+                            {dateLabel(report ? report.assessment_datetime : assignment.session_datetime)} · {asString(teacher.department_head_name) || asString(assignment.evaluator_name) || "No evaluator"} · {asString(assignment.status)}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
@@ -1527,6 +1586,17 @@ function AcademyDetailModal({
                                 <Eye className="h-3.5 w-3.5" />
                                 Review
                               </button>
+                              {!isPassedReport(report) && rescheduledSinceFail(assignment, report) && canAssess ? (
+                                <button type="button" onClick={() => onReview(assignment, report)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                                  <ClipboardCheck className="h-3.5 w-3.5" />
+                                  Re-assess
+                                </button>
+                              ) : !isPassedReport(report) && canSchedule ? (
+                                <button type="button" onClick={() => onReschedule(assignment)} className="inline-flex items-center gap-1 rounded-md bg-foreground px-2.5 py-1 text-[11px] font-bold text-background">
+                                  <CalendarClock className="h-3.5 w-3.5" />
+                                  Re-schedule
+                                </button>
+                              ) : null}
                               {canDeleteAssessment ? (
                                 <button
                                   type="button"
@@ -1549,7 +1619,7 @@ function AcademyDetailModal({
                       {report ? (
                         <p className="mt-1 text-[11px] font-bold">
                           {decisionLabel(report.decision)}
-                          <span className="font-semibold text-muted-foreground"> · {dateLabel(report.assessment_datetime)} · {asString(report.evaluator_name) || "Evaluator not set"}</span>
+                          <span className="font-semibold text-muted-foreground"> · {dateLabel(report.assessment_datetime)} · {asString(teacher.department_head_name) || asString(report.evaluator_name) || "Evaluator not set"}</span>
                         </p>
                       ) : null}
                       {report && (asString(report.areas_for_improvement) || asString(report.strengths)) ? (
@@ -1635,7 +1705,7 @@ function AcademyTeacherCard({
   const nextAssignment = nextAcademyAssignment(teacher);
   const login = asString(teacher.login);
   const status = asString(teacher.academy_status);
-  const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
+  const percent = progress.target ? Math.min(100, Math.round((progress.passed / progress.target) * 100)) : 0;
   const scheduled = assignmentIsScheduled(nextAssignment);
   const primaryAction = nextAssignment && canAssess
     ? {
@@ -1723,7 +1793,7 @@ function AcademyTeacherCard({
             <span className="text-[10px] font-black text-foreground">{percent}%</span>
           </div>
           <ProgressBar value={percent} className="h-1.5 bg-muted" />
-          <p className="mt-1 text-xs font-black text-foreground">{progress.assessed}/{progress.target}</p>
+          <p className="mt-1 text-xs font-black text-foreground">{progress.passed}/{progress.target}</p>
         </div>
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Next</p>
@@ -1907,11 +1977,18 @@ export function TeacherAcademyPanel({
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const isAcademicDirectorMode = adminMode === "academic_director" || authRole === "academic_director";
 
+  // Highest performers first: rank by weighted average score, teachers without a
+  // score last, then a stable name tiebreak.
   const sortedTeachers = [...academyTeachers].sort((left, right) => {
-    const leftReady = asString(left.academy_status) === "ready_for_active_teacher" ? 1 : 0;
-    const rightReady = asString(right.academy_status) === "ready_for_active_teacher" ? 1 : 0;
-    if (leftReady !== rightReady) return rightReady - leftReady;
-    return asString(right.updated_at).localeCompare(asString(left.updated_at));
+    const leftAvg = teacherProgress(left).average;
+    const rightAvg = teacherProgress(right).average;
+    if (leftAvg == null && rightAvg == null) {
+      return asString(left.full_name).localeCompare(asString(right.full_name));
+    }
+    if (leftAvg == null) return 1;
+    if (rightAvg == null) return -1;
+    if (leftAvg !== rightAvg) return rightAvg - leftAvg;
+    return asString(left.full_name).localeCompare(asString(right.full_name));
   });
   const activeTeachers = useMemo(() => {
     const rows = Array.isArray(state.teachers)
@@ -1929,25 +2006,78 @@ export function TeacherAcademyPanel({
     () =>
       academyTeachers
         .flatMap((teacher) =>
-          academyAssignments(teacher).map((assignment) => ({
-            key: `${asNumber(teacher.id)}:${asNumber(assignment.id)}`,
-            teacher,
-            assignment,
-          })),
+          academyAssignments(teacher).map((assignment) => {
+            const report = assessmentForAssignment(teacher, assignment);
+            // Assessed rows carry a recorded (correct) date; otherwise use the scheduled session.
+            const dateSource = asString(report?.assessment_datetime) || asString(assignment.session_datetime);
+            const at = parseSchoolInstant(dateSource);
+            return {
+              key: `${asNumber(teacher.id)}:${asNumber(assignment.id)}`,
+              teacher,
+              assignment,
+              report,
+              at: Number.isFinite(at) ? at : null,
+            };
+          }),
         )
         .sort((left, right) => {
-          const leftDate = Date.parse(asString(left.assignment.session_datetime));
-          const rightDate = Date.parse(asString(right.assignment.session_datetime));
-          const leftHasDate = Number.isFinite(leftDate);
-          const rightHasDate = Number.isFinite(rightDate);
-          if (leftHasDate && rightHasDate && leftDate !== rightDate) return leftDate - rightDate;
-          if (leftHasDate !== rightHasDate) return leftHasDate ? -1 : 1;
+          // Most recent first; rows with no date sink to the bottom.
+          if (left.at != null && right.at != null && left.at !== right.at) return right.at - left.at;
+          if ((left.at == null) !== (right.at == null)) return left.at == null ? 1 : -1;
           const teacherCompare = asString(left.teacher.full_name).localeCompare(asString(right.teacher.full_name));
           if (teacherCompare !== 0) return teacherCompare;
           return asNumber(left.assignment.sequence_no) - asNumber(right.assignment.sequence_no);
         }),
     [academyTeachers],
   );
+
+  // Actions for one appointed lesson row, shared by the desktop table, the mobile
+  // cards and the detail modal. Encodes the retry flow: un-assessed lessons can be
+  // assessed straight away (flexible); passed lessons only offer Review; a failed
+  // lesson must be re-scheduled, and only then can be re-assessed.
+  type LessonAction = { label: string; icon: ReactNode; onClick: () => void; tone?: "primary" | "muted" };
+  function buildLessonActions(
+    teacher: AcademyTeacher,
+    assignment: AcademyAssignment,
+    report: Record<string, unknown> | null,
+  ): { scoreText: string | null; primary: LessonAction | null; menu: ActionMenuItem[] } {
+    const scoreText = report ? Number(report.weighted_overall_score || 0).toFixed(2) : null;
+    const review = () => setReportTarget({ teacher, assignment, report: report as Record<string, unknown> });
+    const reschedule = () => setScheduleTarget({ teacher, assignment });
+    const reviewMenu: ActionMenuItem = { key: "review", label: "Review report", icon: <Eye className="h-4 w-4" />, onClick: review };
+    const rescheduleMenu: ActionMenuItem = {
+      key: "reschedule",
+      label: assignmentIsScheduled(assignment) ? "Re-schedule" : "Schedule",
+      icon: <CalendarClock className="h-4 w-4" />,
+      onClick: reschedule,
+    };
+
+    if (!report) {
+      const menu: ActionMenuItem[] = canScheduleAcademyLesson && canAssessAcademyLesson ? [rescheduleMenu] : [];
+      let primary: LessonAction | null = null;
+      if (canAssessAcademyLesson) {
+        primary = { label: "Assess", icon: <ClipboardCheck className="h-3.5 w-3.5" />, onClick: () => setAssessmentTarget({ teacher, assignment }), tone: "primary" };
+      } else if (canScheduleAcademyLesson) {
+        primary = { label: assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule", icon: <CalendarClock className="h-3.5 w-3.5" />, onClick: reschedule, tone: "primary" };
+      }
+      return { scoreText, primary, menu };
+    }
+
+    if (isPassedReport(report)) {
+      return { scoreText, primary: { label: "Review", icon: <Eye className="h-3.5 w-3.5" />, onClick: review, tone: "primary" }, menu: [] };
+    }
+
+    // Failed (needs improvement): re-schedule, then re-assess.
+    if (rescheduledSinceFail(assignment, report) && canAssessAcademyLesson) {
+      const menu: ActionMenuItem[] = [reviewMenu];
+      if (canScheduleAcademyLesson) menu.push(rescheduleMenu);
+      return { scoreText, primary: { label: "Re-assess", icon: <ClipboardCheck className="h-3.5 w-3.5" />, onClick: review, tone: "primary" }, menu };
+    }
+    if (canScheduleAcademyLesson) {
+      return { scoreText, primary: { label: "Re-schedule", icon: <CalendarClock className="h-3.5 w-3.5" />, onClick: reschedule, tone: "primary" }, menu: [reviewMenu] };
+    }
+    return { scoreText, primary: { label: "Review", icon: <Eye className="h-3.5 w-3.5" />, onClick: review, tone: "primary" }, menu: [] };
+  }
 
   function copyLogin(login: string) {
     const normalizedLogin = login.trim();
@@ -2094,6 +2224,10 @@ export function TeacherAcademyPanel({
             setError("");
             setReportTarget({ teacher: detailTeacher, assignment, report });
           }}
+          onReschedule={(assignment) => {
+            setError("");
+            setScheduleTarget({ teacher: detailTeacher, assignment });
+          }}
           onDeleteAssessment={(assessment) => {
             setError("");
             setAssessmentDeleteTarget({ teacher: detailTeacher, assessment });
@@ -2105,6 +2239,7 @@ export function TeacherAcademyPanel({
           onSyncLessons={(selectedIds) => syncAcademyLessons(detailTeacher, selectedIds)}
           canEditLessons={canEditAcademyLessons}
           canAssess={canAssessAcademyLesson}
+          canSchedule={canScheduleAcademyLesson}
           canDeleteAssessment={canDeleteAssessmentReport}
           canPromote={canPromoteAcademyTeacher}
         />
@@ -2335,8 +2470,8 @@ export function TeacherAcademyPanel({
             {appointedLessons.length ? (
               <>
                 <MobileCardList className="p-3">
-                  {appointedLessons.map(({ key, teacher, assignment }) => {
-                    const report = assessmentForAssignment(teacher, assignment);
+                  {appointedLessons.map(({ key, teacher, assignment, report }) => {
+                    const actions = buildLessonActions(teacher, assignment, report);
                     return (
                     <article key={key} className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
@@ -2356,40 +2491,35 @@ export function TeacherAcademyPanel({
                           </StatusBadge>
                         )}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                         <div>
                           <p className="font-black uppercase tracking-wide text-muted-foreground">Time</p>
-                          <p className="mt-0.5 font-bold text-foreground">{dateLabel(assignment.session_datetime)}</p>
+                          <p className="mt-0.5 font-bold text-foreground">{dateLabel(report ? report.assessment_datetime : assignment.session_datetime)}</p>
                         </div>
                         <div>
-                          <p className="font-black uppercase tracking-wide text-muted-foreground">{report ? "Score" : "Evaluator"}</p>
-                          <p className="mt-0.5 truncate font-bold text-foreground">
-                            {report ? Number(report.weighted_overall_score || 0).toFixed(2) : asString(assignment.evaluator_name) || "Not assigned"}
-                          </p>
+                          <p className="font-black uppercase tracking-wide text-muted-foreground">Evaluator</p>
+                          <p className="mt-0.5 truncate font-bold text-foreground">{asString(teacher.department_head_name) || asString(assignment.evaluator_name) || "Not assigned"}</p>
+                        </div>
+                        <div>
+                          <p className="font-black uppercase tracking-wide text-muted-foreground">Score</p>
+                          <p className="mt-0.5 font-bold text-foreground">{actions.scoreText || "-"}</p>
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {report ? (
-                          <button type="button" onClick={() => setReportTarget({ teacher, assignment, report })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
-                            <Eye className="h-3.5 w-3.5" />
-                            Review
+                        {actions.primary ? (
+                          <button type="button" onClick={actions.primary.onClick} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
+                            {actions.primary.icon}
+                            {actions.primary.label}
                           </button>
-                        ) : (
-                          <>
-                            {canScheduleAcademyLesson ? (
-                              <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">
-                                <CalendarClock className="h-3.5 w-3.5" />
-                                {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
-                              </button>
-                            ) : null}
-                            {canAssessAcademyLesson ? (
-                              <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-bold text-background">
-                                <ClipboardCheck className="h-3.5 w-3.5" />
-                                Assess
-                              </button>
-                            ) : null}
-                          </>
-                        )}
+                        ) : null}
+                        {actions.menu.map((item) => (
+                          "separator" in item ? null : (
+                            <button key={item.key} type="button" onClick={item.onClick} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/10 px-3 text-xs font-bold hover:bg-muted">
+                              {item.icon}
+                              {item.label}
+                            </button>
+                          )
+                        ))}
                       </div>
                     </article>
                     );
@@ -2416,7 +2546,9 @@ export function TeacherAcademyPanel({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#DDE4EF] bg-white">
-                      {appointedLessons.map(({ key, teacher, assignment }, index) => (
+                      {appointedLessons.map(({ key, teacher, assignment, report }, index) => {
+                        const actions = buildLessonActions(teacher, assignment, report);
+                        return (
                         <tr
                           key={key}
                           className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-[#FAFBFE] motion-reduce:animate-none"
@@ -2434,75 +2566,43 @@ export function TeacherAcademyPanel({
                             <p className="line-clamp-2 text-xs font-black text-[#0F172A]">{assignmentTitle(assignment)}</p>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <span className="block text-xs font-bold text-[#64748B]">{dateLabel(assignment.session_datetime)}</span>
+                            <span className="block text-xs font-bold text-[#64748B]">{dateLabel(report ? report.assessment_datetime : assignment.session_datetime)}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(assignment.evaluator_name) || "Not assigned"}</span>
+                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(teacher.department_head_name) || asString(assignment.evaluator_name) || "Not assigned"}</span>
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            {(() => {
-                              const report = assessmentForAssignment(teacher, assignment);
-                              if (report) {
-                                return (
-                                  <StatusBadge tone={decisionTone(report.decision)} className="text-[10px]">
-                                    {decisionLabel(report.decision)}
-                                  </StatusBadge>
-                                );
-                              }
-                              return (
-                                <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
-                                  {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
-                                </StatusBadge>
-                              );
-                            })()}
+                            {report ? (
+                              <StatusBadge tone={decisionTone(report.decision)} className="text-[10px]">
+                                {decisionLabel(report.decision)}
+                              </StatusBadge>
+                            ) : (
+                              <StatusBadge tone={assignmentIsScheduled(assignment) ? "success" : "info"} className="text-[10px]">
+                                {assignmentIsScheduled(assignment) ? "Scheduled" : "Appointed"}
+                              </StatusBadge>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 align-middle">
-                            {(() => {
-                              const report = assessmentForAssignment(teacher, assignment);
-                              if (report) {
-                                return (
-                                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                    <span className="inline-flex h-8 items-center rounded-lg bg-primary/10 px-2.5 text-[11px] font-black text-primary">
-                                      {Number(report.weighted_overall_score || 0).toFixed(2)}
-                                    </span>
-                                    <button type="button" onClick={() => setReportTarget({ teacher, assignment, report })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                      <Eye className="h-3.5 w-3.5" />
-                                      Review
-                                    </button>
-                                  </div>
-                                );
-                              }
-                              const rowActions: ActionMenuItem[] = [];
-                              if (canScheduleAcademyLesson && canAssessAcademyLesson) {
-                                rowActions.push({
-                                  key: "schedule",
-                                  label: assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule",
-                                  icon: <CalendarClock className="h-4 w-4" />,
-                                  onClick: () => setScheduleTarget({ teacher, assignment }),
-                                });
-                              }
-                              return (
-                                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                  {canAssessAcademyLesson ? (
-                                    <button type="button" onClick={() => setAssessmentTarget({ teacher, assignment })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                      <ClipboardCheck className="h-3.5 w-3.5" />
-                                      Assess
-                                    </button>
-                                  ) : canScheduleAcademyLesson ? (
-                                    <button type="button" onClick={() => setScheduleTarget({ teacher, assignment })} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
-                                      <CalendarClock className="h-3.5 w-3.5" />
-                                      {assignmentIsScheduled(assignment) ? "Reschedule" : "Schedule"}
-                                    </button>
-                                  ) : null}
-                                  {rowActions.length ? (
-                                    <ActionMenu label={`Actions for ${asString(teacher.full_name) || "academy teacher"}`} items={rowActions} />
-                                  ) : null}
-                                </div>
-                              );
-                            })()}
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                              {actions.scoreText ? (
+                                <span className="inline-flex h-8 items-center rounded-lg bg-primary/10 px-2.5 text-[11px] font-black text-primary">
+                                  {actions.scoreText}
+                                </span>
+                              ) : null}
+                              {actions.primary ? (
+                                <button type="button" onClick={actions.primary.onClick} className="inline-flex h-8 min-w-[6rem] items-center justify-center gap-1 rounded-lg bg-[#0F172A] px-2.5 text-[11px] font-bold text-white transition hover:-translate-y-px hover:shadow-card active:scale-[0.98] motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:active:scale-100">
+                                  {actions.primary.icon}
+                                  {actions.primary.label}
+                                </button>
+                              ) : null}
+                              {actions.menu.length ? (
+                                <ActionMenu label={`Actions for ${asString(teacher.full_name) || "academy teacher"}`} items={actions.menu} />
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </ResponsiveTable>
@@ -2657,7 +2757,7 @@ export function TeacherAcademyPanel({
                     {sortedTeachers.map((teacher, index) => {
                       const progress = teacherProgress(teacher);
                       const nextAssignment = nextAcademyAssignment(teacher);
-                      const percent = progress.target ? Math.min(100, Math.round((progress.assessed / progress.target) * 100)) : 0;
+                      const percent = progress.target ? Math.min(100, Math.round((progress.passed / progress.target) * 100)) : 0;
                       const status = asString(teacher.academy_status);
                       const login = asString(teacher.login);
                       const scheduled = assignmentIsScheduled(nextAssignment);
@@ -2740,7 +2840,7 @@ export function TeacherAcademyPanel({
                           <td className="px-3 py-2.5 align-middle">
                             <div className="min-w-0">
                               <div className="mb-1 flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-black text-[#0F172A]">{progress.assessed}/{progress.target}</span>
+                                <span className="text-[11px] font-black text-[#0F172A]">{progress.passed}/{progress.target}</span>
                                 <span className="text-[10px] font-bold text-[#64748B]">{percent}%</span>
                               </div>
                               <ProgressBar value={percent} className="h-1.5 bg-[#EEF2F7]" fillClassName="bg-[#3D5AEA]" />
