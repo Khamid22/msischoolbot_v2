@@ -166,3 +166,15 @@ def test_frontend_uses_month_navigation_and_stable_lesson_ids():
     assert "attendanceByLessonId" in source
     assert "homeworkByLessonId" in source
     assert "unscheduledLessonCount" in source
+
+
+def test_gradebook_charts_are_compact_animated_and_motion_safe():
+    source = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(
+        encoding="utf-8"
+    )
+
+    assert "min-h-[500px]" not in source
+    assert "h-[clamp(19rem,46dvh,32rem)]" in source
+    assert 'key={`exam-chart-${selectedExamTypeValue}`}' in source
+    assert "isAnimationActive={!prefersReducedMotion}" in source
+    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in source

@@ -313,18 +313,19 @@ export function ExamViewSwitcher({
   onChange: (value: "chart" | "table") => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/50 p-0.5">
+    <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/50 p-0.5 shadow-sm">
       {([
-        { key: "chart", label: "Chart", icon: <BarChartIcon className="h-3.5 w-3.5" /> },
-        { key: "table", label: "Table", icon: <Table2 className="h-3.5 w-3.5" /> },
+        { key: "chart", label: "Chart", icon: <BarChartIcon className="h-3 w-3" /> },
+        { key: "table", label: "Table", icon: <Table2 className="h-3 w-3" /> },
       ] as const).map((option) => {
         const active = value === option.key;
         return (
           <button
             key={option.key}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(option.key)}
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold transition-[transform,background-color,color,box-shadow] hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+            className={`inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 text-[11px] font-bold transition-[transform,background-color,color,box-shadow] duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-8 motion-reduce:transition-none motion-reduce:active:scale-100 ${
               active ? "bg-surface text-foreground shadow-card" : "text-muted-foreground hover:bg-surface/70 hover:text-foreground"
             }`}
           >

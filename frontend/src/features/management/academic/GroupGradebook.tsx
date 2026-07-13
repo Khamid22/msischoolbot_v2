@@ -70,6 +70,23 @@ function currentMonthKey() {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = (event: MediaQueryListEvent) => setReduced(event.matches);
+    setReduced(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}
+
 function CompactChartTooltip({
   active,
   label,
@@ -172,6 +189,7 @@ export function GroupGradebook({
   const { toast: setupToast, showToast: showSetupToast } = useFloatingToast();
   const [examType, setExamType] = useState("all");
   const [examDisplay, setExamDisplay] = useState<"chart" | "table">("chart");
+  const prefersReducedMotion = usePrefersReducedMotion();
   const popRef = useRef<HTMLDivElement>(null);
   const gradebookCacheRef = useRef(new Map<string, GradebookData>());
   const loadRequestRef = useRef(0);
@@ -965,7 +983,7 @@ export function GroupGradebook({
     : 0;
   const detailMetricClass = `rounded-lg border border-foreground/8 bg-background p-3 shadow-sm ${motion.card}`;
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
-  const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
+  const chartPanelClass = `rounded-xl border border-foreground/8 bg-gradient-to-b from-background to-muted/20 p-3 shadow-sm transition-shadow duration-200 hover:shadow-card ${motion.panel}`;
   return (
     <div className={`w-full min-w-0 max-w-full space-y-3 overflow-x-hidden ${motion.panel}`} aria-busy={loading}>
       <FloatingToast toast={setupToast} />
@@ -1202,20 +1220,20 @@ export function GroupGradebook({
               </div>
               {hasAcademicIndicatorData ? (
                 <div className={`max-w-full overflow-x-auto pb-1 ${motion.panel}`}>
-                  <div className="h-[clamp(22rem,55dvh,42rem)]" style={{ minWidth: academicChartMinWidth }}>
+                  <div className="h-[clamp(18rem,44dvh,30rem)]" style={{ minWidth: academicChartMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={academicIndicatorData} barCategoryGap="18%" barGap={3} margin={{ top: 30, right: 10, left: 4, bottom: 44 }}>
+                      <BarChart key={`academic-chart-${selectedLessonMonth}`} data={academicIndicatorData} barCategoryGap="18%" barGap={3} margin={{ top: 28, right: 10, left: 4, bottom: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
-                        <XAxis dataKey="name" interval={0} height={58} tick={<StudentNameTick />} tickLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <XAxis dataKey="name" interval={0} height={44} tick={<StudentNameTick />} tickLine={false} stroke="hsl(var(--muted-foreground))" />
                         <YAxis domain={[0, 9]} tickCount={10} hide />
                         <YAxis yAxisId="ar" orientation="right" domain={[0, 100]} tickCount={6} hide />
                         <Tooltip cursor={{ fill: "hsl(var(--primary) / 0.06)" }} wrapperClassName="!outline-none" content={<CompactChartTooltip percentKeys={["AR"]} />} />
                         <Legend verticalAlign="top" height={28} />
-                        <Bar dataKey="AAP" name="AAP" fill="#3b82f6" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive animationDuration={650} animationEasing="ease-out">
+                        <Bar dataKey="AAP" name="AAP" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={28} isAnimationActive={!prefersReducedMotion} animationBegin={60} animationDuration={480} animationEasing="ease-out">
                           <LabelList dataKey="AAP" position="top" fontSize={11} fontWeight={700} fill="#2563eb" formatter={formatBarLabel} />
                           {academicIndicatorData.map((entry) => <Cell key={`academic-aap-${entry.enrollmentId}`} fill={entry.isLowAAP ? "#ef4444" : "#3b82f6"} />)}
                         </Bar>
-                        <Bar yAxisId="ar" dataKey="AR" name="AR" fill="#10b981" radius={[5, 5, 0, 0]} maxBarSize={28} isAnimationActive animationBegin={90} animationDuration={650} animationEasing="ease-out">
+                        <Bar yAxisId="ar" dataKey="AR" name="AR" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={28} isAnimationActive={!prefersReducedMotion} animationBegin={120} animationDuration={480} animationEasing="ease-out">
                           <LabelList dataKey="AR" position="top" fontSize={11} fontWeight={700} fill="#059669" formatter={formatPercentLabel} />
                           {academicIndicatorData.map((entry) => <Cell key={`academic-ar-${entry.enrollmentId}`} fill={entry.isLowAR ? "#f59e0b" : "#10b981"} />)}
                         </Bar>
@@ -1287,19 +1305,26 @@ export function GroupGradebook({
                 </div>
                 {examDisplay === "chart" ? (
                   hasFilteredExamScores ? (
-                    <div className={`overflow-hidden pb-1 ${motion.panel}`}>
-                      <div className="h-[calc(var(--tg-app-height)-30rem)] min-h-[500px] w-full">
+                    <div className={`overflow-hidden ${motion.panel}`}>
+                      <div className="h-[clamp(19rem,46dvh,32rem)] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
+                            key={`exam-chart-${selectedExamTypeValue}`}
                             data={studentExamData}
                             barCategoryGap="34%"
-                            margin={{ top: 30, right: 10, left: 4, bottom: 44 }}
+                            margin={{ top: 28, right: 10, left: 4, bottom: 8 }}
                           >
+                            <defs>
+                              <linearGradient id="exam-score-gradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#60a5fa" />
+                                <stop offset="100%" stopColor="#2563eb" />
+                              </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
                             <XAxis
                               dataKey="name"
                               interval={0}
-                              height={58}
+                              height={44}
                               tick={<StudentNameTick />}
                               tickLine={false}
                               stroke="hsl(var(--muted-foreground))"
@@ -1312,12 +1337,14 @@ export function GroupGradebook({
                             />
                             <Bar
                               dataKey="chartScore"
-                              fill="#3b82f6"
-                              radius={[5, 5, 0, 0]}
+                              fill="url(#exam-score-gradient)"
+                              radius={[7, 7, 0, 0]}
                               name="Score"
                               maxBarSize={34}
-                              isAnimationActive
-                              animationDuration={650}
+                              activeBar={{ fill: "#2563eb", stroke: "#1d4ed8", strokeWidth: 1 }}
+                              isAnimationActive={!prefersReducedMotion}
+                              animationBegin={60}
+                              animationDuration={480}
                               animationEasing="ease-out"
                             >
                               <LabelList dataKey="chartScore" position="top" fontSize={11} fontWeight={700} fill="#1e2d4a" formatter={formatBarLabel} />

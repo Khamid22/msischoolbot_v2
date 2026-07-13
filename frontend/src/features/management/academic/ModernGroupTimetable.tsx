@@ -17,6 +17,7 @@ import {
 import { routes } from "@/shared/lib/routes";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 import { queryClient } from "@/shared/api/queryClient";
+import { motion } from "@/shared/lib/motion";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { calculateAdaptiveHourRange } from "./timetableMath";
@@ -254,7 +255,7 @@ function AgendaView({ items, onOpen }: { items: TimetableItem[]; onOpen: (item: 
     <div
       ref={scrollRef}
       onScroll={(event) => sessionStorage.setItem("group-timetable-agenda-scroll", String(event.currentTarget.scrollTop))}
-      className="miniapp-scroll max-h-[68dvh] space-y-5 overflow-y-auto px-3 py-4 sm:px-5"
+      className="miniapp-scroll max-h-[68dvh] space-y-5 overflow-y-auto px-3 py-4 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none sm:px-5"
     >
       {grouped.map(([day, lessons]) => {
         const isToday = day === today;
@@ -336,7 +337,7 @@ function WeekCalendar({
   const today = schoolTodayKey();
 
   return (
-    <div>
+    <div className="animate-in fade-in duration-300 motion-reduce:animate-none">
       {mobile ? (
         <div className="grid grid-cols-7 border-b border-foreground/8 px-2 py-2">
           {weekDays.map((day) => {
@@ -406,7 +407,7 @@ function MonthCalendar({ cursorKey, items, onSelectDay }: { cursorKey: string; i
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
   const today = schoolTodayKey();
   return (
-    <div className="miniapp-table-scroll overflow-x-auto p-2 sm:p-4">
+    <div className="miniapp-table-scroll overflow-x-auto p-2 animate-in fade-in duration-300 motion-reduce:animate-none sm:p-4">
       <div className="min-w-[42rem]">
         <div className="grid grid-cols-7">{WEEKDAYS.map((day) => <div key={day} className="pb-2 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{day}</div>)}</div>
         <div className="grid grid-cols-7 overflow-hidden rounded-xl border border-foreground/8">
@@ -674,29 +675,29 @@ export function ModernGroupTimetable({
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><Clock3 className="h-3.5 w-3.5" />{summary.time}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><MapPin className="h-3.5 w-3.5" />{summary.room}</span>
             </div>
-            <button type="button" onClick={onChangeSchedule} className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Settings className="h-3.5 w-3.5" />Configure</button>
+            <button type="button" onClick={onChangeSchedule} className={`ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}><Settings className="h-3.5 w-3.5" />Configure</button>
           </div>
         </div>
         <div className="flex flex-col gap-3 border-b border-foreground/8 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:h-9 sm:w-9 ${motion.button}`}><ChevronLeft className="h-4 w-4" /></button>
             <label className="relative min-w-0">
               <span className="sr-only">Select timetable month</span>
               <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <select value={selectedMonth} onChange={(event) => selectMonth(event.target.value)} className="h-11 w-[10.75rem] cursor-pointer appearance-none rounded-xl border border-foreground/10 bg-surface pl-10 pr-9 text-sm font-black text-foreground outline-none transition-colors hover:bg-muted/50 focus:border-primary/30 focus:ring-2 focus:ring-primary/20 sm:w-[13.5rem]">
+              <select value={selectedMonth} onChange={(event) => selectMonth(event.target.value)} className="h-11 w-[10.75rem] cursor-pointer appearance-none rounded-xl border border-foreground/10 bg-surface pl-10 pr-9 text-sm font-black text-foreground outline-none transition-colors hover:bg-muted/50 focus:border-primary/30 focus:ring-2 focus:ring-primary/20 sm:h-9 sm:w-[12rem]">
                 {monthOptions.map((month) => <option key={monthKey(month)} value={monthKey(month)}>{monthLabel(month)}</option>)}
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground" />
             </label>
-            <button type="button" onClick={() => movePeriod(1)} aria-label="Next period" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><ChevronRight className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className="min-h-11 rounded-lg border border-foreground/10 px-3 text-xs font-bold transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">Today</button>
+            <button type="button" onClick={() => movePeriod(1)} aria-label="Next period" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:h-9 sm:w-9 ${motion.button}`}><ChevronRight className="h-4 w-4" /></button>
+            <button type="button" onClick={() => setCursorKey(schoolTodayKey())} className={`min-h-11 rounded-lg border border-foreground/10 px-2.5 text-[11px] font-bold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}>Today</button>
           </div>
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">
-              {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-11 rounded-md px-4 text-xs font-bold capitalize ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
+              {(["agenda", "calendar"] as PrimaryMode[]).map((value) => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)} className={`min-h-11 rounded-md px-3 text-[11px] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${mode === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{value}</button>)}
             </div>
-            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-11 rounded-md px-3 text-xs font-bold capitalize ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
-            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-11 rounded-lg border px-3 text-xs font-bold ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
+            {mode === "calendar" ? <div className="inline-flex rounded-lg border border-foreground/10 bg-muted/40 p-0.5">{(["week", "month"] as CalendarMode[]).map((value) => <button key={value} type="button" onClick={() => setCalendarMode(value)} aria-pressed={calendarMode === value} className={`min-h-11 rounded-md px-2.5 text-[11px] font-bold capitalize focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${calendarMode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>{value}</button>)}</div> : null}
+            {mode === "calendar" && calendarMode === "week" ? <button type="button" aria-pressed={fullDay} onClick={() => setFullDay((value) => !value)} className={`min-h-11 rounded-lg border px-2.5 text-[11px] font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-9 ${motion.button} ${fullDay ? "border-primary/30 bg-primary/8 text-primary" : "border-foreground/10 text-muted-foreground"}`}>{fullDay ? "Adaptive hours" : "Show full day"}</button> : null}
           </div>
         </div>
         {Number(query.data?.unscheduledLessonCount || 0) > 0 ? (
