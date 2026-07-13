@@ -16,6 +16,8 @@ export const apiRoutes = {
   academicDirectorHeadOfDepartmentCreate: "/api/v1/academic-director/head-of-departments",
   academicDirectorHeadOfDepartmentPasswordReset: (accountId: number | string) =>
     `/api/v1/academic-director/head-of-departments/${accountId}/reset-password`,
+  academicDirectorTeacherPasswordReset: (teacherId: number | string) =>
+    `/api/v1/academic-director/teachers/${teacherId}/reset-password`,
   academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy",
   academicDirectorTeacherAcademyAssignmentUpdate: (assignmentId: number | string) =>
     `/api/v1/academic-director/teacher-academy/assignments/${assignmentId}`,

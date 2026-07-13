@@ -67,6 +67,7 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/lessons | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
+/api/v1/academic-director/teachers/{teacher_id}/reset-password | POST
 /api/v1/admin/academic/attendance | POST
 /api/v1/admin/academic/classes | POST
 /api/v1/admin/academic/coins | POST

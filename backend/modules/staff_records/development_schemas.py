@@ -174,6 +174,15 @@ class TeacherAcademyMutationResult(BaseModel):
     credentials: AcademyCredentials | None = None
 
 
+class TeacherPasswordResetResult(BaseModel):
+    message: str
+    login: str
+    temporary_password: str
+    display_name: str = ""
+    must_change_password: bool = True
+    updated_at: str = ""
+
+
 def form_list(value: Any) -> list[str]:
     return _split_form_items(value)
 
@@ -188,6 +197,7 @@ __all__ = [
     "PromoteAcademyTeacherForm",
     "SyncAcademyLessonsForm",
     "TeacherAcademyMutationResult",
+    "TeacherPasswordResetResult",
     "UpdateAcademyAssignmentForm",
     "UpdateAcademyStatusForm",
     "form_list",

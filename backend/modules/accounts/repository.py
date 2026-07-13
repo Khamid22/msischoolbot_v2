@@ -146,6 +146,30 @@ def change_account_password(
     return int(row["session_version"] or 0) if row else 0
 
 
+def reset_account_password(
+    conn: Any,
+    *,
+    account_id: int,
+    password_hash: str,
+) -> int:
+    """Replace a forgotten password and revoke existing account sessions."""
+
+    row = conn.execute(
+        """
+        UPDATE msi_v2.accounts
+        SET password_hash = %s,
+            must_change_password = true,
+            password_changed_at = NULL,
+            session_version = session_version + 1,
+            updated_at = now()
+        WHERE id = %s
+        RETURNING session_version
+        """,
+        (password_hash, int(account_id)),
+    ).fetchone()
+    return int(row["session_version"] or 0) if row else 0
+
+
 def insert_account_audit_event(
     conn: Any,
     *,
@@ -333,7 +357,7 @@ def save_teacher_account(
                 updated_at = now()
             WHERE id = %s
             """,
-            (login, password_hash, full_name, int(staff_id), int(account_id)),
+            (login, password_hash, status, full_name, int(staff_id), int(account_id)),
         )
     else:
         row = conn.execute(

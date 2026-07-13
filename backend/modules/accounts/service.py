@@ -529,6 +529,25 @@ def reset_student_password(
         return _with_connection(None, _reset)
 
 
+def reset_linked_account_password(
+    conn: Any,
+    *,
+    account_id: Any,
+    temporary_password: Any,
+) -> int:
+    """Reset a linked canonical account inside a caller-owned transaction."""
+
+    parsed_account_id = _to_int(account_id)
+    password_value = str(temporary_password or "")
+    if parsed_account_id is None or len(password_value) < MIN_PASSWORD_LENGTH:
+        return 0
+    return repository.reset_account_password(
+        conn,
+        account_id=parsed_account_id,
+        password_hash=generate_password_hash(password_value),
+    )
+
+
 def provision_student_account(
     conn: Any,
     *,
@@ -718,6 +737,7 @@ __all__ = [
     "provision_parent_account",
     "provision_teacher_account",
     "reset_student_password",
+    "reset_linked_account_password",
     "synchronize_staff_account",
     "verify_account_password",
 ]

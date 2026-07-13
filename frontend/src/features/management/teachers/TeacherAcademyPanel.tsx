@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, Plus, Trash2, Trophy, UsersRound, XCircle } from "lucide-react";
+import { BookOpenCheck, CalendarClock, CheckCircle2, ClipboardCheck, Copy, Eye, GraduationCap, KeyRound, Plus, RefreshCw, Trash2, Trophy, UsersRound, XCircle } from "lucide-react";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -18,6 +18,13 @@ import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCatego
 type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
 type GeneratedCredentials = Record<string, unknown>;
+type TeacherPasswordResetCredentials = {
+  login?: string;
+  temporary_password?: string;
+  display_name?: string;
+  must_change_password?: boolean;
+  updated_at?: string;
+};
 type TeacherAcademyActionRoutes = {
   create: string;
   assignmentUpdate: (assignmentId: number | string) => string;
@@ -1678,12 +1685,14 @@ function AcademyTeacherCard({
   canAssess,
   canPromote,
   canDelete,
+  canManageAccount,
   onPreview,
   onDetail,
   onSchedule,
   onAssess,
   onPromote,
   onDelete,
+  onAccount,
   onCopyLogin,
 }: {
   teacher: AcademyTeacher;
@@ -1692,12 +1701,14 @@ function AcademyTeacherCard({
   canAssess: boolean;
   canPromote: boolean;
   canDelete: boolean;
+  canManageAccount: boolean;
   onPreview: () => void;
   onDetail: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onPromote: () => void;
   onDelete: () => void;
+  onAccount: () => void;
   onCopyLogin: (login: string) => void;
 }) {
   const assignments = academyAssignments(teacher);
@@ -1742,6 +1753,14 @@ function AcademyTeacherCard({
     icon: <Eye className="h-4 w-4" />,
     onClick: onDetail,
   });
+  if (canManageAccount && asNumber(teacher.account_teacher_id || teacher.promoted_teacher_id)) {
+    secondaryActions.push({
+      key: "account",
+      label: "Account access",
+      icon: <KeyRound className="h-4 w-4" />,
+      onClick: onAccount,
+    });
+  }
   if (allowTeacherPreview) {
     secondaryActions.push({
       key: "preview",
@@ -1835,6 +1854,144 @@ function AcademyTeacherCard({
   );
 }
 
+function ActiveTeacherAccountModal({
+  teacher,
+  resetting,
+  resetError,
+  resetCredentials,
+  onResetPassword,
+  onCopy,
+  onClose,
+}: {
+  teacher: Record<string, unknown>;
+  resetting: boolean;
+  resetError: string;
+  resetCredentials: TeacherPasswordResetCredentials | null;
+  onResetPassword: () => void;
+  onCopy: (value: string, label: string) => void;
+  onClose: () => void;
+}) {
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const login = asString(teacher.login || teacher.teacher_code);
+  const status = asString(teacher.status || teacher.teacher_status || teacher.academy_status) || "Active";
+  const fields: Array<[string, string]> = [
+    ["Name", asString(teacher.full_name) || "Teacher"],
+    ["Account Login", login || "Not set"],
+    ["Role", "Teacher"],
+    ["Subject", asString(teacher.subjects || teacher.subject) || "Not assigned"],
+    ["Group", asString(teacher.assigned_group || teacher.group_name || teacher.group) || "Not assigned"],
+    ["Status", status],
+  ];
+
+  return (
+    <Modal
+      title={asString(teacher.full_name) || "Teacher account"}
+      subtitle="Teacher account"
+      onClose={onClose}
+      size="lg"
+      closeOnOutsideClick={!resetCredentials}
+    >
+      <ModalBody>
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          {fields.map(([label, value]) => (
+            <div key={label} className="min-w-0 rounded-lg border border-border bg-background px-3 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</dt>
+              <dd className="mt-0.5 break-words font-black text-foreground">
+                {label === "Status" ? <StatusBadge status={value} className="text-[10px]" /> : value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <section className="mt-4 rounded-xl border border-border bg-muted/60 p-3" aria-labelledby="teacher-password-access-title">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h3 id="teacher-password-access-title" className="text-sm font-black text-foreground">Password access</h3>
+              <p className="mt-0.5 text-xs font-semibold leading-5 text-muted-foreground">
+                The current password is protected and cannot be viewed. Generate a temporary password when the teacher needs access restored.
+              </p>
+            </div>
+          </div>
+
+          {resetCredentials ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" aria-live="polite">
+              <p className="text-xs font-black text-amber-900">Temporary password — shown once</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Login</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.login)}</p>
+                    <IconButton label="Copy teacher login" onClick={() => onCopy(asString(resetCredentials.login), "Teacher login")}>
+                      <Copy className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Temporary password</p>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.temporary_password)}</p>
+                    <IconButton label="Copy temporary password" onClick={() => onCopy(asString(resetCredentials.temporary_password), "Temporary password")}>
+                      <Copy className="h-4 w-4" />
+                    </IconButton>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
+                Share these credentials securely. This password will not be displayed again after the modal closes.
+              </p>
+            </div>
+          ) : confirmingReset ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-black text-amber-900">Reset this teacher password?</p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-amber-800">
+                This immediately replaces the forgotten password and invalidates existing canonical sessions.
+              </p>
+              <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(false)}
+                  disabled={resetting}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 disabled:opacity-60"
+                >
+                  Keep current password
+                </button>
+                <button
+                  type="button"
+                  onClick={onResetPassword}
+                  disabled={resetting || !login}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${resetting ? "animate-spin" : ""}`} aria-hidden="true" />
+                  {resetting ? "Generating..." : "Generate temporary password"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(true)}
+              disabled={!login}
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-background px-3 text-sm font-black text-primary transition-colors duration-150 hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none sm:w-auto"
+            >
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
+              Reset password
+            </button>
+          )}
+
+          {resetError ? (
+            <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive" role="alert">
+              {resetError}
+            </p>
+          ) : null}
+        </section>
+      </ModalBody>
+    </Modal>
+  );
+}
+
 function ModalShell({
   title,
   subtitle,
@@ -1916,6 +2073,10 @@ export function TeacherAcademyPanel({
   const [promoteTeacher, setPromoteTeacher] = useState<AcademyTeacher | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AcademyTeacher | null>(null);
   const [assessmentDeleteTarget, setAssessmentDeleteTarget] = useState<{ teacher: AcademyTeacher; assessment: Record<string, unknown> } | null>(null);
+  const [activeTeacherAccount, setActiveTeacherAccount] = useState<Record<string, unknown> | null>(null);
+  const [teacherPasswordResetting, setTeacherPasswordResetting] = useState(false);
+  const [teacherPasswordResetError, setTeacherPasswordResetError] = useState("");
+  const [teacherPasswordResetCredentials, setTeacherPasswordResetCredentials] = useState<TeacherPasswordResetCredentials | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [directorAcademyTab, setDirectorAcademyTab] = useState<"teachers" | "lessons">("teachers");
@@ -2088,6 +2249,60 @@ export function TeacherAcademyPanel({
     showToast("Teacher login copied.");
   }
 
+  function openActiveTeacherAccount(teacher: Record<string, unknown>) {
+    setTeacherPasswordResetError("");
+    setTeacherPasswordResetCredentials(null);
+    setTeacherPasswordResetting(false);
+    setActiveTeacherAccount(teacher);
+  }
+
+  function closeActiveTeacherAccount() {
+    setActiveTeacherAccount(null);
+    setTeacherPasswordResetError("");
+    setTeacherPasswordResetCredentials(null);
+    setTeacherPasswordResetting(false);
+  }
+
+  async function resetActiveTeacherPassword() {
+    const teacherId = asNumber(
+      activeTeacherAccount?.account_teacher_id
+      || activeTeacherAccount?.promoted_teacher_id
+      || activeTeacherAccount?.id,
+    );
+    if (!teacherId) {
+      setTeacherPasswordResetError("Reload this teacher account before resetting its password.");
+      return;
+    }
+    setTeacherPasswordResetting(true);
+    setTeacherPasswordResetError("");
+    const { ok, data } = await postForm(
+      routes.academicDirectorTeacherPasswordReset(teacherId),
+      {},
+      csrf,
+    );
+    setTeacherPasswordResetting(false);
+    if (!ok) {
+      setTeacherPasswordResetError(
+        asString(data.message) || asString(data.detail) || "Unable to reset the teacher password.",
+      );
+      return;
+    }
+    const reset = data as TeacherPasswordResetCredentials;
+    if (!asString(reset.temporary_password)) {
+      setTeacherPasswordResetError("The password was reset, but no temporary password was returned. Please try again.");
+      return;
+    }
+    setTeacherPasswordResetCredentials(reset);
+    showToast("Temporary teacher password generated.", "success");
+  }
+
+  function copyTeacherCredential(value: string, label: string) {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText && value) {
+      void navigator.clipboard.writeText(value).catch(() => {});
+      showToast(`${label} copied.`);
+    }
+  }
+
   function previewAsTeacher(teacher: AcademyTeacher) {
     if (!allowTeacherPreview) {
       return;
@@ -2167,6 +2382,17 @@ export function TeacherAcademyPanel({
 
   return (
     <>
+      {activeTeacherAccount ? (
+        <ActiveTeacherAccountModal
+          teacher={activeTeacherAccount}
+          resetting={teacherPasswordResetting}
+          resetError={teacherPasswordResetError}
+          resetCredentials={teacherPasswordResetCredentials}
+          onResetPassword={resetActiveTeacherPassword}
+          onCopy={copyTeacherCredential}
+          onClose={closeActiveTeacherAccount}
+        />
+      ) : null}
       {createOpen ? (
         <NewAcademyTeacherModal
           state={state}
@@ -2633,21 +2859,30 @@ export function TeacherAcademyPanel({
                           <p className="mt-1 truncate font-mono text-[11px] font-bold text-muted-foreground">{asString(teacher.login) || asString(teacher.teacher_code) || "Login not set"}</p>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => openActiveTeacherAccount(teacher)}
+                        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-background text-sm font-black text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
+                      >
+                        <KeyRound className="h-4 w-4" aria-hidden="true" />
+                        View account
+                      </button>
                     </article>
                   ))}
                 </MobileCardList>
                 <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
                   <table className="w-full min-w-[780px] table-fixed border-collapse text-left">
                     <colgroup>
-                      <col className="w-[24%]" />
                       <col className="w-[22%]" />
-                      <col className="w-[18%]" />
-                      <col className="w-[18%]" />
-                      <col className="w-[18%]" />
+                      <col className="w-[19%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[16%]" />
                     </colgroup>
                     <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
                       <tr>
-                        {["Teacher", "Subject", "Group", "Contact", "Status"].map((heading) => (
+                        {["Teacher", "Subject", "Group", "Contact", "Status", "Actions"].map((heading) => (
                           <th key={heading} className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
                             {heading}
                           </th>
@@ -2686,6 +2921,16 @@ export function TeacherAcademyPanel({
                               {asString(teacher.status || teacher.teacher_status) || "Active"}
                             </StatusBadge>
                           </td>
+                          <td className="px-3 py-2.5 text-right align-middle">
+                            <button
+                              type="button"
+                              onClick={() => openActiveTeacherAccount(teacher)}
+                              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-primary/20 bg-white px-3 text-[11px] font-black text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
+                            >
+                              <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                              Account
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2715,6 +2960,7 @@ export function TeacherAcademyPanel({
                       canSchedule={canScheduleAcademyLesson}
                       canAssess={canAssessAcademyLesson}
                       canDelete={canDeleteAcademyTeacher}
+                      canManageAccount={isAcademicDirectorMode}
                       onPreview={() => previewAsTeacher(teacher)}
                       onDetail={() => setDetailTeacher(teacher)}
                       onSchedule={(targetAssignment) => setScheduleTarget({ teacher, assignment: targetAssignment })}
@@ -2724,6 +2970,7 @@ export function TeacherAcademyPanel({
                         setError("");
                         setDeleteTarget(teacher);
                       }}
+                      onAccount={() => openActiveTeacherAccount(teacher)}
                       onCopyLogin={copyLogin}
                       canPromote={canPromoteAcademyTeacher}
                     />
@@ -2777,6 +3024,14 @@ export function TeacherAcademyPanel({
                         icon: <Eye className="h-4 w-4" />,
                         onClick: () => setDetailTeacher(teacher),
                       });
+                      if (isAcademicDirectorMode && asNumber(teacher.account_teacher_id || teacher.promoted_teacher_id)) {
+                        rowActions.push({
+                          key: "account",
+                          label: "Account access",
+                          icon: <KeyRound className="h-4 w-4" />,
+                          onClick: () => openActiveTeacherAccount(teacher),
+                        });
+                      }
                       if (allowTeacherPreview) {
                         rowActions.push({
                           key: "preview",

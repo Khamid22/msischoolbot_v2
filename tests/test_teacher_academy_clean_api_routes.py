@@ -89,6 +89,7 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
     for path in [
         "/api/v1/academic-director/head-of-departments",
         "/api/v1/academic-director/head-of-departments/{account_id}/reset-password",
+        "/api/v1/academic-director/teachers/{teacher_id}/reset-password",
         "/api/v1/academic-director/teacher-academy",
         "/api/v1/academic-director/teacher-academy/assignments/{assignment_id}",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments",
@@ -160,6 +161,69 @@ def test_academic_director_create_academy_teacher_uses_selected_lessons_and_safe
     assert captured["selected_curriculum_item_ids"] == ["103", "101"]
     assert captured["created_by"] == "AD0001"
     assert captured["return_credentials"] is True
+
+
+def test_academic_director_can_reset_teacher_password_and_receives_it_once(client, monkeypatch):
+    import backend.workspaces.academic_director.staff_records_api as staff_records_api
+
+    captured = {}
+
+    def fake_reset(teacher_id, **kwargs):
+        captured["teacher_id"] = teacher_id
+        captured.update(kwargs)
+        return True, "", {
+            "login": "TCH0042",
+            "temporary_password": "SafePass4826",
+            "display_name": "Example Teacher",
+            "must_change_password": True,
+            "updated_at": "2026-07-13T10:00:00Z",
+        }
+
+    monkeypatch.setattr(staff_records_api, "reset_teacher_password", fake_reset)
+    _set_session(
+        client,
+        {"auth_role": "academic_director", "auth_login": "AD0001", "account_id": 12},
+    )
+
+    response = client.post(
+        "/api/v1/academic-director/teachers/42/reset-password",
+        headers=XHR,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {
+        "message": "Temporary password generated.",
+        "login": "TCH0042",
+        "temporary_password": "SafePass4826",
+        "display_name": "Example Teacher",
+        "must_change_password": True,
+        "updated_at": "2026-07-13T10:00:00Z",
+    }
+    assert captured == {
+        "teacher_id": 42,
+        "actor_account_id": 12,
+        "actor_login": "AD0001",
+    }
+
+
+def test_head_of_department_cannot_reset_teacher_password(client, monkeypatch):
+    import backend.workspaces.academic_director.staff_records_api as staff_records_api
+
+    def should_not_reset(*args, **kwargs):
+        raise AssertionError("role dependency must reject this request before password reset")
+
+    monkeypatch.setattr(staff_records_api, "reset_teacher_password", should_not_reset)
+    _set_session(
+        client,
+        {"auth_role": "head_of_department", "auth_login": "HOD0001", "account_id": 80},
+    )
+
+    response = client.post(
+        "/api/v1/academic-director/teachers/42/reset-password",
+        headers=XHR,
+    )
+
+    assert response.status_code == 403
 
 
 def test_academic_director_schedule_assess_status_and_promote_routes_call_domain_service(client, monkeypatch):
@@ -359,6 +423,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "routes.academicDirectorTeacherAcademyAssessmentCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssessmentDelete" in panel_source
     assert "routes.academicDirectorTeacherAcademyDelete" in panel_source
+    assert "routes.academicDirectorTeacherPasswordReset" in panel_source
+    assert "Temporary password — shown once" in panel_source
     assert "Delete assessment report" in panel_source
     assert "assessmentDelete" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssignmentUpdate" in panel_source
@@ -369,6 +435,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "apiRoutes.academicDirectorTeacherAcademyCreate" in routes_source
     assert 'academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy"' in api_routes_source
     assert "academicDirectorTeacherAcademyDelete" in routes_source
+    assert "academicDirectorTeacherPasswordReset" in routes_source
+    assert "/api/v1/academic-director/teachers/${teacherId}/reset-password" in api_routes_source
     assert "academicDirectorTeacherAcademyAssessmentDelete" in routes_source
     assert "headOfDepartmentTeacherAcademyAssignmentUpdate" in routes_source
     assert "headOfDepartmentTeacherAcademyAssessmentDelete" in routes_source

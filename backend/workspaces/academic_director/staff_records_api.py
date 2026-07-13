@@ -2,9 +2,9 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 
-from backend.core.http import ApiSuccess
+from backend.core.http import ApiSuccess, api_success
 from backend.modules.staff_records.development_responses import (
     add_assessment_response,
     create_academy_teacher_response,
@@ -21,13 +21,43 @@ from backend.modules.staff_records.development_schemas import (
     PromoteAcademyTeacherForm,
     SyncAcademyLessonsForm,
     TeacherAcademyMutationResult,
+    TeacherPasswordResetResult,
     UpdateAcademyAssignmentForm,
     UpdateAcademyStatusForm,
 )
 from backend.core.access import CurrentUser, get_current_user
+from backend.modules.staff_records.teachers_service import reset_teacher_password
 
 
 def register_teacher_academy_routes(router: APIRouter) -> None:
+    @router.post(
+        "/teachers/{teacher_id}/reset-password",
+        operation_id="api_v1_academic_director_reset_teacher_password",
+        response_model=ApiSuccess[TeacherPasswordResetResult],
+    )
+    def reset_active_teacher_password(
+        teacher_id: int,
+        user: CurrentUser = Depends(get_current_user),
+    ):
+        reset, error_message, credentials = reset_teacher_password(
+            teacher_id,
+            actor_account_id=user.account_id,
+            actor_login=user.login,
+        )
+        if not reset:
+            status_code = 404 if "not found" in (error_message or "").casefold() else 400
+            raise HTTPException(status_code=status_code, detail=error_message or "Unable to reset password.")
+        return api_success(
+            {
+                "message": "Temporary password generated.",
+                "login": credentials.get("login", ""),
+                "temporary_password": credentials.get("temporary_password", ""),
+                "display_name": credentials.get("display_name", ""),
+                "must_change_password": bool(credentials.get("must_change_password")),
+                "updated_at": credentials.get("updated_at", ""),
+            }
+        )
+
     @router.post(
         "/teacher-academy",
         operation_id="api_v1_academic_director_create_academy_teacher",

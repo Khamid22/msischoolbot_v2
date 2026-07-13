@@ -4,9 +4,10 @@ This module owns teacher profile/account helper behavior.
 """
 
 import re
+import secrets
 
 from backend.core.passwords import generate_password_hash
-from backend.modules.accounts.service import provision_teacher_account
+from backend.modules.accounts.service import provision_teacher_account, reset_linked_account_password
 from backend.modules.staff_records import teachers_repository as repository
 from backend.modules.accounts.database import DB_LOCK, connect, utc_now_iso
 from backend.modules.accounts.bootstrap import init_storage
@@ -136,6 +137,106 @@ def list_teachers():
             conn.commit()
             rows = repository.list_teachers_rows(conn)
     return [teacher_payload(row) for row in rows]
+
+
+def _generate_teacher_temporary_password(length=12):
+    """Return an unambiguous password suitable for secure one-time sharing."""
+
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(max(8, int(length or 0))))
+
+
+def reset_teacher_password(
+    teacher_id,
+    *,
+    actor_account_id=None,
+    actor_login="",
+):
+    init_storage()
+    with DB_LOCK:
+        with connect() as conn:
+            return _reset_teacher_password(
+                conn,
+                teacher_id=teacher_id,
+                actor_account_id=actor_account_id,
+                actor_login=actor_login,
+                commit=True,
+            )
+
+
+def _reset_teacher_password(
+    conn,
+    *,
+    teacher_id,
+    actor_account_id=None,
+    actor_login="",
+    commit=False,
+):
+    try:
+        parsed_teacher_id = int(teacher_id)
+    except (TypeError, ValueError):
+        parsed_teacher_id = 0
+    if parsed_teacher_id <= 0:
+        return False, "Teacher account was not found.", {}
+
+    account = repository.get_teacher_password_reset_row(conn, parsed_teacher_id)
+    if not account:
+        return False, "Teacher account was not found.", {}
+    if str(row_get(account, "teacher_status") or "").strip().casefold() in {
+        "inactive",
+        "deleted",
+        "archived",
+    }:
+        return False, "Teacher account is disabled.", {}
+
+    login = str(row_get(account, "login") or "").strip()
+    if not login:
+        # Imported active teachers may have no credential rows until their first
+        # listing. Provision only this active population before retrying.
+        backfill_teacher_auth(conn)
+        account = repository.get_teacher_password_reset_row(conn, parsed_teacher_id)
+        login = str(row_get(account, "login") or "").strip()
+    if not login:
+        return False, "Teacher account has no login.", {}
+
+    temporary_password = _generate_teacher_temporary_password()
+    password_hash = generate_password_hash(temporary_password)
+    now = utc_now_iso()
+    legacy_updates = repository.update_teacher_legacy_password(
+        conn,
+        teacher_id=parsed_teacher_id,
+        login=login,
+        password_hash=password_hash,
+        updated_at=now,
+    )
+    account_id = int(row_get(account, "account_id") or 0)
+    session_version = 0
+    if account_id:
+        session_version = reset_linked_account_password(
+            conn,
+            account_id=account_id,
+            temporary_password=temporary_password,
+        )
+    if legacy_updates <= 0 and session_version <= 0:
+        return False, "Unable to reset the teacher password.", {}
+
+    repository.insert_teacher_password_reset_audit_event(
+        conn,
+        teacher_id=parsed_teacher_id,
+        account_id=account_id,
+        actor_account_id=actor_account_id,
+        actor_login=actor_login,
+    )
+    if commit:
+        conn.commit()
+
+    return True, "", {
+        "login": login,
+        "temporary_password": temporary_password,
+        "display_name": str(row_get(account, "full_name") or login).strip(),
+        "must_change_password": bool(account_id),
+        "updated_at": now,
+    }
 
 
 def get_teacher_by_id(teacher_id):
@@ -354,9 +455,11 @@ __all__ = [
     "get_teacher_by_id",
     "get_teacher_name_by_group",
     "list_teachers",
+    "reset_teacher_password",
     "subject_teacher_login_prefix",
     "update_teacher_by_id",
     "upsert_teacher",
+    "_reset_teacher_password",
 ]
 
 

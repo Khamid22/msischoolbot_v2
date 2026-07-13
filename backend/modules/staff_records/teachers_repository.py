@@ -4,6 +4,7 @@ The physical PostgreSQL schema remains ``msi_v2``. HTTP adapters and other
 modules must call the teacher service instead of importing this repository.
 """
 
+import json
 import re
 
 
@@ -124,6 +125,87 @@ def get_teacher_auth_row_by_id(conn, teacher_id):
         """,
         (teacher_id,),
     ).fetchone()
+
+
+def get_teacher_password_reset_row(conn, teacher_id):
+    """Return the canonical and legacy credentials linked to one teacher."""
+
+    return conn.execute(
+        """
+        SELECT
+            t.id AS teacher_id,
+            t.full_name,
+            t.status AS teacher_status,
+            staff.id AS staff_id,
+            COALESCE(staff.status, '') AS staff_status,
+            profile.account_id,
+            COALESCE(account.status, '') AS account_status,
+            COALESCE(NULLIF(account.login, ''), NULLIF(staff.login, ''), '') AS login
+        FROM msi_v2.teachers t
+        LEFT JOIN LATERAL (
+            SELECT candidate.id, candidate.login, candidate.status
+            FROM msi_v2.msi_staff candidate
+            WHERE candidate.teacher_id = t.id
+              AND lower(candidate.role) = 'teacher'
+            ORDER BY
+                CASE WHEN lower(candidate.status) = 'active' THEN 0 ELSE 1 END,
+                candidate.id ASC
+            LIMIT 1
+        ) staff ON true
+        LEFT JOIN msi_v2.teacher_profiles profile ON profile.teacher_id = t.id
+        LEFT JOIN msi_v2.accounts account ON account.id = profile.account_id
+        WHERE t.id = %s
+        LIMIT 1
+        """,
+        (int(teacher_id),),
+    ).fetchone()
+
+
+def update_teacher_legacy_password(conn, *, teacher_id, login, password_hash, updated_at):
+    cursor = conn.execute(
+        """
+        UPDATE msi_v2.msi_staff
+        SET password_hash = %s,
+            updated_at = COALESCE(NULLIF(%s, '')::timestamptz, now())
+        WHERE lower(role) = 'teacher'
+          AND (
+              teacher_id = %s
+              OR lower(btrim(login)) = lower(btrim(%s))
+          )
+        """,
+        (password_hash, updated_at, int(teacher_id), str(login or "")),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
+def insert_teacher_password_reset_audit_event(
+    conn,
+    *,
+    teacher_id,
+    account_id,
+    actor_account_id,
+    actor_login,
+):
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        )
+        VALUES (%s, 'teacher.password_reset', 'teacher', %s, %s::jsonb, now())
+        """,
+        (
+            int(actor_account_id) if int(actor_account_id or 0) > 0 else None,
+            int(teacher_id),
+            json.dumps(
+                {
+                    "account_id": int(account_id or 0) or None,
+                    "method": "academic_director",
+                    "actor_login": str(actor_login or "").strip(),
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    )
 
 
 def list_teacher_ids_without_auth(conn):
@@ -491,11 +573,14 @@ __all__ = [
     "get_teacher_login_row",
     "get_teacher_by_telegram_id",
     "get_teacher_auth_row_by_id",
+    "get_teacher_password_reset_row",
     "list_teacher_ids_without_auth",
     "get_next_teacher_code",
     "get_next_teacher_login",
     "insert_teacher_auth",
     "update_teacher_password",
+    "update_teacher_legacy_password",
+    "insert_teacher_password_reset_audit_event",
     "get_teacher_by_id_row",
     "insert_teacher_row",
     "insert_teacher_profile_row",
