@@ -353,7 +353,9 @@ def _gradebook_lesson_payload(lesson_rows, exception_rows):
     return items
 
 
-def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_date=""):
+def _gradebook_lesson_window(
+    items, *, limit=0, cursor="", direction="", anchor_date="", month=""
+):
     def is_cancellation(item):
         return (
             bool(item.get("isCancellation"))
@@ -372,6 +374,105 @@ def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_
     lessons = [item for item in items if not is_cancellation(item)]
     cancellations = [item for item in items if is_cancellation(item)]
     total = len(lessons)
+
+    month_text = str(month or "").strip()
+    if month_text:
+        def month_parts(value):
+            parts = str(value or "").split("-")
+            if len(parts) != 2 or not all(part.isdigit() for part in parts):
+                return None
+            year, month_number = (int(part) for part in parts)
+            try:
+                date(year, month_number, 1)
+            except ValueError:
+                return None
+            return year, month_number
+
+        requested_parts = month_parts(month_text)
+        if requested_parts is None:
+            raise ValueError("month must use YYYY-MM format.")
+
+        dated_items = []
+        available_months = set()
+        for item in items:
+            parsed = canonical.parse_date(item.get("date"))
+            if not parsed:
+                continue
+            key = f"{parsed.year:04d}-{parsed.month:02d}"
+            available_months.add(key)
+            dated_items.append((item, key))
+
+        month_keys = sorted(available_months)
+        month_options = []
+        for key in month_keys:
+            year, month_number = month_parts(key)
+            month_options.append({
+                "value": key,
+                "label": date(year, month_number, 1).strftime("%B %Y"),
+                "lessonCount": sum(
+                    1
+                    for item, item_month in dated_items
+                    if item_month == key and not is_cancellation(item)
+                ),
+            })
+
+        if not month_keys:
+            return [], {
+                "totalLessons": total,
+                "startIndex": 0,
+                "endIndex": 0,
+                "previousCursor": None,
+                "nextCursor": None,
+                "hasPrevious": False,
+                "hasNext": False,
+                "selectedMonth": "",
+                "previousMonth": None,
+                "nextMonth": None,
+                "monthOptions": [],
+            }
+
+        requested_index = requested_parts[0] * 12 + requested_parts[1]
+        selected_month = min(
+            month_keys,
+            key=lambda key: abs(
+                (month_parts(key)[0] * 12 + month_parts(key)[1]) - requested_index
+            ),
+        )
+        selected_items = [item for item, key in dated_items if key == selected_month]
+        selected_items.sort(key=sort_key)
+        selected_lesson_ids = {
+            int(item.get("id") or 0)
+            for item in selected_items
+            if not is_cancellation(item)
+        }
+        selected_indexes = [
+            index
+            for index, item in enumerate(lessons)
+            if int(item.get("id") or 0) in selected_lesson_ids
+        ]
+        start = selected_indexes[0] if selected_indexes else 0
+        end = selected_indexes[-1] + 1 if selected_indexes else start
+        selected_month_index = month_keys.index(selected_month)
+        previous_month = month_keys[selected_month_index - 1] if selected_month_index > 0 else None
+        next_month = (
+            month_keys[selected_month_index + 1]
+            if selected_month_index + 1 < len(month_keys)
+            else None
+        )
+        return selected_items, {
+            "totalLessons": total,
+            "startIndex": start,
+            "endIndex": end,
+            "previousCursor": None,
+            "nextCursor": None,
+            "hasPrevious": previous_month is not None,
+            "hasNext": next_month is not None,
+            "selectedMonth": selected_month,
+            "previousMonth": previous_month,
+            "nextMonth": next_month,
+            "monthOptions": month_options,
+        }
+
     limit = max(0, min(int(limit or 0), 40))
     if limit <= 0 or total <= limit:
         return items, {
@@ -443,7 +544,7 @@ def _gradebook_lesson_window(items, *, limit=0, cursor="", direction="", anchor_
 
 def get_group_gradebook(
     group_id, *, lesson_limit=0, lesson_cursor="", lesson_direction="",
-    anchor_date="", section="all"
+    anchor_date="", lesson_month="", section="all"
 ):
     group_id = int(group_id or 0)
     if group_id <= 0:
@@ -559,6 +660,7 @@ def get_group_gradebook(
                 cursor=lesson_cursor,
                 direction=lesson_direction,
                 anchor_date=anchor_date,
+                month=lesson_month,
             )
         else:
             lesson_payload, page_info = _gradebook_lesson_window(full_lesson_payload, limit=0)

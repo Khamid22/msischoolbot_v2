@@ -738,7 +738,7 @@ export default function InternalOperationsPage(props: InternalOperationsPageProp
           </div>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
           <Suspense fallback={<PanelFallback />}>
             <ActivePanel state={panelState} />
           </Suspense>

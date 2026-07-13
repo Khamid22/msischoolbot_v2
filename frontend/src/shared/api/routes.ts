@@ -1,4 +1,4 @@
-type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; section?: string };
+type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; month?: string; section?: string };
 
 function gradebookUrl(base: string, groupId: number | string, query: GradebookQuery = {}) {
   const params = new URLSearchParams({ group_id: String(groupId) });
@@ -6,6 +6,7 @@ function gradebookUrl(base: string, groupId: number | string, query: GradebookQu
   if (query.cursor) params.set("cursor", query.cursor);
   if (query.direction) params.set("direction", query.direction);
   if (query.anchorDate) params.set("anchor_date", query.anchorDate);
+  if (query.month) params.set("month", query.month);
   if (query.section) params.set("section", query.section);
   return `${base}?${params.toString()}`;
 }

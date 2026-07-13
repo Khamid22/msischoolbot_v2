@@ -67,6 +67,39 @@ def test_gradebook_cursor_returns_stable_next_window():
     assert second_info["hasPrevious"] is True
 
 
+def test_gradebook_month_returns_only_that_calendar_month():
+    page, info = _window_function()(_lessons(70), month="2026-02")
+
+    assert page[0]["date"] == "01/02/2026"
+    assert page[-1]["date"] == "28/02/2026"
+    assert len(page) == 28
+    assert info["selectedMonth"] == "2026-02"
+    assert info["previousMonth"] == "2026-01"
+    assert info["nextMonth"] == "2026-03"
+    assert [option["label"] for option in info["monthOptions"]] == [
+        "January 2026",
+        "February 2026",
+        "March 2026",
+    ]
+
+
+def test_gradebook_month_keeps_cancellations_in_their_calendar_month():
+    items = _lessons(40)
+    items.append({
+        "id": -1,
+        "lessonNumber": "Cancelled",
+        "date": "15/01/2026",
+        "status": "cancelled",
+        "sourceKind": "cancellation",
+        "isCancellation": True,
+    })
+
+    page, info = _window_function()(items, month="2026-01")
+
+    assert any(item.get("isCancellation") for item in page)
+    assert info["monthOptions"][0]["lessonCount"] == 31
+
+
 def test_gradebook_get_is_read_only_and_records_are_id_keyed():
     operations = (ROOT / "backend/modules/academics/operations.py").read_text(encoding="utf-8")
     gradebook_source = operations.split("def get_group_gradebook(", 1)[1].split(
@@ -91,14 +124,15 @@ def test_gradebook_performance_migration_is_non_destructive():
     assert "TRUNCATE" not in migration
 
 
-def test_frontend_uses_window_navigation_and_stable_lesson_ids():
+def test_frontend_uses_month_navigation_and_stable_lesson_ids():
     source = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(
         encoding="utf-8"
     )
 
-    assert "GRADEBOOK_LESSON_WINDOW = 12" in source
-    assert "Previous lessons" in source
-    assert "Next lessons" in source
-    assert "Jump to lesson number" in source
+    assert "Previous month" in source
+    assert "Next month" in source
+    assert '>Show</label>' in source
+    assert "Lessons {data.pageInfo.startIndex" not in source
+    assert ">Loading…</div>" not in source
     assert "attendanceByLessonId" in source
     assert "homeworkByLessonId" in source

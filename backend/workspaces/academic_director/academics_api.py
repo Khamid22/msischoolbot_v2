@@ -166,6 +166,7 @@ def gradebook(
     cursor: str = "",
     direction: str = "",
     anchor_date: str = "",
+    month: str = "",
     section: str = "all",
 ):
     try:
@@ -175,6 +176,7 @@ def gradebook(
             lesson_cursor=cursor,
             lesson_direction=direction,
             anchor_date=anchor_date,
+            lesson_month=month,
             section=section,
         )
     except (TypeError, ValueError) as exc:

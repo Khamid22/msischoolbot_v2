@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
-import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Search, Settings, Users, X } from "lucide-react";
+import { AlertTriangle, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Pencil, Plus, RotateCcw, Settings, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -41,7 +41,7 @@ type ActiveExamCell = {
 };
 
 type GradebookView = "gradebook" | "academic" | "ep" | "timetable";
-type GradebookLoadOptions = { view?: GradebookView; cursor?: string; anchorDate?: string; force?: boolean };
+type GradebookLoadOptions = { view?: GradebookView; cursor?: string; anchorDate?: string; month?: string; force?: boolean };
 type GroupSetupForm = {
   teacherId: string;
   startDate: string;
@@ -54,10 +54,13 @@ type GroupSetupForm = {
   allowRecordedChanges: boolean;
 };
 
-const GRADEBOOK_LESSON_WINDOW = 12;
-
 function gradebookSection(view: GradebookView) {
   return view === "ep" ? "exams" : view;
+}
+
+function currentMonthKey() {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function CompactChartTooltip({
@@ -134,9 +137,7 @@ export function GroupGradebook({
   const [examSavingKey, setExamSavingKey] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<GradebookView>("gradebook");
   const [loadedView, setLoadedView] = useState<GradebookView>("gradebook");
-  const [lessonCursor, setLessonCursor] = useState("");
-  const [lessonJumpInput, setLessonJumpInput] = useState("");
-  const [lessonDateInput, setLessonDateInput] = useState("");
+  const [lessonMonth, setLessonMonth] = useState(currentMonthKey);
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState("");
@@ -177,7 +178,7 @@ export function GroupGradebook({
 
   useEffect(() => {
     const controller = new AbortController();
-    load(groupId, controller.signal, { view: "gradebook", cursor: "", force: true });
+    load(groupId, controller.signal, { view: "gradebook", month: currentMonthKey(), force: true });
     return () => controller.abort();
   }, [groupId]);
 
@@ -194,9 +195,7 @@ export function GroupGradebook({
     setExamInput("");
     setScheduleEdit(null);
     setLessonAction(null);
-    setLessonCursor("");
-    setLessonJumpInput("");
-    setLessonDateInput("");
+    setLessonMonth(currentMonthKey());
     gradebookCacheRef.current.clear();
   }, [groupId]);
 
@@ -220,12 +219,12 @@ export function GroupGradebook({
     return () => document.removeEventListener("mousedown", handler);
   }, [scheduleEdit, scheduleSaving]);
 
-  async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", signal?: AbortSignal) {
+  async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", month = "", signal?: AbortSignal) {
     const section = gradebookSection(view);
     const response = await fetch(academicRoutes.adminAcademicGradebookApi(id, {
-      lessonLimit: section === "gradebook" ? GRADEBOOK_LESSON_WINDOW : undefined,
       cursor: section === "gradebook" ? cursor : undefined,
       anchorDate: section === "gradebook" ? anchorDate : undefined,
+      month: section === "gradebook" ? month : undefined,
       section,
     }), { signal });
     const json = await response.json();
@@ -235,9 +234,10 @@ export function GroupGradebook({
 
   async function load(id: number, signal?: AbortSignal, options: GradebookLoadOptions = {}) {
     const view = options.view ?? activeView;
-    const cursor = options.cursor ?? (view === "gradebook" ? lessonCursor : "");
+    const cursor = options.cursor ?? "";
     const anchorDate = options.anchorDate ?? "";
-    const cacheKey = `${id}:${view}:${cursor || `anchor:${anchorDate || "today"}`}`;
+    const month = options.month ?? (view === "gradebook" ? lessonMonth : "");
+    const cacheKey = `${id}:${view}:${month || cursor || `anchor:${anchorDate || "today"}`}`;
     const cached = options.force ? undefined : gradebookCacheRef.current.get(cacheKey);
     if (cached) {
       loadRequestRef.current += 1;
@@ -245,7 +245,7 @@ export function GroupGradebook({
       setError("");
       setData(cached);
       setLoadedView(view);
-      if (view === "gradebook") setLessonCursor(`o${cached.pageInfo?.startIndex ?? 0}`);
+      if (view === "gradebook" && cached.pageInfo?.selectedMonth) setLessonMonth(cached.pageInfo.selectedMonth);
       return;
     }
     const requestId = ++loadRequestRef.current;
@@ -253,20 +253,22 @@ export function GroupGradebook({
     setError("");
     setActive(null);
     try {
-      const nextData = await fetchGradebookData(id, view, cursor, anchorDate, signal);
+      const nextData = await fetchGradebookData(id, view, cursor, anchorDate, month, signal);
       if (requestId !== loadRequestRef.current) return;
       gradebookCacheRef.current.set(cacheKey, nextData);
       setData(nextData);
       setLoadedView(view);
       if (view === "gradebook") {
-        const resolvedCursor = `o${nextData.pageInfo?.startIndex ?? 0}`;
-        gradebookCacheRef.current.set(`${id}:gradebook:${resolvedCursor}`, nextData);
-        setLessonCursor(resolvedCursor);
-        for (const adjacentCursor of [nextData.pageInfo?.previousCursor, nextData.pageInfo?.nextCursor]) {
-          if (!adjacentCursor) continue;
-          const adjacentKey = `${id}:gradebook:${adjacentCursor}`;
+        const resolvedMonth = nextData.pageInfo?.selectedMonth || month;
+        if (resolvedMonth) {
+          gradebookCacheRef.current.set(`${id}:gradebook:${resolvedMonth}`, nextData);
+          setLessonMonth(resolvedMonth);
+        }
+        for (const adjacentMonth of [nextData.pageInfo?.previousMonth, nextData.pageInfo?.nextMonth]) {
+          if (!adjacentMonth) continue;
+          const adjacentKey = `${id}:gradebook:${adjacentMonth}`;
           if (gradebookCacheRef.current.has(adjacentKey)) continue;
-          void fetchGradebookData(id, "gradebook", adjacentCursor)
+          void fetchGradebookData(id, "gradebook", "", "", adjacentMonth)
             .then((page) => gradebookCacheRef.current.set(adjacentKey, page))
             .catch(() => undefined);
         }
@@ -281,40 +283,24 @@ export function GroupGradebook({
 
   function changeView(view: GradebookView) {
     setActiveView(view);
-    void load(groupId, undefined, { view, cursor: view === "gradebook" ? lessonCursor : "" });
+    void load(groupId, undefined, { view, month: view === "gradebook" ? lessonMonth : "" });
   }
 
-  function openLessonWindow(cursor: string | null | undefined) {
-    if (!cursor || loading) return;
-    setLessonCursor(cursor);
-    void load(groupId, undefined, { view: "gradebook", cursor });
+  function openLessonMonth(month: string | null | undefined) {
+    if (!month || loading) return;
+    setLessonMonth(month);
+    void load(groupId, undefined, { view: "gradebook", month });
   }
 
-  function jumpToLessonWindow(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const lessonNumber = Math.max(1, Number.parseInt(lessonJumpInput, 10) || 1);
-    const total = data?.pageInfo?.totalLessons || lessonNumber;
-    const start = Math.max(0, Math.min(lessonNumber - 1, Math.max(0, total - GRADEBOOK_LESSON_WINDOW)));
-    openLessonWindow(`o${start}`);
-  }
-
-  function jumpToLessonDate() {
-    if (!lessonDateInput || loading) return;
-    setLessonCursor("");
-    void load(groupId, undefined, { view: "gradebook", cursor: "", anchorDate: lessonDateInput, force: true });
-  }
-
-  function jumpToToday() {
-    setLessonCursor("");
-    setLessonDateInput("");
-    void load(groupId, undefined, { view: "gradebook", cursor: "", force: true });
+  function jumpToCurrentMonth() {
+    openLessonMonth(currentMonthKey());
   }
 
   async function refreshCurrentView() {
     gradebookCacheRef.current.clear();
     await load(groupId, undefined, {
       view: activeView,
-      cursor: activeView === "gradebook" ? lessonCursor : "",
+      month: activeView === "gradebook" ? lessonMonth : "",
       force: true,
     });
   }
@@ -356,7 +342,7 @@ export function GroupGradebook({
         return;
       }
       const payload = apiData<{ gradebook?: GradebookData }>(json);
-      if (payload.gradebook) {
+      if (payload.gradebook && activeView === "timetable") {
         gradebookCacheRef.current.clear();
         setData(payload.gradebook);
         setLoadedView(activeView);
@@ -988,6 +974,9 @@ export function GroupGradebook({
   const examLabels = data?.examLabels ?? [];
   const enrollments = data?.enrollments ?? [];
   const allEnrollments = data?.allEnrollments ?? enrollments;
+  const gradebookMonthOptions = data?.pageInfo?.monthOptions ?? [];
+  const selectedLessonMonth = data?.pageInfo?.selectedMonth || lessonMonth;
+  const visibleCurriculumLessonCount = lessons.filter((lesson) => !isCancelledLesson(lesson)).length;
   const gradebookTableWidth =
     GRADEBOOK_STUDENT_COL_WIDTH +
     GRADEBOOK_AAP_COL_WIDTH +
@@ -1109,7 +1098,7 @@ export function GroupGradebook({
   const panelCardClass = `rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`;
   const chartPanelClass = `rounded-lg border border-foreground/8 bg-background/80 p-3 shadow-sm ${motion.panel}`;
   return (
-    <div className={`space-y-3 ${motion.panel}`}>
+    <div className={`w-full min-w-0 max-w-full space-y-3 overflow-x-hidden ${motion.panel}`} aria-busy={loading}>
       <FloatingToast toast={setupToast} />
       {/* 1. Summary Header */}
       <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-surface px-4 py-3 shadow-card ${motion.card}`}>
@@ -1151,8 +1140,6 @@ export function GroupGradebook({
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      ) : loading ? (
-        <div className="rounded-xl border border-foreground/8 bg-surface p-6 text-center text-sm text-muted-foreground">Loading…</div>
       ) : null}
 
       {/* 2. View Switcher Buttons */}
@@ -1192,7 +1179,7 @@ export function GroupGradebook({
           </div>
         ) : (
           <div
-            className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
+            className={`flex min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-foreground/8 bg-surface shadow-card ${motion.panel}`}
             style={{
               height: "calc(var(--tg-app-height) - 11rem)",
               maxHeight: "78dvh",
@@ -1205,28 +1192,36 @@ export function GroupGradebook({
             </div>
             {data.pageInfo ? (
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-foreground/8 bg-muted/20 px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <button type="button" aria-label="Previous lessons" disabled={!data.pageInfo.hasPrevious || loading} onClick={() => openLessonWindow(data.pageInfo?.previousCursor)} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronLeft className="h-4 w-4" /></button>
-                  <span className="min-w-32 text-center text-xs font-bold tabular-nums">Lessons {data.pageInfo.startIndex + 1}–{data.pageInfo.endIndex} of {data.pageInfo.totalLessons}</span>
-                  <button type="button" aria-label="Next lessons" disabled={!data.pageInfo.hasNext || loading} onClick={() => openLessonWindow(data.pageInfo?.nextCursor)} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronRight className="h-4 w-4" /></button>
-                  <button type="button" disabled={loading} onClick={jumpToToday} className="h-11 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary disabled:opacity-50 sm:h-9">Today</button>
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <button type="button" aria-label="Previous month" disabled={!data.pageInfo.previousMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.previousMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronLeft className="h-4 w-4" /></button>
+                  <label htmlFor="gradebook-month" className="px-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Show</label>
+                  <div className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-foreground/10 bg-background px-3 sm:h-9">
+                    <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <select
+                      id="gradebook-month"
+                      aria-label="Show gradebook month"
+                      value={selectedLessonMonth}
+                      disabled={loading || gradebookMonthOptions.length === 0}
+                      onChange={(event) => openLessonMonth(event.target.value)}
+                      className="min-w-0 max-w-[12rem] bg-transparent text-sm font-bold text-foreground outline-none disabled:opacity-50"
+                    >
+                      {gradebookMonthOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="button" aria-label="Next month" disabled={!data.pageInfo.nextMonth || loading} onClick={() => openLessonMonth(data.pageInfo?.nextMonth)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 bg-background text-foreground disabled:opacity-35 sm:h-9 sm:w-9"><ChevronRight className="h-4 w-4" /></button>
+                  <span className="px-1 text-xs font-semibold tabular-nums text-muted-foreground">
+                    {visibleCurriculumLessonCount} {visibleCurriculumLessonCount === 1 ? "lesson" : "lessons"}
+                  </span>
                 </div>
-                <div className="flex flex-1 flex-wrap items-center justify-end gap-1.5">
-                  <form onSubmit={jumpToLessonWindow} className="flex items-center gap-1">
-                    <label className="sr-only" htmlFor="gradebook-lesson-jump">Jump to lesson number</label>
-                    <input id="gradebook-lesson-jump" type="number" min={1} max={data.pageInfo.totalLessons} value={lessonJumpInput} onChange={(event) => setLessonJumpInput(event.target.value)} placeholder="Lesson #" className="h-11 w-24 rounded-lg border border-foreground/10 bg-background px-2 text-sm sm:h-9" />
-                    <button type="submit" disabled={!lessonJumpInput || loading} className="h-11 rounded-lg border border-foreground/10 bg-background px-3 text-xs font-bold disabled:opacity-40 sm:h-9">Go</button>
-                  </form>
-                  <label className="sr-only" htmlFor="gradebook-date-jump">Jump to lesson date</label>
-                  <input id="gradebook-date-jump" type="date" value={lessonDateInput} onChange={(event) => setLessonDateInput(event.target.value)} className="h-11 rounded-lg border border-foreground/10 bg-background px-2 text-sm sm:h-9" />
-                  <button type="button" aria-label="Find lessons by date" disabled={!lessonDateInput || loading} onClick={jumpToLessonDate} className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-foreground/10 bg-background disabled:opacity-40 sm:h-9 sm:w-9"><Search className="h-4 w-4" /></button>
-                </div>
+                <button type="button" disabled={loading} onClick={jumpToCurrentMonth} className="h-11 shrink-0 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary disabled:opacity-50 sm:h-9">This month</button>
               </div>
             ) : null}
-            <div className="miniapp-table-scroll min-h-0 flex-1 pb-8 [scrollbar-gutter:stable]">
+            <div className="miniapp-table-scroll min-h-0 min-w-0 max-w-full flex-1 pb-8 [scrollbar-gutter:stable]">
               <table
                 className="table-fixed border-collapse text-left text-[11px] sm:text-xs"
-                style={{ width: gradebookTableWidth, minWidth: gradebookTableWidth }}
+                style={{ width: gradebookTableWidth, minWidth: gradebookTableWidth, maxWidth: gradebookTableWidth }}
               >
                 <colgroup>
                   <col style={{ width: GRADEBOOK_STUDENT_COL_WIDTH }} />

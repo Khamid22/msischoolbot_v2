@@ -639,6 +639,14 @@ export type GradebookData = {
     nextCursor?: string | null;
     hasPrevious: boolean;
     hasNext: boolean;
+    selectedMonth?: string;
+    previousMonth?: string | null;
+    nextMonth?: string | null;
+    monthOptions?: Array<{
+      value: string;
+      label: string;
+      lessonCount: number;
+    }>;
   };
 };
 
