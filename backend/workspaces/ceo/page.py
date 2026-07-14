@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from backend.workspaces.shared import render_role_home
 from backend.modules.reporting.service import ceo_workspace_cards
-from backend.core.guards import require_role
+from backend.core.access.pages import require_role
 
 
 def register_ceo_page_routes(app):

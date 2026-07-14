@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.core.access import CurrentUser, get_current_user
-from backend.core.http import ApiSuccess, api_success
+from backend.core.api import ApiSuccess, api_success
 from backend.modules.academics.schemas import (
     AdminAcademicContextDelta,
     AdminAcademicContextPayload,
@@ -42,7 +42,7 @@ from backend.modules.academics.calendar.service import (
     preview_calendar_closure,
     unlock_calendar_closure,
 )
-from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
+from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.exceptions import AcademicConflictError
 from backend.modules.academics.groups.operations import (
     create_group_from_payload,

@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 
 from backend.workspaces.shared import render_role_home
 from backend.modules.reporting.service import hr_manager_workspace_cards
-from backend.core.guards import require_role
+from backend.core.access.pages import require_role
 
 
 def register_hr_manager_page_routes(app):

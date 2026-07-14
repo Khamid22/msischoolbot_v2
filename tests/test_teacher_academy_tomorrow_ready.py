@@ -247,7 +247,7 @@ def _minimal_academic_context():
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.internal_operations.page as admin_page
+    import backend.internal_operations.pages.routes as admin_page
     import backend.workspaces.academic_director.page as academic_director_routes
 
     def fake_teacher_academy_page_context():

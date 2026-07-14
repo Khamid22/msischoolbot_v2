@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 
-from backend.core.rendering import generate_csrf, render_react_page
+from backend.core.web.rendering import generate_csrf, render_react_page
 from backend.modules.academics.groups.service import list_academic_admin_rows
 from backend.modules.communications.announcements_service import list_announcements
 from backend.workspaces.shared import render_role_home
@@ -15,9 +15,9 @@ from backend.modules.teacher_academy.read_service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
 )
-from backend.core.guards import require_role
-from backend.core.performance import PagePerformanceTimer, log_page_performance
-from backend.core.session import current_auth_login, current_auth_role
+from backend.core.access.pages import require_role
+from backend.core.runtime.performance import PagePerformanceTimer, log_page_performance
+from backend.modules.identity.session import current_auth_login, current_auth_role
 
 
 def _safe_academy_timetable_context():

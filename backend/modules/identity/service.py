@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from backend.core.passwords import generate_password_hash, verify_password_hash
+from backend.modules.identity.passwords import generate_password_hash, verify_password_hash
 from backend.modules.organization.canonical import normalize_school_code
 from backend.modules.identity import repository
 from backend.modules.identity.database import DB_LOCK, connect

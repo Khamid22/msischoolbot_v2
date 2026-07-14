@@ -48,10 +48,10 @@ def test_parent_module_is_canonical_and_legacy_facades_are_gone():
 def test_parent_domain_imports_are_used_where_safe():
     identity_routes_source = Path("backend/modules/identity/page.py").read_text()
     parent_routes_source = Path("backend/workspaces/parent/page.py").read_text()
-    admin_parent_routes_source = Path("backend/internal_operations/parent_access_api.py").read_text()
-    admin_student_routes_source = Path("backend/internal_operations/student_records_api.py").read_text()
-    admin_page_source = Path("backend/internal_operations/page.py").read_text()
-    admin_page_service_source = Path("backend/internal_operations/workspace.py").read_text()
+    admin_parent_routes_source = Path("backend/internal_operations/people/parents/api_routes.py").read_text()
+    admin_student_routes_source = Path("backend/internal_operations/people/students/api_routes.py").read_text()
+    admin_page_source = Path("backend/internal_operations/pages/routes.py").read_text()
+    admin_page_service_source = Path("backend/internal_operations/pages/context.py").read_text()
     student_payload_source = Path("backend/modules/people/students/payload.py").read_text()
 
     assert "from backend.modules.people.parents.service import (" in identity_routes_source

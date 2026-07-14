@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 from fastapi import HTTPException
 
-from backend.core.http import api_success
+from backend.core.api import api_success
 from backend.modules.teacher_academy.schemas import (
     AddAcademyAssessmentForm,
     CreateAcademyTeacherForm,
@@ -16,7 +16,7 @@ from backend.modules.teacher_academy.schemas import (
     UpdateAcademyStatusForm,
     form_list,
 )
-from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
+from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.modules.teacher_academy.policies import filter_academy_teachers_for_user
 from backend.modules.teacher_academy.service import (
     add_assessment,

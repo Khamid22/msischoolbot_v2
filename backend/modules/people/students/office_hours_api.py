@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.http import ApiSuccess, api_success
+from backend.core.api import ApiSuccess, api_success
 from backend.modules.people.students.schemas import (
     AvailabilityList,
     BookingCreated,

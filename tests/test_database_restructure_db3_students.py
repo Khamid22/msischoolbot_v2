@@ -46,8 +46,8 @@ def test_student_domain_imports_are_used_where_safe():
     student_page_source = Path("backend/workspaces/student/page.py").read_text()
     student_routes_source = Path("backend/workspaces/student/forms.py").read_text()
     auth_routes_source = Path("backend/modules/identity/api.py").read_text()
-    admin_student_routes_source = Path("backend/internal_operations/student_records_forms.py").read_text()
-    admin_page_service_source = Path("backend/internal_operations/workspace.py").read_text()
+    admin_student_routes_source = Path("backend/internal_operations/people/students/form_routes.py").read_text()
+    admin_page_service_source = Path("backend/internal_operations/pages/context.py").read_text()
     parent_service_source = Path("backend/modules/people/parents/service.py").read_text()
     office_hours_source = Path("backend/workspaces/student/office_hours.py").read_text()
 
@@ -70,7 +70,7 @@ def test_student_query_sql_is_owned_by_the_domain():
 
 
 def test_student_public_dashboard_resolution_uses_student_domain():
-    route_service_source = Path("backend/internal_operations/student_records_forms.py").read_text()
+    route_service_source = Path("backend/internal_operations/people/students/form_routes.py").read_text()
     parent_service_source = Path("backend/modules/people/parents/service.py").read_text()
     academic_dashboard_source = Path("backend/modules/reporting/academic_dashboard.py").read_text()
     office_hours_source = Path("backend/workspaces/student/office_hours.py").read_text()

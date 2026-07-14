@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import main
-from backend.core import performance
+from backend.core.runtime import performance
 from backend.server import handle_unexpected_error
 
 

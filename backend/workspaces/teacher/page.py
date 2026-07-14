@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter, Depends
 
-from backend.core.guards import require_role
-from backend.core.performance import PagePerformanceTimer, log_page_performance
-from backend.core.rendering import generate_csrf, render_react_page
-from backend.core.session import (
+from backend.core.access.pages import require_role
+from backend.core.runtime.performance import PagePerformanceTimer, log_page_performance
+from backend.core.web.rendering import generate_csrf, render_react_page
+from backend.modules.identity.session import (
     current_auth_login,
     current_teacher_id,
     current_teacher_staff_id,

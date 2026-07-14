@@ -34,6 +34,10 @@ Forbidden:
 
 `backend/application` registers pages/APIs and system endpoints. `backend/workspaces` and `backend/internal_operations` translate HTTP into calls to domain services. They do not own business rules or persistence.
 
+Core is divided by infrastructure responsibility: `core/access`, `core/api`, `core/runtime`, `core/web`, and `core/database.py`. Password and portal-session behavior is Identity-owned. The remaining `core/web/request_context.py` is an explicit compatibility boundary for older form routes, not the pattern for new FastAPI code.
+
+Internal Operations is divided into `pages`, `academics`, `people`, `staffing`, `resources`, `finance`, and `support`. Its academic API is assembled from focused class, group, curriculum, timetable, and gradebook route modules. Product modules and role workspaces must not import Internal Operations; shared invalidation belongs to Platform.
+
 `backend/modules` is organized by product ownership. Academics is subdivided because scheduling, gradebook, curriculum, and assessment rules change independently, while remaining one transaction-capable module. Schedule changes, cancellation/recovery, and holiday reflow retain their existing explicit transaction boundaries.
 
 `backend/platform` contains technical integrations (Redis, object storage, Telegram verification). It does not own LMS business state.

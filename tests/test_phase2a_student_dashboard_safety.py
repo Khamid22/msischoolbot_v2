@@ -304,7 +304,7 @@ def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypat
 
 
 def test_admin_student_dashboard_redirects_to_embed_dashboard(client, monkeypatch):
-    import backend.internal_operations.student_records_forms as student_routes
+    import backend.internal_operations.people.students.form_routes as student_routes
 
     monkeypatch.setattr(
         student_routes,
@@ -342,7 +342,7 @@ def test_admin_student_dashboard_redirects_to_embed_dashboard(client, monkeypatc
 
 
 def test_admin_student_dashboard_target_preserves_embed_admin(client, monkeypatch):
-    import backend.internal_operations.student_records_forms as student_routes
+    import backend.internal_operations.people.students.form_routes as student_routes
 
     monkeypatch.setattr(
         student_routes,

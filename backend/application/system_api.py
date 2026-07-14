@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from backend.core.database import check_database_ready
-from backend.core.http import ApiMessage, api_message
+from backend.core.api import ApiMessage, api_message
 
 router = APIRouter()
 

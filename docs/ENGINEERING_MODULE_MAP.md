@@ -27,7 +27,11 @@ Audience: engineers locating the owner of a change.
 | complaints | `modules/support` | `features/support` |
 | announcements/chat | `modules/communications` | `features/communications` |
 | dashboards/read models | `modules/reporting` | `features/reporting` |
-| System Admin transport/UI | `internal_operations` | `internal_operations` |
+| System Admin page composition | `internal_operations/pages` | `internal_operations` |
+| System Admin academic transport | `internal_operations/academics` | `internal_operations` |
+| System Admin people/staffing transport | `internal_operations/people`, `internal_operations/staffing` | `internal_operations` |
+| System Admin finance/support/resources transport | corresponding `internal_operations` package | `internal_operations` |
+| shared API/web/runtime infrastructure | `core/api`, `core/web`, `core/runtime` | n/a |
 | storage, Redis, Telegram adapter | `platform` | n/a |
 
 ## Table Ownership

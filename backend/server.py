@@ -9,15 +9,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from slowapi.errors import RateLimitExceeded
-from backend.core.rate_limit import limiter
-from backend.core.error_pages import internal_server_error_page
-from backend.core.observability import RequestMetricsMiddleware, configure_error_reporting
+from backend.core.runtime.rate_limit import limiter
+from backend.core.web.error_pages import internal_server_error_page
+from backend.core.runtime.observability import RequestMetricsMiddleware, configure_error_reporting
 
 from fastapi import Depends
-from backend.core.request_context import RequestContextMiddleware, prime_body_state
-from backend.core.guards import install_guard_handler
+from backend.core.web.request_context import RequestContextMiddleware, prime_body_state
+from backend.core.access.pages import install_guard_handler
 from backend.core.access.roles import is_valid_role, normalize_role, role_display_name
-from backend.core.config import get_web_settings
+from backend.core.runtime.config import get_web_settings
 from backend.application.registry import register_application_pages
 
 _BACKEND_DIR = os.path.dirname(__file__)
@@ -417,7 +417,7 @@ def handle_unexpected_error(request_obj: Request, exc: Exception):
 
 @app.get("/unauthorized")
 def unauthorized_page(request_obj: Request):
-    from backend.core.rendering import render_react_page
+    from backend.core.web.rendering import render_react_page
 
     auth_role = normalize_role(request_obj.session.get("auth_role"))
     return render_react_page(
@@ -490,7 +490,7 @@ def _bootstrap_app(app_instance):
         return app_instance
 
     # Set static asset dependencies in the rendering boundary.
-    import backend.core.rendering as render
+    import backend.core.web.rendering as render
     render.ASSET_VERSION = _ASSET_VERSION
     render.STATIC_FOLDER = _STATIC_DIR
 
@@ -501,7 +501,7 @@ def _bootstrap_app(app_instance):
     # Build small legacy Telegram helper bundles at startup. Some deploy
     # environments start from source without generated bundle artifacts, and
     # render_react_page still loads this helper when Telegram support is enabled.
-    from backend.core.assets import ensure_js_bundles
+    from backend.core.web.assets import ensure_js_bundles
     ensure_js_bundles(_STATIC_DIR)
 
     # Include system router

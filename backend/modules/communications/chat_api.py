@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.http import ApiSuccess, api_success
-from backend.internal_operations.schemas import (
+from backend.core.api import ApiSuccess, api_success
+from backend.modules.communications.schemas import (
     AdminChatMessages,
     BlockStudentRequest,
     BlockedStudents,

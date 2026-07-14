@@ -134,7 +134,7 @@ def _minimal_academic_context(**_kwargs):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.internal_operations.page as admin_page
+    import backend.internal_operations.pages.routes as admin_page
 
     monkeypatch.setattr(
         admin_page,

@@ -11,7 +11,7 @@ from backend.core.access.roles import (
     ALL_ROLES,
     normalize_role,
 )
-from backend.core.access.permissions import (
+from backend.core.access.management_permissions import (
     PERMISSION_VIEW_DASHBOARD,
     PERMISSION_MANAGE_STUDENTS,
     PERMISSION_MANAGE_TEACHERS,
@@ -25,7 +25,7 @@ from backend.core.access.permissions import (
     ALL_PERMISSIONS,
     role_has_permission,
 )
-from backend.core.access.dependencies import (
+from backend.core.access.api import (
     CurrentUser,
     get_current_user,
     get_current_user_role,

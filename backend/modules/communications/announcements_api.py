@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.http import ApiSuccess, api_success
-from backend.internal_operations.schemas import CreateAnnouncementRequest, UpdateAnnouncementRequest
+from backend.core.api import ApiSuccess, api_success
+from backend.modules.communications.schemas import (
+    CreateAnnouncementRequest,
+    UpdateAnnouncementRequest,
+)
 from backend.modules.communications.announcements_service import (
     create_announcement,
     delete_announcement,
     list_announcements,
     update_announcement,
 )
-from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
+from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.core.access import CurrentUser, get_current_user
 
 router = APIRouter(prefix="/announcements")

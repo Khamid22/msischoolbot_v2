@@ -5,7 +5,7 @@ import json
 from fastapi import APIRouter, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from backend.core.rendering import generate_csrf, render_react_page
+from backend.core.web.rendering import generate_csrf, render_react_page
 from backend.platform.telegram.init_data import (
     verify_telegram_init_data,
 )
@@ -16,8 +16,8 @@ from backend.modules.people.students.service import record_student_activity
 from backend.modules.identity.service import authenticate_account_password
 from backend.modules.identity.telegram_auth import authenticate_account_telegram
 from backend.core.access.roles import dashboard_path_for_role
-from backend.core.guards import unauthorized_response
-from backend.core.session import (
+from backend.core.access.pages import unauthorized_response
+from backend.modules.identity.session import (
     build_dashboard_url,
     current_auth_role,
     current_student_enrollment_id,
@@ -27,9 +27,9 @@ from backend.core.session import (
     set_admin_session,
     url_for,
 )
-from backend.core.request_context import request as request_proxy, session
-from backend.core.web_responses import redirect, with_status
-from backend.core.rate_limit import limiter
+from backend.core.web.request_context import request as request_proxy, session
+from backend.core.web.responses import redirect, with_status
+from backend.core.runtime.rate_limit import limiter
 
 _ADMIN_HANDOFF_SALT = "admin-website-handoff"
 _ADMIN_HANDOFF_MAX_AGE_SECONDS = 180

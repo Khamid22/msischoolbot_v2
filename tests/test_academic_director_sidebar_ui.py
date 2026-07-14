@@ -150,7 +150,7 @@ def _patch_academic_director_cards(monkeypatch):
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.internal_operations.page as admin_page
+    import backend.internal_operations.pages.routes as admin_page
     import backend.workspaces.academic_director.page as academic_director_routes
     import backend.workspaces.head_of_departments.page as head_of_department_routes
 
@@ -423,7 +423,7 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     hod_academy_source = Path("frontend/src/workspaces/head_of_departments/pages/TeacherAcademy.tsx").read_text()
     app_source = Path("frontend/src/app/App.tsx").read_text()
     bootstrap_source = Path("frontend/src/shared/lib/bootstrap.ts").read_text()
-    admin_page_source = Path("backend/internal_operations/page.py").read_text()
+    admin_page_source = Path("backend/internal_operations/pages/routes.py").read_text()
 
     assert "Academic Director navigation" in source
     assert "Academic Director mobile navigation" in source

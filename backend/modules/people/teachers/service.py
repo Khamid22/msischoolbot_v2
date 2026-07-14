@@ -1,7 +1,7 @@
 import re
 import secrets
 
-from backend.core.passwords import generate_password_hash
+from backend.modules.identity.passwords import generate_password_hash
 from backend.modules.identity.service import provision_teacher_account
 from backend.modules.people.teachers import repository as repository
 from backend.modules.identity.database import DB_LOCK, connect, utc_now_iso

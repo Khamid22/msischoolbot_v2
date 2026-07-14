@@ -34,8 +34,8 @@ def test_teacher_identity_wrapper_is_gone():
 def test_teacher_module_service_is_used_by_consumers():
     academy_service_source = Path("backend/modules/teacher_academy/service.py").read_text()
     academy_api_source = Path("backend/modules/teacher_academy/responses.py").read_text()
-    admin_teacher_routes_source = Path("backend/internal_operations/staff_records_forms.py").read_text()
-    admin_page_service_source = Path("backend/internal_operations/workspace.py").read_text()
+    admin_teacher_routes_source = Path("backend/internal_operations/staffing/form_routes.py").read_text()
+    admin_page_service_source = Path("backend/internal_operations/pages/context.py").read_text()
 
     assert "from backend.modules.people.teachers.service import list_teachers, upsert_teacher" in academy_service_source
     assert "from backend.modules.people.teachers.service import list_teachers" in academy_api_source

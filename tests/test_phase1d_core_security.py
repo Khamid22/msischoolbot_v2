@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash
 
-from backend.core.passwords import verify_password_hash
+from backend.modules.identity.passwords import verify_password_hash
 from backend.modules.identity.service import verify_account_password
 
 

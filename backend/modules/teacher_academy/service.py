@@ -1,6 +1,6 @@
 import json
 
-from backend.core.passwords import generate_password_hash
+from backend.modules.identity.passwords import generate_password_hash
 from backend.core.database import connect_auth_db
 
 from backend.modules.teacher_academy import repository as repository

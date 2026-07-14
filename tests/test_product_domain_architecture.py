@@ -58,6 +58,55 @@ OBSOLETE_BACKEND_MODULES = {
     "student_records",
 }
 
+CORE_REQUIRED = {"access", "api", "runtime", "web"}
+
+INTERNAL_OPERATIONS_REQUIRED = {
+    "pages",
+    "academics",
+    "people/students",
+    "people/parents",
+    "staffing",
+    "resources",
+    "finance",
+    "support",
+}
+
+OBSOLETE_CORE_FILES = {
+    "api_responses.py",
+    "api_schemas.py",
+    "assets.py",
+    "config.py",
+    "error_pages.py",
+    "guards.py",
+    "http.py",
+    "observability.py",
+    "passwords.py",
+    "performance.py",
+    "rate_limit.py",
+    "rendering.py",
+    "request_context.py",
+    "session.py",
+    "web_responses.py",
+}
+
+OBSOLETE_INTERNAL_OPERATION_FILES = {
+    "academics_api.py",
+    "academic_forms.py",
+    "complaints_api.py",
+    "learning_resources_api.py",
+    "learning_resources_forms.py",
+    "office_hours_api.py",
+    "page.py",
+    "page_cache.py",
+    "parent_access_api.py",
+    "payments_api.py",
+    "schemas.py",
+    "staff_records_forms.py",
+    "student_records_api.py",
+    "student_records_forms.py",
+    "workspace.py",
+}
+
 
 def _python_sources(root: Path):
     return [path for path in root.rglob("*.py") if "__pycache__" not in path.parts]
@@ -77,6 +126,42 @@ def test_implemented_product_domains_are_navigable_packages():
     feature_root = Path("frontend/src/features")
     for relative in FRONTEND_REQUIRED:
         assert (feature_root / relative).is_dir(), f"Missing frontend product domain: {relative}"
+
+
+def test_core_and_internal_operations_are_navigable_packages():
+    core_root = Path("backend/core")
+    for relative in CORE_REQUIRED:
+        package = core_root / relative
+        assert package.is_dir(), f"Missing Core responsibility package: {relative}"
+        assert (package / "__init__.py").is_file()
+    for file_name in OBSOLETE_CORE_FILES:
+        assert not (core_root / file_name).exists(), f"Core flat file returned: {file_name}"
+    assert not (core_root / "access/permissions.py").exists(), (
+        "Keep API and workspace permission vocabularies in separate named files"
+    )
+
+    internal_root = Path("backend/internal_operations")
+    for relative in INTERNAL_OPERATIONS_REQUIRED:
+        package = internal_root / relative
+        assert package.is_dir(), f"Missing Internal Operations package: {relative}"
+        assert (package / "__init__.py").is_file()
+    for file_name in OBSOLETE_INTERNAL_OPERATION_FILES:
+        assert not (internal_root / file_name).exists(), (
+            f"Internal Operations catch-all returned: {file_name}"
+        )
+
+
+def test_core_and_product_domains_do_not_depend_on_internal_operations():
+    for root in (Path("backend/core"), Path("backend/modules"), Path("backend/workspaces")):
+        for path in _python_sources(root):
+            source = path.read_text(encoding="utf-8")
+            assert "backend.internal_operations" not in source, (
+                f"Outer system-admin adapter imported from {path}"
+            )
+
+    for path in _python_sources(Path("backend/core")):
+        source = path.read_text(encoding="utf-8")
+        assert "backend.modules" not in source, f"Product dependency leaked into Core: {path}"
 
 
 def test_obsolete_ownership_packages_and_imports_are_absent():

@@ -2,14 +2,14 @@ import os
 import threading
 import time
 
-from backend.core.web_responses import redirect, with_status
-from backend.core.request_context import request, session
-from backend.core.session import url_for
+from backend.core.web.responses import redirect, with_status
+from backend.core.web.request_context import request, session
+from backend.modules.identity.session import url_for
 from backend.modules.academics.gradebook.rating import (
     get_group_cache_entry,
     is_full_form,
 )
-from backend.core.session import (
+from backend.modules.identity.session import (
     build_dashboard_url,
     current_auth_role,
     current_student_enrollment_id,

@@ -2,8 +2,8 @@
 
 from fastapi.responses import HTMLResponse
 
-from backend.core.rendering import render_react_page, _safe_json
-from backend.core.session import url_for
+from backend.core.web.rendering import render_react_page, _safe_json
+from backend.modules.identity.session import url_for
 
 
 def test_render_react_page_returns_html_response_with_status():

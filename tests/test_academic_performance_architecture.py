@@ -199,7 +199,12 @@ def test_permanent_group_purge_requires_archival_and_exact_confirmation(monkeypa
 
 def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
     paths = [
-        Path("backend/internal_operations/academics_api.py"),
+        Path("backend/internal_operations/academics/routes.py"),
+        Path("backend/internal_operations/academics/group_routes.py"),
+        Path("backend/internal_operations/academics/timetable_routes.py"),
+        Path("backend/internal_operations/academics/gradebook_routes.py"),
+        Path("backend/internal_operations/academics/curriculum_routes.py"),
+        Path("backend/internal_operations/academics/class_routes.py"),
         Path("backend/workspaces/academic_director/academics_api.py"),
         Path("backend/modules/academics/groups/read_service.py"),
     ]
@@ -212,14 +217,24 @@ def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
 
 def test_granular_routes_exist_for_both_management_roles(app):
     del app  # Route prefixes are registered separately; assert the shared adapters here.
-    from backend.internal_operations.academics_api import router as admin_router
+    from backend.internal_operations.academics.routes import router as admin_router
     from backend.workspaces.academic_director.academics_api import router as director_router
 
-    for router in (admin_router, director_router):
+    def collect_paths(router, prefix=""):
         paths = {}
         for route in router.routes:
+            included = getattr(route, "original_router", None)
+            if included is not None:
+                include_prefix = getattr(route.include_context, "prefix", "")
+                for path, methods in collect_paths(included, prefix + include_prefix).items():
+                    paths.setdefault(path, set()).update(methods)
+                continue
             if getattr(route, "path", None):
-                paths.setdefault(route.path, set()).update(route.methods or [])
+                paths.setdefault(prefix + route.path, set()).update(route.methods or [])
+        return paths
+
+    for router in (admin_router, director_router):
+        paths = collect_paths(router)
         assert "GET" in paths["/academic/groups"]
         assert "GET" in paths["/academic/groups/{group_id}/summary"]
         assert "GET" in paths["/academic/groups/{group_id}/timetable"]

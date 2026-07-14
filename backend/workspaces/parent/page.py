@@ -5,14 +5,14 @@ import html
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 
-from backend.core.guards import require_role
-from backend.core.web_responses import redirect
-from backend.core.request_context import session, request as ctx_request
-from backend.core.rendering import generate_csrf
+from backend.core.access.pages import require_role
+from backend.core.web.responses import redirect
+from backend.core.web.request_context import session, request as ctx_request
+from backend.core.web.rendering import generate_csrf
 
 from backend.modules.communications.announcements_service import list_announcements
 from backend.modules.academics.resources.service import list_resources
-from backend.core.rendering import render_react_page
+from backend.core.web.rendering import render_react_page
 from backend.modules.people.parents.service import (
     claim_parent_invite_code,
     list_parent_client_children,
@@ -23,7 +23,7 @@ from backend.modules.people.parents.service import (
 )
 from backend.modules.people.parents.cards import build_parent_workspace_cards
 from backend.platform.telegram.init_data import telegram_user_from_init_data
-from backend.core.session import set_account_session, url_for
+from backend.modules.identity.session import set_account_session, url_for
 
 
 def _page(title, body_html, status_code=200, lang="uz", telegram_webapp=False):

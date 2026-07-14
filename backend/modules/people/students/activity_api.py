@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from backend.core.http import ApiSuccess, api_success
+from backend.core.api import ApiSuccess, api_success
 from backend.modules.people.students.service import (
     get_student_db_id_by_enrollment_id,
     record_student_activity,
 )
 from backend.core.access import CurrentUser, get_current_user
-from backend.core.session import current_student_school_code
+from backend.modules.identity.session import current_student_school_code
 
 router = APIRouter(prefix="/activity")
 

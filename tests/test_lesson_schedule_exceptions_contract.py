@@ -31,7 +31,7 @@ def test_cancel_and_recover_reflow_existing_curriculum_session_ids():
 
 
 def test_both_management_roles_expose_cancel_and_recover_routes():
-    admin = source("backend/internal_operations/academics_api.py")
+    admin = source("backend/internal_operations/academics/timetable_routes.py")
     director = source("backend/workspaces/academic_director/academics_api.py")
 
     for route_source in (admin, director):
@@ -64,7 +64,7 @@ def test_range_payload_keeps_exceptions_separate_and_marks_recorded_lessons():
 def test_reflow_mutations_lock_rows_and_return_deltas_not_gradebook():
     repository = source("backend/modules/academics/timetable/repository.py")
     operations = source("backend/modules/academics/timetable/operations.py")
-    admin = source("backend/internal_operations/academics_api.py")
+    admin = source("backend/internal_operations/academics/timetable_routes.py")
     director = source("backend/workspaces/academic_director/academics_api.py")
 
     assert "def lock_group_timetable_for_reflow(" in repository

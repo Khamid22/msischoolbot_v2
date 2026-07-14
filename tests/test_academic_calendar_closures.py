@@ -120,7 +120,7 @@ def test_closure_migration_is_auditable_and_never_deletes_academic_records():
 
 def test_both_management_roles_expose_preview_create_list_and_unlock_routes():
     for path in (
-        "backend/internal_operations/academics_api.py",
+        "backend/internal_operations/academics/timetable_routes.py",
         "backend/workspaces/academic_director/academics_api.py",
     ):
         route_source = source(path)

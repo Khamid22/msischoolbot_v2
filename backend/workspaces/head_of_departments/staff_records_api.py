@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from backend.core.http import ApiSuccess
+from backend.core.api import ApiSuccess
 from backend.modules.teacher_academy.responses import (
     add_assessment_response,
     delete_assessment_response,

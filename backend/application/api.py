@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from backend.workspaces.academic_director.api import router as academic_director_router
-from backend.internal_operations.api import router as internal_operations_router
+from backend.internal_operations.api_router import router as internal_operations_router
 from backend.workspaces.ceo.api import router as ceo_router
 from backend.workspaces.customer_support.api import router as customer_support_router
 from backend.workspaces.head_of_departments.api import router as head_of_department_router

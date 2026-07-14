@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import RedirectResponse
 
 from backend.modules.communications.announcements_service import list_announcements
-from backend.core.rendering import generate_csrf, render_react_page
+from backend.core.web.rendering import generate_csrf, render_react_page
 from backend.modules.teacher_academy.read_service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
@@ -15,9 +15,9 @@ from backend.modules.teacher_academy.policies import (
 )
 from backend.modules.academics.head_of_departments_cards import head_of_department_workspace_cards
 from backend.workspaces.shared import render_role_home
-from backend.core.guards import require_role
-from backend.core.request_context import session
-from backend.core.session import current_auth_login, current_auth_role, current_staff_id
+from backend.core.access.pages import require_role
+from backend.core.web.request_context import session
+from backend.modules.identity.session import current_auth_login, current_auth_role, current_staff_id
 
 
 def _to_int(value):

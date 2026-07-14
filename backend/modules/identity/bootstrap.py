@@ -3,7 +3,7 @@
 import logging
 import os
 
-from backend.core.passwords import generate_password_hash
+from backend.modules.identity.passwords import generate_password_hash
 from backend.modules.academics.resources.bootstrap import seed_default_resource_types
 from backend.modules.identity.service import synchronize_staff_account
 from backend.modules.identity import repository as identity_repository

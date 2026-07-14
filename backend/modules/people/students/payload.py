@@ -2,7 +2,7 @@
 
 from .access import is_student_owner_of_payload
 from backend.modules.academics.gradebook.rating import load_dashboard_payload
-from backend.core.session import (
+from backend.modules.identity.session import (
     current_auth_role,
     current_parent_id,
     current_student_enrollment_id,

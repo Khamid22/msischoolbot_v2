@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from backend.internal_operations import academics_api as admin_academics_api
+from backend.internal_operations.academics import gradebook_routes as admin_academics_api
 from backend.modules.academics.gradebook import trends as operations
 from backend.workspaces.academic_director import academics_api as director_academics_api
 
@@ -166,7 +166,7 @@ def test_trend_aggregation_is_read_only_and_both_roles_expose_it():
     assert "conn.commit()" not in trend_source
 
     for path in (
-        "backend/internal_operations/academics_api.py",
+        "backend/internal_operations/academics/gradebook_routes.py",
         "backend/workspaces/academic_director/academics_api.py",
     ):
         route_source = (ROOT / path).read_text(encoding="utf-8")

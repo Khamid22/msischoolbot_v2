@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
 
-from backend.core.request_context import request
-from backend.core.session import url_for
-from backend.core.rendering import generate_csrf
+from backend.core.web.request_context import request
+from backend.modules.identity.session import url_for
+from backend.core.web.rendering import generate_csrf
 
-from backend.core.rendering import render_react_page
+from backend.core.web.rendering import render_react_page
 from backend.modules.communications.announcements_service import list_announcements
-from backend.core.performance import PagePerformanceTimer, log_page_performance
+from backend.core.runtime.performance import PagePerformanceTimer, log_page_performance
 
 from backend.modules.people.students import dashboard as dashboard_service
 from backend.modules.people.students import payload as payload_service

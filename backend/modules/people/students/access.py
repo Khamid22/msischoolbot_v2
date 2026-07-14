@@ -1,4 +1,4 @@
-from backend.core.session import current_student_enrollment_id
+from backend.modules.identity.session import current_student_enrollment_id
 
 
 def is_student_owner_of_payload(student_id, payload):

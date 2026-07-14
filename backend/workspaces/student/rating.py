@@ -1,7 +1,7 @@
-from backend.core.request_context import request
-from backend.core.session import url_for
+from backend.core.web.request_context import request
+from backend.modules.identity.session import url_for
 
-from backend.core.rendering import render_react_page
+from backend.core.web.rendering import render_react_page
 
 from backend.modules.academics.gradebook.rating import (
     build_subject_leaderboard,

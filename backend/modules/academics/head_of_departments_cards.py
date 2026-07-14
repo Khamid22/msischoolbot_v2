@@ -7,8 +7,8 @@ from backend.modules.teacher_academy.policies import (
     filter_rows_by_subject_scope,
 )
 from backend.modules.teacher_academy.read_service import list_academy_teachers
-from backend.core.request_context import session
-from backend.core.session import current_auth_role, current_staff_id
+from backend.core.web.request_context import session
+from backend.modules.identity.session import current_auth_role, current_staff_id
 
 
 def _placeholder_cards():

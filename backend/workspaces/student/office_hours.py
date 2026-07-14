@@ -1,7 +1,7 @@
-from backend.core.web_responses import redirect
-from backend.core.request_context import request
-from backend.core.session import url_for, current_student_db_id
-from backend.core.rendering import render_react_page, generate_csrf
+from backend.core.web.responses import redirect
+from backend.core.web.request_context import request
+from backend.modules.identity.session import url_for, current_student_db_id
+from backend.core.web.rendering import render_react_page, generate_csrf
 from backend.modules.people.students import payload as payload_service
 from backend.modules.people.students.service import list_enrolled_subject_options
 from backend.modules.people.teachers.service import list_teachers

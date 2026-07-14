@@ -6,7 +6,7 @@ import secrets
 from typing import Any
 
 from backend.core.database import connect_auth_db
-from backend.core.passwords import generate_password_hash
+from backend.modules.identity.passwords import generate_password_hash
 
 from backend.modules.people.staff import repository
 

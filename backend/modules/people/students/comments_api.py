@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.core.http import ApiSuccess, api_success
+from backend.core.api import ApiSuccess, api_success
 from backend.modules.people.students.schemas import CommentList, CommentPosted, PostCommentRequest
 from backend.modules.academics.resources import comments_service
 from backend.core.access import CurrentUser, get_current_user
-from backend.core.session import current_student_full_name
+from backend.modules.identity.session import current_student_full_name
 
 router = APIRouter(prefix="/resources")
 

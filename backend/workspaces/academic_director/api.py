@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from backend.core.http import ApiSuccess, api_success
+from backend.core.api import ApiSuccess, api_success
 from backend.modules.academics.schemas import (
     CreateHeadOfDepartmentForm,
     HeadOfDepartmentCreated,
@@ -16,7 +16,7 @@ from backend.modules.people.staff.service import (
     create_head_of_department_account,
     reset_head_of_department_password,
 )
-from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
+from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.core.access import CurrentUser, get_current_user, require_role
 
 router = APIRouter(prefix="/academic-director", dependencies=[Depends(require_role("academic_director"))])

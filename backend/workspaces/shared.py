@@ -1,6 +1,6 @@
 from backend.core.access.roles import normalize_role, role_display_name
-from backend.core.rendering import generate_csrf, render_react_page
-from backend.core.session import current_auth_login, current_auth_role
+from backend.core.web.rendering import generate_csrf, render_react_page
+from backend.modules.identity.session import current_auth_login, current_auth_role
 
 
 def render_role_home(

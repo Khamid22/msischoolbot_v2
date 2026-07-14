@@ -3,8 +3,8 @@ import re
 import threading
 import time
 
-from backend.core.request_context import session
-from backend.core.session import url_for
+from backend.core.web.request_context import session
+from backend.modules.identity.session import url_for
 
 from backend.modules.organization import canonical
 from backend.modules.people.students.service import (
@@ -20,7 +20,7 @@ from backend.modules.academics.gradebook.rating import (
     round_grade_half_up,
 )
 from backend.modules.organization.canonical import normalize_text
-from backend.core.session import current_auth_role, current_student_db_id
+from backend.modules.identity.session import current_auth_role, current_student_db_id
 
 
 _SUBJECT_SWITCH_CACHE_LOCK = threading.Lock()

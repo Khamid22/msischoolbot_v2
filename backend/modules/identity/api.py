@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends, Request
 
-from backend.core.http import ApiSuccess, api_error, api_success
+from backend.core.api import ApiSuccess, api_error, api_success
 from backend.modules.identity.schemas import PasswordChangeRequest, PasswordChangeResult
 from backend.modules.identity.service import change_own_password
 from backend.core.access import CurrentUser, get_current_user as get_current_user_dependency, role_has_permission
-from backend.core.access.permissions import ALL_PERMISSIONS
+from backend.core.access.management_permissions import ALL_PERMISSIONS
 
 router = APIRouter()
 

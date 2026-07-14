@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Request
 
 
-from backend.core.request_context import session
-from backend.core.session import url_for
-from backend.core.rendering import generate_csrf
+from backend.core.web.request_context import session
+from backend.modules.identity.session import url_for
+from backend.core.web.rendering import generate_csrf
 
-from backend.core.rendering import render_react_page
+from backend.core.web.rendering import render_react_page
 
 from backend.workspaces.student.dashboard import register_dashboard_routes
 from backend.workspaces.student.rating import register_rating_board_routes
@@ -17,7 +17,7 @@ from backend.modules.people.students.service import (
     record_student_activity,
 )
 from backend.modules.people.students.workspace import build_student_panel_context
-from backend.core.session import (
+from backend.modules.identity.session import (
     current_auth_login,
     current_auth_role,
     current_student_db_id,
@@ -25,7 +25,7 @@ from backend.core.session import (
     current_student_school_code,
 )
 from backend.workspaces.student.forms import register_student_routes
-from backend.core.performance import PagePerformanceTimer, log_page_performance
+from backend.core.runtime.performance import PagePerformanceTimer, log_page_performance
 
 
 def register_student_page_routes(app):

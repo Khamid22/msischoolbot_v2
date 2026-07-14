@@ -34,7 +34,7 @@ def test_required_modular_architecture_paths_exist():
     for path in [
         Path("backend/application/api.py"),
         Path("backend/application/registry.py"),
-        Path("backend/internal_operations/page.py"),
+        Path("backend/internal_operations/pages/routes.py"),
         Path("backend/modules/identity/service.py"),
         Path("backend/modules/organization/service.py"),
         Path("backend/modules/academics/groups/service.py"),
@@ -96,7 +96,7 @@ def test_excel_is_not_an_lms_integration_or_upload_format():
 def test_main_starts_from_modular_accounts_and_core_config():
     main_source = Path("main.py").read_text()
     assert "from backend.modules.identity.bootstrap import init_storage" in main_source
-    assert "from backend.core.config import get_web_settings" in main_source
+    assert "from backend.core.runtime.config import get_web_settings" in main_source
     assert callable(importlib.import_module("backend.modules.identity.bootstrap").init_storage)
 
 

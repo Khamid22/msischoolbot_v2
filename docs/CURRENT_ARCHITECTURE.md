@@ -25,7 +25,12 @@ Alembic is the only DDL owner. This folder refactor does not change tables, migr
 ```text
 backend/
 ├── application/                 FastAPI composition and system endpoints
-├── core/                        config, database, HTTP, auth, sessions
+├── core/
+│   ├── access/                  roles, permissions, API users, page guards
+│   ├── api/                     shared JSON schemas and responses
+│   ├── runtime/                 config, observability, performance, limits
+│   ├── web/                     rendering, requests, assets, HTML responses
+│   └── database.py              PostgreSQL connection/pool infrastructure
 ├── modules/
 │   ├── identity/                accounts, passwords, Telegram account linking
 │   ├── organization/            schools, subjects, classes
@@ -52,10 +57,19 @@ backend/
 │   └── reporting/               cross-domain read models
 ├── workspaces/                  role-specific HTTP/page adapters
 ├── internal_operations/         protected System Admin adapters
+│   ├── pages/                    page routes, bootstrap context, options
+│   ├── academics/                focused academic route adapters
+│   ├── people/                   student and parent adapters
+│   ├── staffing/                 teacher/recruitment form adapters
+│   ├── resources/                learning-resource adapters
+│   ├── finance/                  payment adapters
+│   └── support/                  complaint adapters
 └── platform/                    Redis, storage, Telegram integration
 ```
 
 Every SQL statement under `backend/modules` is in a repository module. Services own validation, policy, calculations, transactions, and response assembly. Cross-domain reads use public contracts; a domain never imports another domain's repository.
+
+Identity owns password and session helpers. Core is product-agnostic infrastructure, while Internal Operations is an outer transport adapter: modules and role workspaces never import it.
 
 ## Frontend Layout
 

@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 import backend.modules.people.students.chat_api as chat_api
 from backend.modules.communications import chat_service
-from backend.core.access.dependencies import CurrentUser
+from backend.core.access.api import CurrentUser
 
 
 class _Result:
