@@ -35,8 +35,8 @@ def main() -> int:
 
     print("HR Manager account ready.")
     print(f"Login: {credentials['login']}")
-    print(f"Temporary password: {credentials['temporary_password']}")
-    print("The password is stored as a hash and must be changed after first sign-in.")
+    print(f"Password: {credentials['temporary_password']}")
+    print("The password is stored as a hash and can be changed later from Account security.")
     return 0
 
 

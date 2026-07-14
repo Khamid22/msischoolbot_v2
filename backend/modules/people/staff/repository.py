@@ -314,6 +314,7 @@ def _upsert_staff_account(
     password_hash: str,
     display_name: str,
     role: str,
+    must_change_password: bool = True,
     now: str,
 ) -> int:
     account = conn.execute(
@@ -345,13 +346,24 @@ def _upsert_staff_account(
                 full_name = %s,
                 legacy_source_table = 'msi_staff',
                 legacy_source_id = %s,
-                must_change_password = true,
-                password_changed_at = NULL,
+                must_change_password = %s,
+                password_changed_at = CASE WHEN %s THEN NULL ELSE %s::timestamptz END,
                 session_version = session_version + 1,
                 updated_at = %s::timestamptz
             WHERE id = %s
             """,
-            (login, password_hash, role, display_name, staff_id, now, account_id),
+            (
+                login,
+                password_hash,
+                role,
+                display_name,
+                staff_id,
+                bool(must_change_password),
+                bool(must_change_password),
+                now,
+                now,
+                account_id,
+            ),
         )
         return account_id
 
@@ -360,12 +372,27 @@ def _upsert_staff_account(
         INSERT INTO msi_v2.accounts (
             login, password_hash, role, status, full_name,
             legacy_source_table, legacy_source_id, must_change_password,
-            session_version, created_at, updated_at
+            password_changed_at, session_version, created_at, updated_at
         )
-        VALUES (%s, %s, %s, 'active', %s, 'msi_staff', %s, true, 1, %s::timestamptz, %s::timestamptz)
+        VALUES (
+            %s, %s, %s, 'active', %s, 'msi_staff', %s, %s,
+            CASE WHEN %s THEN NULL ELSE %s::timestamptz END,
+            1, %s::timestamptz, %s::timestamptz
+        )
         RETURNING id
         """,
-        (login, password_hash, role, display_name, staff_id, now, now),
+        (
+            login,
+            password_hash,
+            role,
+            display_name,
+            staff_id,
+            bool(must_change_password),
+            bool(must_change_password),
+            now,
+            now,
+            now,
+        ),
     ).fetchone()
     return _to_int(inserted["id"]) if inserted else 0
 

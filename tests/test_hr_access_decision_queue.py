@@ -113,7 +113,7 @@ def test_admin_candidate_apis_fail_closed_but_handoff_remains_available(client, 
     assert academy_response.json()["data"]["message"] == "Academy onboarding completed."
 
 
-def test_hr_first_login_is_forced_to_account_security(client, monkeypatch):
+def test_hr_login_routes_directly_to_recruitment_when_password_change_is_optional(client, monkeypatch):
     import backend.modules.identity.page as identity_page
 
     csrf = "hr-first-login-csrf"
@@ -131,7 +131,7 @@ def test_hr_first_login_is_forced_to_account_security(client, monkeypatch):
                 "auth_role": "hr_manager",
                 "auth_login": login,
                 "staff_id": 51,
-                "must_change_password": True,
+                "must_change_password": False,
                 "session_version": 3,
             },
         },
@@ -143,7 +143,7 @@ def test_hr_first_login_is_forced_to_account_security(client, monkeypatch):
     )
 
     assert response.status_code == 302
-    assert response.headers["location"] == "/account/security"
+    assert response.headers["location"] == "/hr-manager"
 
 
 def test_academic_director_decision_queue_endpoint_is_role_scoped(client, monkeypatch):

@@ -30,8 +30,6 @@ def _patch_successful_storage(monkeypatch, *, existing=False):
         "_account_identity_by_staff_id",
         lambda _conn, _staff_id: account,
     )
-    monkeypatch.setattr(service, "_generate_temporary_password", lambda: "SafePass4826")
-
     def save_staff(_conn, **values):
         captured["staff"] = values
         return 20
@@ -55,7 +53,7 @@ def _patch_successful_storage(monkeypatch, *, existing=False):
     return captured
 
 
-def test_hr0001_provisioning_hashes_one_time_password_and_forces_change(monkeypatch):
+def test_hr0001_provisioning_hashes_fixed_password_without_forcing_change(monkeypatch):
     captured = _patch_successful_storage(monkeypatch)
     conn = _Connection()
 
@@ -70,9 +68,9 @@ def test_hr0001_provisioning_hashes_one_time_password_and_forces_change(monkeypa
     assert credentials == {
         "role": "hr_manager",
         "login": "HR0001",
-        "temporary_password": "SafePass4826",
+        "temporary_password": "HR0001",
         "display_name": "Recruitment Lead",
-        "must_change_password": True,
+        "must_change_password": False,
         "account_id": 10,
         "staff_id": 20,
     }
@@ -82,6 +80,7 @@ def test_hr0001_provisioning_hashes_one_time_password_and_forces_change(monkeypa
     assert staff_hash != credentials["temporary_password"]
     assert check_password_hash(staff_hash, credentials["temporary_password"])
     assert captured["account"]["role"] == "hr_manager"
+    assert captured["account"]["must_change_password"] is False
     assert captured["profile"]["department"] == "Human Resources"
     assert captured["audit"]["event_type"] == "account.created"
     assert captured["audit"]["detail"] == {"role": "hr_manager", "method": "operator_cli"}
@@ -157,8 +156,9 @@ def test_hr0001_reset_invalidates_sessions_and_has_no_operator_password_argument
     repository_source = inspect.getsource(service.repository._upsert_staff_account)
     command_source = Path("scripts/create_hr_manager_account.py").read_text()
 
-    assert "must_change_password = true" in repository_source
+    assert "must_change_password = %s" in repository_source
     assert "session_version = session_version + 1" in repository_source
-    assert "password_changed_at = NULL" in repository_source
+    assert "CASE WHEN %s THEN NULL ELSE %s::timestamptz END" in repository_source
     assert "--temporary-password" not in command_source
     assert "--login" not in command_source
+    assert 'print(f"Password: {credentials[' in command_source

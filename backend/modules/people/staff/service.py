@@ -99,8 +99,8 @@ def _create_hr_manager_account(
     ):
         return False, f"{login} is linked to conflicting account records.", {}
 
-    temporary_password = _generate_temporary_password()
-    password_hash = generate_password_hash(temporary_password)
+    password = login
+    password_hash = generate_password_hash(password)
     now = _utc_now_iso()
     existing_account = account_by_login or account_by_staff
 
@@ -124,6 +124,7 @@ def _create_hr_manager_account(
         password_hash=password_hash,
         display_name=normalized_display_name,
         role="hr_manager",
+        must_change_password=False,
         now=now,
     )
     if not account_id:
@@ -154,9 +155,9 @@ def _create_hr_manager_account(
     return True, "", {
         "role": "hr_manager",
         "login": login,
-        "temporary_password": temporary_password,
+        "temporary_password": password,
         "display_name": normalized_display_name,
-        "must_change_password": True,
+        "must_change_password": False,
         "account_id": account_id,
         "staff_id": staff_id,
     }
