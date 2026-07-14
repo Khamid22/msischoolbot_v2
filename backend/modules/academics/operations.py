@@ -616,6 +616,208 @@ def _gradebook_lesson_window(
     }
 
 
+def _gradebook_trend_month_range(through, months):
+    through_text = str(through or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", through_text):
+        raise ValueError("through must use YYYY-MM format.")
+    try:
+        through_month = date.fromisoformat(f"{through_text}-01")
+    except ValueError as exc:
+        raise ValueError("through must be a valid calendar month.") from exc
+
+    try:
+        month_count = int(months)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("months must be a whole number from 3 to 12.") from exc
+    if month_count < 3 or month_count > 12:
+        raise ValueError("months must be between 3 and 12.")
+
+    absolute_month = through_month.year * 12 + through_month.month - month_count
+    start_year, start_month_zero = divmod(absolute_month, 12)
+    start_month = date(start_year, start_month_zero + 1, 1)
+    next_absolute_month = through_month.year * 12 + through_month.month
+    next_year, next_month_zero = divmod(next_absolute_month, 12)
+    end_month = date(next_year, next_month_zero + 1, 1)
+    return start_month, through_month, end_month, month_count
+
+
+def get_group_gradebook_trends(group_id, *, through, months=6):
+    group_id = int(group_id or 0)
+    if group_id <= 0:
+        raise ValueError("group_id is required")
+    start_month, through_month, end_month, month_count = _gradebook_trend_month_range(
+        through, months
+    )
+
+    with connect_auth_db() as conn:
+        group_row = conn.execute(
+            """
+            SELECT g.id
+            FROM msi_v2.groups g
+            WHERE """ + _legacy_or_v2_group_where() + """
+              AND g.status = 'active'
+            """,
+            (group_id, group_id),
+        ).fetchone()
+        if not group_row:
+            return None
+
+        rows = conn.execute(
+            """
+            WITH calendar_months AS (
+                SELECT generate_series(%s::date, %s::date, interval '1 month')::date AS month_start
+            ),
+            active_students AS (
+                SELECT gs.student_id
+                FROM msi_v2.group_students gs
+                WHERE gs.group_id = %s
+                  AND gs.enrollment_status = 'active'
+            ),
+            ranked_sessions AS (
+                SELECT ls.id,
+                       ls.session_date,
+                       ROW_NUMBER() OVER (
+                         PARTITION BY COALESCE(ls.program_item_id, -ls.id)
+                         ORDER BY CASE WHEN ls.source_key <> '' THEN 0 ELSE 1 END,
+                                  COALESCE(NULLIF(ls.source_order, 0), spi.item_order, 999999),
+                                  ls.session_date NULLS LAST,
+                                  ls.id
+                       ) AS session_rank
+                FROM msi_v2.lesson_sessions ls
+                LEFT JOIN msi_v2.subject_program_items spi ON spi.id = ls.program_item_id
+                WHERE ls.group_id = %s
+                  AND (
+                    spi.item_type = 'lesson'
+                    OR (ls.program_item_id IS NULL AND ls.source_key <> '')
+                  )
+            ),
+            month_lessons AS (
+                SELECT rs.id,
+                       date_trunc('month', rs.session_date)::date AS month_start
+                FROM ranked_sessions rs
+                WHERE rs.session_rank = 1
+                  AND rs.session_date >= %s
+                  AND rs.session_date < %s
+            ),
+            lesson_counts AS (
+                SELECT ml.month_start, count(*)::int AS lesson_count
+                FROM month_lessons ml
+                GROUP BY ml.month_start
+            ),
+            homework_by_student AS (
+                SELECT ml.month_start,
+                       active.student_id,
+                       round(avg(hw.score)::numeric, 1) AS avg_aap,
+                       count(*)::int AS homework_record_count
+                FROM active_students active
+                JOIN msi_v2.homework_scores hw
+                  ON hw.group_id = %s AND hw.student_id = active.student_id
+                JOIN month_lessons ml ON ml.id = hw.lesson_session_id
+                WHERE hw.score > 0
+                GROUP BY ml.month_start, active.student_id
+            ),
+            attendance_by_student AS (
+                SELECT ml.month_start,
+                       active.student_id,
+                       round(
+                         count(*) FILTER (WHERE ar.attendance_status = 'present') * 100.0
+                         / NULLIF(count(*), 0),
+                         0
+                       ) AS avg_ar,
+                       count(*)::int AS attendance_record_count
+                FROM active_students active
+                JOIN msi_v2.attendance_records ar
+                  ON ar.group_id = %s AND ar.student_id = active.student_id
+                JOIN month_lessons ml ON ml.id = ar.lesson_session_id
+                WHERE ar.attendance_status IN ('present', 'absent', 'justified')
+                GROUP BY ml.month_start, active.student_id
+            ),
+            student_months AS (
+                SELECT COALESCE(hw.month_start, ar.month_start) AS month_start,
+                       COALESCE(hw.student_id, ar.student_id) AS student_id,
+                       hw.avg_aap,
+                       ar.avg_ar,
+                       COALESCE(hw.homework_record_count, 0) AS homework_record_count,
+                       COALESCE(ar.attendance_record_count, 0) AS attendance_record_count
+                FROM homework_by_student hw
+                FULL OUTER JOIN attendance_by_student ar
+                  ON ar.month_start = hw.month_start AND ar.student_id = hw.student_id
+            ),
+            student_scores AS (
+                SELECT sm.*,
+                       CASE
+                         WHEN sm.avg_aap IS NULL AND sm.avg_ar IS NULL THEN NULL
+                         WHEN sm.avg_aap IS NULL THEN round((sm.avg_ar * 9.0 / 100.0)::numeric, 1)
+                         WHEN sm.avg_ar IS NULL THEN sm.avg_aap
+                         ELSE round(
+                           (sm.avg_aap + round((sm.avg_ar * 9.0 / 100.0)::numeric, 1)) / 2.0,
+                           1
+                         )
+                       END AS avg_performance
+                FROM student_months sm
+            ),
+            monthly_metrics AS (
+                SELECT scores.month_start,
+                       round(avg(scores.avg_aap)::numeric, 1) AS avg_aap,
+                       round(avg(scores.avg_ar)::numeric, 1) AS avg_ar,
+                       round(avg(scores.avg_performance)::numeric, 1) AS avg_performance,
+                       count(*)::int AS students_with_data,
+                       sum(scores.homework_record_count)::int AS homework_record_count,
+                       sum(scores.attendance_record_count)::int AS attendance_record_count
+                FROM student_scores scores
+                GROUP BY scores.month_start
+            )
+            SELECT months.month_start,
+                   metrics.avg_aap,
+                   metrics.avg_ar,
+                   metrics.avg_performance,
+                   COALESCE(lessons.lesson_count, 0)::int AS lesson_count,
+                   COALESCE(metrics.students_with_data, 0)::int AS students_with_data,
+                   COALESCE(metrics.homework_record_count, 0)::int AS homework_record_count,
+                   COALESCE(metrics.attendance_record_count, 0)::int AS attendance_record_count
+            FROM calendar_months months
+            LEFT JOIN monthly_metrics metrics ON metrics.month_start = months.month_start
+            LEFT JOIN lesson_counts lessons ON lessons.month_start = months.month_start
+            ORDER BY months.month_start
+            """,
+            (
+                start_month,
+                through_month,
+                int(group_row["id"]),
+                int(group_row["id"]),
+                start_month,
+                end_month,
+                int(group_row["id"]),
+                int(group_row["id"]),
+            ),
+        ).fetchall()
+
+    def optional_float(value):
+        return None if value is None else float(value)
+
+    return {
+        "range": {
+            "from": start_month.strftime("%Y-%m"),
+            "through": through_month.strftime("%Y-%m"),
+            "months": month_count,
+        },
+        "items": [
+            {
+                "month": row["month_start"].strftime("%Y-%m"),
+                "label": row["month_start"].strftime("%b %Y"),
+                "avgAAP": optional_float(row["avg_aap"]),
+                "avgAR": optional_float(row["avg_ar"]),
+                "avgPerformance": optional_float(row["avg_performance"]),
+                "lessonCount": int(row["lesson_count"] or 0),
+                "studentsWithData": int(row["students_with_data"] or 0),
+                "homeworkRecordCount": int(row["homework_record_count"] or 0),
+                "attendanceRecordCount": int(row["attendance_record_count"] or 0),
+            }
+            for row in rows
+        ],
+    }
+
+
 def get_group_gradebook(
     group_id, *, lesson_limit=0, lesson_cursor="", lesson_direction="",
     anchor_date="", lesson_month="", section="all"

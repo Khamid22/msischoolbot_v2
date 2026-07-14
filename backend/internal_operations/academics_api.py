@@ -35,6 +35,7 @@ from backend.modules.academics.operations import (
     create_schedule_from_payload,
     delete_group,
     get_group_gradebook,
+    get_group_gradebook_trends,
     get_enrollment_gradebook_summary,
     list_admin_academic_context,
     move_enrollment_group_from_payload,
@@ -307,6 +308,21 @@ def gradebook(
     if not result:
         raise HTTPException(status_code=404, detail="Group not found")
     result.pop("ok", None)
+    return api_success(result)
+
+
+@router.get(
+    "/groups/{group_id}/gradebook-trends",
+    operation_id="api_v1_admin_academic_group_gradebook_trends",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def gradebook_trends(group_id: int, through: str, months: int = 6):
+    try:
+        result = get_group_gradebook_trends(group_id, through=through, months=months)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not result:
+        raise HTTPException(status_code=404, detail="Group not found")
     return api_success(result)
 
 

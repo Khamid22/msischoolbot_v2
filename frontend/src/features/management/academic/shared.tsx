@@ -652,6 +652,27 @@ export type GradebookData = {
   };
 };
 
+export type AcademicTrendMonth = {
+  month: string;
+  label: string;
+  avgAAP: number | null;
+  avgAR: number | null;
+  avgPerformance: number | null;
+  lessonCount: number;
+  studentsWithData: number;
+  homeworkRecordCount: number;
+  attendanceRecordCount: number;
+};
+
+export type AcademicTrendsData = {
+  range: {
+    from: string;
+    through: string;
+    months: number;
+  };
+  items: AcademicTrendMonth[];
+};
+
 
 export type ScheduleRow = {
   id: number;

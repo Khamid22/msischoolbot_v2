@@ -538,6 +538,11 @@ export function SchedulePanel({ state }: { state: any }) {
       if (!apiSucceeded(response, data)) {
         throw new Error(apiErrorMessage(data, "Could not move the class."));
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["academic", "timetable"] }),
+        queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", payload.meta.group_id] }),
+        queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", payload.meta.group_id] }),
+      ]);
       showToast(message);
     } catch (dropError) {
       setPlacedBlocks((current) => {

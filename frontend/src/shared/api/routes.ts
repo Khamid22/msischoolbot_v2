@@ -1,4 +1,5 @@
 type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; month?: string; section?: string };
+type GradebookTrendsQuery = { through: string; months?: number };
 
 function gradebookUrl(base: string, groupId: number | string, query: GradebookQuery = {}) {
   const params = new URLSearchParams({ group_id: String(groupId) });
@@ -9,6 +10,12 @@ function gradebookUrl(base: string, groupId: number | string, query: GradebookQu
   if (query.month) params.set("month", query.month);
   if (query.section) params.set("section", query.section);
   return `${base}?${params.toString()}`;
+}
+
+function gradebookTrendsUrl(base: string, groupId: number | string, query: GradebookTrendsQuery) {
+  const params = new URLSearchParams({ through: query.through });
+  if (query.months) params.set("months", String(query.months));
+  return `${base}/${groupId}/gradebook-trends?${params.toString()}`;
 }
 
 export const apiRoutes = {
@@ -52,6 +59,8 @@ export const apiRoutes = {
   academicDirectorAcademicGroupStudents: (groupId: number | string) => `/api/v1/academic-director/academic/groups/${groupId}/students`,
   academicDirectorAcademicGradebookApi: (groupId: number | string, query?: GradebookQuery) =>
     gradebookUrl("/api/v1/academic-director/academic/gradebook", groupId, query),
+  academicDirectorAcademicGradebookTrendsApi: (groupId: number | string, query: GradebookTrendsQuery) =>
+    gradebookTrendsUrl("/api/v1/academic-director/academic/groups", groupId, query),
   academicDirectorAcademicAttendanceApi: "/api/v1/academic-director/academic/attendance",
   academicDirectorAcademicHomeworkApi: "/api/v1/academic-director/academic/homework",
   academicDirectorAcademicExamApi: "/api/v1/academic-director/academic/exams",

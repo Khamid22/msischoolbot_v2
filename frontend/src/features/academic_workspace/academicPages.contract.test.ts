@@ -106,6 +106,7 @@ describe("Academic Director academic workspace", () => {
       "adminAcademicSchoolCreateApi",
       "adminAcademicScheduleCreate",
       "adminAcademicGradebookApi",
+      "adminAcademicGradebookTrendsApi",
     ]) {
       assert.match(src, new RegExp(token));
     }

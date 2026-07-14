@@ -44,6 +44,7 @@
 /api/v1/academic-director/academic/groups | GET
 /api/v1/academic-director/academic/groups | POST
 /api/v1/academic-director/academic/groups/{group_id} | DELETE
+/api/v1/academic-director/academic/groups/{group_id}/gradebook-trends | GET
 /api/v1/academic-director/academic/groups/{group_id}/schedule | PUT
 /api/v1/academic-director/academic/groups/{group_id}/students | POST
 /api/v1/academic-director/academic/groups/{group_id}/summary | GET
@@ -78,6 +79,7 @@
 /api/v1/admin/academic/gradebook | GET
 /api/v1/admin/academic/groups | GET
 /api/v1/admin/academic/groups/{group_id} | DELETE
+/api/v1/admin/academic/groups/{group_id}/gradebook-trends | GET
 /api/v1/admin/academic/groups/{group_id}/purge | POST
 /api/v1/admin/academic/groups/{group_id}/purge-preview | GET
 /api/v1/admin/academic/groups/{group_id}/schedule | PUT

@@ -1,13 +1,14 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
-import { BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Plus, Settings, Table2, Users, X } from "lucide-react";
-import { BarChart, Bar, Cell, Legend, LabelList, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowDownRight, ArrowUpRight, BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Minus, Plus, Settings, Table2, Users, X } from "lucide-react";
+import { BarChart, Bar, Cell, Legend, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { asNumber, asString } from "@/features/managementTypes";
 import { attCls, attLabel, formatScoreOutOfNine, scoreOutOfNine } from "../gradebookFormat";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
-import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, ActiveCell, AttValue } from "./shared";
+import { GRADEBOOK_STUDENT_COL_WIDTH, GRADEBOOK_AAP_COL_WIDTH, GRADEBOOK_ATT_COL_WIDTH, GRADEBOOK_HW_COL_WIDTH, GRADEBOOK_LESSON_COL_WIDTH, EXAM_TABLE_STUDENT_COL_WIDTH, EXAM_TABLE_SCORE_COL_WIDTH, EXAM_TABLE_MIN_WIDTH, collectExamTypeOptions, averageScore, formatBarLabel, formatPercentLabel, StudentNameTick, Select, ExamTypeFilter, ExamViewSwitcher, MiniMetric, Lesson, Enrollment, GradebookData, AcademicTrendMonth, AcademicTrendsData, ActiveCell, AttValue } from "./shared";
 import { ModernGroupTimetable } from "./ModernGroupTimetable";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
@@ -17,6 +18,7 @@ import { queryClient } from "@/shared/api/queryClient";
 type AcademicGradebookRoutes = Pick<
   typeof routes,
   | "adminAcademicGradebookApi"
+  | "adminAcademicGradebookTrendsApi"
   | "adminAcademicGroupTimetableApi"
   | "adminAcademicAttendanceApi"
   | "adminAcademicHomeworkApi"
@@ -48,6 +50,7 @@ type ActiveExamCell = {
 
 type GradebookView = "gradebook" | "ep" | "timetable";
 type GradebookDisplayMode = "table" | "chart";
+type AcademicChartMode = "trends" | "students";
 type GradebookLoadOptions = { view?: GradebookView; cursor?: string; anchorDate?: string; month?: string; force?: boolean };
 type GroupSetupForm = {
   teacherId: string;
@@ -68,6 +71,13 @@ function gradebookSection(view: GradebookView) {
 function currentMonthKey() {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function offsetMonthKey(month: string, offset: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  if (!year || !monthNumber) return month;
+  const value = new Date(Date.UTC(year, monthNumber - 1 + offset, 1));
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function usePrefersReducedMotion() {
@@ -129,6 +139,91 @@ function CompactChartTooltip({
   );
 }
 
+function formatTrendMonth(month: string, format: "long" | "short" = "long") {
+  const [year, monthNumber] = month.split("-").map(Number);
+  if (!year || !monthNumber) return month;
+  return new Intl.DateTimeFormat("en", {
+    month: format,
+    year: format === "short" ? undefined : "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+}
+
+function MetricDelta({
+  current,
+  previous,
+  previousMonth,
+  unit = "",
+}: {
+  current: number | null;
+  previous: number | null;
+  previousMonth: string;
+  unit?: string;
+}) {
+  if (current === null) {
+    return <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">No data for selected month</span>;
+  }
+  if (previous === null) {
+    return <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">No data for {formatTrendMonth(previousMonth)}</span>;
+  }
+  const delta = Math.round((current - previous) * 10) / 10;
+  const isPositive = delta > 0;
+  const isNegative = delta < 0;
+  const Icon = isPositive ? ArrowUpRight : isNegative ? ArrowDownRight : Minus;
+  const tone = isPositive ? "text-emerald-700" : isNegative ? "text-red-700" : "text-muted-foreground";
+  const value = delta > 0 ? `+${delta}` : String(delta);
+  return (
+    <span className={`mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold ${tone}`}>
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      <span>{value}{unit}</span>
+      <span className="font-semibold text-muted-foreground">vs {formatTrendMonth(previousMonth)}</span>
+    </span>
+  );
+}
+
+type AcademicTrendTooltipItem = {
+  dataKey?: unknown;
+  color?: string;
+  value?: unknown;
+  payload?: AcademicTrendMonth;
+};
+
+function AcademicTrendTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: AcademicTrendTooltipItem[];
+}) {
+  const month = payload?.[0]?.payload;
+  if (!active || !month) return null;
+  const values = [
+    { key: "avgAAP", label: "AAP", value: month.avgAAP, color: "#2563eb", suffix: " / 9" },
+    { key: "avgPerformance", label: "Performance", value: month.avgPerformance, color: "#6d28d9", suffix: " / 9" },
+    { key: "avgAR", label: "Attendance", value: month.avgAR, color: "#059669", suffix: "%" },
+  ];
+  return (
+    <div className="min-w-52 rounded-xl border border-foreground/10 bg-popover px-3 py-2.5 text-popover-foreground shadow-card-hover">
+      <p className="text-xs font-bold">{formatTrendMonth(month.month)}</p>
+      <div className="mt-2 space-y-1.5">
+        {values.map((item) => (
+          <div key={item.key} className="flex items-center justify-between gap-4 text-xs">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-muted-foreground">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} aria-hidden="true" />
+              {item.label}
+            </span>
+            <span className="font-bold tabular-nums">{item.value === null ? "No data" : `${item.value}${item.suffix}`}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 border-t border-foreground/8 pt-2 text-[10px] leading-4 text-muted-foreground">
+        <p>{month.lessonCount} lessons · {month.studentsWithData} students with data</p>
+        <p>{month.homeworkRecordCount} homework · {month.attendanceRecordCount} attendance records</p>
+      </div>
+    </div>
+  );
+}
+
 export function GroupGradebook({
   groupId,
   csrf,
@@ -168,6 +263,7 @@ export function GroupGradebook({
   const [activeView, setActiveView] = useState<GradebookView>("gradebook");
   const [loadedView, setLoadedView] = useState<GradebookView>("gradebook");
   const [gradebookDisplay, setGradebookDisplay] = useState<GradebookDisplayMode>("table");
+  const [academicChartMode, setAcademicChartMode] = useState<AcademicChartMode>("trends");
   const [lessonMonth, setLessonMonth] = useState(currentMonthKey);
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
@@ -214,6 +310,7 @@ export function GroupGradebook({
     setActiveView("gradebook");
     setLoadedView("gradebook");
     setGradebookDisplay("table");
+    setAcademicChartMode("trends");
     setData(null);
     setSelectedStudent(null);
     setExamType("all");
@@ -343,9 +440,15 @@ export function GroupGradebook({
 
   async function refreshCurrentView() {
     loadRequestRef.current += 1;
-    await queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] });
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] }),
+      queryClient.cancelQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
+    ]);
     gradebookCacheRef.current.clear();
-    await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] }),
+      queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
+    ]);
     await load(groupId, undefined, {
       view: activeView,
       month: activeView === "gradebook" ? lessonMonth : "",
@@ -355,8 +458,12 @@ export function GroupGradebook({
 
   async function prepareGradebookCacheMutation() {
     loadRequestRef.current += 1;
-    await queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] });
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ["academic", "gradebook", groupId] }),
+      queryClient.cancelQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
+    ]);
     gradebookCacheRef.current.clear();
+    await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", groupId] });
   }
 
   function openAddStudent() {
@@ -480,6 +587,7 @@ export function GroupGradebook({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["academic", "timetable", groupId] }),
         queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] }),
+        queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
       ]);
       if (activeView !== "timetable") await refreshCurrentView();
       setSetupOpen(false);
@@ -927,6 +1035,31 @@ export function GroupGradebook({
   const academicAverageAR = averageScore(academicIndicatorData.map((row) => row.AR));
   const academicAveragePerformance = averageScore(academicIndicatorData.map((row) => row.averagePerformance));
   const academicChartMinWidth = Math.max(640, academicIndicatorData.length * 84);
+  const academicTrendsQuery = useQuery({
+    queryKey: ["academic", "gradebook-trends", groupId, selectedLessonMonth, 6],
+    enabled: Boolean(data && activeView === "gradebook" && gradebookDisplay === "chart" && selectedLessonMonth),
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(
+        academicRoutes.adminAcademicGradebookTrendsApi(groupId, { through: selectedLessonMonth, months: 6 }),
+        { signal },
+      );
+      const json = await response.json().catch(() => ({}));
+      if (!apiSucceeded(response, json)) throw new Error(apiErrorMessage(json, "Unable to load academic trends."));
+      return apiData<AcademicTrendsData>(json);
+    },
+  });
+  const academicTrendItems = academicTrendsQuery.data?.items ?? [];
+  const academicTrendCurrentIndex = academicTrendItems.findIndex((item) => item.month === selectedLessonMonth);
+  const academicTrendCurrent = academicTrendCurrentIndex >= 0 ? academicTrendItems[academicTrendCurrentIndex] : undefined;
+  const academicTrendPrevious = academicTrendCurrentIndex > 0 ? academicTrendItems[academicTrendCurrentIndex - 1] : undefined;
+  const previousTrendMonth = academicTrendPrevious?.month || offsetMonthKey(selectedLessonMonth, -1);
+  const displayedAcademicAAP = academicTrendCurrent ? academicTrendCurrent.avgAAP : academicAverageAAP;
+  const displayedAcademicAR = academicTrendCurrent ? academicTrendCurrent.avgAR : academicAverageAR;
+  const displayedAcademicPerformance = academicTrendCurrent ? academicTrendCurrent.avgPerformance : academicAveragePerformance;
+  const hasAcademicTrendData = academicTrendItems.some(
+    (item) => item.avgAAP !== null || item.avgAR !== null || item.avgPerformance !== null,
+  );
 
   let filteredExamScoreSum = 0;
   let filteredExamScoreCount = 0;
@@ -1214,12 +1347,81 @@ export function GroupGradebook({
                 </div>
               </div>
               <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span><span className="mt-1 block text-lg font-bold text-blue-600">{academicAverageAAP ?? "—"}</span></div>
-                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span><span className="mt-1 block text-lg font-bold text-emerald-600">{academicAverageAR ?? "—"}{academicAverageAR !== null ? <span className="text-xs font-normal text-muted-foreground">%</span> : null}</span></div>
-                <div className={detailMetricClass}><span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span><span className="mt-1 block text-lg font-bold">{academicAveragePerformance ?? "—"}{academicAveragePerformance !== null ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}</span></div>
+                <div className={detailMetricClass}>
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AAP</span>
+                  <span className="mt-1 block text-lg font-bold tabular-nums text-blue-600">{displayedAcademicAAP ?? "—"}</span>
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAAP} previous={academicTrendPrevious?.avgAAP ?? null} previousMonth={previousTrendMonth} />}
+                </div>
+                <div className={detailMetricClass}>
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg AR</span>
+                  <span className="mt-1 block text-lg font-bold tabular-nums text-emerald-600">{displayedAcademicAR ?? "—"}{displayedAcademicAR !== null ? <span className="text-xs font-normal text-muted-foreground">%</span> : null}</span>
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicAR} previous={academicTrendPrevious?.avgAR ?? null} previousMonth={previousTrendMonth} unit=" pp" />}
+                </div>
+                <div className={detailMetricClass}>
+                  <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Avg Performance</span>
+                  <span className="mt-1 block text-lg font-bold tabular-nums">{displayedAcademicPerformance ?? "—"}{displayedAcademicPerformance !== null ? <span className="text-xs font-normal text-muted-foreground"> / 9</span> : null}</span>
+                  {academicTrendsQuery.isPending ? <span className="mt-2 block h-2.5 w-24 rounded bg-muted motion-safe:animate-pulse" /> : academicTrendsQuery.isError ? <span className="mt-1.5 block text-[10px] font-semibold text-muted-foreground">Comparison unavailable</span> : <MetricDelta current={displayedAcademicPerformance} previous={academicTrendPrevious?.avgPerformance ?? null} previousMonth={previousTrendMonth} />}
+                </div>
               </div>
-              {hasAcademicIndicatorData ? (
-                <div className={`max-w-full overflow-x-auto pb-1 ${motion.panel}`}>
+              <div className="mb-3 flex justify-end">
+                <div className="inline-flex rounded-xl border border-foreground/10 bg-muted/60 p-1" role="group" aria-label="Academic indicator chart view">
+                  {(["trends", "students"] as const).map((mode) => {
+                    const selected = academicChartMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setAcademicChartMode(mode)}
+                        aria-pressed={selected}
+                        className={`min-h-11 rounded-lg px-4 text-xs font-bold transition-[background-color,color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${selected ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {mode === "trends" ? "Trends" : "Students"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {academicChartMode === "trends" ? (
+                <div key={`academic-trends-${selectedLessonMonth}`} className={motion.panel}>
+                  {academicTrendsQuery.isPending ? (
+                    <div className="h-[clamp(18rem,42dvh,26rem)] rounded-xl border border-foreground/8 bg-muted/35 p-5 motion-safe:animate-pulse" role="status" aria-label="Loading academic trends">
+                      <div className="h-full rounded-lg bg-gradient-to-b from-background/40 to-muted/50" />
+                    </div>
+                  ) : academicTrendsQuery.isError ? (
+                    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-12 text-center">
+                      <p className="text-sm font-bold text-red-800">{academicTrendsQuery.error instanceof Error ? academicTrendsQuery.error.message : "Unable to load academic trends."}</p>
+                      <button type="button" onClick={() => void academicTrendsQuery.refetch()} className="mt-3 min-h-11 rounded-lg border border-red-300 bg-surface px-4 text-xs font-bold text-red-800 transition-colors hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300">Retry</button>
+                    </div>
+                  ) : hasAcademicTrendData ? (
+                    <>
+                      <div className="h-[clamp(18rem,42dvh,26rem)] w-full" role="img" aria-label={`Six-month academic trend through ${selectedLessonMonthLabel}`}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={academicTrendItems} margin={{ top: 24, right: 8, left: 0, bottom: 4 }} accessibilityLayer>
+                            <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="hsl(var(--foreground)/0.08)" />
+                            <XAxis dataKey="label" tickFormatter={(value) => asString(value).split(" ")[0]} tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis yAxisId="score" domain={[0, 9]} ticks={[0, 3, 6, 9]} width={26} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis yAxisId="attendance" orientation="right" domain={[0, 100]} ticks={[0, 50, 100]} width={34} tickFormatter={(value) => `${value}%`} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                            <ReferenceLine x={academicTrendCurrent?.label} stroke="hsl(var(--primary)/0.32)" strokeDasharray="4 4" />
+                            <Tooltip cursor={{ stroke: "hsl(var(--foreground)/0.16)", strokeDasharray: "3 3" }} wrapperClassName="!outline-none" content={<AcademicTrendTooltip />} />
+                            <Legend verticalAlign="top" height={32} iconType="line" wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                            <Line yAxisId="score" type="monotone" dataKey="avgAAP" name="AAP" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3, fill: "#2563eb", strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={!prefersReducedMotion} animationDuration={380} animationEasing="ease-out" />
+                            <Line yAxisId="score" type="monotone" dataKey="avgPerformance" name="Performance" stroke="#6d28d9" strokeWidth={2.5} strokeDasharray="8 4" dot={{ r: 3, fill: "#6d28d9", strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={!prefersReducedMotion} animationBegin={50} animationDuration={380} animationEasing="ease-out" />
+                            <Line yAxisId="attendance" type="monotone" dataKey="avgAR" name="Attendance" stroke="#059669" strokeWidth={2.5} strokeDasharray="2 5" dot={{ r: 3, fill: "#059669", strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={!prefersReducedMotion} animationBegin={100} animationDuration={380} animationEasing="ease-out" />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <table className="sr-only">
+                        <caption>Monthly academic indicator values through {selectedLessonMonthLabel}</caption>
+                        <thead><tr><th>Month</th><th>Average AAP</th><th>Attendance rate</th><th>Average performance</th><th>Lessons</th><th>Students with data</th><th>Homework records</th><th>Attendance records</th></tr></thead>
+                        <tbody>{academicTrendItems.map((item) => <tr key={`trend-table-${item.month}`}><th>{formatTrendMonth(item.month)}</th><td>{item.avgAAP ?? "No data"}</td><td>{item.avgAR === null ? "No data" : `${item.avgAR}%`}</td><td>{item.avgPerformance ?? "No data"}</td><td>{item.lessonCount}</td><td>{item.studentsWithData}</td><td>{item.homeworkRecordCount}</td><td>{item.attendanceRecordCount}</td></tr>)}</tbody>
+                      </table>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-foreground/15 py-16 text-center text-sm text-muted-foreground">No academic indicator records are available in the six months through {selectedLessonMonthLabel}.</div>
+                  )}
+                </div>
+              ) : hasAcademicIndicatorData ? (
+                <div key={`academic-students-${selectedLessonMonth}`} className={`max-w-full overflow-x-auto pb-1 ${motion.panel}`}>
                   <div className="h-[clamp(18rem,44dvh,30rem)]" style={{ minWidth: academicChartMinWidth }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart key={`academic-chart-${selectedLessonMonth}`} data={academicIndicatorData} barCategoryGap="18%" barGap={3} margin={{ top: 28, right: 10, left: 4, bottom: 8 }}>

@@ -1,6 +1,7 @@
 import { apiRoutes } from "../api/routes.ts";
 
 type GradebookQuery = { lessonLimit?: number; cursor?: string; direction?: string; anchorDate?: string; month?: string; section?: string };
+type GradebookTrendsQuery = { through: string; months?: number };
 
 const gradebookUrl = (base: string, groupId: number | string, query: GradebookQuery = {}) => {
   const params = new URLSearchParams({ group_id: String(groupId) });
@@ -11,6 +12,12 @@ const gradebookUrl = (base: string, groupId: number | string, query: GradebookQu
   if (query.month) params.set("month", query.month);
   if (query.section) params.set("section", query.section);
   return `${base}?${params.toString()}`;
+};
+
+const gradebookTrendsUrl = (base: string, groupId: number | string, query: GradebookTrendsQuery) => {
+  const params = new URLSearchParams({ through: query.through });
+  if (query.months) params.set("months", String(query.months));
+  return `${base}/${groupId}/gradebook-trends?${params.toString()}`;
 };
 
 const adminStudentQuery = (school = "all") =>
@@ -103,6 +110,8 @@ export const routes = {
   adminAcademicGroupSchedule: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/schedule`,
   adminAcademicGroupStudents: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/students`,
   adminAcademicGradebookApi: (groupId: number | string, query?: GradebookQuery) => gradebookUrl("/api/v1/admin/academic/gradebook", groupId, query),
+  adminAcademicGradebookTrendsApi: (groupId: number | string, query: GradebookTrendsQuery) =>
+    gradebookTrendsUrl("/api/v1/admin/academic/groups", groupId, query),
   adminAcademicAttendanceApi: "/api/v1/admin/academic/attendance",
   adminAcademicHomeworkApi: "/api/v1/admin/academic/homework",
   adminAcademicExamApi: "/api/v1/admin/academic/exams",
@@ -127,6 +136,7 @@ export const routes = {
   academicDirectorAcademicGroupSchedule: apiRoutes.academicDirectorAcademicGroupSchedule,
   academicDirectorAcademicGroupStudents: apiRoutes.academicDirectorAcademicGroupStudents,
   academicDirectorAcademicGradebookApi: apiRoutes.academicDirectorAcademicGradebookApi,
+  academicDirectorAcademicGradebookTrendsApi: apiRoutes.academicDirectorAcademicGradebookTrendsApi,
   academicDirectorAcademicAttendanceApi: apiRoutes.academicDirectorAcademicAttendanceApi,
   academicDirectorAcademicHomeworkApi: apiRoutes.academicDirectorAcademicHomeworkApi,
   academicDirectorAcademicExamApi: apiRoutes.academicDirectorAcademicExamApi,

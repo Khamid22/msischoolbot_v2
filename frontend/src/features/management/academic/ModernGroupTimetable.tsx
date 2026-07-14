@@ -435,12 +435,14 @@ function MonthCalendar({ cursorKey, items, onSelectDay }: { cursorKey: string; i
 
 function LessonDetailsSheet({
   item,
+  groupId,
   csrf,
   academicRoutes,
   onClose,
   onSaved,
 }: {
   item: TimetableItem | null;
+  groupId: number;
   csrf: string;
   academicRoutes: TimetableRoutes;
   onClose: () => void;
@@ -535,6 +537,7 @@ function LessonDetailsSheet({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["academic", "timetable"] }),
         queryClient.invalidateQueries({ queryKey: ["academic", "gradebook"] }),
+        queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
       ]);
       onSaved(flow === "edit" ? "Lesson updated." : flow === "cancel" ? "Lesson cancelled and the timetable moved forward." : "Lesson recovered and the timetable restored.");
     } catch {
@@ -722,7 +725,7 @@ export function ModernGroupTimetable({
           <WeekCalendar cursorKey={cursorKey} items={items} fullDay={fullDay} onCursorChange={setCursorKey} onOpen={setSelected} />
         )}
       </section>
-      <LessonDetailsSheet item={selected} csrf={csrf} academicRoutes={academicRoutes} onClose={() => setSelected(null)} onSaved={(message) => { setSelected(null); showToast(message); }} />
+      <LessonDetailsSheet item={selected} groupId={groupId} csrf={csrf} academicRoutes={academicRoutes} onClose={() => setSelected(null)} onSaved={(message) => { setSelected(null); showToast(message); }} />
       <FloatingToast toast={toast} />
     </>
   );
