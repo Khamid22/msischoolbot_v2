@@ -6,7 +6,6 @@ from backend.platform.admin_page_cache import (
 from backend.modules.people.students.service import get_admin_student_profile, list_students_for_admin
 from backend.modules.people.teachers.service import list_teachers
 from backend.modules.teacher_academy.read_service import list_academy_teachers
-from backend.modules.hr.recruitment.service import list_teacher_candidates
 from backend.modules.support.service import list_complaints
 from backend.modules.people.parents.service import list_parent_accounts, list_parent_children
 from backend.modules.reporting.performance_summary import (
@@ -107,7 +106,6 @@ def build_admin_page_context(
         "students",
         "parents",
         "teachers",
-        "candidates",
         "resources",
         "payments",
         "complaints",
@@ -153,7 +151,6 @@ def build_admin_page_context(
     group_school_sets = _get_group_school_sets_from_db()
 
     admin_teachers = list_teachers()
-    admin_teacher_candidates = list_teacher_candidates()
     admin_teacher_academy = list_academy_teachers()
     should_defer_overview_lists = bool(defer_overview_lists and panel == "overview")
     admin_complaints = [] if should_defer_overview_lists else list_complaints()
@@ -307,7 +304,6 @@ def build_admin_page_context(
         "load_error": load_error,
         "admin_students": admin_students,
         "admin_teachers": admin_teachers,
-        "admin_teacher_candidates": admin_teacher_candidates,
         "admin_teacher_academy": admin_teacher_academy,
         "admin_complaints": admin_complaints,
         "admin_parents": admin_parents,

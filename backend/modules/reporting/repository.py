@@ -10,7 +10,6 @@ COUNT_SQL = {
     "subjects": "SELECT count(*) AS total FROM msi_v2.subjects WHERE status = 'active'",
     "groups": "SELECT count(*) AS total FROM msi_v2.groups WHERE status = 'active'",
     "parents": "SELECT count(*) AS total FROM msi_v2.parents WHERE status = 'active'",
-    "candidates": "SELECT count(*) AS total FROM msi_v2.teacher_candidates",
     "pending_parent_accounts": "SELECT count(*) AS total FROM msi_v2.accounts WHERE role = 'parent' AND status = 'pending'",
     "pending_parent_invites": "SELECT count(*) AS total FROM msi_v2.account_invites WHERE invite_type = 'parent' AND status = 'pending' AND (expires_at IS NULL OR expires_at > now())",
 }

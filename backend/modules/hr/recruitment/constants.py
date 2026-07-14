@@ -1,0 +1,81 @@
+"""Stable recruitment enums shared by schemas, policy, and services."""
+
+PRIMARY_STAGES = (
+    "new_candidate",
+    "job_interview",
+    "test_and_demo",
+    "under_review",
+    "teacher_academy",
+    "active_teacher",
+)
+ALTERNATIVE_STAGES = ("rejected", "on_hold", "candidate_withdrew")
+ALL_STAGES = frozenset((*PRIMARY_STAGES, *ALTERNATIVE_STAGES))
+PROTECTED_HIRE_STAGES = frozenset({"teacher_academy", "active_teacher"})
+
+DOCUMENT_TYPES = (
+    "cv",
+    "a_level",
+    "igcse",
+    "id_passport",
+    "ielts",
+    "sat",
+    "diploma",
+    "other",
+)
+CANDIDATE_SOURCES = (
+    "hh.uz",
+    "Telegram",
+    "Referral",
+    "Instagram",
+    "LinkedIn",
+    "University",
+    "MSI website",
+    "Other",
+)
+
+REJECTION_REASONS = (
+    "insufficient_subject_knowledge",
+    "insufficient_english_level",
+    "weak_demo_lesson",
+    "schedule_incompatibility",
+    "salary_expectation_incompatibility",
+    "insufficient_experience",
+    "unprofessional_behaviour",
+    "missing_or_invalid_documents",
+    "candidate_did_not_attend",
+    "position_already_filled",
+    "other",
+)
+
+INTERVIEW_RESULTS = frozenset(
+    {"passed", "failed", "on_hold", "additional_interview", "candidate_withdrew"}
+)
+SUBJECT_TEST_RESULTS = frozenset({"passed", "failed", "retake_required", "not_completed"})
+DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo", "on_hold"})
+TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
+
+RECRUITMENT_ROLES = frozenset(
+    {"hr_manager", "academic_director", "head_of_department", "admin", "system_admin", "ceo"}
+)
+FULL_VIEW_ROLES = frozenset({"hr_manager", "admin", "system_admin", "ceo"})
+FINAL_DECISION_ROLES = frozenset({"admin", "system_admin", "ceo"})
+ACADEMIC_ROLES = frozenset({"academic_director", "head_of_department"})
+
+
+__all__ = [
+    "ACADEMIC_ROLES",
+    "ALL_STAGES",
+    "ALTERNATIVE_STAGES",
+    "CANDIDATE_SOURCES",
+    "DEMO_RESULTS",
+    "DOCUMENT_TYPES",
+    "FINAL_DECISION_ROLES",
+    "FULL_VIEW_ROLES",
+    "INTERVIEW_RESULTS",
+    "PRIMARY_STAGES",
+    "PROTECTED_HIRE_STAGES",
+    "RECRUITMENT_ROLES",
+    "REJECTION_REASONS",
+    "SUBJECT_TEST_RESULTS",
+    "TASK_STATUSES",
+]

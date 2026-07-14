@@ -85,20 +85,10 @@ def customer_support_workspace_cards() -> list[dict[str, str]]:
     ]
 
 
-def hr_manager_workspace_cards() -> list[dict[str, str]]:
-    counts = _load_counts(["teachers", "candidates"])
-    return [
-        {"label": "Teachers", "value": _format_count(counts["teachers"])},
-        {"label": "Candidates", "value": _format_count(counts["candidates"])},
-        {"label": "Teacher Academy", "value": "Placeholder"},
-    ]
-
-
 __all__ = [
     "academic_director_workspace_cards",
     "ceo_workspace_cards",
     "customer_support_workspace_cards",
-    "hr_manager_workspace_cards",
     "list_active_group_names",
     "list_active_group_school_mappings",
     "list_active_schools",

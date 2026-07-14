@@ -1,5 +1,7 @@
 # Frontend Cleanliness Report
 
+> Superseded again 2026-07-14: the new recruitment workspace is active. The former candidate practice UI and `TrainingEvaluationModal.tsx` remain removed, and Teacher Academy remains active.
+
 Scope: cleanup/refactor pass on `FastAPI-Run-System`. No redesign, no new widgets, no business features, and no push.
 
 ## Duplicate UI Removed

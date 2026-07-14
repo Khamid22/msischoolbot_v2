@@ -40,15 +40,6 @@ ROLE_WORKSPACES = [
         "Parents",
         "4",
     ),
-    (
-        "hr_manager",
-        "/hr-manager",
-        "hr-manager-home",
-        "HR Manager Dashboard",
-        "HR Manager",
-        "Teachers",
-        "3",
-    ),
 ]
 
 
@@ -72,7 +63,6 @@ def _patch_workspace_cards(monkeypatch):
     import backend.workspaces.academic_director.page as academic_director_routes
     import backend.workspaces.ceo.page as ceo_page
     import backend.workspaces.customer_support.page as customer_support_page
-    import backend.workspaces.hr_manager.page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -102,15 +92,6 @@ def _patch_workspace_cards(monkeypatch):
             {"label": "Students", "value": "177"},
             {"label": "Pending Parents/Invites", "value": "3 / 5"},
             {"label": "Support/Payments", "value": "Placeholder"},
-        ],
-    )
-    monkeypatch.setattr(
-        hr_manager_page,
-        "hr_manager_workspace_cards",
-        lambda: [
-            {"label": "Teachers", "value": "3"},
-            {"label": "Candidates", "value": "1"},
-            {"label": "Teacher Academy", "value": "Placeholder"},
         ],
     )
 
@@ -224,11 +205,27 @@ def test_existing_critical_routes_remain_registered(app, method, path):
     assert method in routes[path]
 
 
+def test_recruitment_routes_replace_the_removed_legacy_hr_pipeline(app):
+    routes = _route_methods(app)
+
+    assert "/hr-manager" in routes
+    assert "GET" in routes["/hr-manager"]
+    assert "/recruitment/pipeline" in routes
+    for path in (
+        "/hr",
+        "/admin/teacher-candidates",
+        "/admin/teacher-candidates/{candidate_id}/status",
+        "/admin/teacher-candidates/{candidate_id}/promote",
+        "/admin/teacher-candidates/{candidate_id}/events/{event_id}/edit",
+        "/admin/teacher-candidates/{candidate_id}/events/{event_id}/delete",
+    ):
+        assert path not in routes
+
+
 def test_staff_role_pages_are_owned_by_one_staff_module():
     assert not Path("backend/roles").exists()
     for path in [
         Path("backend/workspaces/ceo/page.py"),
-        Path("backend/workspaces/hr_manager/page.py"),
         Path("backend/workspaces/customer_support/page.py"),
         Path("backend/modules/reporting/service.py"),
     ]:

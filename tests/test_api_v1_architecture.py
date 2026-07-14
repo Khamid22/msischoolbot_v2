@@ -8,7 +8,6 @@ WORKSPACE_NAMES = {
     "academic_director",
     "head_of_departments",
     "customer_support",
-    "hr_manager",
     "student",
     "parent",
     "teacher",
@@ -22,7 +21,7 @@ def _python_sources(root: str):
     return [path for path in Path(root).rglob("*.py") if "__pycache__" not in path.parts]
 
 
-def test_application_composes_exactly_seven_workspace_routers():
+def test_application_composes_exactly_six_workspace_routers():
     source = Path("backend/application/api.py").read_text()
 
     assert 'APIRouter(prefix="/api/v1")' in source

@@ -4,6 +4,7 @@ import {
   AlertCircle,
   BookOpen,
   BookMarked,
+  BriefcaseBusiness,
   CalendarDays,
   CreditCard,
   GraduationCap,
@@ -19,7 +20,6 @@ import {
   TrendingUp,
   Trophy,
   User,
-  UserPlus,
   UserRound,
   Users,
   X,
@@ -438,7 +438,6 @@ const tabIcons: Record<string, LucideIcon> = {
   payments: CreditCard,
   complaints: AlertCircle,
   career_growth: TrendingUp,
-  candidates: UserPlus,
   contact: Phone,
   chat: MessageSquare,
   student_dashboard: LayoutDashboard,
@@ -536,6 +535,16 @@ function InternalOperationsSidebar({
               })}
             </div>
           ))}
+          <div className="space-y-1">
+            <p className="px-2.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Recruitment</p>
+            <a
+              href={routes.adminRecruitment}
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              <BriefcaseBusiness className="h-4 w-4 shrink-0" />
+              <span>Teacher Recruitment</span>
+            </a>
+          </div>
         </nav>
       </div>
 

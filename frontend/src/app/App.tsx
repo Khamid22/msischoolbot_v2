@@ -16,7 +16,6 @@ const pageMap = {
   "internal-operations-home": lazy(() => import("@/internal_operations/pages/InternalOperations")),
   "parent-home": lazy(() => import("@/workspaces/parent/pages/ParentHome")),
   "ceo-home": lazy(() => import("@/workspaces/ceo/pages/Home")),
-  "hr-manager-home": lazy(() => import("@/workspaces/hr_manager/pages/Home")),
   "customer-support-home": lazy(() => import("@/workspaces/customer_support/pages/Home")),
   "academic-director-home": lazy(() => import("@/workspaces/academic_director/pages/Home")),
   "academic-director-academy": lazy(() => import("@/workspaces/academic_director/pages/TeacherAcademy")),
@@ -29,6 +28,7 @@ const pageMap = {
   "head-of-departments-academy": lazy(() => import("@/workspaces/head_of_departments/pages/TeacherAcademy")),
   "head-of-departments-timetable": lazy(() => import("@/workspaces/academic_shared/AcademicDepartmentWorkspace")),
   "head-of-departments-announcements": lazy(() => import("@/workspaces/academic_shared/AcademicDepartmentWorkspace")),
+  "recruitment-workspace": lazy(() => import("@/features/recruitment/RecruitmentWorkspace")),
   "teacher-home": lazy(() => import("@/workspaces/teacher/pages/Home")),
   "account-security": lazy(() => import("@/features/identity/pages/AccountSecurity")),
   unauthorized: lazy(() => import("@/features/identity/pages/Unauthorized")),
@@ -40,7 +40,9 @@ const pageMap = {
 
 function isWorkspacePath(pathname: string) {
   return pathname === "/academic-director" || pathname.startsWith("/academic-director/") ||
-    pathname === "/head-of-departments" || pathname.startsWith("/head-of-departments/");
+    pathname === "/head-of-departments" || pathname.startsWith("/head-of-departments/") ||
+    pathname === "/hr-manager" || pathname.startsWith("/hr-manager/") ||
+    pathname.startsWith("/ceo/recruitment") || pathname.startsWith("/internal/operations/recruitment");
 }
 
 class AppErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {

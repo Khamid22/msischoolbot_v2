@@ -143,6 +143,59 @@ def teacher_payload(row):
         "igcse_evidence": str(row_get(row, "igcse_evidence") or ""),
         "promotion_notes": str(row_get(row, "promotion_notes") or ""),
         "login": str(row_get(row, "login") or ""),
+        "recruitment_candidate_id": int(row_get(row, "recruitment_candidate_id") or 0),
+        "account_onboarding_status": str(row_get(row, "account_onboarding_status") or "complete"),
+    }
+
+
+def provision_recruitment_teacher_account(teacher_id, *, actor_account_id=None, actor_login=""):
+    """Explicitly provision a recruitment-linked active teacher login."""
+    init_storage()
+    with DB_LOCK:
+        with connect() as conn:
+            row = repository.get_pending_recruitment_teacher_row(conn, int(teacher_id or 0))
+            if not row:
+                return False, "Pending recruitment teacher was not found.", {}
+            now = utc_now_iso()
+            login = repository.get_next_teacher_code(conn)
+            repository.insert_teacher_auth(
+                conn,
+                int(row["id"]),
+                login,
+                login,
+                generate_password_hash(login),
+                now,
+            )
+            auth = repository.get_teacher_auth_row_by_id(conn, int(row["id"]))
+            staff_id = int(row_get(auth, "staff_id") or 0)
+            if not staff_id:
+                return False, "Unable to create the teacher login.", {}
+            provision_teacher_account(
+                conn,
+                teacher_id=int(row["id"]),
+                staff_id=staff_id,
+                full_name=str(row["full_name"] or login),
+                canonical_login=login,
+            )
+            repository.complete_recruitment_teacher_onboarding(
+                conn,
+                teacher_id=int(row["id"]),
+                updated_at=now,
+            )
+            repository.insert_recruitment_teacher_onboarding_audit(
+                conn,
+                teacher_id=int(row["id"]),
+                candidate_id=int(row["recruitment_candidate_id"]),
+                actor_account_id=int(actor_account_id or 0) or None,
+                actor_login=str(actor_login or ""),
+                created_at=now,
+            )
+            conn.commit()
+    return True, "Teacher account provisioned. Group assignment remains manual.", {
+        "role": "teacher",
+        "login": login,
+        "temporary_password": login,
+        "display_name": str(row["full_name"] or ""),
     }
 
 
@@ -478,6 +531,7 @@ __all__ = [
     "get_teacher_by_id",
     "get_teacher_name_by_group",
     "list_teachers",
+    "provision_recruitment_teacher_account",
     "reset_teacher_password",
     "subject_teacher_login_prefix",
     "update_teacher_by_id",

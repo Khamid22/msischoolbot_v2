@@ -22,7 +22,9 @@ def _teacher_select():
         t.notes AS promotion_notes,
         t.created_at::text AS created_at,
         t.updated_at::text AS updated_at,
-        COALESCE(account.login, staff.login, '') AS login
+        COALESCE(account.login, staff.login, '') AS login,
+        t.recruitment_candidate_id,
+        t.account_onboarding_status
     """
 
 
@@ -267,9 +269,60 @@ def list_teacher_ids_without_auth(conn):
         LEFT JOIN msi_v2.accounts account ON account.id = profile.account_id
         WHERE staff.id IS NULL
           AND t.status = 'active'
+          AND COALESCE(t.account_onboarding_status, 'complete') <> 'pending'
         ORDER BY t.id ASC
         """
     ).fetchall()
+
+
+def get_pending_recruitment_teacher_row(conn, teacher_id):
+    return conn.execute(
+        """
+        SELECT t.id, t.full_name, t.recruitment_candidate_id,
+               COALESCE(group_subject.subject_name, direct_subject.subject_name, '') AS subject_name,
+               COALESCE(g.group_name, '') AS assigned_group
+        FROM msi_v2.teachers t
+        LEFT JOIN msi_v2.group_teachers gt
+          ON gt.teacher_id = t.id AND gt.status = 'active' AND gt.role = 'main'
+        LEFT JOIN msi_v2.groups g ON g.id = gt.group_id
+        LEFT JOIN msi_v2.subject_programs sp ON sp.id = g.program_id
+        LEFT JOIN msi_v2.subjects group_subject ON group_subject.id = sp.subject_id
+        LEFT JOIN msi_v2.teacher_subjects ts ON ts.teacher_id = t.id AND ts.status = 'active'
+        LEFT JOIN msi_v2.subjects direct_subject ON direct_subject.id = ts.subject_id
+        WHERE t.id = %s
+          AND t.recruitment_candidate_id IS NOT NULL
+          AND t.account_onboarding_status = 'pending'
+        FOR UPDATE OF t
+        """,
+        (teacher_id,),
+    ).fetchone()
+
+
+def complete_recruitment_teacher_onboarding(conn, *, teacher_id, updated_at):
+    conn.execute(
+        """
+        UPDATE msi_v2.teachers
+        SET account_onboarding_status = 'complete', updated_at = %s::timestamptz
+        WHERE id = %s AND recruitment_candidate_id IS NOT NULL
+        """,
+        (updated_at, teacher_id),
+    )
+
+
+def insert_recruitment_teacher_onboarding_audit(
+    conn, *, teacher_id, candidate_id, actor_account_id, actor_login, created_at
+):
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        ) VALUES (
+            %s, 'candidate.active_teacher_account_provisioned', 'teacher_candidate', %s,
+            jsonb_build_object('teacher_id', %s, 'actor_login', %s::text), %s::timestamptz
+        )
+        """,
+        (actor_account_id, candidate_id, teacher_id, actor_login, created_at),
+    )
 
 
 def get_next_teacher_code(conn, prefix="TCH"):
@@ -609,6 +662,9 @@ __all__ = [
     "get_teacher_auth_row_by_id",
     "get_teacher_password_reset_row",
     "list_teacher_ids_without_auth",
+    "get_pending_recruitment_teacher_row",
+    "complete_recruitment_teacher_onboarding",
+    "insert_recruitment_teacher_onboarding_audit",
     "get_next_teacher_code",
     "get_next_teacher_login",
     "insert_teacher_auth",

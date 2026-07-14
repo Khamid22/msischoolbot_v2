@@ -17,7 +17,7 @@ Rewrite branch: `FastAPI-Run-System`.
 - Admin is an internal system operator, not an LMS business role.
 - Documentation uses `system_admin`; current code may temporarily still use `admin`.
 - One user has one role.
-- Real LMS roles are `ceo`, `hr_manager`, `customer_support`, `student`, `teacher`, `parent`, and `academic_director`.
+- Real LMS roles are `ceo`, `customer_support`, `student`, `teacher`, `parent`, `academic_director`, and `head_of_department`.
 - AI, Google Slides, and adaptive learning are future modules and are outside the first rebuild.
 
 ## Current Architecture Inventory
@@ -34,7 +34,7 @@ Current runtime source of truth is PostgreSQL schema `msi_v2`.
 The current code already has useful structure, but boundaries are not clean yet:
 
 - `backend/roles/admin` is the mature workspace, but it mixes several LMS business responsibilities.
-- CEO, HR, customer support, and academic director pages exist mostly as shell pages.
+- CEO, customer support, and academic director pages exist mostly as shell pages.
 - `tgbot` imports `backend.identity`, which couples the bot to the web backend.
 - Two permission systems exist: `backend/identity/permissions.py` and `backend/security/permissions.py`.
 - The docs describe a future `shared/` and `web/` split, but the actual branch still uses `backend/`, `frontend/`, and `database/`.
@@ -87,7 +87,7 @@ Examples:
 - Learning delivery.
 - Parent linking.
 - Support tickets.
-- HR and teacher academy.
+- Teacher Academy.
 
 ### Repository Layer
 
@@ -157,7 +157,7 @@ Do not delete rows or columns casually. Destructive cleanup requires a backup, r
 - Teacher account provisioning to `TCH0001` format.
 - Payment and access-control engine.
 - Parent Telegram linking as a shared domain service.
-- CEO, HR, customer support, and academic director workspaces.
+- CEO, customer support, and academic director workspaces.
 - SQL ownership into domain repositories.
 
 ## Target Folder Structure
@@ -189,7 +189,6 @@ backend/
       analytics_reports/
     workspaces/
       ceo/
-      hr_manager/
       customer_support/
       academic_director/
       teacher/

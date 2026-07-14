@@ -18,7 +18,6 @@ Status: planning document. Do not treat this as implemented code.
 The LMS business roles are:
 
 - `ceo`
-- `hr_manager`
 - `customer_support`
 - `student`
 - `teacher`
@@ -64,17 +63,6 @@ Access:
 
 - Full academic access for v1.
 - Subjects, programs, groups, enrollments, lessons, attendance, homework, exams, progress, and teacher academic performance.
-
-### `hr_manager`
-
-Hiring and teacher development.
-
-Access:
-
-- Teacher candidates.
-- Hiring pipeline.
-- Teacher academy.
-- Training evaluations.
 
 ### `customer_support`
 
@@ -157,7 +145,7 @@ Access:
 | Student | globally unique MSI student code |
 | Teacher | `TCH0001`, `TCH0002`, etc. |
 | Parent | Telegram identity in v1 |
-| CEO/HR/Support/Academic Director | staff account login |
+| CEO/Support/Academic Director | staff account login |
 | System Admin | internal operator login |
 
 ## Session Model
@@ -207,7 +195,6 @@ Permission areas:
 - `payments.view`
 - `payments.manage`
 - `support.manage`
-- `hr.manage`
 - `reports.view`
 - `system.manage`
 
@@ -224,7 +211,7 @@ Current code uses `admin` for:
 Target split:
 
 - `system_admin` gets internal technical operations.
-- `ceo`, `academic_director`, `hr_manager`, and `customer_support` get real workspaces.
+- `ceo`, `academic_director`, and `customer_support` get real workspaces.
 - Shared UI components can remain, but access must be enforced by role and policy.
 
 ## Audit Requirements
@@ -251,6 +238,6 @@ Implement first:
 - Student MSI code login.
 - Teacher `TCH0001` login.
 - Telegram-first parent login.
-- Real workspaces for CEO, Academic Director, HR, Customer Support, Teacher, Student, Parent, and System Admin.
+- Real workspaces for CEO, Academic Director, Customer Support, Teacher, Student, Parent, and System Admin.
 
 Do not implement parent password login in v1.

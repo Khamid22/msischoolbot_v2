@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   BarChart3,
+  BriefcaseBusiness,
   CheckCircle2,
   LayoutDashboard,
   ShieldCheck,
@@ -262,6 +263,19 @@ export function RoleHome({
         />
 
         <RoleMetricCards cards={normalizedCards} />
+
+        {normalizedRole === "ceo" ? (
+          <a
+            href="/ceo/recruitment"
+            className="flex min-h-16 items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary p-5 text-primary-foreground shadow-card transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <span className="flex items-center gap-3">
+              <BriefcaseBusiness className="h-6 w-6" />
+              <span><span className="block font-black">Teacher Recruitment</span><span className="mt-1 block text-sm text-primary-foreground/80">Review approvals and finalize hiring outcomes.</span></span>
+            </span>
+            <ArrowRight className="h-5 w-5 shrink-0" />
+          </a>
+        ) : null}
 
         <section className="rounded-2xl border border-border bg-surface p-5 shadow-card">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

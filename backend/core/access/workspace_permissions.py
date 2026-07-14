@@ -11,13 +11,8 @@ ROLE_FEATURE_PERMISSIONS = {
         "view_finance_summary",
         "view_school_performance",
         "view_staff_summary",
-    },
-    "hr_manager": {
-        "manage_candidates",
-        "view_candidates",
-        "manage_interviews",
-        "manage_teacher_academy",
-        "view_teacher_profiles",
+        "view_recruitment",
+        "finalize_recruitment",
     },
     "customer_support": {
         "view_tickets",
@@ -45,12 +40,20 @@ ROLE_FEATURE_PERMISSIONS = {
         "observe_lessons",
         "manage_curriculum_progress",
         "review_demo_lessons",
+        "view_recruitment",
+        "evaluate_recruitment_candidates",
     },
     "head_of_department": {
         "view_teacher_performance",
         "observe_lessons",
         "manage_teacher_academy",
         "view_teacher_profiles",
+        "view_recruitment",
+        "evaluate_recruitment_candidates",
+    },
+    "hr_manager": {
+        "view_recruitment",
+        "manage_recruitment",
     },
 }
 

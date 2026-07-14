@@ -1,6 +1,7 @@
 import {
   BookOpenCheck,
   BookMarked,
+  BriefcaseBusiness,
   CalendarDays,
   GraduationCap,
   LayoutDashboard,
@@ -39,6 +40,7 @@ const academicDirectorNavIcons: Record<AcademicDirectorNavKey, LucideIcon> = {
   subjects: BookMarked,
   timetable: CalendarDays,
   announcements: Megaphone,
+  recruitment: BriefcaseBusiness,
   profile: User,
 };
 
@@ -47,6 +49,7 @@ const headOfDepartmentNavIcons: Record<HeadOfDepartmentNavKey, LucideIcon> = {
   academy: GraduationCap,
   timetable: CalendarDays,
   announcements: Megaphone,
+  recruitment: BriefcaseBusiness,
   profile: User,
 };
 

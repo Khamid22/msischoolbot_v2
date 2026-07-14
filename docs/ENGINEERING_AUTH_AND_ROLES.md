@@ -43,7 +43,6 @@ Each account has one canonical role:
 | `ceo` | staff profile | executive workspace |
 | `academic_director` | staff profile | full academic management |
 | `head_of_department` | staff profile plus subject scopes | subject-scoped academic management |
-| `hr_manager` | staff profile | HR workspace |
 | `customer_support` | staff profile | parent/support operations |
 | `student` | student profile | own academic dashboard and tools |
 | `parent` | parent profile | linked children only |

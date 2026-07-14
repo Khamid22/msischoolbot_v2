@@ -10,11 +10,10 @@ The executable route inventory is [tests/route_snapshot.txt](../tests/route_snap
 | Academic Director | `/academic-director` |
 | Head of Departments | `/head-of-departments` |
 | Customer Support | `/customer-support` |
-| HR Manager | `/hr-manager` |
 | Student | `/student` |
 | Parent | `/parent` |
 
-System Admin uses `/internal/operations`. Teacher has no portal route. `/hr`, `/support`, singular `/head-of-department`, and `/admin` page entry points are redirects/compatibility boundaries, not canonical workspaces.
+System Admin uses `/internal/operations`. HR Manager uses `/hr-manager`; Admin, CEO, Academic Director, and HOD receive recruitment entries inside their existing workspaces. `/support`, singular `/head-of-department`, `/hr`, and `/admin` page entry points are redirects/compatibility boundaries rather than canonical workspaces.
 
 ## Versioned API Ownership
 
@@ -28,6 +27,8 @@ System Admin uses `/internal/operations`. Teacher has no portal route. `/hr`, `/
 | `/api/v1/admin/*` | protected internal-operations compatibility API |
 
 There is no `/api/v1/teacher/*` namespace. Teacher office-hour and Teacher Academy data is managed through authorized business/internal workflows.
+
+Teacher Recruitment uses `/api/v1/recruitment/*`. The removed `/admin/teacher-candidates/*` endpoints and Lesson Practice UI are intentionally not restored.
 
 ## Public and Compatibility Pages
 

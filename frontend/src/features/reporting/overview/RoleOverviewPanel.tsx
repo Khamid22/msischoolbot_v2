@@ -1,8 +1,8 @@
 import { AlertCircle, AlertTriangle, BarChart3, BookOpen, Clock3, CreditCard, GraduationCap, MessageSquare, School, Trophy, Users } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { asNumber, asString } from "@/shared/lib/workspace";
-import { Candidate, candidateEvents, parseIsoMillis, candidateLastTouchedAt, candidateAgeDays, relativeDaysLabel, openTeacherCandidateView, roleStudentRows, supportComplaintRows, supportComplaintStatus, supportComplaintCategory, supportComplaintTitle, formatMoney, supportPaymentFollowUps, studentDashboardCards } from "./shared";
-import { ClosedCandidatesOverviewCard, HrAttentionCard, RoleMetric } from "./cards";
+import { roleStudentRows, supportComplaintRows, supportComplaintStatus, supportComplaintCategory, supportComplaintTitle, formatMoney, supportPaymentFollowUps, studentDashboardCards } from "./shared";
+import { RoleMetric } from "./cards";
 
 function academyStatusLabel(value: unknown) {
   const labels: Record<string, string> = {
@@ -217,9 +217,6 @@ export function RoleOverviewPanel({ state }: { state: any }) {
   const mode = asString(state.adminMode).toLowerCase();
   const students = roleStudentRows(state);
   const teachers = Array.isArray(state.teachers) ? (state.teachers as Array<Record<string, unknown>>) : [];
-  const candidates = Array.isArray(state.props?.adminTeacherCandidates)
-    ? (state.props.adminTeacherCandidates as Array<Record<string, unknown>>)
-    : [];
   const resources = Array.isArray(state.resourcesList) ? (state.resourcesList as Array<Record<string, unknown>>) : [];
   const announcements = Array.isArray(state.props?.adminAnnouncements)
     ? (state.props.adminAnnouncements as Array<Record<string, unknown>>)
@@ -229,151 +226,6 @@ export function RoleOverviewPanel({ state }: { state: any }) {
     : [];
   const currentSchool = asString(state.currentSchool) || "all";
   const activeStudents = students.filter((student) => asString(student.last_seen_at)).length;
-  const activePipelineCandidates = candidates.filter((candidate) => {
-    const status = asString(candidate.status) || "new";
-    return !["rejected", "withdrawn", "hired"].includes(status);
-  });
-  const closedCandidates = candidates.filter((candidate) => {
-    const status = asString(candidate.status) || "new";
-    return ["rejected", "withdrawn"].includes(status);
-  });
-  const hiredCandidates = candidates.filter((candidate) => asString(candidate.status) === "hired");
-  const inTraining = candidates.filter((candidate) => asString(candidate.status) === "training_ready").length;
-  const awaitingDecision = candidates.filter((candidate) => asString(candidate.status) === "training_passed").length;
-  const newCandidates = candidates.filter((candidate) => asString(candidate.status) === "new").length;
-  const interviewCandidates = candidates.filter((candidate) => asString(candidate.status) === "interview").length;
-  const mathTestCandidates = candidates.filter((candidate) => asString(candidate.status) === "math_test").length;
-  const hiresThisMonth = hiredCandidates.filter((candidate) => {
-    const parsed = parseIsoMillis(candidateLastTouchedAt(candidate));
-    if (parsed == null) return false;
-    const date = new Date(parsed);
-    const now = new Date();
-    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
-  }).length;
-  const closedDecisionCount = closedCandidates.length + hiredCandidates.length;
-  const rejectionRate = closedDecisionCount ? Math.round((closedCandidates.length / closedDecisionCount) * 100) : 0;
-
-  const urgentItems = activePipelineCandidates
-    .map((candidate) => {
-      const status = asString(candidate.status) || "new";
-      const ageDays = candidateAgeDays(candidate);
-      const evaluations = candidateEvents(candidate).filter((event) => asString(event.event_type) === "training_evaluation");
-      if (status === "training_passed" && (ageDays ?? 0) >= 3) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Final decision overdue",
-          detail: `${relativeDaysLabel(ageDays)} since sent for final review`,
-          tone: "bad" as const,
-          priority: 5,
-          tab: "training" as const,
-          filter: "passed" as const,
-        };
-      }
-      if (status === "training_ready" && !evaluations.length && (ageDays ?? 0) >= 2) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Practice needs first evaluation",
-          detail: `${relativeDaysLabel(ageDays)} in practice with no lesson review`,
-          tone: "bad" as const,
-          priority: 4,
-          tab: "training" as const,
-          filter: "in_training" as const,
-        };
-      }
-      if (status === "training_ready" && (ageDays ?? 0) >= 5) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Practice looks stalled",
-          detail: `${relativeDaysLabel(ageDays)} since the last practice activity`,
-          tone: "warn" as const,
-          priority: 3,
-          tab: "training" as const,
-          filter: "in_training" as const,
-        };
-      }
-      if (status === "math_test" && (ageDays ?? 0) >= 2) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Math test pending follow-up",
-          detail: `${relativeDaysLabel(ageDays)} waiting in the test stage`,
-          tone: "warn" as const,
-          priority: 2,
-          tab: "hiring" as const,
-        };
-      }
-      if (status === "interview" && (ageDays ?? 0) >= 2) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Interview queue is aging",
-          detail: `${relativeDaysLabel(ageDays)} in interview stage`,
-          tone: "info" as const,
-          priority: 1,
-          tab: "hiring" as const,
-        };
-      }
-      if (status === "new" && (ageDays ?? 0) >= 1) {
-        return {
-          candidateId: asNumber(candidate.id),
-          fullName: asString(candidate.full_name) || "Candidate",
-          title: "Needs first screening",
-          detail: `${relativeDaysLabel(ageDays)} since application was added`,
-          tone: "info" as const,
-          priority: 0,
-          tab: "hiring" as const,
-        };
-      }
-      return null;
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null)
-    .sort((left, right) => {
-      if (left.priority !== right.priority) return right.priority - left.priority;
-      return right.candidateId - left.candidateId;
-    })
-    .slice(0, 4);
-
-  const pipelineSnapshotStages = [
-    { key: "new", label: "New", count: newCandidates, tone: "bg-sky-500", tab: "hiring" as const },
-    {
-      key: "interview_test",
-      label: "Interview / Test",
-      count: interviewCandidates + mathTestCandidates,
-      tone: "bg-amber-500",
-      tab: "hiring" as const,
-    },
-    {
-      key: "training_ready",
-      label: "Practice",
-      count: inTraining,
-      tone: "bg-emerald-500",
-      tab: "training" as const,
-      filter: "in_training" as const,
-    },
-    {
-      key: "training_passed",
-      label: "Review",
-      count: awaitingDecision,
-      tone: "bg-violet-500",
-      tab: "training" as const,
-      filter: "passed" as const,
-    },
-  ];
-  const openPipelineTotal = Math.max(
-    1,
-    pipelineSnapshotStages.reduce((sum, stage) => sum + stage.count, 0),
-  );
-
-  function openRejectedQueue() {
-    openTeacherCandidateView(state.switchAdminTab, {
-      tab: "training",
-      filter: "rejected",
-    });
-  }
-
   if (mode === "student" || mode === "parent") {
     return (
       <div className="space-y-3">
@@ -394,114 +246,6 @@ export function RoleOverviewPanel({ state }: { state: any }) {
 
   if (mode === "teacher" && state.academyTeacherPreview) {
     return <AcademyTeacherPreview teacher={state.academyTeacherPreview as Record<string, unknown>} />;
-  }
-
-  if (mode === "hr_manager") {
-    return (
-      <div className="space-y-3">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          <RoleMetric label="New" value={newCandidates} detail="fresh applications" icon={<Users className="h-4 w-4" />} tone="bg-sky-50" />
-          <RoleMetric label="Practice" value={inTraining} detail="trainees in lessons" icon={<GraduationCap className="h-4 w-4" />} tone="bg-emerald-50" />
-          <RoleMetric label="Review" value={awaitingDecision} detail="awaiting final decision" icon={<Trophy className="h-4 w-4" />} tone="bg-violet-50" />
-          <RoleMetric label="Overdue" value={urgentItems.length} detail="need attention now" icon={<Clock3 className="h-4 w-4" />} tone={urgentItems.length ? "bg-rose-50" : "bg-slate-50"} />
-        </div>
-        <div className="grid items-stretch gap-3 xl:grid-cols-[1.1fr_0.9fr]">
-          <HrAttentionCard
-            urgentItems={urgentItems}
-            onOpenItem={(item) =>
-              openTeacherCandidateView(state.switchAdminTab, {
-                tab: item.tab,
-                filter: item.filter,
-                candidateId: item.candidateId,
-              })
-            }
-          />
-          <ChartCard title="Pipeline Snapshot" subtitle="Open queue only" icon={<BarChart3 className="h-4 w-4 text-info" />}>
-            <div className="flex min-h-[22rem] flex-col rounded-lg border border-foreground/8 bg-background p-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold text-muted-foreground">Stage distribution</p>
-                <span className="text-[11px] font-semibold text-muted-foreground">
-                  {activePipelineCandidates.length} open
-                </span>
-              </div>
-              <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-muted">
-                {pipelineSnapshotStages.map((stage) => {
-                  const percent = Math.round((stage.count / openPipelineTotal) * 100);
-                  return (
-                    <button
-                      key={`${stage.key}-snapshot`}
-                      type="button"
-                      onClick={() => openTeacherCandidateView(state.switchAdminTab, stage)}
-                      className={`${stage.tone} h-full transition-opacity hover:opacity-85`}
-                      style={{ width: `${percent}%` }}
-                      title={`${stage.label}: ${stage.count}`}
-                    />
-                  );
-                })}
-              </div>
-              <div className="mt-4 space-y-2">
-                {pipelineSnapshotStages.map((stage) => {
-                  const percent = Math.round((stage.count / openPipelineTotal) * 100);
-                  return (
-                    <button
-                      key={stage.key}
-                      type="button"
-                      onClick={() => openTeacherCandidateView(state.switchAdminTab, stage)}
-                      className="flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-surface"
-                    >
-                      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stage.tone}`} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-bold">{stage.label}</span>
-                          <span className="text-base font-bold tabular-nums">{stage.count}</span>
-                        </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{percent}% of open queue</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-auto grid gap-2 border-t border-foreground/8 pt-3 sm:grid-cols-3">
-                {[
-                  {
-                    label: "Open",
-                    value: activePipelineCandidates.length,
-                    detail: "not yet closed",
-                    tone: "text-sky-700",
-                  },
-                  {
-                    label: "Hired",
-                    value: hiresThisMonth,
-                    detail: "this month",
-                    tone: "text-emerald-700",
-                  },
-                  {
-                    label: "Reject Rate",
-                    value: `${rejectionRate}%`,
-                    detail: `${closedDecisionCount} resolved`,
-                    tone:
-                      rejectionRate >= 60
-                        ? "text-rose-700"
-                        : rejectionRate >= 35
-                          ? "text-amber-700"
-                          : "text-emerald-700",
-                  },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-md bg-surface px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                    <div className="mt-1 flex items-end justify-between gap-2">
-                      <p className={`text-lg font-bold leading-none ${item.tone}`}>{item.value}</p>
-                      <p className="text-[11px] font-semibold text-muted-foreground">{item.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ChartCard>
-        </div>
-        <ClosedCandidatesOverviewCard candidates={candidates} onOpenRejected={openRejectedQueue} />
-      </div>
-    );
   }
 
   if (mode === "academic_director") {

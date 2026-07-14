@@ -99,20 +99,3 @@ def test_customer_support_workspace_cards_show_parent_and_invite_counts(monkeypa
         {"label": "Pending Parents/Invites", "value": "3 / 5"},
         {"label": "Support/Payments", "value": "Placeholder"},
     ]
-
-
-def test_hr_manager_workspace_cards_keep_candidate_placeholder_when_table_missing(monkeypatch):
-    connection = _patch_counts_connection(
-        monkeypatch,
-        {
-            "from msi_v2.teachers": 3,
-        },
-        failing_markers={"from msi_v2.teacher_candidates"},
-    )
-
-    assert workspace_counts.hr_manager_workspace_cards() == [
-        {"label": "Teachers", "value": "3"},
-        {"label": "Candidates", "value": "Placeholder"},
-        {"label": "Teacher Academy", "value": "Placeholder"},
-    ]
-    assert connection.rollbacks == 1

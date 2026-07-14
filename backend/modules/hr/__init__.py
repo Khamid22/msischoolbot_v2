@@ -1,1 +1,1 @@
-"""Human-resources domains."""
+"""Human-resources product domain."""

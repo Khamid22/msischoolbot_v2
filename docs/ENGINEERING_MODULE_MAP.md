@@ -12,8 +12,8 @@ Audience: engineers locating the owner of a change.
 | parent records and links | `modules/people/parents` | `features/people/parents` |
 | teacher records | `modules/people/teachers` | `features/people/teachers` |
 | staff account registration | `modules/people/staff` | authorized workspace adapters |
-| candidates and promotion | `modules/hr/recruitment` | `features/hr/recruitment` |
 | Teacher Academy | `modules/teacher_academy` | `features/teacher-academy` |
+| teacher recruitment | `modules/hr/recruitment` | `features/recruitment` |
 | curriculum/program | `modules/academics/curriculum` | `features/academics` |
 | groups/enrollment | `modules/academics/groups` | `features/academics` |
 | schedules/reflow/office hours | `modules/academics/timetable` | `features/academics/timetable` |
@@ -52,7 +52,7 @@ Audience: engineers locating the owner of a change.
 | Academics / Assessments | `exam_results` |
 | Academics / Calendar | `academic_calendar_closures`, `lesson_schedule_exceptions` |
 | Academics / Resources | resource type/resource/comment tables |
-| HR / Recruitment | candidate and candidate-event tables |
+| Recruitment | `teacher_candidates`, normalized candidate document/evaluation/assignment/task/note/approval/decision tables; legacy candidate events are read-only history |
 | Teacher Academy | training, evaluation, assignment, and development tables |
 | Finance | `payments` |
 | Support | complaint/support tables |
@@ -79,6 +79,8 @@ These existing stateful orchestrators remain above the target threshold after ex
 - `features/communications/AnnouncementsPanel.tsx`
 - internal-operation and workspace orchestrators (transport composition, not domain features)
 - `modules/reporting/insights.py`, `modules/people/students/dashboard.py`, and `platform/storage/r2.py`
+- `modules/hr/recruitment/service.py` — cohesive transaction/orchestration boundary for the MVP; persistence remains extracted to its repository and the next expansion should split documents and decisions into focused services.
+- `modules/hr/recruitment/repository.py` — one SQL ownership boundary for the normalized recruitment aggregate; split read projections from mutation persistence before adding another recruitment subdomain.
 
 No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 

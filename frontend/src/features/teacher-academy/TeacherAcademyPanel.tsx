@@ -14,6 +14,7 @@ import { StatusBadge } from "@/shared/ui/StatusBadge";
 import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "@/shared/lib/workspace";
 import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCategories, ToastTone } from "@/features/people/teachers/model";
+import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
 
 type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
@@ -1686,6 +1687,7 @@ function AcademyTeacherCard({
   canPromote,
   canDelete,
   canManageAccount,
+  canOnboard,
   onPreview,
   onDetail,
   onSchedule,
@@ -1693,6 +1695,7 @@ function AcademyTeacherCard({
   onPromote,
   onDelete,
   onAccount,
+  onOnboard,
   onCopyLogin,
 }: {
   teacher: AcademyTeacher;
@@ -1702,6 +1705,7 @@ function AcademyTeacherCard({
   canPromote: boolean;
   canDelete: boolean;
   canManageAccount: boolean;
+  canOnboard: boolean;
   onPreview: () => void;
   onDetail: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
@@ -1709,6 +1713,7 @@ function AcademyTeacherCard({
   onPromote: () => void;
   onDelete: () => void;
   onAccount: () => void;
+  onOnboard: () => void;
   onCopyLogin: (login: string) => void;
 }) {
   const assignments = academyAssignments(teacher);
@@ -1739,6 +1744,14 @@ function AcademyTeacherCard({
           className: "bg-foreground text-background",
         };
   const secondaryActions: ActionMenuItem[] = [];
+  if (canOnboard && asString(teacher.account_onboarding_status) === "pending") {
+    secondaryActions.push({
+      key: "complete-onboarding",
+      label: "Complete onboarding",
+      icon: <KeyRound className="h-4 w-4" />,
+      onClick: onOnboard,
+    });
+  }
   if (nextAssignment && canSchedule) {
     secondaryActions.push({
       key: "schedule",
@@ -1801,7 +1814,7 @@ function AcademyTeacherCard({
           <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subject) || "Subject not set"}</p>
         </button>
         <StatusBadge tone={academyStatusTone(status)} className="shrink-0 text-[10px]">
-          {statusLabel(status)}
+          {asString(teacher.account_onboarding_status) === "pending" ? "Onboarding pending" : statusLabel(status)}
         </StatusBadge>
       </div>
 
@@ -2125,6 +2138,56 @@ export function TeacherAcademyPanel({
     return data;
   }
 
+  async function onboardRecruitmentAcademyTeacher(teacher: AcademyTeacher) {
+    const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
+      ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+      : [];
+    const items = Array.isArray(state.props?.adminAcademicCurriculumItems)
+      ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+      : [];
+    const programGuide = programs.map((program) => `${asNumber(program.id)}: ${asString(program.program_name || program.name || program.subject_name)}`).join("\n");
+    const selectedProgram = window.prompt(`Select a curriculum program ID for ${asString(teacher.full_name)}:\n${programGuide}`);
+    const programId = asNumber(selectedProgram);
+    if (!programId) return;
+    const programLessons = items.filter((item) => asNumber(item.program_id || item.programId) === programId && asString(item.item_type || item.itemType).toLowerCase() === "lesson");
+    const lessonGuide = programLessons.map((item) => `${asNumber(item.id)}: ${asString(item.lesson_number || item.title)}`).join("\n");
+    const selectedLessons = window.prompt(`Enter one or more lesson IDs, separated by commas:\n${lessonGuide}`);
+    const lessonIds = String(selectedLessons || "").split(",").map((value) => asNumber(value)).filter(Boolean);
+    if (!lessonIds.length) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/v1/recruitment/academy-intakes/${asNumber(teacher.id)}/onboard`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: jsonCsrfHeaders(csrf),
+        body: JSON.stringify({ subject_program_id: programId, curriculum_item_ids: lessonIds }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!apiSucceeded(response, payload)) {
+        const message = apiErrorMessage(payload, "Could not complete Academy onboarding.");
+        setError(message);
+        showToast(message, "danger");
+        return;
+      }
+      const data = apiData<Record<string, any>>(payload);
+      const generated = data.credentials || {};
+      setCredentials(generated);
+      onAcademyChange(academyTeachers.map((row) => asNumber(row.id) === asNumber(teacher.id) ? {
+        ...row,
+        account_onboarding_status: "complete",
+        academy_status: "in_training",
+        subject_program_id: programId,
+        login: asString(generated.login),
+      } : row));
+      showToast(asString(data.message) || "Academy onboarding completed.");
+    } catch {
+      showToast("Network error. Please try again.", "danger");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const adminMode = asString(state.adminMode || state.props?.adminMode).toLowerCase();
   const authRole = asString(state.props?.authRole).toLowerCase();
   const academyApi = useMemo(() => teacherAcademyActionRoutes(adminMode, authRole), [adminMode, authRole]);
@@ -2137,6 +2200,7 @@ export function TeacherAcademyPanel({
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const isAcademicDirectorMode = adminMode === "academic_director" || authRole === "academic_director";
+  const canOnboardRecruitmentTeacher = isAcademicDirectorMode || adminMode === "admin" || authRole === "admin";
 
   // Highest performers first: rank by weighted average score, teachers without a
   // score last, then a stable name tiebreak.
@@ -2961,6 +3025,7 @@ export function TeacherAcademyPanel({
                       canAssess={canAssessAcademyLesson}
                       canDelete={canDeleteAcademyTeacher}
                       canManageAccount={isAcademicDirectorMode}
+                      canOnboard={canOnboardRecruitmentTeacher}
                       onPreview={() => previewAsTeacher(teacher)}
                       onDetail={() => setDetailTeacher(teacher)}
                       onSchedule={(targetAssignment) => setScheduleTarget({ teacher, assignment: targetAssignment })}
@@ -2971,6 +3036,7 @@ export function TeacherAcademyPanel({
                         setDeleteTarget(teacher);
                       }}
                       onAccount={() => openActiveTeacherAccount(teacher)}
+                      onOnboard={() => void onboardRecruitmentAcademyTeacher(teacher)}
                       onCopyLogin={copyLogin}
                       canPromote={canPromoteAcademyTeacher}
                     />
@@ -3010,6 +3076,14 @@ export function TeacherAcademyPanel({
                       const scheduled = assignmentIsScheduled(nextAssignment);
                       const canUsePrimaryLessonAction = nextAssignment && canAssessAcademyLesson;
                       const rowActions: ActionMenuItem[] = [];
+                      if (canOnboardRecruitmentTeacher && asString(teacher.account_onboarding_status) === "pending") {
+                        rowActions.push({
+                          key: "complete-onboarding",
+                          label: "Complete onboarding",
+                          icon: <KeyRound className="h-4 w-4" />,
+                          onClick: () => void onboardRecruitmentAcademyTeacher(teacher),
+                        });
+                      }
                       if (nextAssignment && canScheduleAcademyLesson) {
                         rowActions.push({
                           key: "schedule",
@@ -3085,7 +3159,7 @@ export function TeacherAcademyPanel({
                                 >
                                   {asString(teacher.full_name) || "Academy teacher"}
                                 </button>
-                                <span className="shrink-0 font-mono text-[11px] font-bold text-[#64748B]">{login || "Creating..."}</span>
+                                <span className="shrink-0 font-mono text-[11px] font-bold text-[#64748B]">{login || (asString(teacher.account_onboarding_status) === "pending" ? "Onboarding pending" : "Creating...")}</span>
                               </span>
                             </div>
                           </td>

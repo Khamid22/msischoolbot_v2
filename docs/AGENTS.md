@@ -15,8 +15,8 @@ The system supports:
 - Teachers
 - Parents
 - CEO
-- HR Manager
 - Customer Support
+- HR Manager
 - Academic Director
 - Head of Department
 - Internal System Admin
@@ -37,13 +37,13 @@ The system supports:
 - `system_admin` is internal operator/superuser, not an LMS business role.
 - Real LMS roles are:
   - `ceo`
-  - `hr_manager`
   - `customer_support`
   - `student`
   - `teacher`
   - `parent`
   - `academic_director`
   - `head_of_department`
+  - `hr_manager`
 - Teacher login format is `TCH0001`, `TCH0002`, etc. The current read-only Teacher workspace is preserved; teacher records remain managed by authorized staff.
 - Students login with MSI code + password.
 - Login-equals-password credentials must force self-service password change before workspace access.

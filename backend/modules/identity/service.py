@@ -17,21 +17,21 @@ MIN_PASSWORD_LENGTH = 8
 ACCOUNT_AUTH_ROLES = {
     "system_admin",
     "ceo",
-    "hr_manager",
     "customer_support",
     "student",
     "parent",
     "teacher",
     "academic_director",
     "head_of_department",
+    "hr_manager",
 }
 STAFF_ACCOUNT_ROLES = {
     "system_admin",
     "ceo",
-    "hr_manager",
     "customer_support",
     "academic_director",
     "head_of_department",
+    "hr_manager",
 }
 
 

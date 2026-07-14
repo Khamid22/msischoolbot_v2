@@ -1,0 +1,108 @@
+"""Browser page adapters for the shared recruitment workspace."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+
+from backend.core.access.pages import require_role
+from backend.core.web.rendering import generate_csrf, render_react_page
+from backend.modules.identity.session import current_auth_login, current_auth_role
+
+
+def _render(*, role: str, view: str, base_path: str, candidate_id: int | None = None):
+    return render_react_page(
+        "recruitment-workspace",
+        {
+            "authLogin": current_auth_login(),
+            "authRole": current_auth_role(),
+            "role": role,
+            "view": view,
+            "basePath": base_path,
+            "candidateId": candidate_id,
+            "csrfToken": generate_csrf(),
+        },
+        title="Teacher Recruitment | MSI School",
+        description="Role-aware teacher recruitment pipeline and candidate workspace.",
+        telegram=True,
+    )
+
+
+def _register_role_routes(
+    app,
+    *,
+    role: str,
+    base_path: str,
+    operation_prefix: str,
+    root_view: str = "pipeline",
+) -> None:
+    router = APIRouter(dependencies=[Depends(require_role(role))])
+
+    @router.get(base_path, operation_id=f"{operation_prefix}_recruitment")
+    def root():
+        return _render(role=role, view=root_view, base_path=base_path)
+
+    @router.get(f"{base_path}/pipeline", operation_id=f"{operation_prefix}_recruitment_pipeline")
+    def pipeline():
+        return _render(role=role, view="pipeline", base_path=base_path)
+
+    @router.get(f"{base_path}/candidates", operation_id=f"{operation_prefix}_recruitment_candidates")
+    def candidates():
+        return _render(role=role, view="candidates", base_path=base_path)
+
+    @router.get(f"{base_path}/tasks", operation_id=f"{operation_prefix}_recruitment_tasks")
+    def tasks():
+        return _render(role=role, view="tasks", base_path=base_path)
+
+    @router.get(f"{base_path}/profile", operation_id=f"{operation_prefix}_recruitment_profile")
+    def profile():
+        return _render(role=role, view="profile", base_path=base_path)
+
+    @router.get(
+        f"{base_path}/candidates/{{candidate_id}}",
+        operation_id=f"{operation_prefix}_recruitment_candidate",
+    )
+    def candidate(candidate_id: int):
+        return _render(
+            role=role,
+            view="candidate",
+            base_path=base_path,
+            candidate_id=candidate_id,
+        )
+
+    app.include_router(router)
+
+
+def register_recruitment_page_routes(app) -> None:
+    _register_role_routes(
+        app,
+        role="hr_manager",
+        base_path="/hr-manager",
+        operation_prefix="hr_manager",
+    )
+    _register_role_routes(
+        app,
+        role="admin",
+        base_path="/internal/operations/recruitment",
+        operation_prefix="admin",
+    )
+    _register_role_routes(
+        app,
+        role="ceo",
+        base_path="/ceo/recruitment",
+        operation_prefix="ceo",
+    )
+    _register_role_routes(
+        app,
+        role="academic_director",
+        base_path="/academic-director/recruitment",
+        operation_prefix="academic_director",
+    )
+    _register_role_routes(
+        app,
+        role="head_of_department",
+        base_path="/head-of-departments/recruitment",
+        operation_prefix="head_of_department",
+    )
+
+
+__all__ = ["register_recruitment_page_routes"]

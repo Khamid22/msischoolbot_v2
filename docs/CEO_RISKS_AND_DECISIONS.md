@@ -21,7 +21,7 @@ Current implementation still uses `admin` for several different meanings:
 Target decision:
 
 - Use `system_admin` only for internal platform operation.
-- Create real LMS workspaces for CEO, Academic Director, HR Manager, Customer Support, Teacher, Student, and Parent.
+- Create real LMS workspaces for CEO, Academic Director, Customer Support, Teacher, Student, and Parent.
 
 ### Payment Model Not Final
 

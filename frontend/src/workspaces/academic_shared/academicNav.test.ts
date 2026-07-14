@@ -21,15 +21,16 @@ describe("Academic Director navigation", () => {
         "Subjects",
         "Academic Timetable",
         "Announcements",
+        "Recruitment",
         "Profile",
       ],
     );
   });
 
-  it("mobile nav is Overview, Academy, Groups, Schedule, Profile", () => {
+  it("mobile nav includes the assigned-candidate recruitment entry", () => {
     assert.deepEqual(
       academicDirectorMobileNavConfig.map((item) => item.label),
-      ["Overview", "Academy", "Groups", "Schedule", "Profile"],
+      ["Overview", "Academy", "Groups", "Schedule", "Hiring", "Profile"],
     );
   });
 
@@ -47,23 +48,24 @@ describe("Academic Director navigation", () => {
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/subjects"), "subjects");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/timetable"), "timetable");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/announcements"), "announcements");
+    assert.equal(academicDirectorActiveNavFromPath("/academic-director/recruitment"), "recruitment");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director/profile"), "profile");
     assert.equal(academicDirectorActiveNavFromPath("/academic-director", "#academic-director-profile"), "overview");
   });
 });
 
 describe("Head of Departments navigation", () => {
-  it("desktop nav is Overview, Teacher Academy, Timetable, Announcements, Profile", () => {
+  it("desktop nav includes recruitment", () => {
     assert.deepEqual(
       headOfDepartmentNavConfig.map((item) => item.label),
-      ["Overview", "Teacher Academy", "Timetable", "Announcements", "Profile"],
+      ["Overview", "Teacher Academy", "Timetable", "Announcements", "Recruitment", "Profile"],
     );
   });
 
-  it("mobile nav is Overview, Academy, Schedule, News, Profile", () => {
+  it("mobile nav includes assigned-candidate recruitment", () => {
     assert.deepEqual(
       headOfDepartmentMobileNavConfig.map((item) => item.label),
-      ["Overview", "Academy", "Schedule", "News", "Profile"],
+      ["Overview", "Academy", "Schedule", "News", "Hiring", "Profile"],
     );
   });
 
@@ -78,6 +80,7 @@ describe("Head of Departments navigation", () => {
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments/teacher-academy"), "academy");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments/timetable"), "timetable");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments/announcements"), "announcements");
+    assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments/recruitment"), "recruitment");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments/profile"), "profile");
     assert.equal(headOfDepartmentActiveNavFromPath("/head-of-departments", "#head-of-department-profile"), "overview");
   });

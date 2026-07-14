@@ -12,8 +12,6 @@ AUDIENCES = {
     "teachers",
     "year10",
     "year11",
-    "trainees",
-    "candidates",
     "staff",
 }
 PRIORITIES = {"info", "important", "urgent"}

@@ -36,7 +36,6 @@ Purpose:
 - CEO
 - academic director
 - head of department
-- HR manager
 - customer support
 - admin/owner
 - teacher login can also be linked here if we want teachers to use staff access
@@ -60,7 +59,7 @@ Important fields:
 Notes:
 
 - `role` can be `owner`, `ceo`, `academic_director`, `head_of_department`,
-  `hr_manager`, `customer_support`, `admin`, `teacher`.
+  `customer_support`, `admin`, `teacher`.
 - `subject_scope` handles Head of Math, Head of English, etc.
 - `school_scope` handles staff limited to one client school if needed.
 
@@ -311,16 +310,7 @@ Teacher availability.
 
 Student bookings.
 
-## 8. HR
-
-### 33. `teacher_candidates`
-
-Hiring pipeline candidates.
-
-Candidate stage events can be stored in `audit_events` first. If HR becomes
-more detailed later, add `teacher_candidate_events` back as table 35.
-
-## 9. System Settings
+## 8. System Settings
 
 ### 34. `app_settings`
 
@@ -366,7 +356,7 @@ When the rebuild is approved, these current concepts should disappear:
 9. Import gradebook/attendance/exams if needed from Excel.
 10. Generate parent invite links instead of manually creating parent passwords.
 11. Update code queries to the new table names.
-12. Verify every workspace: CEO, Academic Director, Head of Department, HR,
+12. Verify every workspace: CEO, Academic Director, Head of Department,
     Customer Support, Teacher, Student, Parent.
 
 ## Safety Rule

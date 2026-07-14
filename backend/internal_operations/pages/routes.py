@@ -150,7 +150,6 @@ def register_internal_operations_page_routes(
                 "adminSchool": school_filter,
                 "adminStudents": page_context["admin_students"],
                 "adminTeachers": page_context["admin_teachers"],
-                "adminTeacherCandidates": page_context["admin_teacher_candidates"],
                 "adminTeacherAcademy": page_context["admin_teacher_academy"],
                 "adminComplaints": page_context["admin_complaints"],
                 "adminParents": page_context["admin_parents"],
@@ -195,7 +194,6 @@ def register_internal_operations_page_routes(
             rows={
                 "admin_students": page_context["admin_students"],
                 "admin_teachers": page_context["admin_teachers"],
-                "admin_teacher_candidates": page_context["admin_teacher_candidates"],
                 "admin_teacher_academy": page_context["admin_teacher_academy"],
                 "admin_complaints": page_context["admin_complaints"],
                 "admin_parents": page_context["admin_parents"],

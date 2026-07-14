@@ -72,7 +72,7 @@ Includes:
 - Student MSI code login.
 - Teacher `TCH0001` login.
 - Telegram-first parent access.
-- Staff logins for CEO, HR Manager, Customer Support, Academic Director.
+- Staff logins for CEO, Customer Support, Academic Director.
 
 Business value:
 
@@ -91,10 +91,9 @@ Priority:
 1. CEO.
 2. Academic Director.
 3. Customer Support.
-4. HR Manager.
-5. Teacher.
-6. Student.
-7. Parent.
+4. Teacher.
+5. Student.
+6. Parent.
 8. System Admin.
 
 Business value:

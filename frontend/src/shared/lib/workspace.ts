@@ -13,7 +13,6 @@ export type AdminTab =
   | "payments"
   | "complaints"
   | "career_growth"
-  | "candidates"
   | "contact"
   | "chat"
   | "student_dashboard"
@@ -31,7 +30,6 @@ export type OverviewGrade = "7" | "8";
 export type WorkspaceMode =
   | "admin"
   | "ceo"
-  | "hr_manager"
   | "customer_support"
   | "student"
   | "parent"
@@ -59,7 +57,6 @@ export interface InternalOperationsPageProps {
   adminParents?: Array<Record<string, unknown>>;
   adminParentChildren?: Array<Record<string, unknown>>;
   adminTeachers?: Array<Record<string, unknown>>;
-  adminTeacherCandidates?: Array<Record<string, unknown>>;
   adminTeacherAcademy?: Array<Record<string, unknown>>;
   adminComplaints?: Array<Record<string, unknown>>;
   adminTeacherOptions?: Array<{ name: string; school_codes: string[] }>;
@@ -126,7 +123,6 @@ export const tabs: { key: AdminTab; label: string }[] = [
   { key: "payments", label: "Payments" },
   { key: "complaints", label: "Complaints" },
   { key: "career_growth", label: "Career Growth" },
-  { key: "candidates", label: "Candidates" },
   { key: "contact", label: "Contact" },
   { key: "chat", label: "Chat" },
   { key: "student_dashboard", label: "Academic Dashboard" },
@@ -163,12 +159,6 @@ export const workspaceModeProfiles: Record<
     description: "Performance, schools, staff, and decisions.",
     tabs: ["overview", "groups", "payments", "complaints"],
   },
-  hr_manager: {
-    label: "HR Manager",
-    shortLabel: "HR",
-    description: "Hiring pipeline and teacher records.",
-    tabs: ["candidates", "teachers"],
-  },
   customer_support: {
     label: "Customer Support",
     shortLabel: "Support",
@@ -204,7 +194,6 @@ export const workspaceModeProfiles: Record<
 export const workspaceModes: WorkspaceMode[] = [
   "admin",
   "ceo",
-  "hr_manager",
   "customer_support",
   "student",
   "parent",
@@ -215,7 +204,6 @@ export const workspaceModes: WorkspaceMode[] = [
 export function normalizeWorkspaceMode(value: unknown): WorkspaceMode {
   const normalized = asString(value).toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
   const aliases: Record<string, WorkspaceMode> = {
-    hr: "hr_manager",
     sales: "customer_support",
     support: "customer_support",
     customer: "customer_support",
@@ -235,9 +223,6 @@ export function tabsForWorkspaceMode(mode: WorkspaceMode) {
   return tabs
     .filter((tab) => allowedTabs.has(tab.key))
     .map((tab) => {
-      if (mode === "hr_manager" && tab.key === "announcements") {
-        return { ...tab, label: "Broadcasts" };
-      }
       if (mode === "parent") {
         const parentLabels: Partial<Record<AdminTab, string>> = {
           overview: "Home",
@@ -262,7 +247,7 @@ export interface NavSection {
 
 export const navSections: NavSection[] = [
   { label: "Overview", keys: ["overview"] },
-  { label: "People", keys: ["students", "parents", "teachers", "candidates"] },
+  { label: "People", keys: ["students", "parents", "teachers"] },
   { label: "Academics", keys: ["subjects", "groups", "schedule", "curriculum", "gradebook", "office_hours", "career_growth"] },
   { label: "Communication", keys: ["announcements", "chat", "complaints", "contact"] },
   { label: "Operations", keys: ["payments", "resources"] },

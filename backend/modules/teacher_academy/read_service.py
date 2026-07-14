@@ -483,6 +483,8 @@ def _academy_teacher_payload(row, assignments, assessments):
         "account_teacher_id": int(row["account_teacher_id"] or 0),
         "telegram_user_id": _as_int(_row_value(row, "telegram_user_id")),
         "promoted_teacher_id": int(row["promoted_teacher_id"] or 0),
+        "recruitment_candidate_id": int(_row_value(row, "recruitment_candidate_id") or 0),
+        "account_onboarding_status": str(_row_value(row, "account_onboarding_status") or "complete"),
         "created_at": str(row["created_at"] or ""),
         "updated_at": str(row["updated_at"] or ""),
         "assignments": assignments,

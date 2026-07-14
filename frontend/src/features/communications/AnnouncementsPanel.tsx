@@ -29,8 +29,6 @@ type Audience =
   | "teachers"
   | "year10"
   | "year11"
-  | "trainees"
-  | "candidates"
   | "staff";
 type Priority = "info" | "important" | "urgent";
 type Status = "published" | "draft" | "scheduled";
@@ -57,8 +55,6 @@ const audienceLabels: Record<Audience, string> = {
   teachers: "Active teachers",
   year10: "Year 10",
   year11: "Year 11",
-  trainees: "Trainees",
-  candidates: "Candidates",
   staff: "All staff",
 };
 
@@ -69,60 +65,7 @@ const priorityLabels: Record<Priority, string> = {
 };
 
 const defaultAudienceOptions: Audience[] = ["all", "students", "parents", "teachers", "year10", "year11"];
-const hrAudienceOptions: Audience[] = ["teachers", "trainees", "candidates", "staff"];
-const hrAudienceSet = new Set<Audience>(hrAudienceOptions);
 const teacherAudienceSet = new Set<Audience>(["all", "teachers", "staff"]);
-
-const hrBroadcastTemplates: Array<{
-  key: string;
-  label: string;
-  summary: string;
-  title: string;
-  body: string;
-  audience: Audience;
-  priority: Priority;
-}> = [
-  {
-    key: "interview",
-    label: "Interview Reminder",
-    summary: "Prompt candidates before an interview day.",
-    title: "Interview reminder",
-    body:
-      "Reminder: your interview is scheduled for tomorrow. Please arrive 10 minutes early and be ready for a short fluency and professionalism check.",
-    audience: "candidates",
-    priority: "important",
-  },
-  {
-    key: "training",
-    label: "Practice Session",
-    summary: "Share a lesson practice or observation update.",
-    title: "Practice session update",
-    body:
-      "Please review the lesson plan and be ready for the upcoming practice session. Bring your notebook, teaching materials, and arrive on time.",
-    audience: "trainees",
-    priority: "important",
-  },
-  {
-    key: "documents",
-    label: "Documents Request",
-    summary: "Collect missing onboarding or hiring files.",
-    title: "Required documents",
-    body:
-      "Please send the remaining required documents today so we can continue your hiring process without delay.",
-    audience: "candidates",
-    priority: "urgent",
-  },
-  {
-    key: "staff",
-    label: "Staff Notice",
-    summary: "Broadcast a policy or staffing update.",
-    title: "HR policy update",
-    body:
-      "Please review the latest HR update and follow the revised process from today onward. Reach out to HR if anything is unclear.",
-    audience: "staff",
-    priority: "info",
-  },
-];
 
 type AnnouncementForm = {
   title: string;
@@ -186,10 +129,9 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   const props = state.props || {};
   const csrf = asString(props.csrfToken);
   const adminMode = asString(state.adminMode).toLowerCase();
-  const isHrMode = adminMode === "hr_manager";
   const isTeacherMode = adminMode === "teacher";
-  const audienceOptions = isHrMode ? hrAudienceOptions : defaultAudienceOptions;
-  const defaultAudience: Audience = isHrMode ? "trainees" : "all";
+  const audienceOptions = defaultAudienceOptions;
+  const defaultAudience: Audience = "all";
   const [items, setItems] = useState<Announcement[]>(
     Array.isArray(props.adminAnnouncements)
       ? props.adminAnnouncements.map((row: Record<string, unknown>) => normalizeAnnouncement(row))
@@ -204,12 +146,10 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
 
   const workspaceItems = useMemo(
     () =>
-      isHrMode
-        ? items.filter((item) => hrAudienceSet.has(item.audience))
-        : isTeacherMode
-          ? items.filter((item) => item.status === "published" && teacherAudienceSet.has(item.audience))
+      isTeacherMode
+        ? items.filter((item) => item.status === "published" && teacherAudienceSet.has(item.audience))
         : items,
-    [isHrMode, isTeacherMode, items],
+    [isTeacherMode, items],
   );
 
   const filtered = useMemo(
@@ -223,37 +163,19 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
   const stats = useMemo(() => {
     const published = workspaceItems.filter((item) => item.status === "published").length;
     const drafts = workspaceItems.filter((item) => item.status === "draft").length;
-    const pinned = workspaceItems.filter((item) => item.pinned).length;
-    const urgent = workspaceItems.filter((item) => item.priority === "urgent").length;
     return {
       total: workspaceItems.length,
       published,
       drafts,
       reach: workspaceItems.reduce((sum, item) => sum + item.views, 0),
-      pinned,
-      urgent,
     };
   }, [workspaceItems]);
 
-  const panelTitle = isHrMode ? "HR Broadcasts" : isTeacherMode ? "Updates" : "Announcements";
-  const panelSubtitle = isHrMode
-    ? "Internal updates for candidates, trainees, and teaching staff."
-    : isTeacherMode
+  const panelTitle = isTeacherMode ? "Updates" : "Announcements";
+  const panelSubtitle = isTeacherMode
       ? "School updates for teachers."
-    : "Publish news and updates to students and teachers.";
-  const createButtonLabel = isHrMode ? "New Broadcast" : "New Announcement";
-  const emptyStateLabel = isHrMode ? "No HR broadcasts yet." : isTeacherMode ? "No teacher updates yet." : "Nothing here yet.";
-
-  function applyHrTemplate(template: (typeof hrBroadcastTemplates)[number]) {
-    setForm((prev) => ({
-      ...prev,
-      title: template.title,
-      body: template.body,
-      audience: template.audience,
-      priority: template.priority,
-    }));
-    setError("");
-  }
+      : "Publish news and updates to students and teachers.";
+  const emptyStateLabel = isTeacherMode ? "No teacher updates yet." : "Nothing here yet.";
 
   function openNew() {
     setEditing(null);
@@ -357,31 +279,15 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground"
           >
             <Plus className="h-4 w-4" />
-            {createButtonLabel}
+            New Announcement
           </button>
         }
       >
-        {isHrMode ? (
-          <div className="mb-3 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700">
-            Only HR audiences are shown here. Student-facing school announcements stay outside this workspace.
-          </div>
-        ) : null}
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {isHrMode ? (
-            <>
-              <MetricCard icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} detail="sent broadcasts" tone="success" />
-              <MetricCard icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} detail="in progress" />
-              <MetricCard icon={<Pin className="h-4 w-4" />} label="Pinned" value={stats.pinned} detail="highlighted" tone="info" />
-              <MetricCard icon={<AlertTriangle className="h-4 w-4" />} label="Urgent" value={stats.urgent} detail="priority notices" tone="warning" />
-            </>
-          ) : (
-            <>
-              <MetricCard icon={<Megaphone className="h-4 w-4" />} label="Total" value={stats.total} detail="all announcements" tone="info" />
-              <MetricCard icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} detail="visible posts" tone="success" />
-              <MetricCard icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} detail="not published" />
-              <MetricCard icon={<Users className="h-4 w-4" />} label="Reach" value={stats.reach} detail="target audience" />
-            </>
-          )}
+          <MetricCard icon={<Megaphone className="h-4 w-4" />} label="Total" value={stats.total} detail="all announcements" tone="info" />
+          <MetricCard icon={<Send className="h-4 w-4" />} label="Published" value={stats.published} detail="visible posts" tone="success" />
+          <MetricCard icon={<Pencil className="h-4 w-4" />} label="Drafts" value={stats.drafts} detail="not published" />
+          <MetricCard icon={<Users className="h-4 w-4" />} label="Reach" value={stats.reach} detail="target audience" />
         </div>
       </ChartCard>
 
@@ -459,7 +365,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                       <span>{item.author}</span>
                       <span>|</span>
                       <span>{formatDate(item.publishedAt || item.updatedAt || item.createdAt)}</span>
-                      {item.status === "published" && !isHrMode ? (
+                      {item.status === "published" ? (
                         <>
                           <span>|</span>
                           <span>{item.views} views</span>
@@ -499,31 +405,13 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
 
       {open ? (
         <Modal
-          title={editing ? (isHrMode ? "Edit Broadcast" : "Edit Announcement") : isHrMode ? "New Broadcast" : "New Announcement"}
+          title={editing ? "Edit Announcement" : "New Announcement"}
           onClose={() => setOpen(false)}
           size="md"
         >
           <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
               {error ? <p className="text-xs font-semibold text-destructive">{error}</p> : null}
-              {isHrMode ? (
-                <div className="rounded-lg border border-foreground/10 bg-background p-3">
-                  <FieldLabel>Quick Templates</FieldLabel>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {hrBroadcastTemplates.map((template) => (
-                      <button
-                        key={template.key}
-                        type="button"
-                        onClick={() => applyHrTemplate(template)}
-                        className="rounded-lg border border-foreground/10 bg-surface px-3 py-3 text-left transition-colors hover:bg-muted"
-                      >
-                        <p className="text-sm font-bold">{template.label}</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{template.summary}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
               <label className="block">
                 <FieldLabel>Title</FieldLabel>
                 <input
@@ -531,7 +419,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                   onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
                   maxLength={120}
                   className="w-full rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
-                  placeholder={isHrMode ? "Practice session update" : "Midterm exam schedule"}
+                  placeholder="Midterm exam schedule"
                 />
               </label>
               <label className="block">
@@ -542,7 +430,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                   maxLength={1000}
                   rows={5}
                   className="w-full resize-none rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm outline-none focus:border-foreground/30"
-                  placeholder={isHrMode ? "Write the broadcast..." : "Write the announcement..."}
+                  placeholder="Write the announcement..."
                 />
                 <p className="mt-1 text-xs text-muted-foreground">{form.body.length}/1000</p>
               </label>
@@ -614,7 +502,7 @@ export default function AnnouncementsPanel({ state }: { state: any }) {
                 disabled={saving}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
               >
-                {saving ? "Saving..." : editing ? "Save Changes" : form.status === "published" ? (isHrMode ? "Publish Broadcast" : "Publish") : "Save Draft"}
+                {saving ? "Saving..." : editing ? "Save Changes" : form.status === "published" ? "Publish" : "Save Draft"}
               </button>
             </div>
           </form>

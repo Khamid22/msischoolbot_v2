@@ -24,7 +24,6 @@ MSI LMS Portal should help MSI:
 - Give teachers structured workspaces for their assigned groups.
 - Give Academic Director full academic oversight.
 - Give Customer Support a clear parent/payment/follow-up workflow.
-- Give HR Manager a structured teacher hiring and development flow.
 - Give CEO broad visibility across students, teachers, parents, subjects, exams, payments, and operations.
 
 ## Current Implementation
@@ -69,7 +68,6 @@ flowchart LR
     Login --> Role{Role}
     Role --> CEO[CEO]
     Role --> AD[Academic Director]
-    Role --> HR[HR Manager]
     Role --> CS[Customer Support]
     Role --> T[Teacher]
     Role --> S[Student]
@@ -115,15 +113,6 @@ Customer Support is B2C support:
 - Support tickets.
 
 Customer Support should not directly change academic structure by default.
-
-### HR Manager
-
-HR Manager needs teacher hiring and development tools:
-
-- Candidate pipeline.
-- Teacher academy.
-- Evaluations.
-- Promotion readiness.
 
 ### Teacher
 

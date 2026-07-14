@@ -317,7 +317,7 @@ def register_portal_routes(app):
         if role == "parent":
             return redirect(dashboard_path_for_role("parent"))
 
-        if role in {"ceo", "hr_manager", "customer_support", "academic_director", "head_of_department"}:
+        if role in {"ceo", "customer_support", "academic_director", "head_of_department", "hr_manager"}:
             return redirect(dashboard_path_for_role(role))
 
         # Telegram auto-login happens via POST /auth/telegram, which verifies the

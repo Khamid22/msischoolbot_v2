@@ -1,6 +1,6 @@
 # MSI School LMS
 
-MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. Its product-domain modular monolith serves CEO, Academic Director, Head of Departments, Customer Support, HR Manager, Student, Parent, and the current read-only Teacher workspace. System Admin is a separate protected internal-operations boundary.
+MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. Its product-domain modular monolith serves CEO, HR Manager, Academic Director, Head of Departments, Customer Support, Student, Parent, and the current read-only Teacher workspace. The recruitment domain hands accepted candidates into the retained Teacher Academy and Active Teachers workflows without automatically provisioning accounts. System Admin is a separate protected internal-operations boundary.
 
 ## Architecture at a Glance
 

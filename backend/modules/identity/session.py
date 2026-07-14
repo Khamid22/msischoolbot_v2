@@ -118,17 +118,17 @@ def set_admin_session(admin):
         return False
 
     raw_admin_role = str(admin.get("role", "admin")).strip() or "admin"
-    portal_role = normalize_role(raw_admin_role) or "admin"
+    portal_role = normalize_role(raw_admin_role)
     if portal_role not in {
         "admin",
         "ceo",
-        "hr_manager",
         "customer_support",
         "parent",
         "academic_director",
         "head_of_department",
+        "hr_manager",
     }:
-        portal_role = "admin"
+        return False
     admin_role = "owner" if raw_admin_role.strip().casefold() == "owner" else portal_role
 
     session.clear()

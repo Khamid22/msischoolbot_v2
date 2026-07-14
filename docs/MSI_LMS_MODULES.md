@@ -40,7 +40,7 @@ tgbot/
 
 - `backend/roles/admin` owns too many business areas: students, parents, payments, teachers, resources, academics, support, announcements, and chat.
 - `system_admin` and LMS business roles are mixed under the current code name `admin`.
-- CEO, HR, support, and academic director modes are partly represented as admin UI modes instead of real workspaces.
+- CEO, support, and academic director modes are partly represented as admin UI modes instead of real workspaces.
 - `tgbot` imports backend identity modules directly.
 - Payment logic exists, but access restriction policy does not.
 - SQL is spread across route modules, services, and query modules.
@@ -84,15 +84,12 @@ Rules:
 - Parents can have children across schools.
 - Teacher can teach multiple subjects.
 
-### Staff & Hiring
+### Teacher Development
 
-Owns internal hiring and teacher development.
+Owns Teacher Academy development.
 
 Responsibilities:
 
-- HR manager workspace data.
-- Teacher candidates.
-- Candidate events.
 - Teacher academy.
 - Training assignments.
 - Evaluations.
@@ -265,17 +262,6 @@ Responsibilities:
 - Attendance/homework/exams.
 - Teacher academic performance.
 - Student academic progress.
-
-### `hr_manager`
-
-Hiring and staff development workspace.
-
-Responsibilities:
-
-- Teacher candidates.
-- Interviews/events.
-- Teacher academy.
-- Evaluation records.
 
 ### `customer_support`
 

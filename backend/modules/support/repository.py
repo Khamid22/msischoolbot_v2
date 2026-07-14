@@ -195,7 +195,7 @@ def _author_type(author_role):
     role = str(author_role or "system").strip().casefold()
     if role == "parent":
         return "parent"
-    if role in {"owner", "admin", "staff", "ceo", "customer_support", "academic_director", "hr_manager", "teacher"}:
+    if role in {"owner", "admin", "staff", "ceo", "customer_support", "academic_director", "teacher"}:
         return role
     return "system"
 

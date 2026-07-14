@@ -21,7 +21,6 @@ BACKEND_REQUIRED = {
     "academics/assessments",
     "academics/calendar",
     "academics/resources",
-    "hr/recruitment",
     "teacher_academy",
     "support",
     "finance",
@@ -40,7 +39,6 @@ FRONTEND_REQUIRED = {
     "academics/groups",
     "academics/timetable",
     "academics/resources",
-    "hr/recruitment",
     "teacher-academy",
     "support",
     "finance",
@@ -180,6 +178,24 @@ def test_obsolete_ownership_packages_and_imports_are_absent():
         assert f"backend.modules.{name}" not in source
     assert "backend.integrations" not in source
     assert "@/features/management" not in source
+
+
+def test_recruitment_domain_does_not_restore_the_legacy_pipeline_or_lesson_practice():
+    for path in (
+        Path("backend/modules/hr/recruitment"),
+        Path("frontend/src/features/recruitment"),
+    ):
+        assert path.exists()
+
+    teacher_panel = Path("frontend/src/internal_operations/pages/TeachersPanel.tsx").read_text()
+    teacher_model = Path("frontend/src/features/people/teachers/model.ts").read_text()
+    combined = f"{teacher_panel}\n{teacher_model}"
+    assert "Teacher Academy" in combined
+    assert "Active Teachers" in combined
+    assert "Hiring Pipeline" not in combined
+    assert "Lesson Practice" not in combined
+    assert "adminTeacherCandidates" not in combined
+    assert not Path("frontend/src/features/teacher-academy/TrainingEvaluationModal.tsx").exists()
 
 
 def test_runtime_postgresql_sql_is_repository_owned():

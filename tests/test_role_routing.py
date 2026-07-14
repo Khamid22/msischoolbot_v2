@@ -40,7 +40,6 @@ def _patch_workspace_cards(monkeypatch):
     import backend.workspaces.head_of_departments.page as head_of_department_routes
     import backend.workspaces.ceo.page as ceo_page
     import backend.workspaces.customer_support.page as customer_support_page
-    import backend.workspaces.hr_manager.page as hr_manager_page
 
     monkeypatch.setattr(
         ceo_page,
@@ -58,11 +57,6 @@ def _patch_workspace_cards(monkeypatch):
         lambda: [{"label": "Parents", "value": "4"}],
     )
     monkeypatch.setattr(
-        hr_manager_page,
-        "hr_manager_workspace_cards",
-        lambda: [{"label": "Teachers", "value": "3"}],
-    )
-    monkeypatch.setattr(
         head_of_department_routes,
         "head_of_department_workspace_cards",
         lambda: [{"label": "Subject Scope", "value": "1"}],
@@ -74,7 +68,6 @@ def _patch_workspace_cards(monkeypatch):
     [
         ("owner", "admin", "/internal/operations", "Admin"),
         ("system_admin", "system_admin", "/internal/operations", "System Admin"),
-        ("hr", "hr_manager", "/hr-manager", "HR Manager"),
         ("sales", "customer_support", "/customer-support", "Customer Support"),
         ("academic-director", "academic_director", "/academic-director", "Academic Director"),
         ("hod", "head_of_department", "/head-of-departments", "Head of Departments"),
@@ -109,7 +102,6 @@ def test_customer_support_permission_alias():
     ("role", "path", "page"),
     [
         ("ceo", "/ceo", "ceo-home"),
-        ("hr_manager", "/hr-manager", "hr-manager-home"),
         ("customer_support", "/customer-support", "customer-support-home"),
         ("academic_director", "/academic-director", "academic-director-home"),
         ("head_of_department", "/head-of-departments", "head-of-departments-home"),
@@ -149,13 +141,26 @@ def test_student_role_entry_redirects_to_own_dashboard(client):
     assert response.headers["location"] == "/dashboard/321?school=sehriyo"
 
 
-def test_wrong_role_route_returns_403_json(client):
-    _set_session(client, {"auth_role": "ceo", "auth_login": "ceo@test"})
+def test_hr_role_aliases_route_to_the_recruitment_workspace():
+    for role in ("hr", "hr-manager", "hr_manager", "hr manager"):
+        assert normalize_role(role) == "hr_manager"
+        assert dashboard_path_for_role(role) == "/hr-manager"
+        assert role_display_name(role) == "HR Manager"
 
-    response = client.get("/hr-manager", headers=XHR)
 
-    assert response.status_code == 403
-    assert response.json()["message"] == "This page requires HR Manager access."
+def test_hr_role_can_initialize_staff_session_and_routes_to_its_workspace(client, monkeypatch):
+    import backend.modules.identity.page as identity_page
+
+    monkeypatch.setattr(
+        identity_page,
+        "_load_admin_handoff_payload",
+        lambda _token: ({"id": 91, "login": "former-hr", "role": "hr_manager"}, ""),
+    )
+
+    response = client.get("/admin/continue?handoff=test")
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/hr-manager"
 
 
 def test_invalid_session_role_fails_closed(client):

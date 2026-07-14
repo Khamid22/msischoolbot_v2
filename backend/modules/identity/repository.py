@@ -419,7 +419,7 @@ def find_staff_account_row(conn: Any, *, staff_id: int, login: str) -> Any:
            OR (account.legacy_source_table = 'msi_staff' AND account.legacy_source_id = %s)
            OR (
                 account.role IN (
-                    'system_admin', 'ceo', 'hr_manager', 'customer_support',
+                    'system_admin', 'ceo', 'customer_support', 'hr_manager',
                     'academic_director', 'head_of_department'
                 )
                 AND lower(btrim(account.login)) = lower(btrim(%s))

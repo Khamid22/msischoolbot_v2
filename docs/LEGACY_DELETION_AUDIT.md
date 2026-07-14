@@ -1,5 +1,7 @@
 # Legacy Deletion Audit
 
+> Superseded again 2026-07-14: a new recruitment domain now replaces the deleted HR runtime. The legacy candidate pipeline and candidate lesson-practice flow remain removed, while historical candidate data is preserved and migrated.
+
 Date: 2026-07-07
 
 Scope: source, tests, and documentation. Generated React build chunks under `backend/static/react/**`, `frontend/node_modules/**`, and Python cache folders were excluded from proof searches.

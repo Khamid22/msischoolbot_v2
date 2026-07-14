@@ -18,7 +18,7 @@ React workspace
         -> PostgreSQL (msi_v2)
 ```
 
-Alembic is the only DDL owner. This folder refactor does not change tables, migrations, routes, payloads, permissions, or user data.
+Alembic is the only DDL owner. Migration `0013_teacher_recruitment_mvp.py` preserves historical candidates and adds the normalized recruitment workflow.
 
 ## Backend Layout
 
@@ -49,7 +49,6 @@ backend/
 │   │   ├── assessments/         exam results
 │   │   ├── calendar/            school/group closures and teaching dates
 │   │   └── resources/           learning resources and comments
-│   ├── hr/recruitment/          candidates and teacher promotion
 │   ├── teacher_academy/         training, evaluation, progression
 │   ├── support/                 complaints and support cases
 │   ├── finance/                 payments
@@ -60,7 +59,7 @@ backend/
 │   ├── pages/                    page routes, bootstrap context, options
 │   ├── academics/                focused academic route adapters
 │   ├── people/                   student and parent adapters
-│   ├── staffing/                 teacher/recruitment form adapters
+│   ├── staffing/                 active-teacher form adapters
 │   ├── resources/                learning-resource adapters
 │   ├── finance/                  payment adapters
 │   └── support/                  complaint adapters
@@ -80,7 +79,6 @@ frontend/src/
 │   ├── identity/
 │   ├── people/
 │   ├── academics/
-│   ├── hr/recruitment/
 │   ├── teacher-academy/
 │   ├── support/
 │   ├── finance/
@@ -104,6 +102,7 @@ The current working tree includes a pre-existing read-only Teacher workspace res
 - Attendance, homework, exams, timetable exceptions, and closure history retain their existing IDs.
 - `Asia/Tashkent` remains the school calendar timezone.
 - There is no runtime Excel or Google Sheets integration.
+- Teacher Recruitment is active under `/api/v1/recruitment` and role-scoped pages. Legacy candidate events remain read-only and are copied into the audit timeline.
 
 ## Verification
 

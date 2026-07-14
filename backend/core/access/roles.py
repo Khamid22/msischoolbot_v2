@@ -6,25 +6,24 @@ ROLE_CEO = "ceo"
 ROLE_ADMIN = "admin"
 ROLE_TEACHER = "teacher"
 ROLE_CUSTOMER_SUPPORT = "customer_support"
-ROLE_HR_MANAGER = "hr_manager"
 ROLE_PARENT = "parent"
 ROLE_STUDENT = "student"
 ROLE_ACADEMIC_DIRECTOR = "academic_director"
 ROLE_HEAD_OF_DEPARTMENT = "head_of_department"
+ROLE_HR_MANAGER = "hr_manager"
 
 WORKSPACE_ROLES = {
     ROLE_CEO,
     ROLE_ACADEMIC_DIRECTOR,
     ROLE_HEAD_OF_DEPARTMENT,
     ROLE_CUSTOMER_SUPPORT,
-    ROLE_HR_MANAGER,
     ROLE_STUDENT,
     ROLE_PARENT,
     ROLE_TEACHER,
+    ROLE_HR_MANAGER,
 }
 
-# Academy teachers sign in to their own read-only Academy profile workspace, so
-# there are no non-portal staff roles at present.
+# Staff roles that have a dedicated browser workspace.
 NON_PORTAL_STAFF_ROLES: set[str] = set()
 
 ALL_ROLES = {
@@ -34,11 +33,11 @@ ALL_ROLES = {
     ROLE_ADMIN,
     ROLE_TEACHER,
     ROLE_CUSTOMER_SUPPORT,
-    ROLE_HR_MANAGER,
     ROLE_PARENT,
     ROLE_STUDENT,
     ROLE_ACADEMIC_DIRECTOR,
     ROLE_HEAD_OF_DEPARTMENT,
+    ROLE_HR_MANAGER,
 }
 
 # Roles a session may carry; "owner" normalizes to admin and is never stored.
@@ -46,39 +45,39 @@ VALID_ROLES = {
     ROLE_ADMIN,
     ROLE_SYSTEM_ADMIN,
     ROLE_CEO,
-    ROLE_HR_MANAGER,
     ROLE_CUSTOMER_SUPPORT,
     ROLE_STUDENT,
     ROLE_PARENT,
     ROLE_TEACHER,
     ROLE_ACADEMIC_DIRECTOR,
     ROLE_HEAD_OF_DEPARTMENT,
+    ROLE_HR_MANAGER,
 }
 
 ROLE_DASHBOARD_PATHS = {
     "admin": "/internal/operations",
     "system_admin": "/internal/operations",
     "ceo": "/ceo",
-    "hr_manager": "/hr-manager",
     "customer_support": "/customer-support",
     "student": "/student",
     "parent": "/parent",
     "teacher": "/teacher",
     "academic_director": "/academic-director",
     "head_of_department": "/head-of-departments",
+    "hr_manager": "/hr-manager",
 }
 
 ROLE_DISPLAY_NAMES = {
     "admin": "Admin",
     "system_admin": "System Admin",
     "ceo": "CEO",
-    "hr_manager": "HR Manager",
     "customer_support": "Customer Support",
     "student": "Student",
     "parent": "Parent",
     "teacher": "Teacher",
     "academic_director": "Academic Director",
     "head_of_department": "Head of Departments",
+    "hr_manager": "HR Manager",
 }
 
 _ROLE_ALIASES = {
@@ -91,10 +90,11 @@ _ROLE_ALIASES = {
     "head_of_department": "head_of_department",
     "head of department": "head_of_department",
     "hod": "head_of_department",
-    "hr": "hr_manager",
+    "hrmanager": "hr_manager",
     "hr-manager": "hr_manager",
     "hr_manager": "hr_manager",
     "hr manager": "hr_manager",
+    "hr": "hr_manager",
     "customersupport": "customer_support",
     "customer-support": "customer_support",
     "customer_support": "customer_support",
@@ -155,11 +155,11 @@ __all__ = [
     "ROLE_ADMIN",
     "ROLE_TEACHER",
     "ROLE_CUSTOMER_SUPPORT",
-    "ROLE_HR_MANAGER",
     "ROLE_PARENT",
     "ROLE_STUDENT",
     "ROLE_ACADEMIC_DIRECTOR",
     "ROLE_HEAD_OF_DEPARTMENT",
+    "ROLE_HR_MANAGER",
     "WORKSPACE_ROLES",
     "NON_PORTAL_STAFF_ROLES",
     "ALL_ROLES",

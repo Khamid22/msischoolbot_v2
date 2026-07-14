@@ -57,7 +57,7 @@ PostgreSQL schema `msi_v2` remains unchanged. Each table has one documented owne
 
 ## Frontend Boundaries
 
-Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. HR recruitment and Teacher Academy are separate from teacher records. Internal System Admin composition lives under `internal_operations`, not a reusable business feature.
+Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. Teacher Recruitment is owned by `modules/hr/recruitment` and hands accepted records to the separate Teacher Academy or active-teacher domains without provisioning accounts. Internal System Admin composition lives under `internal_operations`, not a reusable business feature.
 
 Large stateful screens are progressively decomposed through focused model, calculation, modal, and calendar modules. Temporary size exceptions are listed in the module map and guarded from further growth; they are not permission to create new catch-all components.
 

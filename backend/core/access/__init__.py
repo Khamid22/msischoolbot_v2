@@ -8,6 +8,7 @@ from backend.core.access.roles import (
     ROLE_PARENT,
     ROLE_STUDENT,
     ROLE_HEAD_OF_DEPARTMENT,
+    ROLE_HR_MANAGER,
     ALL_ROLES,
     normalize_role,
 )
@@ -22,6 +23,7 @@ from backend.core.access.management_permissions import (
     PERMISSION_MANAGE_PAYMENTS,
     PERMISSION_MANAGE_ACADEMICS,
     PERMISSION_SYSTEM_SETTINGS,
+    PERMISSION_MANAGE_RECRUITMENT,
     ALL_PERMISSIONS,
     role_has_permission,
 )
@@ -41,6 +43,7 @@ __all__ = [
     "ROLE_PARENT",
     "ROLE_STUDENT",
     "ROLE_HEAD_OF_DEPARTMENT",
+    "ROLE_HR_MANAGER",
     "ALL_ROLES",
     "normalize_role",
     "PERMISSION_VIEW_DASHBOARD",
@@ -53,6 +56,7 @@ __all__ = [
     "PERMISSION_MANAGE_PAYMENTS",
     "PERMISSION_MANAGE_ACADEMICS",
     "PERMISSION_SYSTEM_SETTINGS",
+    "PERMISSION_MANAGE_RECRUITMENT",
     "ALL_PERMISSIONS",
     "role_has_permission",
     "CurrentUser",

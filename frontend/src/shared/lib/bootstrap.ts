@@ -12,7 +12,6 @@ export type ReactPageName =
   | "internal-edit-student"
   | "parent-home"
   | "ceo-home"
-  | "hr-manager-home"
   | "customer-support-home"
   | "academic-director-home"
   | "academic-director-academy"
@@ -25,6 +24,7 @@ export type ReactPageName =
   | "head-of-departments-academy"
   | "head-of-departments-timetable"
   | "head-of-departments-announcements"
+  | "recruitment-workspace"
   | "account-security"
   | "unauthorized"
   | "student-not-found";
@@ -48,7 +48,6 @@ const REACT_PAGES = new Set<ReactPageName>([
   "internal-edit-student",
   "parent-home",
   "ceo-home",
-  "hr-manager-home",
   "customer-support-home",
   "academic-director-home",
   "academic-director-academy",
@@ -61,6 +60,7 @@ const REACT_PAGES = new Set<ReactPageName>([
   "head-of-departments-academy",
   "head-of-departments-timetable",
   "head-of-departments-announcements",
+  "recruitment-workspace",
   "account-security",
   "unauthorized",
   "student-not-found",
@@ -103,7 +103,6 @@ export function normalizePageName(page: unknown): ReactPageName | null {
   const aliases: Record<string, ReactPageName> = {
     "admin-home": "internal-operations-home",
     "admin-edit-student": "internal-edit-student",
-    "hr-home": "hr-manager-home",
     "support-home": "customer-support-home",
     "head-of-department-home": "head-of-departments-home",
     "head-of-department-academy": "head-of-departments-academy",

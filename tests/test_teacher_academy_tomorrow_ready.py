@@ -208,7 +208,6 @@ def _minimal_admin_page_context():
         "load_error": "",
         "admin_students": [],
         "admin_teachers": [],
-        "admin_teacher_candidates": [],
         "admin_teacher_academy": [_academy_workspace()["academy"]],
         "admin_complaints": [],
         "admin_parents": [],

@@ -174,6 +174,96 @@ def create_academy_teacher(
     return _create_result(True, "", credentials, return_credentials=return_credentials)
 
 
+def onboard_recruitment_academy_teacher(
+    *,
+    academy_teacher_id,
+    subject_program_id,
+    selected_curriculum_item_ids,
+    actor_account_id=None,
+    actor_login="",
+):
+    """Explicitly attach curriculum and provision a pending Academy intake."""
+    now = _utc_now_iso()
+    with connect_auth_db() as conn:
+        intake = mutations_repository.get_pending_recruitment_academy_intake(
+            conn, _as_int(academy_teacher_id)
+        )
+        if not intake:
+            return False, "Pending recruitment Academy intake was not found.", {}
+        program = _program_row(conn, subject_program_id)
+        if not program:
+            return False, "Select a subject curriculum program.", {}
+        lessons, lesson_error = _selected_curriculum_lessons(
+            conn, program["id"], selected_curriculum_item_ids
+        )
+        if lesson_error:
+            return False, lesson_error, {}
+
+        teacher_id = repository.insert_teacher_profile_row(
+            conn,
+            str(intake["full_name"] or "").strip(),
+            notes=str(intake["notes"] or "").strip(),
+            status="academy",
+            subject_id=int(program["subject_id"]),
+            created_at=now,
+            updated_at=now,
+        )
+        login = repository.get_next_teacher_code(conn)
+        password_hash = generate_password_hash(login)
+        staff_id = repository.insert_teacher_auth(
+            conn, teacher_id, login, login, password_hash, now
+        )
+        if not staff_id:
+            return False, "Unable to provision the Academy teacher login.", {}
+        _provision_teacher_account_v2(
+            conn,
+            teacher_id=teacher_id,
+            staff_id=staff_id,
+            login=login,
+            password_hash=password_hash,
+            full_name=str(intake["full_name"] or login),
+        )
+        for sequence_no, lesson in enumerate(lessons, start=1):
+            mutations_repository.insert_academy_lesson_assignment(
+                conn,
+                academy_teacher_id=int(intake["id"]),
+                subject_id=int(program["subject_id"]),
+                subject_program_id=int(program["id"]),
+                curriculum_item_id=int(lesson["id"]),
+                sequence_no=sequence_no,
+                lesson_number=str(lesson["lesson_number"] or ""),
+                lesson_topic=str(lesson["title"] or ""),
+                focus_areas_json=json.dumps([]),
+                created_by=str(actor_login or "Academic Director"),
+                created_at=now,
+            )
+        mutations_repository.complete_recruitment_academy_intake(
+            conn,
+            academy_teacher_id=int(intake["id"]),
+            staff_id=staff_id,
+            subject_id=int(program["subject_id"]),
+            subject_program_id=int(program["id"]),
+            updated_at=now,
+        )
+        mutations_repository.insert_recruitment_academy_onboarding_audit(
+            conn,
+            academy_teacher_id=int(intake["id"]),
+            candidate_id=int(intake["recruitment_candidate_id"]),
+            actor_account_id=_as_int(actor_account_id) or None,
+            actor_login=str(actor_login or ""),
+            created_at=now,
+        )
+        conn.commit()
+    return True, "Academy onboarding completed with selected curriculum lessons.", {
+        "role": "teacher",
+        "login": login,
+        "teacher_code": login,
+        "temporary_password": login,
+        "display_name": str(intake["full_name"] or ""),
+        "subject_name": str(program["subject_name"] or ""),
+    }
+
+
 def update_assignment(
     *,
     assignment_id,

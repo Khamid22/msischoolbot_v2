@@ -17,12 +17,14 @@ export type AcademicDirectorNavKey =
   | "subjects"
   | "timetable"
   | "announcements"
+  | "recruitment"
   | "profile";
 export type HeadOfDepartmentNavKey =
   | "overview"
   | "academy"
   | "timetable"
   | "announcements"
+  | "recruitment"
   | "profile";
 
 export type AcademicNavConfigItem<Key extends string> = {
@@ -40,6 +42,7 @@ export const academicDirectorNavConfig: ReadonlyArray<AcademicNavConfigItem<Acad
   { key: "subjects", label: "Subjects", href: routes.academicDirectorSubjects },
   { key: "timetable", label: "Academic Timetable", mobileLabel: "Schedule", href: routes.academicDirectorTimetable },
   { key: "announcements", label: "Announcements", mobileLabel: "News", href: routes.academicDirectorAnnouncements },
+  { key: "recruitment", label: "Recruitment", mobileLabel: "Hiring", href: routes.academicDirectorRecruitment },
   { key: "profile", label: "Profile", href: routes.academicDirectorProfile },
 ];
 
@@ -52,6 +55,7 @@ export const headOfDepartmentNavConfig: ReadonlyArray<AcademicNavConfigItem<Head
   { key: "academy", label: "Teacher Academy", mobileLabel: "Academy", href: routes.headOfDepartmentTeacherAcademy },
   { key: "timetable", label: "Timetable", mobileLabel: "Schedule", href: routes.headOfDepartmentTimetable },
   { key: "announcements", label: "Announcements", mobileLabel: "News", href: routes.headOfDepartmentAnnouncements },
+  { key: "recruitment", label: "Recruitment", mobileLabel: "Hiring", href: routes.headOfDepartmentRecruitment },
   { key: "profile", label: "Profile", href: routes.headOfDepartmentProfile },
 ];
 

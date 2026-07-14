@@ -124,7 +124,7 @@ Decision:
 - route functions should become thinner.
 - SQL should move fully into repositories.
 - frontend should get a formal design system.
-- CEO/HR/Support/Academic Director pages need real implementations.
+- CEO/Support/Academic Director pages need real implementations.
 - import scripts should live under an import integration area.
 - docs still need final senior engineer review.
 

@@ -43,13 +43,6 @@ export const routes = {
     `/internal/operations?panel=teachers&school=${encodeURIComponent(String(school || "all"))}${
       mode ? `&mode=${encodeURIComponent(String(mode))}` : ""
     }&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
-  adminTeacherCandidateCreate: "/admin/teacher-candidates",
-  adminTeacherCandidateStatus: (candidateId: number | string) => `/admin/teacher-candidates/${candidateId}/status`,
-  adminTeacherCandidatePromote: (candidateId: number | string) => `/admin/teacher-candidates/${candidateId}/promote`,
-  adminTeacherCandidateEventEdit: (candidateId: number | string, eventId: number | string) =>
-    `/admin/teacher-candidates/${candidateId}/events/${eventId}/edit`,
-  adminTeacherCandidateEventDelete: (candidateId: number | string, eventId: number | string) =>
-    `/admin/teacher-candidates/${candidateId}/events/${eventId}/delete`,
   academicDirectorOverview: "/academic-director",
   academicDirectorTeacherAcademy: "/academic-director/teacher-academy",
   academicDirectorHeadOfDepartments: "/academic-director/head-of-departments",
@@ -57,6 +50,7 @@ export const routes = {
   academicDirectorSubjects: "/academic-director/subjects",
   academicDirectorTimetable: "/academic-director/timetable",
   academicDirectorAnnouncements: "/academic-director/announcements",
+  academicDirectorRecruitment: "/academic-director/recruitment",
   academicDirectorProfile: "/academic-director/profile",
   academicDirectorHeadOfDepartmentCreate: apiRoutes.academicDirectorHeadOfDepartmentCreate,
   academicDirectorHeadOfDepartmentPasswordReset: apiRoutes.academicDirectorHeadOfDepartmentPasswordReset,
@@ -73,7 +67,10 @@ export const routes = {
   headOfDepartmentTeacherAcademy: "/head-of-departments/teacher-academy",
   headOfDepartmentTimetable: "/head-of-departments/timetable",
   headOfDepartmentAnnouncements: "/head-of-departments/announcements",
+  headOfDepartmentRecruitment: "/head-of-departments/recruitment",
   headOfDepartmentProfile: "/head-of-departments/profile",
+  adminRecruitment: "/internal/operations/recruitment",
+  ceoRecruitment: "/ceo/recruitment",
   headOfDepartmentTeacherAcademyAssignmentUpdate: apiRoutes.headOfDepartmentTeacherAcademyAssignmentUpdate,
   headOfDepartmentTeacherAcademyAssessmentCreate: apiRoutes.headOfDepartmentTeacherAcademyAssessmentCreate,
   headOfDepartmentTeacherAcademyAssessmentDelete: apiRoutes.headOfDepartmentTeacherAcademyAssessmentDelete,

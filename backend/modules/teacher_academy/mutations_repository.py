@@ -71,6 +71,65 @@ def insert_academy_teacher(
     return int(row["id"] or 0) if row else 0
 
 
+def get_pending_recruitment_academy_intake(conn: Any, academy_teacher_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, full_name, phone, telegram_username, notes,
+               recruitment_candidate_id, account_onboarding_status
+        FROM msi_v2.academy_teachers
+        WHERE id = %s
+          AND recruitment_candidate_id IS NOT NULL
+          AND account_onboarding_status = 'pending'
+        FOR UPDATE
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+
+
+def complete_recruitment_academy_intake(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
+    staff_id: int,
+    subject_id: int,
+    subject_program_id: int,
+    updated_at: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.academy_teachers
+        SET user_id = %s, subject_id = %s, subject_program_id = %s,
+            academy_status = 'in_training', account_onboarding_status = 'complete',
+            updated_at = %s::timestamptz
+        WHERE id = %s AND account_onboarding_status = 'pending'
+        """,
+        (staff_id, subject_id, subject_program_id, updated_at, academy_teacher_id),
+    )
+
+
+def insert_recruitment_academy_onboarding_audit(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
+    candidate_id: int,
+    actor_account_id: int | None,
+    actor_login: str,
+    created_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        ) VALUES (
+            %s, 'candidate.academy_onboarding_completed', 'teacher_candidate', %s,
+            jsonb_build_object('academy_teacher_id', %s, 'actor_login', %s::text),
+            %s::timestamptz
+        )
+        """,
+        (actor_account_id, candidate_id, academy_teacher_id, actor_login, created_at),
+    )
+
+
 def insert_academy_lesson_assignment(
     conn: Any,
     *,

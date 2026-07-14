@@ -72,6 +72,11 @@ _RESOURCE_EXTENSION_MIME_MAP = {
 }
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}
 
+_ALLOWED_CANDIDATE_DOCUMENT_EXTENSIONS = {
+    ".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png",
+}
+_CANDIDATE_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
+
 
 # ---------------------------------------------------------------------------
 # Environment helpers
@@ -383,6 +388,19 @@ def _build_object_key(subject_name, original_name, folder_path=""):
         f"{subject_slug}/"
         f"{folder_prefix}"
         f"{stem}-{unique_token}{ext}"
+    )
+
+
+def _build_candidate_document_key(candidate_id, document_type, original_name):
+    now = datetime.now(timezone.utc)
+    safe_name = _safe_file_name(original_name)
+    extension = _file_extension(original_name)
+    if extension and not safe_name.endswith(extension):
+        safe_name = f"{safe_name or 'document'}{extension}"
+    return (
+        f"private/recruitment/{int(candidate_id)}/"
+        f"{_slugify(document_type) or 'other'}/"
+        f"{now.strftime('%Y%m%d%H%M%S%f')}-{safe_name}"
     )
 
 
@@ -822,6 +840,121 @@ def build_resource_file_url(resource_file_path):
         return ""
 
 
+def upload_private_candidate_document(uploaded_file, *, candidate_id, document_type):
+    """Upload a small, private candidate document without exposing a public URL."""
+    original_name = str(getattr(uploaded_file, "filename", "") or "").strip()
+    if not original_name:
+        return {}, "No file was uploaded."
+    extension = _file_extension(original_name)
+    if extension not in _ALLOWED_CANDIDATE_DOCUMENT_EXTENSIONS:
+        return {}, "Candidate documents must be PDF, DOC, DOCX, JPG, or PNG files."
+    if not is_r2_configured():
+        return {}, "Private document storage is not configured."
+
+    stream = getattr(uploaded_file, "file", None) or getattr(uploaded_file, "stream", None)
+    if stream is None:
+        return {}, "Unable to read the uploaded file."
+    try:
+        stream.seek(0)
+    except Exception:
+        pass
+
+    fd, temp_path = tempfile.mkstemp(suffix=extension)
+    os.close(fd)
+    size_bytes = 0
+    try:
+        with open(temp_path, "wb") as output:
+            while True:
+                chunk = stream.read(256 * 1024)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > _CANDIDATE_DOCUMENT_MAX_BYTES:
+                    return {}, "Candidate documents must be 20 MB or smaller."
+                output.write(chunk)
+        if size_bytes <= 0:
+            return {}, "Uploaded file is empty."
+
+        object_key = _build_candidate_document_key(candidate_id, document_type, original_name)
+        content_type = (
+            infer_resource_mime_type(original_name)
+            or str(getattr(uploaded_file, "content_type", "") or getattr(uploaded_file, "mimetype", "") or "").strip()
+            or "application/octet-stream"
+        )
+        client = _get_r2_client()
+        if client is None:
+            return {}, "Unable to connect to private document storage."
+        with open(temp_path, "rb") as payload:
+            client.upload_fileobj(
+                payload,
+                _resource_bucket_name(),
+                object_key,
+                ExtraArgs={
+                    "ContentType": content_type,
+                    "ContentDisposition": f'inline; filename="{_safe_file_name(original_name)}"',
+                    "CacheControl": "private, no-store, max-age=0",
+                },
+            )
+        return {
+            "object_key": object_key,
+            "original_file_name": original_name,
+            "mime_type": content_type,
+            "size_bytes": size_bytes,
+        }, ""
+    except Exception:
+        return {}, "Failed to upload the candidate document."
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+
+
+def build_private_candidate_document_url(
+    object_key,
+    *,
+    original_file_name="",
+    download=False,
+    expires_in=300,
+):
+    """Return a short-lived signed URL; deliberately ignores public R2 base URLs."""
+    normalized_key = str(object_key or "").strip()
+    if not normalized_key.startswith("private/recruitment/") or not is_r2_configured():
+        return ""
+    client = _get_r2_client()
+    if client is None:
+        return ""
+    safe_name = _safe_file_name(original_file_name or normalized_key.rsplit("/", 1)[-1])
+    disposition = "attachment" if download else "inline"
+    try:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": _resource_bucket_name(),
+                "Key": normalized_key,
+                "ResponseContentDisposition": f'{disposition}; filename="{safe_name}"',
+                "ResponseCacheControl": "private, no-store, max-age=0",
+            },
+            ExpiresIn=max(60, min(int(expires_in or 300), 900)),
+        )
+    except (BotoCoreError, ClientError):
+        return ""
+
+
+def delete_private_candidate_document(object_key):
+    normalized_key = str(object_key or "").strip()
+    if not normalized_key.startswith("private/recruitment/") or not is_r2_configured():
+        return False
+    client = _get_r2_client()
+    if client is None:
+        return False
+    try:
+        client.delete_object(Bucket=_resource_bucket_name(), Key=normalized_key)
+        return True
+    except (BotoCoreError, ClientError):
+        return False
+
+
 def delete_resource_file(resource_file_path):
     object_key = str(resource_file_path or "").strip()
     if not object_key or not is_r2_configured():
@@ -847,4 +980,7 @@ __all__ = [
     "build_resource_file_url",
     "delete_resource_file",
     "infer_resource_mime_type",
+    "upload_private_candidate_document",
+    "build_private_candidate_document_url",
+    "delete_private_candidate_document",
 ]

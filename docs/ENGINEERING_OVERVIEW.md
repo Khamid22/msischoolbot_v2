@@ -43,12 +43,11 @@ PostgreSQL is the only LMS data source. Google Sheets and Excel are not integrat
 - `ceo`
 - `academic_director`
 - `head_of_department`
-- `hr_manager`
 - `customer_support`
 - `student`
 - `parent`
 
-The seven roles other than `system_admin` own business workspaces. `system_admin` is protected internal operations. Teacher is staff data, not an authenticatable role or workspace. Role checks do not replace object checks such as linked child, subject scope, chat membership, or canonical student ownership.
+The business roles own separate workspaces. `system_admin` is protected internal operations. Role checks do not replace object checks such as linked child, subject scope, chat membership, or canonical student ownership.
 
 ## Important Remaining Compatibility
 

@@ -10,7 +10,7 @@ Status: planning and rebuild documentation. This document separates what exists 
 
 MSI LMS Portal is the planned central platform for managing MSI's IGCSE learning operations across multiple schools.
 
-It will bring students, teachers, parents, academic leadership, HR, customer support, payments, and company reporting into one PostgreSQL-first platform.
+It will bring students, teachers, parents, academic leadership, customer support, payments, and company reporting into one PostgreSQL-first platform.
 
 The current system already has a FastAPI backend, React/Vite frontend, aiogram Telegram bot, and PostgreSQL database. Academic Excel statistics for School 5 and Sehriyo have been migrated and verified in PostgreSQL.
 
@@ -40,7 +40,7 @@ Current product status:
 - Student academic dashboards exist.
 - Parent Telegram linking exists in an early form.
 - Admin-style internal screens exist.
-- Teacher, CEO, HR, Customer Support, and Academic Director workspaces need to become real role workspaces.
+- Teacher, CEO, Customer Support, and Academic Director workspaces need to become real role workspaces.
 
 ## What Problems MSI LMS Portal Solves
 
@@ -64,7 +64,6 @@ The target platform is role-based:
 
 - CEO sees company-wide performance and operations.
 - Academic Director controls and reviews academic work.
-- HR Manager manages hiring and teacher development.
 - Customer Support manages parent/payment/support workflows.
 - Teachers manage their assigned groups.
 - Students view their own progress.
@@ -98,7 +97,6 @@ flowchart TD
     Login --> Role{One role per user}
     Role --> CEO[CEO Workspace]
     Role --> AD[Academic Director Workspace]
-    Role --> HR[HR Manager Workspace]
     Role --> Support[Customer Support Workspace]
     Role --> Teacher[Teacher Workspace]
     Role --> Student[Student Workspace]

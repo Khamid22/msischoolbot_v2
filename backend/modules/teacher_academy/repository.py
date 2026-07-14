@@ -178,6 +178,7 @@ def list_academy_teacher_rows(conn: Any) -> list[Any]:
                    ),
                    0
                ) AS telegram_user_id,
+               at.recruitment_candidate_id, at.account_onboarding_status,
                at.created_at::text AS created_at, at.updated_at::text AS updated_at
         FROM msi_v2.academy_teachers at
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
@@ -335,6 +336,7 @@ def list_academy_teacher_account_backfill_rows(conn: Any) -> list[Any]:
         LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
         WHERE COALESCE(at.full_name, '') <> ''
           AND COALESCE(at.academy_status, '') NOT IN ('rejected')
+          AND COALESCE(at.account_onboarding_status, 'complete') <> 'pending'
           AND (
             at.user_id IS NULL
             OR staff.id IS NULL
