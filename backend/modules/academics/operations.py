@@ -7,8 +7,11 @@ from datetime import UTC, date, datetime, timedelta
 from backend.core.database import connect_auth_db
 from backend.modules.academics.exam_filters import is_exam_performance_row
 from backend.modules.academics import canonical
+from backend.modules.academics import calendar_repository
 from backend.modules.academics import timetable_repository
 from backend.modules.academics import repository as academic_repository
+from backend.modules.academics.calendar_closures import serialize_calendar_closure
+from backend.modules.academics.scheduling import closure_ranges, generate_teaching_dates
 from backend.modules.academics.service import (
     create_group_from_program,
     create_class,
@@ -395,6 +398,7 @@ def _gradebook_lesson_payload(lesson_rows, exception_rows):
             "status": str(row["status"] or "scheduled"),
             "sourceKind": str(row["source_kind"] or ""),
             "hasHomework": bool(row["has_homework"]),
+            "hasAcademicRecords": bool(row.get("has_academic_records")),
             "isCancellation": False,
             "cancellationReason": "",
             "exceptionId": None,
@@ -416,6 +420,7 @@ def _gradebook_lesson_payload(lesson_rows, exception_rows):
             "status": "cancelled",
             "sourceKind": "cancellation",
             "hasHomework": False,
+            "hasAcademicRecords": False,
             "isCancellation": True,
             "cancellationReason": str(row["reason"] or ""),
             "exceptionId": int(row["id"]),
@@ -429,7 +434,7 @@ def _gradebook_lesson_payload(lesson_rows, exception_rows):
 
 
 def _gradebook_lesson_window(
-    items, *, limit=0, cursor="", direction="", anchor_date="", month=""
+    items, *, limit=0, cursor="", direction="", anchor_date="", month="", closures=()
 ):
     def is_cancellation(item):
         return (
@@ -481,12 +486,30 @@ def _gradebook_lesson_window(
         # lessons. Silently substituting the nearest populated month made the
         # Gradebook toolbar and chart appear to ignore the administrator's
         # selection (especially for "This month").
-        month_keys = sorted(available_months)
+        closure_months = set()
+        for closure in closures:
+            cursor_month = date(closure["start_date"].year, closure["start_date"].month, 1)
+            final_month = date(closure["end_date"].year, closure["end_date"].month, 1)
+            while cursor_month <= final_month:
+                closure_months.add(cursor_month.strftime("%Y-%m"))
+                absolute = cursor_month.year * 12 + cursor_month.month
+                next_year, next_month_zero = divmod(absolute, 12)
+                cursor_month = date(next_year, next_month_zero + 1, 1)
+        month_keys = sorted(available_months | closure_months)
         option_month_keys = sorted({*month_keys, month_text})
         month_options = []
         for key in option_month_keys:
             year, month_number = month_parts(key)
-            month_options.append({
+            month_start = date(year, month_number, 1)
+            absolute = year * 12 + month_number
+            next_year, next_month_zero = divmod(absolute, 12)
+            next_month = date(next_year, next_month_zero + 1, 1)
+            month_end = date.fromordinal(next_month.toordinal() - 1)
+            month_closures = [
+                row for row in closures
+                if row["start_date"] <= month_end and month_start <= row["end_date"]
+            ]
+            month_option = {
                 "value": key,
                 "label": date(year, month_number, 1).strftime("%B %Y"),
                 "lessonCount": sum(
@@ -494,7 +517,27 @@ def _gradebook_lesson_window(
                     for item, item_month in dated_items
                     if item_month == key and not is_cancellation(item)
                 ),
-            })
+            }
+            if month_closures:
+                month_option.update({
+                    "hasClosure": True,
+                    "isLocked": any(
+                        row["start_date"] <= month_start and row["end_date"] >= month_end
+                        for row in month_closures
+                    ),
+                    "closureTitles": list(dict.fromkeys(str(row["title"]) for row in month_closures)),
+                    "closureScopes": list(dict.fromkeys(
+                        "group" if row.get("group_id") else "school" for row in month_closures
+                    )),
+                    "protectedRecordCount": sum(
+                        1
+                        for item, item_month in dated_items
+                        if item_month == key
+                        and not is_cancellation(item)
+                        and bool(item.get("hasAcademicRecords"))
+                    ),
+                })
+            month_options.append(month_option)
 
         if not month_keys:
             return [], {
@@ -652,7 +695,7 @@ def get_group_gradebook_trends(group_id, *, through, months=6):
     with connect_auth_db() as conn:
         group_row = conn.execute(
             """
-            SELECT g.id
+            SELECT g.id, g.school_id
             FROM msi_v2.groups g
             WHERE """ + _legacy_or_v2_group_where() + """
               AND g.status = 'active'
@@ -666,6 +709,22 @@ def get_group_gradebook_trends(group_id, *, through, months=6):
             """
             WITH calendar_months AS (
                 SELECT generate_series(%s::date, %s::date, interval '1 month')::date AS month_start
+            ),
+            closure_months AS (
+                SELECT months.month_start,
+                       COALESCE(
+                         array_agg(DISTINCT closure.title ORDER BY closure.title)
+                           FILTER (WHERE closure.id IS NOT NULL),
+                         ARRAY[]::text[]
+                       ) AS closure_titles
+                FROM calendar_months months
+                LEFT JOIN msi_v2.academic_calendar_closures closure
+                  ON closure.school_id = %s
+                 AND closure.status = 'active'
+                 AND (closure.group_id IS NULL OR closure.group_id = %s)
+                 AND closure.start_date < (months.month_start + interval '1 month')::date
+                 AND closure.end_date >= months.month_start
+                GROUP BY months.month_start
             ),
             active_students AS (
                 SELECT gs.student_id
@@ -774,15 +833,19 @@ def get_group_gradebook_trends(group_id, *, through, months=6):
                    COALESCE(lessons.lesson_count, 0)::int AS lesson_count,
                    COALESCE(metrics.students_with_data, 0)::int AS students_with_data,
                    COALESCE(metrics.homework_record_count, 0)::int AS homework_record_count,
-                   COALESCE(metrics.attendance_record_count, 0)::int AS attendance_record_count
+                   COALESCE(metrics.attendance_record_count, 0)::int AS attendance_record_count,
+                   closures.closure_titles
             FROM calendar_months months
             LEFT JOIN monthly_metrics metrics ON metrics.month_start = months.month_start
             LEFT JOIN lesson_counts lessons ON lessons.month_start = months.month_start
+            JOIN closure_months closures ON closures.month_start = months.month_start
             ORDER BY months.month_start
             """,
             (
                 start_month,
                 through_month,
+                int(group_row["school_id"]),
+                int(group_row["id"]),
                 int(group_row["id"]),
                 int(group_row["id"]),
                 start_month,
@@ -795,26 +858,31 @@ def get_group_gradebook_trends(group_id, *, through, months=6):
     def optional_float(value):
         return None if value is None else float(value)
 
+    trend_items = []
+    for row in rows:
+        month_start = row["month_start"]
+        closure_titles = [str(value) for value in (row.get("closure_titles") or [])]
+        trend_items.append({
+            "month": month_start.strftime("%Y-%m"),
+            "label": month_start.strftime("%b %Y"),
+            "avgAAP": optional_float(row["avg_aap"]),
+            "avgAR": optional_float(row["avg_ar"]),
+            "avgPerformance": optional_float(row["avg_performance"]),
+            "lessonCount": int(row["lesson_count"] or 0),
+            "studentsWithData": int(row["students_with_data"] or 0),
+            "homeworkRecordCount": int(row["homework_record_count"] or 0),
+            "attendanceRecordCount": int(row["attendance_record_count"] or 0),
+            "hasClosure": bool(closure_titles),
+            "closureTitles": closure_titles,
+        })
+
     return {
         "range": {
             "from": start_month.strftime("%Y-%m"),
             "through": through_month.strftime("%Y-%m"),
             "months": month_count,
         },
-        "items": [
-            {
-                "month": row["month_start"].strftime("%Y-%m"),
-                "label": row["month_start"].strftime("%b %Y"),
-                "avgAAP": optional_float(row["avg_aap"]),
-                "avgAR": optional_float(row["avg_ar"]),
-                "avgPerformance": optional_float(row["avg_performance"]),
-                "lessonCount": int(row["lesson_count"] or 0),
-                "studentsWithData": int(row["students_with_data"] or 0),
-                "homeworkRecordCount": int(row["homework_record_count"] or 0),
-                "attendanceRecordCount": int(row["attendance_record_count"] or 0),
-            }
-            for row in rows
-        ],
+        "items": trend_items,
     }
 
 
@@ -829,7 +897,7 @@ def get_group_gradebook(
     with connect_auth_db() as conn:
         group_row = conn.execute(
             """
-            SELECT g.id, g.legacy_group_id, g.group_name, g.group_code,
+            SELECT g.id, g.legacy_group_id, g.school_id, g.group_name, g.group_code,
                    s.school_key, subj.subject_name,
                    (SELECT count(*) FROM (
                       SELECT lower(btrim(exam_item.title)) AS exam_key
@@ -855,6 +923,9 @@ def get_group_gradebook(
         active_schedule_row = timetable_repository.get_active_group_schedule(
             conn, int(group_row["id"])
         )
+        closure_rows = list(calendar_repository.list_effective_group_closures(
+            conn, int(group_row["school_id"]), int(group_row["id"])
+        ))
 
         lesson_rows = conn.execute(
             """
@@ -876,6 +947,10 @@ def get_group_gradebook(
                          WHEN ls.program_item_id IS NOT NULL AND spi.item_type = 'lesson' THEN true
                          ELSE false
                        END AS has_homework,
+                       (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
+                                WHERE ar.lesson_session_id=ls.id)
+                        OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
+                                   WHERE hw.lesson_session_id=ls.id)) AS has_academic_records,
                        ROW_NUMBER() OVER (
                          PARTITION BY COALESCE(ls.program_item_id, -ls.id)
                          ORDER BY CASE WHEN ls.source_key <> '' THEN 0 ELSE 1 END,
@@ -901,7 +976,8 @@ def get_group_gradebook(
                    ls.lesson_order,
                    ls.status,
                    ls.source_kind,
-                   ls.has_homework
+                   ls.has_homework,
+                   ls.has_academic_records
             FROM ranked_sessions ls
             WHERE ls.session_rank = 1
             ORDER BY ls.lesson_order,
@@ -942,9 +1018,12 @@ def get_group_gradebook(
                 direction=lesson_direction,
                 anchor_date=anchor_date,
                 month=lesson_month,
+                closures=closure_rows,
             )
         else:
-            lesson_payload, page_info = _gradebook_lesson_window(full_lesson_payload, limit=0)
+            lesson_payload, page_info = _gradebook_lesson_window(
+                full_lesson_payload, limit=0, closures=closure_rows
+            )
         record_lesson_ids = [int(item["id"]) for item in lesson_payload if int(item["id"]) > 0]
 
         enrollment_rows = conn.execute(
@@ -1130,6 +1209,7 @@ def get_group_gradebook(
         ),
         "lessons": lesson_payload,
         "pageInfo": page_info,
+        "calendarClosures": [serialize_calendar_closure(dict(row)) for row in closure_rows],
         "examLabels": exam_labels,
         "examDates": exam_dates_by_label,
         "enrollments": [
@@ -1551,6 +1631,16 @@ def update_lesson_session_from_payload(lesson_session_id, payload, actor_staff_i
                 raise AcademicConflictError(
                     "That date is blocked by an active lesson cancellation."
                 )
+            active_closure = calendar_repository.group_date_has_active_closure(
+                conn,
+                int(row["school_id"]),
+                int(row["group_id"]),
+                proposed_date,
+            )
+            if active_closure:
+                raise AcademicConflictError(
+                    f"That date is locked for {active_closure['title']}. Choose a teaching date outside the break."
+                )
             conflicts = timetable_repository.list_lesson_occurrence_conflicts(
                 conn,
                 lesson_session_id=lesson_session_id,
@@ -1673,12 +1763,16 @@ def _reflow_lesson_sequence(conn, lesson, *, first_date, include_first_date, ign
     lessons = timetable_repository.list_curriculum_lessons_from_order(
         conn, int(lesson["group_id"]), int(lesson["item_order"])
     )
-    cursor = first_date if include_first_date else first_date + timedelta(days=1)
-    dates = []
-    while len(dates) < len(lessons):
-        if cursor.weekday() in weekdays and cursor not in blocked:
-            dates.append(cursor)
-        cursor += timedelta(days=1)
+    active_closures = calendar_repository.list_effective_group_closures(
+        conn, int(lesson["school_id"]), int(lesson["group_id"])
+    )
+    dates = generate_teaching_dates(
+        start_date=first_date if include_first_date else first_date + timedelta(days=1),
+        count=len(lessons),
+        weekdays=weekdays,
+        blocked_dates=blocked,
+        closures=closure_ranges(active_closures),
+    )
     for row, session_date in zip(lessons, dates):
         timetable_repository.schedule_curriculum_lesson(
             conn,

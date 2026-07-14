@@ -48,6 +48,12 @@ export const apiRoutes = {
   academicDirectorAcademicTimetableApi: (query: string) => `/api/v1/academic-director/academic/timetable?${query}`,
   academicDirectorAcademicGroupTimetableApi: (groupId: number | string, query: string) =>
     `/api/v1/academic-director/academic/groups/${groupId}/timetable?${query}`,
+  academicDirectorAcademicCalendarClosuresApi: (query = "") =>
+    `/api/v1/academic-director/academic/calendar-closures${query ? `?${query}` : ""}`,
+  academicDirectorAcademicCalendarClosurePreview: "/api/v1/academic-director/academic/calendar-closures/preview",
+  academicDirectorAcademicCalendarClosureCreate: "/api/v1/academic-director/academic/calendar-closures",
+  academicDirectorAcademicCalendarClosureUnlock: (closureId: number | string) =>
+    `/api/v1/academic-director/academic/calendar-closures/${closureId}/unlock`,
   academicDirectorAcademicSchoolCreate: "/api/v1/academic-director/academic/schools",
   academicDirectorAcademicGroupCreate: "/api/v1/academic-director/academic/groups",
   academicDirectorAcademicGroupApi: (groupId: number | string) =>

@@ -104,6 +104,10 @@ export const routes = {
   adminAcademicTimetableApi: (query: string) => `/api/v1/admin/academic/timetable?${query}`,
   adminAcademicGroupTimetableApi: (groupId: number | string, query: string) =>
     `/api/v1/admin/academic/groups/${groupId}/timetable?${query}`,
+  adminAcademicCalendarClosuresApi: (query = "") => `/api/v1/admin/academic/calendar-closures${query ? `?${query}` : ""}`,
+  adminAcademicCalendarClosurePreview: "/api/v1/admin/academic/calendar-closures/preview",
+  adminAcademicCalendarClosureCreate: "/api/v1/admin/academic/calendar-closures",
+  adminAcademicCalendarClosureUnlock: (closureId: number | string) => `/api/v1/admin/academic/calendar-closures/${closureId}/unlock`,
   adminAcademicGroupApi: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}`,
   adminAcademicGroupSummaryApi: (groupId: number | string) => `/api/v1/admin/academic/groups/${groupId}/summary`,
   adminAcademicScheduleCreate: "/api/v1/admin/academic/schedules",
@@ -123,6 +127,10 @@ export const routes = {
   adminAcademicEnrollmentGroupApi: (enrollmentId: number | string) =>
     `/api/v1/admin/academic/enrollments/${enrollmentId}/group`,
   academicDirectorAcademicSchoolCreate: apiRoutes.academicDirectorAcademicSchoolCreate,
+  academicDirectorAcademicCalendarClosuresApi: apiRoutes.academicDirectorAcademicCalendarClosuresApi,
+  academicDirectorAcademicCalendarClosurePreview: apiRoutes.academicDirectorAcademicCalendarClosurePreview,
+  academicDirectorAcademicCalendarClosureCreate: apiRoutes.academicDirectorAcademicCalendarClosureCreate,
+  academicDirectorAcademicCalendarClosureUnlock: apiRoutes.academicDirectorAcademicCalendarClosureUnlock,
   academicDirectorAcademicGroupCreate: apiRoutes.academicDirectorAcademicGroupCreate,
   academicDirectorAcademicContextApi: apiRoutes.academicDirectorAcademicContextApi,
   academicDirectorAcademicGroupsApi: apiRoutes.academicDirectorAcademicGroupsApi,

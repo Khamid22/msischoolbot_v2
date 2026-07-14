@@ -354,7 +354,7 @@ def schedule_curriculum_lesson(conn, lesson_session_id, *, schedule_id, teacher_
 def get_curriculum_lesson_for_exception(conn, lesson_session_id, *, for_update=False):
     lock_clause = " FOR UPDATE OF ls" if for_update else ""
     return conn.execute(
-        f"""SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
+        f"""SELECT ls.id, ls.group_id, g.school_id, ls.schedule_rule_id, ls.teacher_id,
                   ls.session_date, ls.start_time, ls.end_time, ls.room,
                   spi.item_order,
                   (EXISTS (SELECT 1 FROM msi_v2.attendance_records ar
@@ -362,6 +362,7 @@ def get_curriculum_lesson_for_exception(conn, lesson_session_id, *, for_update=F
                    OR EXISTS (SELECT 1 FROM msi_v2.homework_scores hw
                               WHERE hw.lesson_session_id=ls.id)) AS has_academic_records
            FROM msi_v2.lesson_sessions ls
+           JOIN msi_v2.groups g ON g.id=ls.group_id
            JOIN msi_v2.subject_program_items spi ON spi.id=ls.program_item_id
            WHERE ls.id=%s AND spi.item_type='lesson'{lock_clause}""",
         (int(lesson_session_id),),
@@ -407,7 +408,7 @@ def lock_lesson_occurrence_scope(conn, group_v2_id, teacher_v2_id=0):
 def get_lesson_session_snapshot(conn, lesson_session_id, *, for_update=False):
     lock_clause = " FOR UPDATE OF ls" if for_update else ""
     return conn.execute(
-        f"""SELECT ls.id, ls.group_id, ls.schedule_rule_id, ls.teacher_id,
+        f"""SELECT ls.id, ls.group_id, g.school_id, ls.schedule_rule_id, ls.teacher_id,
                   ls.program_item_id, ls.status, ls.session_date, ls.start_time,
                   ls.end_time, coalesce(ls.room, '') AS room,
                   coalesce(ls.online_url, '') AS online_url,

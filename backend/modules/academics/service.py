@@ -9,8 +9,10 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from backend.core.database import connect_auth_db
 from backend.modules.academics import canonical
+from backend.modules.academics import calendar_repository
 from backend.modules.academics import repository as academic_repository
 from backend.modules.academics import timetable_repository
+from backend.modules.academics.scheduling import closure_ranges, generate_teaching_dates
 
 
 def _utc_now_iso():
@@ -203,15 +205,15 @@ def _time_ranges_overlap(start_a, end_a, start_b, end_b):
     return start_a < end_b and start_b < end_a
 
 
-def _generated_schedule_dates(start_date, end_date, weekdays):
-    current = start_date
-    wanted = set(weekdays)
-    dates = []
-    while current <= end_date:
-        if current.weekday() in wanted:
-            dates.append(current)
-        current += timedelta(days=1)
-    return dates
+def _generated_schedule_dates(start_date, end_date, weekdays, *, blocked_dates=(), closures=()):
+    return generate_teaching_dates(
+        start_date=start_date,
+        count=0,
+        weekdays=weekdays,
+        blocked_dates=blocked_dates,
+        closures=closures,
+        end_date=end_date,
+    )
 
 
 def _schedule_conflict_message(
@@ -513,27 +515,44 @@ def create_schedule(
         end_minutes = _time_to_minutes(end_time, "End time")
 
     predicted = not str(end_date or "").strip()
-    if predicted:
-        with _connect() as prediction_conn:
-            prediction_group = _resolve_group(prediction_conn, group_id)
-            if not prediction_group:
-                raise ValueError("Group was not found.")
+    with _connect() as prediction_conn:
+        prediction_group = _resolve_group(prediction_conn, group_id)
+        if not prediction_group:
+            raise ValueError("Group was not found.")
+        prediction_group_id = int(prediction_group["id"])
+        active_closures = calendar_repository.list_effective_group_closures(
+            prediction_conn, int(prediction_group["school_id"]), prediction_group_id
+        )
+        blocked_dates = {
+            row["blocked_date"]
+            for row in timetable_repository.list_blocked_group_dates(
+                prediction_conn, prediction_group_id
+            )
+            if row.get("blocked_date") is not None
+        }
+        if predicted:
             session_count = academic_repository.get_program_teaching_session_count(
                 prediction_conn, int(prediction_group["program_id"])
             )
-        if session_count <= 0:
-            raise ValueError("The subject program has no lessons to schedule.")
-        current = start_date_obj
-        remaining = session_count
-        selected_days = set(weekdays)
-        while remaining > 0:
-            if current.weekday() in selected_days:
-                remaining -= 1
-            if remaining > 0:
-                current += timedelta(days=1)
-        end_date_obj = current
-    else:
-        end_date_obj = _parse_date_input(end_date, "End date")
+            if session_count <= 0:
+                raise ValueError("The subject program has no lessons to schedule.")
+            generated_dates = generate_teaching_dates(
+                start_date=start_date_obj,
+                count=session_count,
+                weekdays=weekdays,
+                blocked_dates=blocked_dates,
+                closures=closure_ranges(active_closures),
+            )
+            end_date_obj = generated_dates[-1]
+        else:
+            end_date_obj = _parse_date_input(end_date, "End date")
+            generated_dates = _generated_schedule_dates(
+                start_date_obj,
+                end_date_obj,
+                weekdays,
+                blocked_dates=blocked_dates,
+                closures=closure_ranges(active_closures),
+            )
     if end_date_obj < start_date_obj:
         raise ValueError("End date cannot be earlier than start date.")
     if (end_date_obj - start_date_obj).days > 366:
@@ -541,9 +560,8 @@ def create_schedule(
     if end_minutes <= start_minutes:
         raise ValueError("End time must be after start time.")
 
-    generated_dates = _generated_schedule_dates(start_date_obj, end_date_obj, weekdays)
     if not generated_dates:
-        raise ValueError("The selected date range does not contain the selected weekdays.")
+        raise ValueError("The selected date range has no teaching days outside school breaks.")
 
     weekdays_text = ",".join(str(day) for day in weekdays)
     title = str(title or "").strip()
@@ -757,18 +775,21 @@ def schedule_group_curriculum(
         if not selected:
             raise ValueError("No lessons match the selected timetable change scope.")
 
-        dates = []
-        cursor = anchor
-        wanted = set(weekdays)
         blocked_dates = {
             row["blocked_date"]
             for row in timetable_repository.list_blocked_group_dates(conn, v2_group_id)
             if row.get("blocked_date") is not None
         }
-        while len(dates) < len(selected):
-            if cursor.weekday() in wanted and cursor not in blocked_dates:
-                dates.append(cursor)
-            cursor += timedelta(days=1)
+        active_closures = calendar_repository.list_effective_group_closures(
+            conn, int(group["school_id"]), v2_group_id
+        )
+        dates = generate_teaching_dates(
+            start_date=anchor,
+            count=len(selected),
+            weekdays=weekdays,
+            blocked_dates=blocked_dates,
+            closures=closure_ranges(active_closures),
+        )
         final_date = dates[-1]
         existing_id = int(existing["id"]) if existing else 0
         conflict = _schedule_conflict_message(

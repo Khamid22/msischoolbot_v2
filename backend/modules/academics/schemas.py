@@ -187,6 +187,18 @@ class AdminLessonUpdated(BaseModel):
     lesson: dict[str, Any]
 
 
+class AdminCalendarClosureRequest(BaseModel):
+    school_id: int
+    group_id: int = 0
+    title: str = "Summer holiday"
+    start_date: str
+    end_date: str
+
+
+class AdminCalendarClosureUnlockRequest(BaseModel):
+    rebuild_future: bool = False
+
+
 class CreateHeadOfDepartmentForm(BaseModel):
     hod_display_name: str = ""
     hod_subject_id: str = ""

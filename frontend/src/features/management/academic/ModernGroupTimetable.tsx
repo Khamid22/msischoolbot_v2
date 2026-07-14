@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  LockKeyhole,
   MapPin,
   RotateCcw,
   Settings,
@@ -21,6 +22,7 @@ import { motion } from "@/shared/lib/motion";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { calculateAdaptiveHourRange } from "./timetableMath";
+import { CalendarClosuresModal, type CalendarClosure } from "./CalendarClosuresModal";
 
 type TimetableRoutes = Pick<
   typeof routes,
@@ -28,6 +30,10 @@ type TimetableRoutes = Pick<
   | "adminAcademicLessonApi"
   | "adminAcademicLessonCancelApi"
   | "adminAcademicLessonRecoverApi"
+  | "adminAcademicCalendarClosuresApi"
+  | "adminAcademicCalendarClosurePreview"
+  | "adminAcademicCalendarClosureCreate"
+  | "adminAcademicCalendarClosureUnlock"
 >;
 
 type TimetableRow = {
@@ -68,6 +74,14 @@ type TimetablePayload = {
   exceptions?: TimetableRow[];
   hasAcademicRecords?: boolean;
   unscheduledLessonCount?: number;
+  calendarClosures?: CalendarClosure[];
+  scope?: {
+    groupId: number;
+    groupName: string;
+    schoolId: number;
+    schoolCode: string;
+    schoolName: string;
+  } | null;
 };
 
 type TimetableItem = {
@@ -185,6 +199,10 @@ function formatDay(value: string, withYear = false) {
     day: "numeric",
     year: withYear ? "numeric" : undefined,
   });
+}
+
+function closureForDate(closures: CalendarClosure[], value: string) {
+  return closures.find((closure) => closure.startDate <= value && value <= closure.endDate);
 }
 
 function normalizeItem(row: TimetableRow, cancellation: boolean): TimetableItem {
@@ -314,12 +332,14 @@ function WeekCalendar({
   fullDay,
   onCursorChange,
   onOpen,
+  closures,
 }: {
   cursorKey: string;
   items: TimetableItem[];
   fullDay: boolean;
   onCursorChange: (value: string) => void;
   onOpen: (item: TimetableItem) => void;
+  closures: CalendarClosure[];
 }) {
   const [mobile, setMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
@@ -358,7 +378,8 @@ function WeekCalendar({
             <div />
             {visibleDays.map((day) => {
               const key = dateKey(day);
-              return <div key={key} className={`border-l border-foreground/8 px-2 py-2 text-center ${key === today ? "bg-primary/5 text-primary" : ""}`}><span className="block text-[9px] font-bold uppercase text-muted-foreground">{WEEKDAYS[(day.getDay() + 6) % 7]}</span><span className="text-sm font-black">{day.getDate()} {day.toLocaleDateString("en-US", { month: "short" })}</span></div>;
+              const closure = closureForDate(closures, key);
+              return <div key={key} className={`border-l border-foreground/8 px-2 py-2 text-center ${closure ? "bg-amber-50 text-amber-900" : key === today ? "bg-primary/5 text-primary" : ""}`}><span className="block text-[9px] font-bold uppercase text-muted-foreground">{WEEKDAYS[(day.getDay() + 6) % 7]}</span><span className="text-sm font-black">{day.getDate()} {day.toLocaleDateString("en-US", { month: "short" })}</span>{closure ? <span className="mt-0.5 block truncate text-[8px] font-bold uppercase">Holiday</span> : null}</div>;
             })}
           </div>
           <div className="grid" style={{ gridTemplateColumns: `3.5rem repeat(${visibleDays.length}, minmax(0,1fr))` }}>
@@ -370,8 +391,9 @@ function WeekCalendar({
             {visibleDays.map((day) => {
               const key = dateKey(day);
               const dayItems = items.filter((item) => item.isoDate === key && item.startTime && item.endTime);
+              const closure = closureForDate(closures, key);
               return (
-                <div key={key} className="relative border-l border-foreground/8" style={{ height: totalHeight }}>
+                <div key={key} className={`relative border-l border-foreground/8 ${closure ? "bg-amber-50/55" : ""}`} style={{ height: totalHeight }}>
                   {Array.from({ length: hours.endHour - hours.startHour + 1 }, (_, index) => <span key={index} className="absolute inset-x-0 border-t border-foreground/8" style={{ top: index * HOUR_HEIGHT }} />)}
                   {dayItems.map((item) => {
                     const top = ((timeMinutes(item.startTime) - hours.startHour * 60) / 60) * HOUR_HEIGHT;
@@ -401,7 +423,7 @@ function WeekCalendar({
   );
 }
 
-function MonthCalendar({ cursorKey, items, onSelectDay }: { cursorKey: string; items: TimetableItem[]; onSelectDay: (value: string) => void }) {
+function MonthCalendar({ cursorKey, items, closures, onSelectDay }: { cursorKey: string; items: TimetableItem[]; closures: CalendarClosure[]; onSelectDay: (value: string) => void }) {
   const cursor = parseDateKey(cursorKey);
   const gridStart = startOfWeek(startOfMonth(cursor));
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
@@ -417,9 +439,11 @@ function MonthCalendar({ cursorKey, items, onSelectDay }: { cursorKey: string; i
             const cancellations = dayItems.filter((item) => item.isCancellation).length;
             const recorded = dayItems.filter((item) => item.hasAcademicRecords && !item.isCancellation).length;
             const outside = day.getMonth() !== cursor.getMonth();
+            const closure = closureForDate(closures, key);
             return (
-              <button key={key} type="button" onClick={() => onSelectDay(key)} className={`min-h-24 border-b border-r border-foreground/8 p-2 text-left hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${outside ? "bg-muted/20 text-muted-foreground" : "bg-background"}`}>
+              <button key={key} type="button" onClick={() => onSelectDay(key)} className={`min-h-24 border-b border-r border-foreground/8 p-2 text-left hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${closure ? "bg-amber-50 text-amber-950" : outside ? "bg-muted/20 text-muted-foreground" : "bg-background"}`}>
                 <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${key === today ? "bg-primary text-primary-foreground" : ""}`}>{day.getDate()}</span>
+                {closure ? <span className="mt-1 flex items-center gap-1 truncate text-[9px] font-bold uppercase text-amber-800"><LockKeyhole className="h-3 w-3 shrink-0" />Holiday</span> : null}
                 {dayItems.length ? <span className="mt-2 block text-xs font-bold">{dayItems.length} lesson{dayItems.length === 1 ? "" : "s"}</span> : null}
                 <span className="mt-1 flex gap-1" aria-label={`${cancellations} cancelled, ${recorded} recorded`}>
                   {dayItems.slice(0, 4).map((item) => <span key={item.key} className={`h-2 w-2 rounded-full ${item.isCancellation ? "bg-red-500" : item.hasAcademicRecords ? "bg-emerald-500" : "bg-primary"}`} />)}
@@ -621,6 +645,7 @@ export function ModernGroupTimetable({
   const [cursorKey, setCursorKey] = useState(schoolTodayKey);
   const [fullDay, setFullDay] = useState(false);
   const [selected, setSelected] = useState<TimetableItem | null>(null);
+  const [breaksOpen, setBreaksOpen] = useState(false);
   const { toast, showToast } = useFloatingToast();
   const range = useMemo(() => rangeFor(mode, calendarMode, cursorKey), [mode, calendarMode, cursorKey]);
   const query = useQuery({
@@ -643,6 +668,12 @@ export function ModernGroupTimetable({
     ...(query.data?.exceptions || []).map((row) => normalizeItem(row, true)),
   ].filter((item) => item.isoDate).sort((left, right) => left.isoDate.localeCompare(right.isoDate) || left.startTime.localeCompare(right.startTime) || Number(left.isCancellation) - Number(right.isCancellation) || left.order - right.order), [query.data]);
   const schedule = query.data?.activeSchedule || query.data?.schedules?.[0] || null;
+  const closures = query.data?.calendarClosures || [];
+  const scope = query.data?.scope || null;
+  const closureSchools = useMemo(
+    () => scope ? [{ id: scope.schoolId, name: scope.schoolName, code: scope.schoolCode }] : [],
+    [scope?.schoolId, scope?.schoolName, scope?.schoolCode],
+  );
   const summary = scheduleSummary(schedule);
   const selectedMonth = monthKey(parseDateKey(cursorKey));
   const monthOptions = useMemo(() => {
@@ -678,9 +709,17 @@ export function ModernGroupTimetable({
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><Clock3 className="h-3.5 w-3.5" />{summary.time}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5"><MapPin className="h-3.5 w-3.5" />{summary.room}</span>
             </div>
-            <button type="button" onClick={onChangeSchedule} className={`ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}><Settings className="h-3.5 w-3.5" />Configure</button>
+            <div className="ml-auto flex items-center gap-2">
+              <button type="button" onClick={() => setBreaksOpen(true)} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-amber-300/70 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-900 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:min-h-9 ${motion.button}`}><LockKeyhole className="h-3.5 w-3.5" />Breaks</button>
+              <button type="button" onClick={onChangeSchedule} className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-9 ${motion.button}`}><Settings className="h-3.5 w-3.5" />Configure</button>
+            </div>
           </div>
         </div>
+        {closures.length ? (
+          <div className="flex flex-wrap gap-2 border-b border-amber-200 bg-amber-50/70 px-4 py-2" aria-label="Holiday locks in this period">
+            {closures.map((closure) => <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-[10px] font-bold text-amber-900"><LockKeyhole className="h-3 w-3" />{closure.title} · {closure.startDate}–{closure.endDate}{closure.scope === "school" ? " · School" : " · Group"}</span>)}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-3 border-b border-foreground/8 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-5">
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => movePeriod(-1)} aria-label="Previous period" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-foreground/10 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:h-9 sm:w-9 ${motion.button}`}><ChevronLeft className="h-4 w-4" /></button>
@@ -715,17 +754,37 @@ export function ModernGroupTimetable({
           <div className="px-6 py-14 text-center"><AlertTriangle className="mx-auto h-7 w-7 text-red-600" /><p className="mt-2 text-sm font-bold">Timetable could not be loaded</p><p className="mt-1 text-xs text-muted-foreground">{query.error instanceof Error ? query.error.message : "Try again."}</p><button type="button" onClick={() => void query.refetch()} className="mt-4 min-h-11 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">Try again</button></div>
         ) : !schedule ? (
           <div className="px-6 py-16 text-center"><CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" /><p className="mt-3 text-sm font-bold">Timetable not configured</p><p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">Set teaching days and lesson time to place the subject program automatically.</p><button type="button" onClick={onChangeSchedule} className="mt-4 min-h-11 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground">Set Up Timetable</button></div>
-        ) : !items.length ? (
+        ) : !items.length ? closures.length ? (
+          <div className="bg-amber-50/30 px-6 py-14 text-center"><LockKeyhole className="mx-auto h-7 w-7 text-amber-700" /><p className="mt-2 text-sm font-bold text-amber-950">{closures[0].title} — no lessons scheduled</p><p className="mt-1 text-xs text-amber-800">This period is locked. Lessons continue on the next available teaching date.</p></div>
+        ) : (
           <div className="px-6 py-14 text-center"><CalendarDays className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-2 text-sm font-bold">No lessons in this period</p><p className="mt-1 text-xs text-muted-foreground">Use the arrows or Today to open another period.</p></div>
         ) : mode === "agenda" ? (
           <AgendaView items={items} onOpen={setSelected} />
         ) : calendarMode === "month" ? (
-          <MonthCalendar cursorKey={cursorKey} items={items} onSelectDay={openWeek} />
+          <MonthCalendar cursorKey={cursorKey} items={items} closures={closures} onSelectDay={openWeek} />
         ) : (
-          <WeekCalendar cursorKey={cursorKey} items={items} fullDay={fullDay} onCursorChange={setCursorKey} onOpen={setSelected} />
+          <WeekCalendar cursorKey={cursorKey} items={items} closures={closures} fullDay={fullDay} onCursorChange={setCursorKey} onOpen={setSelected} />
         )}
       </section>
       <LessonDetailsSheet item={selected} groupId={groupId} csrf={csrf} academicRoutes={academicRoutes} onClose={() => setSelected(null)} onSaved={(message) => { setSelected(null); showToast(message); }} />
+      <CalendarClosuresModal
+        open={breaksOpen}
+        onClose={() => setBreaksOpen(false)}
+        csrf={csrf}
+        academicRoutes={academicRoutes}
+        schools={closureSchools}
+        fixedSchoolId={scope?.schoolId || 0}
+        groupId={groupId}
+        groupName={scope?.groupName || ""}
+        initialYear={parseDateKey(cursorKey).getFullYear()}
+        onChanged={async () => {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["academic", "timetable", groupId] }),
+            queryClient.invalidateQueries({ queryKey: ["academic", "gradebook", groupId] }),
+            queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends", groupId] }),
+          ]);
+        }}
+      />
       <FloatingToast toast={toast} />
     </>
   );

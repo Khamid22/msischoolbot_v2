@@ -599,6 +599,7 @@ export type Lesson = {
   status?: string;
   sourceKind?: string;
   hasHomework?: boolean;
+  hasAcademicRecords?: boolean;
   lessonSessionId?: number;
   isCancellation?: boolean;
   cancellationReason?: string;
@@ -633,6 +634,13 @@ export type GradebookData = {
   examDates?: Record<string, string>;
   allEnrollments?: Enrollment[];
   schedule?: ScheduleRow | null;
+  calendarClosures?: Array<{
+    id: number;
+    title: string;
+    startDate: string;
+    endDate: string;
+    scope: "school" | "group";
+  }>;
   pageInfo?: {
     totalLessons: number;
     startIndex: number;
@@ -648,6 +656,11 @@ export type GradebookData = {
       value: string;
       label: string;
       lessonCount: number;
+      hasClosure?: boolean;
+      isLocked?: boolean;
+      closureTitles?: string[];
+      closureScopes?: Array<"school" | "group">;
+      protectedRecordCount?: number;
     }>;
   };
 };
@@ -662,6 +675,8 @@ export type AcademicTrendMonth = {
   studentsWithData: number;
   homeworkRecordCount: number;
   attendanceRecordCount: number;
+  hasClosure?: boolean;
+  closureTitles?: string[];
 };
 
 export type AcademicTrendsData = {

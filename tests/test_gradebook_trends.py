@@ -37,8 +37,10 @@ class _TrendConnection:
         return False
 
     def execute(self, sql, params):
+        if "FROM msi_v2.academic_calendar_closures" in sql:
+            return _Result([])
         if "WITH calendar_months" not in sql:
-            return _Result([{"id": 41}] if self.group_exists else [])
+            return _Result([{"id": 41, "school_id": 5}] if self.group_exists else [])
         self.aggregation_sql = sql
         self.aggregation_params = params
         return _Result(
@@ -108,6 +110,8 @@ def test_trend_payload_keeps_empty_months_and_compact_coverage(monkeypatch):
         "studentsWithData": 0,
         "homeworkRecordCount": 0,
         "attendanceRecordCount": 0,
+        "hasClosure": False,
+        "closureTitles": [],
     }
     assert payload["items"][1]["avgAAP"] == 6.2
     assert payload["items"][1]["avgAR"] == 80.8
@@ -117,6 +121,7 @@ def test_trend_payload_keeps_empty_months_and_compact_coverage(monkeypatch):
     assert "generate_series" in connection.aggregation_sql
     assert "enrollment_status = 'active'" in connection.aggregation_sql
     assert "FULL OUTER JOIN attendance_by_student" in connection.aggregation_sql
+    assert "academic_calendar_closures" in connection.aggregation_sql
 
 
 def test_trend_query_returns_none_for_a_missing_group(monkeypatch):

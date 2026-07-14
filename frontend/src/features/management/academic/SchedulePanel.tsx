@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Filter, Plus, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock, Filter, LockKeyhole, Plus, X } from "lucide-react";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { routes } from "@/shared/lib/routes";
@@ -10,6 +10,7 @@ import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/share
 import { fetchApiQuery, queryClient } from "@/shared/api/queryClient";
 import { FieldLabel, TextInput, Select, weekdayLabels, timetableStartHour, timetableEndHour, isoDate, startOfWeek, addDays, formatWeekRange, timeToMinutes, formatSessionTime, lessonDateToIso, lessonStatus, scheduleTimeForLesson, ScheduleRow, SessionRow, LessonHistoryRow, RawTimetableBlock, TimetableLessonBlock, layoutSessionsForDay } from "./shared";
 import { DEFAULT_CLASS_MINUTES, SCHEDULE_SNAP_MINUTES, clampNumber, lessonDurationMinutesForSchoolCode, snapToMinutes, snappedStartMinutes } from "./scheduleMath";
+import { CalendarClosuresModal, type CalendarClosure } from "./CalendarClosuresModal";
 
 // The grid scales up when the week has many overlapping classes instead of
 // squeezing those cards into unreadable strips.
@@ -145,6 +146,7 @@ export function SchedulePanel({ state }: { state: any }) {
   const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
   const canDrag = !isTeacherMode;
   const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
+  const schools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
   const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
   const initialSchedules = Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : [];
   const initialSessions = Array.isArray(props.adminAcademicSessions) ? props.adminAcademicSessions : [];
@@ -163,6 +165,9 @@ export function SchedulePanel({ state }: { state: any }) {
   const timetableScrollRef = useRef<HTMLDivElement | null>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [createOpen, setCreateOpen] = useState(false);
+  const [breaksOpen, setBreaksOpen] = useState(false);
+  const [rangeRevision, setRangeRevision] = useState(0);
+  const [calendarClosures, setCalendarClosures] = useState<CalendarClosure[]>([]);
   useDismissibleLayer({
     enabled: createOpen,
     onDismiss: () => setCreateOpen(false),
@@ -202,25 +207,34 @@ export function SchedulePanel({ state }: { state: any }) {
 
   useEffect(() => {
     if (typeof academicRoutes.adminAcademicTimetableApi !== "function") return;
+    let active = true;
     const query = new URLSearchParams({
       date_from: isoDate(weekDays[0]),
       date_to: isoDate(weekDays[6]),
     });
     setRangeLoading(true);
     setError("");
-    void fetchApiQuery<{ schedules?: ScheduleRow[]; sessions?: SessionRow[] }>(
+    void fetchApiQuery<{ schedules?: ScheduleRow[]; sessions?: SessionRow[]; calendarClosures?: CalendarClosure[] }>(
       ["academic", "timetable", query.toString()],
       academicRoutes.adminAcademicTimetableApi(query.toString()),
     )
       .then((data) => {
+        if (!active) return;
         setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
         setSessions(Array.isArray(data.sessions) ? data.sessions : []);
+        setCalendarClosures(Array.isArray(data.calendarClosures) ? data.calendarClosures : []);
       })
       .catch((loadError: unknown) => {
+        if (!active) return;
         setError(loadError instanceof Error ? loadError.message : "Could not load this timetable week.");
       })
-      .finally(() => setRangeLoading(false));
-  }, [academicRoutes.adminAcademicTimetableApi, weekStart]);
+      .finally(() => {
+        if (active) setRangeLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [academicRoutes.adminAcademicTimetableApi, weekStart, rangeRevision]);
 
   // Any lesson session that already carries explicit times (server sessions or
   // this session's drag placements) must not re-render from lesson history.
@@ -784,6 +798,16 @@ export function SchedulePanel({ state }: { state: any }) {
             {!isTeacherMode ? (
               <button
                 type="button"
+                onClick={() => setBreaksOpen(true)}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-amber-300/70 bg-amber-50 px-2.5 text-[11px] font-bold text-amber-900 transition-colors hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+              >
+                <LockKeyhole className="h-3 w-3" />
+                Manage Breaks
+              </button>
+            ) : null}
+            {!isTeacherMode ? (
+              <button
+                type="button"
                 onClick={() => {
                   setError("");
                   clearToast();
@@ -830,6 +854,16 @@ export function SchedulePanel({ state }: { state: any }) {
           <p className="mb-2 rounded-md bg-destructive/10 px-2.5 py-1.5 text-[11px] font-semibold text-destructive">
             {error}
           </p>
+        ) : null}
+        {calendarClosures.length ? (
+          <div className="mb-2 flex flex-wrap gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-2" aria-label="School holiday locks in this timetable week">
+            {calendarClosures.map((closure) => (
+              <span key={closure.id} className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-background/80 px-2 py-1 text-[10px] font-bold text-amber-900">
+                <LockKeyhole className="h-3 w-3" />
+                {closure.schoolName ? `${closure.schoolName} · ` : ""}{closure.title} · {closure.startDate}–{closure.endDate}
+              </span>
+            ))}
+          </div>
         ) : null}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className="inline-flex h-7 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-bold">
@@ -1248,6 +1282,23 @@ export function SchedulePanel({ state }: { state: any }) {
             </div>
           </aside>
         </div>
+      ) : null}
+      {!isTeacherMode ? (
+        <CalendarClosuresModal
+          open={breaksOpen}
+          onClose={() => setBreaksOpen(false)}
+          csrf={csrf}
+          academicRoutes={academicRoutes}
+          schools={schools}
+          initialYear={weekStart.getFullYear()}
+          onChanged={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["academic", "timetable"] });
+            await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook"] });
+            await queryClient.invalidateQueries({ queryKey: ["academic", "gradebook-trends"] });
+            setRangeRevision((current) => current + 1);
+            showToast("School break settings updated.");
+          }}
+        />
       ) : null}
     </>
   );

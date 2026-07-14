@@ -32,6 +32,15 @@ from backend.modules.academics.schemas import (
     AdminUpdateGroupScheduleRequest,
     AdminCreateGroupStudentRequest,
     AdminStudentCreated,
+    AdminCalendarClosureRequest,
+    AdminCalendarClosureUnlockRequest,
+)
+from backend.modules.academics.calendar_closures import (
+    CalendarClosureConflictError,
+    create_calendar_closure,
+    list_calendar_closures,
+    preview_calendar_closure,
+    unlock_calendar_closure,
 )
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.operations import (
@@ -150,6 +159,90 @@ def list_academic_program_items(
         )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get(
+    "/calendar-closures",
+    operation_id="api_v1_academic_director_list_academic_calendar_closures",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def academic_calendar_closures(
+    school_id: int,
+    group_id: int = 0,
+    date_from: str = "",
+    date_to: str = "",
+):
+    try:
+        return api_success(list_calendar_closures(
+            school_id=school_id,
+            group_id=group_id,
+            date_from=date_from,
+            date_to=date_to,
+        ))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/calendar-closures/preview",
+    operation_id="api_v1_academic_director_preview_academic_calendar_closure",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def preview_academic_calendar_closure(payload: AdminCalendarClosureRequest):
+    try:
+        return api_success(preview_calendar_closure(_payload(payload)))
+    except CalendarClosureConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post(
+    "/calendar-closures",
+    operation_id="api_v1_academic_director_create_academic_calendar_closure",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def create_academic_calendar_closure(
+    payload: AdminCalendarClosureRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        result = create_calendar_closure(
+            _payload(payload),
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
+    except CalendarClosureConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success(result)
+
+
+@router.post(
+    "/calendar-closures/{closure_id}/unlock",
+    operation_id="api_v1_academic_director_unlock_academic_calendar_closure",
+    response_model=ApiSuccess[dict[str, Any]],
+)
+def unlock_academic_calendar_closure(
+    closure_id: int,
+    payload: AdminCalendarClosureUnlockRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        result = unlock_calendar_closure(
+            closure_id,
+            rebuild_future=payload.rebuild_future,
+            actor_staff_id=user.staff_id,
+            actor_account_id=user.account_id,
+        )
+    except CalendarClosureConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    invalidate_admin_page_context_cache()
+    return api_success(result)
 
 
 @router.get(

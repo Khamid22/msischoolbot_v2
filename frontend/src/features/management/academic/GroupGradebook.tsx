@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, Minus, Plus, Settings, Table2, Users, X } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, BookMarked, CalendarDays, ChevronLeft, ChevronRight, Layers, LockKeyhole, Minus, Plus, Settings, Table2, Users, X } from "lucide-react";
 import { BarChart, Bar, Cell, Legend, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { routes } from "@/shared/lib/routes";
 import { motion } from "@/shared/lib/motion";
@@ -30,6 +30,10 @@ type AcademicGradebookRoutes = Pick<
   | "adminAcademicLessonRecoverApi"
   | "adminAcademicGroupSchedule"
   | "adminAcademicGroupStudents"
+  | "adminAcademicCalendarClosuresApi"
+  | "adminAcademicCalendarClosurePreview"
+  | "adminAcademicCalendarClosureCreate"
+  | "adminAcademicCalendarClosureUnlock"
 >;
 
 type CompactTooltipItem = {
@@ -205,6 +209,11 @@ function AcademicTrendTooltip({
   return (
     <div className="min-w-52 rounded-xl border border-foreground/10 bg-popover px-3 py-2.5 text-popover-foreground shadow-card-hover">
       <p className="text-xs font-bold">{formatTrendMonth(month.month)}</p>
+      {month.hasClosure ? (
+        <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+          <LockKeyhole className="h-3 w-3" />{month.closureTitles?.join(", ") || "School holiday"}
+        </p>
+      ) : null}
       <div className="mt-2 space-y-1.5">
         {values.map((item) => (
           <div key={item.key} className="flex items-center justify-between gap-4 text-xs">
@@ -965,6 +974,15 @@ export function GroupGradebook({
     return text;
   }
 
+  function lessonIsRecordedInsideClosure(lesson: Lesson) {
+    if (!lesson.hasAcademicRecords) return false;
+    const lessonDate = lessonDateToInputValue(lesson.date);
+    if (!lessonDate) return false;
+    return Boolean(data?.calendarClosures?.some(
+      (closure) => closure.startDate <= lessonDate && lessonDate <= closure.endDate,
+    ));
+  }
+
   const lessons = data?.lessons ?? [];
   const examLabels = data?.examLabels ?? [];
   const enrollments = data?.enrollments ?? [];
@@ -974,6 +992,9 @@ export function GroupGradebook({
   const selectedLessonMonthLabel = gradebookMonthOptions.find(
     (option) => option.value === selectedLessonMonth,
   )?.label || selectedLessonMonth;
+  const selectedLessonMonthOption = gradebookMonthOptions.find(
+    (option) => option.value === selectedLessonMonth,
+  );
   const visibleCurriculumLessonCount = lessons.filter((lesson) => !isCancelledLesson(lesson)).length;
   const visibleCancellationCount = lessons.length - visibleCurriculumLessonCount;
   const scheduledCurriculumLessonCount = gradebookMonthOptions.reduce(
@@ -1230,7 +1251,7 @@ export function GroupGradebook({
                   className="min-w-0 max-w-[12rem] bg-transparent text-sm font-bold text-foreground outline-none disabled:opacity-50"
                 >
                   {gradebookMonthOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>{option.label}{option.hasClosure ? " — Holiday" : ""}</option>
                   ))}
                 </select>
               </div>
@@ -1250,11 +1271,18 @@ export function GroupGradebook({
             </div>
           ) : null}
 
+          {selectedLessonMonthOption?.hasClosure ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900">
+              <LockKeyhole className="h-4 w-4 shrink-0" />
+              <span>{selectedLessonMonthOption.closureTitles?.join(", ") || "School holiday"}{selectedLessonMonthOption.protectedRecordCount ? ` · ${selectedLessonMonthOption.protectedRecordCount} recorded ${selectedLessonMonthOption.protectedRecordCount === 1 ? "lesson remains" : "lessons remain"} visible` : lessons.length ? " · protected lessons remain visible below" : " · no lessons scheduled"}</span>
+            </div>
+          ) : null}
+
           {gradebookDisplay === "table" ? (
             <>
               {lessons.length === 0 ? (
-                <div className="border-b border-foreground/8 bg-muted/10 px-4 py-3 text-xs text-muted-foreground">
-                  No lessons are scheduled in {selectedLessonMonthLabel || "this month"}. Student enrollment remains available below.
+                <div className={`border-b px-4 py-4 text-xs ${selectedLessonMonthOption?.hasClosure ? "border-amber-200 bg-amber-50/40 text-amber-900" : "border-foreground/8 bg-muted/10 text-muted-foreground"}`}>
+                  {selectedLessonMonthOption?.hasClosure ? `${selectedLessonMonthOption.closureTitles?.[0] || "School holiday"} — no lessons are scheduled in ${selectedLessonMonthLabel}.` : `No lessons are scheduled in ${selectedLessonMonthLabel || "this month"}. Student enrollment remains available below.`}
                 </div>
               ) : null}
               <div
@@ -1289,6 +1317,7 @@ export function GroupGradebook({
                             </span>
                             <span className={`mt-1 block whitespace-nowrap text-[9px] font-semibold ${isCancelledLesson(lesson) ? "text-red-700" : "text-muted-foreground/75"}`}>{lesson.lessonNumber}</span>
                             <span className={`mt-1 block w-full whitespace-normal break-words text-center text-[9px] font-medium italic leading-[1.15] ${isCancelledLesson(lesson) ? "text-red-700/80" : "text-muted-foreground/70"}`}>{lesson.topic || "—"}</span>
+                            {lessonIsRecordedInsideClosure(lesson) ? <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-bold leading-tight text-amber-900"><LockKeyhole className="h-2.5 w-2.5" />Recorded before holiday lock</span> : null}
                           </div>
                         </th>
                       ))}
@@ -1412,8 +1441,8 @@ export function GroupGradebook({
                       </div>
                       <table className="sr-only">
                         <caption>Monthly academic indicator values through {selectedLessonMonthLabel}</caption>
-                        <thead><tr><th>Month</th><th>Average AAP</th><th>Attendance rate</th><th>Average performance</th><th>Lessons</th><th>Students with data</th><th>Homework records</th><th>Attendance records</th></tr></thead>
-                        <tbody>{academicTrendItems.map((item) => <tr key={`trend-table-${item.month}`}><th>{formatTrendMonth(item.month)}</th><td>{item.avgAAP ?? "No data"}</td><td>{item.avgAR === null ? "No data" : `${item.avgAR}%`}</td><td>{item.avgPerformance ?? "No data"}</td><td>{item.lessonCount}</td><td>{item.studentsWithData}</td><td>{item.homeworkRecordCount}</td><td>{item.attendanceRecordCount}</td></tr>)}</tbody>
+                        <thead><tr><th>Month</th><th>Calendar status</th><th>Average AAP</th><th>Attendance rate</th><th>Average performance</th><th>Lessons</th><th>Students with data</th><th>Homework records</th><th>Attendance records</th></tr></thead>
+                        <tbody>{academicTrendItems.map((item) => <tr key={`trend-table-${item.month}`}><th>{formatTrendMonth(item.month)}</th><td>{item.hasClosure ? item.closureTitles?.join(", ") || "School holiday" : "Open"}</td><td>{item.avgAAP ?? "No data"}</td><td>{item.avgAR === null ? "No data" : `${item.avgAR}%`}</td><td>{item.avgPerformance ?? "No data"}</td><td>{item.lessonCount}</td><td>{item.studentsWithData}</td><td>{item.homeworkRecordCount}</td><td>{item.attendanceRecordCount}</td></tr>)}</tbody>
                       </table>
                     </>
                   ) : (

@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from backend.core.database import connect_auth_db
-from backend.modules.academics import repository, timetable_repository
+from backend.modules.academics import calendar_repository, repository, timetable_repository
+from backend.modules.academics.calendar_closures import serialize_calendar_closure
 
 
 def _bounded_limit(value, *, default, maximum):
@@ -112,11 +113,20 @@ def list_timetable_range(*, start_date="", end_date="", group_id=0, school_id=0)
 
     with connect_auth_db() as conn:
         group_v2_id = 0
+        group_scope = None
         if int(group_id or 0) > 0:
             group = repository.get_group_by_legacy_or_id(conn, int(group_id))
             if not group:
                 raise ValueError("Group was not found.")
             group_v2_id = int(group["id"])
+            school_id = int(group["school_id"])
+            group_scope = {
+                "groupId": int(group_id),
+                "groupName": str(group["group_name"]),
+                "schoolId": int(group["school_id"]),
+                "schoolCode": str(group["school_key"]),
+                "schoolName": str(group["school_name"]),
+            }
         sessions = [
             dict(row)
             for row in timetable_repository.list_timetable_rows_in_range(
@@ -153,14 +163,26 @@ def list_timetable_range(*, start_date="", end_date="", group_id=0, school_id=0)
             if group_v2_id
             else 0
         )
+        closures = [
+            serialize_calendar_closure(dict(row))
+            for row in calendar_repository.list_calendar_closures(
+                conn,
+                school_id=school_id,
+                group_v2_id=group_v2_id,
+                start_date=parsed_start,
+                end_date=parsed_end,
+            )
+        ]
     return {
         "from": parsed_start.isoformat(),
         "to": parsed_end.isoformat(),
         "range": {"from": parsed_start.isoformat(), "to": parsed_end.isoformat()},
+        "scope": group_scope,
         "schedules": schedules,
         "activeSchedule": schedules[0] if len(schedules) == 1 else None,
         "sessions": sessions,
         "exceptions": exceptions,
+        "calendarClosures": closures,
         "hasAcademicRecords": any(
             bool(item.get("has_academic_records")) for item in sessions + exceptions
         ),

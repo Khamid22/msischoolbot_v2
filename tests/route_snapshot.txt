@@ -34,6 +34,10 @@
 /admin/teachers/{teacher_id} | POST
 /admin/teachers/{teacher_id}/delete | POST
 /api/v1/academic-director/academic/attendance | POST
+/api/v1/academic-director/academic/calendar-closures | GET
+/api/v1/academic-director/academic/calendar-closures | POST
+/api/v1/academic-director/academic/calendar-closures/preview | POST
+/api/v1/academic-director/academic/calendar-closures/{closure_id}/unlock | POST
 /api/v1/academic-director/academic/classes | POST
 /api/v1/academic-director/academic/coins | POST
 /api/v1/academic-director/academic/context | GET
@@ -70,6 +74,10 @@
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/academic-director/teachers/{teacher_id}/reset-password | POST
 /api/v1/admin/academic/attendance | POST
+/api/v1/admin/academic/calendar-closures | GET
+/api/v1/admin/academic/calendar-closures | POST
+/api/v1/admin/academic/calendar-closures/preview | POST
+/api/v1/admin/academic/calendar-closures/{closure_id}/unlock | POST
 /api/v1/admin/academic/classes | POST
 /api/v1/admin/academic/coins | POST
 /api/v1/admin/academic/context | GET
