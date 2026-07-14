@@ -78,9 +78,8 @@ def test_teacher_password_reset_updates_legacy_and_canonical_credentials(monkeyp
         captured["audit"] = kwargs
 
     monkeypatch.setattr(teachers_service.repository, "update_teacher_legacy_password", update_legacy)
-    monkeypatch.setattr(teachers_service, "reset_linked_account_password", update_canonical)
+    monkeypatch.setattr(teachers_service.repository, "activate_teacher_account_with_password", update_canonical)
     monkeypatch.setattr(teachers_service.repository, "insert_teacher_password_reset_audit_event", audit)
-    monkeypatch.setattr(teachers_service, "_generate_teacher_temporary_password", lambda: "SafePass4826")
     monkeypatch.setattr(teachers_service, "utc_now_iso", lambda: "2026-07-13T10:00:00Z")
 
     reset, error, credentials = teachers_service._reset_teacher_password(
@@ -93,17 +92,18 @@ def test_teacher_password_reset_updates_legacy_and_canonical_credentials(monkeyp
 
     assert reset is True
     assert error == ""
+    # Reset restores the password to the login and re-enables the account.
     assert credentials == {
         "login": "TCH0042",
-        "temporary_password": "SafePass4826",
+        "temporary_password": "TCH0042",
         "display_name": "Example Teacher",
-        "must_change_password": True,
+        "must_change_password": False,
         "updated_at": "2026-07-13T10:00:00Z",
     }
     assert captured["legacy"]["teacher_id"] == 42
     assert captured["canonical"]["account_id"] == 88
-    assert captured["canonical"]["temporary_password"] == "SafePass4826"
-    assert verify_password_hash(captured["legacy"]["password_hash"], "SafePass4826")
+    assert verify_password_hash(captured["canonical"]["password_hash"], "TCH0042")
+    assert verify_password_hash(captured["legacy"]["password_hash"], "TCH0042")
     assert captured["audit"] == {
         "teacher_id": 42,
         "account_id": 88,

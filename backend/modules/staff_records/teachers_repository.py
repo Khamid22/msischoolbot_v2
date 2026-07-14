@@ -178,6 +178,40 @@ def update_teacher_legacy_password(conn, *, teacher_id, login, password_hash, up
     return int(getattr(cursor, "rowcount", 0) or 0)
 
 
+def activate_teacher_account_with_password(conn, *, account_id, password_hash):
+    """Enable a teacher's canonical account and set its password so login works.
+
+    Writes the hash directly (bypassing the shared min-length rule) because
+    teacher passwords are intentionally login-based.
+    """
+    cursor = conn.execute(
+        """
+        UPDATE msi_v2.accounts
+        SET password_hash = %s,
+            status = 'active',
+            must_change_password = false,
+            session_version = session_version + 1,
+            updated_at = now()
+        WHERE id = %s AND lower(role) = 'teacher'
+        """,
+        (password_hash, int(account_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
+def list_disabled_teacher_account_rows(conn):
+    """Canonical teacher accounts still disabled (never usable) — id + login."""
+    return conn.execute(
+        """
+        SELECT id, login
+        FROM msi_v2.accounts
+        WHERE lower(role) = 'teacher'
+          AND lower(btrim(status)) = 'disabled'
+          AND COALESCE(btrim(login), '') <> ''
+        """
+    ).fetchall()
+
+
 def insert_teacher_password_reset_audit_event(
     conn,
     *,
@@ -580,6 +614,8 @@ __all__ = [
     "insert_teacher_auth",
     "update_teacher_password",
     "update_teacher_legacy_password",
+    "activate_teacher_account_with_password",
+    "list_disabled_teacher_account_rows",
     "insert_teacher_password_reset_audit_event",
     "get_teacher_by_id_row",
     "insert_teacher_row",

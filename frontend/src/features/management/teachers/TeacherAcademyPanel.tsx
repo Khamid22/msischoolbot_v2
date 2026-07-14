@@ -1911,17 +1911,17 @@ function ActiveTeacherAccountModal({
             <div className="min-w-0">
               <h3 id="teacher-password-access-title" className="text-sm font-black text-foreground">Password access</h3>
               <p className="mt-0.5 text-xs font-semibold leading-5 text-muted-foreground">
-                The current password is protected and cannot be viewed. Generate a temporary password when the teacher needs access restored.
+                The current password is protected and cannot be viewed. Resetting sets the password back to the teacher's login; they can change it later in their profile.
               </p>
             </div>
           </div>
 
           {resetCredentials ? (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" aria-live="polite">
-              <p className="text-xs font-black text-amber-900">Temporary password — shown once</p>
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3" aria-live="polite">
+              <p className="text-xs font-black text-emerald-900">Password reset — same as the login</p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Login</p>
+                <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Login</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.login)}</p>
                     <IconButton label="Copy teacher login" onClick={() => onCopy(asString(resetCredentials.login), "Teacher login")}>
@@ -1929,25 +1929,25 @@ function ActiveTeacherAccountModal({
                     </IconButton>
                   </div>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Temporary password</p>
+                <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">Password</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="min-w-0 break-all font-mono text-sm font-black text-foreground">{asString(resetCredentials.temporary_password)}</p>
-                    <IconButton label="Copy temporary password" onClick={() => onCopy(asString(resetCredentials.temporary_password), "Temporary password")}>
+                    <IconButton label="Copy password" onClick={() => onCopy(asString(resetCredentials.temporary_password), "Password")}>
                       <Copy className="h-4 w-4" />
                     </IconButton>
                   </div>
                 </div>
               </div>
-              <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
-                Share these credentials securely. This password will not be displayed again after the modal closes.
+              <p className="mt-2 text-xs font-semibold leading-5 text-emerald-800">
+                The teacher can sign in with these now and change the password anytime in their profile.
               </p>
             </div>
           ) : confirmingReset ? (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
               <p className="text-xs font-black text-amber-900">Reset this teacher password?</p>
               <p className="mt-1 text-xs font-semibold leading-5 text-amber-800">
-                This immediately replaces the forgotten password and invalidates existing canonical sessions.
+                This sets the password back to the teacher's login and signs them out of other sessions.
               </p>
               <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button
@@ -1965,7 +1965,7 @@ function ActiveTeacherAccountModal({
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-black text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-60"
                 >
                   <RefreshCw className={`h-4 w-4 ${resetting ? "animate-spin" : ""}`} aria-hidden="true" />
-                  {resetting ? "Generating..." : "Generate temporary password"}
+                  {resetting ? "Resetting..." : "Reset to login"}
                 </button>
               </div>
             </div>
@@ -2293,7 +2293,7 @@ export function TeacherAcademyPanel({
       return;
     }
     setTeacherPasswordResetCredentials(reset);
-    showToast("Temporary teacher password generated.", "success");
+    showToast("Password reset to the teacher's login.", "success");
   }
 
   function copyTeacherCredential(value: string, label: string) {

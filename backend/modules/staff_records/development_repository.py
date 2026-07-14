@@ -396,7 +396,7 @@ def update_teacher_account_for_provisioning(
         UPDATE msi_v2.accounts
         SET login = %s,
             role = 'teacher',
-            status = 'disabled',
+            status = 'active',
             full_name = %s,
             legacy_source_table = 'msi_staff',
             legacy_source_id = %s,
@@ -418,7 +418,7 @@ def insert_teacher_account_for_provisioning(
             legacy_source_table, legacy_source_id, must_change_password,
             session_version, created_at, updated_at
         )
-        VALUES (%s, %s, 'teacher', 'disabled', %s, 'msi_staff', %s, true, 1, %s::timestamptz, %s::timestamptz)
+        VALUES (%s, %s, 'teacher', 'active', %s, 'msi_staff', %s, false, 1, %s::timestamptz, %s::timestamptz)
         RETURNING id
         """,
         (login, password_hash, full_name, staff_id, created_at, created_at),

@@ -424,7 +424,7 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "routes.academicDirectorTeacherAcademyAssessmentDelete" in panel_source
     assert "routes.academicDirectorTeacherAcademyDelete" in panel_source
     assert "routes.academicDirectorTeacherPasswordReset" in panel_source
-    assert "Temporary password — shown once" in panel_source
+    assert "Password reset — same as the login" in panel_source
     assert "Delete assessment report" in panel_source
     assert "assessmentDelete" in panel_source
     assert "routes.headOfDepartmentTeacherAcademyAssignmentUpdate" in panel_source

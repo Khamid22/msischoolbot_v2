@@ -2,10 +2,31 @@ import re
 import secrets
 
 from backend.core.passwords import generate_password_hash
-from backend.modules.accounts.service import provision_teacher_account, reset_linked_account_password
+from backend.modules.accounts.service import provision_teacher_account
 from backend.modules.staff_records import teachers_repository as repository
 from backend.modules.accounts.database import DB_LOCK, connect, utc_now_iso
 from backend.modules.accounts.bootstrap import init_storage
+
+
+def activate_disabled_teacher_accounts(conn):
+    """Enable canonical teacher accounts that are still 'disabled' so teachers can log in.
+
+    Teacher accounts were historically provisioned disabled, blocking login even
+    with the right password. Teacher passwords are login-based, so we activate any
+    still-disabled account and (re)set its password to its login. Scoped to
+    ``status = 'disabled'`` only, so it never clobbers a password a teacher later
+    set (their account is 'active' by then). Idempotent.
+    """
+    for row in repository.list_disabled_teacher_account_rows(conn):
+        account_id = int(row_get(row, "id") or 0)
+        login = str(row_get(row, "login") or "").strip()
+        if not account_id or not login:
+            continue
+        repository.activate_teacher_account_with_password(
+            conn,
+            account_id=account_id,
+            password_hash=generate_password_hash(login),
+        )
 
 
 def backfill_teacher_auth(conn):
@@ -16,6 +37,8 @@ def backfill_teacher_auth(conn):
     the login (admins can reset). Idempotent — safe to call on every
     teacher-list load and right after a teacher is created.
     """
+    # Ensure any still-disabled teacher accounts become usable (login-based password).
+    activate_disabled_teacher_accounts(conn)
     missing = repository.list_teacher_ids_without_auth(conn)
     if not missing:
         return
@@ -194,8 +217,11 @@ def _reset_teacher_password(
     if not login:
         return False, "Teacher account has no login.", {}
 
-    temporary_password = _generate_teacher_temporary_password()
-    password_hash = generate_password_hash(temporary_password)
+    # Teacher passwords are login-based: resetting simply restores the password to
+    # the login and re-enables the account so the teacher can sign in immediately
+    # (they can change it later in /account/security).
+    new_password = login
+    password_hash = generate_password_hash(new_password)
     now = utc_now_iso()
     legacy_updates = repository.update_teacher_legacy_password(
         conn,
@@ -205,14 +231,16 @@ def _reset_teacher_password(
         updated_at=now,
     )
     account_id = int(row_get(account, "account_id") or 0)
-    session_version = 0
+    account_updates = 0
     if account_id:
-        session_version = reset_linked_account_password(
+        # Write the hash directly (activates + clears must-change) so the
+        # login-length password is not rejected by the shared min-length rule.
+        account_updates = repository.activate_teacher_account_with_password(
             conn,
             account_id=account_id,
-            temporary_password=temporary_password,
+            password_hash=password_hash,
         )
-    if legacy_updates <= 0 and session_version <= 0:
+    if legacy_updates <= 0 and account_updates <= 0:
         return False, "Unable to reset the teacher password.", {}
 
     repository.insert_teacher_password_reset_audit_event(
@@ -227,9 +255,9 @@ def _reset_teacher_password(
 
     return True, "", {
         "login": login,
-        "temporary_password": temporary_password,
+        "temporary_password": new_password,
         "display_name": str(row_get(account, "full_name") or login).strip(),
-        "must_change_password": bool(account_id),
+        "must_change_password": False,
         "updated_at": now,
     }
 
