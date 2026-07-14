@@ -1,8 +1,8 @@
-import { KeyRound, Menu, X } from "lucide-react";
+import { ArrowLeft, KeyRound, Menu, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isTelegramMiniApp } from "@/shared/lib/telegram";
 import { RoleMobileNav } from "@/shared/ui/RoleMobileNav";
-import { RoleSidebar } from "@/shared/ui/RoleSidebar";
+import { RoleSidebar, type WorkspaceBackLink } from "@/shared/ui/RoleSidebar";
 import { routes } from "@/shared/lib/routes";
 import { uiLayers } from "@/shared/ui/layers";
 import { mobileNavItemsFrom, type RoleNavItem } from "@/shared/ui/roleNav";
@@ -10,6 +10,8 @@ import { initialsFromLogin } from "@/shared/ui/RoleSidebar";
 import { useBodyScrollLock } from "@/shared/ui/useBodyScrollLock";
 
 export type MobileNavigationMode = "auto" | "bottom" | "drawer";
+export type DesktopSidebarMode = "fixed" | "collapsible";
+export type DesktopSidebarInitialState = "expanded" | "collapsed" | "adaptive";
 
 export interface RoleWorkspaceShellProps<Key extends string = string> {
   authLogin?: string;
@@ -32,7 +34,32 @@ export interface RoleWorkspaceShellProps<Key extends string = string> {
   maxWidthClass?: string;
   sectionClassName?: string;
   mobileNavigationMode?: MobileNavigationMode;
+  desktopSidebarMode?: DesktopSidebarMode;
+  desktopSidebarInitialState?: DesktopSidebarInitialState;
+  desktopSidebarStorageKey?: string;
+  workspaceBackLink?: WorkspaceBackLink;
+  profileHref?: string;
   children: ReactNode;
+}
+
+function storedSidebarPreference(storageKey?: string) {
+  if (!storageKey || typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage.getItem(storageKey);
+    if (value === "collapsed") return true;
+    if (value === "expanded") return false;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function initialSidebarCollapsed(initialState: DesktopSidebarInitialState, storageKey?: string) {
+  const stored = storedSidebarPreference(storageKey);
+  if (stored !== null) return stored;
+  if (initialState === "collapsed") return true;
+  if (initialState === "expanded") return false;
+  return typeof window !== "undefined" ? window.innerWidth < 1600 : false;
 }
 
 /**
@@ -59,10 +86,22 @@ export function RoleWorkspaceShell<Key extends string = string>({
   maxWidthClass = "max-w-7xl",
   sectionClassName = "gap-5",
   mobileNavigationMode = "auto",
+  desktopSidebarMode = "fixed",
+  desktopSidebarInitialState = "expanded",
+  desktopSidebarStorageKey,
+  workspaceBackLink,
+  profileHref,
   children,
 }: RoleWorkspaceShellProps<Key>) {
   const mobileItems = mobileNavItems ?? mobileNavItemsFrom(navItems);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const desktopSidebarCollapsible = desktopSidebarMode === "collapsible";
+  const [desktopSidebarPreferenceSet, setDesktopSidebarPreferenceSet] = useState(
+    () => storedSidebarPreference(desktopSidebarStorageKey) !== null,
+  );
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(
+    () => desktopSidebarCollapsible && initialSidebarCollapsed(desktopSidebarInitialState, desktopSidebarStorageKey),
+  );
   const shouldUseBottomNav = useMemo(() => {
     if (mobileNavigationMode === "bottom") return true;
     if (mobileNavigationMode === "drawer") return false;
@@ -91,6 +130,35 @@ export function RoleWorkspaceShell<Key extends string = string>({
     }
   }, [drawerOpen, shouldUseDrawer]);
 
+  useEffect(() => {
+    if (!desktopSidebarCollapsible || desktopSidebarInitialState !== "adaptive" || desktopSidebarPreferenceSet) return;
+    const applyAdaptiveState = () => setDesktopSidebarCollapsed(window.innerWidth < 1600);
+    applyAdaptiveState();
+    window.addEventListener("resize", applyAdaptiveState);
+    return () => window.removeEventListener("resize", applyAdaptiveState);
+  }, [desktopSidebarCollapsible, desktopSidebarInitialState, desktopSidebarPreferenceSet]);
+
+  const toggleDesktopSidebar = () => {
+    setDesktopSidebarCollapsed((current) => {
+      const next = !current;
+      if (desktopSidebarStorageKey) {
+        try {
+          window.localStorage.setItem(desktopSidebarStorageKey, next ? "collapsed" : "expanded");
+        } catch {
+          // Storage can be unavailable in strict/private browser contexts.
+        }
+      }
+      return next;
+    });
+    setDesktopSidebarPreferenceSet(true);
+  };
+
+  const desktopMarginClass = desktopSidebarCollapsible
+    ? desktopSidebarCollapsed
+      ? "lg:ml-[4.5rem]"
+      : "lg:ml-56"
+    : "lg:ml-64";
+
   return (
     <div className="min-h-[var(--tg-viewport-height)] bg-background text-foreground">
       <RoleSidebar
@@ -105,10 +173,15 @@ export function RoleWorkspaceShell<Key extends string = string>({
         initialsFallback={initialsFallback}
         brandLabel={brandLabel}
         logoutAction={logoutAction}
+        collapsible={desktopSidebarCollapsible}
+        collapsed={desktopSidebarCollapsed}
+        onToggleCollapsed={toggleDesktopSidebar}
+        workspaceBackLink={workspaceBackLink}
+        profileHref={profileHref}
       />
 
       <main
-        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+1rem)] sm:px-5 lg:ml-64 lg:px-8 lg:pb-8 lg:pt-6 ${
+        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+1rem)] transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-6 motion-reduce:transition-none ${desktopMarginClass} ${
           shouldUseBottomNav
             ? "pb-[calc(var(--app-bottom-inset)+6.25rem)]"
             : "pb-[calc(var(--app-bottom-inset)+1.25rem)]"
@@ -169,7 +242,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
               <a
                 href={homeHref}
                 onClick={() => setDrawerOpen(false)}
-                className="flex min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/12 font-bold text-white ring-1 ring-white/10">
                   {(brandLabel || "MSI School").charAt(0) || "M"}
@@ -191,6 +264,16 @@ export function RoleWorkspaceShell<Key extends string = string>({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
               <nav className="space-y-2" aria-label={mobileNavLabel || `${roleLabel} mobile navigation`}>
+                {workspaceBackLink ? (
+                  <a
+                    href={workspaceBackLink.href}
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-300 hover:bg-sidebar-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span>{workspaceBackLink.label}</span>
+                  </a>
+                ) : null}
                 <p className="px-2 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   {sectionLabel}
                 </p>
@@ -225,13 +308,15 @@ export function RoleWorkspaceShell<Key extends string = string>({
 
             <div className="border-t border-white/10 p-3">
               <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-900">
-                  {initialsFromLogin(login, initialsFallback || "MS")}
-                </div>
-                <div className="min-w-0 flex-1 leading-tight">
-                  <span className="block truncate text-sm font-medium text-white">{login}</span>
-                  <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
-                </div>
+                <a href={profileHref || routes.accountSecurity} onClick={() => setDrawerOpen(false)} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-900">
+                    {initialsFromLogin(login, initialsFallback || "MS")}
+                  </div>
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <span className="block truncate text-sm font-medium text-white">{login}</span>
+                    <span className="block truncate text-xs text-slate-400">{roleLabel}</span>
+                  </div>
+                </a>
                 <a
                   href={routes.accountSecurity}
                   onClick={() => setDrawerOpen(false)}

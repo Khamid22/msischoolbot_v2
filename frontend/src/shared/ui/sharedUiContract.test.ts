@@ -80,7 +80,26 @@ describe("RoleSidebar", () => {
 
   it("uses the shared sidebar layer and hides below lg", () => {
     assert.match(src, /uiLayers\.sidebar/);
-    assert.match(src, /hidden w-64 .*lg:flex/);
+    assert.match(src, /const widthClass = collapsible .* "w-64"/);
+    assert.match(src, /hidden \$\{widthClass\} .*lg:flex/);
+  });
+
+  it("supports an accessible opt-in collapsed state", () => {
+    assert.match(src, /collapsible\?: boolean/);
+    assert.match(src, /aria-label=\{compact \? "Expand recruitment sidebar" : "Collapse recruitment sidebar"\}/);
+    assert.match(src, /data-sidebar-collapsed/);
+    assert.match(src, /workspaceBackLink/);
+  });
+});
+
+describe("Drawer focus management", () => {
+  const src = source("Drawer.tsx");
+
+  it("traps tab focus and restores the opening control", () => {
+    assert.match(src, /event\.key !== "Tab"/);
+    assert.match(src, /previousFocusRef\.current = document\.activeElement/);
+    assert.match(src, /previousFocusRef\.current\?\.focus\(\)/);
+    assert.match(src, /aria-describedby/);
   });
 });
 

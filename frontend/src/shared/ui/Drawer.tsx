@@ -31,41 +31,82 @@ export function Drawer({
   widthClass = "sm:max-w-md",
 }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const headingId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
 
     const previousOverflow = document.body.style.overflow;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
 
-    // Move focus into the panel so keyboard users land inside the dialog.
+    // Move focus to the first control, falling back to the panel itself.
     const focusTimer = window.setTimeout(() => {
-      panelRef.current?.focus();
+      const firstControl = panelRef.current?.querySelector<HTMLElement>(
+        '[data-drawer-content] input:not([disabled]), [data-drawer-content] select:not([disabled]), [data-drawer-content] textarea:not([disabled]), [data-drawer-content] button:not([disabled]), [data-drawer-content] a[href]',
+      );
+      (firstControl || panelRef.current)?.focus();
     }, 0);
 
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
       window.clearTimeout(focusTimer);
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className={`fixed inset-0 ${uiLayers.overlay}`} role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <div
+      className={`fixed inset-0 ${uiLayers.overlay}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      aria-describedby={description ? descriptionId : undefined}
+    >
       <button
         type="button"
         aria-label="Close panel"
+        tabIndex={-1}
         onClick={onClose}
         className="absolute inset-0 h-full w-full cursor-default bg-foreground/50 backdrop-blur-[1px] animate-in fade-in duration-200 motion-reduce:animate-none"
       />
@@ -86,7 +127,7 @@ export function Drawer({
               {title}
             </h2>
             {description ? (
-              <div className="mt-0.5 break-words text-xs text-muted-foreground">{description}</div>
+              <div id={descriptionId} className="mt-0.5 break-words text-xs text-muted-foreground">{description}</div>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -102,7 +143,7 @@ export function Drawer({
           </div>
         </div>
 
-        <div className="miniapp-scroll flex-1 bg-surface px-3 py-3 sm:px-5 sm:py-4">{children}</div>
+        <div data-drawer-content className="miniapp-scroll flex-1 bg-surface px-3 py-3 sm:px-5 sm:py-4">{children}</div>
 
         {footer ? (
           <div className="shrink-0 border-t border-foreground/8 bg-surface/95 px-3 py-3 shadow-[0_-8px_24px_hsl(var(--foreground)/0.06)] backdrop-blur sm:px-5">

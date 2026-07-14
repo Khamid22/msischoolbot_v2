@@ -21,6 +21,7 @@ interface ModalProps {
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
   panelClassName?: string;
+  initialFocusSelector?: string;
 }
 
 const sizeClass: Record<ModalSize, string> = {
@@ -97,6 +98,7 @@ export function Modal({
   closeOnEscape = true,
   showCloseButton = true,
   panelClassName = "",
+  initialFocusSelector,
 }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -156,7 +158,10 @@ export function Modal({
   useEffect(() => {
     if (!open) return;
     const timer = window.setTimeout(() => {
-      const preferred = panelRef.current?.querySelector<HTMLElement>("[autofocus]")
+      const preferred = (initialFocusSelector
+        ? panelRef.current?.querySelector<HTMLElement>(initialFocusSelector)
+        : null)
+        || panelRef.current?.querySelector<HTMLElement>("[autofocus]")
         || panelRef.current?.querySelector<HTMLElement>(
           'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])',
         );
@@ -165,7 +170,7 @@ export function Modal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [open]);
+  }, [initialFocusSelector, open]);
 
   if (!mounted || !open) return null;
 

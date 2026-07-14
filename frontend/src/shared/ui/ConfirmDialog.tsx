@@ -92,7 +92,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="h-10 flex-1 rounded-lg border border-foreground/10 text-sm font-bold hover:bg-muted disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-lg border border-foreground/10 text-sm font-bold hover:bg-muted disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -101,7 +101,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className={`h-10 flex-1 rounded-lg text-sm font-bold text-white disabled:opacity-50 ${
+            className={`min-h-11 flex-1 rounded-lg text-sm font-bold text-white disabled:opacity-50 ${
               danger ? "bg-destructive hover:bg-destructive/90" : "bg-primary text-primary-foreground hover:bg-primary/90"
             }`}
           >

@@ -207,7 +207,7 @@ export function ActionMenu({ items, label = "More actions", trigger, align = "ri
                 onClick={(event) => {
                   event.stopPropagation();
                   if (item.disabled) return;
-                  close(false);
+                  close();
                   item.onClick();
                 }}
                 onKeyDown={(event) => {
