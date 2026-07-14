@@ -12,7 +12,7 @@ from backend.internal_operations.schemas import (
     CreateComplaintRequest,
     UpdateComplaintRequest,
 )
-from backend.modules.complaints.service import (
+from backend.modules.support.service import (
     add_complaint_reply,
     create_complaint,
     get_complaint,

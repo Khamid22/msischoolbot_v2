@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import hashlib
 
-from backend.modules.parent_access import service
+from backend.modules.people.parents import service
 
 
 class _Connection:

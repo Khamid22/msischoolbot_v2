@@ -193,4 +193,5 @@
 /student | GET
 /support | GET
 /sw.js | GET
+/teacher | GET
 /unauthorized | GET

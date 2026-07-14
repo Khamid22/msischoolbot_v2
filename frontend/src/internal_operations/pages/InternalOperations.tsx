@@ -38,21 +38,21 @@ import {
   asString,
   groupTabsBySection,
   tabs,
-} from "@/features/managementTypes";
+} from "@/shared/lib/workspace";
 import { useInternalOperationsState } from "@/internal_operations/hooks/useInternalOperationsState";
 
-const OverviewPanel = lazy(() => import("@/features/management/OverviewPanel"));
-const StudentsPanel = lazy(() => import("@/features/management/StudentsPanel"));
-const ParentsPanel = lazy(() => import("@/features/management/ParentsPanel"));
-const TeachersPanel = lazy(() => import("@/features/management/TeachersPanel"));
-const AcademicPanel = lazy(() => import("@/features/management/AcademicPanel"));
-const AnnouncementsPanel = lazy(() => import("@/features/management/AnnouncementsPanel"));
-const ResourcesPanel = lazy(() => import("@/features/management/ResourcesPanel"));
-const ChatPanel = lazy(() => import("@/features/management/ChatPanel"));
-const PaymentsPanel = lazy(() => import("@/features/management/PaymentsPanel"));
-const ComplaintsPanel = lazy(() => import("@/features/management/ComplaintsPanel"));
-const CareerGrowthPanel = lazy(() => import("@/features/management/CareerGrowthPanel"));
-const OfficeHoursPanel = lazy(() => import("@/features/management/OfficeHoursPanel"));
+const OverviewPanel = lazy(() => import("@/features/reporting/OverviewPanel"));
+const StudentsPanel = lazy(() => import("@/features/people/students/StudentsPanel"));
+const ParentsPanel = lazy(() => import("@/features/people/parents/ParentsPanel"));
+const TeachersPanel = lazy(() => import("@/internal_operations/pages/TeachersPanel"));
+const AcademicPanel = lazy(() => import("@/features/academics/AcademicPanel"));
+const AnnouncementsPanel = lazy(() => import("@/features/communications/AnnouncementsPanel"));
+const ResourcesPanel = lazy(() => import("@/features/academics/resources/ResourcesPanel"));
+const ChatPanel = lazy(() => import("@/features/communications/ChatPanel"));
+const PaymentsPanel = lazy(() => import("@/features/finance/PaymentsPanel"));
+const ComplaintsPanel = lazy(() => import("@/features/support/ComplaintsPanel"));
+const CareerGrowthPanel = lazy(() => import("@/features/reporting/CareerGrowthPanel"));
+const OfficeHoursPanel = lazy(() => import("@/features/academics/office-hours/OfficeHoursPanel"));
 
 type StudentActionTab =
   | "student_dashboard"

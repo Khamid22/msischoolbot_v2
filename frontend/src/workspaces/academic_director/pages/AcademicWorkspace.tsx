@@ -1,11 +1,11 @@
 import { Suspense, lazy, useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
-import { AcademicDirectorPageShell, type AcademicDirectorNavKey } from "@/features/academic_workspace/AcademicDirectorShell";
-import type { AdminTab } from "@/features/managementTypes";
+import { AcademicDirectorPageShell, type AcademicDirectorNavKey } from "@/workspaces/academic_shared/AcademicDirectorShell";
+import type { AdminTab } from "@/shared/lib/workspace";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { routes } from "@/shared/lib/routes";
 
-const AcademicPanel = lazy(() => import("@/features/management/AcademicPanel"));
+const AcademicPanel = lazy(() => import("@/features/academics/AcademicPanel"));
 
 type AcademicWorkspaceKind = "groups" | "subjects" | "timetable";
 

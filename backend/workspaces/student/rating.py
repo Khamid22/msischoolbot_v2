@@ -3,14 +3,14 @@ from backend.core.session import url_for
 
 from backend.core.rendering import render_react_page
 
-from backend.modules.academics.rating import (
+from backend.modules.academics.gradebook.rating import (
     build_subject_leaderboard,
     collect_subject_dashboards_from_cache,
     collect_subject_dashboards_from_dataset,
     load_dataset,
     seed_group_cache_from_dataset,
 )
-from backend.modules.student_records import payload as payload_service
+from backend.modules.people.students import payload as payload_service
 
 
 def register_rating_board_routes(students):

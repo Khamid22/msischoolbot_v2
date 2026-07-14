@@ -12,7 +12,7 @@ from backend.modules.academics.schemas import (
 )
 from backend.workspaces.academic_director.academics_api import router as academic_router
 from backend.workspaces.academic_director.staff_records_api import register_teacher_academy_routes
-from backend.modules.staff_records.registration import (
+from backend.modules.people.staff.service import (
     create_head_of_department_account,
     reset_head_of_department_password,
 )

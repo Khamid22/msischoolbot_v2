@@ -5,21 +5,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException
 
 from backend.core.http import ApiSuccess
-from backend.modules.staff_records.development_responses import (
+from backend.modules.teacher_academy.responses import (
     add_assessment_response,
     delete_assessment_response,
     sync_lessons_response,
     update_assignment_response,
     update_status_response,
 )
-from backend.modules.staff_records.development_schemas import (
+from backend.modules.teacher_academy.schemas import (
     AddAcademyAssessmentForm,
     SyncAcademyLessonsForm,
     TeacherAcademyMutationResult,
     UpdateAcademyAssignmentForm,
     UpdateAcademyStatusForm,
 )
-from backend.modules.staff_records.development_permissions import (
+from backend.modules.teacher_academy.policies import (
     can_user_manage_academy_assignment,
     can_user_manage_academy_teacher,
 )

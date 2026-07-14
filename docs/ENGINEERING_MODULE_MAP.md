@@ -1,67 +1,91 @@
 # Engineering Module Map
 
-Audience: engineers locating the current owner of a change.
-
-## Repository Map
-
-```text
-backend/application/              FastAPI composition
-backend/workspaces/               seven business workspace adapters
-backend/internal_operations/      protected System Admin adapters
-backend/modules/accounts/         identity, password, Telegram account auth
-backend/modules/academics/        schools, programs, groups, gradebook, schedule
-backend/modules/communications/   announcements and chat
-backend/modules/complaints/       complaints and support workflow
-backend/modules/learning_resources/ resources and comments
-backend/modules/parent_access/    parents, invites, linked-child access
-backend/modules/payments/         payment rules and persistence
-backend/modules/reporting/        dashboards, summaries, cross-feature read models
-backend/modules/staff_records/    teachers, candidates, staff development
-backend/modules/student_records/  student profiles, dashboard, activity
-backend/core/                     config, database, session, guards, rendering
-backend/integrations/             Telegram and object storage
-database/alembic/                 all schema DDL and migration history
-
-frontend/src/app/                 bootstrap and lazy page registry
-frontend/src/workspaces/          seven business workspace entry pages
-frontend/src/features/            reusable business workflows
-frontend/src/internal_operations/ protected System Admin UI
-frontend/src/shared/              routes, API, time, motion, accessible UI
-```
+Audience: engineers locating the owner of a change.
 
 ## Change Routing
 
-| Change | Primary owner |
+| Change | Backend owner | Frontend owner |
+| --- | --- | --- |
+| account, password, session identity | `modules/identity` | `features/identity` |
+| school, subject, class | `modules/organization` | composed by academic workspaces |
+| student records | `modules/people/students` | `features/people/students` |
+| parent records and links | `modules/people/parents` | `features/people/parents` |
+| teacher records | `modules/people/teachers` | `features/people/teachers` |
+| staff account registration | `modules/people/staff` | authorized workspace adapters |
+| candidates and promotion | `modules/hr/recruitment` | `features/hr/recruitment` |
+| Teacher Academy | `modules/teacher_academy` | `features/teacher-academy` |
+| curriculum/program | `modules/academics/curriculum` | `features/academics` |
+| groups/enrollment | `modules/academics/groups` | `features/academics` |
+| schedules/reflow/office hours | `modules/academics/timetable` | `features/academics/timetable` |
+| lesson overrides | `modules/academics/lessons` | timetable details UI |
+| attendance | `modules/academics/attendance` | `features/academics/gradebook` |
+| homework/rewards/trends | `modules/academics/gradebook` | `features/academics/gradebook` |
+| exams | `modules/academics/assessments` | Gradebook exam view |
+| holiday closures | `modules/academics/calendar` | timetable closure UI |
+| learning resources | `modules/academics/resources` | `features/academics/resources` |
+| payments | `modules/finance` | `features/finance` |
+| complaints | `modules/support` | `features/support` |
+| announcements/chat | `modules/communications` | `features/communications` |
+| dashboards/read models | `modules/reporting` | `features/reporting` |
+| System Admin transport/UI | `internal_operations` | `internal_operations` |
+| storage, Redis, Telegram adapter | `platform` | n/a |
+
+## Table Ownership
+
+| Owner | Principal tables |
 | --- | --- |
-| account/password/session | `backend/modules/accounts` |
-| role normalization/guards | `backend/core/access`, `backend/core/guards.py` |
-| workspace composition | matching package under `backend/workspaces` |
-| schools/groups/programs/gradebook/schedules | `backend/modules/academics` |
-| executive/academic summaries | `backend/modules/reporting` |
-| students and dashboard payload | `backend/modules/student_records` |
-| parents, invites, linked-child access | `backend/modules/parent_access` |
-| teachers/candidates/Teacher Academy records | `backend/modules/staff_records` |
-| payments | `backend/modules/payments` |
-| chat/announcements | `backend/modules/communications` |
-| complaints | `backend/modules/complaints` |
-| resources/comments | `backend/modules/learning_resources` |
-| System Admin UI/forms | `backend/internal_operations`, `frontend/src/internal_operations` |
-| schema/constraint/index | new revision under `database/alembic/versions` |
-| business workspace UI | matching `frontend/src/workspaces` package |
-| reusable business UI | `frontend/src/features` |
-| reusable UI behavior | `frontend/src/shared/ui` or `frontend/src/shared/lib` |
+| Identity | `accounts`, `account_telegram_links`, `student_auth`, `staff_profiles`, `audit_events` |
+| Organization | `schools`, `subjects`, `classes`, `class_students` |
+| People / Students | `students`, `student_profiles` |
+| People / Parents | `parents`, `parent_profiles`, parent links/invites |
+| People / Teachers and Staff | `teachers`, `teacher_profiles`, `msi_staff`, `staff_subject_scopes` |
+| Academics / Curriculum | `subject_programs`, `subject_program_items` |
+| Academics / Groups | `groups`, `group_students` |
+| Academics / Timetable | `group_schedule_rules`, `lesson_sessions`, office-hour tables |
+| Academics / Lessons | group-specific lesson-session overrides (within `lesson_sessions`) |
+| Academics / Attendance | `attendance_records` |
+| Academics / Gradebook | `homework_scores`, `coin_events` |
+| Academics / Assessments | `exam_results` |
+| Academics / Calendar | `academic_calendar_closures`, `lesson_schedule_exceptions` |
+| Academics / Resources | resource type/resource/comment tables |
+| HR / Recruitment | candidate and candidate-event tables |
+| Teacher Academy | training, evaluation, assignment, and development tables |
+| Finance | `payments` |
+| Support | complaint/support tables |
+| Communications | announcement and chat tables |
+| Reporting | no transactional ownership; read-only projections |
+
+When one physical table serves closely related academic concerns, the write contract is owned by the row's domain service; other domains consume a public read contract.
+
+## Explicit Size Exceptions
+
+These existing stateful orchestrators remain above the target threshold after extracting their models, calculations, dialogs, or child views. They are documented compatibility exceptions and must not grow without first extracting another focused unit:
+
+- `features/academics/AcademicPanel.tsx`
+- `features/academics/gradebook/GroupGradebook.tsx`
+- `features/academics/timetable/SchedulePanel.tsx`
+- `features/academics/timetable/Timetable.tsx`
+- `features/academics/timetable/ModernGroupTimetable.tsx`
+- `features/teacher-academy/TeacherAcademyPanel.tsx`
+- `features/finance/PaymentsPanel.tsx`
+- `features/reporting/overview/RoleOverviewPanel.tsx`
+- `features/reporting/overview/SchoolOverviewPanel.tsx`
+- `features/academics/office-hours/OfficeHoursPanel.tsx`
+- `features/people/students/StudentsPanel.tsx`
+- `features/communications/AnnouncementsPanel.tsx`
+- internal-operation and workspace orchestrators (transport composition, not domain features)
+- `modules/reporting/insights.py`, `modules/people/students/dashboard.py`, and `platform/storage/r2.py`
+
+No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 
 ## Removed Owners
 
 Do not import or recreate:
 
-- `backend/api`
-- `backend/pages`
-- `backend/services`
-- `backend/repositories`
-- `backend/schemas`
-- `frontend/src/roles`
-- Teacher portal page/API/navigation packages
-- Excel or Google Sheets import/reconciliation packages
+- old module packages: `accounts`, `complaints`, `learning_resources`, `parent_access`, `payments`, `staff_records`, `student_records`;
+- academic catch-alls: `academics/operations.py`, `academics/service.py`, `academics/repository.py`;
+- `backend/integrations` (use `backend/platform`);
+- `frontend/src/features/management` and `frontend/src/features/accounts`;
+- generic backend `api`, `pages`, `services`, `repositories`, or `schemas` trees.
 
-Before adding a feature, identify its workspace/API adapter, object policy, public module contract, owning repository, migration need, frontend feature/workspace owner, and tests.
+Future observations, interventions, payroll, and expanded finance capabilities remain documentation-only until implemented.

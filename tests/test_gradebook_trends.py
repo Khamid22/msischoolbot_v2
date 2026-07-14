@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from backend.internal_operations import academics_api as admin_academics_api
-from backend.modules.academics import operations
+from backend.modules.academics.gradebook import trends as operations
 from backend.workspaces.academic_director import academics_api as director_academics_api
 
 
@@ -157,10 +157,9 @@ def test_both_role_handlers_return_success_and_meaningful_errors(monkeypatch, ap
 
 
 def test_trend_aggregation_is_read_only_and_both_roles_expose_it():
-    operations_source = (ROOT / "backend/modules/academics/operations.py").read_text(encoding="utf-8")
-    trend_source = operations_source.split("def get_group_gradebook_trends(", 1)[1].split(
-        "def get_group_gradebook(", 1
-    )[0]
+    trend_source = (ROOT / "backend/modules/academics/gradebook/trends.py").read_text(
+        encoding="utf-8"
+    )
     assert "INSERT " not in trend_source
     assert "UPDATE " not in trend_source
     assert "DELETE " not in trend_source
@@ -176,10 +175,10 @@ def test_trend_aggregation_is_read_only_and_both_roles_expose_it():
 
 
 def test_frontend_trends_are_lazy_accessible_and_mutation_aware():
-    gradebook = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(
+    gradebook = (ROOT / "frontend/src/features/academics/gradebook/GroupGradebook.tsx").read_text(
         encoding="utf-8"
     )
-    timetable = (ROOT / "frontend/src/features/management/academic/ModernGroupTimetable.tsx").read_text(
+    timetable = (ROOT / "frontend/src/features/academics/timetable/ModernGroupTimetable.tsx").read_text(
         encoding="utf-8"
     )
 

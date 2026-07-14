@@ -7,11 +7,11 @@ on — while write handlers enforce the student role themselves.
 
 from fastapi import APIRouter, Depends, Request
 
-from backend.modules.student_records.activity_api import router as activity_router
-from backend.modules.student_records.chat_api import router as chat_router
-from backend.modules.student_records.comments_api import router as comments_router
-from backend.modules.student_records.office_hours_api import router as office_hours_router
-from backend.modules.student_records.service import record_student_activity
+from backend.modules.people.students.activity_api import router as activity_router
+from backend.modules.people.students.chat_api import router as chat_router
+from backend.modules.people.students.comments_api import router as comments_router
+from backend.modules.people.students.office_hours_api import router as office_hours_router
+from backend.modules.people.students.service import record_student_activity
 from backend.core.access import get_current_user
 from backend.core.access.roles import normalize_role
 

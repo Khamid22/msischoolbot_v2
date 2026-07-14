@@ -212,7 +212,7 @@ class AuthAndSecurityMiddleware:
                 account = None
                 if account_id > 0 and cookie_version > 0:
                     try:
-                        from backend.modules.accounts.service import get_account_by_id
+                        from backend.modules.identity.service import get_account_by_id
 
                         account = get_account_by_id(account_id)
                     except Exception:

@@ -5,8 +5,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_group_timetable_schedules_existing_curriculum_lessons():
-    service = (ROOT / "backend/modules/academics/service.py").read_text(encoding="utf-8")
-    repository = (ROOT / "backend/modules/academics/timetable_repository.py").read_text(encoding="utf-8")
+    service = (ROOT / "backend/modules/academics/timetable/service.py").read_text(encoding="utf-8")
+    repository = (ROOT / "backend/modules/academics/timetable/repository.py").read_text(encoding="utf-8")
 
     assert "def schedule_group_curriculum(" in service
     assert 'scope not in {"all", "from_date", "remaining"}' in service
@@ -16,9 +16,9 @@ def test_group_timetable_schedules_existing_curriculum_lessons():
 
 
 def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
-    panel = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(encoding="utf-8")
-    timetable = (ROOT / "frontend/src/features/management/academic/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
-    groups = (ROOT / "frontend/src/features/management/AcademicPanel.tsx").read_text(encoding="utf-8")
+    panel = (ROOT / "frontend/src/features/academics/gradebook/GroupGradebook.tsx").read_text(encoding="utf-8")
+    timetable = (ROOT / "frontend/src/features/academics/timetable/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
+    groups = (ROOT / "frontend/src/features/academics/AcademicPanel.tsx").read_text(encoding="utf-8")
 
     assert "Set Up Timetable" in timetable
     assert "Configure" in timetable
@@ -38,7 +38,7 @@ def test_group_ui_owns_setup_in_timetable_and_dates_are_read_only():
 
 
 def test_modern_timetable_opens_on_today_and_fetches_only_the_visible_range():
-    source = (ROOT / "frontend/src/features/management/academic/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
+    source = (ROOT / "frontend/src/features/academics/timetable/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
 
     assert "useState(schoolTodayKey)" in source
     assert "adminAcademicGroupTimetableApi" in source

@@ -1,6 +1,7 @@
 """Teacher Academy performance-oriented service coverage."""
 
-import backend.modules.staff_records.development_service as academy_service
+import backend.modules.teacher_academy.service as academy_service
+import backend.modules.teacher_academy.read_service as academy_read_service
 
 
 class _Rows:
@@ -131,21 +132,21 @@ class _SingleAcademyTeacherConnection:
 
 
 def test_list_academy_teachers_does_not_backfill_on_read(monkeypatch):
-    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: _EmptyAcademyConnection())
+    monkeypatch.setattr(academy_read_service, "connect_auth_db", lambda: _EmptyAcademyConnection())
     monkeypatch.setattr(
-        academy_service,
+        academy_read_service,
         "_backfill_academy_teacher_accounts",
         lambda conn: (_ for _ in ()).throw(AssertionError("backfill should not run on read")),
     )
 
-    assert academy_service.list_academy_teachers() == []
+    assert academy_read_service.list_academy_teachers() == []
 
 
 def test_lightweight_teacher_academy_lookup_returns_matching_teacher(monkeypatch):
     conn = _SingleAcademyTeacherConnection()
-    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_read_service, "connect_auth_db", lambda: conn)
 
-    teacher = academy_service.get_academy_teacher_for_teacher_account(12, staff_id=44)
+    teacher = academy_read_service.get_academy_teacher_for_teacher_account(12, staff_id=44)
 
     assert teacher["id"] == 3
     assert teacher["account_teacher_id"] == 12
@@ -160,8 +161,8 @@ def test_progress_target_matches_selected_assignment_count():
     six_assignments = [{"id": index + 1, "status": "assigned"} for index in range(6)]
     ten_assignments = [{"id": index + 1, "status": "assigned"} for index in range(10)]
 
-    six_progress = academy_service._progress_for(six_assignments, [])
-    ten_progress = academy_service._progress_for(ten_assignments, [])
+    six_progress = academy_read_service._progress_for(six_assignments, [])
+    ten_progress = academy_read_service._progress_for(ten_assignments, [])
 
     assert six_progress["assigned_count"] == 6
     assert six_progress["target_lessons"] == 6
@@ -171,7 +172,7 @@ def test_progress_target_matches_selected_assignment_count():
 
 def test_academy_timetable_events_include_only_scheduled_assignments_and_scope(monkeypatch):
     monkeypatch.setattr(
-        academy_service,
+        academy_read_service,
         "list_academy_teachers",
         lambda: [
             {
@@ -220,8 +221,8 @@ def test_academy_timetable_events_include_only_scheduled_assignments_and_scope(m
         ],
     )
 
-    all_events = academy_service.list_academy_timetable_events()
-    scoped_events = academy_service.list_academy_timetable_events({2})
+    all_events = academy_read_service.list_academy_timetable_events()
+    scoped_events = academy_read_service.list_academy_timetable_events({2})
 
     assert [event["assignment_id"] for event in all_events] == [8, 10]
     assert all_events[0]["title"] == "Lesson 3 - HCF and LCM"
@@ -247,9 +248,9 @@ def test_delete_academy_teacher_removes_generated_academy_identity(monkeypatch):
             calls.append(("commit",))
 
     conn = Conn()
-    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_service, "connect_auth_db", lambda: conn)
     monkeypatch.setattr(
-        academy_service.repository,
+        academy_service.mutations_repository,
         "get_academy_teacher_delete_row",
         lambda conn, academy_teacher_id: {
             "id": academy_teacher_id,
@@ -260,21 +261,21 @@ def test_delete_academy_teacher_removes_generated_academy_identity(monkeypatch):
         },
     )
     monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: True)
-    monkeypatch.setattr(academy_service.repository, "list_teacher_account_ids_for_staff", lambda conn, staff_id: [88])
-    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(academy_service.mutations_repository, "list_teacher_account_ids_for_staff", lambda conn, staff_id: [88])
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
     monkeypatch.setattr(
-        academy_service.repository,
+        academy_service.mutations_repository,
         "delete_teacher_profiles_for_delete",
         lambda conn, teacher_id, account_ids: calls.append(("teacher_profiles", teacher_id, account_ids)),
     )
     monkeypatch.setattr(
-        academy_service.repository,
+        academy_service.mutations_repository,
         "delete_staff_profiles_for_delete",
         lambda conn, staff_id, account_ids: calls.append(("staff_profiles", staff_id, account_ids)),
     )
-    monkeypatch.setattr(academy_service.repository, "delete_teacher_accounts_for_delete", lambda conn, account_ids: calls.append(("accounts", account_ids)))
-    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_staff_row", lambda conn, staff_id: calls.append(("staff", staff_id)))
-    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_profile_row", lambda conn, teacher_id: calls.append(("teacher", teacher_id)))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_teacher_accounts_for_delete", lambda conn, account_ids: calls.append(("accounts", account_ids)))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_academy_teacher_staff_row", lambda conn, staff_id: calls.append(("staff", staff_id)))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_academy_teacher_profile_row", lambda conn, teacher_id: calls.append(("teacher", teacher_id)))
 
     deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
 
@@ -303,9 +304,9 @@ def test_delete_academy_teacher_preserves_non_academy_identity(monkeypatch):
             calls.append(("commit",))
 
     conn = Conn()
-    monkeypatch.setattr(academy_service.repository, "connect_auth_db", lambda: conn)
+    monkeypatch.setattr(academy_service, "connect_auth_db", lambda: conn)
     monkeypatch.setattr(
-        academy_service.repository,
+        academy_service.mutations_repository,
         "get_academy_teacher_delete_row",
         lambda conn, academy_teacher_id: {
             "id": academy_teacher_id,
@@ -316,9 +317,9 @@ def test_delete_academy_teacher_preserves_non_academy_identity(monkeypatch):
         },
     )
     monkeypatch.setattr(academy_service, "_phase1_accounts_available", lambda conn: (_ for _ in ()).throw(AssertionError("identity cleanup should be skipped")))
-    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
-    monkeypatch.setattr(academy_service.repository, "delete_teacher_profiles_for_delete", lambda *args, **kwargs: calls.append(("unexpected", "teacher_profiles")))
-    monkeypatch.setattr(academy_service.repository, "delete_academy_teacher_staff_row", lambda *args, **kwargs: calls.append(("unexpected", "staff")))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_academy_teacher_row", lambda conn, teacher_id: calls.append(("academy", teacher_id)))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_teacher_profiles_for_delete", lambda *args, **kwargs: calls.append(("unexpected", "teacher_profiles")))
+    monkeypatch.setattr(academy_service.mutations_repository, "delete_academy_teacher_staff_row", lambda *args, **kwargs: calls.append(("unexpected", "staff")))
 
     deleted, message = academy_service.delete_academy_teacher(academy_teacher_id=91)
 

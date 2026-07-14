@@ -326,7 +326,7 @@ def test_academic_director_head_of_departments_route_loads_safe_page(client, mon
 def test_academic_department_timetable_announcements_and_profile_routes_load(client, monkeypatch):
     _patch_admin_page_context(monkeypatch)
     ad_workspace_source = Path("frontend/src/workspaces/academic_director/pages/AcademicWorkspace.tsx").read_text()
-    department_workspace_source = Path("frontend/src/features/academic_workspace/AcademicDepartmentWorkspace.tsx").read_text()
+    department_workspace_source = Path("frontend/src/workspaces/academic_shared/AcademicDepartmentWorkspace.tsx").read_text()
 
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
     ad_groups = client.get("/academic-director/groups")
@@ -393,7 +393,7 @@ def test_academic_department_timetable_announcements_and_profile_routes_load(cli
 
 
 def test_academic_department_overviews_do_not_render_duplicate_profile_logout_blocks():
-    source = Path("frontend/src/features/workspace_home/RoleHome.tsx").read_text()
+    source = Path("frontend/src/workspaces/shared/RoleHome.tsx").read_text()
     route_source = Path("backend/workspaces/academic_director/page.py").read_text()
     hod_route_source = Path("backend/workspaces/head_of_departments/page.py").read_text()
     ad_overview_block = source.split("function AcademicDirectorHome", 1)[1].split("function HeadOfDepartmentHome", 1)[0]
@@ -415,8 +415,8 @@ def test_academic_department_overviews_do_not_render_duplicate_profile_logout_bl
 
 
 def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobile_nav():
-    source = Path("frontend/src/features/academic_workspace/AcademicDirectorShell.tsx").read_text()
-    nav_source = Path("frontend/src/features/academic_workspace/academicNav.ts").read_text()
+    source = Path("frontend/src/workspaces/academic_shared/AcademicDirectorShell.tsx").read_text()
+    nav_source = Path("frontend/src/workspaces/academic_shared/academicNav.ts").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     admin_source = Path("frontend/src/internal_operations/pages/InternalOperations.tsx").read_text()
     academy_source = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()
@@ -485,7 +485,7 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'active="academy"' in hod_academy_source
     assert "allowTeacherPreview={false}" in academy_source
     assert "if (!allowTeacherPreview)" in Path(
-        "frontend/src/features/management/teachers/TeacherAcademyPanel.tsx"
+        "frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx"
     ).read_text()
     assert '"academic-director-academy"' in app_source
     assert '"academic-director-head-of-departments"' in app_source

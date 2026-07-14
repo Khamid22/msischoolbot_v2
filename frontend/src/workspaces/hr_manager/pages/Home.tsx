@@ -1,1 +1,1 @@
-export { default } from "@/features/workspace_home/RoleHome";
+export { default } from "@/workspaces/shared/RoleHome";

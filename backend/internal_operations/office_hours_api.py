@@ -13,7 +13,7 @@ from backend.internal_operations.schemas import (
     CancelAvailabilityRequest,
     UpdateBookingStatusRequest,
 )
-from backend.modules.academics import office_hours_service as oh_service
+from backend.modules.academics.timetable import office_hours_service as oh_service
 
 router = APIRouter(prefix="/office-hours")
 

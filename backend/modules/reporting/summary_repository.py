@@ -1,6 +1,6 @@
 """Read-only subject summary helpers from the msi_v2 academic schema."""
 
-from backend.modules.academics import canonical
+from backend.modules.organization import canonical
 
 
 def _subject_summary_select(where_clause="", params=()):

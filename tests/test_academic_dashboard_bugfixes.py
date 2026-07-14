@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from backend.modules.academics.exam_filters import is_exam_performance_row
+from backend.modules.academics.assessments.filters import is_exam_performance_row
 from backend.modules.reporting.insights import build_admin_group_counts, build_admin_quick_stats, build_admin_subject_counts, build_admin_subject_info
 
 
@@ -191,7 +191,7 @@ def test_subject_performance_keeps_every_group_when_series_data_is_sparse():
 
 
 def test_performance_graph_uses_responsive_full_width_layout():
-    source = Path("frontend/src/features/management/overview/SchoolOverviewPanel.tsx").read_text()
+    source = Path("frontend/src/features/reporting/overview/SchoolOverviewPanel.tsx").read_text()
 
     assert "graphLineSeries.length * 70" not in source
     # The chart fills the available vertical space instead of forcing tall

@@ -6,13 +6,13 @@ from backend.core.request_context import current_app, request, session
 from backend.core.session import url_for
 from werkzeug.utils import secure_filename
 
-from backend.modules.student_records.service import (
+from backend.modules.people.students.service import (
     admin_change_student_password,
     get_admin_student_profile,
     resolve_student_for_internal_operations,
     update_student_admin_profile,
 )
-from backend.modules.staff_records.teachers_service import assign_teacher_to_group, list_teachers
+from backend.modules.people.teachers.service import assign_teacher_to_group, list_teachers
 from backend.internal_operations.workspace import invalidate_admin_page_context_cache
 
 

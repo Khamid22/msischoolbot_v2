@@ -1,7 +1,7 @@
 """Subject performance summaries derived directly from msi_v2 academic tables."""
 
 from backend.core.database import connect_auth_db
-from backend.modules.academics import canonical
+from backend.modules.organization import canonical
 from backend.modules.reporting import summary_repository
 
 

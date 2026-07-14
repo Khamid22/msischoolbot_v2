@@ -195,7 +195,7 @@ def test_dashboard_renders_with_mocked_valid_payload(client, monkeypatch):
 
 
 def test_student_cannot_access_another_dashboard(client, monkeypatch):
-    import backend.modules.student_records.payload as payload_service
+    import backend.modules.people.students.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -211,8 +211,8 @@ def test_student_cannot_access_another_dashboard(client, monkeypatch):
     assert "Access denied: you can open only your own dashboard." in response.text
 
 
-def test_removed_teacher_role_cannot_open_student_dashboard(client, monkeypatch):
-    import backend.modules.student_records.payload as payload_service
+def test_teacher_role_cannot_open_student_dashboard(client, monkeypatch):
+    import backend.modules.people.students.payload as payload_service
 
     monkeypatch.setattr(
         payload_service,
@@ -230,8 +230,7 @@ def test_removed_teacher_role_cannot_open_student_dashboard(client, monkeypatch)
 
     response = client.get("/dashboard/321")
 
-    assert response.status_code == 302
-    assert response.headers["location"] == "/unauthorized"
+    assert response.status_code == 403
 
 
 def test_parent_child_dashboard_redirects_to_public_dashboard(client, monkeypatch):
@@ -276,7 +275,7 @@ def test_unlinked_parent_child_dashboard_returns_access_denied(client, monkeypat
 
 def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypatch):
     import backend.workspaces.student.dashboard as dashboard_routes
-    import backend.modules.student_records.payload as payload_service
+    import backend.modules.people.students.payload as payload_service
 
     calls = []
     monkeypatch.setattr(

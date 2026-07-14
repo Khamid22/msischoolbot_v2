@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Any
 
-from backend.core.redis_client import get_redis_client
+from backend.platform.cache import get_redis_client
 
 
 _ADMIN_PAGE_CONTEXT_CACHE_LOCK = threading.Lock()

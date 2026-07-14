@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _window_function():
-    operations = (ROOT / "backend/modules/academics/operations.py").read_text(encoding="utf-8")
+    operations = (ROOT / "backend/modules/academics/gradebook/window.py").read_text(encoding="utf-8")
     tree = ast.parse(operations)
     function = next(
         node
@@ -128,10 +128,9 @@ def test_gradebook_month_keeps_cancellations_in_their_calendar_month():
 
 
 def test_gradebook_get_is_read_only_and_records_are_id_keyed():
-    operations = (ROOT / "backend/modules/academics/operations.py").read_text(encoding="utf-8")
-    gradebook_source = operations.split("def get_group_gradebook(", 1)[1].split(
-        "def update_enrollment_status(", 1
-    )[0]
+    gradebook_source = (ROOT / "backend/modules/academics/gradebook/service.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "INSERT INTO msi_v2.lesson_sessions" not in gradebook_source
     assert "conn.commit()" not in gradebook_source
@@ -152,7 +151,7 @@ def test_gradebook_performance_migration_is_non_destructive():
 
 
 def test_frontend_uses_month_navigation_and_stable_lesson_ids():
-    source = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(
+    source = (ROOT / "frontend/src/features/academics/gradebook/GroupGradebook.tsx").read_text(
         encoding="utf-8"
     )
 
@@ -169,7 +168,7 @@ def test_frontend_uses_month_navigation_and_stable_lesson_ids():
 
 
 def test_gradebook_charts_are_compact_animated_and_motion_safe():
-    source = (ROOT / "frontend/src/features/management/academic/GroupGradebook.tsx").read_text(
+    source = (ROOT / "frontend/src/features/academics/gradebook/GroupGradebook.tsx").read_text(
         encoding="utf-8"
     )
 

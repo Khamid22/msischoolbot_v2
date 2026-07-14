@@ -31,7 +31,7 @@ def _signed_init_data(*, user_id=42, auth_date=1, bot_token=BOT_TOKEN):
 
 
 def test_import_path_exports_public_helpers():
-    from backend.integrations.telegram.init_data import (
+    from backend.platform.telegram.init_data import (
         telegram_user_from_init_data,
         telegram_user_id_from_init_data,
         verify_telegram_init_data,
@@ -43,7 +43,7 @@ def test_import_path_exports_public_helpers():
 
 
 def test_import_path_verifies_valid_init_data():
-    import backend.integrations.telegram.init_data as init_data_module
+    import backend.platform.telegram.init_data as init_data_module
 
     init_data = _signed_init_data()
 
@@ -67,7 +67,7 @@ def test_import_path_verifies_valid_init_data():
 
 
 def test_invalid_init_data_returns_none():
-    import backend.integrations.telegram.init_data as init_data_module
+    import backend.platform.telegram.init_data as init_data_module
 
     invalid_init_data = "auth_date=1&user=%7B%7D&hash=bad"
 

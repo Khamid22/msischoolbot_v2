@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from backend.modules.accounts.api import (
+from backend.modules.identity.api import (
     get_current_user,
     router as auth_api_router,
 )

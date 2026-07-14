@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from backend.modules.staff_records.development_permissions import (
+from backend.modules.teacher_academy.policies import (
     hod_subject_ids_for_context,
     filter_rows_by_subject_scope,
 )
-from backend.modules.staff_records.development_service import list_academy_teachers
+from backend.modules.teacher_academy.read_service import list_academy_teachers
 from backend.core.request_context import session
 from backend.core.session import current_auth_role, current_staff_id
 

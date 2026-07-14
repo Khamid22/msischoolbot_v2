@@ -28,28 +28,30 @@ def test_legacy_database_module_is_removed_after_core_migration():
 
 
 def test_teacher_academy_domain_modules_import_successfully():
-    import backend.modules.staff_records.development_repository as academy_repository
-    import backend.modules.staff_records.development_service as academy_service
+    import backend.modules.teacher_academy.repository as academy_repository
+    import backend.modules.teacher_academy.mutations_repository as academy_mutations
+    import backend.modules.teacher_academy.read_service as academy_read_service
+    import backend.modules.teacher_academy.service as academy_service
 
     assert callable(academy_repository.list_academy_teacher_rows)
-    assert callable(academy_repository.insert_academy_lesson_assignment)
-    assert callable(academy_repository.insert_assessment)
-    assert callable(academy_service.list_academy_teachers)
-    assert academy_service.repository is academy_repository
+    assert callable(academy_mutations.insert_academy_lesson_assignment)
+    assert callable(academy_mutations.insert_assessment)
+    assert callable(academy_read_service.list_academy_teachers)
+    assert academy_read_service.repository is academy_repository
 
 
 def test_old_admin_teacher_academy_service_path_is_removed():
     page_service_source = Path("backend/internal_operations/workspace.py").read_text()
 
     assert not Path("backend/roles/admin/services/teacher_academy_service.py").exists()
-    assert "from backend.modules.staff_records.development_service import list_academy_teachers" in page_service_source
+    assert "from backend.modules.teacher_academy.read_service import list_academy_teachers" in page_service_source
     assert "teacher_academy_service" not in page_service_source
 
 
 def test_teacher_academy_service_uses_module_repository_not_inline_sql():
-    service_source = Path("backend/modules/staff_records/development_service.py").read_text()
+    service_source = Path("backend/modules/teacher_academy/service.py").read_text()
 
-    assert "from backend.modules.staff_records import development_repository as repository" in service_source
+    assert "from backend.modules.teacher_academy import repository as repository" in service_source
     assert "from database import queries" not in service_source
     assert "conn.execute" not in service_source
     assert "FROM msi_v2" not in service_source
@@ -66,5 +68,5 @@ def test_page_and_role_edges_import_teacher_academy_domain_service_where_safe():
     ]
 
     for source in role_sources:
-        assert "backend.modules.staff_records.development_service" in source
+        assert "backend.modules.teacher_academy.read_service" in source
         assert "backend.roles.admin.services.teacher_academy_service" not in source

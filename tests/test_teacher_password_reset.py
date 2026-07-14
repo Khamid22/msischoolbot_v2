@@ -1,6 +1,6 @@
 from backend.core.passwords import verify_password_hash
-from backend.modules.accounts import repository as accounts_repository
-from backend.modules.staff_records import teachers_service
+from backend.modules.identity import repository as accounts_repository
+from backend.modules.people.teachers import service as teachers_service
 
 
 class _Connection:

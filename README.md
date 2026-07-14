@@ -1,19 +1,19 @@
 # MSI School LMS
 
-MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. It provides seven business workspaces: CEO, Academic Director, Head of Departments, Customer Support, HR Manager, Student, and Parent. Teachers are staff records managed inside authorized workspaces; they do not have a portal workspace or login role. System Admin is a protected internal-operations boundary, not an eighth business workspace.
+MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. Its product-domain modular monolith serves CEO, Academic Director, Head of Departments, Customer Support, HR Manager, Student, Parent, and the current read-only Teacher workspace. System Admin is a separate protected internal-operations boundary.
 
 ## Architecture at a Glance
 
 ```text
-frontend/src/workspaces/  the seven business workspace adapters
-frontend/src/features/    reusable business UI and workflows
+frontend/src/workspaces/  role-specific workspace adapters
+frontend/src/features/    product-domain UI and workflows
 frontend/src/shared/      shared UI, routing, time, and API primitives
 backend/application/      FastAPI composition and route registration
-backend/workspaces/       the seven business HTTP/page adapters
-backend/modules/          independent business modules and module-owned SQL
+backend/workspaces/       role-specific HTTP/page adapters
+backend/modules/          product domains and repository-owned SQL
 backend/internal_operations/ protected System Admin operations
 backend/core/             configuration, PostgreSQL, sessions, and security
-backend/integrations/     Telegram and storage adapters
+backend/platform/         Redis, Telegram, and storage adapters
 database/alembic/         the only owner of schema DDL
 tgbot/                    Telegram worker shell; inbound router registry is empty
 scripts/                  deployment and explicit reconciliation/import tools
@@ -36,9 +36,9 @@ PostgreSQL schema `msi_v2` is the only runtime source of truth. Google Sheets, E
 - `PATCH /api/v1/auth/password` is the self-service password endpoint for every password-enabled role.
 - Sessions carry `account_id`, canonical role, and `session_version`. Password resets, role changes, and account disablement invalidate older cookies.
 - Backend authorization uses canonical `msi_v2.students.id`. Legacy row IDs and public dashboard/enrollment IDs remain only at explicit compatibility boundaries.
-- Runtime code does not create or alter tables. Apply schema changes with Alembic; current migration head is `0008_remove_teacher_portal`.
-- SQL is owned by the matching package under `backend/modules`. Workspace and application adapters contain no SQL.
-- Business modules communicate through public service/contract functions, never by importing another module's repository.
+- Runtime code does not create or alter tables. Apply schema changes with the current Alembic head.
+- SQL is owned by a repository in the matching product domain under `backend/modules`. Workspace, application, adapter, and service modules contain no SQL.
+- Product domains communicate through public service/contract functions, never by importing another domain's repository.
 - The deleted `backend/api`, `backend/pages`, `backend/services`, `backend/repositories`, and `backend/schemas` trees must not be recreated.
 - Parent invite codes are random, expiring, single-use, hashed at rest, and consumed inside the same transaction that creates the parent link and canonical identity.
 - Telegram `initData` is HMAC-verified with a replay window before it can identify a user.

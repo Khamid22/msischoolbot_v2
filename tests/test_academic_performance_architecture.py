@@ -16,7 +16,7 @@ class _Connection:
 
 
 def test_group_page_is_bounded_and_uses_an_opaque_cursor(monkeypatch):
-    from backend.modules.academics import read_service
+    from backend.modules.academics.groups import read_service
 
     captured = {}
 
@@ -28,7 +28,7 @@ def test_group_page_is_bounded_and_uses_an_opaque_cursor(monkeypatch):
         ]
 
     monkeypatch.setattr(read_service, "connect_auth_db", lambda: _Connection())
-    monkeypatch.setattr(read_service.repository, "list_group_rows_page", rows)
+    monkeypatch.setattr(read_service.group_repository, "list_group_rows_page", rows)
 
     page = read_service.list_group_page(cursor="o0", limit=2)
 
@@ -42,7 +42,7 @@ def test_group_page_is_bounded_and_uses_an_opaque_cursor(monkeypatch):
 
 
 def test_group_page_caps_requested_size(monkeypatch):
-    from backend.modules.academics import read_service
+    from backend.modules.academics.groups import read_service
 
     captured = {}
 
@@ -51,7 +51,7 @@ def test_group_page_caps_requested_size(monkeypatch):
         return []
 
     monkeypatch.setattr(read_service, "connect_auth_db", lambda: _Connection())
-    monkeypatch.setattr(read_service.repository, "list_group_rows_page", rows)
+    monkeypatch.setattr(read_service.group_repository, "list_group_rows_page", rows)
 
     read_service.list_group_page(limit=10_000)
 
@@ -59,7 +59,7 @@ def test_group_page_caps_requested_size(monkeypatch):
 
 
 def test_timetable_range_rejects_unbounded_reads_before_database_access(monkeypatch):
-    from backend.modules.academics import read_service
+    from backend.modules.academics.groups import read_service
 
     monkeypatch.setattr(
         read_service,
@@ -74,19 +74,19 @@ def test_timetable_range_rejects_unbounded_reads_before_database_access(monkeypa
 
 
 def test_light_academic_context_omits_group_collection(monkeypatch):
-    from backend.modules.academics import service
+    from backend.modules.academics.groups import service
 
     monkeypatch.setattr(service, "_connect", lambda: _Connection())
-    monkeypatch.setattr(service.academic_repository, "list_school_rows", lambda _conn: [])
-    monkeypatch.setattr(service.academic_repository, "list_class_rows", lambda _conn: [])
-    monkeypatch.setattr(service.academic_repository, "list_subject_rows", lambda _conn: [])
+    monkeypatch.setattr(service.organization_contract, "list_school_rows", lambda _conn: [])
+    monkeypatch.setattr(service.organization_contract, "list_class_rows", lambda _conn: [])
+    monkeypatch.setattr(service.organization_contract, "list_subject_rows", lambda _conn: [])
     monkeypatch.setattr(
-        service.academic_repository,
+        service.group_repository,
         "list_group_rows",
         lambda _conn: pytest.fail("groups must use the paginated endpoint"),
     )
     monkeypatch.setattr(
-        service.academic_repository,
+        service.group_repository,
         "get_enrollment_summary_row",
         lambda _conn: {},
     )
@@ -101,7 +101,7 @@ def test_light_academic_context_omits_group_collection(monkeypatch):
 
 
 def test_group_archive_preserves_dependencies_and_writes_audit(monkeypatch):
-    from backend.modules.academics import operations
+    from backend.modules.academics.groups import operations
 
     connection = _Connection()
     connection.committed = False
@@ -157,7 +157,7 @@ def test_group_archive_preserves_dependencies_and_writes_audit(monkeypatch):
 
 
 def test_permanent_group_purge_requires_archival_and_exact_confirmation(monkeypatch):
-    from backend.modules.academics import operations
+    from backend.modules.academics.groups import operations
 
     connection = _Connection()
     connection.commit = lambda: None
@@ -201,7 +201,7 @@ def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
     paths = [
         Path("backend/internal_operations/academics_api.py"),
         Path("backend/workspaces/academic_director/academics_api.py"),
-        Path("backend/modules/academics/read_service.py"),
+        Path("backend/modules/academics/groups/read_service.py"),
     ]
     for path in paths:
         source = path.read_text(encoding="utf-8")

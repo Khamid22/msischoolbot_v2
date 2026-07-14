@@ -3,8 +3,8 @@ from backend.core.session import url_for
 
 from backend.core.rendering import render_react_page
 
-from backend.modules.learning_resources import service as resources_service
-from backend.modules.student_records import payload as payload_service
+from backend.modules.academics.resources import service as resources_service
+from backend.modules.people.students import payload as payload_service
 
 
 def register_resources_routes(students):

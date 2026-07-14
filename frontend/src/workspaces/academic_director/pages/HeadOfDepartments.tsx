@@ -12,8 +12,8 @@ import {
   UserRoundCheck,
   UsersRound,
 } from "lucide-react";
-import { AcademicDirectorPageShell } from "@/features/academic_workspace/AcademicDirectorShell";
-import { postForm } from "@/features/management/teachers/shared";
+import { AcademicDirectorPageShell } from "@/workspaces/academic_shared/AcademicDirectorShell";
+import { postForm } from "@/features/people/teachers/model";
 import { routes } from "@/shared/lib/routes";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";

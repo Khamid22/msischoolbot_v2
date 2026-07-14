@@ -1,5 +1,3 @@
-"""System API routes for MSI LMS Portal."""
-
 from time import perf_counter
 
 from fastapi import APIRouter, Request

@@ -35,10 +35,13 @@ def test_required_modular_architecture_paths_exist():
         Path("backend/application/api.py"),
         Path("backend/application/registry.py"),
         Path("backend/internal_operations/page.py"),
-        Path("backend/modules/accounts/service.py"),
-        Path("backend/modules/academics/service.py"),
-        Path("backend/modules/staff_records/development_service.py"),
-        Path("backend/modules/student_records/service.py"),
+        Path("backend/modules/identity/service.py"),
+        Path("backend/modules/organization/service.py"),
+        Path("backend/modules/academics/groups/service.py"),
+        Path("backend/modules/academics/timetable/service.py"),
+        Path("backend/modules/academics/gradebook/service.py"),
+        Path("backend/modules/teacher_academy/service.py"),
+        Path("backend/modules/people/students/service.py"),
         Path("frontend/src/shared/api/routes.ts"),
     ]:
         assert path.exists(), f"Expected modular architecture path: {path}"
@@ -70,11 +73,11 @@ def test_generated_database_caches_are_not_tracked():
 def test_module_repositories_are_canonical():
     expected = [
         Path("backend/modules/communications/announcements_repository.py"),
-        Path("backend/modules/complaints/repository.py"),
-        Path("backend/modules/academics/office_hours_repository.py"),
-        Path("backend/modules/learning_resources/repository.py"),
-        Path("backend/modules/parent_access/repository.py"),
-        Path("backend/modules/payments/repository.py"),
+        Path("backend/modules/support/repository.py"),
+        Path("backend/modules/academics/timetable/office_hours_repository.py"),
+        Path("backend/modules/academics/resources/repository.py"),
+        Path("backend/modules/people/parents/repository.py"),
+        Path("backend/modules/finance/repository.py"),
         Path("backend/modules/reporting/repository.py"),
     ]
     assert all(path.exists() for path in expected)
@@ -82,7 +85,7 @@ def test_module_repositories_are_canonical():
 
 def test_excel_is_not_an_lms_integration_or_upload_format():
     source = _active_source_text().casefold()
-    assert not Path("backend/integrations/excel").exists()
+    assert not Path("backend/platform/excel").exists()
     assert not Path("scripts/reconcile_academic_workbooks.py").exists()
     assert "openpyxl" not in Path("requirements.txt").read_text().casefold()
     assert '".xls"' not in source
@@ -92,9 +95,9 @@ def test_excel_is_not_an_lms_integration_or_upload_format():
 
 def test_main_starts_from_modular_accounts_and_core_config():
     main_source = Path("main.py").read_text()
-    assert "from backend.modules.accounts.bootstrap import init_storage" in main_source
+    assert "from backend.modules.identity.bootstrap import init_storage" in main_source
     assert "from backend.core.config import get_web_settings" in main_source
-    assert callable(importlib.import_module("backend.modules.accounts.bootstrap").init_storage)
+    assert callable(importlib.import_module("backend.modules.identity.bootstrap").init_storage)
 
 
 def test_demo_authentication_bypass_is_removed():

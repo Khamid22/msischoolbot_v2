@@ -3,15 +3,15 @@
 from fastapi import APIRouter, Depends
 
 from backend.core.rendering import generate_csrf, render_react_page
-from backend.modules.academics.service import list_academic_admin_rows
+from backend.modules.academics.groups.service import list_academic_admin_rows
 from backend.modules.communications.announcements_service import list_announcements
 from backend.workspaces.shared import render_role_home
 from backend.modules.reporting.service import academic_director_workspace_cards
-from backend.modules.staff_records.registration import (
+from backend.modules.people.staff.service import (
     list_active_subjects,
     list_head_of_department_accounts,
 )
-from backend.modules.staff_records.development_service import (
+from backend.modules.teacher_academy.read_service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
 )

@@ -9,8 +9,8 @@ from backend.core.rendering import render_react_page
 from backend.modules.communications.announcements_service import list_announcements
 from backend.core.performance import PagePerformanceTimer, log_page_performance
 
-from backend.modules.student_records import dashboard as dashboard_service
-from backend.modules.student_records import payload as payload_service
+from backend.modules.people.students import dashboard as dashboard_service
+from backend.modules.people.students import payload as payload_service
 
 
 def register_dashboard_routes(students):

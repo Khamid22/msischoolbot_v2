@@ -85,10 +85,10 @@ def test_role_aliases_normalize_to_dashboard_paths(raw_role, normalized, path, l
     assert role_display_name(raw_role) == label
 
 
-def test_teacher_is_not_a_portal_destination():
+def test_teacher_has_a_portal_destination():
     assert normalize_role("teacher") == "teacher"
-    assert dashboard_path_for_role("teacher") == "/"
-    assert role_display_name("teacher") == "Unknown Role"
+    assert dashboard_path_for_role("teacher") == "/teacher"
+    assert role_display_name("teacher") == "Teacher"
 
 
 def test_admin_has_all_permissions():

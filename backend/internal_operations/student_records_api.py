@@ -13,9 +13,9 @@ from backend.internal_operations.schemas import (
     AdminStudentCreated,
     AdminStudentsList,
 )
-from backend.modules.parent_access.service import create_parent_invite_code
-from backend.modules.student_records.service import get_admin_student_profile, list_students_for_admin
-from backend.modules.academics.operations import create_student_with_enrollment_from_payload
+from backend.modules.people.parents.service import create_parent_invite_code
+from backend.modules.people.students.service import get_admin_student_profile, list_students_for_admin
+from backend.modules.academics.groups.operations import create_student_with_enrollment_from_payload
 from backend.internal_operations.page_cache import invalidate_admin_page_context_cache
 from backend.core.access import CurrentUser, get_current_user
 

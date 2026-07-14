@@ -5,7 +5,7 @@ import time
 from backend.core.web_responses import redirect, with_status
 from backend.core.request_context import request, session
 from backend.core.session import url_for
-from backend.modules.academics.rating import (
+from backend.modules.academics.gradebook.rating import (
     get_group_cache_entry,
     is_full_form,
 )

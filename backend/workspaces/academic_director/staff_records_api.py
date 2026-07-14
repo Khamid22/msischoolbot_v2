@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException
 
 from backend.core.http import ApiSuccess, api_success
-from backend.modules.staff_records.development_responses import (
+from backend.modules.teacher_academy.responses import (
     add_assessment_response,
     create_academy_teacher_response,
     delete_academy_teacher_response,
@@ -15,7 +15,7 @@ from backend.modules.staff_records.development_responses import (
     update_assignment_response,
     update_status_response,
 )
-from backend.modules.staff_records.development_schemas import (
+from backend.modules.teacher_academy.schemas import (
     AddAcademyAssessmentForm,
     CreateAcademyTeacherForm,
     PromoteAcademyTeacherForm,
@@ -26,7 +26,7 @@ from backend.modules.staff_records.development_schemas import (
     UpdateAcademyStatusForm,
 )
 from backend.core.access import CurrentUser, get_current_user
-from backend.modules.staff_records.teachers_service import reset_teacher_password
+from backend.modules.people.teachers.service import reset_teacher_password
 
 
 def register_teacher_academy_routes(router: APIRouter) -> None:

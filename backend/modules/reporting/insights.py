@@ -3,8 +3,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.modules.academics.exam_filters import is_exam_performance_row
-from backend.modules.academics import canonical
+from backend.modules.academics.assessments.filters import is_exam_performance_row
+from backend.modules.organization import canonical
 
 _EXAM_NAME_ALIASES = {
     "half term test 1": "HFT1",

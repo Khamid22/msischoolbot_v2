@@ -29,8 +29,8 @@ The system supports:
 - PostgreSQL is the source of truth.
 - Google Sheets is retired as a live runtime dependency. Excel is used only through explicit import/reconciliation tooling.
 - `msi_v2.accounts` is the sole password authority; role tables must not provide fallback password hashes.
-- PostgreSQL DDL is Alembic-only. The current repository migration head is `0007_lms_integrity`.
-- Runtime SQL belongs to `backend/domains/*/queries.py`; the old database query barrels are deleted.
+- PostgreSQL DDL is Alembic-only. Use the current repository migration head; do not hard-code a historical revision in runtime code.
+- Runtime SQL belongs to the owning `repository.py` under `backend/modules`; application, workspace, adapter, and service modules contain no SQL.
 - Current schools: School 5 and Sehriyo.
 - More schools will be added later.
 - One user has exactly one role.
@@ -44,7 +44,7 @@ The system supports:
   - `parent`
   - `academic_director`
   - `head_of_department`
-- Teacher login format should be `TCH0001`, `TCH0002`, etc.
+- Teacher login format is `TCH0001`, `TCH0002`, etc. The current read-only Teacher workspace is preserved; teacher records remain managed by authorized staff.
 - Students login with MSI code + password.
 - Login-equals-password credentials must force self-service password change before workspace access.
 - Parents are Telegram-first in the first rebuild.

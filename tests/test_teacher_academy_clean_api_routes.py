@@ -29,7 +29,7 @@ def _set_session(client, data):
 
 
 def _patch_api_payload(monkeypatch):
-    import backend.modules.staff_records.development_responses as academy_api
+    import backend.modules.teacher_academy.responses as academy_api
 
     monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
@@ -412,7 +412,7 @@ def test_hod_teacher_routes_enforce_subject_scope(client, monkeypatch, path, ser
 
 
 def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fallback():
-    panel_source = Path("frontend/src/features/management/teachers/TeacherAcademyPanel.tsx").read_text()
+    panel_source = Path("frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx").read_text()
     routes_source = Path("frontend/src/shared/lib/routes.ts").read_text()
     api_routes_source = Path("frontend/src/shared/api/routes.ts").read_text()
     ad_page = Path("frontend/src/workspaces/academic_director/pages/TeacherAcademy.tsx").read_text()

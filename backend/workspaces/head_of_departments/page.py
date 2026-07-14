@@ -5,11 +5,11 @@ from fastapi.responses import RedirectResponse
 
 from backend.modules.communications.announcements_service import list_announcements
 from backend.core.rendering import generate_csrf, render_react_page
-from backend.modules.staff_records.development_service import (
+from backend.modules.teacher_academy.read_service import (
     list_academy_timetable_events,
     list_teacher_academy_page_context,
 )
-from backend.modules.staff_records.development_permissions import (
+from backend.modules.teacher_academy.policies import (
     hod_subject_ids_for_context,
     filter_rows_by_subject_scope,
 )

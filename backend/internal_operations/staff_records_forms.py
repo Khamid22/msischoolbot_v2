@@ -2,18 +2,18 @@ from fastapi.responses import JSONResponse
 from backend.core.web_responses import with_status
 from backend.core.request_context import request
 
-from backend.modules.staff_records.teachers_service import (
+from backend.modules.people.teachers.service import (
     delete_teacher_by_id,
     get_teacher_by_id,
     list_teachers,
     update_teacher_by_id,
     upsert_teacher,
 )
-from backend.modules.academics.canonical import normalize_school_code
-from backend.modules.academics.service import group_belongs_to_school
+from backend.modules.organization.canonical import normalize_school_code
+from backend.modules.academics.groups.service import group_belongs_to_school
 from backend.internal_operations.workspace import invalidate_admin_page_context_cache
 from backend.core.session import current_auth_login
-from backend.modules.staff_records.candidates import (
+from backend.modules.hr.recruitment.service import (
     create_teacher_candidate,
     delete_candidate_event,
     get_teacher_candidate,

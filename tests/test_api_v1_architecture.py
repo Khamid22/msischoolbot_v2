@@ -11,7 +11,9 @@ WORKSPACE_NAMES = {
     "hr_manager",
     "student",
     "parent",
+    "teacher",
 }
+API_WORKSPACE_NAMES = WORKSPACE_NAMES - {"teacher"}
 
 LEGACY_BACKEND_LAYERS = {"api", "pages", "services", "repositories", "schemas"}
 
@@ -25,15 +27,14 @@ def test_application_composes_exactly_seven_workspace_routers():
 
     assert 'APIRouter(prefix="/api/v1")' in source
     assert "teacher_router" not in source
-    for workspace in WORKSPACE_NAMES:
+    for workspace in API_WORKSPACE_NAMES:
         import_path = f"backend.workspaces.{workspace}.api"
         assert import_path in source
 
 
-def test_application_registry_composes_exactly_seven_workspace_pages():
+def test_application_registry_composes_workspace_pages():
     source = Path("backend/application/registry.py").read_text()
 
-    assert "register_teacher_page_routes" not in source
     for workspace in WORKSPACE_NAMES:
         assert f"backend.workspaces.{workspace}.page" in source
 
@@ -90,12 +91,13 @@ def test_http_api_adapters_do_not_render_pages():
         assert "HTMLResponse" not in source
 
 
-def test_teacher_is_staff_data_not_a_portal_workspace():
-    assert not Path("backend/workspaces/teacher").exists()
-    assert not Path("frontend/src/workspaces/teacher").exists()
+def test_teacher_workspace_is_a_read_only_role_adapter():
+    assert Path("backend/workspaces/teacher/page.py").exists()
+    assert Path("frontend/src/workspaces/teacher/pages/Home.tsx").exists()
     assert not Path("frontend/src/roles").exists()
-    assert Path("backend/modules/staff_records/teachers_service.py").exists()
-    assert Path("backend/modules/staff_records/teachers_repository.py").exists()
+    source = Path("backend/workspaces/teacher/page.py").read_text()
+    assert "get_academy_teacher_for_teacher_account" in source
+    assert "@router.post" not in source
 
 
 def test_teacher_academy_actions_remain_owned_by_authorized_workspaces():
@@ -126,7 +128,7 @@ def test_frontend_uses_workspace_feature_shared_and_internal_boundaries():
         for path in (source_root / "workspaces").iterdir()
         if path.is_dir()
     }
-    assert actual_workspaces == WORKSPACE_NAMES
+    assert actual_workspaces == WORKSPACE_NAMES | {"academic_shared", "shared"}
 
 
 def test_frontend_teacher_academy_uses_api_v1_contracts():

@@ -3,8 +3,8 @@
 import math
 
 from backend.core.database import connect_auth_db
-from backend.modules.academics import reporting_contract as academic_data
-from backend.modules.academics.exam_filters import is_exam_performance_row
+from backend.modules.reporting import academic_contract as academic_data
+from backend.modules.academics.assessments.filters import is_exam_performance_row
 
 _SCHOOL_DISPLAY_NAMES = {
     "school5": "School 5",
@@ -391,7 +391,7 @@ def build_internal_overview_dataset(school_code=""):
 
 def get_student_subject_enrollments(public_dashboard_id):
     """Compatibility wrapper for DB-3 student domain ownership."""
-    from backend.modules.student_records.service import (
+    from backend.modules.people.students.service import (
         get_student_subject_enrollments as _get_student_subject_enrollments,
     )
 

@@ -7,7 +7,7 @@ from base64 import b64encode
 import pytest
 from itsdangerous import TimestampSigner
 
-from backend.modules.parent_access.cards import build_parent_workspace_cards
+from backend.modules.people.parents.cards import build_parent_workspace_cards
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}

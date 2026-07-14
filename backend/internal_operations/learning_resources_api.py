@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException
 
 from backend.core.http import ApiSuccess, api_success
 from backend.internal_operations.schemas import AdminResourceList, AdminResourceUploadProgress
-from backend.modules.learning_resources.service import list_resources
-from backend.modules.learning_resources.upload_progress import (
+from backend.modules.academics.resources.service import list_resources
+from backend.modules.academics.resources.upload_progress import (
     get_upload_events,
     normalize_upload_id,
 )

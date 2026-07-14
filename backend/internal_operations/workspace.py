@@ -1,18 +1,18 @@
 import os
 
-from backend.modules.academics import canonical
+from backend.modules.organization import canonical
 from backend.internal_operations.page_cache import (
     get_cached_admin_page_context as _get_cached_admin_page_context,
     invalidate_admin_page_context_cache,
     set_cached_admin_page_context as _set_cached_admin_page_context,
 )
-from backend.modules.student_records.service import get_admin_student_profile, list_students_for_admin
-from backend.modules.staff_records.teachers_service import list_teachers
-from backend.modules.staff_records.development_service import list_academy_teachers
-from backend.modules.staff_records.candidates import list_teacher_candidates
-from backend.modules.complaints.service import list_complaints
-from backend.modules.academics.canonical import normalize_text
-from backend.modules.parent_access.service import list_parent_accounts, list_parent_children
+from backend.modules.people.students.service import get_admin_student_profile, list_students_for_admin
+from backend.modules.people.teachers.service import list_teachers
+from backend.modules.teacher_academy.read_service import list_academy_teachers
+from backend.modules.hr.recruitment.service import list_teacher_candidates
+from backend.modules.support.service import list_complaints
+from backend.modules.organization.canonical import normalize_text
+from backend.modules.people.parents.service import list_parent_accounts, list_parent_children
 from backend.modules.reporting.performance_summary import (
     list_subject_group_counts,
     list_subject_student_counts,
@@ -34,7 +34,7 @@ from backend.modules.reporting.insights import (
     build_admin_subject_info,
     extract_overview_student_metrics,
 )
-from backend.modules.learning_resources.service import (
+from backend.modules.academics.resources.service import (
     is_resource_upload_enabled,
     list_resource_subject_names,
     list_resource_types,

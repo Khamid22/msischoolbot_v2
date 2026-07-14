@@ -57,11 +57,11 @@ def test_removed_teacher_api_is_not_registered_for_other_roles(client):
     assert response.status_code == 404
 
 
-def test_teacher_session_role_is_rejected(client):
+def test_teacher_session_role_is_recognized(client):
     _set_session(client, {"auth_role": "teacher", "auth_login": "TCH0001", "teacher_id": 42})
     response = client.get("/api/v1/auth/me", headers=XHR)
-    assert response.status_code == 403
-    assert response.json() == {"status": "error", "message": "Invalid session role."}
+    assert response.status_code == 200
+    assert response.json()["data"]["role"] == "teacher"
 
 
 def test_cross_origin_post_rejected(client):

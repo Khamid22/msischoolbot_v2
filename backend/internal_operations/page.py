@@ -21,8 +21,8 @@ from backend.core.session import (
     current_auth_role,
     current_staff_id,
 )
-from backend.modules.academics.operations import list_admin_academic_context
-from backend.modules.parent_access.service import list_linked_parents_for_student
+from backend.modules.academics.groups.operations import list_admin_academic_context
+from backend.modules.people.parents.service import list_linked_parents_for_student
 from backend.modules.communications.announcements_service import list_announcements
 
 FULL_ACADEMIC_BOOTSTRAP_PANELS = {
@@ -120,7 +120,7 @@ def register_internal_operations_page_routes(
         announcements = list_announcements()
         timer.mark("support_context_build")
         if current_auth_role() == "head_of_department":
-            from backend.modules.staff_records.development_permissions import filter_admin_context_for_hod_scope
+            from backend.modules.teacher_academy.policies import filter_admin_context_for_hod_scope
 
             filter_admin_context_for_hod_scope(
                 page_context,

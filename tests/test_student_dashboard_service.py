@@ -1,7 +1,7 @@
 from urllib.parse import parse_qs, urlparse
 
-from backend.modules.student_records import service as student_service
-from backend.modules.student_records import dashboard as dashboard_service
+from backend.modules.people.students import service as student_service
+from backend.modules.people.students import dashboard as dashboard_service
 
 
 def test_subject_switch_options_mark_current_subject_and_group(monkeypatch):

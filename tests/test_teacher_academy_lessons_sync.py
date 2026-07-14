@@ -15,8 +15,9 @@ class _FakeConn:
 
 @pytest.fixture
 def sync_env(monkeypatch):
-    from backend.modules.staff_records import development_service as service
-    from backend.modules.staff_records import development_repository as repository
+    from backend.modules.teacher_academy import service as service
+    from backend.modules.teacher_academy import repository as repository
+    from backend.modules.teacher_academy import mutations_repository
 
     conn = _FakeConn()
     calls = {
@@ -31,9 +32,9 @@ def sync_env(monkeypatch):
     def fake_connect():
         yield conn
 
-    monkeypatch.setattr(repository, "connect_auth_db", fake_connect)
+    monkeypatch.setattr(service, "connect_auth_db", fake_connect)
     monkeypatch.setattr(
-        repository,
+        mutations_repository,
         "get_academy_teacher_program_row",
         lambda _conn, teacher_id: {
             "id": teacher_id,
@@ -68,22 +69,22 @@ def sync_env(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        repository,
+        mutations_repository,
         "delete_assignment_rows_with_assessments",
         lambda _conn, assignment_ids: calls["deleted"].extend(assignment_ids),
     )
     monkeypatch.setattr(
-        repository,
+        mutations_repository,
         "update_assignment_sequence",
         lambda _conn, **kwargs: calls["sequenced"].append(kwargs),
     )
     monkeypatch.setattr(
-        repository,
+        mutations_repository,
         "insert_academy_lesson_assignment",
         lambda _conn, **kwargs: calls["inserted"].append(kwargs),
     )
     monkeypatch.setattr(
-        repository,
+        mutations_repository,
         "touch_academy_teacher",
         lambda _conn, **kwargs: calls["touched"].append(kwargs),
     )

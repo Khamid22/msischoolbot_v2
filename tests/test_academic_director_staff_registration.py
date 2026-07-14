@@ -7,7 +7,8 @@ from base64 import b64encode
 from itsdangerous import TimestampSigner
 from werkzeug.security import check_password_hash
 
-from backend.modules.staff_records import registration as staff_registration
+from backend.modules.people.staff import service as staff_registration
+from backend.modules.people.staff import repository as staff_repository
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -194,7 +195,7 @@ def test_academic_director_bootstrap_generates_ad_login_and_hashes_password():
 
 
 def test_list_head_of_department_accounts_returns_safe_display_payload():
-    result = staff_registration._list_head_of_department_accounts(_HodListConn())
+    result = staff_repository._list_head_of_department_accounts(_HodListConn())
 
     assert result["warning"] == ""
     assert result["items"] == [
@@ -215,7 +216,7 @@ def test_list_head_of_department_accounts_returns_safe_display_payload():
 
 
 def test_list_head_of_department_accounts_warns_when_scope_table_missing():
-    result = staff_registration._list_head_of_department_accounts(
+    result = staff_repository._list_head_of_department_accounts(
         _HodListConn(missing_table="msi_v2.staff_subject_scopes")
     )
 
@@ -485,7 +486,7 @@ def test_hod_out_of_scope_academy_assessment_is_denied(client, monkeypatch):
 
 
 def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypatch):
-    import backend.modules.staff_records.development_responses as academy_api
+    import backend.modules.teacher_academy.responses as academy_api
 
     captured = {}
 
@@ -538,7 +539,7 @@ def test_hod_out_of_scope_academy_schedule_is_denied(client, monkeypatch):
 
 
 def test_hod_filters_academy_rows_by_assigned_subject():
-    from backend.modules.staff_records.development_permissions import filter_rows_by_subject_scope
+    from backend.modules.teacher_academy.policies import filter_rows_by_subject_scope
 
     rows = [
         {"id": 1, "subject_id": 5, "full_name": "Math Teacher"},

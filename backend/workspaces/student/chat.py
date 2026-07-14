@@ -2,7 +2,7 @@ from backend.core.request_context import request
 from backend.core.session import url_for
 
 from backend.core.rendering import render_react_page
-from backend.modules.student_records import payload as payload_service
+from backend.modules.people.students import payload as payload_service
 from backend.core.session import current_auth_login
 
 

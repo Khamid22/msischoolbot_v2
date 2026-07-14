@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.core.http import ApiSuccess, api_success
 from backend.internal_operations.schemas import AssignParentChildRequest, ParentChildAssigned
-from backend.modules.parent_access.service import (
+from backend.modules.people.parents.service import (
     assign_parent_child,
     delete_parent_account,
     remove_parent_child,

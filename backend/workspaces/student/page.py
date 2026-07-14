@@ -12,11 +12,11 @@ from backend.workspaces.student.rating import register_rating_board_routes
 from backend.workspaces.student.chat import register_chat_page_routes
 from backend.workspaces.student.resources import register_resources_routes
 from backend.workspaces.student.office_hours import register_office_hours_routes
-from backend.modules.student_records.service import (
+from backend.modules.people.students.service import (
     get_student_db_id_by_enrollment_id,
     record_student_activity,
 )
-from backend.modules.student_records.workspace import build_student_panel_context
+from backend.modules.people.students.workspace import build_student_panel_context
 from backend.core.session import (
     current_auth_login,
     current_auth_role,

@@ -14,19 +14,19 @@ Read these first. They describe the implemented rewrite rather than an earlier t
 6. [Route Map](./ENGINEERING_ROUTE_MAP.md)
 7. [Telegram Integration](./ENGINEERING_TELEGRAM_FLOW.md)
 
-The physical PostgreSQL schema remains `msi_v2`, and Alembic migration head is `0008_remove_teacher_portal`.
+The physical PostgreSQL schema remains `msi_v2`; use the current Alembic head in `database/alembic/versions`.
 
 ## Current Project Facts
 
 - Production branch `main` is read-only during rewrite work.
 - PostgreSQL is the canonical runtime data store.
 - `msi_v2.accounts` is the sole password authority.
-- Runtime SQL belongs to its owning package under `backend/modules`.
+- Runtime SQL belongs to an owning domain repository under `backend/modules`.
 - Runtime DDL is prohibited; `database/alembic` owns schema changes.
 - Google Sheets and Excel are not LMS integrations.
 - Telegram authentication and Mini App parent linking remain active web integrations.
 - `tgbot` has an explicit empty inbound router registry while new bot handlers are not yet implemented.
-- The portal has exactly seven business workspaces; Teacher is staff data and System Admin is internal operations.
+- The current tree includes a read-only Teacher workspace; Teacher remains staff data managed by authorized roles. System Admin is internal operations.
 
 ## Supporting Engineering Docs
 

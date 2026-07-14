@@ -32,37 +32,41 @@ from backend.modules.academics.schemas import (
     AdminCalendarClosureRequest,
     AdminCalendarClosureUnlockRequest,
 )
-from backend.modules.academics.calendar_closures import (
+from backend.modules.academics.calendar.service import (
     CalendarClosureConflictError,
     create_calendar_closure,
     list_calendar_closures,
     preview_calendar_closure,
     unlock_calendar_closure,
 )
-from backend.modules.academics.operations import (
-    AcademicConflictError,
+from backend.modules.academics.exceptions import AcademicConflictError
+from backend.modules.academics.timetable.operations import (
     create_schedule_from_payload,
-    delete_group,
-    get_group_gradebook,
-    get_group_gradebook_trends,
-    get_enrollment_gradebook_summary,
-    list_admin_academic_context,
-    move_enrollment_group_from_payload,
-    record_attendance_from_payload,
-    record_coin_from_payload,
-    record_exam_from_payload,
-    record_homework_from_payload,
-    update_enrollment_status_from_payload,
-    update_lesson_session_from_payload,
+    upsert_group_schedule_from_payload,
     cancel_lesson_session,
     recover_lesson_session,
-    create_class_from_payload,
-    upsert_group_schedule_from_payload,
+)
+from backend.modules.academics.groups.operations import (
+    delete_group,
+    list_admin_academic_context,
+    move_enrollment_group_from_payload,
+    update_enrollment_status_from_payload,
     create_student_with_enrollment_from_payload,
     permanently_purge_group,
     preview_group_purge,
 )
-from backend.modules.academics.read_service import (
+from backend.modules.organization.operations import create_class_from_payload
+from backend.modules.academics.gradebook.service import (
+    get_group_gradebook,
+    get_enrollment_gradebook_summary,
+)
+from backend.modules.academics.gradebook.trends import get_group_gradebook_trends
+from backend.modules.academics.attendance.service import record_attendance_from_payload
+from backend.modules.academics.gradebook.homework import record_homework_from_payload
+from backend.modules.academics.gradebook.rewards import record_coin_from_payload
+from backend.modules.academics.assessments.service import record_exam_from_payload
+from backend.modules.academics.lessons.service import update_lesson_session_from_payload
+from backend.modules.academics.groups.read_service import (
     get_group_summary,
     list_group_page,
     list_group_schedule_rows,

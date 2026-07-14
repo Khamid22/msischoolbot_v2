@@ -1,9 +1,9 @@
 from datetime import date, time
 from pathlib import Path
 
-from backend.modules.academics import calendar_closures
-from backend.modules.academics.operations import _gradebook_lesson_window
-from backend.modules.academics.scheduling import generate_teaching_dates
+from backend.modules.academics.calendar import service as calendar_closures
+from backend.modules.academics.gradebook.window import _gradebook_lesson_window
+from backend.modules.academics.calendar.scheduling import generate_teaching_dates
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,9 +131,14 @@ def test_both_management_roles_expose_preview_create_list_and_unlock_routes():
 
 
 def test_all_timetable_mutations_share_closure_aware_date_generation():
-    service = source("backend/modules/academics/service.py")
-    operations = source("backend/modules/academics/operations.py")
-    closure_service = source("backend/modules/academics/calendar_closures.py")
+    service = source("backend/modules/academics/timetable/service.py")
+    operations = "\n".join(
+        [
+            source("backend/modules/academics/timetable/operations.py"),
+            source("backend/modules/academics/lessons/service.py"),
+        ]
+    )
+    closure_service = source("backend/modules/academics/calendar/service.py")
 
     assert "generate_teaching_dates(" in service
     assert "list_effective_group_closures(" in service
@@ -146,10 +151,10 @@ def test_all_timetable_mutations_share_closure_aware_date_generation():
 
 
 def test_closure_controls_are_visible_at_school_and_group_scope():
-    modal = source("frontend/src/features/management/academic/CalendarClosuresModal.tsx")
-    academic_timetable = source("frontend/src/features/management/academic/SchedulePanel.tsx")
-    group_timetable = source("frontend/src/features/management/academic/ModernGroupTimetable.tsx")
-    gradebook = source("frontend/src/features/management/academic/GroupGradebook.tsx")
+    modal = source("frontend/src/features/academics/timetable/CalendarClosuresModal.tsx")
+    academic_timetable = source("frontend/src/features/academics/timetable/SchedulePanel.tsx")
+    group_timetable = source("frontend/src/features/academics/timetable/ModernGroupTimetable.tsx")
+    gradebook = source("frontend/src/features/academics/gradebook/GroupGradebook.tsx")
 
     assert "Manage Breaks" in academic_timetable
     assert ">Breaks</button>" in group_timetable

@@ -3,7 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
-import backend.modules.student_records.chat_api as chat_api
+import backend.modules.people.students.chat_api as chat_api
 from backend.modules.communications import chat_service
 from backend.core.access.dependencies import CurrentUser
 

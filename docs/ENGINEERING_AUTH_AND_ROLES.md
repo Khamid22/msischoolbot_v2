@@ -26,10 +26,10 @@ The role profile proves which business entity the account represents. An account
 
 Canonical password and Telegram code lives in:
 
-- `backend/modules/accounts/service.py`
-- `backend/modules/accounts/repository.py`
-- `backend/modules/accounts/telegram_auth.py`
-- `backend/modules/accounts/api.py`
+- `backend/modules/identity/service.py`
+- `backend/modules/identity/repository.py`
+- `backend/modules/identity/telegram_auth.py`
+- `backend/modules/identity/api.py`
 
 The former `backend/identity/account_auth.py`, `account_telegram_auth.py`, `parent_accounts.py`, `parent_invites.py`, and `telegram_links.py` facades have been removed.
 
@@ -47,18 +47,19 @@ Each account has one canonical role:
 | `customer_support` | staff profile | parent/support operations |
 | `student` | student profile | own academic dashboard and tools |
 | `parent` | parent profile | linked children only |
+| `teacher` | teacher profile | own read-only Teacher Academy profile |
 
 `system_admin` may still be represented as `auth_role="admin"` inside presentation compatibility code. Its canonical account role remains `system_admin`; the compatibility value must not grant business roles equivalent privileges.
 
-Teacher profiles remain active staff records, but `teacher` is not a valid portal session role. Teacher password/Telegram authentication and the former Teacher workspace are disabled. Migration `0008_remove_teacher_portal` disables existing teacher accounts and increments their session versions.
+Teacher profiles remain managed staff records. The current tree permits an active canonical Teacher account to open a read-only Teacher Academy profile at `/teacher`; it does not grant academic-management mutations.
 
 ## Password Lifecycle
 
-New Student and staff provisioners use the canonical login as the initial password and set `must_change_password=true`. Teacher provisioning creates staff/profile records without active portal credentials. The migration does not blindly reset existing independently changed credentials:
+New Student, staff, and Teacher provisioners use the canonical login as the initial password and set `must_change_password=true`. The migration does not blindly reset existing independently changed credentials:
 
 - student/staff hashes that already verify their login are marked for change;
 - independently changed canonical hashes are preserved;
-- existing teacher credentials are disabled by `0008_remove_teacher_portal`;
+- newly provisioned Teacher credentials follow the same forced-change lifecycle;
 - owner bootstrap preserves an existing independent owner password instead of rotating it on every startup.
 
 Parents are Telegram-first. A parent always receives a canonical account/profile, but a Telegram-only or manual-invite parent can legitimately have no password login. If a parent is later given a password credential, the same canonical password lifecycle and self-service endpoint apply.
@@ -174,14 +175,14 @@ Alembic `0005_canonical_identity`:
 - removes `msi_v2.student_auth` and `students.password_plain`;
 - adds account actors to audit events.
 
-Alembic `0007_lms_integrity` enforces credential requirements for active password roles while explicitly allowing Telegram-first parents without a password. Alembic `0008_remove_teacher_portal` removes Teacher portal access without deleting teacher staff records.
+Alembic `0007_lms_integrity` enforces credential requirements for active password roles while explicitly allowing Telegram-first parents without a password. Historical revision `0008_remove_teacher_portal` removed an earlier portal implementation; the current read-only Teacher workspace is application behavior preserved in this working tree.
 
 ## Required Tests
 
 Identity changes should cover:
 
-- canonical password login for each of the seven business roles and System Admin;
-- rejected password and Telegram login for Teacher records;
+- canonical password login for each current workspace role and System Admin;
+- Teacher access limited to its own read-only Academy profile;
 - initial-password redirect and API blocking;
 - successful and rejected self-service changes;
 - session-version invalidation;

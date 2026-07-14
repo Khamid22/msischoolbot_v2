@@ -1,11 +1,11 @@
 import { Suspense, lazy, useMemo, useState } from "react";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { PageHeader } from "@/shared/ui/PageHeader";
-import { AcademicDirectorPageShell } from "@/features/academic_workspace/AcademicDirectorShell";
-import { asString } from "@/features/managementTypes";
+import { AcademicDirectorPageShell } from "@/workspaces/academic_shared/AcademicDirectorShell";
+import { asString } from "@/shared/lib/workspace";
 
 const TeacherAcademyPanel = lazy(() =>
-  import("@/features/management/teachers/TeacherAcademyPanel").then((module) => ({
+  import("@/features/teacher-academy/TeacherAcademyPanel").then((module) => ({
     default: module.TeacherAcademyPanel,
   })),
 );

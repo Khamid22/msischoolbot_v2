@@ -3,8 +3,8 @@ from backend.core.web_responses import with_status
 from backend.core.request_context import request, session
 from backend.core.session import url_for
 
-from backend.integrations.storage.r2 import upload_resource_file, upload_thumbnail_file
-from backend.modules.learning_resources.service import (
+from backend.platform.storage.r2 import upload_resource_file, upload_thumbnail_file
+from backend.modules.academics.resources.service import (
     create_resource as svc_create_resource,
     create_resource_type as svc_create_resource_type,
     delete_resource as svc_delete_resource,
@@ -13,7 +13,7 @@ from backend.modules.learning_resources.service import (
     update_resource as svc_update_resource,
 )
 from backend.internal_operations.workspace import invalidate_admin_page_context_cache
-from backend.modules.learning_resources.upload_progress import (
+from backend.modules.academics.resources.upload_progress import (
     begin_upload,
     complete_upload,
     fail_upload,

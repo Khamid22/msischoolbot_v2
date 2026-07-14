@@ -3,10 +3,8 @@ from backend.core.request_context import request
 from backend.core.session import url_for
 
 from backend.internal_operations.workspace import invalidate_admin_page_context_cache
-from backend.modules.academics.operations import (
-    create_group_from_payload,
-    create_school_from_payload,
-)
+from backend.modules.academics.groups.operations import create_group_from_payload
+from backend.modules.organization.operations import create_school_from_payload
 
 
 def register_academic_admin_routes(

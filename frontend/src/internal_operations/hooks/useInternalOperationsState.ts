@@ -25,7 +25,7 @@ import {
   sortSubjectsMathFirst,
   tabsForWorkspaceMode,
   trimEmptyMonthlyMonths,
-} from "@/features/managementTypes";
+} from "@/shared/lib/workspace";
 import { JSON_HEADERS, XHR_HEADERS, apiData } from "@/shared/lib/api";
 import {
   canUseAdminPreviewForRole,

@@ -11,9 +11,9 @@ from backend.core.request_context import session, request as ctx_request
 from backend.core.rendering import generate_csrf
 
 from backend.modules.communications.announcements_service import list_announcements
-from backend.modules.learning_resources.service import list_resources
+from backend.modules.academics.resources.service import list_resources
 from backend.core.rendering import render_react_page
-from backend.modules.parent_access.service import (
+from backend.modules.people.parents.service import (
     claim_parent_invite_code,
     list_parent_client_children,
     list_parent_children,
@@ -21,8 +21,8 @@ from backend.modules.parent_access.service import (
     parent_can_access_student,
     resolve_parent_child_dashboard,
 )
-from backend.modules.parent_access.cards import build_parent_workspace_cards
-from backend.integrations.telegram.init_data import telegram_user_from_init_data
+from backend.modules.people.parents.cards import build_parent_workspace_cards
+from backend.platform.telegram.init_data import telegram_user_from_init_data
 from backend.core.session import set_account_session, url_for
 
 

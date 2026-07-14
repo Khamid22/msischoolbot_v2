@@ -11,7 +11,7 @@ def _read(path: str) -> str:
 
 
 def test_academy_uses_shared_accessible_modal_and_action_menu():
-    source = _read("features/management/teachers/TeacherAcademyPanel.tsx")
+    source = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
     assert 'from "@/shared/ui/ActionMenu"' in source
     assert 'from "@/shared/ui/Modal"' in source
     assert "ActionMenu" in source
@@ -19,7 +19,7 @@ def test_academy_uses_shared_accessible_modal_and_action_menu():
 
 
 def test_teacher_academy_has_mobile_cards_and_desktop_table():
-    source = _read("features/management/teachers/TeacherAcademyPanel.tsx")
+    source = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
     assert "MobileCardList" in source
     assert "ResponsiveTable" in source
     assert "AcademyTeacherCard" in source
@@ -48,8 +48,8 @@ def test_shared_responsive_components_remain_available():
         assert (ROOT / path).exists()
 
 
-def test_teacher_portal_navigation_and_page_are_removed():
+def test_teacher_portal_navigation_and_page_are_domain_owned():
     source = _read("app/App.tsx")
-    assert "teacher-home" not in source
+    assert "teacher-home" in source
     assert not (ROOT / "roles").exists()
-    assert not (ROOT / "workspaces/teacher").exists()
+    assert (ROOT / "workspaces/teacher/pages/Home.tsx").exists()

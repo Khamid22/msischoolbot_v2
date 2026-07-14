@@ -10,7 +10,7 @@ from backend.internal_operations.schemas import (
     MarkStudentPaymentRequest,
     StudentPaymentPayload,
 )
-from backend.modules.payments.service import (
+from backend.modules.finance.service import (
     create_student_payment,
     delete_student_payment,
     list_student_payments,

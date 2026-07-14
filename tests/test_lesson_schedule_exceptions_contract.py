@@ -19,14 +19,15 @@ def test_exception_migration_preserves_lesson_identity_and_audit_history():
 
 
 def test_cancel_and_recover_reflow_existing_curriculum_session_ids():
-    operations = source("backend/modules/academics/operations.py")
+    operations = source("backend/modules/academics/timetable/operations.py")
+    read_service = source("backend/modules/academics/groups/read_service.py")
 
     assert "def cancel_lesson_session(" in operations
     assert "def recover_lesson_session(" in operations
     assert "Cancellation reason is required." in operations
     assert "schedule_curriculum_lesson(" in operations
-    assert '"isCancellation": True' in operations
-    assert '"canRecover": True' in operations
+    assert '"is_cancellation": True' in read_service
+    assert '"can_recover": True' in read_service
 
 
 def test_both_management_roles_expose_cancel_and_recover_routes():
@@ -39,7 +40,7 @@ def test_both_management_roles_expose_cancel_and_recover_routes():
 
 
 def test_timetable_actions_and_validation_are_visible_in_the_ui():
-    timetable = source("frontend/src/features/management/academic/ModernGroupTimetable.tsx")
+    timetable = source("frontend/src/features/academics/timetable/ModernGroupTimetable.tsx")
 
     assert "Cancel this lesson" in timetable
     assert "Recover Lesson" in timetable
@@ -50,8 +51,8 @@ def test_timetable_actions_and_validation_are_visible_in_the_ui():
 
 
 def test_range_payload_keeps_exceptions_separate_and_marks_recorded_lessons():
-    repository = source("backend/modules/academics/timetable_repository.py")
-    read_service = source("backend/modules/academics/read_service.py")
+    repository = source("backend/modules/academics/timetable/repository.py")
+    read_service = source("backend/modules/academics/groups/read_service.py")
 
     assert "def list_timetable_exceptions_in_range(" in repository
     assert "AS has_academic_records" in repository
@@ -61,8 +62,8 @@ def test_range_payload_keeps_exceptions_separate_and_marks_recorded_lessons():
 
 
 def test_reflow_mutations_lock_rows_and_return_deltas_not_gradebook():
-    repository = source("backend/modules/academics/timetable_repository.py")
-    operations = source("backend/modules/academics/operations.py")
+    repository = source("backend/modules/academics/timetable/repository.py")
+    operations = source("backend/modules/academics/timetable/operations.py")
     admin = source("backend/internal_operations/academics_api.py")
     director = source("backend/workspaces/academic_director/academics_api.py")
 
