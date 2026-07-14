@@ -14,8 +14,6 @@ export function roleLabel(role: string) {
     hr_manager: "HR Manager",
     academic_director: "Academic Director",
     head_of_department: "Head of Department",
-    system_admin: "System Admin",
-    admin: "Admin",
     ceo: "CEO",
   }[role] || "Recruitment";
 }
@@ -25,8 +23,6 @@ export function workspaceHome(role: string) {
     hr_manager: "/hr-manager",
     academic_director: "/academic-director",
     head_of_department: "/head-of-departments",
-    system_admin: "/internal/operations",
-    admin: "/internal/operations",
     ceo: "/ceo",
   }[role] || "/";
 }
@@ -77,7 +73,7 @@ export function replaceUrlParams(values: Record<string, string | number | null |
 
 const returnPositionPrefix = "msi:recruitment:return:";
 
-export function rememberRecruitmentReturn(view: "pipeline" | "candidates" | "tasks") {
+export function rememberRecruitmentReturn(view: "pipeline" | "decisions" | "candidates" | "tasks") {
   try {
     window.sessionStorage.setItem(`${returnPositionPrefix}${view}`, JSON.stringify({
       url: `${window.location.pathname}${window.location.search}`,
@@ -88,7 +84,7 @@ export function rememberRecruitmentReturn(view: "pipeline" | "candidates" | "tas
   }
 }
 
-export function restoreRecruitmentReturn(view: "pipeline" | "candidates" | "tasks") {
+export function restoreRecruitmentReturn(view: "pipeline" | "decisions" | "candidates" | "tasks") {
   try {
     const raw = window.sessionStorage.getItem(`${returnPositionPrefix}${view}`);
     if (!raw) return;

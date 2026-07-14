@@ -7,6 +7,7 @@
 /academic-director/recruitment | GET
 /academic-director/recruitment/candidates | GET
 /academic-director/recruitment/candidates/{candidate_id} | GET
+/academic-director/recruitment/decisions | GET
 /academic-director/recruitment/pipeline | GET
 /academic-director/recruitment/profile | GET
 /academic-director/recruitment/tasks | GET
@@ -164,6 +165,7 @@
 /api/v1/recruitment/candidates/{candidate_id}/subject-tests | POST
 /api/v1/recruitment/candidates/{candidate_id}/tasks | POST
 /api/v1/recruitment/candidates/{candidate_id}/tasks/{task_id} | PUT
+/api/v1/recruitment/decision-queue | GET
 /api/v1/recruitment/options | GET
 /api/v1/recruitment/pipeline | GET
 /api/v1/recruitment/tasks | GET
@@ -219,12 +221,6 @@
 /hr-manager/profile | GET
 /hr-manager/tasks | GET
 /internal/operations | GET
-/internal/operations/recruitment | GET
-/internal/operations/recruitment/candidates | GET
-/internal/operations/recruitment/candidates/{candidate_id} | GET
-/internal/operations/recruitment/pipeline | GET
-/internal/operations/recruitment/profile | GET
-/internal/operations/recruitment/tasks | GET
 /login | POST
 /logout | POST
 /manifest.webmanifest | GET

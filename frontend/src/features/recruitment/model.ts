@@ -1,12 +1,10 @@
 export type RecruitmentRole =
   | "hr_manager"
-  | "admin"
-  | "system_admin"
   | "ceo"
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "candidates" | "tasks" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "candidate" | "profile";
 
 export type RecruitmentPermissions = {
   can_edit_profile: boolean;
@@ -19,6 +17,7 @@ export type RecruitmentPermissions = {
   can_request_approval: boolean;
   can_review_approval: boolean;
   can_finalize: boolean;
+  can_reject: boolean;
   can_add_note: boolean;
 };
 
@@ -78,6 +77,14 @@ export type RecruitmentCandidate = {
   activity?: Array<Record<string, unknown>>;
   missing_document_types?: string[];
   under_review?: Record<string, unknown>;
+  access_reason?: "assignment" | "approval_request";
+  actionable_approval?: {
+    id: number;
+    requested_outcome: string;
+    status: string;
+    request_note?: string;
+    created_at?: string;
+  } | null;
 };
 
 export type RecruitmentOptions = {

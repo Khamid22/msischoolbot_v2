@@ -69,7 +69,6 @@ export const routes = {
   headOfDepartmentAnnouncements: "/head-of-departments/announcements",
   headOfDepartmentRecruitment: "/head-of-departments/recruitment",
   headOfDepartmentProfile: "/head-of-departments/profile",
-  adminRecruitment: "/internal/operations/recruitment",
   ceoRecruitment: "/ceo/recruitment",
   headOfDepartmentTeacherAcademyAssignmentUpdate: apiRoutes.headOfDepartmentTeacherAcademyAssignmentUpdate,
   headOfDepartmentTeacherAcademyAssessmentCreate: apiRoutes.headOfDepartmentTeacherAcademyAssessmentCreate,

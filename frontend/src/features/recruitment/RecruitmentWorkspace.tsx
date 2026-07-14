@@ -1,9 +1,10 @@
-import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, ShieldCheck, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { CandidateListView } from "@/features/recruitment/CandidateListView";
 import { CandidateProfile } from "@/features/recruitment/CandidateProfile";
+import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
 import { PipelineView } from "@/features/recruitment/PipelineView";
 import { TasksView } from "@/features/recruitment/TasksView";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
@@ -67,12 +68,18 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
   const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
-  const navItems = useMemo(() => [
-    { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
-    { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-    { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
-  ], [basePath]);
-  const title = { pipeline: "Recruitment Pipeline", candidates: "Candidates", tasks: "Recruitment Tasks", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const navItems = useMemo(() => effectiveRole === "academic_director"
+    ? [
+        { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
+        { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+        { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
+      ]
+    : [
+        { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+        { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+        { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
+      ], [basePath, effectiveRole]);
+  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -101,6 +108,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Teacher Recruitment</p>
             <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
             {view === "pipeline" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Move candidates through a manual, auditable hiring workflow.</p> : null}
+            {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
           </div>
           {effectiveRole === "hr_manager" && view !== "profile" ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
@@ -110,6 +118,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {announcement ? <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 text-[13px]" role="alert"><span>{announcement}</span><button className="min-h-11 px-2 font-semibold" onClick={() => setAnnouncement("")}>Dismiss</button></div> : null}
 
       {view === "pipeline" ? <PipelineView basePath={basePath} onAnnouncement={setAnnouncement} /> : null}
+      {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={setAnnouncement} /> : null}

@@ -17,11 +17,11 @@ from backend.modules.hr.recruitment.policies import (
     ensure_approval_review,
     ensure_assignment_management,
     ensure_candidate_view,
+    ensure_final_decision,
     ensure_hr_management,
     ensure_pipeline_management,
 )
 from backend.modules.hr.recruitment.schemas import (
-    AcademyIntakeOnboarding,
     ApprovalRequestCreate,
     ApprovalReview,
     AssignmentReplace,
@@ -35,10 +35,6 @@ from backend.modules.hr.recruitment.schemas import (
     SubjectTestWrite,
     TaskWrite,
 )
-from backend.modules.people.teachers.service import provision_recruitment_teacher_account
-from backend.modules.teacher_academy.service import onboard_recruitment_academy_teacher
-
-
 router = APIRouter(
     prefix="/recruitment",
     tags=["teacher-recruitment"],
@@ -86,6 +82,22 @@ def candidates(
             application_to=application_to,
             final_decision=final_decision,
             evaluator_account_id=evaluator_account_id,
+        )
+    )
+
+
+@router.get("/decision-queue", operation_id="api_v1_recruitment_decision_queue")
+def decision_queue(
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 25,
+    user: CurrentUser = Depends(require_role("academic_director")),
+):
+    return api_success(
+        _call(
+            service.list_decision_queue,
+            user,
+            page=page,
+            per_page=per_page,
         )
     )
 
@@ -277,7 +289,12 @@ def review_approval(
         status=payload.status,
         review_comment=payload.review_comment,
     )
-    return api_success({"message": f"Approval request {payload.status}.", "candidate": candidate})
+    message = (
+        "Candidate approved and finalized."
+        if payload.status == "approved"
+        else "Approval request returned."
+    )
+    return api_success({"message": message, "candidate": candidate})
 
 
 @router.post("/candidates/{candidate_id}/final-decisions", status_code=201, operation_id="api_v1_recruitment_final_decision")
@@ -286,44 +303,10 @@ def final_decision(
     payload: FinalDecisionCreate,
     user: CurrentUser = Depends(get_current_user),
 ):
-    ensure_pipeline_management(user)
+    ensure_final_decision(user, payload.decision)
     ensure_candidate_view(user, candidate_id)
     candidate = _call(service.make_final_decision, user, candidate_id, payload.model_dump())
     return api_success({"message": "Final decision recorded.", "candidate": candidate}, status_code=201)
-
-
-@router.post("/academy-intakes/{academy_teacher_id}/onboard", operation_id="api_v1_recruitment_onboard_academy_intake")
-def onboard_academy_intake(
-    academy_teacher_id: int,
-    payload: AcademyIntakeOnboarding,
-    user: CurrentUser = Depends(get_current_user),
-):
-    if user.role not in {"admin", "system_admin", "academic_director"}:
-        raise HTTPException(status_code=403, detail="Only Admin or Academic Director can provision this Academy intake.")
-    created, message, credentials = onboard_recruitment_academy_teacher(
-        academy_teacher_id=academy_teacher_id,
-        subject_program_id=payload.subject_program_id,
-        selected_curriculum_item_ids=payload.curriculum_item_ids,
-        actor_account_id=user.account_id,
-        actor_login=user.login,
-    )
-    if not created:
-        raise HTTPException(status_code=400, detail=message or "Unable to onboard this Academy teacher.")
-    return api_success({"message": message, "credentials": credentials})
-
-
-@router.post("/active-teacher-intakes/{teacher_id}/provision-account", operation_id="api_v1_recruitment_provision_active_teacher")
-def provision_active_teacher_intake(teacher_id: int, user: CurrentUser = Depends(get_current_user)):
-    if user.role not in {"admin", "system_admin"}:
-        raise HTTPException(status_code=403, detail="Only Admin can provision an active teacher account.")
-    created, message, credentials = provision_recruitment_teacher_account(
-        teacher_id,
-        actor_account_id=user.account_id,
-        actor_login=user.login,
-    )
-    if not created:
-        raise HTTPException(status_code=400, detail=message or "Unable to provision this teacher account.")
-    return api_success({"message": message, "credentials": credentials})
 
 
 __all__ = ["router"]

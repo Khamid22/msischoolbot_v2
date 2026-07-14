@@ -129,6 +129,7 @@ def list_pipeline(user: CurrentUser) -> dict[str, Any]:
             conn,
             visible_account_id=restricted,
             visible_subject_ids=_visible_subject_ids(user, conn),
+            include_decision_queue=user.role == "academic_director",
         )
     candidates = [{**_candidate_summary(row), "permissions": _permissions(user)} for row in rows]
     grouped = {stage: [] for stage in (*PRIMARY_STAGES, "rejected", "on_hold", "candidate_withdrew")}
@@ -165,6 +166,7 @@ def list_candidates(
             conn,
             visible_account_id=_academic_visible_id(user),
             visible_subject_ids=_visible_subject_ids(user, conn),
+            include_decision_queue=user.role == "academic_director",
             search=_text(search),
             position=_text(position),
             stage=normalized_stage,
@@ -178,6 +180,56 @@ def list_candidates(
         )
     return {
         "items": [{**_candidate_summary(row), "permissions": _permissions(user)} for row in rows],
+        "page": safe_page,
+        "per_page": safe_per_page,
+        "total": total,
+        "total_pages": max(1, ceil(total / safe_per_page)) if total else 1,
+    }
+
+
+def list_decision_queue(
+    user: CurrentUser,
+    *,
+    page: int = 1,
+    per_page: int = 25,
+) -> dict[str, Any]:
+    if user.role != "academic_director" or not user.account_id:
+        raise RecruitmentError(
+            "The recruitment decision queue requires Academic Director access.",
+            status_code=403,
+        )
+    safe_page = max(1, int(page or 1))
+    safe_per_page = max(1, min(int(per_page or 25), 100))
+    with connect_auth_db() as conn:
+        rows, total = repository.list_decision_queue_rows(
+            conn,
+            account_id=int(user.account_id),
+            limit=safe_per_page,
+            offset=(safe_page - 1) * safe_per_page,
+        )
+    items = []
+    for row in rows:
+        candidate = _candidate_summary(row)
+        approval_id = candidate.pop("actionable_approval_id", None)
+        requested_outcome = candidate.pop("actionable_requested_outcome", None)
+        approval_status = candidate.pop("actionable_approval_status", None)
+        request_note = candidate.pop("actionable_request_note", None)
+        requested_at = candidate.pop("actionable_requested_at", None)
+        candidate["actionable_approval"] = (
+            {
+                "id": approval_id,
+                "requested_outcome": requested_outcome,
+                "status": approval_status,
+                "request_note": request_note,
+                "created_at": requested_at,
+            }
+            if approval_id
+            else None
+        )
+        candidate["permissions"] = _permissions(user)
+        items.append(candidate)
+    return {
+        "items": items,
         "page": safe_page,
         "per_page": safe_per_page,
         "total": total,
@@ -200,20 +252,30 @@ def _normalize_attempt_rows(rows: list[Any], timestamp_key: str) -> list[dict[st
     return normalized
 
 
-def _permissions(user: CurrentUser) -> dict[str, bool]:
+def _permissions(
+    user: CurrentUser,
+    *,
+    can_add_academic_evaluation: bool | None = None,
+) -> dict[str, bool]:
     role = user.role
+    academic_evaluation = (
+        role in {"academic_director", "head_of_department"}
+        if can_add_academic_evaluation is None
+        else bool(can_add_academic_evaluation)
+    )
     return {
         "can_edit_profile": role == "hr_manager",
         "can_manage_documents": role == "hr_manager",
         "can_manage_interviews": role == "hr_manager",
         "can_manage_tasks": role == "hr_manager",
-        "can_manage_assignments": role in {"hr_manager", "admin", "system_admin", "ceo"},
-        "can_move_stage": role in {"hr_manager", "admin", "system_admin", "ceo"},
-        "can_add_academic_evaluation": role in {"academic_director", "head_of_department"},
-        "can_request_approval": role in {"hr_manager", "admin", "system_admin", "ceo"},
+        "can_manage_assignments": role in {"hr_manager", "ceo"},
+        "can_move_stage": role in {"hr_manager", "ceo"},
+        "can_add_academic_evaluation": academic_evaluation,
+        "can_request_approval": role in {"hr_manager", "ceo"},
         "can_review_approval": role == "academic_director",
-        "can_finalize": role in {"admin", "system_admin", "ceo"},
-        "can_add_note": role in {"hr_manager", "academic_director", "head_of_department", "admin", "system_admin", "ceo"},
+        "can_finalize": role == "ceo",
+        "can_reject": role in {"academic_director", "ceo"},
+        "can_add_note": role in {"hr_manager", "academic_director", "head_of_department", "ceo"},
     }
 
 
@@ -270,7 +332,17 @@ def get_candidate(user: CurrentUser, candidate_id: int) -> dict[str, Any]:
                 "unfinished_actions": len(pending_tasks),
                 "final_decision": candidate.get("final_decision") or "pending",
             },
-            "permissions": _permissions(user),
+            "permissions": _permissions(
+                user,
+                can_add_academic_evaluation=(
+                    any(
+                        int(item.get("assignee_account_id") or 0) == int(user.account_id or 0)
+                        for item in assignments
+                    )
+                    if user.role in {"academic_director", "head_of_department"}
+                    else None
+                ),
+            ),
         }
     )
     return candidate
@@ -282,6 +354,7 @@ def list_tasks(user: CurrentUser) -> dict[str, Any]:
             conn,
             visible_account_id=_academic_visible_id(user),
             visible_subject_ids=_visible_subject_ids(user, conn),
+            include_decision_queue=user.role == "academic_director",
         )
     items = [_task_payload(row) for row in rows]
     return {
@@ -700,6 +773,137 @@ def request_approval(user: CurrentUser, candidate_id: int, *, requested_outcome:
     return get_candidate(user, int(candidate_id))
 
 
+def _approve_and_finalize_request(
+    user: CurrentUser,
+    candidate_id: int,
+    approval_id: int,
+    *,
+    review_comment: str,
+) -> dict[str, Any]:
+    now = _now()
+    with connect_auth_db() as conn:
+        candidate = repository.lock_candidate_decision_row(conn, int(candidate_id))
+        if not candidate:
+            raise RecruitmentError("Candidate was not found.", status_code=404)
+        approval = repository.get_approval_row(
+            conn,
+            candidate_id=int(candidate_id),
+            approval_id=int(approval_id),
+            for_update=True,
+        )
+        if not approval:
+            mismatched = repository.get_approval_by_id(
+                conn,
+                approval_id=int(approval_id),
+                for_update=True,
+            )
+            if mismatched:
+                raise RecruitmentError(
+                    "Approval request does not belong to this candidate.",
+                    status_code=409,
+                )
+            raise RecruitmentError("Approval request was not found.", status_code=404)
+
+        outcome = _text(approval["requested_outcome"])
+        approval_status = _text(approval["status"])
+        linked_id = (
+            int(candidate["academy_teacher_id"] or 0)
+            if outcome == "teacher_academy"
+            else int(candidate["active_teacher_id"] or 0)
+        )
+        if approval_status == "consumed":
+            final_decision = repository.final_decision_for_approval(
+                conn,
+                candidate_id=int(candidate_id),
+                approval_id=int(approval_id),
+            )
+            if (
+                outcome in PROTECTED_HIRE_STAGES
+                and _text(candidate["status"]) == outcome
+                and linked_id
+                and final_decision
+                and _text(final_decision["decision"]) == outcome
+            ):
+                conn.rollback()
+                return get_candidate(user, int(candidate_id))
+            raise RecruitmentError("This approval was already consumed by another decision.", status_code=409)
+        if approval_status not in {"requested", "approved"}:
+            raise RecruitmentError("Approval request is no longer actionable.", status_code=409)
+        if outcome not in PROTECTED_HIRE_STAGES:
+            raise RecruitmentError("Approval request has an invalid hiring outcome.", status_code=409)
+        if _text(candidate["status"]) in PROTECTED_HIRE_STAGES or linked_id:
+            raise RecruitmentError("The candidate already has a finalized hiring outcome.", status_code=409)
+
+        if approval_status == "requested":
+            if not repository.review_approval(
+                conn,
+                candidate_id=int(candidate_id),
+                approval_id=int(approval_id),
+                status="approved",
+                comment=review_comment,
+                actor_account_id=_actor_account(user),
+                now=now,
+            ):
+                raise RecruitmentError("Approval request changed elsewhere. Refresh and try again.", status_code=409)
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type="candidate.hire_approval_approved",
+                detail={"approval_id": int(approval_id), "comment": review_comment},
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+
+        if outcome == "teacher_academy":
+            repository.ensure_academy_intake(conn, candidate=candidate, actor_login=user.login, now=now)
+        else:
+            repository.ensure_active_teacher_intake(conn, candidate=candidate, now=now)
+
+        updated = repository.update_candidate_stage(
+            conn,
+            candidate_id=int(candidate_id),
+            stage=outcome,
+            expected_version=int(candidate["version"]),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not updated:
+            raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
+        decision_id = repository.insert_final_decision(
+            conn,
+            candidate_id=int(candidate_id),
+            values={
+                "decision": outcome,
+                "rejection_reason": "",
+                "reason_detail": review_comment,
+                "follow_up_at": "",
+                "approval_id": int(approval_id),
+            },
+            actor_account_id=_actor_account(user),
+            actor_login=user.login,
+            now=now,
+        )
+        repository.consume_approval(conn, approval_id=int(approval_id), now=now)
+        repository.insert_audit(
+            conn,
+            candidate_id=int(candidate_id),
+            event_type="candidate.final_decision_made",
+            detail={
+                "decision_id": decision_id,
+                "decision": outcome,
+                "rejection_reason": "",
+                "reason_detail": review_comment,
+                "approval_id": int(approval_id),
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return get_candidate(user, int(candidate_id))
+
+
 def review_approval(user: CurrentUser, candidate_id: int, approval_id: int, *, status: str, review_comment: str) -> dict[str, Any]:
     normalized_status = _text(status)
     normalized_comment = _text(review_comment)
@@ -707,6 +911,13 @@ def review_approval(user: CurrentUser, candidate_id: int, approval_id: int, *, s
         raise RecruitmentError("Unknown approval review status.")
     if normalized_status == "returned" and not normalized_comment:
         raise RecruitmentError("A comment is required when returning an approval request.")
+    if normalized_status == "approved":
+        return _approve_and_finalize_request(
+            user,
+            candidate_id,
+            approval_id,
+            review_comment=normalized_comment or "Approved and finalized by Academic Director.",
+        )
     now = _now()
     with connect_auth_db() as conn:
         if not repository.review_approval(
@@ -738,9 +949,11 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
     allowed = {*PROTECTED_HIRE_STAGES, "rejected", "on_hold", "candidate_withdrew"}
     if decision not in allowed:
         raise RecruitmentError("Unknown final decision.")
-    if decision in PROTECTED_HIRE_STAGES | {"rejected"} and user.role not in {"admin", "system_admin", "ceo"}:
-        raise RecruitmentError("Only Admin or CEO can finalize this decision.", status_code=403)
-    if decision in {"on_hold", "candidate_withdrew"} and user.role not in {"hr_manager", "admin", "system_admin", "ceo"}:
+    if decision in PROTECTED_HIRE_STAGES and user.role != "ceo":
+        raise RecruitmentError("Only CEO can directly finalize this hiring outcome.", status_code=403)
+    if decision == "rejected" and user.role not in {"academic_director", "ceo"}:
+        raise RecruitmentError("Only Academic Director or CEO can reject a candidate.", status_code=403)
+    if decision in {"on_hold", "candidate_withdrew"} and user.role not in {"hr_manager", "ceo"}:
         raise RecruitmentError("You cannot record this outcome.", status_code=403)
 
     rejection_reason = _text(values.get("rejection_reason"))
@@ -756,9 +969,15 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
     now = _now()
     approval_id = int(values.get("approval_id") or 0)
     with connect_auth_db() as conn:
-        candidate = repository.get_candidate_row(conn, int(candidate_id))
+        candidate = repository.lock_candidate_decision_row(conn, int(candidate_id))
         if not candidate:
             raise RecruitmentError("Candidate was not found.", status_code=404)
+        if decision == "rejected" and (
+            _text(candidate["status"]) in PROTECTED_HIRE_STAGES
+            or int(candidate["academy_teacher_id"] or 0)
+            or int(candidate["active_teacher_id"] or 0)
+        ):
+            raise RecruitmentError("A finalized teacher intake cannot be rejected.", status_code=409)
         if decision in PROTECTED_HIRE_STAGES:
             linked_id = int(candidate["academy_teacher_id"] or 0) if decision == "teacher_academy" else int(candidate["active_teacher_id"] or 0)
             if _text(candidate["status"]) == decision and linked_id:
@@ -779,6 +998,16 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
             repository.ensure_academy_intake(conn, candidate=candidate, actor_login=user.login, now=now)
         elif decision == "active_teacher":
             repository.ensure_active_teacher_intake(conn, candidate=candidate, now=now)
+
+        revoked_approval_ids: list[int] = []
+        if decision == "rejected":
+            revoked_approval_ids = repository.revoke_open_approvals(
+                conn,
+                candidate_id=int(candidate_id),
+                comment=reason_detail or rejection_reason,
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
 
         updated = repository.update_candidate_stage(
             conn,
@@ -808,6 +1037,16 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
         )
         if decision in PROTECTED_HIRE_STAGES:
             repository.consume_approval(conn, approval_id=approval_id, now=now)
+        if revoked_approval_ids:
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type="candidate.hire_approvals_revoked",
+                detail={"approval_ids": revoked_approval_ids, "reason": reason_detail or rejection_reason},
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
         repository.insert_audit(
             conn,
             candidate_id=int(candidate_id),

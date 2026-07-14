@@ -92,13 +92,13 @@ def test_protected_stage_and_decision_rules_fail_before_persistence():
         service.move_candidate(
             _user(), 1, stage="active_teacher", expected_version=1
         )
-    with pytest.raises(service.RecruitmentError, match="Only Admin or CEO"):
+    with pytest.raises(service.RecruitmentError, match="Only CEO"):
         service.make_final_decision(
             _user(), 1, {"decision": "active_teacher", "approval_id": 1}
         )
     with pytest.raises(service.RecruitmentError, match="Explain"):
         service.make_final_decision(
-            _user("admin"),
+            _user("academic_director"),
             1,
             {"decision": "rejected", "rejection_reason": "other", "reason_detail": ""},
         )
@@ -127,6 +127,11 @@ def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, mon
     denied = client.get("/api/v1/recruitment/pipeline", headers=XHR)
     assert denied.status_code == 403
 
+    for role in ("admin", "system_admin"):
+        _set_session(client, role, account_id=12)
+        denied = client.get("/api/v1/recruitment/pipeline", headers=XHR)
+        assert denied.status_code == 403
+
 
 def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     _set_session(client, "hr_manager", account_id=10, staff_id=20)
@@ -134,6 +139,17 @@ def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     assert response.status_code == 200
     assert '"page":"recruitment-workspace"' in response.text
     assert "Lesson Practice" not in response.text
+
+
+def test_admin_recruitment_pages_are_not_registered(client):
+    _set_session(client, "admin", account_id=1)
+
+    for path in (
+        "/internal/operations/recruitment",
+        "/internal/operations/recruitment/pipeline",
+        "/internal/operations/recruitment/candidates",
+    ):
+        assert client.get(path).status_code == 404
 
 
 def test_migration_preserves_candidates_and_normalizes_history():
@@ -161,6 +177,15 @@ def test_migration_preserves_candidates_and_normalizes_history():
     upgrade_source = source.split("def downgrade", 1)[0]
     assert "DROP TABLE IF EXISTS msi_v2.teacher_candidates" not in upgrade_source
     assert "candidate.legacy_event" in upgrade_source
+
+
+def test_decision_queue_migration_is_history_preserving_and_partial():
+    source = Path("database/alembic/versions/0014_hr_access_decision_queue.py").read_text()
+
+    assert "idx_teacher_candidate_hire_approvals_actionable" in source
+    assert "WHERE status IN ('requested', 'approved')" in source
+    assert "DELETE FROM" not in source
+    assert "DROP TABLE" not in source.split("def downgrade", 1)[0]
 
 
 def test_recruitment_document_urls_never_use_public_resource_url():

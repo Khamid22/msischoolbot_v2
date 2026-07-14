@@ -6,6 +6,10 @@ function source(name: string) {
   return readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 }
 
+function projectSource(relativePath: string) {
+  return readFileSync(new URL(`../../${relativePath}`, import.meta.url), "utf8");
+}
+
 describe("compact recruitment pipeline", () => {
   const pipeline = source("PipelineView.tsx");
 
@@ -48,6 +52,22 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
   });
+
+  test("opens Academic Director Recruitment on a compact decision queue", () => {
+    const decisions = source("DecisionQueueView.tsx");
+    assert.match(workspace, /key: "decisions", label: "Decisions"/);
+    assert.match(workspace, /view === "decisions" \? <DecisionQueueView/);
+    assert.match(decisions, /\/decision-queue\?page=/);
+    assert.match(decisions, /actionable_approval/);
+    assert.match(decisions, /origin=decisions/);
+  });
+});
+
+test("Admin workspace no longer exposes Recruitment navigation or routes", () => {
+  const adminWorkspace = projectSource("internal_operations/pages/InternalOperations.tsx");
+  const routes = projectSource("shared/lib/routes.ts");
+  assert.doesNotMatch(adminWorkspace, /label: "Teacher Recruitment"/);
+  assert.doesNotMatch(routes, /adminRecruitment/);
 });
 
 test("tasks use compact status tabs", () => {

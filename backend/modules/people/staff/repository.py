@@ -53,6 +53,28 @@ def _insert_password_reset_audit_event(
     )
 
 
+def _insert_account_audit_event(
+    conn: Any,
+    *,
+    event_type: str,
+    entity_account_id: int,
+    detail: dict[str, Any],
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        )
+        VALUES (NULL, %s, 'account', %s, %s::jsonb, now())
+        """,
+        (
+            str(event_type),
+            int(entity_account_id),
+            json.dumps(detail, ensure_ascii=False),
+        ),
+    )
+
+
 def lock_head_of_department_account(conn: Any, account_id: int):
     return conn.execute(
         """
@@ -112,6 +134,42 @@ def _phase1_accounts_available(conn: Any) -> bool:
     except Exception:
         return False
     return bool(row and row["table_name"])
+
+
+def _staff_identity_by_login(conn: Any, login: str):
+    return conn.execute(
+        """
+        SELECT id, login, role, status
+        FROM msi_v2.msi_staff
+        WHERE lower(btrim(login)) = lower(btrim(%s))
+        LIMIT 1
+        """,
+        (login,),
+    ).fetchone()
+
+
+def _account_identity_by_login(conn: Any, login: str):
+    return conn.execute(
+        """
+        SELECT id, login, role, status, legacy_source_id
+        FROM msi_v2.accounts
+        WHERE lower(btrim(login)) = lower(btrim(%s))
+        LIMIT 1
+        """,
+        (login,),
+    ).fetchone()
+
+
+def _account_identity_by_staff_id(conn: Any, staff_id: int):
+    return conn.execute(
+        """
+        SELECT id, login, role, status, legacy_source_id
+        FROM msi_v2.accounts
+        WHERE legacy_source_table = 'msi_staff' AND legacy_source_id = %s
+        LIMIT 1
+        """,
+        (int(staff_id),),
+    ).fetchone()
 
 
 def _table_available(conn: Any, table_name: str) -> bool:

@@ -6,9 +6,14 @@ import secrets
 from typing import Any
 
 from backend.core.database import connect_auth_db
+from backend.core.access.roles import normalize_role
 from backend.modules.identity.passwords import generate_password_hash
 
 from backend.modules.people.staff import repository
+
+
+HR_MANAGER_LOGIN = "HR0001"
+
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
@@ -46,6 +51,115 @@ def list_active_subjects() -> list[dict[str, Any]]:
             return repository._list_active_subjects(conn)
     except Exception:
         return []
+
+
+def create_hr_manager_account(
+    *,
+    display_name: str = "HR Manager",
+) -> tuple[bool, str, dict[str, Any]]:
+    """Create or reset the single standalone HR Manager identity."""
+
+    with connect_auth_db() as conn:
+        return _create_hr_manager_account(
+            conn,
+            display_name=display_name,
+            commit=True,
+        )
+
+
+def _create_hr_manager_account(
+    conn: Any,
+    *,
+    display_name: str = "HR Manager",
+    commit: bool = False,
+) -> tuple[bool, str, dict[str, Any]]:
+    if not repository._phase1_accounts_available(conn):
+        return False, "Shared accounts are not available. Apply the account schema first.", {}
+
+    login = HR_MANAGER_LOGIN
+    normalized_display_name = _text(display_name) or "HR Manager"
+    staff = repository._staff_identity_by_login(conn, login)
+    if staff and normalize_role(staff["role"]) != "hr_manager":
+        return False, f"{login} already belongs to another staff role.", {}
+
+    account_by_login = repository._account_identity_by_login(conn, login)
+    if account_by_login and normalize_role(account_by_login["role"]) != "hr_manager":
+        return False, f"{login} already belongs to another account role.", {}
+
+    staff_id = _to_int(staff["id"]) if staff else 0
+    account_by_staff = (
+        repository._account_identity_by_staff_id(conn, staff_id) if staff_id else None
+    )
+    if account_by_staff and normalize_role(account_by_staff["role"]) != "hr_manager":
+        return False, "The linked staff identity belongs to another account role.", {}
+    if (
+        account_by_login
+        and account_by_staff
+        and _to_int(account_by_login["id"]) != _to_int(account_by_staff["id"])
+    ):
+        return False, f"{login} is linked to conflicting account records.", {}
+
+    temporary_password = _generate_temporary_password()
+    password_hash = generate_password_hash(temporary_password)
+    now = _utc_now_iso()
+    existing_account = account_by_login or account_by_staff
+
+    staff_id = repository._insert_or_update_staff_role(
+        conn,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="hr_manager",
+        subject_scope="",
+        now=now,
+    )
+    if not staff_id:
+        conn.rollback()
+        return False, "Unable to create the HR Manager staff row.", {}
+
+    account_id = repository._upsert_staff_account(
+        conn,
+        staff_id=staff_id,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="hr_manager",
+        now=now,
+    )
+    if not account_id:
+        conn.rollback()
+        return False, "Unable to create the HR Manager account.", {}
+
+    profile_id = repository._upsert_staff_profile_role(
+        conn,
+        account_id=account_id,
+        staff_id=staff_id,
+        job_title="HR Manager",
+        department="Human Resources",
+        now=now,
+    )
+    if not profile_id:
+        conn.rollback()
+        return False, "Unable to create the HR Manager profile.", {}
+
+    repository._insert_account_audit_event(
+        conn,
+        event_type="account.password_reset" if existing_account else "account.created",
+        entity_account_id=account_id,
+        detail={"role": "hr_manager", "method": "operator_cli"},
+    )
+    if commit:
+        conn.commit()
+
+    return True, "", {
+        "role": "hr_manager",
+        "login": login,
+        "temporary_password": temporary_password,
+        "display_name": normalized_display_name,
+        "must_change_password": True,
+        "account_id": account_id,
+        "staff_id": staff_id,
+    }
 
 
 def create_head_of_department_account(

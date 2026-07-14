@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Create or reset the standalone HR Manager account."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from backend.modules.people.staff.service import create_hr_manager_account  # noqa: E402
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Create or reset the fixed HR0001 HR Manager account."
+    )
+    parser.add_argument(
+        "--display-name",
+        default="HR Manager",
+        help="Display name to store for HR0001.",
+    )
+    args = parser.parse_args()
+
+    created, error_message, credentials = create_hr_manager_account(
+        display_name=args.display_name,
+    )
+    if not created:
+        print(f"HR Manager provisioning failed: {error_message}", file=sys.stderr)
+        return 1
+
+    print("HR Manager account ready.")
+    print(f"Login: {credentials['login']}")
+    print(f"Temporary password: {credentials['temporary_password']}")
+    print("The password is stored as a hash and must be changed after first sign-in.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

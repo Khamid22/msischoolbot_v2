@@ -71,6 +71,7 @@ def _candidate_joins() -> str:
 def _visibility_clause(
     visible_account_id: int | None,
     visible_subject_ids: set[int] | None = None,
+    include_decision_queue: bool = False,
 ) -> tuple[str, list[Any]]:
     if not visible_account_id:
         return "", []
@@ -81,17 +82,25 @@ def _visibility_clause(
     if visible_subject_ids is not None:
         subject_clause = "AND visibility.subject_id = ANY(%s::bigint[])"
         params.append(sorted(visible_subject_ids))
-    return (
-        f"""EXISTS (
+    assignment_clause = f"""EXISTS (
             SELECT 1
             FROM msi_v2.teacher_candidate_assignments visibility
             WHERE visibility.candidate_id = candidate.id
               AND visibility.assignee_account_id = %s
               AND visibility.status = 'active'
               {subject_clause}
-        )""",
-        params,
-    )
+        )"""
+    if include_decision_queue:
+        return (
+            f"""({assignment_clause} OR EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_candidate_hire_approvals queue_approval
+                WHERE queue_approval.candidate_id = candidate.id
+                  AND queue_approval.status IN ('requested', 'approved')
+            ))""",
+            params,
+        )
+    return assignment_clause, params
 
 
 def list_pipeline_rows(
@@ -99,8 +108,13 @@ def list_pipeline_rows(
     *,
     visible_account_id: int | None = None,
     visible_subject_ids: set[int] | None = None,
+    include_decision_queue: bool = False,
 ) -> list[Any]:
-    visibility, params = _visibility_clause(visible_account_id, visible_subject_ids)
+    visibility, params = _visibility_clause(
+        visible_account_id,
+        visible_subject_ids,
+        include_decision_queue,
+    )
     where_sql = f"WHERE {visibility}" if visibility else ""
     return conn.execute(
         f"""
@@ -119,6 +133,7 @@ def list_candidate_rows(
     *,
     visible_account_id: int | None = None,
     visible_subject_ids: set[int] | None = None,
+    include_decision_queue: bool = False,
     search: str = "",
     position: str = "",
     stage: str = "",
@@ -132,7 +147,11 @@ def list_candidate_rows(
 ) -> tuple[list[Any], int]:
     clauses: list[str] = []
     params: list[Any] = []
-    visibility, visibility_params = _visibility_clause(visible_account_id, visible_subject_ids)
+    visibility, visibility_params = _visibility_clause(
+        visible_account_id,
+        visible_subject_ids,
+        include_decision_queue,
+    )
     if visibility:
         clauses.append(visibility)
         params.extend(visibility_params)
@@ -190,6 +209,70 @@ def list_candidate_rows(
     return rows, int(total_row["total"] or 0) if total_row else 0
 
 
+def list_decision_queue_rows(
+    conn: Any,
+    *,
+    account_id: int,
+    limit: int = 25,
+    offset: int = 0,
+) -> tuple[list[Any], int]:
+    visibility = """
+        EXISTS (
+            SELECT 1
+            FROM msi_v2.teacher_candidate_assignments queue_assignment
+            WHERE queue_assignment.candidate_id = candidate.id
+              AND queue_assignment.assignee_account_id = %s
+              AND queue_assignment.status = 'active'
+        )
+        OR EXISTS (
+            SELECT 1
+            FROM msi_v2.teacher_candidate_hire_approvals queue_visibility
+            WHERE queue_visibility.candidate_id = candidate.id
+              AND queue_visibility.status IN ('requested', 'approved')
+        )
+    """
+    total_row = conn.execute(
+        f"""
+        SELECT count(*) AS total
+        FROM msi_v2.teacher_candidates candidate
+        WHERE {visibility}
+        """,
+        (int(account_id),),
+    ).fetchone()
+    rows = conn.execute(
+        f"""
+        SELECT {_CANDIDATE_COLUMNS},
+               actionable.id AS actionable_approval_id,
+               actionable.requested_outcome AS actionable_requested_outcome,
+               actionable.status AS actionable_approval_status,
+               actionable.request_note AS actionable_request_note,
+               actionable.created_at::text AS actionable_requested_at,
+               CASE WHEN actionable.id IS NULL THEN 'assignment' ELSE 'approval_request' END
+                   AS access_reason
+        FROM msi_v2.teacher_candidates candidate
+        {_candidate_joins()}
+        LEFT JOIN LATERAL (
+            SELECT approval.id, approval.requested_outcome, approval.status,
+                   approval.request_note, approval.created_at
+            FROM msi_v2.teacher_candidate_hire_approvals approval
+            WHERE approval.candidate_id = candidate.id
+              AND approval.status IN ('requested', 'approved')
+            ORDER BY CASE WHEN approval.status = 'requested' THEN 0 ELSE 1 END,
+                     approval.created_at DESC, approval.id DESC
+            LIMIT 1
+        ) actionable ON true
+        WHERE {visibility}
+        ORDER BY CASE WHEN actionable.id IS NULL THEN 1 ELSE 0 END,
+                 actionable.created_at DESC NULLS LAST,
+                 candidate.updated_at DESC,
+                 candidate.id DESC
+        LIMIT %s OFFSET %s
+        """,
+        (int(account_id), int(limit), int(offset)),
+    ).fetchall()
+    return rows, int(total_row["total"] or 0) if total_row else 0
+
+
 def get_candidate_row(conn: Any, candidate_id: int) -> Any:
     return conn.execute(
         f"""
@@ -200,6 +283,27 @@ def get_candidate_row(conn: Any, candidate_id: int) -> Any:
         LIMIT 1
         """,
         (candidate_id,),
+    ).fetchone()
+
+
+def lock_candidate_decision_row(conn: Any, candidate_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT candidate.id, candidate.full_name, candidate.phone,
+               candidate.telegram_username, candidate.subject_id,
+               candidate.applied_position, candidate.status, candidate.version,
+               academy.id AS academy_teacher_id,
+               teacher.id AS active_teacher_id
+        FROM msi_v2.teacher_candidates candidate
+        LEFT JOIN msi_v2.academy_teachers academy
+          ON academy.recruitment_candidate_id = candidate.id
+        LEFT JOIN msi_v2.teachers teacher
+          ON teacher.recruitment_candidate_id = candidate.id
+        WHERE candidate.id = %s
+        LIMIT 1
+        FOR UPDATE OF candidate
+        """,
+        (int(candidate_id),),
     ).fetchone()
 
 
@@ -214,6 +318,19 @@ def candidate_assignment_row(conn: Any, *, candidate_id: int, account_id: int) -
         LIMIT 1
         """,
         (candidate_id, account_id),
+    ).fetchone()
+
+
+def candidate_actionable_approval_row(conn: Any, candidate_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, requested_outcome, status, created_at
+        FROM msi_v2.teacher_candidate_hire_approvals
+        WHERE candidate_id = %s AND status IN ('requested', 'approved')
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        """,
+        (int(candidate_id),),
     ).fetchone()
 
 
@@ -309,6 +426,7 @@ def list_task_rows(
     candidate_id: int | None = None,
     visible_account_id: int | None = None,
     visible_subject_ids: set[int] | None = None,
+    include_decision_queue: bool = False,
 ) -> list[Any]:
     clauses: list[str] = []
     params: list[Any] = []
@@ -322,14 +440,24 @@ def list_task_rows(
             subject_clause = ""
             if visible_subject_ids is not None:
                 subject_clause = "AND visibility.subject_id = ANY(%s::bigint[])"
+            queue_clause = ""
+            if include_decision_queue:
+                queue_clause = """
+                    OR EXISTS (
+                        SELECT 1
+                        FROM msi_v2.teacher_candidate_hire_approvals queue_approval
+                        WHERE queue_approval.candidate_id = task.candidate_id
+                          AND queue_approval.status IN ('requested', 'approved')
+                    )
+                """
             clauses.append(
-                f"""EXISTS (
+                f"""(EXISTS (
                     SELECT 1 FROM msi_v2.teacher_candidate_assignments visibility
                     WHERE visibility.candidate_id = task.candidate_id
                       AND visibility.assignee_account_id = %s
                       AND visibility.status = 'active'
                       {subject_clause}
-                )"""
+                ){queue_clause})"""
             )
             params.append(visible_account_id)
             if visible_subject_ids is not None:
@@ -789,6 +917,20 @@ def get_approval_row(conn: Any, *, candidate_id: int, approval_id: int, for_upda
     ).fetchone()
 
 
+def get_approval_by_id(conn: Any, *, approval_id: int, for_update: bool = False) -> Any:
+    lock = "FOR UPDATE" if for_update else ""
+    return conn.execute(
+        f"""
+        SELECT id, candidate_id, requested_outcome, status,
+               requested_by_account_id, reviewed_by_account_id
+        FROM msi_v2.teacher_candidate_hire_approvals
+        WHERE id = %s
+        LIMIT 1 {lock}
+        """,
+        (int(approval_id),),
+    ).fetchone()
+
+
 def review_approval(conn: Any, *, candidate_id: int, approval_id: int, status: str, comment: str, actor_account_id: int | None, now: str) -> bool:
     cursor = conn.execute(
         """
@@ -800,6 +942,43 @@ def review_approval(conn: Any, *, candidate_id: int, approval_id: int, status: s
         (status, comment, actor_account_id, now, now, approval_id, candidate_id),
     )
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+
+def final_decision_for_approval(conn: Any, *, candidate_id: int, approval_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, decision
+        FROM msi_v2.teacher_candidate_final_decisions
+        WHERE candidate_id = %s AND approval_id = %s
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (int(candidate_id), int(approval_id)),
+    ).fetchone()
+
+
+def revoke_open_approvals(
+    conn: Any,
+    *,
+    candidate_id: int,
+    comment: str,
+    actor_account_id: int | None,
+    now: str,
+) -> list[int]:
+    rows = conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_hire_approvals
+        SET status = 'revoked',
+            review_comment = %s,
+            reviewed_by_account_id = %s,
+            reviewed_at = %s::timestamptz,
+            updated_at = %s::timestamptz
+        WHERE candidate_id = %s AND status IN ('requested', 'approved')
+        RETURNING id
+        """,
+        (comment, actor_account_id, now, now, int(candidate_id)),
+    ).fetchall()
+    return [int(row["id"]) for row in rows]
 
 
 def consume_approval(conn: Any, *, approval_id: int, now: str) -> None:
@@ -935,7 +1114,7 @@ def list_recruitment_options(conn: Any) -> dict[str, list[dict[str, Any]]]:
         SELECT id, role, COALESCE(NULLIF(full_name, ''), login) AS name, login
         FROM msi_v2.accounts
         WHERE status = 'active'
-          AND role IN ('system_admin', 'ceo', 'hr_manager', 'academic_director', 'head_of_department')
+          AND role IN ('ceo', 'hr_manager', 'academic_director', 'head_of_department')
         ORDER BY role, lower(COALESCE(NULLIF(full_name, ''), login))
         """
     ).fetchall()

@@ -55,10 +55,9 @@ DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo", "on_hold"})
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
 
 RECRUITMENT_ROLES = frozenset(
-    {"hr_manager", "academic_director", "head_of_department", "admin", "system_admin", "ceo"}
+    {"hr_manager", "academic_director", "head_of_department", "ceo"}
 )
-FULL_VIEW_ROLES = frozenset({"hr_manager", "admin", "system_admin", "ceo"})
-FINAL_DECISION_ROLES = frozenset({"admin", "system_admin", "ceo"})
+FULL_VIEW_ROLES = frozenset({"hr_manager", "ceo"})
 ACADEMIC_ROLES = frozenset({"academic_director", "head_of_department"})
 
 
@@ -69,7 +68,6 @@ __all__ = [
     "CANDIDATE_SOURCES",
     "DEMO_RESULTS",
     "DOCUMENT_TYPES",
-    "FINAL_DECISION_ROLES",
     "FULL_VIEW_ROLES",
     "INTERVIEW_RESULTS",
     "PRIMARY_STAGES",
