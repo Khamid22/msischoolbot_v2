@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any, Callable
 
 from backend.modules.identity.passwords import generate_password_hash, verify_password_hash
@@ -10,6 +11,9 @@ from backend.modules.organization.canonical import normalize_school_code
 from backend.modules.identity import repository
 from backend.modules.identity.database import DB_LOCK, connect
 from backend.core.access.roles import normalize_role
+
+
+LOGGER = logging.getLogger("msi.identity")
 
 
 PASSWORD_LOGIN_ALLOWED_STATUS = "active"
@@ -388,23 +392,34 @@ def authenticate_account_password(
     password: Any,
     conn: Any | None = None,
 ) -> dict[str, Any] | None:
+    normalized_login = normalize_login(login)
+
+    def _reject(reason: str) -> None:
+        LOGGER.warning(
+            "password_auth_rejected login=%s reason=%s password_length=%s",
+            normalized_login,
+            reason,
+            len(str(password or "")),
+        )
+        return None
+
     def _authenticate(active_conn: Any) -> dict[str, Any] | None:
         account = get_account_by_login(login, conn=active_conn)
         if not account:
-            return None
+            return _reject("account_missing")
         role = normalize_role(account.get("role"))
         if role not in ACCOUNT_AUTH_ROLES:
-            return None
+            return _reject("role_not_allowed")
         if _text(account.get("status")).casefold() != PASSWORD_LOGIN_ALLOWED_STATUS:
-            return None
+            return _reject("account_inactive")
         if not verify_account_password(account, password):
-            return None
+            return _reject("password_mismatch")
         profile = load_account_profile(account, conn=active_conn)
         if not _profile_allows_login(profile):
-            return None
+            return _reject("profile_inactive")
         session_payload = build_session_payload(account, profile)
         if not session_payload:
-            return None
+            return _reject("session_payload_invalid")
         # Unit-test connection doubles intentionally do not advertise a backend.
         # Real connections record login time in the same transaction.
         if conn is None or getattr(active_conn, "db_backend", "") == "postgres":
