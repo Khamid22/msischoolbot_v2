@@ -100,6 +100,22 @@ def get_staff_profile_row(conn: Any, account_id: int) -> Any:
     ).fetchone()
 
 
+def get_teacher_profile_row(conn: Any, account_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT tp.id AS profile_id, tp.account_id, tp.teacher_id, tp.teacher_code,
+               tp.status AS profile_status,
+               account.full_name AS full_name,
+               account.legacy_source_id AS staff_id
+        FROM msi_v2.teacher_profiles tp
+        LEFT JOIN msi_v2.accounts account ON account.id = tp.account_id
+        WHERE tp.account_id = %s
+        LIMIT 1
+        """,
+        (int(account_id),),
+    ).fetchone()
+
+
 def get_account_telegram_link_row(conn: Any, telegram_user_id: int) -> Any:
     return conn.execute(
         """
@@ -351,7 +367,7 @@ def save_teacher_account(
                 full_name = %s,
                 legacy_source_table = 'msi_staff',
                 legacy_source_id = %s,
-                must_change_password = true,
+                must_change_password = false,
                 password_changed_at = NULL,
                 session_version = session_version + 1,
                 updated_at = now()
@@ -367,10 +383,10 @@ def save_teacher_account(
                 legacy_source_table, legacy_source_id, must_change_password,
                 session_version, created_at, updated_at
             )
-            VALUES (%s, %s, 'teacher', 'disabled', %s, 'msi_staff', %s, true, 1, now(), now())
+            VALUES (%s, %s, 'teacher', %s, %s, 'msi_staff', %s, false, 1, now(), now())
             RETURNING id
             """,
-            (login, password_hash, full_name, int(staff_id)),
+            (login, password_hash, status, full_name, int(staff_id)),
         ).fetchone()
         account_id = int(row["id"] or 0) if row else 0
     if account_id <= 0:

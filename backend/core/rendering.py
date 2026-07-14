@@ -1,18 +1,3 @@
-"""
-Core React page rendering boundary.
------------------
-Generates HTML pages directly from Python — no Jinja2 templates needed.
-
-How it works
-------------
-  1. A backend route builds a props dict (camelCase keys matching React component props).
-  2. The route calls render_react_page("page-name", props, title="...").
-  3. render_react_page() returns an HTML string with the props embedded as JSON.
-  4. The browser loads React, which reads the JSON and renders the right page.
-
-The page name must match a key in frontend/src/App.tsx's pageMap.
-"""
-
 import json
 import os
 import re

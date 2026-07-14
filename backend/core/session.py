@@ -26,6 +26,26 @@ def current_parent_id():
     return parsed_value if parsed_value > 0 else None
 
 
+def current_teacher_id():
+    if current_auth_role() != "teacher":
+        return None
+    try:
+        parsed_value = int(session.get("teacher_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
+
+
+def current_teacher_staff_id():
+    if current_auth_role() != "teacher":
+        return None
+    try:
+        parsed_value = int(session.get("staff_id"))
+    except (TypeError, ValueError):
+        return None
+    return parsed_value if parsed_value > 0 else None
+
+
 def current_student_enrollment_id():
     if current_auth_role() != "student":
         return None

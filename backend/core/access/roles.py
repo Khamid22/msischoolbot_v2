@@ -20,12 +20,12 @@ WORKSPACE_ROLES = {
     ROLE_HR_MANAGER,
     ROLE_STUDENT,
     ROLE_PARENT,
+    ROLE_TEACHER,
 }
 
-# Teachers are staff records managed by HR and Academic workspaces. The value
-# remains normalizable for persisted data, but it is intentionally not a portal
-# session role.
-NON_PORTAL_STAFF_ROLES = {ROLE_TEACHER}
+# Academy teachers sign in to their own read-only Academy profile workspace, so
+# there are no non-portal staff roles at present.
+NON_PORTAL_STAFF_ROLES: set[str] = set()
 
 ALL_ROLES = {
     ROLE_OWNER,
@@ -50,6 +50,7 @@ VALID_ROLES = {
     ROLE_CUSTOMER_SUPPORT,
     ROLE_STUDENT,
     ROLE_PARENT,
+    ROLE_TEACHER,
     ROLE_ACADEMIC_DIRECTOR,
     ROLE_HEAD_OF_DEPARTMENT,
 }
@@ -62,6 +63,7 @@ ROLE_DASHBOARD_PATHS = {
     "customer_support": "/customer-support",
     "student": "/student",
     "parent": "/parent",
+    "teacher": "/teacher",
     "academic_director": "/academic-director",
     "head_of_department": "/head-of-departments",
 }
@@ -74,6 +76,7 @@ ROLE_DISPLAY_NAMES = {
     "customer_support": "Customer Support",
     "student": "Student",
     "parent": "Parent",
+    "teacher": "Teacher",
     "academic_director": "Academic Director",
     "head_of_department": "Head of Departments",
 }

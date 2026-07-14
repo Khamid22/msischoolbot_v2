@@ -10,6 +10,7 @@ from backend.workspaces.ceo.page import register_ceo_page_routes
 from backend.workspaces.hr_manager.page import register_hr_manager_page_routes
 from backend.workspaces.customer_support.page import register_customer_support_page_routes
 from backend.workspaces.student.page import register_student_page_routes
+from backend.workspaces.teacher.page import register_teacher_page_routes
 
 
 def register_application_pages(app) -> None:
@@ -25,6 +26,7 @@ def register_application_pages(app) -> None:
     register_ceo_page_routes(app)
     register_hr_manager_page_routes(app)
     register_customer_support_page_routes(app)
+    register_teacher_page_routes(app)
     register_academic_director_page_routes(app)
     register_head_of_department_page_routes(app)
     register_parent_invite_routes(app)

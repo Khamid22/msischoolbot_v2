@@ -1,5 +1,3 @@
-"""Re-export API Pydantic schemas and standard JSONResponse helpers."""
-
 from backend.core.api_schemas import (
     ApiError,
     ApiMessage,

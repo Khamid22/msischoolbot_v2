@@ -21,6 +21,7 @@ ACCOUNT_AUTH_ROLES = {
     "customer_support",
     "student",
     "parent",
+    "teacher",
     "academic_director",
     "head_of_department",
 }
@@ -184,6 +185,22 @@ def _staff_profile(conn: Any, account_id: int, role: str) -> dict[str, Any] | No
     }
 
 
+def _teacher_profile(conn: Any, account_id: int) -> dict[str, Any] | None:
+    row = _row_to_dict(repository.get_teacher_profile_row(conn, account_id))
+    if not row:
+        return None
+    return {
+        "role": "teacher",
+        "profile_id": _to_int(row.get("profile_id")),
+        "account_id": _to_int(row.get("account_id")),
+        "teacher_id": _to_int(row.get("teacher_id")),
+        "staff_id": _to_int(row.get("staff_id")),
+        "teacher_code": _text(row.get("teacher_code")),
+        "full_name": _text(row.get("full_name")),
+        "status": _text(row.get("profile_status")).casefold() or "disabled",
+    }
+
+
 def load_account_profile(
     account: dict[str, Any] | None,
     conn: Any | None = None,
@@ -200,6 +217,8 @@ def load_account_profile(
             return _student_profile(active_conn, account_id)
         if role == "parent":
             return _parent_profile(active_conn, account_id)
+        if role == "teacher":
+            return _teacher_profile(active_conn, account_id)
         if role in STAFF_ACCOUNT_ROLES:
             return _staff_profile(active_conn, account_id, role)
         return None
@@ -279,6 +298,23 @@ def build_session_payload(
         telegram_user_id = _to_int(profile.get("telegram_user_id"))
         if telegram_user_id is not None:
             payload["telegram_user_id"] = telegram_user_id
+        return payload
+
+    if role == "teacher":
+        teacher_id = _to_int(profile.get("teacher_id"))
+        staff_id = _to_int(profile.get("staff_id"))
+        if teacher_id is None and staff_id is None:
+            return None
+        teacher_code = _text(profile.get("teacher_code")) or auth_login
+        payload.update(
+            {
+                "auth_role": "teacher",
+                "auth_login": teacher_code,
+                "teacher_id": teacher_id,
+                "staff_id": staff_id,
+                "teacher_full_name": _text(profile.get("full_name")),
+            }
+        )
         return payload
 
     if role in STAFF_ACCOUNT_ROLES:

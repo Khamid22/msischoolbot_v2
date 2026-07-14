@@ -103,7 +103,7 @@ function TeacherIdentityCard({ teacher }: { teacher: Record<string, unknown> | n
   );
 }
 
-function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }) {
+export function AcademyTeacherPreview({ teacher }: { teacher: Record<string, unknown> }) {
   const assignments = academyAssignments(teacher);
   const assessments = academyAssessments(teacher).slice().reverse();
   const progress = academyProgress(teacher);

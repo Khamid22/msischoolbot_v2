@@ -10,12 +10,6 @@ _request_context = contextvars.ContextVar("request_context")
 
 
 class RequestContextMiddleware:
-    """Expose the current request to legacy page handlers via a contextvar.
-
-    Deliberately never touches the request body: body parsing happens exactly
-    once, inside ``prime_body_state`` (an async dependency), so the
-    consumed-receive-channel hang class of bugs cannot come back.
-    """
 
     def __init__(self, app):
         self.app = app
