@@ -178,6 +178,7 @@ async def run_bot():
     from aiogram import Bot, Dispatcher
     from aiogram.client.default import DefaultBotProperties
     from aiogram.enums import ParseMode
+    from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 
     from tgbot.routing import BOT_ROUTERS
     from tgbot.settings import settings as bot_settings
@@ -191,6 +192,15 @@ async def run_bot():
     bot_routers = tuple(BOT_ROUTERS)
     for router in bot_routers:
         dp.include_router(router)
+
+    try:
+        web_app = WebAppInfo(url=bot_settings.mini_app_url)
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Open MSI School", web_app=web_app)
+        )
+        await bot.set_my_commands([BotCommand(command="start", description="Open MSI School")])
+    except Exception:
+        logging.exception("Unable to configure the Telegram Mini App menu button.")
 
     if bot_routers:
         logging.info("Starting Telegram bot polling (%d routers).", len(bot_routers))

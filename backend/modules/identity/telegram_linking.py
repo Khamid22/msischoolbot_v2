@@ -38,7 +38,7 @@ def _connection_payload(row: Any | None) -> dict[str, Any]:
         "connected": bool(row),
         "username": username,
         "linked_at": linked_at,
-        "open_telegram_url": f"https://t.me/{bot_username}?startapp=link_account" if bot_username else "",
+        "open_telegram_url": f"https://t.me/{bot_username}?start=link_account" if bot_username else "",
         "bot_configured": bool(bot_username and _text(os.getenv("BOT_TOKEN"))),
     }
 

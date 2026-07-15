@@ -1,10 +1,8 @@
-"""Telegram bot router registry.
+"""Explicit Telegram bot router registry."""
 
-The legacy handler modules were removed while the new bot architecture is being
-rebuilt. Keep the runtime registry explicit so polling can still start without
-importing old handler code.
-"""
+from tgbot.portal_router import router as portal_router
 
-BOT_ROUTERS = ()
+
+BOT_ROUTERS = (portal_router,)
 
 __all__ = ["BOT_ROUTERS"]
