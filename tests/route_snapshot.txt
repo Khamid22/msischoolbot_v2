@@ -224,6 +224,7 @@
 /hr-manager/profile | GET
 /hr-manager/settings | GET
 /hr-manager/tasks | GET
+/hr-manager/trash | GET
 /internal/operations | GET
 /login | POST
 /logout | POST

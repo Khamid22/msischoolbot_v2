@@ -4,7 +4,7 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "settings" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "settings" | "trash" | "candidate" | "profile";
 
 export type RecruitmentPermissions = {
   can_edit_profile: boolean;

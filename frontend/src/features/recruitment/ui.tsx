@@ -72,8 +72,9 @@ export function replaceUrlParams(values: Record<string, string | number | null |
 }
 
 const returnPositionPrefix = "msi:recruitment:return:";
+type RecruitmentReturnView = "pipeline" | "decisions" | "candidates" | "tasks" | "trash";
 
-export function rememberRecruitmentReturn(view: "pipeline" | "decisions" | "candidates" | "tasks") {
+export function rememberRecruitmentReturn(view: RecruitmentReturnView) {
   try {
     window.sessionStorage.setItem(`${returnPositionPrefix}${view}`, JSON.stringify({
       url: `${window.location.pathname}${window.location.search}`,
@@ -84,7 +85,7 @@ export function rememberRecruitmentReturn(view: "pipeline" | "decisions" | "cand
   }
 }
 
-export function restoreRecruitmentReturn(view: "pipeline" | "decisions" | "candidates" | "tasks") {
+export function restoreRecruitmentReturn(view: RecruitmentReturnView) {
   try {
     const raw = window.sessionStorage.getItem(`${returnPositionPrefix}${view}`);
     if (!raw) return;

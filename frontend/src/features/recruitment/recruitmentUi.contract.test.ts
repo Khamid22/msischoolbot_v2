@@ -86,12 +86,16 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /RECRUITMENT_API}\/settings/);
   });
 
-  test("adds an HR-only Trash Bin sidebar tab backed by the archived candidate filter", () => {
+  test("uses a dedicated HR-only Trash Bin that cannot expose active candidates", () => {
+    const trash = source("TrashBinView.tsx");
     assert.match(workspace, /effectiveRole === "hr_manager"/);
-    assert.match(workspace, /key: "trash", label: "Trash Bin", href: `\$\{basePath\}\/candidates\?stage=trash_bin`/);
-    assert.match(workspace, /const viewingTrash = view === "candidates"/);
-    assert.match(workspace, /const active = viewingTrash \? "trash"/);
-    assert.match(workspace, /const title = viewingTrash \? "Trash Bin"/);
+    assert.match(workspace, /key: "trash", label: "Trash Bin", href: `\$\{basePath\}\/trash`/);
+    assert.match(workspace, /view === "trash" && effectiveRole === "hr_manager" \? <TrashBinView/);
+    assert.match(trash, /stage: "trash_bin"/);
+    assert.match(trash, /items\.filter\(\(candidate\) => candidate\.status === "trash_bin"\)/);
+    assert.match(trash, /origin=trash/);
+    assert.doesNotMatch(trash, /All stages|Candidate filters|filters\.stage/);
+    assert.match(profile, /origin === "trash" \? `\$\{basePath\}\/trash/);
   });
 
   test("opens Academic Director Recruitment on a compact decision queue", () => {

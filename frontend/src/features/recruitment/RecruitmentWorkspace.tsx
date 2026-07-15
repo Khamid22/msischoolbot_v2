@@ -8,6 +8,7 @@ import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
 import { PipelineView } from "@/features/recruitment/PipelineView";
 import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
+import { TrashBinView } from "@/features/recruitment/TrashBinView";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import { type RecruitmentCandidate, type RecruitmentOptions, type RecruitmentRole, type RecruitmentView } from "@/features/recruitment/model";
 import {
@@ -69,8 +70,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const { toast, showToast, clearToast } = useFloatingToast();
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
-  const viewingTrash = view === "candidates" && new URLSearchParams(window.location.search).get("stage") === "trash_bin";
-  const active = viewingTrash ? "trash" : view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
+  const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
   const navItems = useMemo(() => {
     if (effectiveRole === "academic_director") return [
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
@@ -83,12 +83,12 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
     ];
     if (effectiveRole === "hr_manager") {
-      items.splice(2, 0, { key: "trash", label: "Trash Bin", href: `${basePath}/candidates?stage=trash_bin`, icon: Trash2 });
+      items.splice(2, 0, { key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 });
       items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
     }
     return items;
   }, [basePath, effectiveRole]);
-  const title = viewingTrash ? "Trash Bin" : { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", settings: "Recruitment Settings", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -118,9 +118,9 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
             {view === "pipeline" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Move candidates through a manual, auditable hiring workflow.</p> : null}
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
-            {viewingTrash ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review archived candidates or open a profile to restore one.</p> : null}
+            {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
-          {effectiveRole === "hr_manager" && !viewingTrash && !["profile", "settings"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
+          {effectiveRole === "hr_manager" && !["profile", "settings", "trash"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
       ) : null}
 
@@ -131,6 +131,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
       {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={showToast} /> : null}
+      {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
       {view === "profile" ? <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section> : null}
 

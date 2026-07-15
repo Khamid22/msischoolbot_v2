@@ -252,9 +252,9 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
   const origin = params.get("origin");
   const returnQuery = params.get("return") || "";
   const safeReturn = returnQuery.startsWith("?") ? returnQuery : "";
-  const backHref = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : `${basePath}/candidates${safeReturn}`;
-  const backLabel = origin === "pipeline" ? "Pipeline" : origin === "decisions" ? "Decisions" : origin === "tasks" ? "Tasks" : "Candidates";
-  const backPath = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : `${basePath}/candidates`;
+  const backHref = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash${safeReturn}` : `${basePath}/candidates${safeReturn}`;
+  const backLabel = origin === "pipeline" ? "Pipeline" : origin === "decisions" ? "Decisions" : origin === "tasks" ? "Tasks" : origin === "trash" ? "Trash Bin" : "Candidates";
+  const backPath = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash` : `${basePath}/candidates`;
 
   const submit = (path: string, values: unknown, method = "POST") => mutation.mutate({ url: `${RECRUITMENT_API}/candidates/${candidateId}${path}`, method, values });
   const submitAction = (event: FormEvent<HTMLFormElement>) => {

@@ -204,6 +204,13 @@ def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     assert settings.status_code == 200
     assert '"view":"settings"' in settings.text
 
+    trash = client.get("/hr-manager/trash")
+    assert trash.status_code == 200
+    assert '"view":"trash"' in trash.text
+
+    _set_session(client, "ceo", account_id=11, staff_id=21)
+    assert client.get("/ceo/recruitment/trash").status_code == 404
+
 
 def test_recruitment_settings_api_is_hr_only(client, monkeypatch):
     monkeypatch.setattr(
