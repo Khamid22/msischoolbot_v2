@@ -122,6 +122,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /activeInlineField/);
     assert.match(profile, /pendingInlineField/);
     assert.match(profile, /inlineFieldDirty/);
+    assert.match(profile, /useDismissibleLayer/);
+    assert.match(profile, /onRequestDismiss: requestInlineDismiss/);
+    assert.match(profile, /data-inline-edit-trigger/);
+    assert.match(profile, /confirmInlineClose/);
     assert.match(profile, /Discard unsaved change\?/);
     assert.match(profile, /Discard & continue/);
     assert.match(profile, /Keep editing/);

@@ -21,7 +21,7 @@ import {
   useId,
   useState,
   type FormEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 
@@ -51,6 +51,7 @@ import {
   queryError,
   secondaryButtonClass,
 } from "@/features/recruitment/ui";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Drawer } from "@/shared/ui/Drawer";
@@ -146,6 +147,7 @@ function InlineField({
   editing,
   onRequestEdit,
   onDirtyChange,
+  onRequestDismiss,
   onFinish,
   onCancel,
   onSave,
@@ -161,11 +163,16 @@ function InlineField({
   editing: boolean;
   onRequestEdit: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  onRequestDismiss: (event?: KeyboardEvent | PointerEvent) => void;
   onFinish: () => void;
   onCancel: () => void;
   onSave: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(String(value ?? ""));
+  const inlineLayerRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: editing,
+    onDismiss: onRequestDismiss,
+  });
   useEffect(() => {
     if (!editing) setDraft(String(value ?? ""));
   }, [editing, value]);
@@ -176,9 +183,10 @@ function InlineField({
   };
 
   return (
-    <div className="relative h-16 min-h-16 min-w-0">
+    <div ref={inlineLayerRef} className="relative h-16 min-h-16 min-w-0">
       {!editing ? (
       <button
+        data-inline-edit-trigger
         type="button"
         disabled={busy}
         onClick={onRequestEdit}
@@ -1168,6 +1176,7 @@ export function CandidateProfile({
   const [activeInlineField, setActiveInlineField] = useState<InlineEditTarget | null>(null);
   const [inlineFieldDirty, setInlineFieldDirty] = useState(false);
   const [pendingInlineField, setPendingInlineField] = useState<InlineEditTarget | null>(null);
+  const [confirmInlineClose, setConfirmInlineClose] = useState(false);
   const formId = useId();
   const detail = useQuery({
     queryKey: ["recruitment", "candidate", candidateId],
@@ -1278,18 +1287,31 @@ export function CandidateProfile({
       setPendingInlineField(target);
       return;
     }
+    setConfirmInlineClose(false);
     setInlineFieldDirty(false);
     setActiveInlineField(target);
   };
   const closeInlineEdit = () => {
+    setPendingInlineField(null);
+    setConfirmInlineClose(false);
     setInlineFieldDirty(false);
     setActiveInlineField(null);
+  };
+  const requestInlineDismiss = (event?: KeyboardEvent | PointerEvent) => {
+    if (event instanceof PointerEvent && event.target instanceof Element && event.target.closest("[data-inline-edit-trigger]")) return;
+    if (!activeInlineField) return;
+    if (inlineFieldDirty) {
+      setConfirmInlineClose(true);
+      return;
+    }
+    closeInlineEdit();
   };
   const inlineEditProps = (id: string, label: string) => ({
     fieldId: id,
     editing: activeInlineField?.id === id,
     onRequestEdit: () => requestInlineEdit({ id, label }),
     onDirtyChange: setInlineFieldDirty,
+    onRequestDismiss: requestInlineDismiss,
     onFinish: closeInlineEdit,
     onCancel: closeInlineEdit,
   });
@@ -1308,7 +1330,7 @@ export function CandidateProfile({
   };
 
   const handleTabKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
     current: ProfileTab,
   ) => {
     const currentIndex = visibleProfileTabs.findIndex(
@@ -2595,11 +2617,11 @@ export function CandidateProfile({
       </Drawer>
 
       <ConfirmDialog
-        open={Boolean(pendingInlineField)}
+        open={Boolean(pendingInlineField || confirmInlineClose)}
         title="Discard unsaved change?"
         message={
           <>
-            You changed <strong>{activeInlineField?.label}</strong>. Discard that change before editing <strong>{pendingInlineField?.label}</strong>?
+            You changed <strong>{activeInlineField?.label}</strong>. {pendingInlineField ? <>Discard that change before editing <strong>{pendingInlineField.label}</strong>?</> : <>Discard that change and close the editor?</>}
           </>
         }
         confirmLabel="Discard & continue"
@@ -2607,6 +2629,7 @@ export function CandidateProfile({
         danger
         onCancel={() => {
           setPendingInlineField(null);
+          setConfirmInlineClose(false);
           window.requestAnimationFrame(() => {
             if (activeInlineField) document.getElementById(`candidate-inline-${activeInlineField.id}`)?.focus();
           });
@@ -2614,6 +2637,7 @@ export function CandidateProfile({
         onConfirm={() => {
           const next = pendingInlineField;
           setPendingInlineField(null);
+          setConfirmInlineClose(false);
           setInlineFieldDirty(false);
           setActiveInlineField(next);
         }}
