@@ -674,6 +674,14 @@ function ActionFields({
             />
           </label>
           <label className="text-xs font-semibold sm:col-span-2">
+            Education background
+            <textarea
+              name="education_background"
+              defaultValue={candidate.education_background}
+              className={`${fieldClass} mt-1 min-h-20`}
+            />
+          </label>
+          <label className="text-xs font-semibold sm:col-span-2">
             Work experience
             <textarea
               name="work_experience"
@@ -1914,6 +1922,19 @@ export function CandidateProfile({
                   }
                 />
                 <InlineField
+                  label="Education background"
+                  {...inlineEditProps(
+                    "education_background",
+                    "Education background",
+                  )}
+                  value={candidate.education_background}
+                  multiline
+                  busy={mutation.isPending}
+                  onSave={(value) =>
+                    saveInlineField("education_background", value)
+                  }
+                />
+                <InlineField
                   label="Motivation"
                   {...inlineEditProps("motivation_expectations", "Motivation")}
                   value={candidate.motivation_expectations}
@@ -1973,6 +1994,7 @@ export function CandidateProfile({
                     ],
                     ["Address", candidate.address],
                     ["Previous workplace", candidate.previous_workplace],
+                    ["Education background", candidate.education_background],
                   ]}
                 />
                 <div className="mt-2">

@@ -48,6 +48,7 @@ class CandidateUpdate(StrictModel):
     interests_hobbies: str | None = Field(default=None, max_length=3000)
     preferred_schedule: str | None = Field(default=None, max_length=1000)
     employment_availability: str | None = Field(default=None, max_length=120)
+    education_background: str | None = Field(default=None, max_length=5000)
     work_experience: str | None = Field(default=None, max_length=5000)
     teaching_experience: str | None = Field(default=None, max_length=5000)
     previous_workplace: str | None = Field(default=None, max_length=1000)

@@ -149,6 +149,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /url\.searchParams\.set\("tab", next\)/);
     assert.match(profile, /<Drawer/);
     assert.match(profile, /<InlineField/);
+    assert.match(profile, /education_background/);
+    assert.match(profile, /Education background/);
     assert.match(profile, /expected_version: candidate\.version/);
     assert.match(profile, /Void mistaken result/);
     assert.match(profile, /Read-only audit trail/);

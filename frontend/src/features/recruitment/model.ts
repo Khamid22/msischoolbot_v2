@@ -83,6 +83,7 @@ export type RecruitmentCandidate = {
   interests_hobbies?: string;
   preferred_schedule?: string;
   employment_availability?: string;
+  education_background?: string;
   work_experience?: string;
   teaching_experience?: string;
   previous_workplace?: string;

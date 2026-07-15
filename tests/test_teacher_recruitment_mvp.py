@@ -14,7 +14,12 @@ from pydantic import ValidationError
 from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository, service
 from backend.modules.hr.recruitment.constants import ALL_STAGES, PRIMARY_STAGES, REJECTION_REASONS
-from backend.modules.hr.recruitment.schemas import CandidateCreate, DemoLessonWrite, SubjectTestWrite
+from backend.modules.hr.recruitment.schemas import (
+    CandidateCreate,
+    CandidateUpdate,
+    DemoLessonWrite,
+    SubjectTestWrite,
+)
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -63,6 +68,11 @@ def test_minimal_candidate_and_blank_optional_values_validate():
     )
     assert test.score is None
     assert test.maximum_score is None
+
+    update = CandidateUpdate.model_validate(
+        {"education_background": "  BA in English Education  "}
+    )
+    assert update.education_background == "BA in English Education"
 
 
 def test_demo_score_is_restricted_to_zero_through_ten():
@@ -431,6 +441,17 @@ def test_decision_queue_migration_is_history_preserving_and_partial():
     assert "WHERE status IN ('requested', 'approved')" in source
     assert "DELETE FROM" not in source
     assert "DROP TABLE" not in source.split("def downgrade", 1)[0]
+
+
+def test_candidate_education_migration_preserves_existing_candidates():
+    source = Path(
+        "database/alembic/versions/0021_candidate_education_background.py"
+    ).read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    assert "ADD COLUMN IF NOT EXISTS education_background" in upgrade_source
+    assert "DELETE FROM" not in upgrade_source
+    assert "DROP TABLE" not in upgrade_source
 
 
 def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candidate_loss():

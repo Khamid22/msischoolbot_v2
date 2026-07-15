@@ -24,6 +24,7 @@ _CANDIDATE_COLUMNS = """
     candidate.interests_hobbies,
     candidate.preferred_schedule,
     candidate.employment_availability,
+    candidate.education_background,
     candidate.work_experience,
     candidate.teaching_experience,
     candidate.previous_workplace,
@@ -1188,6 +1189,7 @@ def update_candidate(
         "full_name", "phone", "telegram_username", "applied_position", "subject_id", "application_date",
         "age", "address", "source", "english_level", "motivation_expectations",
         "interests_hobbies", "preferred_schedule", "employment_availability",
+        "education_background",
         "work_experience", "teaching_experience", "previous_workplace",
         "expected_salary_uzs", "available_start_date",
     }
