@@ -132,7 +132,7 @@ class _FakeConn:
                 "legacy_login": "TCH001",
                 "profile_status": "active",
                 "full_name": "Teacher User",
-                "teacher_staff_id": 2,
+                "staff_id": 2,
                 "assigned_group": "IGCSE",
             }
         }
@@ -229,6 +229,7 @@ def test_active_teacher_account_authenticates_to_teacher_workspace():
     result = _authenticate("TCH0001")
     assert result["session"]["auth_role"] == "teacher"
     assert result["session"]["teacher_id"] == 10
+    assert result["session"]["staff_id"] == 2
     assert result["session"]["auth_login"] == "TCH0001"
 
 

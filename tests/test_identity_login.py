@@ -91,20 +91,25 @@ def test_student_login_uses_accounts(client, monkeypatch):
     }
 
 
-def test_teacher_login_is_rejected(client, monkeypatch):
+def test_teacher_login_redirects_to_teacher_workspace(client, monkeypatch):
     import backend.modules.identity.page as identity_routes
 
     _set_csrf_session(client)
     monkeypatch.setattr(
         identity_routes,
         "authenticate_account_password",
-        lambda login, password: None,
+        lambda login, password: _auth_result(
+            "teacher",
+            auth_login="TCH0001",
+            teacher_id=10,
+            staff_id=2,
+        ),
     )
 
     response = _post_login(client, "TCH0001")
 
-    assert response.status_code == 401
-    assert "Invalid login or password" in response.text
+    assert response.status_code == 302
+    assert response.headers["location"] == "/teacher"
 
 
 def test_system_admin_reaches_admin_compatibility(client, monkeypatch):

@@ -25,6 +25,7 @@ export type ReactPageName =
   | "head-of-departments-timetable"
   | "head-of-departments-announcements"
   | "recruitment-workspace"
+  | "teacher-home"
   | "account-security"
   | "unauthorized"
   | "student-not-found";
@@ -61,12 +62,16 @@ const REACT_PAGES = new Set<ReactPageName>([
   "head-of-departments-timetable",
   "head-of-departments-announcements",
   "recruitment-workspace",
+  "teacher-home",
   "account-security",
   "unauthorized",
   "student-not-found",
 ]);
 
-function inferPageFromPath(pathname: string): ReactPageName | null {
+export function inferPageFromPath(pathname: string): ReactPageName | null {
+  if (/^\/teacher\/?$/.test(pathname)) {
+    return "teacher-home";
+  }
   if (/^\/dashboard\/\d+\/chat\/?$/.test(pathname)) {
     return "student-chat";
   }

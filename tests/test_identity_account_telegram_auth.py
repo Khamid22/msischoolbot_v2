@@ -201,7 +201,7 @@ class _FakeConn:
                 "legacy_login": "TCH001",
                 "profile_status": "active",
                 "full_name": "Teacher User",
-                "teacher_staff_id": 2,
+                "staff_id": 2,
                 "assigned_group": "IGCSE",
             }
         }
