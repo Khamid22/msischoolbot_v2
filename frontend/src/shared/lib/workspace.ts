@@ -27,15 +27,6 @@ export type AdminTab =
   | "gradebook"
   | "office_hours";
 export type OverviewGrade = "7" | "8";
-export type WorkspaceMode =
-  | "admin"
-  | "ceo"
-  | "customer_support"
-  | "student"
-  | "parent"
-  | "academic_director"
-  | "head_of_department";
-
 export interface ResourceUploadState {
   active: boolean;
   percent: number;
@@ -47,9 +38,7 @@ export interface InternalOperationsPageProps {
   authLogin?: string;
   authRole?: string;
   authError?: string;
-  adminMode?: WorkspaceMode;
-  previewRole?: WorkspaceMode;
-  devPreviewEnabled?: boolean;
+  adminMode?: string;
   adminNotice?: string;
   adminPanel?: AdminTab;
   adminSchool?: string;
@@ -138,107 +127,26 @@ export const tabs: { key: AdminTab; label: string }[] = [
   { key: "office_hours", label: "Office Hours" },
 ];
 
-export const workspaceModeProfiles: Record<
-  WorkspaceMode,
-  {
-    label: string;
-    shortLabel: string;
-    description: string;
-    tabs: AdminTab[];
-  }
-> = {
-  admin: {
-    label: "Admin",
-    shortLabel: "Admin",
-    description: "Full developer and owner access.",
-    tabs: ["overview", "students", "parents", "teachers", "subjects", "groups", "schedule", "announcements", "resources", "payments", "complaints", "chat"],
-  },
-  ceo: {
-    label: "CEO",
-    shortLabel: "CEO",
-    description: "Performance, schools, staff, and decisions.",
-    tabs: ["overview", "groups", "payments", "complaints"],
-  },
-  customer_support: {
-    label: "Customer Support",
-    shortLabel: "Support",
-    description: "Students, parent communication, payments, and follow-up.",
-    tabs: ["complaints", "students", "parents", "payments"],
-  },
-  student: {
-    label: "Student",
-    shortLabel: "Student",
-    description: "Student dashboard, progress, resources, and communication.",
-    tabs: ["student_dashboard", "student_profile", "student_resources", "student_chat", "student_rating", "student_aap", "student_ar", "student_office_hours"],
-  },
-  parent: {
-    label: "Parent",
-    shortLabel: "Parent",
-    description: "Student progress, announcements, payments, and support.",
-    tabs: ["overview", "announcements", "payments", "contact"],
-  },
-  academic_director: {
-    label: "Academic Director",
-    shortLabel: "Acad Dir",
-    description: "Teachers, groups, curriculum, timetable, quality, and student risk.",
-    tabs: ["teachers", "groups", "schedule", "curriculum", "gradebook", "office_hours", "career_growth"],
-  },
-  head_of_department: {
-    label: "Head of Departments",
-    shortLabel: "HOD",
-    description: "Subject-scoped Teacher Academy management and teacher journeys.",
-    tabs: ["teachers", "schedule", "curriculum", "career_growth"],
-  },
-};
+const adminNavigationTabKeys = new Set<AdminTab>([
+  "overview",
+  "students",
+  "parents",
+  "teachers",
+  "subjects",
+  "groups",
+  "schedule",
+  "announcements",
+  "resources",
+  "payments",
+  "complaints",
+  "chat",
+]);
 
-export const workspaceModes: WorkspaceMode[] = [
-  "admin",
-  "ceo",
-  "customer_support",
-  "student",
-  "parent",
-  "academic_director",
-  "head_of_department",
-];
-
-export function normalizeWorkspaceMode(value: unknown): WorkspaceMode {
-  const normalized = asString(value).toLowerCase().replace(/-/g, "_").replace(/\s+/g, "_");
-  const aliases: Record<string, WorkspaceMode> = {
-    sales: "customer_support",
-    support: "customer_support",
-    customer: "customer_support",
-    customer_support: "customer_support",
-    customer_support_manager: "customer_support",
-    academicdirector: "academic_director",
-    hod: "head_of_department",
-    head: "head_of_department",
-    headofdepartment: "head_of_department",
-  };
-  const aliased = aliases[normalized] || aliases[normalized.replace(/_/g, "")] || normalized;
-  return aliased in workspaceModeProfiles ? (aliased as WorkspaceMode) : "admin";
-}
-
-export function tabsForWorkspaceMode(mode: WorkspaceMode) {
-  const allowedTabs = new Set(workspaceModeProfiles[mode]?.tabs || workspaceModeProfiles.admin.tabs);
-  return tabs
-    .filter((tab) => allowedTabs.has(tab.key))
-    .map((tab) => {
-      if (mode === "parent") {
-        const parentLabels: Partial<Record<AdminTab, string>> = {
-          overview: "Home",
-          announcements: "Updates",
-          contact: "Support",
-        };
-        return parentLabels[tab.key] ? { ...tab, label: parentLabels[tab.key] as string } : tab;
-      }
-      return tab;
-    });
-}
+export const adminNavigationTabs = tabs.filter((tab) => adminNavigationTabKeys.has(tab.key));
 
 // Sidebar grouping. Tabs are bucketed into labelled sections for the admin
-// navigation. This is presentation-only: routes and per-mode permissions still
-// come from `tabsForWorkspaceMode` — `groupTabsBySection` only reorganizes the
-// already-filtered tabs. Any tab not listed in a section falls into a trailing
+// navigation. This is presentation-only: `groupTabsBySection` only reorganizes
+// the already-filtered tabs. Any tab not listed in a section falls into a trailing
 // "More" group so nothing is ever hidden.
 export interface NavSection {
   label: string;
@@ -557,13 +465,9 @@ export function normalizeAdminTab(value: unknown): AdminTab {
   return adminTabKeys.has(normalized) ? (normalized as AdminTab) : "overview";
 }
 
-export function buildAdminTabUrl(tab: AdminTab, school: string, mode?: WorkspaceMode | string) {
+export function buildAdminTabUrl(tab: AdminTab, school: string) {
   const params = new URLSearchParams();
   params.set("panel", tab);
   params.set("school", school || "all");
-  const rawMode = asString(mode);
-  if (rawMode) {
-    params.set("mode", normalizeWorkspaceMode(rawMode));
-  }
   return `/?${params.toString()}`;
 }

@@ -3,7 +3,6 @@ import { routes } from "@/shared/lib/routes";
 import {
   InternalOperationsPageProps,
   AdminTab,
-  WorkspaceMode,
   BlockedUser,
   ChatMsg,
   OverviewGrade,
@@ -20,17 +19,12 @@ import {
   filterGroupsByGrade,
   filterMonthlySeriesByGrade,
   formatMonthKeyLabel,
-  normalizeWorkspaceMode,
   normalizeAdminTab,
+  adminNavigationTabs,
   sortSubjectsMathFirst,
-  tabsForWorkspaceMode,
   trimEmptyMonthlyMonths,
 } from "@/shared/lib/workspace";
 import { JSON_HEADERS, XHR_HEADERS, apiData } from "@/shared/lib/api";
-import {
-  canUseAdminPreviewForRole,
-  clearRolePreviewStorage,
-} from "@/shared/lib/staleUiState";
 
 function preferredSchoolCode(schoolCodes: string[]) {
   if (schoolCodes.includes("sehriyo")) {
@@ -59,16 +53,6 @@ function preferredSubjectName(rows: Array<Record<string, unknown>>) {
   return findPreferredMathSubject(rows.map((row) => asString(row.subject_name)));
 }
 
-function urlWorkspaceMode() {
-  try {
-    return asString(new URLSearchParams(window.location.search).get("mode"));
-  } catch {
-    return "";
-  }
-}
-
-const DEV_PREVIEW_ROLE_KEY = "devPreviewRole";
-const LEGACY_ADMIN_MODE_KEY = "msi_admin_mode";
 const FULL_ACADEMIC_CONTEXT_TABS = new Set<AdminTab>([
   "teachers",
   "curriculum",
@@ -77,38 +61,10 @@ const FULL_ACADEMIC_CONTEXT_TABS = new Set<AdminTab>([
   "career_growth",
 ]);
 
-function serverWorkspaceMode(props: InternalOperationsPageProps) {
-  const realRole = asString(props.authRole || props.adminMode);
-  if (props.devPreviewEnabled && canUseAdminPreviewForRole(realRole)) {
-    return normalizeWorkspaceMode(props.previewRole || props.adminMode || props.authRole || "admin");
-  }
-  return normalizeWorkspaceMode(props.adminMode || props.authRole || "admin");
-}
-
-function storedWorkspaceMode() {
-  try {
-    return (
-      asString(window.localStorage.getItem(DEV_PREVIEW_ROLE_KEY)) ||
-      asString(window.localStorage.getItem(LEGACY_ADMIN_MODE_KEY))
-    );
-  } catch {
-    return "";
-  }
-}
-
 export function useInternalOperationsState(props: InternalOperationsPageProps) {
   const initialTab = normalizeAdminTab(props.adminPanel);
-  const realRole = asString(props.authRole || props.adminMode || props.previewRole);
-  const serverMode = serverWorkspaceMode(props);
-  const allowPreviewMode = Boolean(props.devPreviewEnabled) && canUseAdminPreviewForRole(realRole);
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
-  const [previewRole, setPreviewRoleState] = useState<WorkspaceMode>(() => {
-    if (!allowPreviewMode) {
-      return serverMode;
-    }
-    return normalizeWorkspaceMode(urlWorkspaceMode() || storedWorkspaceMode() || props.previewRole || props.adminMode);
-  });
-  const adminMode = previewRole;
+  const adminMode = "admin";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeStudentRowId, setActiveStudentRowId] = useState(() => {
     try {
@@ -254,33 +210,7 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
   const [chatLoading, setChatLoading] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [blockReason, setBlockReason] = useState("");
-  const visibleTabs = tabsForWorkspaceMode(adminMode);
-
-  useEffect(() => {
-    if (!allowPreviewMode) {
-      clearRolePreviewStorage();
-      if (serverMode !== adminMode) {
-        setPreviewRoleState(serverMode);
-      }
-      return;
-    }
-    const serverPreviewMode = asString(props.previewRole || props.adminMode);
-    const clientMode = urlWorkspaceMode() || storedWorkspaceMode();
-    if (clientMode) {
-      const normalizedClientMode = normalizeWorkspaceMode(clientMode);
-      if (normalizedClientMode !== adminMode) {
-        setPreviewRoleState(normalizedClientMode);
-      }
-      return;
-    }
-    if (!serverPreviewMode) {
-      return;
-    }
-    const normalizedMode = normalizeWorkspaceMode(serverPreviewMode);
-    if (normalizedMode !== adminMode) {
-      setPreviewRoleState(normalizedMode);
-    }
-  }, [adminMode, allowPreviewMode, props.adminMode, props.previewRole, realRole, serverMode]);
+  const visibleTabs = adminNavigationTabs;
 
   function clearResourceUploadResetTimer() {
     if (resourceUploadResetTimerRef.current !== null) {
@@ -510,12 +440,12 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
     }
     const fallbackTab = visibleTabs[0]?.key || "overview";
     setActiveTab(fallbackTab);
-    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, allowPreviewMode ? adminMode : "");
+    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.history.replaceState({}, "", nextUrl);
     }
-  }, [activeTab, adminMode, currentSchool, visibleTabs]);
+  }, [activeTab, currentSchool, visibleTabs]);
 
   useEffect(() => {
     if (Array.isArray(props.adminResources)) {
@@ -784,12 +714,6 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       setActiveTab(normalizeAdminTab(params.get("panel")));
-      const modeParam = params.get("mode");
-      if (modeParam && allowPreviewMode) {
-        setPreviewRoleState(normalizeWorkspaceMode(modeParam));
-      } else if (!allowPreviewMode) {
-        setPreviewRoleState(serverMode);
-      }
       setActiveStudentRowId(Math.max(0, Math.floor(Number(params.get("student") || 0))));
       setMobileNavOpen(false);
     };
@@ -797,7 +721,7 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [allowPreviewMode, serverMode]);
+  }, []);
 
   useEffect(() => {
     if (!isSubmittingResource) {
@@ -827,33 +751,7 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
   function switchAdminTab(nextTab: AdminTab) {
     setActiveTab(nextTab);
     setMobileNavOpen(false);
-    const nextUrl = buildAdminTabUrl(nextTab, currentSchool, allowPreviewMode ? adminMode : "");
-    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    if (nextUrl !== currentUrl) {
-      window.history.pushState({}, "", nextUrl);
-    }
-  }
-
-  function switchWorkspaceMode(nextMode: WorkspaceMode | string) {
-    if (!allowPreviewMode) {
-      setPreviewRoleState(serverMode);
-      setActiveTab(tabsForWorkspaceMode(serverMode)[0]?.key || "overview");
-      setMobileNavOpen(false);
-      clearRolePreviewStorage();
-      return;
-    }
-    const normalizedMode = normalizeWorkspaceMode(nextMode);
-    const nextTabs = tabsForWorkspaceMode(normalizedMode);
-    const fallbackTab = nextTabs[0]?.key || "overview";
-    setPreviewRoleState(normalizedMode);
-    setActiveTab(fallbackTab);
-    setMobileNavOpen(false);
-    try {
-      window.localStorage.setItem(DEV_PREVIEW_ROLE_KEY, normalizedMode);
-      window.localStorage.removeItem(LEGACY_ADMIN_MODE_KEY);
-    } catch {
-    }
-    const nextUrl = buildAdminTabUrl(fallbackTab, currentSchool, normalizedMode);
+    const nextUrl = buildAdminTabUrl(nextTab, currentSchool);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     if (nextUrl !== currentUrl) {
       window.history.pushState({}, "", nextUrl);
@@ -1080,7 +978,6 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
   return {
     props: {
       ...props,
-      previewRole,
       adminMode,
       adminTeachers: teachers,
       adminTeacherAcademy: academyTeachers,
@@ -1096,7 +993,6 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
       adminAcademicEnrollmentSummary: academicContext.enrollmentSummary,
       adminAcademicContextMode: academicContextMode,
     },
-    previewRole,
     adminMode,
     visibleTabs,
     activeTab,
@@ -1196,7 +1092,6 @@ export function useInternalOperationsState(props: InternalOperationsPageProps) {
     monthlySeries,
     monthlyChartData,
     switchAdminTab,
-    switchWorkspaceMode,
     refreshResources,
     saveEditResource,
     submitResourceForm,

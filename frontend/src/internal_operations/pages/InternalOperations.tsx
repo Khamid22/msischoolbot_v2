@@ -30,9 +30,7 @@ import { withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { routes } from "@/shared/lib/routes";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import {
-  WorkspaceMode,
   InternalOperationsPageProps,
-  workspaceModeProfiles,
   asNumber,
   asString,
   groupTabsBySection,
@@ -463,12 +461,6 @@ function InternalOperationsSidebar({
   compact?: boolean;
   onClose?: () => void;
 }) {
-  const activeWorkspaceMode: WorkspaceMode =
-    state.adminMode && workspaceModeProfiles[state.adminMode as WorkspaceMode]
-      ? (state.adminMode as WorkspaceMode)
-      : "admin";
-  const activeAdminProfile = workspaceModeProfiles[activeWorkspaceMode];
-
   return (
     <aside
       className={
@@ -545,7 +537,7 @@ function InternalOperationsSidebar({
           <div className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-sm font-medium text-white">Khamid A.</span>
             <span className="block truncate text-xs text-slate-400">
-              {activeAdminProfile.label} mode
+              Admin
             </span>
           </div>
           <a

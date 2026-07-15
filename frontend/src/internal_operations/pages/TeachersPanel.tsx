@@ -95,7 +95,7 @@ export default function TeachersPanel({ state }: { state: any }) {
       window.history.replaceState(
         {},
         "",
-        buildAdminTabUrl("teachers", currentSchool, state.adminMode),
+        buildAdminTabUrl("teachers", currentSchool),
       );
     }
   }
@@ -318,7 +318,7 @@ export default function TeachersPanel({ state }: { state: any }) {
                             </button>
                           ) : null}
                           <a
-                            href={routes.adminTeacherEdit(asNumber(teacher.id), currentSchool, state.adminMode)}
+                            href={routes.adminTeacherEdit(asNumber(teacher.id), currentSchool)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
                             aria-label={`Edit ${asString(teacher.full_name)}`}
                           >

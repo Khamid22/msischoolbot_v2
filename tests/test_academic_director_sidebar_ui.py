@@ -482,10 +482,12 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert 'active="academy"' in academy_source
     assert "HeadOfDepartmentPageShell" in hod_academy_source
     assert 'active="academy"' in hod_academy_source
-    assert "allowTeacherPreview={false}" in academy_source
-    assert "if (!allowTeacherPreview)" in Path(
+    academy_panel_source = Path(
         "frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx"
     ).read_text()
+    assert "allowTeacherPreview" not in academy_source
+    assert "allowTeacherPreview" not in academy_panel_source
+    assert "Preview as Teacher" not in academy_panel_source
     assert '"academic-director-academy"' in app_source
     assert '"academic-director-head-of-departments"' in app_source
     assert '"academic-director-groups"' in app_source
@@ -508,7 +510,8 @@ def test_academic_director_shell_source_contains_sidebar_profile_logout_and_mobi
     assert '"head-of-departments-announcements"' in bootstrap_source
     assert '"previewRole"' not in admin_page_source
     assert '"devPreviewEnabled"' not in admin_page_source
-    assert 'resolved_admin_mode = "admin"' in admin_page_source
+    assert '"adminMode": "admin"' in admin_page_source
+    assert "requested_mode" not in admin_page_source
 
 
 def test_academic_director_academy_uses_single_shell_source():

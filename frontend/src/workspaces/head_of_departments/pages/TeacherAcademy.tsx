@@ -93,7 +93,6 @@ export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartme
           onAcademyChange={setAcademyTeachers}
           onTeachersChange={setTeachers}
           showToast={showToast}
-          allowTeacherPreview={false}
         />
       </Suspense>
 

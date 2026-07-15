@@ -28,14 +28,26 @@ def test_teacher_academy_has_mobile_cards_and_desktop_table():
 def test_head_of_departments_workspace_uses_exact_folder_and_shared_shell():
     source = _read("workspaces/head_of_departments/pages/TeacherAcademy.tsx")
     assert "HeadOfDepartmentPageShell" in source
-    assert "allowTeacherPreview={false}" in source
+    assert "allowTeacherPreview" not in source
     assert not (ROOT / "workspaces/head_of_department").exists()
 
 
-def test_academic_director_workspace_disables_teacher_portal_preview():
+def test_academic_director_workspace_has_no_teacher_portal_preview():
     source = _read("workspaces/academic_director/pages/TeacherAcademy.tsx")
     assert "AcademicDirectorPageShell" in source
-    assert "allowTeacherPreview={false}" in source
+    assert "allowTeacherPreview" not in source
+
+
+def test_obsolete_admin_role_previews_are_deleted():
+    academy = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
+    state = _read("internal_operations/hooks/useInternalOperationsState.ts")
+    workspace = _read("shared/lib/workspace.ts")
+    assert "Preview as Teacher" not in academy
+    assert "switchWorkspaceMode" not in state
+    assert "previewRole" not in state
+    assert "devPreviewEnabled" not in workspace
+    assert not (ROOT / "features/reporting/overview/RoleOverviewPanel.tsx").exists()
+    assert not (ROOT / "shared/lib/staleUiState.ts").exists()
 
 
 def test_shared_responsive_components_remain_available():

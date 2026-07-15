@@ -1396,14 +1396,12 @@ function AcademyDetailModal({
   submitting,
   error,
   onClose,
-  onPreview,
   onAssess,
   onReview,
   onReschedule,
   onDeleteAssessment,
   onPromote,
   onSyncLessons,
-  allowTeacherPreview,
   canEditLessons,
   canAssess,
   canSchedule,
@@ -1415,14 +1413,12 @@ function AcademyDetailModal({
   submitting: boolean;
   error: string;
   onClose: () => void;
-  onPreview: () => void;
   onAssess: (assignment: AcademyAssignment) => void;
   onReview: (assignment: AcademyAssignment, report: Record<string, unknown>) => void;
   onReschedule: (assignment: AcademyAssignment) => void;
   onDeleteAssessment: (assessment: Record<string, unknown>) => void;
   onPromote: () => void;
   onSyncLessons: (selectedIds: number[]) => Promise<boolean>;
-  allowTeacherPreview: boolean;
   canEditLessons: boolean;
   canAssess: boolean;
   canSchedule: boolean;
@@ -1498,17 +1494,10 @@ function AcademyDetailModal({
           {metric("Average", progress.average == null ? "-" : progress.average.toFixed(2), "weighted score")}
           {metric("Latest", progress.latest == null ? "-" : progress.latest.toFixed(2), "last report")}
         </div>
-        <div className="mt-3 grid gap-2 rounded-xl border border-primary/10 bg-primary/5 p-3 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="mt-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher account login</p>
             <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created yet"}</p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Default password</p>
-            <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created yet"}</p>
-          </div>
-          <div className="flex items-center rounded-lg bg-background px-3 py-2 text-[11px] font-bold text-muted-foreground">
-            Default password equals login.
           </div>
         </div>
 
@@ -1533,12 +1522,6 @@ function AcademyDetailModal({
             })}
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-            {allowTeacherPreview ? (
-              <button type="button" onClick={onPreview} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-bold text-primary hover:bg-primary/10">
-                <Eye className="h-3.5 w-3.5" />
-                Preview as Teacher
-              </button>
-            ) : null}
             {canPromote && asString(teacher.academy_status) === "ready_for_active_teacher" ? (
               <button type="button" onClick={onPromote} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-primary-foreground">
                 <Trophy className="h-3.5 w-3.5" />
@@ -1681,14 +1664,12 @@ function AcademyDetailModal({
 
 function AcademyTeacherCard({
   teacher,
-  allowTeacherPreview,
   canSchedule,
   canAssess,
   canPromote,
   canDelete,
   canManageAccount,
   canOnboard,
-  onPreview,
   onDetail,
   onSchedule,
   onAssess,
@@ -1699,14 +1680,12 @@ function AcademyTeacherCard({
   onCopyLogin,
 }: {
   teacher: AcademyTeacher;
-  allowTeacherPreview: boolean;
   canSchedule: boolean;
   canAssess: boolean;
   canPromote: boolean;
   canDelete: boolean;
   canManageAccount: boolean;
   canOnboard: boolean;
-  onPreview: () => void;
   onDetail: () => void;
   onSchedule: (assignment: AcademyAssignment) => void;
   onAssess: (assignment: AcademyAssignment) => void;
@@ -1772,14 +1751,6 @@ function AcademyTeacherCard({
       label: "Account access",
       icon: <KeyRound className="h-4 w-4" />,
       onClick: onAccount,
-    });
-  }
-  if (allowTeacherPreview) {
-    secondaryActions.push({
-      key: "preview",
-      label: "Preview",
-      icon: <Eye className="h-4 w-4" />,
-      onClick: onPreview,
     });
   }
   if (canPromote && status === "ready_for_active_teacher") {
@@ -2066,14 +2037,12 @@ export function TeacherAcademyPanel({
   onAcademyChange,
   onTeachersChange,
   showToast,
-  allowTeacherPreview = false,
 }: {
   state: any;
   academyTeachers: AcademyTeacher[];
   onAcademyChange: (rows: AcademyTeacher[]) => void;
   onTeachersChange: (rows: Array<Record<string, unknown>>) => void;
   showToast: (message: string, tone?: ToastTone) => void;
-  allowTeacherPreview?: boolean;
 }) {
   const csrf = asString(state.props?.csrfToken);
   const [createOpen, setCreateOpen] = useState(false);
@@ -2367,25 +2336,6 @@ export function TeacherAcademyPanel({
     }
   }
 
-  function previewAsTeacher(teacher: AcademyTeacher) {
-    if (!allowTeacherPreview) {
-      return;
-    }
-    const previewKey = `academy:${asNumber(teacher.id)}`;
-    if (typeof state.selectTeacherPreview === "function") {
-      state.selectTeacherPreview(previewKey);
-    } else {
-      try {
-        window.localStorage.setItem("msi_teacher_preview_key", previewKey);
-        window.localStorage.removeItem("msi_teacher_preview_id");
-      } catch {
-      }
-    }
-    if (typeof state.switchWorkspaceMode === "function") {
-      state.switchWorkspaceMode("teacher");
-    }
-  }
-
   function openPromote(teacher: AcademyTeacher) {
     if (!canPromoteAcademyTeacher) {
       showToast("Promotion is available to Academic Director or Admin.", "danger");
@@ -2504,8 +2454,6 @@ export function TeacherAcademyPanel({
           submitting={submitting}
           error={error}
           onClose={() => setDetailTeacher(null)}
-          onPreview={() => previewAsTeacher(detailTeacher)}
-          allowTeacherPreview={allowTeacherPreview}
           onAssess={(nextAssignment) => {
             setError("");
             setAssessmentTarget({ teacher: detailTeacher, assignment: nextAssignment });
@@ -3020,13 +2968,11 @@ export function TeacherAcademyPanel({
                     <AcademyTeacherCard
                       key={asNumber(teacher.id)}
                       teacher={teacher}
-                      allowTeacherPreview={allowTeacherPreview}
                       canSchedule={canScheduleAcademyLesson}
                       canAssess={canAssessAcademyLesson}
                       canDelete={canDeleteAcademyTeacher}
                       canManageAccount={isAcademicDirectorMode}
                       canOnboard={canOnboardRecruitmentTeacher}
-                      onPreview={() => previewAsTeacher(teacher)}
                       onDetail={() => setDetailTeacher(teacher)}
                       onSchedule={(targetAssignment) => setScheduleTarget({ teacher, assignment: targetAssignment })}
                       onAssess={(targetAssignment) => setAssessmentTarget({ teacher, assignment: targetAssignment })}
@@ -3104,14 +3050,6 @@ export function TeacherAcademyPanel({
                           label: "Account access",
                           icon: <KeyRound className="h-4 w-4" />,
                           onClick: () => openActiveTeacherAccount(teacher),
-                        });
-                      }
-                      if (allowTeacherPreview) {
-                        rowActions.push({
-                          key: "preview",
-                          label: "Preview",
-                          icon: <Eye className="h-4 w-4" />,
-                          onClick: () => previewAsTeacher(teacher),
                         });
                       }
                       if (canPromoteAcademyTeacher && status === "ready_for_active_teacher") {

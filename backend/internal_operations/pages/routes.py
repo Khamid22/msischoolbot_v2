@@ -64,18 +64,14 @@ def register_internal_operations_page_routes(
         admin_panel="overview",
         admin_teacher_edit=None,
         admin_school="all",
-        admin_mode="",
     ):
         timer = PagePerformanceTimer()
         requested_panel = str(request.args.get("panel", "") or "").strip()
         requested_school = str(request.args.get("school", "") or "").strip()
-        requested_mode = str(request.args.get("mode", "") or "").strip().lower()
         if requested_panel and str(admin_panel or "overview").strip().lower() == "overview":
             admin_panel = requested_panel
         if requested_school and str(admin_school or "all").strip().lower() == "all":
             admin_school = requested_school
-        if not str(admin_mode or "").strip():
-            admin_mode = requested_mode
         pre_context_mode = "admin"
         normalized_panel = str(admin_panel or "overview").strip().lower()
         defer_overview_lists = (
@@ -136,8 +132,6 @@ def register_internal_operations_page_routes(
             session["admin_last_panel"] = panel
             session["admin_last_school"] = school_filter
 
-        resolved_admin_mode = "admin"
-
         response = render_react_page(
             "internal-operations-home",
             {
@@ -146,7 +140,7 @@ def register_internal_operations_page_routes(
                 "authError": auth_error or (page_context["sync_errors"][0] if page_context["sync_errors"] else ""),
                 "adminNotice": admin_notice or page_context["load_error"] or "",
                 "adminPanel": panel,
-                "adminMode": resolved_admin_mode,
+                "adminMode": "admin",
                 "adminSchool": school_filter,
                 "adminStudents": page_context["admin_students"],
                 "adminTeachers": page_context["admin_teachers"],
@@ -262,7 +256,6 @@ def register_internal_operations_page_routes(
         return render_admin_page(
             admin_panel=str(request.args.get("panel") or "overview"),
             admin_school=str(request.args.get("school") or "all"),
-            admin_mode=str(request.args.get("mode") or ""),
         )
 
     register_academic_admin_routes(

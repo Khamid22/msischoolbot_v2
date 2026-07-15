@@ -93,7 +93,6 @@ export default function AcademicDirectorTeacherAcademyPage(props: AcademicDirect
           onAcademyChange={setAcademyTeachers}
           onTeachersChange={setTeachers}
           showToast={showToast}
-          allowTeacherPreview={false}
         />
       </Suspense>
 

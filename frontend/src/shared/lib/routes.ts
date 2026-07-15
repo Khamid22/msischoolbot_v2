@@ -39,10 +39,8 @@ export const routes = {
   adminTeacherCreate: "/admin/teachers",
   adminTeacherUpdate: (teacherId: number | string) => `/admin/teachers/${teacherId}`,
   adminTeacherDelete: (teacherId: number | string) => `/admin/teachers/${teacherId}/delete`,
-  adminTeacherEdit: (teacherId: number | string, school = "all", mode = "") =>
-    `/internal/operations?panel=teachers&school=${encodeURIComponent(String(school || "all"))}${
-      mode ? `&mode=${encodeURIComponent(String(mode))}` : ""
-    }&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
+  adminTeacherEdit: (teacherId: number | string, school = "all") =>
+    `/internal/operations?panel=teachers&school=${encodeURIComponent(String(school || "all"))}&edit_teacher_id=${encodeURIComponent(String(teacherId))}`,
   academicDirectorOverview: "/academic-director",
   academicDirectorTeacherAcademy: "/academic-director/teacher-academy",
   academicDirectorHeadOfDepartments: "/academic-director/head-of-departments",
