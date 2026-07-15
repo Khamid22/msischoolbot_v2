@@ -13,10 +13,13 @@ function projectSource(relativePath: string) {
 describe("compact recruitment pipeline", () => {
   const pipeline = source("PipelineView.tsx");
 
-  test("uses drag plus an accessible menu instead of a permanent card selector", () => {
-    assert.match(pipeline, /<ActionMenu items=\{items\}/);
-    assert.match(pipeline, /draggable/);
-    assert.match(pipeline, /MoveCandidateDialog/);
+  test("makes the whole card draggable without dotted handle or menu controls", () => {
+    assert.match(pipeline, /<article[\s\S]*draggable=\{canMove\}/);
+    assert.match(pipeline, /draggedCandidateRef/);
+    assert.doesNotMatch(pipeline, /GripVertical/);
+    assert.doesNotMatch(pipeline, /<ActionMenu/);
+    assert.doesNotMatch(pipeline, /MoveCandidateDialog/);
+    assert.doesNotMatch(pipeline, /The dragged candidate could not be read/);
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
