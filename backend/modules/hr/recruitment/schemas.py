@@ -33,6 +33,7 @@ class CandidateCreate(StrictModel):
 
 
 class CandidateUpdate(StrictModel):
+    expected_version: OptionalInt = Field(default=None, ge=1)
     full_name: str | None = Field(default=None, min_length=1, max_length=200)
     phone: str | None = Field(default=None, max_length=80)
     telegram_username: str | None = Field(default=None, max_length=120)
@@ -58,6 +59,12 @@ class StageChange(StrictModel):
     stage: str = Field(min_length=1, max_length=80)
     expected_version: int = Field(ge=1)
     reason: str = Field(default="", max_length=2000)
+
+
+class CandidateHold(StrictModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=5000)
+    application_date: OptionalDate = None
 
 
 class AppointmentFields(StrictModel):
@@ -163,6 +170,10 @@ class FinalDecisionCreate(StrictModel):
     approval_id: OptionalInt = Field(default=None, ge=1)
 
 
+class EvaluationVoid(StrictModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
 class RecruitmentSettingCreate(StrictModel):
     category: str = Field(pattern="^(source|rejection_reason)$")
     label: str = Field(min_length=1, max_length=120)
@@ -187,8 +198,10 @@ __all__ = [
     "AppointmentUpdate",
     "AssignmentReplace",
     "CandidateCreate",
+    "CandidateHold",
     "CandidateUpdate",
     "DemoLessonWrite",
+    "EvaluationVoid",
     "FinalDecisionCreate",
     "InterviewWrite",
     "NoteCreate",

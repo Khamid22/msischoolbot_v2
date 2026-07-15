@@ -40,13 +40,15 @@ def _user(role="hr_manager"):
 def test_stage_and_rejection_taxonomies_are_stable():
     assert PRIMARY_STAGES == (
         "new_candidate",
+        "responded",
         "job_interview",
         "test_and_demo",
         "under_review",
+        "on_hold",
         "teacher_academy",
         "active_teacher",
     )
-    assert ALL_STAGES == {*PRIMARY_STAGES, "rejected", "on_hold", "candidate_withdrew", "trash_bin"}
+    assert ALL_STAGES == {*PRIMARY_STAGES, "rejected", "candidate_withdrew", "trash_bin"}
     assert "other" in REJECTION_REASONS
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
@@ -89,7 +91,7 @@ def test_hod_summary_visibility_fails_closed_without_subject_scope():
 
 
 def test_protected_stage_and_decision_rules_fail_before_persistence():
-    with pytest.raises(service.RecruitmentError, match="final decision"):
+    with pytest.raises(service.RecruitmentError, match="protected outcome"):
         service.move_candidate(
             _user(), 1, stage="active_teacher", expected_version=1
         )
@@ -181,7 +183,7 @@ def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, mon
     monkeypatch.setattr(
         service,
         "list_pipeline",
-        lambda user: {"stages": {}, "counts": {}, "total": 0, "role": user.role},
+        lambda user, **_filters: {"stages": {}, "counts": {}, "total": 0, "role": user.role},
     )
     _set_session(client, "hr_manager", account_id=10, staff_id=20)
     allowed = client.get("/api/v1/recruitment/pipeline", headers=XHR)

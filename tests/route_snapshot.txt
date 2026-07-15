@@ -161,15 +161,19 @@
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests/{approval_id}/review | POST
 /api/v1/recruitment/candidates/{candidate_id}/assignments | PUT
 /api/v1/recruitment/candidates/{candidate_id}/demo-lessons | POST
+/api/v1/recruitment/candidates/{candidate_id}/demo-lessons/{attempt_id}/void | POST
 /api/v1/recruitment/candidates/{candidate_id}/documents | POST
 /api/v1/recruitment/candidates/{candidate_id}/documents/{document_id} | DELETE
 /api/v1/recruitment/candidates/{candidate_id}/documents/{document_id}/open | GET
 /api/v1/recruitment/candidates/{candidate_id}/final-decisions | POST
+/api/v1/recruitment/candidates/{candidate_id}/hold | POST
 /api/v1/recruitment/candidates/{candidate_id}/interviews | POST
+/api/v1/recruitment/candidates/{candidate_id}/interviews/{attempt_id}/void | POST
 /api/v1/recruitment/candidates/{candidate_id}/notes | POST
 /api/v1/recruitment/candidates/{candidate_id}/scheduled-stage-moves | POST
 /api/v1/recruitment/candidates/{candidate_id}/stage | POST
 /api/v1/recruitment/candidates/{candidate_id}/subject-tests | POST
+/api/v1/recruitment/candidates/{candidate_id}/subject-tests/{attempt_id}/void | POST
 /api/v1/recruitment/candidates/{candidate_id}/tasks | POST
 /api/v1/recruitment/candidates/{candidate_id}/tasks/{task_id} | PUT
 /api/v1/recruitment/decision-queue | GET
@@ -231,6 +235,7 @@
 /hr-manager/candidates/{candidate_id} | GET
 /hr-manager/pipeline | GET
 /hr-manager/profile | GET
+/hr-manager/rejected | GET
 /hr-manager/schedule | GET
 /hr-manager/settings | GET
 /hr-manager/tasks | GET

@@ -23,31 +23,45 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
-  test("uses a single-stage mobile view and six compact desktop columns", () => {
+  test("uses a single-stage mobile view and eight independently scrolling desktop columns", () => {
     assert.match(pipeline, /md:hidden/);
-    assert.match(pipeline, /grid min-w-\[1230px\] grid-cols-6/);
-    assert.match(pipeline, /min-h-60/);
+    assert.match(pipeline, /grid min-w-\[1600px\] grid-cols-8/);
+    assert.match(pipeline, /overflow-y-auto/);
+    assert.match(pipeline, /h-\[calc\(100dvh-20rem\)\]/);
     assert.match(pipeline, /dragOverStage/);
   });
 
-  test("reveals CRM outcome targets during a drag and confirms audited decisions", () => {
+  test("reveals only Trash Bin and Reject targets during a drag", () => {
     assert.match(pipeline, /Candidate outcome drop targets/);
-    assert.match(pipeline, /\["trash_bin", "on_hold", "candidate_withdrew", "rejected"\]/);
-    assert.match(pipeline, /label: "Trash Bin"/);
-    assert.match(pipeline, /border-blue-500\/40 bg-blue-500\/10/);
-    assert.match(pipeline, /border-rose-300\/60 bg-rose-100\/60/);
-    assert.match(pipeline, /move\.mutate\(\{ candidate, stage: decision \}\)/);
-    assert.match(pipeline, /<OutcomeDialog/);
+    assert.match(pipeline, /\["trash_bin", "rejected"\]/);
+    assert.match(pipeline, /target === "trash_bin" \? "Trash Bin" : "Reject"/);
+    assert.match(pipeline, /setRejectSelection/);
     assert.match(pipeline, /\/final-decisions/);
+    assert.doesNotMatch(pipeline, /\["trash_bin", "on_hold", "candidate_withdrew", "rejected"\]/);
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
   });
 
-  test("requires a scheduler before entering Interview or Test & Demo", () => {
+  test("moves first and schedules Interview or Demo from the yellow warning", () => {
     assert.match(pipeline, /<AppointmentForm/);
-    assert.match(pipeline, /\/scheduled-stage-moves/);
-    assert.match(pipeline, /Schedule & move/);
+    assert.match(pipeline, /Interview not scheduled/);
+    assert.match(pipeline, /Demo lesson not scheduled/);
+    assert.match(pipeline, /\/appointments/);
+    assert.doesNotMatch(pipeline, /\/scheduled-stage-moves/);
+    assert.doesNotMatch(pipeline, /Schedule & move/);
     assert.match(pipeline, /appointmentConflictDetails/);
     assert.match(pipeline, /setScheduleSelection/);
+  });
+
+  test("renders the seven-segment filtered percentage summary without a chart dependency", () => {
+    assert.match(pipeline, /const chartStages = \[/);
+    for (const stage of ["new_candidate", "responded", "on_hold", "job_interview", "test_and_demo", "teacher_academy", "active_teacher"]) {
+      assert.match(pipeline, new RegExp(`stage: "${stage}"`));
+    }
+    assert.match(pipeline, /Pipeline distribution\. Total/);
+    assert.match(pipeline, /h-2\.5/);
+    assert.match(pipeline, /100 - floorTotal/);
+    assert.match(pipeline, /\{item\.percentage\}%/);
+    assert.doesNotMatch(pipeline, /recharts|chart\.js/i);
   });
 });
 
@@ -56,15 +70,20 @@ describe("candidate navigation and progressive disclosure", () => {
   const list = source("CandidateListView.tsx");
   const workspace = source("RecruitmentWorkspace.tsx");
 
-  test("exposes exactly the five URL-backed profile tabs", () => {
-    for (const tab of ["overview", "evaluations", "documents", "hiring", "activity"]) {
+  test("gives HR four URL-backed tabs, inline editing, voidable evaluations, and a history drawer", () => {
+    for (const tab of ["overview", "evaluations", "documents", "hiring"]) {
       assert.match(profile, new RegExp(`key: "${tab}"`));
     }
+    assert.match(profile, /const hrProfileTabs = profileTabs\.filter\(\(item\) => item\.key !== "activity"\)/);
     assert.match(profile, /url\.searchParams\.set\("tab", next\)/);
     assert.match(profile, /<Drawer/);
+    assert.match(profile, /<InlineField/);
+    assert.match(profile, /expected_version: candidate\.version/);
+    assert.match(profile, /Void mistaken result/);
+    assert.match(profile, /Read-only audit trail/);
     assert.match(profile, /value="trash_bin"/);
-    assert.match(profile, /Trash Bin is recoverable/);
-    assert.match(profile, /\/scheduled-stage-moves/);
+    assert.match(profile, /appointments are scheduled separately after the move/);
+    assert.doesNotMatch(profile, /\/scheduled-stage-moves/);
     assert.match(profile, /candidate\.next_appointment/);
     assert.match(profile, /Upcoming appointments/);
   });
@@ -107,9 +126,19 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(trash, /origin=trash/);
     assert.doesNotMatch(trash, /All stages|Candidate filters|filters\.stage/);
     assert.match(profile, /origin === "trash" \? `\$\{basePath\}\/trash/);
-    assert.ok(workspace.indexOf('key: "schedule"') < workspace.indexOf('key: "tasks"'));
-    assert.ok(workspace.indexOf('key: "tasks"') < workspace.indexOf('key: "trash"'));
+    assert.ok(workspace.indexOf('key: "schedule"') < workspace.indexOf('key: "rejected"'));
+    assert.ok(workspace.indexOf('key: "rejected"') < workspace.indexOf('key: "trash"'));
     assert.ok(workspace.indexOf('key: "trash"') < workspace.indexOf('key: "settings"'));
+  });
+
+  test("uses the lean HR navigation and dedicated Rejected/Withdrawn tabs", () => {
+    const rejected = source("RejectedCandidatesView.tsx");
+    const hrNav = workspace.match(/if \(effectiveRole === "hr_manager"\) return \[[\s\S]*?key: "settings"[\s\S]*?\];/)?.[0] || "";
+    for (const label of ["Pipeline", "Schedule", "Rejected", "Trash Bin", "Settings"]) assert.match(hrNav, new RegExp(`label: "${label}"`));
+    assert.doesNotMatch(hrNav, /label: "Candidates"|label: "Tasks"/);
+    assert.match(rejected, /type OutcomeTab = "rejected" \| "candidate_withdrew"/);
+    assert.match(rejected, /origin_stage/);
+    assert.match(rejected, /reason_detail/);
   });
 
   test("opens Academic Director Recruitment on a compact decision queue", () => {
@@ -131,6 +160,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /appointment_type/);
     assert.match(schedule, /responsible_account_id/);
     assert.match(schedule, /Asia\/Tashkent/);
+    assert.match(schedule, /scheduleDayLabel\(day\)/);
+    assert.match(schedule, /appointmentTimeLabel\(item\)/);
+    assert.match(schedule, /min-w-\[70rem\]/);
+    assert.doesNotMatch(schedule, /dateLabel\(schoolDayStartIso\(day\)\)/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
   });
 });

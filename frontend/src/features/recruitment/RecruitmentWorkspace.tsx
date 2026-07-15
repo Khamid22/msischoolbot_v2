@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { Ban, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -6,6 +6,7 @@ import { CandidateListView } from "@/features/recruitment/CandidateListView";
 import { CandidateProfile } from "@/features/recruitment/CandidateProfile";
 import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
 import { PipelineView } from "@/features/recruitment/PipelineView";
+import { RejectedCandidatesView } from "@/features/recruitment/RejectedCandidatesView";
 import { ScheduleView } from "@/features/recruitment/ScheduleView";
 import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
@@ -56,7 +57,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
           <label className="text-xs font-semibold">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Phone<input name="phone" type="tel" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Applied position<input name="applied_position" className={`${fieldClass} mt-1`} /></label>
-          <label className="text-xs font-semibold">Application date<input name="application_date" type="date" className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)} className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Source<select name="source" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
           <label className="text-xs font-semibold">Initial note<textarea name="comment" className={`${fieldClass} mt-1 min-h-24`} /></label>
         </ModalBody>
@@ -71,7 +72,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const { toast, showToast, clearToast } = useFloatingToast();
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
-  const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
+  const active = view === "candidate" ? (effectiveRole === "hr_manager" ? "pipeline" : "candidates") : view === "profile" ? "profile" : view;
   const navItems = useMemo(() => {
     if (effectiveRole === "academic_director") return [
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
@@ -79,19 +80,22 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
         { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
       ];
+    if (effectiveRole === "hr_manager") return [
+      { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+      { key: "rejected", label: "Rejected", href: `${basePath}/rejected`, icon: Ban },
+      { key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 },
+      { key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 },
+    ];
     const items = [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
       { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+      { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
     ];
-    items.splice(2, 0, { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays });
-    if (effectiveRole === "hr_manager") {
-      items.push({ key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 });
-      items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
-    }
     return items;
   }, [basePath, effectiveRole]);
-  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -119,22 +123,22 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Teacher Recruitment</p>
             <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
-            {view === "pipeline" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Move candidates through a manual, auditable hiring workflow.</p> : null}
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
             {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Manage upcoming job interviews and demo lessons in Asia/Tashkent time.</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
-          {effectiveRole === "hr_manager" && !["profile", "settings", "trash"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
+          {effectiveRole === "hr_manager" && view === "pipeline" ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
       ) : null}
 
       <FloatingToast toast={toast} onClose={clearToast} />
 
-      {view === "pipeline" ? <PipelineView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
+      {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
+      {view === "rejected" && effectiveRole === "hr_manager" ? <RejectedCandidatesView basePath={basePath} /> : null}
       {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}

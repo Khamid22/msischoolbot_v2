@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
 import { appointmentConflictDetails, formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, type RecruitmentAppointment, type RecruitmentOptions, type RecruitmentRole } from "@/features/recruitment/model";
+import { dateLabel, type RecruitmentAppointment, type RecruitmentOptions, type RecruitmentRole } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, buttonClass, fieldClass, queryError, rememberRecruitmentReturn, replaceUrlParams, restoreRecruitmentReturn, secondaryButtonClass } from "@/features/recruitment/ui";
 import { addDaysToDateKey, schoolDateKey, schoolDateKeyFromValue, schoolDayStartIso, schoolWeekBounds } from "@/shared/lib/schoolTime";
 import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
@@ -17,6 +17,44 @@ type ScheduleMode = "agenda" | "week";
 type AppointmentData = { items: RecruitmentAppointment[]; total: number; page: number; total_pages: number };
 type MutationPayload = { message: string };
 
+const scheduleDayFormatter = new Intl.DateTimeFormat("en", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: "Asia/Tashkent",
+});
+const scheduleDateFormatter = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "Asia/Tashkent",
+});
+const scheduleTimeFormatter = new Intl.DateTimeFormat("en", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "Asia/Tashkent",
+});
+
+function dateKeyValue(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00Z`);
+}
+
+function scheduleDayLabel(dateKey: string) {
+  return scheduleDayFormatter.format(dateKeyValue(dateKey));
+}
+
+function scheduleDateLabel(dateKey: string) {
+  return scheduleDateFormatter.format(dateKeyValue(dateKey));
+}
+
+function appointmentTimeLabel(item: RecruitmentAppointment) {
+  const startsAt = new Date(item.starts_at);
+  const endsAt = new Date(item.ends_at);
+  if (Number.isNaN(startsAt.getTime())) return "Time not set";
+  const start = scheduleTimeFormatter.format(startsAt);
+  return Number.isNaN(endsAt.getTime()) ? start : `${start}–${scheduleTimeFormatter.format(endsAt)}`;
+}
+
 function appointmentTitle(item: RecruitmentAppointment) {
   return item.appointment_type === "job_interview" ? "Job interview" : "Demo lesson";
 }
@@ -25,12 +63,14 @@ function AppointmentCard({
   item,
   basePath,
   canManage,
+  compact = false,
   onEdit,
   onStatus,
 }: {
   item: RecruitmentAppointment;
   basePath: string;
   canManage: boolean;
+  compact?: boolean;
   onEdit: (item: RecruitmentAppointment) => void;
   onStatus: (item: RecruitmentAppointment, status: "cancelled" | "no_show") => void;
 }) {
@@ -42,14 +82,43 @@ function AppointmentCard({
         { key: "cancel", label: "Cancel appointment", icon: <Ban className="h-4 w-4" />, danger: true, onClick: () => onStatus(item, "cancelled") },
       ]
     : [];
+  const candidateName = item.candidate_name || "Candidate";
+
+  if (compact) {
+    return (
+      <article className="min-w-0 rounded-lg border border-border bg-card p-2 shadow-sm">
+        <div className="flex min-w-0 items-start gap-1">
+          <a
+            href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations&origin=schedule`}
+            onClick={() => rememberRecruitmentReturn("schedule")}
+            className="min-w-0 flex-1 rounded-md py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            title={candidateName}
+          >
+            <p className="truncate text-[13px] font-semibold hover:text-primary">{candidateName}</p>
+          </a>
+          {actions.length ? <ActionMenu items={actions} label={`Actions for ${candidateName}`} /> : null}
+        </div>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">{appointmentTitle(item)}</p>
+        <p className="mt-1 text-[13px] font-semibold tabular-nums text-foreground">{appointmentTimeLabel(item)}</p>
+        <div className="mt-2 flex min-w-0 items-center justify-between gap-1.5">
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={item.responsible_name || "Staff not assigned"}>
+            {item.responsible_name || "Staff not assigned"}
+          </span>
+          <StatusBadge status={item.status} className="shrink-0 text-[9px]" />
+        </div>
+        {item.appointment_format ? <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.appointment_format}</p> : null}
+      </article>
+    );
+  }
+
   return (
     <article className="rounded-lg border border-border bg-card p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <a href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations&origin=schedule`} onClick={() => rememberRecruitmentReturn("schedule")} className="min-w-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
-          <p className="truncate text-sm font-semibold hover:text-primary">{item.candidate_name}</p>
+          <p className="truncate text-sm font-semibold hover:text-primary">{candidateName}</p>
           <p className="mt-0.5 text-xs font-medium text-muted-foreground">{appointmentTitle(item)} · {dateLabel(item.starts_at)}</p>
         </a>
-        <div className="flex shrink-0 items-center gap-1"><StatusBadge status={item.status} />{actions.length ? <ActionMenu items={actions} label={`Actions for ${item.candidate_name}`} /> : null}</div>
+        <div className="flex shrink-0 items-center gap-1"><StatusBadge status={item.status} />{actions.length ? <ActionMenu items={actions} label={`Actions for ${candidateName}`} /> : null}</div>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>{item.responsible_name || "Staff not assigned"}</span>
@@ -166,23 +235,25 @@ export function ScheduleView({
           <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Status<select className={`${fieldClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-show</option><option value="">All statuses</option></select></label>
           <label className="min-w-44 flex-1 text-xs font-semibold text-muted-foreground">Staff<select className={`${fieldClass} mt-1`} value={staffId} onChange={(event) => setStaffId(event.target.value)}><option value="">All staff</option>{options?.staff.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{dateLabel(schoolDayStartIso(bounds.start))} – {dateLabel(schoolDayStartIso(bounds.end))} · Asia/Tashkent</p>
+        <p className="mt-2 text-xs text-muted-foreground">{scheduleDateLabel(bounds.start)} – {scheduleDateLabel(bounds.end)} · Asia/Tashkent</p>
       </section>
 
       <div className="md:hidden">{agenda}</div>
       <div className="hidden md:block">
         {mode === "agenda" ? agenda : (
-          <section className="grid grid-cols-7 overflow-hidden rounded-xl border border-border bg-card">
-            {weekDays.map((day) => (
-              <div key={day} className="min-w-0 border-r border-border last:border-r-0">
-                <div className="border-b border-border bg-muted/50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide">{dateLabel(schoolDayStartIso(day))}</div>
-                <div className="min-h-56 space-y-2 p-2">
-                  {itemsForDay(day).map((item) => <AppointmentCard key={item.id} item={item} basePath={basePath} canManage={canManage} onEdit={(value) => { setConflicts([]); setEditing(value); }} onStatus={(value, nextStatus) => setStatusAction({ item: value, status: nextStatus })} />)}
-                  {!itemsForDay(day).length ? <p className="py-4 text-center text-[11px] text-muted-foreground">No appointments</p> : null}
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <section className="grid min-w-[70rem] grid-cols-7">
+              {weekDays.map((day) => (
+                <div key={day} className="min-w-0 border-r border-border last:border-r-0">
+                  <div className="sticky top-0 z-10 border-b border-border bg-muted px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide">{scheduleDayLabel(day)}</div>
+                  <div className="min-h-56 space-y-2 p-2">
+                    {itemsForDay(day).map((item) => <AppointmentCard key={item.id} item={item} basePath={basePath} canManage={canManage} compact onEdit={(value) => { setConflicts([]); setEditing(value); }} onStatus={(value, nextStatus) => setStatusAction({ item: value, status: nextStatus })} />)}
+                    {!itemsForDay(day).length ? <p className="py-4 text-center text-[11px] text-muted-foreground">No appointments</p> : null}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </section>
+              ))}
+            </section>
+          </div>
         )}
       </div>
 

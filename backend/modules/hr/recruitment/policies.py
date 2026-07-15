@@ -104,7 +104,7 @@ def ensure_final_decision(user: CurrentUser, decision: str) -> None:
     normalized = str(decision or "").strip()
     if user.role == "ceo":
         return
-    if user.role == "academic_director" and normalized == "rejected":
+    if user.role in {"hr_manager", "academic_director"} and normalized == "rejected":
         return
     if user.role == "hr_manager" and normalized in {"on_hold", "candidate_withdrew"}:
         return

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import RedirectResponse
 
 from backend.core.access.pages import require_role
 from backend.core.web.rendering import generate_csrf, render_react_page
@@ -37,6 +38,7 @@ def _register_role_routes(
     include_decisions: bool = False,
     include_settings: bool = False,
     include_trash: bool = False,
+    include_rejected: bool = False,
 ) -> None:
     router = APIRouter(dependencies=[Depends(require_role(role))])
 
@@ -49,7 +51,10 @@ def _register_role_routes(
         return _render(role=role, view="pipeline", base_path=base_path)
 
     @router.get(f"{base_path}/candidates", operation_id=f"{operation_prefix}_recruitment_candidates")
-    def candidates():
+    def candidates(request: Request):
+        if role == "hr_manager":
+            suffix = f"?{request.query_params}" if request.query_params else ""
+            return RedirectResponse(f"{base_path}/pipeline{suffix}", status_code=307)
         return _render(role=role, view="candidates", base_path=base_path)
 
     @router.get(f"{base_path}/schedule", operation_id=f"{operation_prefix}_recruitment_schedule")
@@ -57,8 +62,20 @@ def _register_role_routes(
         return _render(role=role, view="schedule", base_path=base_path)
 
     @router.get(f"{base_path}/tasks", operation_id=f"{operation_prefix}_recruitment_tasks")
-    def tasks():
+    def tasks(request: Request):
+        if role == "hr_manager":
+            suffix = f"?{request.query_params}" if request.query_params else ""
+            return RedirectResponse(f"{base_path}/pipeline{suffix}", status_code=307)
         return _render(role=role, view="tasks", base_path=base_path)
+
+    if include_rejected:
+
+        @router.get(
+            f"{base_path}/rejected",
+            operation_id=f"{operation_prefix}_recruitment_rejected",
+        )
+        def rejected():
+            return _render(role=role, view="rejected", base_path=base_path)
 
     if include_decisions:
 
@@ -114,6 +131,7 @@ def register_recruitment_page_routes(app) -> None:
         operation_prefix="hr_manager",
         include_settings=True,
         include_trash=True,
+        include_rejected=True,
     )
     _register_role_routes(
         app,

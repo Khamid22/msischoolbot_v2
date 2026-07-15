@@ -69,6 +69,21 @@ def test_migration_adds_normalized_appointments_and_optional_evaluation_links():
     assert migration.count("ADD COLUMN IF NOT EXISTS appointment_id BIGINT") == 2
 
 
+def test_workflow_simplification_migration_preserves_history_and_enforces_one_active_appointment():
+    migration = (ROOT / "database/alembic/versions/0019_recruitment_workflow_simplification.py").read_text()
+
+    assert 'revision = "0019_recruitment_workflow"' in migration
+    assert 'down_revision = "0018_recruitment_appointments"' in migration
+    assert "'responded'" in migration
+    assert "CREATE TABLE IF NOT EXISTS msi_v2.teacher_candidate_holds" in migration
+    assert "ADD COLUMN IF NOT EXISTS origin_stage" in migration
+    assert migration.count("ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ") == 3
+    assert "idx_teacher_candidate_appointments_active_type" in migration
+    assert "Superseded during recruitment workflow migration" in migration
+    assert "DELETE FROM msi_v2.teacher_candidates" not in migration
+    assert "DELETE FROM msi_v2.teacher_candidate_appointments" not in migration
+
+
 def test_naive_form_time_is_interpreted_as_asia_tashkent():
     normalized = service._school_datetime(datetime(2099, 7, 16, 10, 0))
 
@@ -257,10 +272,27 @@ def test_hod_demo_evaluator_must_cover_the_candidate_subject(monkeypatch):
     assert conn.commits == 0
 
 
-def test_ordinary_stage_endpoint_cannot_bypass_required_scheduling():
-    for stage in ("job_interview", "test_and_demo"):
-        with pytest.raises(service.RecruitmentError, match="Schedule the required appointment"):
-            service.move_candidate(_user(), 7, stage=stage, expected_version=4)
+@pytest.mark.parametrize("stage", ["job_interview", "test_and_demo"])
+def test_ordinary_stage_endpoint_enters_scheduled_stage_without_an_appointment(monkeypatch, stage):
+    conn = _Connection()
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "get_candidate_row",
+        lambda *_args, **_kwargs: {"id": 7, "status": "new_candidate", "version": 4},
+    )
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: {"id": kwargs["candidate_id"], "status": kwargs["stage"], "version": 5},
+    )
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": stage})
+
+    result = service.move_candidate(_user(), 7, stage=stage, expected_version=4)
+
+    assert result["status"] == stage
+    assert conn.commits == 1
 
 
 def test_terminal_candidate_must_be_reopened_before_an_additional_appointment(monkeypatch):
@@ -272,7 +304,7 @@ def test_terminal_candidate_must_be_reopened_before_an_additional_appointment(mo
         lambda *_args, **_kwargs: {"id": 7, "status": "on_hold", "subject_id": 3},
     )
 
-    with pytest.raises(service.RecruitmentError, match="Reopen this candidate"):
+    with pytest.raises(service.RecruitmentError, match="Move the candidate to Job Interview"):
         service.create_appointment(
             _user(),
             7,
@@ -383,3 +415,79 @@ def test_cancel_appointment_uses_version_and_writes_audit(monkeypatch):
             {"appointment_id": 92, "reason": "Candidate requested a new date"},
         )
     ]
+
+
+def test_failed_evaluation_cancels_remaining_upcoming_appointments(monkeypatch):
+    conn = _Connection()
+    events = []
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "get_candidate_row", lambda *_args, **_kwargs: {"id": 7})
+    monkeypatch.setattr(repository, "insert_interview", lambda *_args, **_kwargs: 108)
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [91, 92])
+    monkeypatch.setattr(repository, "touch_candidate", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "next_appointment": None})
+
+    result = service.add_interview(_user(), 7, {"result": "failed", "notes": "Did not pass"})
+
+    assert result["next_appointment"] is None
+    assert conn.commits == 1
+    assert events[0][0] == "candidate.appointments_cancelled_after_failed_evaluation"
+    assert events[0][1]["appointment_ids"] == [91, 92]
+    assert events[1][0] == "candidate.interview_recorded"
+
+
+def test_void_evaluation_is_audited_without_deleting_history(monkeypatch):
+    conn = _Connection()
+    events = []
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "get_candidate_row", lambda *_args, **_kwargs: {"id": 7})
+    monkeypatch.setattr(repository, "void_evaluation", lambda *_args, **_kwargs: {"id": 108})
+    monkeypatch.setattr(repository, "touch_candidate", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7})
+
+    service.void_evaluation(
+        _user(),
+        7,
+        evaluation_type="interview",
+        attempt_id=108,
+        reason="Entered for the wrong candidate",
+    )
+
+    assert conn.commits == 1
+    assert events == [("candidate.evaluation_voided", {
+        "evaluation_type": "interview",
+        "attempt_id": 108,
+        "reason": "Entered for the wrong candidate",
+    })]
+
+
+def test_on_hold_records_origin_reason_date_and_cancels_appointments(monkeypatch):
+    conn = _Connection()
+    holds = []
+    events = []
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "get_candidate_row", lambda *_args, **_kwargs: {"id": 7, "status": "job_interview", "application_date": "2026-07-01"})
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **_kwargs: {"id": 7, "status": "on_hold", "version": 5})
+    monkeypatch.setattr(repository, "release_open_hold", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "insert_candidate_hold", lambda *_args, **kwargs: holds.append(kwargs) or 12)
+    monkeypatch.setattr(repository, "set_candidate_application_date", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [91])
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "on_hold"})
+
+    result = service.hold_candidate(
+        _user(),
+        7,
+        expected_version=4,
+        reason="Waiting for availability",
+        application_date="2026-07-03",
+    )
+
+    assert result["status"] == "on_hold"
+    assert holds[0]["origin_stage"] == "job_interview"
+    assert holds[0]["reason"] == "Waiting for availability"
+    assert holds[0]["application_date"] == "2026-07-03"
+    assert events[0][1]["cancelled_appointment_ids"] == [91]
+    assert conn.commits == 1

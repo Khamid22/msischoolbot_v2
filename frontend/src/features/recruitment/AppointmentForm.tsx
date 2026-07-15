@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { useState } from "react";
 
 import { humanize, type RecruitmentAppointment, type RecruitmentOptions } from "@/features/recruitment/model";
 import { fieldClass } from "@/features/recruitment/ui";
@@ -39,6 +40,7 @@ export function AppointmentForm({
   conflicts?: RecruitmentAppointment[];
 }) {
   const demo = appointmentType === "demo_lesson";
+  const [format, setFormat] = useState(appointment?.appointment_format || "");
   const staff = (options?.staff || []).filter((person) => (
     demo
       ? ["academic_director", "head_of_department"].includes(person.role)
@@ -86,8 +88,8 @@ export function AppointmentForm({
         </select>
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-semibold">Format<input name="appointment_format" defaultValue={appointment?.appointment_format} placeholder={demo ? "In person or online" : "In person, online or phone"} className={`${fieldClass} mt-1`} /></label>
-        <label className="text-xs font-semibold">Location or link<input name="location_or_link" defaultValue={appointment?.location_or_link} className={`${fieldClass} mt-1`} /></label>
+        <label className="text-xs font-semibold">Format<select required name="appointment_format" value={format} onChange={(event) => setFormat(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select format</option><option value="Online">Online</option><option value="In person">In person</option>{!demo ? <option value="Phone">Phone</option> : null}</select></label>
+        <label className="text-xs font-semibold">{format === "Online" ? "Conference link" : format === "In person" ? "Location" : "Location or link"}<input required={["Online", "In person"].includes(format)} type={format === "Online" ? "url" : "text"} name="location_or_link" defaultValue={appointment?.location_or_link} placeholder={format === "Online" ? "https://meet.example/..." : ""} className={`${fieldClass} mt-1`} /></label>
       </div>
       {demo ? <label className="text-xs font-semibold">Demo topic<input name="topic" defaultValue={appointment?.topic} className={`${fieldClass} mt-1`} /></label> : null}
       <label className="text-xs font-semibold">Notes<textarea name="note" defaultValue={appointment?.note} className={`${fieldClass} mt-1 min-h-24`} /></label>

@@ -35,7 +35,14 @@ _CANDIDATE_COLUMNS = """
     candidate.updated_at::text AS updated_at,
     COALESCE(decision.decision, '') AS final_decision,
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
+    COALESCE(decision.reason_detail, '') AS decision_reason_detail,
+    COALESCE(decision.origin_stage, '') AS decision_origin_stage,
     decision.follow_up_at::text AS decision_follow_up_at,
+    decision.created_at::text AS final_decision_at,
+    COALESCE(active_hold.reason, '') AS hold_reason,
+    COALESCE(active_hold.origin_stage, '') AS hold_origin_stage,
+    active_hold.application_date::text AS hold_application_date,
+    active_hold.placed_at::text AS hold_placed_at,
     task.id AS next_task_id,
     COALESCE(task.title, '') AS next_action,
     task.due_at::text AS next_action_at,
@@ -60,12 +67,20 @@ def _candidate_joins() -> str:
     return """
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN LATERAL (
-            SELECT d.decision, d.rejection_reason, d.follow_up_at
+            SELECT d.decision, d.rejection_reason, d.reason_detail,
+                   d.origin_stage, d.follow_up_at, d.created_at
             FROM msi_v2.teacher_candidate_final_decisions d
             WHERE d.candidate_id = candidate.id
             ORDER BY d.created_at DESC, d.id DESC
             LIMIT 1
         ) decision ON true
+        LEFT JOIN LATERAL (
+            SELECT hold.reason, hold.origin_stage, hold.application_date, hold.placed_at
+            FROM msi_v2.teacher_candidate_holds hold
+            WHERE hold.candidate_id = candidate.id AND hold.released_at IS NULL
+            ORDER BY hold.placed_at DESC, hold.id DESC
+            LIMIT 1
+        ) active_hold ON true
         LEFT JOIN LATERAL (
             SELECT t.id, t.title, t.due_at
             FROM msi_v2.teacher_candidate_tasks t
@@ -134,13 +149,49 @@ def list_pipeline_rows(
     visible_account_id: int | None = None,
     visible_subject_ids: set[int] | None = None,
     include_decision_queue: bool = False,
+    search: str = "",
+    position: str = "",
+    source: str = "",
+    application_from: str = "",
+    application_to: str = "",
+    evaluator_account_id: int | None = None,
 ) -> list[Any]:
-    visibility, params = _visibility_clause(
+    visibility, visibility_params = _visibility_clause(
         visible_account_id,
         visible_subject_ids,
         include_decision_queue,
     )
-    where_sql = f"WHERE {visibility}" if visibility else ""
+    clauses: list[str] = []
+    params: list[Any] = []
+    if visibility:
+        clauses.append(visibility)
+        params.extend(visibility_params)
+    if search:
+        clauses.append("candidate.full_name ILIKE %s")
+        params.append(f"%{search}%")
+    if position:
+        clauses.append("candidate.applied_position ILIKE %s")
+        params.append(f"%{position}%")
+    if source:
+        clauses.append("candidate.source = %s")
+        params.append(source)
+    if application_from:
+        clauses.append("candidate.application_date >= %s::date")
+        params.append(application_from)
+    if application_to:
+        clauses.append("candidate.application_date <= %s::date")
+        params.append(application_to)
+    if evaluator_account_id:
+        clauses.append(
+            """EXISTS (
+                SELECT 1 FROM msi_v2.teacher_candidate_assignments evaluator_filter
+                WHERE evaluator_filter.candidate_id = candidate.id
+                  AND evaluator_filter.assignee_account_id = %s
+                  AND evaluator_filter.status = 'active'
+            )"""
+        )
+        params.append(int(evaluator_account_id))
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     return conn.execute(
         f"""
         SELECT {_CANDIDATE_COLUMNS}
@@ -632,6 +683,24 @@ def insert_appointment(
     return int(row["id"]) if row else 0
 
 
+def scheduled_appointment_for_type(
+    conn: Any,
+    *,
+    candidate_id: int,
+    appointment_type: str,
+) -> Any:
+    return conn.execute(
+        """
+        SELECT id, version, starts_at::text AS starts_at
+        FROM msi_v2.teacher_candidate_appointments
+        WHERE candidate_id = %s AND appointment_type = %s AND status = 'scheduled'
+        ORDER BY starts_at ASC, id ASC
+        LIMIT 1
+        """,
+        (candidate_id, appointment_type),
+    ).fetchone()
+
+
 def update_appointment(
     conn: Any,
     *,
@@ -734,6 +803,38 @@ def cancel_scheduled_appointments(
         (reason, now, actor_account_id, now, int(candidate_id)),
     ).fetchall()
     return [int(row["id"]) for row in rows]
+
+
+def void_evaluation(
+    conn: Any,
+    *,
+    table: str,
+    candidate_id: int,
+    attempt_id: int,
+    actor_account_id: int | None,
+    reason: str,
+    now: str,
+) -> Any:
+    allowed_tables = {
+        "teacher_candidate_interviews",
+        "teacher_candidate_subject_tests",
+        "teacher_candidate_demo_lessons",
+    }
+    if table not in allowed_tables:
+        return None
+    return conn.execute(
+        f"""
+        UPDATE msi_v2.{table}
+        SET voided_at = %s::timestamptz,
+            voided_by_account_id = %s,
+            void_reason = %s,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE id = %s AND candidate_id = %s AND voided_at IS NULL
+        RETURNING id
+        """,
+        (now, actor_account_id, reason, actor_account_id, now, attempt_id, candidate_id),
+    ).fetchone()
 
 
 def responsible_account_row(conn: Any, account_id: int) -> Any:
@@ -911,6 +1012,7 @@ def list_decision_rows(conn: Any, candidate_id: int) -> list[Any]:
         """
         SELECT decision.id, decision.candidate_id, decision.decision,
                decision.rejection_reason, decision.reason_detail,
+               decision.origin_stage,
                decision.follow_up_at::text AS follow_up_at,
                decision.approval_id, decision.decided_by_account_id,
                COALESCE(account.login, decision.decided_by_login, '') AS decided_by,
@@ -971,6 +1073,7 @@ def update_candidate(
     values: dict[str, Any],
     actor_account_id: int | None,
     now: str,
+    expected_version: int | None = None,
 ) -> bool:
     allowed = {
         "full_name", "phone", "telegram_username", "applied_position", "subject_id", "application_date",
@@ -994,9 +1097,12 @@ def update_candidate(
     assignments.extend(
         ["updated_by_account_id = %s", "updated_at = %s::timestamptz", "version = version + 1"]
     )
+    version_clause = " AND version = %s" if expected_version else ""
     params.extend([actor_account_id, now, candidate_id])
+    if expected_version:
+        params.append(int(expected_version))
     cursor = conn.execute(
-        f"UPDATE msi_v2.teacher_candidates SET {', '.join(assignments)} WHERE id = %s",
+        f"UPDATE msi_v2.teacher_candidates SET {', '.join(assignments)} WHERE id = %s{version_clause}",
         tuple(params),
     )
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
@@ -1033,6 +1139,68 @@ def touch_candidate(conn: Any, *, candidate_id: int, actor_account_id: int | Non
         """,
         (now, actor_account_id, candidate_id),
     )
+
+
+def insert_candidate_hold(
+    conn: Any,
+    *,
+    candidate_id: int,
+    origin_stage: str,
+    reason: str,
+    application_date: str,
+    actor_account_id: int | None,
+    now: str,
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO msi_v2.teacher_candidate_holds (
+            candidate_id, origin_stage, reason, application_date,
+            placed_by_account_id, placed_at
+        ) VALUES (%s, %s, %s, NULLIF(%s, '')::date, %s, %s::timestamptz)
+        RETURNING id
+        """,
+        (candidate_id, origin_stage, reason, application_date, actor_account_id, now),
+    ).fetchone()
+    return int(row["id"]) if row else 0
+
+
+def set_candidate_application_date(
+    conn: Any,
+    *,
+    candidate_id: int,
+    application_date: str,
+    actor_account_id: int | None,
+    now: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidates
+        SET application_date = NULLIF(%s, '')::date,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE id = %s
+        """,
+        (application_date, actor_account_id, now, candidate_id),
+    )
+
+
+def release_open_hold(
+    conn: Any,
+    *,
+    candidate_id: int,
+    actor_account_id: int | None,
+    now: str,
+) -> list[int]:
+    rows = conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_holds
+        SET released_at = %s::timestamptz, released_by_account_id = %s
+        WHERE candidate_id = %s AND released_at IS NULL
+        RETURNING id
+        """,
+        (now, actor_account_id, candidate_id),
+    ).fetchall()
+    return [int(row["id"]) for row in rows]
 
 
 def insert_note(conn: Any, *, candidate_id: int, body: str, actor_account_id: int | None, actor_login: str, now: str) -> int:
@@ -1363,14 +1531,15 @@ def insert_final_decision(conn: Any, *, candidate_id: int, values: dict[str, Any
         """
         INSERT INTO msi_v2.teacher_candidate_final_decisions (
             candidate_id, decision, rejection_reason, reason_detail,
-            follow_up_at, approval_id, decided_by_account_id,
+            origin_stage, follow_up_at, approval_id, decided_by_account_id,
             decided_by_login, created_at
-        ) VALUES (%s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s, %s::timestamptz)
+        ) VALUES (%s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s, %s::timestamptz)
         RETURNING id
         """,
         (
             candidate_id, values["decision"], values.get("rejection_reason", ""),
-            values.get("reason_detail", ""), values.get("follow_up_at", ""),
+            values.get("reason_detail", ""), values.get("origin_stage", ""),
+            values.get("follow_up_at", ""),
             values.get("approval_id"), actor_account_id, actor_login, now,
         ),
     ).fetchone()

@@ -4,7 +4,7 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "schedule" | "tasks" | "settings" | "trash" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "schedule" | "tasks" | "rejected" | "settings" | "trash" | "candidate" | "profile";
 
 export type RecruitmentPermissions = {
   can_edit_profile: boolean;
@@ -20,6 +20,7 @@ export type RecruitmentPermissions = {
   can_review_approval: boolean;
   can_finalize: boolean;
   can_reject: boolean;
+  can_void_evaluations: boolean;
   can_add_note: boolean;
 };
 
@@ -90,6 +91,13 @@ export type RecruitmentCandidate = {
   version: number;
   final_decision?: string;
   rejection_reason?: string;
+  decision_reason_detail?: string;
+  decision_origin_stage?: string;
+  final_decision_at?: string;
+  hold_reason?: string;
+  hold_origin_stage?: string;
+  hold_application_date?: string;
+  hold_placed_at?: string;
   next_task?: RecruitmentTask | null;
   next_appointment?: RecruitmentAppointment | null;
   academy_teacher_id?: number | null;
@@ -146,18 +154,21 @@ export type RecruitmentSettingsData = {
 
 export const primaryStages = [
   "new_candidate",
+  "responded",
   "job_interview",
   "test_and_demo",
   "under_review",
+  "on_hold",
   "teacher_academy",
   "active_teacher",
 ] as const;
 
-export const manualStages = ["new_candidate", "job_interview", "test_and_demo", "under_review"] as const;
-export const alternativeStages = ["rejected", "on_hold", "candidate_withdrew", "trash_bin"] as const;
+export const manualStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review", "on_hold"] as const;
+export const alternativeStages = ["rejected", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
   new_candidate: "New Candidate",
+  responded: "Responded",
   job_interview: "Job Interview",
   test_and_demo: "Test & Demo",
   under_review: "Under Review",

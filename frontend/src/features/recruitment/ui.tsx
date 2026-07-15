@@ -72,7 +72,7 @@ export function replaceUrlParams(values: Record<string, string | number | null |
 }
 
 const returnPositionPrefix = "msi:recruitment:return:";
-type RecruitmentReturnView = "pipeline" | "decisions" | "candidates" | "schedule" | "tasks" | "trash";
+type RecruitmentReturnView = "pipeline" | "decisions" | "candidates" | "schedule" | "tasks" | "rejected" | "trash";
 
 export function rememberRecruitmentReturn(view: RecruitmentReturnView) {
   try {
