@@ -116,6 +116,18 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /Upcoming appointments/);
   });
 
+  test("keeps inline editors dimensionally stable and protects unsaved field changes", () => {
+    assert.match(profile, /relative h-16 min-h-16 min-w-0/);
+    assert.match(profile, /absolute inset-x-0 top-0 z-20/);
+    assert.match(profile, /activeInlineField/);
+    assert.match(profile, /pendingInlineField/);
+    assert.match(profile, /inlineFieldDirty/);
+    assert.match(profile, /Discard unsaved change\?/);
+    assert.match(profile, /Discard & continue/);
+    assert.match(profile, /Keep editing/);
+    assert.doesNotMatch(profile, /const \[editing, setEditing\]/);
+  });
+
   test("keeps only search and stage visible while advanced filters use a drawer", () => {
     assert.match(list, /title="Candidate filters"/);
     assert.match(list, /activeFilters/);

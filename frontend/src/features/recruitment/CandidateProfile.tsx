@@ -95,6 +95,7 @@ type ProfileAction =
   | { kind: "add_note" };
 
 type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
+type InlineEditTarget = { id: string; label: string };
 const profileTabs: Array<{ key: ProfileTab; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "evaluations", label: "Evaluations" },
@@ -134,6 +135,7 @@ function Panel({
 }
 
 function InlineField({
+  fieldId,
   label,
   value,
   displayValue,
@@ -141,8 +143,14 @@ function InlineField({
   multiline = false,
   options = [],
   busy,
+  editing,
+  onRequestEdit,
+  onDirtyChange,
+  onFinish,
+  onCancel,
   onSave,
 }: {
+  fieldId: string;
   label: string;
   value: string | number | null | undefined;
   displayValue?: string;
@@ -150,91 +158,116 @@ function InlineField({
   multiline?: boolean;
   options?: Array<{ value: string | number; label: string }>;
   busy: boolean;
+  editing: boolean;
+  onRequestEdit: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+  onFinish: () => void;
+  onCancel: () => void;
   onSave: (value: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value ?? ""));
   useEffect(() => {
     if (!editing) setDraft(String(value ?? ""));
   }, [editing, value]);
-  if (!editing)
-    return (
+  const originalValue = String(value ?? "");
+  const updateDraft = (next: string) => {
+    setDraft(next);
+    onDirtyChange(next !== originalValue);
+  };
+
+  return (
+    <div className="relative h-16 min-h-16 min-w-0">
+      {!editing ? (
       <button
         type="button"
         disabled={busy}
-        onClick={() => setEditing(true)}
-        className="min-h-16 min-w-0 rounded-lg bg-muted/45 px-3 py-2.5 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait"
+        onClick={onRequestEdit}
+        className="h-16 w-full min-w-0 overflow-hidden rounded-lg bg-muted/45 px-3 py-2.5 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait"
         aria-label={`Edit ${label}`}
       >
         <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </span>
-        <span className="mt-0.5 block break-words text-[13px] font-semibold text-foreground">
+        <span className="mt-0.5 block truncate text-[13px] font-semibold text-foreground" title={displayValue || String(value ?? "") || "Not set"}>
           {displayValue || String(value ?? "") || "Not set"}
         </span>
       </button>
-    );
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave(draft);
-        setEditing(false);
-      }}
-      className="rounded-lg border border-primary/30 bg-card p-2 focus-within:ring-2 focus-within:ring-primary/20"
-    >
-      <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-        {options.length ? (
-          <select
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            className={`${fieldClass} mt-1`}
-          >
-            <option value="">Not set</option>
-            {options.map((option) => (
-              <option key={String(option.value)} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ) : multiline ? (
-          <textarea
-            autoFocus
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            className={`${fieldClass} mt-1 min-h-24 normal-case tracking-normal`}
-          />
-        ) : (
-          <input
-            autoFocus
-            type={type}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            className={`${fieldClass} mt-1 normal-case tracking-normal`}
-          />
-        )}
-      </label>
-      <div className="mt-2 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setEditing(false)}
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          aria-label={`Cancel editing ${label}`}
+      ) : (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave(draft);
+            onDirtyChange(false);
+            onFinish();
+          }}
+          className={`absolute inset-x-0 top-0 z-20 rounded-lg border border-primary/30 bg-card p-1.5 shadow-card-hover focus-within:ring-2 focus-within:ring-primary/20 ${multiline ? "min-h-40" : "h-16"}`}
         >
-          <X className="h-4 w-4" />
-        </button>
-        <button
-          type="submit"
-          disabled={busy}
-          className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          aria-label={`Save ${label}`}
-        >
-          <Check className="h-4 w-4" />
-        </button>
-      </div>
-    </form>
+          <div className={multiline ? "grid gap-1.5" : "grid h-full grid-cols-[minmax(0,1fr)_2.75rem_2.75rem] items-center gap-1"}>
+            <label className={multiline ? "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground" : "relative min-w-0"}>
+              <span className={multiline ? "block" : "pointer-events-none absolute left-3 top-1 z-10 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"}>{label}</span>
+              {options.length ? (
+                <select
+                  id={`candidate-inline-${fieldId}`}
+                  autoFocus
+                  value={draft}
+                  onChange={(event) => updateDraft(event.target.value)}
+                  className={`${fieldClass} ${multiline ? "mt-1" : "h-12 pt-4"}`}
+                  aria-label={label}
+                >
+                  <option value="">Not set</option>
+                  {options.map((option) => (
+                    <option key={String(option.value)} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : multiline ? (
+                <textarea
+                  id={`candidate-inline-${fieldId}`}
+                  autoFocus
+                  value={draft}
+                  onChange={(event) => updateDraft(event.target.value)}
+                  className={`${fieldClass} mt-1 min-h-24 normal-case tracking-normal`}
+                />
+              ) : (
+                <input
+                  id={`candidate-inline-${fieldId}`}
+                  autoFocus
+                  type={type}
+                  value={draft}
+                  onChange={(event) => updateDraft(event.target.value)}
+                  className={`${fieldClass} h-12 pt-4 normal-case tracking-normal`}
+                  aria-label={label}
+                />
+              )}
+            </label>
+            <div className={multiline ? "flex justify-end gap-2" : "contents"}>
+              <button
+                type="button"
+                onClick={() => {
+                  onDirtyChange(false);
+                  onCancel();
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                aria-label={`Cancel editing ${label}`}
+                title="Cancel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-50"
+                aria-label={`Save ${label}`}
+                title="Save"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -1132,6 +1165,9 @@ export function CandidateProfile({
     unknown
   > | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeInlineField, setActiveInlineField] = useState<InlineEditTarget | null>(null);
+  const [inlineFieldDirty, setInlineFieldDirty] = useState(false);
+  const [pendingInlineField, setPendingInlineField] = useState<InlineEditTarget | null>(null);
   const formId = useId();
   const detail = useQuery({
     queryKey: ["recruitment", "candidate", candidateId],
@@ -1235,6 +1271,28 @@ export function CandidateProfile({
       values: { [field]: value, expected_version: candidate.version },
     });
   };
+
+  const requestInlineEdit = (target: InlineEditTarget) => {
+    if (activeInlineField?.id === target.id) return;
+    if (activeInlineField && inlineFieldDirty) {
+      setPendingInlineField(target);
+      return;
+    }
+    setInlineFieldDirty(false);
+    setActiveInlineField(target);
+  };
+  const closeInlineEdit = () => {
+    setInlineFieldDirty(false);
+    setActiveInlineField(null);
+  };
+  const inlineEditProps = (id: string, label: string) => ({
+    fieldId: id,
+    editing: activeInlineField?.id === id,
+    onRequestEdit: () => requestInlineEdit({ id, label }),
+    onDirtyChange: setInlineFieldDirty,
+    onFinish: closeInlineEdit,
+    onCancel: closeInlineEdit,
+  });
 
   const setProfileTab = (next: ProfileTab) => {
     const url = new URL(window.location.href);
@@ -1707,18 +1765,21 @@ export function CandidateProfile({
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 <InlineField
                   label="Full name"
+                  {...inlineEditProps("full_name", "Full name")}
                   value={candidate.full_name}
                   busy={mutation.isPending}
                   onSave={(value) => saveInlineField("full_name", value)}
                 />
                 <InlineField
                   label="Position"
+                  {...inlineEditProps("applied_position", "Position")}
                   value={candidate.applied_position}
                   busy={mutation.isPending}
                   onSave={(value) => saveInlineField("applied_position", value)}
                 />
                 <InlineField
                   label="Phone"
+                  {...inlineEditProps("phone", "Phone")}
                   value={candidate.phone}
                   type="tel"
                   busy={mutation.isPending}
@@ -1726,6 +1787,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Telegram"
+                  {...inlineEditProps("telegram_username", "Telegram")}
                   value={candidate.telegram_username}
                   busy={mutation.isPending}
                   onSave={(value) =>
@@ -1734,6 +1796,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Application date"
+                  {...inlineEditProps("application_date", "Application date")}
                   value={candidate.application_date?.slice(0, 10)}
                   displayValue={dateLabel(candidate.application_date)}
                   type="date"
@@ -1742,6 +1805,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Source"
+                  {...inlineEditProps("source", "Source")}
                   value={candidate.source}
                   options={(options.data?.sources || []).map((value) => ({
                     value,
@@ -1752,6 +1816,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Age"
+                  {...inlineEditProps("age", "Age")}
                   value={candidate.age}
                   type="number"
                   busy={mutation.isPending}
@@ -1759,12 +1824,14 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="English"
+                  {...inlineEditProps("english_level", "English")}
                   value={candidate.english_level}
                   busy={mutation.isPending}
                   onSave={(value) => saveInlineField("english_level", value)}
                 />
                 <InlineField
                   label="Schedule"
+                  {...inlineEditProps("preferred_schedule", "Schedule")}
                   value={candidate.preferred_schedule}
                   busy={mutation.isPending}
                   onSave={(value) =>
@@ -1773,6 +1840,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Availability"
+                  {...inlineEditProps("employment_availability", "Availability")}
                   value={candidate.employment_availability}
                   busy={mutation.isPending}
                   onSave={(value) =>
@@ -1781,6 +1849,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Start date"
+                  {...inlineEditProps("available_start_date", "Start date")}
                   value={candidate.available_start_date?.slice(0, 10)}
                   displayValue={dateLabel(candidate.available_start_date)}
                   type="date"
@@ -1791,6 +1860,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Expected salary"
+                  {...inlineEditProps("expected_salary_uzs", "Expected salary")}
                   value={candidate.expected_salary_uzs}
                   displayValue={
                     candidate.expected_salary_uzs
@@ -1805,6 +1875,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Address"
+                  {...inlineEditProps("address", "Address")}
                   value={candidate.address}
                   multiline
                   busy={mutation.isPending}
@@ -1812,6 +1883,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Previous workplace"
+                  {...inlineEditProps("previous_workplace", "Previous workplace")}
                   value={candidate.previous_workplace}
                   multiline
                   busy={mutation.isPending}
@@ -1821,6 +1893,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Motivation"
+                  {...inlineEditProps("motivation_expectations", "Motivation")}
                   value={candidate.motivation_expectations}
                   multiline
                   busy={mutation.isPending}
@@ -1830,6 +1903,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Work experience"
+                  {...inlineEditProps("work_experience", "Work experience")}
                   value={candidate.work_experience}
                   multiline
                   busy={mutation.isPending}
@@ -1837,6 +1911,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Teaching experience"
+                  {...inlineEditProps("teaching_experience", "Teaching experience")}
                   value={candidate.teaching_experience}
                   multiline
                   busy={mutation.isPending}
@@ -1846,6 +1921,7 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Interests"
+                  {...inlineEditProps("interests_hobbies", "Interests")}
                   value={candidate.interests_hobbies}
                   multiline
                   busy={mutation.isPending}
@@ -2517,6 +2593,31 @@ export function CandidateProfile({
           ) : null}
         </ol>
       </Drawer>
+
+      <ConfirmDialog
+        open={Boolean(pendingInlineField)}
+        title="Discard unsaved change?"
+        message={
+          <>
+            You changed <strong>{activeInlineField?.label}</strong>. Discard that change before editing <strong>{pendingInlineField?.label}</strong>?
+          </>
+        }
+        confirmLabel="Discard & continue"
+        cancelLabel="Keep editing"
+        danger
+        onCancel={() => {
+          setPendingInlineField(null);
+          window.requestAnimationFrame(() => {
+            if (activeInlineField) document.getElementById(`candidate-inline-${activeInlineField.id}`)?.focus();
+          });
+        }}
+        onConfirm={() => {
+          const next = pendingInlineField;
+          setPendingInlineField(null);
+          setInlineFieldDirty(false);
+          setActiveInlineField(next);
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(removeDocument)}
