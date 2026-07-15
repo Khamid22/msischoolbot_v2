@@ -83,7 +83,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
     ];
     if (effectiveRole === "hr_manager") {
-      items.splice(2, 0, { key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 });
+      items.push({ key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 });
       items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
     }
     return items;

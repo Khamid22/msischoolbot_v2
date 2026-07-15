@@ -96,6 +96,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(trash, /origin=trash/);
     assert.doesNotMatch(trash, /All stages|Candidate filters|filters\.stage/);
     assert.match(profile, /origin === "trash" \? `\$\{basePath\}\/trash/);
+    assert.ok(workspace.indexOf('key: "tasks"') < workspace.indexOf('key: "trash"'));
+    assert.ok(workspace.indexOf('key: "trash"') < workspace.indexOf('key: "settings"'));
   });
 
   test("opens Academic Director Recruitment on a compact decision queue", () => {
