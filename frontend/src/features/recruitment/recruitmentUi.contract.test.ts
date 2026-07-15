@@ -23,12 +23,40 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
-  test("uses a single-stage mobile view and eight independently scrolling desktop columns", () => {
+  test("uses a single-stage mobile view and eight wider independently scrolling desktop columns", () => {
     assert.match(pipeline, /md:hidden/);
-    assert.match(pipeline, /grid min-w-\[1600px\] grid-cols-8/);
+    assert.match(pipeline, /auto-cols-\[240px\]/);
+    assert.match(pipeline, /no-scrollbar/);
     assert.match(pipeline, /overflow-y-auto/);
     assert.match(pipeline, /h-\[calc\(100dvh-20rem\)\]/);
     assert.match(pipeline, /dragOverStage/);
+  });
+
+  test("keeps chart and compact search together with accessible popover behavior", () => {
+    assert.match(pipeline, /<PipelineSummary[\s\S]*action=\{/);
+    assert.match(pipeline, /aria-label=\{`Search and filters/);
+    assert.match(pipeline, /useDismissibleLayer/);
+    assert.match(pipeline, /searchInputRef\.current\?\.focus/);
+    assert.match(pipeline, /aria-expanded=\{searchOpen\}/);
+    assert.match(pipeline, /Search candidates/);
+    assert.doesNotMatch(pipeline, /rounded-xl border border-border bg-card p-3[\s\S]{0,220}>Search</);
+  });
+
+  test("supports empty-space board panning without taking over candidate cards", () => {
+    assert.match(pipeline, /boardPanRef/);
+    assert.match(pipeline, /data-candidate-card/);
+    assert.match(pipeline, /Math\.abs\(deltaX\) < 6/);
+    assert.match(pipeline, /onPointerMove=\{moveBoardPan\}/);
+    assert.match(pipeline, /onWheel=\{shiftWheelBoard\}/);
+    assert.match(pipeline, /\["ArrowLeft", "ArrowRight"\]/);
+    assert.match(pipeline, /\[data-candidate-card\], a, button, input, select, textarea/);
+  });
+
+  test("places the HR-only add action in New Candidate headers", () => {
+    assert.match(pipeline, /canAddCandidate && onAddCandidate/);
+    assert.match(pipeline, /stage === "new_candidate"/);
+    assert.match(pipeline, /mobileStage === "new_candidate"/);
+    assert.match(pipeline, /aria-label="Add candidate"/);
   });
 
   test("reveals only Trash Bin and Reject targets during a drag", () => {
@@ -98,6 +126,18 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /desktopSidebarMode="collapsible"/);
     assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
+  });
+
+  test("opens documents directly while keeping permission-scoped replace and remove controls", () => {
+    const documentPanel = profile.split('{tab === "documents" ? (')[1]?.split('{tab === "hiring" ? (')[0] || "";
+    assert.match(documentPanel, /href=\{`\$\{RECRUITMENT_API\}\/candidates\/\$\{candidateId\}\/documents\/\$\{text\(document\.id\)\}\/open`\}/);
+    assert.match(documentPanel, /target="_blank"/);
+    assert.match(documentPanel, /rel="noopener noreferrer"/);
+    assert.match(documentPanel, /role === "hr_manager" && permissions\?\.can_manage_documents/);
+    assert.match(documentPanel, /<IconButton label=\{`Replace/);
+    assert.match(documentPanel, /<IconButton label=\{`Remove/);
+    assert.doesNotMatch(documentPanel, /<ActionMenu/);
+    assert.doesNotMatch(documentPanel, /Download|download=true/);
   });
 
   test("uses the shared fading toast instead of a full-width warning banner", () => {

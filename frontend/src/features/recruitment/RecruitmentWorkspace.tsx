@@ -127,13 +127,12 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Manage upcoming job interviews and demo lessons in Asia/Tashkent time.</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
-          {effectiveRole === "hr_manager" && view === "pipeline" ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
       ) : null}
 
       <FloatingToast toast={toast} onClose={clearToast} />
 
-      {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
+      {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} canAddCandidate={effectiveRole === "hr_manager"} onAddCandidate={() => setNewCandidateOpen(true)} onAnnouncement={showToast} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}

@@ -1,6 +1,16 @@
-import { Ban, CalendarPlus, ListFilter, Loader2, Search, Trash2, X } from "lucide-react";
+import { Ban, CalendarPlus, ListFilter, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  type WheelEvent as ReactWheelEvent,
+} from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
 import { appointmentConflictDetails, formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
@@ -26,6 +36,7 @@ import {
   restoreRecruitmentReturn,
   secondaryButtonClass,
 } from "@/features/recruitment/ui";
+import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 import { Drawer } from "@/shared/ui/Drawer";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
@@ -86,7 +97,7 @@ function matchingAppointment(candidate: RecruitmentCandidate) {
     || (candidate.next_appointment?.appointment_type === expectedType ? candidate.next_appointment : null);
 }
 
-function PipelineSummary({ counts }: { counts: Record<string, number> }) {
+function PipelineSummary({ counts, action }: { counts: Record<string, number>; action?: ReactNode }) {
   const total = chartStages.reduce((sum, item) => sum + Number(counts[item.stage] || 0), 0);
   const rawValues = chartStages.map((item) => ({
     ...item,
@@ -105,13 +116,16 @@ function PipelineSummary({ counts }: { counts: Record<string, number> }) {
   const summary = values.map((item) => `${item.label}: ${item.count} (${item.percentage}%)`).join(", ");
   return (
     <section className="rounded-xl border border-border bg-card px-3 py-2.5" aria-label={`Pipeline distribution. Total ${total}. ${summary}`}>
-      <div className="flex items-center gap-3">
-        <div className="shrink-0 text-xs font-semibold text-foreground"><span className="text-muted-foreground">Total</span> <span className="tabular-nums">{total}</span></div>
-        <div className="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border border-slate-300 bg-muted" aria-hidden="true">
-          {values.filter((item) => item.count > 0).map((item) => (
-            <span key={item.stage} className={`${item.color} first:rounded-l-full last:rounded-r-full`} style={{ width: `${item.rawPercentage}%` }} />
-          ))}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="shrink-0 text-xs font-semibold text-foreground"><span className="text-muted-foreground">Total</span> <span className="tabular-nums">{total}</span></div>
+          <div className="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border border-slate-300 bg-muted" aria-hidden="true">
+            {values.filter((item) => item.count > 0).map((item) => (
+              <span key={item.stage} className={`${item.color} first:rounded-l-full last:rounded-r-full`} style={{ width: `${item.rawPercentage}%` }} />
+            ))}
+          </div>
         </div>
+        {action}
       </div>
       <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
         {values.map((item) => (
@@ -191,6 +205,7 @@ function CandidateCard({
 
   return (
     <article
+      data-candidate-card
       draggable={canMove}
       onDragStart={(event) => {
         if (!canMove) { event.preventDefault(); return; }
@@ -218,10 +233,14 @@ function CandidateCard({
 export function PipelineView({
   basePath,
   options,
+  canAddCandidate = false,
+  onAddCandidate,
   onAnnouncement,
 }: {
   basePath: string;
   options?: RecruitmentOptions;
+  canAddCandidate?: boolean;
+  onAddCandidate?: () => void;
   onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
 }) {
   const queryClient = useQueryClient();
@@ -230,6 +249,8 @@ export function PipelineView({
   const [mobileStage, setMobileStage] = useState((primaryStages as readonly string[]).includes(initialStage) ? initialStage : primaryStages[0]);
   const [filters, setFilters] = useState<PipelineFilters>(initialFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [boardPanning, setBoardPanning] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | null>(null);
@@ -239,6 +260,16 @@ export function PipelineView({
   const [scheduleConflicts, setScheduleConflicts] = useState<RecruitmentAppointment[]>([]);
   const [undoTrash, setUndoTrash] = useState<UndoTrash | null>(null);
   const draggedCandidateRef = useRef<RecruitmentCandidate | null>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const boardViewportRef = useRef<HTMLDivElement>(null);
+  const boardPanRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    active: boolean;
+  } | null>(null);
   const deferredSearch = useDeferredValue(filters.search);
   const requestParams = new URLSearchParams();
   Object.entries({ ...filters, search: deferredSearch }).forEach(([key, value]) => { if (value) requestParams.set(key, value); });
@@ -258,6 +289,21 @@ export function PipelineView({
     const timer = window.setTimeout(() => setUndoTrash(null), 5000);
     return () => window.clearTimeout(timer);
   }, [undoTrash]);
+
+  const closeSearch = useCallback((event?: KeyboardEvent | PointerEvent) => {
+    setSearchOpen(false);
+    if (!event || event instanceof KeyboardEvent) {
+      window.requestAnimationFrame(() => searchTriggerRef.current?.focus());
+    }
+  }, []);
+  const searchLayerRef = useDismissibleLayer<HTMLDivElement>({
+    enabled: searchOpen,
+    onDismiss: closeSearch,
+  });
+  useEffect(() => {
+    if (!searchOpen) return;
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  }, [searchOpen]);
 
   const move = useMutation({
     mutationFn: ({ candidate, stage }: { candidate: RecruitmentCandidate; stage: string }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/stage`, { method: "POST", body: jsonBody({ stage, expected_version: candidate.version, reason: "Pipeline move" }) }),
@@ -302,8 +348,53 @@ export function PipelineView({
   });
 
   const activeAdvanced = filterKeys.filter((key) => key !== "search" && Boolean(filters[key]));
+  const activeFilterCount = activeAdvanced.length + (filters.search ? 1 : 0);
   const clearFilters = () => setFilters(Object.fromEntries(filterKeys.map((key) => [key, ""])) as PipelineFilters);
+  const closeFilters = () => {
+    setFiltersOpen(false);
+    window.requestAnimationFrame(() => searchTriggerRef.current?.focus());
+  };
   const finishDrag = () => { draggedCandidateRef.current = null; setDraggedCandidate(null); setDragOverStage(null); setDragOverOutcome(null); };
+
+  const canStartBoardPan = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return true;
+    return !target.closest("[data-candidate-card], a, button, input, select, textarea, [role='menu'], [role='dialog']");
+  };
+  const startBoardPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !canStartBoardPan(event.target)) return;
+    boardPanRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: event.currentTarget.scrollLeft,
+      active: false,
+    };
+  };
+  const moveBoardPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = boardPanRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - pan.startX;
+    const deltaY = event.clientY - pan.startY;
+    if (!pan.active) {
+      if (Math.abs(deltaX) < 6 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+      pan.active = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setBoardPanning(true);
+    }
+    event.currentTarget.scrollLeft = pan.scrollLeft - deltaX;
+    event.preventDefault();
+  };
+  const finishBoardPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (boardPanRef.current?.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    boardPanRef.current = null;
+    setBoardPanning(false);
+  };
+  const shiftWheelBoard = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.shiftKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.currentTarget.scrollLeft += event.deltaY;
+    event.preventDefault();
+  };
 
   if (pipeline.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
   if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
@@ -317,29 +408,65 @@ export function PipelineView({
 
   return (
     <div className="space-y-3">
-      <PipelineSummary counts={pipeline.data.counts} />
-      <section className="rounded-xl border border-border bg-card p-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="min-w-0 flex-1 text-xs font-semibold text-muted-foreground">Search<span className="relative mt-1 block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4" /><input className={`${fieldClass} pl-9`} value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Candidate name" /></span></label>
-          <button type="button" className={secondaryButtonClass} onClick={() => setFiltersOpen(true)}><ListFilter className="h-4 w-4" />Filters{activeAdvanced.length ? ` (${activeAdvanced.length})` : ""}</button>
-          {(filters.search || activeAdvanced.length) ? <button type="button" className={secondaryButtonClass} onClick={clearFilters}><X className="h-4 w-4" />Clear</button> : null}
-        </div>
-      </section>
+      <PipelineSummary
+        counts={pipeline.data.counts}
+        action={(
+          <div ref={searchLayerRef} className="relative shrink-0">
+            <button
+              ref={searchTriggerRef}
+              type="button"
+              className={`relative flex h-11 w-11 items-center justify-center rounded-lg border bg-card text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${activeFilterCount ? "border-primary text-primary" : "border-border"}`}
+              aria-label={`Search and filters${activeFilterCount ? `, ${activeFilterCount} active` : ""}`}
+              aria-expanded={searchOpen}
+              aria-controls="pipeline-search-popover"
+              onClick={() => setSearchOpen((open) => !open)}
+              title="Search and filters"
+            >
+              <Search className="h-4 w-4" />
+              {activeFilterCount ? <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">{activeFilterCount}</span> : null}
+            </button>
+            {searchOpen ? (
+              <div id="pipeline-search-popover" role="group" aria-label="Search candidates and filters" className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-3 shadow-card-hover">
+                <label className="text-xs font-semibold text-muted-foreground">Search candidates<span className="relative mt-1 block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4" /><input ref={searchInputRef} className={`${fieldClass} pl-9`} value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Candidate name" /></span></label>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" className={secondaryButtonClass} onClick={() => { setSearchOpen(false); setFiltersOpen(true); }}><ListFilter className="h-4 w-4" />Filters{activeAdvanced.length ? ` (${activeAdvanced.length})` : ""}</button>
+                  {activeFilterCount ? <button type="button" className={secondaryButtonClass} onClick={clearFilters}><X className="h-4 w-4" />Clear</button> : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      />
 
       <div className="md:hidden">
         <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{primaryStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
-        <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><h2 className="text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{cards(pipeline.data.stages[mobileStage] || [])}</section>
+        <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{cards(pipeline.data.stages[mobileStage] || [])}</section>
       </div>
 
-      <div className="hidden overflow-x-auto pb-1 md:block">
-        <div className="grid min-w-[1600px] grid-cols-8 gap-2">
+      <div
+        ref={boardViewportRef}
+        className={`no-scrollbar hidden overflow-x-auto pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 md:block ${boardPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}
+        tabIndex={0}
+        aria-label="Recruitment pipeline board. Use left and right arrow keys to move horizontally."
+        onPointerDown={startBoardPan}
+        onPointerMove={moveBoardPan}
+        onPointerUp={finishBoardPan}
+        onPointerCancel={finishBoardPan}
+        onWheel={shiftWheelBoard}
+        onKeyDown={(event) => {
+          if (event.currentTarget !== event.target || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+          event.preventDefault();
+          event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -240 : 240, behavior: "smooth" });
+        }}
+      >
+        <div className="grid w-max grid-flow-col auto-cols-[240px] gap-3">
           {primaryStages.map((stage) => {
             const acceptsDrop = (manualStages as readonly string[]).includes(stage);
             const highlighted = dragOverStage === stage;
             const items = pipeline.data.stages[stage] || [];
             return (
               <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; if (stage === "on_hold") setHoldSelection({ candidate }); else move.mutate({ candidate, stage }); }} className={`flex h-[calc(100dvh-20rem)] min-h-[28rem] max-h-[52rem] flex-col overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
-                <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-3"><h2 className="text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
+                <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
                 <div className="miniapp-scroll flex-1 overflow-y-auto p-2">{cards(items)}</div>
               </section>
             );
@@ -361,7 +488,7 @@ export function PipelineView({
 
       {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-foreground px-3 py-2 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-11 rounded-md px-2 text-primary underline" onClick={() => { if (undoTrash.previousCandidate.status === "on_hold") hold.mutate({ candidate: undoTrash.candidate, values: { reason: undoTrash.previousCandidate.hold_reason || "Restored after undoing Trash Bin move.", application_date: undoTrash.previousCandidate.hold_application_date || undoTrash.previousCandidate.application_date || "" } }); else move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
 
-      <FiltersDrawer open={filtersOpen} filters={filters} options={options} onClose={() => setFiltersOpen(false)} onApply={(next) => { setFilters(next); setFiltersOpen(false); }} />
+      <FiltersDrawer open={filtersOpen} filters={filters} options={options} onClose={closeFilters} onApply={(next) => { setFilters(next); closeFilters(); }} />
 
       <Modal open={Boolean(holdSelection)} onClose={() => { if (!hold.isPending) setHoldSelection(null); }} title="Place candidate On Hold" subtitle={holdSelection?.candidate.full_name} size="sm">
         {holdSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); hold.mutate({ candidate: holdSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-3"><label className="text-xs font-semibold">Reason<textarea autoFocus required name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">Application date<input required type="date" name="application_date" defaultValue={holdSelection.candidate.application_date?.slice(0, 10)} className={`${fieldClass} mt-1`} /></label></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setHoldSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={hold.isPending}>{hold.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Place On Hold</button></div></ModalFooter></form> : null}

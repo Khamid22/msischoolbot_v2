@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -54,6 +55,7 @@ import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Drawer } from "@/shared/ui/Drawer";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
+import { IconButton } from "@/shared/ui/IconButton";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type ProfileTab =
@@ -2130,59 +2132,35 @@ export function CandidateProfile({
           >
             <div className="divide-y divide-border rounded-lg border border-border">
               {(candidate.documents || []).map((document) => {
-                const documentItems: ActionMenuItem[] = [
-                  {
-                    key: "open",
-                    label: "Open",
-                    onClick: () =>
-                      window.open(
-                        `${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open`,
-                        "_blank",
-                        "noopener,noreferrer",
-                      ),
-                  },
-                  {
-                    key: "download",
-                    label: "Download",
-                    onClick: () =>
-                      window.location.assign(
-                        `${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open?download=true`,
-                      ),
-                  },
-                ];
-                if (permissions?.can_manage_documents) {
-                  documentItems.push({
-                    key: "replace",
-                    label: "Replace",
-                    onClick: () =>
-                      setAction({ kind: "upload_document", document }),
-                  });
-                  documentItems.push({ separator: true, key: "separator" });
-                  documentItems.push({
-                    key: "remove",
-                    label: "Remove",
-                    danger: true,
-                    onClick: () => setRemoveDocument(document),
-                  });
-                }
+                const fileName = text(document.original_file_name) || "Candidate document";
                 return (
                   <div
                     key={Number(document.id)}
-                    className="flex min-h-14 items-center justify-between gap-2 px-3 py-2"
+                    className="flex min-h-14 items-center gap-1"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold">
-                        {text(document.original_file_name)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {humanize(document.document_type)} · v
-                        {text(document.version)}
-                      </p>
-                    </div>
-                    <ActionMenu
-                      items={documentItems}
-                      label={`Actions for ${text(document.original_file_name)}`}
-                    />
+                    <a
+                      href={`${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35"
+                      aria-label={`Open ${fileName}`}
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-semibold text-foreground">{fileName}</span>
+                        <span className="block text-xs text-muted-foreground">{humanize(document.document_type)} · v{text(document.version)}</span>
+                      </span>
+                    </a>
+                    {role === "hr_manager" && permissions?.can_manage_documents ? (
+                      <div className="flex shrink-0 items-center gap-1 pr-1">
+                        <IconButton label={`Replace ${fileName}`} onClick={() => setAction({ kind: "upload_document", document })}>
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                        </IconButton>
+                        <IconButton label={`Remove ${fileName}`} danger onClick={() => setRemoveDocument(document)}>
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </IconButton>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
