@@ -4,7 +4,7 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "settings" | "candidate" | "profile";
 
 export type RecruitmentPermissions = {
   can_edit_profile: boolean;
@@ -92,9 +92,25 @@ export type RecruitmentOptions = {
   sources: string[];
   document_types: string[];
   rejection_reasons: string[];
+  rejection_reason_options: Array<{ value: string; label: string }>;
   subjects: Array<{ id: number; name: string }>;
   staff: Array<{ id: number; role: string; name: string; login: string }>;
   document_upload_enabled: boolean;
+};
+
+export type RecruitmentSetting = {
+  id: number;
+  category: "source" | "rejection_reason";
+  value: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+export type RecruitmentSettingsData = {
+  items: RecruitmentSetting[];
+  sources: RecruitmentSetting[];
+  rejection_reasons: RecruitmentSetting[];
 };
 
 export const primaryStages = [

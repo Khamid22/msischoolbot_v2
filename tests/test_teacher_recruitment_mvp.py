@@ -3,6 +3,7 @@
 import json
 import os
 from base64 import b64encode
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -140,6 +141,102 @@ def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     assert '"page":"recruitment-workspace"' in response.text
     assert "Lesson Practice" not in response.text
 
+    settings = client.get("/hr-manager/settings")
+    assert settings.status_code == 200
+    assert '"view":"settings"' in settings.text
+
+
+def test_recruitment_settings_api_is_hr_only(client, monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "list_settings",
+        lambda user: {"items": [], "sources": [], "rejection_reasons": [], "role": user.role},
+    )
+    monkeypatch.setattr(
+        service,
+        "add_setting",
+        lambda user, **values: {"id": 9, "category": values["category"], "label": values["label"]},
+    )
+    monkeypatch.setattr(
+        service,
+        "remove_setting",
+        lambda user, setting_id: {"id": setting_id, "is_active": False},
+    )
+
+    _set_session(client, "hr_manager", account_id=10, staff_id=20)
+    assert client.get("/api/v1/recruitment/settings", headers=XHR).status_code == 200
+    created = client.post(
+        "/api/v1/recruitment/settings",
+        headers=XHR,
+        json={"category": "source", "label": "Job fair"},
+    )
+    assert created.status_code == 201
+    assert created.json()["data"]["setting"]["label"] == "Job fair"
+    assert client.delete("/api/v1/recruitment/settings/9", headers=XHR).status_code == 200
+
+    _set_session(client, "ceo", account_id=11, staff_id=21)
+    assert client.get("/api/v1/recruitment/settings", headers=XHR).status_code == 403
+    assert client.post(
+        "/api/v1/recruitment/settings",
+        headers=XHR,
+        json={"category": "source", "label": "Denied"},
+    ).status_code == 403
+
+
+def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(repository, "recruitment_setting_by_label_or_value", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        repository,
+        "save_recruitment_setting",
+        lambda *_args, **kwargs: {
+            "id": 7,
+            "category": kwargs["category"],
+            "value": kwargs["value"],
+            "label": kwargs["label"],
+            "is_active": True,
+            "sort_order": 10,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_recruitment_setting_audit",
+        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+    )
+
+    setting = service.add_setting(
+        _user(),
+        category="rejection_reason",
+        label="  Weak communication skills  ",
+    )
+
+    assert setting["value"] == "weak_communication_skills"
+    assert setting["label"] == "Weak communication skills"
+    assert conn.commits == 1
+    assert events == [
+        (
+            "recruitment.setting_created",
+            {
+                "category": "rejection_reason",
+                "value": "weak_communication_skills",
+                "label": "Weak communication skills",
+            },
+        )
+    ]
+
 
 def test_admin_recruitment_pages_are_not_registered(client):
     _set_session(client, "admin", account_id=1)
@@ -186,6 +283,18 @@ def test_decision_queue_migration_is_history_preserving_and_partial():
     assert "WHERE status IN ('requested', 'approved')" in source
     assert "DELETE FROM" not in source
     assert "DROP TABLE" not in source.split("def downgrade", 1)[0]
+
+
+def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candidate_loss():
+    source = Path("database/alembic/versions/0015_recruitment_settings.py").read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    assert "CREATE TABLE IF NOT EXISTS msi_v2.teacher_recruitment_settings" in upgrade_source
+    assert "'source', 'hh.uz', 'hh.uz'" in upgrade_source
+    assert "'rejection_reason', 'other', 'Other'" in upgrade_source
+    assert "is_active BOOLEAN NOT NULL DEFAULT true" in upgrade_source
+    assert "DELETE FROM" not in upgrade_source
+    assert "teacher_candidates" not in upgrade_source
 
 
 def test_recruitment_document_urls_never_use_public_resource_url():

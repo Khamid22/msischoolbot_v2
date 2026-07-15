@@ -132,6 +132,11 @@ class FinalDecisionCreate(StrictModel):
     approval_id: OptionalInt = Field(default=None, ge=1)
 
 
+class RecruitmentSettingCreate(StrictModel):
+    category: str = Field(pattern="^(source|rejection_reason)$")
+    label: str = Field(min_length=1, max_length=120)
+
+
 class RecruitmentMutationResult(BaseModel):
     message: str
     candidate: dict[str, Any] | None = None
@@ -153,6 +158,7 @@ __all__ = [
     "FinalDecisionCreate",
     "InterviewWrite",
     "NoteCreate",
+    "RecruitmentSettingCreate",
     "RecruitmentMutationResult",
     "StageChange",
     "SubjectTestWrite",

@@ -102,13 +102,16 @@ function OutcomeFields({ candidate, options }: { candidate: RecruitmentCandidate
       : ["on_hold", "candidate_withdrew"];
   const [decision, setDecision] = useState(availableDecisions[0]);
   const [rejectionReason, setRejectionReason] = useState("");
+  const rejectionReasons = options?.rejection_reason_options?.length
+    ? options.rejection_reason_options
+    : (options?.rejection_reasons || []).map((value) => ({ value, label: humanize(value) }));
   const approved = (candidate.approvals || []).filter((item) => item.status === "approved");
   const isHire = decision === "teacher_academy" || decision === "active_teacher";
   return (
     <>
       <label className="text-xs font-semibold">Decision<select name="decision" value={decision} onChange={(event) => setDecision(event.target.value)} className={`${fieldClass} mt-1`}>{availableDecisions.map((value) => <option key={value} value={value}>{stageLabels[value]}</option>)}</select></label>
       {isHire ? <label className="text-xs font-semibold">Approved request<select required name="approval_id" className={`${fieldClass} mt-1`}><option value="">Select an approved request</option>{approved.filter((item) => item.requested_outcome === decision).map((item) => <option key={Number(item.id)} value={Number(item.id)}>#{text(item.id)} · {stageLabels[text(item.requested_outcome)]}</option>)}</select></label> : null}
-      {decision === "rejected" ? <label className="text-xs font-semibold">Rejection reason<select required name="rejection_reason" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{options?.rejection_reasons.map((reason) => <option key={reason} value={reason}>{humanize(reason)}</option>)}</select></label> : null}
+      {decision === "rejected" ? <label className="text-xs font-semibold">Rejection reason<select required name="rejection_reason" value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{rejectionReasons.map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label> : null}
       {["rejected", "on_hold", "candidate_withdrew"].includes(decision) ? <label className="text-xs font-semibold">Reason / explanation<textarea name="reason_detail" required={decision === "on_hold" || rejectionReason === "other"} className={`${fieldClass} mt-1 min-h-24`} /></label> : null}
       {decision === "on_hold" ? <label className="text-xs font-semibold">Follow-up date<input name="follow_up_at" type="datetime-local" className={`${fieldClass} mt-1`} /></label> : null}
     </>

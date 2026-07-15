@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from math import ceil
@@ -371,14 +373,124 @@ def list_tasks(user: CurrentUser) -> dict[str, Any]:
 def options() -> dict[str, Any]:
     with connect_auth_db() as conn:
         values = repository.list_recruitment_options(conn)
+    configured_sources = list(values.get("sources") or CANDIDATE_SOURCES)
+    configured_reasons = list(values.get("rejection_reason_options") or [
+        {"value": value, "label": value.replace("_", " ").title()}
+        for value in REJECTION_REASONS
+    ])
     return {
         **values,
         "stages": list(PRIMARY_STAGES) + ["rejected", "on_hold", "candidate_withdrew"],
-        "sources": list(CANDIDATE_SOURCES),
+        "sources": configured_sources,
         "document_types": list(DOCUMENT_TYPES),
-        "rejection_reasons": list(REJECTION_REASONS),
+        "rejection_reasons": [item["value"] for item in configured_reasons],
+        "rejection_reason_options": configured_reasons,
         "document_upload_enabled": bool(is_r2_configured()),
     }
+
+
+_RECRUITMENT_SETTING_CATEGORIES = frozenset({"source", "rejection_reason"})
+
+
+def _setting_value(category: str, label: str) -> str:
+    if category == "source":
+        return label
+    normalized = re.sub(r"[^a-z0-9]+", "_", label.casefold()).strip("_")
+    if normalized:
+        return normalized[:120]
+    digest = hashlib.sha256(label.casefold().encode("utf-8")).hexdigest()[:16]
+    return f"custom_{digest}"
+
+
+def list_settings(user: CurrentUser) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError("Only HR Manager can manage recruitment settings.", status_code=403)
+    with connect_auth_db() as conn:
+        rows = repository.list_recruitment_setting_rows(conn)
+    items = [_row_dict(row) for row in rows]
+    return {
+        "items": items,
+        "sources": [item for item in items if item["category"] == "source"],
+        "rejection_reasons": [item for item in items if item["category"] == "rejection_reason"],
+    }
+
+
+def add_setting(user: CurrentUser, *, category: str, label: str) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError("Only HR Manager can manage recruitment settings.", status_code=403)
+    normalized_category = _text(category).lower()
+    normalized_label = " ".join(_text(label).split())
+    if normalized_category not in _RECRUITMENT_SETTING_CATEGORIES:
+        raise RecruitmentError("Unknown recruitment setting category.")
+    if not normalized_label:
+        raise RecruitmentError("Setting name is required.")
+    if len(normalized_label) > 120:
+        raise RecruitmentError("Setting name must be 120 characters or fewer.")
+    value = _setting_value(normalized_category, normalized_label)
+    now = _now()
+    with connect_auth_db() as conn:
+        existing = repository.recruitment_setting_by_label_or_value(
+            conn,
+            category=normalized_category,
+            value=value,
+            label=normalized_label,
+        )
+        if existing and bool(existing["is_active"]):
+            raise RecruitmentError("This recruitment setting already exists.", status_code=409)
+        saved = repository.save_recruitment_setting(
+            conn,
+            existing_id=int(existing["id"]) if existing else None,
+            category=normalized_category,
+            value=value,
+            label=normalized_label,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not saved:
+            raise RecruitmentError("Unable to save the recruitment setting.")
+        setting = _row_dict(saved)
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=int(setting["id"]),
+            event_type="recruitment.setting_reactivated" if existing else "recruitment.setting_created",
+            detail={"category": normalized_category, "value": value, "label": normalized_label},
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return setting
+
+
+def remove_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError("Only HR Manager can manage recruitment settings.", status_code=403)
+    now = _now()
+    with connect_auth_db() as conn:
+        removed = repository.deactivate_recruitment_setting(
+            conn,
+            setting_id=int(setting_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not removed:
+            raise RecruitmentError("Recruitment setting was not found.", status_code=404)
+        setting = _row_dict(removed)
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=int(setting["id"]),
+            event_type="recruitment.setting_removed",
+            detail={
+                "category": setting["category"],
+                "value": setting["value"],
+                "label": setting["label"],
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return setting
 
 
 def create_candidate(user: CurrentUser, values: dict[str, Any]) -> dict[str, Any]:
@@ -959,7 +1071,7 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
     rejection_reason = _text(values.get("rejection_reason"))
     reason_detail = _text(values.get("reason_detail"))
     if decision == "rejected":
-        if rejection_reason not in REJECTION_REASONS:
+        if not rejection_reason:
             raise RecruitmentError("Select a rejection reason.")
         if rejection_reason == "other" and not reason_detail:
             raise RecruitmentError("Explain the other rejection reason.")
@@ -969,6 +1081,12 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
     now = _now()
     approval_id = int(values.get("approval_id") or 0)
     with connect_auth_db() as conn:
+        if decision == "rejected" and not repository.recruitment_setting_value_exists(
+            conn,
+            category="rejection_reason",
+            value=rejection_reason,
+        ):
+            raise RecruitmentError("Select an active rejection reason.")
         candidate = repository.lock_candidate_decision_row(conn, int(candidate_id))
         if not candidate:
             raise RecruitmentError("Candidate was not found.", status_code=404)

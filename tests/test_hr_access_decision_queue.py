@@ -381,6 +381,7 @@ def test_academic_director_rejection_revokes_open_requests_and_audits(monkeypatc
     conn = _Connection()
     events: list[tuple[str, object]] = []
     monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "recruitment_setting_value_exists", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(
         repository,
         "lock_candidate_decision_row",

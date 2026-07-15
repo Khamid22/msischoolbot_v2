@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -6,6 +6,7 @@ import { CandidateListView } from "@/features/recruitment/CandidateListView";
 import { CandidateProfile } from "@/features/recruitment/CandidateProfile";
 import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
 import { PipelineView } from "@/features/recruitment/PipelineView";
+import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import { type RecruitmentCandidate, type RecruitmentOptions, type RecruitmentRole, type RecruitmentView } from "@/features/recruitment/model";
@@ -68,18 +69,21 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
   const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
-  const navItems = useMemo(() => effectiveRole === "academic_director"
-    ? [
+  const navItems = useMemo(() => {
+    if (effectiveRole === "academic_director") return [
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
         { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
         { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
-      ]
-    : [
-        { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
-        { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
-        { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
-      ], [basePath, effectiveRole]);
-  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", candidate: "Candidate Profile", profile: "Profile" }[view];
+      ];
+    const items = [
+      { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+      { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+      { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
+    ];
+    if (effectiveRole === "hr_manager") items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
+    return items;
+  }, [basePath, effectiveRole]);
+  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", settings: "Recruitment Settings", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -110,17 +114,18 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             {view === "pipeline" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Move candidates through a manual, auditable hiring workflow.</p> : null}
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
           </div>
-          {effectiveRole === "hr_manager" && view !== "profile" ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
+          {effectiveRole === "hr_manager" && !["profile", "settings"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
       ) : null}
 
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
       {announcement ? <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 text-[13px]" role="alert"><span>{announcement}</span><button className="min-h-11 px-2 font-semibold" onClick={() => setAnnouncement("")}>Dismiss</button></div> : null}
 
-      {view === "pipeline" ? <PipelineView basePath={basePath} onAnnouncement={setAnnouncement} /> : null}
+      {view === "pipeline" ? <PipelineView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={setAnnouncement} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
+      {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={setAnnouncement} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={setAnnouncement} /> : null}
       {view === "profile" ? <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section> : null}
 

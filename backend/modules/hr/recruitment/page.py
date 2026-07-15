@@ -35,6 +35,7 @@ def _register_role_routes(
     operation_prefix: str,
     root_view: str = "pipeline",
     include_decisions: bool = False,
+    include_settings: bool = False,
 ) -> None:
     router = APIRouter(dependencies=[Depends(require_role(role))])
 
@@ -63,6 +64,15 @@ def _register_role_routes(
         def decisions():
             return _render(role=role, view="decisions", base_path=base_path)
 
+    if include_settings:
+
+        @router.get(
+            f"{base_path}/settings",
+            operation_id=f"{operation_prefix}_recruitment_settings",
+        )
+        def settings():
+            return _render(role=role, view="settings", base_path=base_path)
+
     @router.get(f"{base_path}/profile", operation_id=f"{operation_prefix}_recruitment_profile")
     def profile():
         return _render(role=role, view="profile", base_path=base_path)
@@ -88,6 +98,7 @@ def register_recruitment_page_routes(app) -> None:
         role="hr_manager",
         base_path="/hr-manager",
         operation_prefix="hr_manager",
+        include_settings=True,
     )
     _register_role_routes(
         app,

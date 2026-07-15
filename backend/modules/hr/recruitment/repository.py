@@ -1101,7 +1101,153 @@ def insert_audit(
     )
 
 
-def list_recruitment_options(conn: Any) -> dict[str, list[dict[str, Any]]]:
+def list_recruitment_setting_rows(
+    conn: Any,
+    *,
+    include_inactive: bool = False,
+) -> list[Any]:
+    active_clause = "" if include_inactive else "WHERE is_active = true"
+    return conn.execute(
+        f"""
+        SELECT id, category, value, label, is_active, sort_order,
+               created_at::text AS created_at, updated_at::text AS updated_at
+        FROM msi_v2.teacher_recruitment_settings
+        {active_clause}
+        ORDER BY category, sort_order, lower(label), id
+        """
+    ).fetchall()
+
+
+def recruitment_setting_by_label_or_value(
+    conn: Any,
+    *,
+    category: str,
+    value: str,
+    label: str,
+) -> Any:
+    return conn.execute(
+        """
+        SELECT id, category, value, label, is_active, sort_order,
+               created_at::text AS created_at, updated_at::text AS updated_at
+        FROM msi_v2.teacher_recruitment_settings
+        WHERE category = %s
+          AND (value = %s OR lower(label) = lower(%s))
+        ORDER BY id
+        LIMIT 1
+        FOR UPDATE
+        """,
+        (category, value, label),
+    ).fetchone()
+
+
+def save_recruitment_setting(
+    conn: Any,
+    *,
+    existing_id: int | None,
+    category: str,
+    value: str,
+    label: str,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    if existing_id:
+        return conn.execute(
+            """
+            UPDATE msi_v2.teacher_recruitment_settings
+            SET value = %s,
+                label = %s,
+                is_active = true,
+                updated_by_account_id = %s,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            RETURNING id, category, value, label, is_active, sort_order,
+                      created_at::text AS created_at, updated_at::text AS updated_at
+            """,
+            (value, label, actor_account_id, now, int(existing_id)),
+        ).fetchone()
+    return conn.execute(
+        """
+        INSERT INTO msi_v2.teacher_recruitment_settings (
+            category, value, label, sort_order,
+            created_by_account_id, updated_by_account_id, created_at, updated_at
+        ) VALUES (
+            %s, %s, %s,
+            COALESCE((
+                SELECT max(sort_order) + 10
+                FROM msi_v2.teacher_recruitment_settings
+                WHERE category = %s
+            ), 10),
+            %s, %s, %s::timestamptz, %s::timestamptz
+        )
+        RETURNING id, category, value, label, is_active, sort_order,
+                  created_at::text AS created_at, updated_at::text AS updated_at
+        """,
+        (
+            category, value, label, category,
+            actor_account_id, actor_account_id, now, now,
+        ),
+    ).fetchone()
+
+
+def deactivate_recruitment_setting(
+    conn: Any,
+    *,
+    setting_id: int,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_settings
+        SET is_active = false,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE id = %s AND is_active = true
+        RETURNING id, category, value, label, is_active, sort_order,
+                  created_at::text AS created_at, updated_at::text AS updated_at
+        """,
+        (actor_account_id, now, int(setting_id)),
+    ).fetchone()
+
+
+def recruitment_setting_value_exists(conn: Any, *, category: str, value: str) -> bool:
+    row = conn.execute(
+        """
+        SELECT 1
+        FROM msi_v2.teacher_recruitment_settings
+        WHERE category = %s AND value = %s AND is_active = true
+        LIMIT 1
+        """,
+        (category, value),
+    ).fetchone()
+    return bool(row)
+
+
+def insert_recruitment_setting_audit(
+    conn: Any,
+    *,
+    setting_id: int,
+    event_type: str,
+    detail: dict[str, Any],
+    actor_account_id: int | None,
+    actor_staff_id: int | None,
+    now: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_staff_id, actor_account_id, event_type,
+            entity_type, entity_id, detail_json, created_at
+        ) VALUES (%s, %s, %s, 'teacher_recruitment_setting', %s, %s::jsonb, %s::timestamptz)
+        """,
+        (
+            actor_staff_id, actor_account_id, event_type, setting_id,
+            json.dumps(detail, ensure_ascii=False, default=str), now,
+        ),
+    )
+
+
+def list_recruitment_options(conn: Any) -> dict[str, Any]:
     subject_rows = conn.execute(
         """
         SELECT id, subject_name AS name
@@ -1118,9 +1264,18 @@ def list_recruitment_options(conn: Any) -> dict[str, list[dict[str, Any]]]:
         ORDER BY role, lower(COALESCE(NULLIF(full_name, ''), login))
         """
     ).fetchall()
+    setting_rows = list_recruitment_setting_rows(conn)
+    sources = [str(row["label"]) for row in setting_rows if row["category"] == "source"]
+    rejection_reason_options = [
+        {"value": str(row["value"]), "label": str(row["label"])}
+        for row in setting_rows
+        if row["category"] == "rejection_reason"
+    ]
     return {
         "subjects": [dict(row) for row in subject_rows],
         "staff": [dict(row) for row in staff_rows],
+        "sources": sources,
+        "rejection_reason_options": rejection_reason_options,
     }
 
 

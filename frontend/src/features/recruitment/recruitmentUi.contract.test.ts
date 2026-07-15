@@ -29,6 +29,14 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /min-h-60/);
     assert.match(pipeline, /dragOverStage/);
   });
+
+  test("reveals CRM outcome targets during a drag and confirms audited decisions", () => {
+    assert.match(pipeline, /Candidate outcome drop targets/);
+    assert.match(pipeline, /\["rejected", "on_hold", "candidate_withdrew"\]/);
+    assert.match(pipeline, /<OutcomeDialog/);
+    assert.match(pipeline, /\/final-decisions/);
+    assert.doesNotMatch(pipeline, /delete.*candidate/i);
+  });
 });
 
 describe("candidate navigation and progressive disclosure", () => {
@@ -54,6 +62,16 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /desktopSidebarMode="collapsible"/);
     assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
+  });
+
+  test("adds HR-only recruitment settings for dynamic sources and rejection reasons", () => {
+    const settings = source("SettingsView.tsx");
+    assert.match(workspace, /effectiveRole === "hr_manager"/);
+    assert.match(workspace, /key: "settings", label: "Settings"/);
+    assert.match(workspace, /<SettingsView/);
+    assert.match(settings, /Candidate sources/);
+    assert.match(settings, /Rejection reasons/);
+    assert.match(settings, /RECRUITMENT_API}\/settings/);
   });
 
   test("opens Academic Director Recruitment on a compact decision queue", () => {

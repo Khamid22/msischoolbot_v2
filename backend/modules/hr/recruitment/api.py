@@ -31,6 +31,7 @@ from backend.modules.hr.recruitment.schemas import (
     FinalDecisionCreate,
     InterviewWrite,
     NoteCreate,
+    RecruitmentSettingCreate,
     StageChange,
     SubjectTestWrite,
     TaskWrite,
@@ -116,6 +117,37 @@ def tasks(user: CurrentUser = Depends(get_current_user)):
 @router.get("/options", operation_id="api_v1_recruitment_options")
 def options():
     return api_success(_call(service.options))
+
+
+@router.get("/settings", operation_id="api_v1_recruitment_settings")
+def settings(user: CurrentUser = Depends(get_current_user)):
+    ensure_hr_management(user)
+    return api_success(_call(service.list_settings, user))
+
+
+@router.post("/settings", status_code=201, operation_id="api_v1_recruitment_create_setting")
+def create_setting(
+    payload: RecruitmentSettingCreate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    setting = _call(
+        service.add_setting,
+        user,
+        category=payload.category,
+        label=payload.label,
+    )
+    return api_success(
+        {"message": "Recruitment setting added.", "setting": setting},
+        status_code=201,
+    )
+
+
+@router.delete("/settings/{setting_id}", operation_id="api_v1_recruitment_remove_setting")
+def remove_setting(setting_id: int, user: CurrentUser = Depends(get_current_user)):
+    ensure_hr_management(user)
+    setting = _call(service.remove_setting, user, setting_id)
+    return api_success({"message": "Recruitment setting removed.", "setting": setting})
 
 
 @router.post("/candidates", status_code=201, operation_id="api_v1_recruitment_create_candidate")
