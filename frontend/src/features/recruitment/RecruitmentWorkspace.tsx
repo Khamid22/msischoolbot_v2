@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -69,7 +69,8 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const { toast, showToast, clearToast } = useFloatingToast();
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
-  const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
+  const viewingTrash = view === "candidates" && new URLSearchParams(window.location.search).get("stage") === "trash_bin";
+  const active = viewingTrash ? "trash" : view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
   const navItems = useMemo(() => {
     if (effectiveRole === "academic_director") return [
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
@@ -81,10 +82,13 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
     ];
-    if (effectiveRole === "hr_manager") items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
+    if (effectiveRole === "hr_manager") {
+      items.splice(2, 0, { key: "trash", label: "Trash Bin", href: `${basePath}/candidates?stage=trash_bin`, icon: Trash2 });
+      items.push({ key: "settings", label: "Settings", href: `${basePath}/settings`, icon: Settings2 });
+    }
     return items;
   }, [basePath, effectiveRole]);
-  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", settings: "Recruitment Settings", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const title = viewingTrash ? "Trash Bin" : { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", tasks: "Recruitment Tasks", settings: "Recruitment Settings", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -114,8 +118,9 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
             {view === "pipeline" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Move candidates through a manual, auditable hiring workflow.</p> : null}
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
+            {viewingTrash ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review archived candidates or open a profile to restore one.</p> : null}
           </div>
-          {effectiveRole === "hr_manager" && !["profile", "settings"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
+          {effectiveRole === "hr_manager" && !viewingTrash && !["profile", "settings"].includes(view) ? <button className={buttonClass} onClick={() => setNewCandidateOpen(true)}><Plus className="h-4 w-4" />Add candidate</button> : null}
         </header>
       ) : null}
 

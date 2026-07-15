@@ -86,6 +86,14 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /RECRUITMENT_API}\/settings/);
   });
 
+  test("adds an HR-only Trash Bin sidebar tab backed by the archived candidate filter", () => {
+    assert.match(workspace, /effectiveRole === "hr_manager"/);
+    assert.match(workspace, /key: "trash", label: "Trash Bin", href: `\$\{basePath\}\/candidates\?stage=trash_bin`/);
+    assert.match(workspace, /const viewingTrash = view === "candidates"/);
+    assert.match(workspace, /const active = viewingTrash \? "trash"/);
+    assert.match(workspace, /const title = viewingTrash \? "Trash Bin"/);
+  });
+
   test("opens Academic Director Recruitment on a compact decision queue", () => {
     const decisions = source("DecisionQueueView.tsx");
     assert.match(workspace, /key: "decisions", label: "Decisions"/);
