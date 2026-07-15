@@ -1,15 +1,15 @@
 """add HR-managed recruitment sources and rejection reasons
 
-Revision ID: 0015_recruitment_settings
-Revises: 0014_hr_decision_queue
+Revision ID: 0016_recruitment_settings
+Revises: 0015_legacy_public_cutover
 Create Date: 2026-07-15
 """
 
 from alembic import op
 
 
-revision = "0015_recruitment_settings"
-down_revision = "0014_hr_decision_queue"
+revision = "0016_recruitment_settings"
+down_revision = "0015_legacy_public_cutover"
 branch_labels = None
 depends_on = None
 

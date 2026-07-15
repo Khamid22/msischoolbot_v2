@@ -286,7 +286,7 @@ def test_decision_queue_migration_is_history_preserving_and_partial():
 
 
 def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candidate_loss():
-    source = Path("database/alembic/versions/0015_recruitment_settings.py").read_text()
+    source = Path("database/alembic/versions/0016_recruitment_settings.py").read_text()
     upgrade_source = source.split("def downgrade", 1)[0]
 
     assert "CREATE TABLE IF NOT EXISTS msi_v2.teacher_recruitment_settings" in upgrade_source
