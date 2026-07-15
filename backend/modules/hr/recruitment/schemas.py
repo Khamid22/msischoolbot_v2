@@ -60,12 +60,42 @@ class StageChange(StrictModel):
     reason: str = Field(default="", max_length=2000)
 
 
+class AppointmentFields(StrictModel):
+    starts_at: datetime
+    duration_minutes: OptionalInt = Field(default=None, ge=15, le=240)
+    responsible_account_id: OptionalInt = Field(default=None, ge=1)
+    appointment_format: str = Field(default="", max_length=120)
+    location_or_link: str = Field(default="", max_length=1000)
+    topic: str = Field(default="", max_length=500)
+    note: str = Field(default="", max_length=5000)
+    allow_conflict: bool = False
+
+
+class ScheduledStageMove(AppointmentFields):
+    stage: str = Field(pattern="^(job_interview|test_and_demo)$")
+    expected_version: int = Field(ge=1)
+
+
+class AppointmentCreate(AppointmentFields):
+    appointment_type: str = Field(pattern="^(job_interview|demo_lesson)$")
+
+
+class AppointmentUpdate(AppointmentFields):
+    expected_version: int = Field(ge=1)
+
+
+class AppointmentStatusChange(StrictModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(default="", max_length=2000)
+
+
 class AssignmentReplace(StrictModel):
     assignee_account_ids: list[int] = Field(default_factory=list, max_length=20)
     subject_id: OptionalInt = Field(default=None, ge=1)
 
 
 class InterviewWrite(StrictModel):
+    appointment_id: OptionalInt = Field(default=None, ge=1)
     interview_at: OptionalDateTime = None
     interviewer_account_id: OptionalInt = Field(default=None, ge=1)
     interview_format: str = Field(default="", max_length=120)
@@ -89,6 +119,7 @@ class SubjectTestWrite(StrictModel):
 
 
 class DemoLessonWrite(StrictModel):
+    appointment_id: OptionalInt = Field(default=None, ge=1)
     demo_at: OptionalDateTime = None
     subject_id: OptionalInt = Field(default=None, ge=1)
     subject_label: str = Field(default="", max_length=200)
@@ -151,6 +182,9 @@ __all__ = [
     "ApprovalRequestCreate",
     "AcademyIntakeOnboarding",
     "ApprovalReview",
+    "AppointmentCreate",
+    "AppointmentStatusChange",
+    "AppointmentUpdate",
     "AssignmentReplace",
     "CandidateCreate",
     "CandidateUpdate",
@@ -160,6 +194,7 @@ __all__ = [
     "NoteCreate",
     "RecruitmentSettingCreate",
     "RecruitmentMutationResult",
+    "ScheduledStageMove",
     "StageChange",
     "SubjectTestWrite",
     "TaskWrite",

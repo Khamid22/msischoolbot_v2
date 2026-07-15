@@ -143,6 +143,7 @@ def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
         },
     )
     monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [21])
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [31])
     monkeypatch.setattr(
         repository,
         "insert_audit",
@@ -164,6 +165,10 @@ def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
         (
             "candidate.hire_approvals_revoked",
             {"approval_ids": [21], "reason": "Candidate moved to Trash Bin."},
+        ),
+        (
+            "candidate.appointments_cancelled",
+            {"appointment_ids": [31], "reason": "Candidate moved to Trash Bin."},
         ),
         (
             "candidate.moved_to_trash",
@@ -208,8 +213,83 @@ def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     assert trash.status_code == 200
     assert '"view":"trash"' in trash.text
 
+    schedule = client.get("/hr-manager/schedule")
+    assert schedule.status_code == 200
+    assert '"view":"schedule"' in schedule.text
+
     _set_session(client, "ceo", account_id=11, staff_id=21)
     assert client.get("/ceo/recruitment/trash").status_code == 404
+
+
+def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(client, monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "list_appointments",
+        lambda user, **_values: {"items": [], "total": 0, "role": user.role},
+    )
+    monkeypatch.setattr(
+        service,
+        "schedule_stage_move",
+        lambda user, candidate_id, values: {
+            "candidate": {"id": candidate_id, "status": values["stage"]},
+            "appointment": {"id": 90, "appointment_type": "job_interview"},
+            "role": user.role,
+        },
+    )
+
+    _set_session(client, "academic_director", account_id=41, staff_id=51)
+    visible = client.get("/api/v1/recruitment/appointments", headers=XHR)
+    assert visible.status_code == 200
+    assert visible.json()["data"]["role"] == "academic_director"
+    denied = client.post(
+        "/api/v1/recruitment/candidates/7/scheduled-stage-moves",
+        headers=XHR,
+        json={
+            "stage": "job_interview",
+            "expected_version": 4,
+            "starts_at": "2099-07-16T10:00:00",
+            "duration_minutes": 30,
+        },
+    )
+    assert denied.status_code == 403
+
+    _set_session(client, "hr_manager", account_id=41, staff_id=51)
+    allowed = client.post(
+        "/api/v1/recruitment/candidates/7/scheduled-stage-moves",
+        headers=XHR,
+        json={
+            "stage": "job_interview",
+            "expected_version": 4,
+            "starts_at": "2099-07-16T10:00:00",
+            "duration_minutes": 30,
+        },
+    )
+    assert allowed.status_code == 201
+    assert allowed.json()["data"]["appointment"]["id"] == 90
+
+    def conflict(*_args, **_kwargs):
+        raise service.RecruitmentError(
+            "The selected staff member is busy.",
+            status_code=409,
+            code="appointment_conflict",
+            details=[{"id": 91, "candidate_name": "Existing candidate"}],
+        )
+
+    monkeypatch.setattr(service, "schedule_stage_move", conflict)
+    overlapping = client.post(
+        "/api/v1/recruitment/candidates/7/scheduled-stage-moves",
+        headers=XHR,
+        json={
+            "stage": "job_interview",
+            "expected_version": 4,
+            "starts_at": "2099-07-16T10:00:00",
+            "duration_minutes": 30,
+            "responsible_account_id": 41,
+        },
+    )
+    assert overlapping.status_code == 409
+    assert overlapping.json()["code"] == "appointment_conflict"
+    assert overlapping.json()["details"][0]["candidate_name"] == "Existing candidate"
 
 
 def test_recruitment_settings_api_is_hr_only(client, monkeypatch):

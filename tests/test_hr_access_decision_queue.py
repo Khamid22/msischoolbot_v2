@@ -394,6 +394,7 @@ def test_academic_director_rejection_revokes_open_requests_and_audits(monkeypatc
         },
     )
     monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [9, 10])
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(repository, "insert_final_decision", lambda *_args, **_kwargs: 18)
     monkeypatch.setattr(

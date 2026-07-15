@@ -53,6 +53,9 @@ INTERVIEW_RESULTS = frozenset(
 SUBJECT_TEST_RESULTS = frozenset({"passed", "failed", "retake_required", "not_completed"})
 DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo", "on_hold"})
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
+APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
+APPOINTMENT_STATUSES = frozenset({"scheduled", "completed", "cancelled", "no_show"})
+SCHEDULED_STAGE_TYPES = {"job_interview": "job_interview", "test_and_demo": "demo_lesson"}
 
 RECRUITMENT_ROLES = frozenset(
     {"hr_manager", "academic_director", "head_of_department", "ceo"}
@@ -63,6 +66,8 @@ ACADEMIC_ROLES = frozenset({"academic_director", "head_of_department"})
 
 __all__ = [
     "ACADEMIC_ROLES",
+    "APPOINTMENT_STATUSES",
+    "APPOINTMENT_TYPES",
     "ALL_STAGES",
     "ALTERNATIVE_STAGES",
     "CANDIDATE_SOURCES",
@@ -74,6 +79,7 @@ __all__ = [
     "PROTECTED_HIRE_STAGES",
     "RECRUITMENT_ROLES",
     "REJECTION_REASONS",
+    "SCHEDULED_STAGE_TYPES",
     "SUBJECT_TEST_RESULTS",
     "TASK_STATUSES",
 ]

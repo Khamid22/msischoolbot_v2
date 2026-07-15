@@ -2,7 +2,8 @@ import { Ban, Clock3, Loader2, Trash2, UserMinus } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
-import { recruitmentRequest, jsonBody } from "@/features/recruitment/api";
+import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
+import { appointmentConflictDetails, formValues, recruitmentRequest, jsonBody } from "@/features/recruitment/api";
 import {
   alternativeStages,
   dateLabel,
@@ -10,6 +11,7 @@ import {
   primaryStages,
   stageLabels,
   type RecruitmentCandidate,
+  type RecruitmentAppointment,
   type RecruitmentOptions,
   type RecruitmentRole,
 } from "@/features/recruitment/model";
@@ -27,6 +29,7 @@ type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
 type FinalOutcomeDecision = "rejected" | "on_hold" | "candidate_withdrew";
 type DropTarget = FinalOutcomeDecision | "trash_bin";
 type OutcomeSelection = { candidate: RecruitmentCandidate; decision: FinalOutcomeDecision };
+type ScheduleSelection = { candidate: RecruitmentCandidate; stage: "job_interview" | "test_and_demo" };
 const allStages = [...primaryStages, ...alternativeStages];
 
 const dropTargetDetails: Record<DropTarget, { label: string; icon: ReactNode; tone: string; activeTone: string }> = {
@@ -171,7 +174,12 @@ function CandidateCard({
         <p className="mt-1 truncate text-xs text-muted-foreground">
           {candidate.applied_position || candidate.subject || "Position not set"}
         </p>
-        {candidate.next_task ? (
+        {candidate.next_appointment ? (
+          <div className="mt-2 rounded-md bg-primary/5 px-2 py-1.5 text-xs">
+            <span className="block truncate font-medium text-foreground">{candidate.next_appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"}</span>
+            <span className="text-muted-foreground">{dateLabel(candidate.next_appointment.starts_at)}</span>
+          </div>
+        ) : candidate.next_task ? (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs">
             <span className="min-w-0 truncate font-medium text-foreground">{candidate.next_task.title}</span>
             <span className="shrink-0 text-muted-foreground">{dateLabel(candidate.next_task.due_at)}</span>
@@ -200,6 +208,8 @@ export function PipelineView({
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverOutcome, setDragOverOutcome] = useState<DropTarget | null>(null);
   const [outcomeSelection, setOutcomeSelection] = useState<OutcomeSelection | null>(null);
+  const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
+  const [scheduleConflicts, setScheduleConflicts] = useState<RecruitmentAppointment[]>([]);
   const draggedCandidateRef = useRef<RecruitmentCandidate | null>(null);
   const pipeline = useQuery({
     queryKey: ["recruitment", "pipeline"],
@@ -241,6 +251,24 @@ export function PipelineView({
       onAnnouncement(result.message || "Candidate outcome recorded.");
     },
     onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
+  const schedule = useMutation({
+    mutationFn: ({ candidate, stage, values }: { candidate: RecruitmentCandidate; stage: ScheduleSelection["stage"]; values: Record<string, string | number | boolean | null> }) =>
+      recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/scheduled-stage-moves`, {
+        method: "POST",
+        body: jsonBody({ ...values, stage, expected_version: candidate.version }),
+      }),
+    onSuccess: (result) => {
+      setScheduleSelection(null);
+      setScheduleConflicts([]);
+      onAnnouncement(result.message || "Appointment scheduled and candidate moved.");
+    },
+    onError: (error) => {
+      const conflicts = appointmentConflictDetails<RecruitmentAppointment>(error);
+      if (conflicts.length) setScheduleConflicts(conflicts);
+      onAnnouncement(queryError(error), "error");
+    },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
 
@@ -332,7 +360,14 @@ export function PipelineView({
                   const candidate = draggedCandidateRef.current;
                   draggedCandidateRef.current = null;
                   setDraggedCandidate(null);
-                  if (candidate && candidate.status !== stage) move.mutate({ candidate, stage });
+                  if (candidate && candidate.status !== stage) {
+                    if (stage === "job_interview" || stage === "test_and_demo") {
+                      setScheduleConflicts([]);
+                      setScheduleSelection({ candidate, stage });
+                    } else {
+                      move.mutate({ candidate, stage });
+                    }
+                  }
                 }}
                 className={`min-h-60 rounded-xl border p-2 transition-colors motion-reduce:transition-none ${
                   highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"
@@ -420,6 +455,15 @@ export function PipelineView({
           if (outcomeSelection) outcome.mutate({ candidate: outcomeSelection.candidate, values });
         }}
       />
+
+      <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) { setScheduleSelection(null); setScheduleConflicts([]); } }} title={scheduleSelection?.stage === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">
+        {scheduleSelection ? (
+          <form onSubmit={(event) => { event.preventDefault(); const values = formValues(event.currentTarget); schedule.mutate({ candidate: scheduleSelection.candidate, stage: scheduleSelection.stage, values: { ...values, allow_conflict: Boolean(scheduleConflicts.length) } }); }}>
+            <ModalBody><AppointmentForm appointmentType={scheduleSelection.stage === "job_interview" ? "job_interview" : "demo_lesson"} options={options} conflicts={scheduleConflicts} /></ModalBody>
+            <ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => { setScheduleSelection(null); setScheduleConflicts([]); }} disabled={schedule.isPending}>Cancel</button><button type="submit" className={buttonClass} disabled={schedule.isPending}>{schedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{scheduleConflicts.length ? "Schedule anyway" : "Schedule & move"}</button></div></ModalFooter>
+          </form>
+        ) : null}
+      </Modal>
 
     </div>
   );

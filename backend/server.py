@@ -378,6 +378,8 @@ def handle_http_exception(request_obj: Request, exc: HTTPException):
     requested_with = request_obj.headers.get("X-Requested-With", "")
     is_xhr = requested_with == "XMLHttpRequest"
     if request_obj.url.path.startswith("/api/") or is_xhr:
+        if isinstance(exc.detail, dict):
+            return JSONResponse({"status": "error", **exc.detail}, status_code=exc.status_code)
         return JSONResponse({"status": "error", "message": exc.detail}, status_code=exc.status_code)
     if exc.status_code in {401, 403}:
         return RedirectResponse(url="/", status_code=302)

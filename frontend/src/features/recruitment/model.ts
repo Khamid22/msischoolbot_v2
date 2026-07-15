@@ -4,13 +4,15 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "tasks" | "settings" | "trash" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "decisions" | "candidates" | "schedule" | "tasks" | "settings" | "trash" | "candidate" | "profile";
 
 export type RecruitmentPermissions = {
   can_edit_profile: boolean;
   can_manage_documents: boolean;
   can_manage_interviews: boolean;
   can_manage_tasks: boolean;
+  can_manage_appointments: boolean;
+  can_view_schedule: boolean;
   can_manage_assignments: boolean;
   can_move_stage: boolean;
   can_add_academic_evaluation: boolean;
@@ -32,6 +34,33 @@ export type RecruitmentTask = {
   note?: string;
   responsible_account_id?: number | null;
   responsible_name?: string;
+};
+
+export type RecruitmentAppointment = {
+  id: number;
+  candidate_id: number;
+  candidate_name?: string;
+  candidate_status?: string;
+  appointment_type: "job_interview" | "demo_lesson";
+  starts_at: string;
+  ends_at: string;
+  responsible_account_id?: number | null;
+  responsible_name?: string;
+  responsible_role?: string;
+  appointment_format?: string;
+  location_or_link?: string;
+  topic?: string;
+  note?: string;
+  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  version: number;
+  cancellation_reason?: string;
+  completed_at?: string;
+  cancelled_at?: string;
+  no_show_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  subject_id?: number | null;
+  subject?: string;
 };
 
 export type RecruitmentCandidate = {
@@ -62,6 +91,7 @@ export type RecruitmentCandidate = {
   final_decision?: string;
   rejection_reason?: string;
   next_task?: RecruitmentTask | null;
+  next_appointment?: RecruitmentAppointment | null;
   academy_teacher_id?: number | null;
   active_teacher_id?: number | null;
   permissions?: RecruitmentPermissions;
@@ -69,6 +99,7 @@ export type RecruitmentCandidate = {
   interviews?: Array<Record<string, unknown>>;
   subject_tests?: Array<Record<string, unknown>>;
   demo_lessons?: Array<Record<string, unknown>>;
+  appointments?: RecruitmentAppointment[];
   tasks?: RecruitmentTask[];
   notes?: Array<Record<string, unknown>>;
   assignments?: Array<Record<string, unknown>>;
@@ -150,5 +181,5 @@ export function dateLabel(value: unknown) {
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime())
     ? raw
-    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: raw.includes("T") ? "short" : undefined }).format(parsed);
+    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: raw.includes("T") ? "short" : undefined, timeZone: "Asia/Tashkent" }).format(parsed);
 }

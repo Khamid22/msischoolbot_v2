@@ -52,6 +52,10 @@ def _register_role_routes(
     def candidates():
         return _render(role=role, view="candidates", base_path=base_path)
 
+    @router.get(f"{base_path}/schedule", operation_id=f"{operation_prefix}_recruitment_schedule")
+    def schedule():
+        return _render(role=role, view="schedule", base_path=base_path)
+
     @router.get(f"{base_path}/tasks", operation_id=f"{operation_prefix}_recruitment_tasks")
     def tasks():
         return _render(role=role, view="tasks", base_path=base_path)

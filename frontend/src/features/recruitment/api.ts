@@ -15,7 +15,8 @@ export async function recruitmentRequest<T>(url: string, init: RequestInit = {})
   const payload = await response.json().catch(() => ({}));
   if (!apiSucceeded(response, payload)) {
     const error = new Error(apiErrorMessage(payload, "Unable to complete the recruitment request."));
-    Object.assign(error, { status: response.status });
+    const detail = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+    Object.assign(error, { status: response.status, code: detail.code, details: detail.details });
     throw error;
   }
   return apiData<T>(payload);
@@ -23,6 +24,14 @@ export async function recruitmentRequest<T>(url: string, init: RequestInit = {})
 
 export function jsonBody(value: unknown) {
   return JSON.stringify(value);
+}
+
+export function appointmentConflictDetails<T = Record<string, unknown>>(error: unknown): T[] {
+  if (!error || typeof error !== "object") return [];
+  const candidate = error as { code?: unknown; details?: unknown };
+  return candidate.code === "appointment_conflict" && Array.isArray(candidate.details)
+    ? candidate.details as T[]
+    : [];
 }
 
 export function formValues(form: HTMLFormElement): Record<string, string | number | null> {

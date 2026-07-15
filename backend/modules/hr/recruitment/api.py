@@ -24,6 +24,9 @@ from backend.modules.hr.recruitment.policies import (
 from backend.modules.hr.recruitment.schemas import (
     ApprovalRequestCreate,
     ApprovalReview,
+    AppointmentCreate,
+    AppointmentStatusChange,
+    AppointmentUpdate,
     AssignmentReplace,
     CandidateCreate,
     CandidateUpdate,
@@ -32,6 +35,7 @@ from backend.modules.hr.recruitment.schemas import (
     InterviewWrite,
     NoteCreate,
     RecruitmentSettingCreate,
+    ScheduledStageMove,
     StageChange,
     SubjectTestWrite,
     TaskWrite,
@@ -47,7 +51,10 @@ def _call(operation: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
     try:
         return operation(*args, **kwargs)
     except service.RecruitmentError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        detail: str | dict[str, Any] = str(exc)
+        if exc.code or exc.details is not None:
+            detail = {"message": str(exc), "code": exc.code, "details": exc.details}
+        raise HTTPException(status_code=exc.status_code, detail=detail) from exc
 
 
 @router.get("/pipeline", operation_id="api_v1_recruitment_pipeline")
@@ -112,6 +119,32 @@ def candidate_detail(candidate_id: int, user: CurrentUser = Depends(get_current_
 @router.get("/tasks", operation_id="api_v1_recruitment_tasks")
 def tasks(user: CurrentUser = Depends(get_current_user)):
     return api_success(_call(service.list_tasks, user))
+
+
+@router.get("/appointments", operation_id="api_v1_recruitment_appointments")
+def appointments(
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 50,
+    starts_from: Annotated[str, Query(alias="from")] = "",
+    starts_to: Annotated[str, Query(alias="to")] = "",
+    appointment_type: str = "",
+    status: str = "scheduled",
+    responsible_account_id: int | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
+    return api_success(
+        _call(
+            service.list_appointments,
+            user,
+            page=page,
+            per_page=per_page,
+            starts_from=starts_from,
+            starts_to=starts_to,
+            appointment_type=appointment_type,
+            status=status,
+            responsible_account_id=responsible_account_id,
+        )
+    )
 
 
 @router.get("/options", operation_id="api_v1_recruitment_options")
@@ -183,6 +216,97 @@ def move_candidate(candidate_id: int, payload: StageChange, user: CurrentUser = 
     )
     message = "Candidate moved to Trash Bin." if payload.stage == "trash_bin" else "Candidate moved."
     return api_success({"message": message, "candidate": candidate})
+
+
+@router.post(
+    "/candidates/{candidate_id}/scheduled-stage-moves",
+    status_code=201,
+    operation_id="api_v1_recruitment_scheduled_stage_move",
+)
+def scheduled_stage_move(
+    candidate_id: int,
+    payload: ScheduledStageMove,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_pipeline_management(user)
+    result = _call(service.schedule_stage_move, user, candidate_id, payload.model_dump())
+    return api_success({"message": "Appointment scheduled and candidate moved.", **result}, status_code=201)
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments",
+    status_code=201,
+    operation_id="api_v1_recruitment_create_appointment",
+)
+def create_appointment(
+    candidate_id: int,
+    payload: AppointmentCreate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_pipeline_management(user)
+    result = _call(service.create_appointment, user, candidate_id, payload.model_dump())
+    return api_success({"message": "Appointment scheduled.", **result}, status_code=201)
+
+
+@router.patch(
+    "/candidates/{candidate_id}/appointments/{appointment_id}",
+    operation_id="api_v1_recruitment_update_appointment",
+)
+def update_appointment(
+    candidate_id: int,
+    appointment_id: int,
+    payload: AppointmentUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_pipeline_management(user)
+    result = _call(service.update_appointment, user, candidate_id, appointment_id, payload.model_dump())
+    return api_success({"message": "Appointment rescheduled.", **result})
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/cancel",
+    operation_id="api_v1_recruitment_cancel_appointment",
+)
+def cancel_appointment(
+    candidate_id: int,
+    appointment_id: int,
+    payload: AppointmentStatusChange,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_pipeline_management(user)
+    result = _call(
+        service.change_appointment_status,
+        user,
+        candidate_id,
+        appointment_id,
+        status="cancelled",
+        expected_version=payload.expected_version,
+        reason=payload.reason,
+    )
+    return api_success({"message": "Appointment cancelled.", **result})
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/no-show",
+    operation_id="api_v1_recruitment_no_show_appointment",
+)
+def no_show_appointment(
+    candidate_id: int,
+    appointment_id: int,
+    payload: AppointmentStatusChange,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_pipeline_management(user)
+    result = _call(
+        service.change_appointment_status,
+        user,
+        candidate_id,
+        appointment_id,
+        status="no_show",
+        expected_version=payload.expected_version,
+        reason=payload.reason,
+    )
+    return api_success({"message": "Appointment marked as no-show.", **result})
 
 
 @router.put("/candidates/{candidate_id}/assignments", operation_id="api_v1_recruitment_assign_candidate")

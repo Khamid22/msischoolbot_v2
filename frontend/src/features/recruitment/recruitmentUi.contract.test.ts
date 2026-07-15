@@ -41,6 +41,14 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /\/final-decisions/);
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
   });
+
+  test("requires a scheduler before entering Interview or Test & Demo", () => {
+    assert.match(pipeline, /<AppointmentForm/);
+    assert.match(pipeline, /\/scheduled-stage-moves/);
+    assert.match(pipeline, /Schedule & move/);
+    assert.match(pipeline, /appointmentConflictDetails/);
+    assert.match(pipeline, /setScheduleSelection/);
+  });
 });
 
 describe("candidate navigation and progressive disclosure", () => {
@@ -56,6 +64,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /<Drawer/);
     assert.match(profile, /value="trash_bin"/);
     assert.match(profile, /Trash Bin is recoverable/);
+    assert.match(profile, /\/scheduled-stage-moves/);
+    assert.match(profile, /candidate\.next_appointment/);
+    assert.match(profile, /Upcoming appointments/);
   });
 
   test("keeps only search and stage visible while advanced filters use a drawer", () => {
@@ -96,6 +107,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(trash, /origin=trash/);
     assert.doesNotMatch(trash, /All stages|Candidate filters|filters\.stage/);
     assert.match(profile, /origin === "trash" \? `\$\{basePath\}\/trash/);
+    assert.ok(workspace.indexOf('key: "schedule"') < workspace.indexOf('key: "tasks"'));
     assert.ok(workspace.indexOf('key: "tasks"') < workspace.indexOf('key: "trash"'));
     assert.ok(workspace.indexOf('key: "trash"') < workspace.indexOf('key: "settings"'));
   });
@@ -107,6 +119,19 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(decisions, /\/decision-queue\?page=/);
     assert.match(decisions, /actionable_approval/);
     assert.match(decisions, /origin=decisions/);
+  });
+
+  test("adds URL-backed agenda and week schedule views without a calendar dependency", () => {
+    const schedule = source("ScheduleView.tsx");
+    assert.match(workspace, /key: "schedule", label: "Schedule"/);
+    assert.match(workspace, /view === "schedule" \? <ScheduleView/);
+    assert.match(schedule, /mode === "week"/);
+    assert.match(schedule, /md:hidden/);
+    assert.match(schedule, /replaceUrlParams/);
+    assert.match(schedule, /appointment_type/);
+    assert.match(schedule, /responsible_account_id/);
+    assert.match(schedule, /Asia\/Tashkent/);
+    assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
   });
 });
 

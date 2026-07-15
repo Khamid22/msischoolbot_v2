@@ -15,8 +15,9 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 
-import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, manualStages, stageLabels, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
+import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
+import { appointmentConflictDetails, formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
+import { dateLabel, humanize, manualStages, stageLabels, type RecruitmentAppointment, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
   DefinitionGrid,
@@ -38,9 +39,12 @@ type ProfileAction =
   | { kind: "edit_profile" }
   | { kind: "move_candidate" }
   | { kind: "upload_document"; document?: Record<string, unknown> }
-  | { kind: "record_interview" }
+  | { kind: "record_interview"; appointment?: RecruitmentAppointment }
   | { kind: "record_test" }
-  | { kind: "record_demo" }
+  | { kind: "record_demo"; appointment?: RecruitmentAppointment }
+  | { kind: "schedule_appointment"; appointmentType: "job_interview" | "demo_lesson" }
+  | { kind: "reschedule_appointment"; appointment: RecruitmentAppointment }
+  | { kind: "appointment_status"; appointment: RecruitmentAppointment; status: "cancelled" | "no_show" }
   | { kind: "assign_evaluators" }
   | { kind: "request_approval" }
   | { kind: "record_outcome" }
@@ -119,20 +123,38 @@ function OutcomeFields({ candidate, options }: { candidate: RecruitmentCandidate
   );
 }
 
-function ActionFields({ action, candidate, options }: { action: ProfileAction; candidate: RecruitmentCandidate; options?: RecruitmentOptions }) {
+function MoveCandidateFields({ candidate, options, conflicts }: { candidate: RecruitmentCandidate; options?: RecruitmentOptions; conflicts: RecruitmentAppointment[] }) {
+  const [stage, setStage] = useState("");
+  const appointmentType = stage === "job_interview" ? "job_interview" : stage === "test_and_demo" ? "demo_lesson" : null;
+  return (
+    <div className="grid gap-3">
+      <label className="text-xs font-semibold">New stage<select required name="stage" value={stage} onChange={(event) => setStage(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Choose a stage</option>{manualStages.filter((value) => value !== candidate.status).map((value) => <option key={value} value={value}>{stageLabels[value]}</option>)}{candidate.status !== "trash_bin" ? <option value="trash_bin">{stageLabels.trash_bin}</option> : null}</select></label>
+      {appointmentType ? <AppointmentForm appointmentType={appointmentType} options={options} conflicts={conflicts} /> : <label className="text-xs font-semibold">Reason<textarea name="reason" defaultValue="Candidate profile move" className={`${fieldClass} mt-1 min-h-20`} /></label>}
+      <p className="text-xs leading-5 text-muted-foreground">Job Interview and Test & Demo require a scheduled appointment. Trash Bin is recoverable; protected outcomes continue through Hiring.</p>
+    </div>
+  );
+}
+
+function ActionFields({ action, candidate, options, conflicts }: { action: ProfileAction; candidate: RecruitmentCandidate; options?: RecruitmentOptions; conflicts: RecruitmentAppointment[] }) {
   switch (action.kind) {
     case "edit_profile":
       return <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Full name<input name="full_name" defaultValue={candidate.full_name} required className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Phone<input name="phone" type="tel" defaultValue={candidate.phone} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Telegram<input name="telegram_username" defaultValue={candidate.telegram_username} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Position<input name="applied_position" defaultValue={candidate.applied_position} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={candidate.application_date?.slice(0, 10)} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Source<select name="source" defaultValue={candidate.source} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label><label className="text-xs font-semibold">Age<input name="age" type="number" min="14" max="100" defaultValue={candidate.age || ""} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">English level<input name="english_level" defaultValue={candidate.english_level} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Preferred schedule<input name="preferred_schedule" defaultValue={candidate.preferred_schedule} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Availability<input name="employment_availability" defaultValue={candidate.employment_availability} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Available start date<input name="available_start_date" type="date" defaultValue={candidate.available_start_date?.slice(0, 10)} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Expected salary (UZS)<input name="expected_salary_uzs" type="number" min="0" defaultValue={candidate.expected_salary_uzs || ""} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold sm:col-span-2">Address<textarea name="address" defaultValue={candidate.address} className={`${fieldClass} mt-1 min-h-20`} /></label><label className="text-xs font-semibold sm:col-span-2">Work experience<textarea name="work_experience" defaultValue={candidate.work_experience} className={`${fieldClass} mt-1 min-h-20`} /></label><label className="text-xs font-semibold sm:col-span-2">Teaching experience<textarea name="teaching_experience" defaultValue={candidate.teaching_experience} className={`${fieldClass} mt-1 min-h-20`} /></label><label className="text-xs font-semibold sm:col-span-2">Motivation & expectations<textarea name="motivation_expectations" defaultValue={candidate.motivation_expectations} className={`${fieldClass} mt-1 min-h-20`} /></label><label className="text-xs font-semibold sm:col-span-2">Interests & hobbies<textarea name="interests_hobbies" defaultValue={candidate.interests_hobbies} className={`${fieldClass} mt-1 min-h-20`} /></label></div>;
     case "move_candidate":
-      return <div className="grid gap-3"><label className="text-xs font-semibold">New stage<select required name="stage" className={`${fieldClass} mt-1`}><option value="">Choose a stage</option>{manualStages.filter((stage) => stage !== candidate.status).map((stage) => <option key={stage} value={stage}>{stageLabels[stage]}</option>)}{candidate.status !== "trash_bin" ? <option value="trash_bin">{stageLabels.trash_bin}</option> : null}</select></label><label className="text-xs font-semibold">Reason<textarea name="reason" defaultValue="Candidate profile move" className={`${fieldClass} mt-1 min-h-20`} /></label><p className="text-xs leading-5 text-muted-foreground">Trash Bin is recoverable. Academy, Active Teacher, rejection, hold, and withdrawal continue through the Hiring tab.</p></div>;
+      return <MoveCandidateFields candidate={candidate} options={options} conflicts={conflicts} />;
     case "upload_document":
       return <div className="grid gap-3"><label className="text-xs font-semibold">Document type<select name="document_type" required defaultValue={text(action.document?.document_type)} className={`${fieldClass} mt-1`}><option value="">Select document type</option>{options?.document_types.map((type) => <option key={type} value={type}>{humanize(type)}</option>)}</select></label><label className="text-xs font-semibold">PDF, DOC/DOCX, JPG or PNG (max 20 MB)<input name="document" required type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className={`${fieldClass} mt-1 file:mr-2 file:border-0 file:bg-transparent file:font-semibold`} /></label>{action.document ? <input type="hidden" name="replaces_document_id" value={Number(action.document.id)} /> : null}{!options?.document_upload_enabled ? <p className="text-xs text-muted-foreground">Storage is not configured. Uploads remain disabled.</p> : null}</div>;
     case "record_interview":
-      return <div className="grid gap-3"><label className="text-xs font-semibold">Result<select required name="result" className={`${fieldClass} mt-1`}><option value="passed">Passed</option><option value="failed">Failed</option><option value="on_hold">On hold</option><option value="additional_interview">Additional interview</option><option value="candidate_withdrew">Candidate withdrew</option></select></label><label className="text-xs font-semibold">Format<input name="interview_format" className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Notes<textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">HR recommendation<textarea name="hr_recommendation" className={`${fieldClass} mt-1 min-h-24`} /></label></div>;
+      return <div className="grid gap-3">{action.appointment ? <input type="hidden" name="appointment_id" value={action.appointment.id} /> : null}<label className="text-xs font-semibold">Result<select required name="result" className={`${fieldClass} mt-1`}><option value="passed">Passed</option><option value="failed">Failed</option><option value="on_hold">On hold</option><option value="additional_interview">Additional interview</option><option value="candidate_withdrew">Candidate withdrew</option></select></label><label className="text-xs font-semibold">Format<input name="interview_format" defaultValue={action.appointment?.appointment_format} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Notes<textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">HR recommendation<textarea name="hr_recommendation" className={`${fieldClass} mt-1 min-h-24`} /></label></div>;
     case "record_test":
       return <div className="grid gap-3"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Score<input name="score" type="number" min="0" step="0.01" className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Maximum score<input name="maximum_score" type="number" min="0.01" step="0.01" className={`${fieldClass} mt-1`} /></label></div><label className="text-xs font-semibold">Result<select name="result" className={`${fieldClass} mt-1`}><option value="passed">Passed</option><option value="failed">Failed</option><option value="retake_required">Retake required</option><option value="not_completed">Not completed</option></select></label><label className="text-xs font-semibold">Notes<textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} /></label></div>;
     case "record_demo":
-      return <div className="grid gap-3"><label className="text-xs font-semibold">Topic<input name="topic" className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Score (0–10)<input name="score" type="number" min="0" max="10" step="0.01" className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Result<select name="result" className={`${fieldClass} mt-1`}><option value="passed">Passed</option><option value="failed">Failed</option><option value="additional_demo">Additional demo</option><option value="on_hold">On hold</option></select></label><label className="text-xs font-semibold">Overview<textarea name="overview" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">Academic recommendation<textarea name="recommendation" className={`${fieldClass} mt-1 min-h-24`} /></label></div>;
+      return <div className="grid gap-3">{action.appointment ? <input type="hidden" name="appointment_id" value={action.appointment.id} /> : null}<label className="text-xs font-semibold">Topic<input name="topic" defaultValue={action.appointment?.topic} className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Score (0–10)<input name="score" type="number" min="0" max="10" step="0.01" className={`${fieldClass} mt-1`} /></label><label className="text-xs font-semibold">Result<select name="result" className={`${fieldClass} mt-1`}><option value="passed">Passed</option><option value="failed">Failed</option><option value="additional_demo">Additional demo</option><option value="on_hold">On hold</option></select></label><label className="text-xs font-semibold">Overview<textarea name="overview" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">Academic recommendation<textarea name="recommendation" className={`${fieldClass} mt-1 min-h-24`} /></label></div>;
+    case "schedule_appointment":
+      return <AppointmentForm appointmentType={action.appointmentType} options={options} conflicts={conflicts} />;
+    case "reschedule_appointment":
+      return <AppointmentForm appointmentType={action.appointment.appointment_type} appointment={action.appointment} options={options} conflicts={conflicts} />;
+    case "appointment_status":
+      return <label className="text-xs font-semibold">Reason / note<textarea autoFocus required={action.status === "cancelled"} name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label>;
     case "assign_evaluators": {
       const assigned = new Set((candidate.assignments || []).map((item) => Number(item.assignee_account_id)));
       const evaluators = options?.staff.filter((person) => ["academic_director", "head_of_department"].includes(person.role)) || [];
@@ -160,6 +182,9 @@ function actionTitle(action: ProfileAction | null) {
     case "record_interview": return "Record interview";
     case "record_test": return "Record subject test";
     case "record_demo": return "Record demo lesson";
+    case "schedule_appointment": return action.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson";
+    case "reschedule_appointment": return "Reschedule appointment";
+    case "appointment_status": return action.status === "cancelled" ? "Cancel appointment" : "Mark no-show";
     case "assign_evaluators": return "Assign evaluators";
     case "request_approval": return "Request hiring approval";
     case "record_outcome": return "Record outcome";
@@ -172,6 +197,9 @@ function actionTitle(action: ProfileAction | null) {
 function actionSubmitLabel(action: ProfileAction | null) {
   if (!action) return "Save";
   if (action.kind === "move_candidate") return "Move candidate";
+  if (action.kind === "schedule_appointment") return "Schedule appointment";
+  if (action.kind === "reschedule_appointment") return "Save appointment";
+  if (action.kind === "appointment_status") return action.status === "cancelled" ? "Cancel appointment" : "Mark no-show";
   if (action.kind === "review_approval") return action.status === "approved" ? "Approve & finalize" : "Return request";
   if (action.kind === "upload_document") return action.document ? "Replace" : "Upload";
   return "Save";
@@ -182,6 +210,7 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
   const requestedTab = new URLSearchParams(window.location.search).get("tab") || "overview";
   const [tab, setTab] = useState<ProfileTab>(profileTabs.some((item) => item.key === requestedTab) ? requestedTab as ProfileTab : "overview");
   const [action, setAction] = useState<ProfileAction | null>(null);
+  const [appointmentConflicts, setAppointmentConflicts] = useState<RecruitmentAppointment[]>([]);
   const [removeDocument, setRemoveDocument] = useState<Record<string, unknown> | null>(null);
   const formId = useId();
   const detail = useQuery({ queryKey: ["recruitment", "candidate", candidateId], queryFn: () => recruitmentRequest<RecruitmentCandidate>(`${RECRUITMENT_API}/candidates/${candidateId}`) });
@@ -200,10 +229,15 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
         return;
       }
       setAction(null);
+      setAppointmentConflicts([]);
       setRemoveDocument(null);
       void queryClient.invalidateQueries({ queryKey: ["recruitment"] });
     },
-    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onError: (error) => {
+      const conflicts = appointmentConflictDetails<RecruitmentAppointment>(error);
+      if (conflicts.length) setAppointmentConflicts(conflicts);
+      onAnnouncement(queryError(error), "error");
+    },
   });
 
   useEffect(() => {
@@ -224,6 +258,7 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
   const latestInterview = candidate.interviews?.[0];
   const latestTest = candidate.subject_tests?.[0];
   const latestDemo = candidate.demo_lessons?.[0];
+  const scheduledAppointments = (candidate.appointments || []).filter((item) => item.status === "scheduled");
   const pendingTasks = (candidate.tasks || []).filter((task) => ["pending", "overdue"].includes(task.effective_status));
 
   const setProfileTab = (next: ProfileTab) => {
@@ -252,9 +287,9 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
   const origin = params.get("origin");
   const returnQuery = params.get("return") || "";
   const safeReturn = returnQuery.startsWith("?") ? returnQuery : "";
-  const backHref = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash${safeReturn}` : `${basePath}/candidates${safeReturn}`;
-  const backLabel = origin === "pipeline" ? "Pipeline" : origin === "decisions" ? "Decisions" : origin === "tasks" ? "Tasks" : origin === "trash" ? "Trash Bin" : "Candidates";
-  const backPath = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash` : `${basePath}/candidates`;
+  const backHref = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "schedule" ? `${basePath}/schedule` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash${safeReturn}` : `${basePath}/candidates${safeReturn}`;
+  const backLabel = origin === "pipeline" ? "Pipeline" : origin === "decisions" ? "Decisions" : origin === "schedule" ? "Schedule" : origin === "tasks" ? "Tasks" : origin === "trash" ? "Trash Bin" : "Candidates";
+  const backPath = origin === "pipeline" ? `${basePath}/pipeline` : origin === "decisions" ? `${basePath}/decisions` : origin === "schedule" ? `${basePath}/schedule` : origin === "tasks" ? `${basePath}/tasks` : origin === "trash" ? `${basePath}/trash` : `${basePath}/candidates`;
 
   const submit = (path: string, values: unknown, method = "POST") => mutation.mutate({ url: `${RECRUITMENT_API}/candidates/${candidateId}${path}`, method, values });
   const submitAction = (event: FormEvent<HTMLFormElement>) => {
@@ -266,13 +301,21 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
     } else if (action.kind === "edit_profile") {
       submit("", formValues(form), "PATCH");
     } else if (action.kind === "move_candidate") {
-      submit("/stage", { ...formValues(form), expected_version: candidate.version });
+      const values = formValues(form);
+      const scheduled = values.stage === "job_interview" || values.stage === "test_and_demo";
+      submit(scheduled ? "/scheduled-stage-moves" : "/stage", { ...values, expected_version: candidate.version, allow_conflict: scheduled && Boolean(appointmentConflicts.length) });
     } else if (action.kind === "record_interview") {
       submit("/interviews", formValues(form));
     } else if (action.kind === "record_test") {
       submit("/subject-tests", { ...formValues(form), subject_id: candidate.subject_id || null });
     } else if (action.kind === "record_demo") {
       submit("/demo-lessons", { ...formValues(form), subject_id: candidate.subject_id || null });
+    } else if (action.kind === "schedule_appointment") {
+      submit("/appointments", { ...formValues(form), appointment_type: action.appointmentType, allow_conflict: Boolean(appointmentConflicts.length) });
+    } else if (action.kind === "reschedule_appointment") {
+      submit(`/appointments/${action.appointment.id}`, { ...formValues(form), expected_version: action.appointment.version, allow_conflict: Boolean(appointmentConflicts.length) }, "PATCH");
+    } else if (action.kind === "appointment_status") {
+      submit(`/appointments/${action.appointment.id}/${action.status === "cancelled" ? "cancel" : "no-show"}`, { ...formValues(form), expected_version: action.appointment.version });
     } else if (action.kind === "assign_evaluators") {
       const ids = new FormData(form).getAll("assignee_account_ids").map(Number).filter(Boolean);
       submit("/assignments", { assignee_account_ids: ids, subject_id: candidate.subject_id || null }, "PUT");
@@ -291,6 +334,10 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
   };
 
   const evaluationItems: ActionMenuItem[] = [];
+  if (permissions?.can_manage_appointments) {
+    evaluationItems.push({ key: "schedule_interview", label: "Schedule interview", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }); } });
+    evaluationItems.push({ key: "schedule_demo", label: "Schedule demo lesson", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }); } });
+  }
   if (permissions?.can_manage_interviews) evaluationItems.push({ key: "interview", label: "Record interview", onClick: () => setAction({ kind: "record_interview" }) });
   if (permissions?.can_add_academic_evaluation) {
     evaluationItems.push({ key: "test", label: "Record subject test", onClick: () => setAction({ kind: "record_test" }) });
@@ -326,7 +373,7 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
       <header className="sticky top-[calc(var(--app-top-inset)+4.5rem)] z-20 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur lg:top-3">
         <div className="flex items-start gap-2">
           <a href={backHref} onClick={(event) => { try { const previous = new URL(document.referrer); if (origin && previous.origin === window.location.origin && previous.pathname === backPath) { event.preventDefault(); window.history.back(); } } catch { /* Direct deep links use the safe fallback href. */ } }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" aria-label={`Back to ${backLabel}`} title={`Back to ${backLabel}`}><ArrowLeft className="h-4 w-4" /></a>
-          <div className="min-w-0 flex-1 py-0.5"><div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">{candidate.full_name}</h1><StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge></div><p className="mt-0.5 truncate text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}{candidate.next_task ? ` · Next: ${candidate.next_task.title}` : ""}</p></div>
+          <div className="min-w-0 flex-1 py-0.5"><div className="flex flex-wrap items-center gap-2"><h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">{candidate.full_name}</h1><StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge></div><p className="mt-0.5 truncate text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}{candidate.next_appointment ? ` · Next: ${candidate.next_appointment.appointment_type === "job_interview" ? "Interview" : "Demo"} ${dateLabel(candidate.next_appointment.starts_at)}` : candidate.next_task ? ` · Next: ${candidate.next_task.title}` : ""}</p></div>
           <div className="shrink-0">{tabAction}</div>
         </div>
         <label className="mt-2 block text-xs font-semibold text-muted-foreground sm:hidden">Profile section<select value={tab} onChange={(event) => setProfileTab(event.target.value as ProfileTab)} className={`${fieldClass} mt-1`}>{profileTabs.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
@@ -335,9 +382,9 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
         </div>
       </header>
 
-      {tab === "overview" ? <div id="candidate-panel-overview" role="tabpanel" aria-labelledby="candidate-tab-overview" className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]"><Panel title="Personal & background" icon={<UserRound className="h-4 w-4" />}><DefinitionGrid values={[["Phone", candidate.phone], ["Telegram", candidate.telegram_username], ["Application date", dateLabel(candidate.application_date)], ["Source", candidate.source], ["Age", candidate.age], ["English", candidate.english_level], ["Schedule", candidate.preferred_schedule], ["Availability", candidate.employment_availability], ["Start date", dateLabel(candidate.available_start_date)], ["Expected salary", candidate.expected_salary_uzs ? `${Number(candidate.expected_salary_uzs).toLocaleString()} UZS` : ""], ["Address", candidate.address], ["Previous workplace", candidate.previous_workplace]]} /><div className="mt-2"><DefinitionGrid values={[["Motivation", candidate.motivation_expectations], ["Work experience", candidate.work_experience], ["Teaching experience", candidate.teaching_experience], ["Interests", candidate.interests_hobbies]]} /></div></Panel><div className="space-y-3"><Panel title="Next action" icon={<CalendarClock className="h-4 w-4" />}>{candidate.next_task ? <div><p className="text-sm font-semibold">{candidate.next_task.title}</p><p className="mt-1 text-xs text-muted-foreground">Due {dateLabel(candidate.next_task.due_at)}</p></div> : <EmptyLine>No open task.</EmptyLine>}</Panel><Panel title="Readiness" icon={<BriefcaseBusiness className="h-4 w-4" />}><DefinitionGrid values={[["Missing documents", candidate.missing_document_types?.length || 0], ["Interview", latestInterview?.result], ["Subject test", latestTest?.result], ["Demo", latestDemo?.result], ["Open tasks", pendingTasks.length], ["Final decision", candidate.final_decision || "Pending"]]} /></Panel></div></div> : null}
+      {tab === "overview" ? <div id="candidate-panel-overview" role="tabpanel" aria-labelledby="candidate-tab-overview" className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]"><Panel title="Personal & background" icon={<UserRound className="h-4 w-4" />}><DefinitionGrid values={[["Phone", candidate.phone], ["Telegram", candidate.telegram_username], ["Application date", dateLabel(candidate.application_date)], ["Source", candidate.source], ["Age", candidate.age], ["English", candidate.english_level], ["Schedule", candidate.preferred_schedule], ["Availability", candidate.employment_availability], ["Start date", dateLabel(candidate.available_start_date)], ["Expected salary", candidate.expected_salary_uzs ? `${Number(candidate.expected_salary_uzs).toLocaleString()} UZS` : ""], ["Address", candidate.address], ["Previous workplace", candidate.previous_workplace]]} /><div className="mt-2"><DefinitionGrid values={[["Motivation", candidate.motivation_expectations], ["Work experience", candidate.work_experience], ["Teaching experience", candidate.teaching_experience], ["Interests", candidate.interests_hobbies]]} /></div></Panel><div className="space-y-3"><Panel title="Next action" icon={<CalendarClock className="h-4 w-4" />}>{candidate.next_appointment ? <div><p className="text-sm font-semibold">{candidate.next_appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"}</p><p className="mt-1 text-xs text-muted-foreground">{dateLabel(candidate.next_appointment.starts_at)}{candidate.next_appointment.responsible_name ? ` · ${candidate.next_appointment.responsible_name}` : ""}</p></div> : candidate.next_task ? <div><p className="text-sm font-semibold">{candidate.next_task.title}</p><p className="mt-1 text-xs text-muted-foreground">Due {dateLabel(candidate.next_task.due_at)}</p></div> : <EmptyLine>No open action.</EmptyLine>}</Panel><Panel title="Readiness" icon={<BriefcaseBusiness className="h-4 w-4" />}><DefinitionGrid values={[["Missing documents", candidate.missing_document_types?.length || 0], ["Interview", latestInterview?.result], ["Subject test", latestTest?.result], ["Demo", latestDemo?.result], ["Open tasks", pendingTasks.length], ["Final decision", candidate.final_decision || "Pending"]]} /></Panel></div></div> : null}
 
-      {tab === "evaluations" ? <div id="candidate-panel-evaluations" role="tabpanel" aria-labelledby="candidate-tab-evaluations" className="grid gap-3 xl:grid-cols-3"><Panel title="Interviews" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.interviews || []} empty="No interviews recorded." /></Panel><Panel title="Subject tests" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.subject_tests || []} empty="No subject tests recorded." /></Panel><Panel title="Demo lessons" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.demo_lessons || []} empty="No demo lessons recorded." /></Panel></div> : null}
+      {tab === "evaluations" ? <div id="candidate-panel-evaluations" role="tabpanel" aria-labelledby="candidate-tab-evaluations" className="space-y-3"><Panel title="Upcoming appointments" icon={<CalendarClock className="h-4 w-4" />}><div className="divide-y divide-border rounded-lg border border-border">{scheduledAppointments.map((appointment) => { const appointmentItems: ActionMenuItem[] = []; if (permissions?.can_manage_appointments) { appointmentItems.push({ key: "reschedule", label: "Reschedule", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "reschedule_appointment", appointment }); } }); appointmentItems.push({ key: "no_show", label: "Mark no-show", onClick: () => setAction({ kind: "appointment_status", appointment, status: "no_show" }) }); appointmentItems.push({ separator: true, key: "separator" }); appointmentItems.push({ key: "cancel", label: "Cancel appointment", danger: true, onClick: () => setAction({ kind: "appointment_status", appointment, status: "cancelled" }) }); } if (appointment.appointment_type === "job_interview" && permissions?.can_manage_interviews) appointmentItems.unshift({ key: "result", label: "Record interview result", onClick: () => setAction({ kind: "record_interview", appointment }) }); if (appointment.appointment_type === "demo_lesson" && permissions?.can_add_academic_evaluation) appointmentItems.unshift({ key: "result", label: "Record demo result", onClick: () => setAction({ kind: "record_demo", appointment }) }); return <article key={appointment.id} className="flex min-h-16 items-center justify-between gap-3 px-3 py-2"><div className="min-w-0"><p className="truncate text-[13px] font-semibold">{appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{dateLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</p></div>{appointmentItems.length ? <ActionMenu items={appointmentItems} label={`Actions for ${appointment.appointment_type}`} /> : <StatusBadge status={appointment.status} />}</article>; })}</div>{!scheduledAppointments.length ? <EmptyLine>No upcoming appointments.</EmptyLine> : null}</Panel><div className="grid gap-3 xl:grid-cols-3"><Panel title="Interviews" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.interviews || []} empty="No interviews recorded." /></Panel><Panel title="Subject tests" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.subject_tests || []} empty="No subject tests recorded." /></Panel><Panel title="Demo lessons" icon={<ClipboardCheck className="h-4 w-4" />}><AttemptList items={candidate.demo_lessons || []} empty="No demo lessons recorded." /></Panel></div></div> : null}
 
       {tab === "documents" ? <div id="candidate-panel-documents" role="tabpanel" aria-labelledby="candidate-tab-documents"><Panel title="Documents" icon={<FileText className="h-4 w-4" />} action={<span className="text-xs text-muted-foreground">Missing: {candidate.missing_document_types?.length || 0}</span>}><div className="divide-y divide-border rounded-lg border border-border">{(candidate.documents || []).map((document) => { const documentItems: ActionMenuItem[] = [{ key: "open", label: "Open", onClick: () => window.open(`${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open`, "_blank", "noopener,noreferrer") }, { key: "download", label: "Download", onClick: () => window.location.assign(`${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open?download=true`) }]; if (permissions?.can_manage_documents) { documentItems.push({ key: "replace", label: "Replace", onClick: () => setAction({ kind: "upload_document", document }) }); documentItems.push({ separator: true, key: "separator" }); documentItems.push({ key: "remove", label: "Remove", danger: true, onClick: () => setRemoveDocument(document) }); } return <div key={Number(document.id)} className="flex min-h-14 items-center justify-between gap-2 px-3 py-2"><div className="min-w-0"><p className="truncate text-[13px] font-semibold">{text(document.original_file_name)}</p><p className="text-xs text-muted-foreground">{humanize(document.document_type)} · v{text(document.version)}</p></div><ActionMenu items={documentItems} label={`Actions for ${text(document.original_file_name)}`} /></div>; })}</div>{!(candidate.documents || []).length ? <EmptyLine>No documents uploaded.</EmptyLine> : null}<p className="mt-3 text-xs leading-5 text-muted-foreground">Missing document types remain informational: {(candidate.missing_document_types || []).map(humanize).join(", ") || "none"}.</p></Panel></div> : null}
 
@@ -347,14 +394,14 @@ export function CandidateProfile({ candidateId, basePath, role, onAnnouncement }
 
       <Drawer
         open={Boolean(action)}
-        onClose={() => { if (!mutation.isPending) { mutation.reset(); setAction(null); } }}
+        onClose={() => { if (!mutation.isPending) { mutation.reset(); setAction(null); setAppointmentConflicts([]); } }}
         title={actionTitle(action)}
         description={candidate.full_name}
         widthClass="sm:max-w-xl"
-        footer={action ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); }}>Cancel</button><button type="submit" form={formId} className={buttonClass} disabled={mutation.isPending || (action.kind === "upload_document" && !options.data?.document_upload_enabled)}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{actionSubmitLabel(action)}</button></div> : undefined}
+        footer={action ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); setAppointmentConflicts([]); }}>Cancel</button><button type="submit" form={formId} className={buttonClass} disabled={mutation.isPending || (action.kind === "upload_document" && !options.data?.document_upload_enabled)}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{appointmentConflicts.length ? "Schedule anyway" : actionSubmitLabel(action)}</button></div> : undefined}
       >
         {mutation.error ? <div role="alert" className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">{queryError(mutation.error)}</div> : null}
-        {action ? <form id={formId} onSubmit={submitAction}><ActionFields action={action} candidate={candidate} options={options.data} /></form> : null}
+        {action ? <form id={formId} onSubmit={submitAction}><ActionFields action={action} candidate={candidate} options={options.data} conflicts={appointmentConflicts} /></form> : null}
       </Drawer>
 
       <ConfirmDialog

@@ -10,6 +10,7 @@
 /academic-director/recruitment/decisions | GET
 /academic-director/recruitment/pipeline | GET
 /academic-director/recruitment/profile | GET
+/academic-director/recruitment/schedule | GET
 /academic-director/recruitment/tasks | GET
 /academic-director/subjects | GET
 /academic-director/teacher-academy | GET
@@ -147,10 +148,15 @@
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status | POST
 /api/v1/recruitment/academy-intakes/{academy_teacher_id}/onboard | POST
 /api/v1/recruitment/active-teacher-intakes/{teacher_id}/provision-account | POST
+/api/v1/recruitment/appointments | GET
 /api/v1/recruitment/candidates | GET
 /api/v1/recruitment/candidates | POST
 /api/v1/recruitment/candidates/{candidate_id} | GET
 /api/v1/recruitment/candidates/{candidate_id} | PATCH
+/api/v1/recruitment/candidates/{candidate_id}/appointments | POST
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id} | PATCH
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/cancel | POST
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/no-show | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests/{approval_id}/review | POST
 /api/v1/recruitment/candidates/{candidate_id}/assignments | PUT
@@ -161,6 +167,7 @@
 /api/v1/recruitment/candidates/{candidate_id}/final-decisions | POST
 /api/v1/recruitment/candidates/{candidate_id}/interviews | POST
 /api/v1/recruitment/candidates/{candidate_id}/notes | POST
+/api/v1/recruitment/candidates/{candidate_id}/scheduled-stage-moves | POST
 /api/v1/recruitment/candidates/{candidate_id}/stage | POST
 /api/v1/recruitment/candidates/{candidate_id}/subject-tests | POST
 /api/v1/recruitment/candidates/{candidate_id}/tasks | POST
@@ -191,6 +198,7 @@
 /ceo/recruitment/candidates/{candidate_id} | GET
 /ceo/recruitment/pipeline | GET
 /ceo/recruitment/profile | GET
+/ceo/recruitment/schedule | GET
 /ceo/recruitment/tasks | GET
 /customer-support | GET
 /dashboard/{student_id} | GET
@@ -212,6 +220,7 @@
 /head-of-departments/recruitment/candidates/{candidate_id} | GET
 /head-of-departments/recruitment/pipeline | GET
 /head-of-departments/recruitment/profile | GET
+/head-of-departments/recruitment/schedule | GET
 /head-of-departments/recruitment/tasks | GET
 /head-of-departments/teacher-academy | GET
 /head-of-departments/timetable | GET
@@ -222,6 +231,7 @@
 /hr-manager/candidates/{candidate_id} | GET
 /hr-manager/pipeline | GET
 /hr-manager/profile | GET
+/hr-manager/schedule | GET
 /hr-manager/settings | GET
 /hr-manager/tasks | GET
 /hr-manager/trash | GET

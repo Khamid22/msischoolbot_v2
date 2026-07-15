@@ -11,6 +11,8 @@ export type KnownStatus =
   | "in_academy"
   | "ready"
   | "completed"
+  | "cancelled"
+  | "no_show"
   | "needs_support"
   | "scheduled"
   | "assigned"
@@ -29,6 +31,8 @@ export const statusToneMap: Record<KnownStatus, StatusTone> = {
   in_academy: "info",
   ready: "success",
   completed: "success",
+  cancelled: "neutral",
+  no_show: "warning",
   needs_support: "warning",
   scheduled: "info",
   assigned: "neutral",
@@ -48,6 +52,8 @@ const statusLabels: Record<KnownStatus, string> = {
   in_academy: "In Academy",
   ready: "Ready",
   completed: "Completed",
+  cancelled: "Cancelled",
+  no_show: "No-show",
   needs_support: "Needs Support",
   scheduled: "Scheduled",
   assigned: "Assigned",
