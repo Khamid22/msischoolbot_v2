@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 from backend.core.access import CurrentUser, get_current_user, require_role
 from backend.core.api import api_success
 from backend.modules.hr.recruitment import service
+from backend.modules.hr.recruitment import notifications as recruitment_notifications
 from backend.modules.hr.recruitment.constants import RECRUITMENT_ROLES
 from backend.modules.hr.recruitment.policies import (
     ensure_academic_write,
@@ -166,6 +167,37 @@ def appointments(
             responsible_account_id=responsible_account_id,
         )
     )
+
+
+@router.get("/notifications", operation_id="api_v1_recruitment_notifications")
+def notifications(
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 25,
+    user: CurrentUser = Depends(get_current_user),
+):
+    if not user.account_id:
+        raise HTTPException(status_code=403, detail="An account is required for notifications.")
+    return api_success(
+        recruitment_notifications.list_notifications(
+            int(user.account_id), page=page, per_page=per_page
+        )
+    )
+
+
+@router.get("/notifications/unread-count", operation_id="api_v1_recruitment_notification_unread_count")
+def notification_unread_count(user: CurrentUser = Depends(get_current_user)):
+    if not user.account_id:
+        raise HTTPException(status_code=403, detail="An account is required for notifications.")
+    return api_success({"unread_count": recruitment_notifications.unread_count(int(user.account_id))})
+
+
+@router.post("/notifications/{notification_id}/read", operation_id="api_v1_recruitment_notification_read")
+def mark_notification_read(notification_id: int, user: CurrentUser = Depends(get_current_user)):
+    if not user.account_id:
+        raise HTTPException(status_code=403, detail="An account is required for notifications.")
+    if not recruitment_notifications.mark_notification_read(int(user.account_id), int(notification_id)):
+        raise HTTPException(status_code=404, detail="Notification was not found.")
+    return api_success({"message": "Notification marked as read."})
 
 
 @router.get("/options", operation_id="api_v1_recruitment_options")

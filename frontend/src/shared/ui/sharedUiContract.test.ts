@@ -15,8 +15,8 @@ function source(name: string): string {
 }
 
 describe("uiLayers z-scale", () => {
-  it("stacks sidebar < mobile nav < toast < overlay < popover", () => {
-    const order: Array<keyof typeof uiLayers> = ["sidebar", "mobileNav", "toast", "overlay", "popover"];
+  it("stacks sidebar < mobile nav < overlay < popover < toast", () => {
+    const order: Array<keyof typeof uiLayers> = ["sidebar", "mobileNav", "overlay", "popover", "toast"];
     const values = order.map((key) => {
       const match = uiLayers[key].match(/z-\[?(\d+)\]?/);
       assert.ok(match, `uiLayers.${key} ("${uiLayers[key]}") is not a z-index class`);

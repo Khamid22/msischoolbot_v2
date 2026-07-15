@@ -2119,7 +2119,7 @@ export function CandidateProfile({
                 return (
                   <article
                     key={appointment.id}
-                    className="flex min-h-16 items-center justify-between gap-3 px-3 py-2"
+                    className={`flex min-h-16 items-center justify-between gap-3 px-3 py-2 ${appointment.is_overdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-semibold">
@@ -2133,6 +2133,8 @@ export function CandidateProfile({
                           ? ` · ${appointment.responsible_name}`
                           : ""}
                       </p>
+                      {appointment.topic ? <p className="mt-0.5 truncate text-xs text-muted-foreground">Topic: {appointment.topic}</p> : null}
+                      {appointment.is_overdue ? <p className="mt-1 text-xs font-semibold text-destructive">Overdue — record a result, reschedule, cancel, or mark no-show.</p> : null}
                     </div>
                     {appointmentItems.length ? (
                       <ActionMenu
@@ -2140,7 +2142,7 @@ export function CandidateProfile({
                         label={`Actions for ${appointment.appointment_type}`}
                       />
                     ) : (
-                      <StatusBadge status={appointment.status} />
+                      <StatusBadge status={appointment.is_overdue ? "overdue" : appointment.status} />
                     )}
                   </article>
                 );
@@ -2410,11 +2412,11 @@ export function CandidateProfile({
                 {(candidate.decisions || []).map((item) => (
                   <article
                     key={Number(item.id)}
-                    className="rounded-lg border border-border p-3"
+                    className={`rounded-lg border border-border p-3 ${item.voided_at ? "opacity-60" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[13px] font-semibold">
-                        {stageLabels[text(item.decision)]}
+                        {stageLabels[text(item.decision)]}{item.voided_at ? " · Voided" : ""}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {dateLabel(item.created_at)}
@@ -2423,6 +2425,10 @@ export function CandidateProfile({
                     <p className="mt-1 text-xs text-muted-foreground">
                       {humanize(item.rejection_reason) ||
                         text(item.reason_detail || "No reason")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {item.decided_by ? `By ${text(item.decided_by)}` : "Recorded by system"}
+                      {item.source_evaluation_type ? ` · ${humanize(item.source_evaluation_type)} evaluation #${text(item.source_evaluation_id)}` : ""}
                     </p>
                   </article>
                 ))}

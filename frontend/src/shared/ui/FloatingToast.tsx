@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { uiLayers } from "@/shared/ui/layers";
 
@@ -48,10 +49,12 @@ export function FloatingToast({ toast, onClose }: { toast: FloatingToastState; o
   const tone = toast.tone === "danger" ? "error" : toast.tone || "success";
   const { className, icon: Icon } = toneStyles[tone];
 
-  return (
+  return createPortal(
     <div
       className={`fixed left-4 right-4 ${uiLayers.toast} bottom-[calc(var(--app-bottom-inset)+5.5rem)] ml-auto flex w-fit max-w-[min(22rem,calc(100vw-2rem))] items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold shadow-card-hover animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none lg:bottom-auto lg:left-auto lg:top-4 lg:slide-in-from-top-2 ${className}`}
       role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
       data-toast-tone={tone}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -66,6 +69,7 @@ export function FloatingToast({ toast, onClose }: { toast: FloatingToastState; o
           <X className="h-3.5 w-3.5" />
         </button>
       ) : null}
-    </div>
+    </div>,
+    document.body,
   );
 }

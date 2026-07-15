@@ -83,10 +83,12 @@ function AppointmentCard({
       ]
     : [];
   const candidateName = item.candidate_name || "Candidate";
+  const effectiveStatus = item.is_overdue && item.status === "scheduled" ? "overdue" : item.status;
+  const overdueClass = effectiveStatus === "overdue" ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/20" : "border-border bg-card";
 
   if (compact) {
     return (
-      <article className="min-w-0 rounded-lg border border-border bg-card p-2 shadow-sm">
+      <article className={`min-w-0 rounded-lg border p-2 shadow-sm ${overdueClass}`}>
         <div className="flex min-w-0 items-start gap-1">
           <a
             href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations&origin=schedule`}
@@ -104,26 +106,28 @@ function AppointmentCard({
           <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={item.responsible_name || "Staff not assigned"}>
             {item.responsible_name || "Staff not assigned"}
           </span>
-          <StatusBadge status={item.status} className="shrink-0 text-[9px]" />
+          <StatusBadge status={effectiveStatus} className="shrink-0 text-[9px]" />
         </div>
         {item.appointment_format ? <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.appointment_format}</p> : null}
+        {item.topic ? <p className="mt-1 truncate text-[11px] text-muted-foreground">Topic: {item.topic}</p> : null}
       </article>
     );
   }
 
   return (
-    <article className="rounded-lg border border-border bg-card p-3 shadow-sm">
+    <article className={`rounded-lg border p-3 shadow-sm ${overdueClass}`}>
       <div className="flex items-start justify-between gap-2">
         <a href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations&origin=schedule`} onClick={() => rememberRecruitmentReturn("schedule")} className="min-w-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
           <p className="truncate text-sm font-semibold hover:text-primary">{candidateName}</p>
           <p className="mt-0.5 text-xs font-medium text-muted-foreground">{appointmentTitle(item)} · {dateLabel(item.starts_at)}</p>
         </a>
-        <div className="flex shrink-0 items-center gap-1"><StatusBadge status={item.status} />{actions.length ? <ActionMenu items={actions} label={`Actions for ${candidateName}`} /> : null}</div>
+        <div className="flex shrink-0 items-center gap-1"><StatusBadge status={effectiveStatus} />{actions.length ? <ActionMenu items={actions} label={`Actions for ${candidateName}`} /> : null}</div>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>{item.responsible_name || "Staff not assigned"}</span>
         {item.appointment_format ? <span>{item.appointment_format}</span> : null}
         {item.location_or_link ? <span className="max-w-full truncate">{item.location_or_link}</span> : null}
+        {item.topic ? <span className="max-w-full truncate">Topic: {item.topic}</span> : null}
       </div>
     </article>
   );

@@ -121,7 +121,8 @@ def get_account_telegram_link_row(conn: Any, telegram_user_id: int) -> Any:
         """
         SELECT id, account_id, telegram_user_id, telegram_username, status
         FROM msi_v2.account_telegram_links
-        WHERE telegram_user_id = %s
+        WHERE telegram_user_id = %s AND status = 'active'
+        ORDER BY linked_at DESC, id DESC
         LIMIT 1
         """,
         (int(telegram_user_id),),
@@ -510,7 +511,7 @@ def save_parent_account(
                 account_id, telegram_user_id, telegram_username, status, linked_at
             )
             VALUES (%s, %s, NULLIF(%s, ''), 'active', now())
-            ON CONFLICT (telegram_user_id) DO UPDATE SET
+            ON CONFLICT (telegram_user_id) WHERE status = 'active' DO UPDATE SET
                 account_id = excluded.account_id,
                 telegram_username = excluded.telegram_username,
                 status = 'active',

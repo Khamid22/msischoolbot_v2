@@ -1,4 +1,4 @@
-import { Link2, Loader2, Plus, Tags, Trash2 } from "lucide-react";
+import { Link2, Loader2, LockKeyhole, Plus, Tags, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 
@@ -66,8 +66,8 @@ function SettingsPanel({
       <div className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
         {items.map((item) => (
           <div key={item.id} className="flex min-h-12 items-center justify-between gap-2 px-3 py-1.5">
-            <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{item.label}</span>
-            <button
+            <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{item.label}{item.is_system ? <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"><LockKeyhole className="h-3 w-3" />System</span> : null}</span>
+            {!item.is_system ? <button
               type="button"
               onClick={() => onRemove(item)}
               disabled={busy}
@@ -76,7 +76,7 @@ function SettingsPanel({
               title={`Remove ${item.label}`}
             >
               <Trash2 className="h-4 w-4" />
-            </button>
+            </button> : null}
           </div>
         ))}
       </div>

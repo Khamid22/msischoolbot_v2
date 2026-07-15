@@ -1,4 +1,4 @@
-import { Ban, CalendarPlus, ListFilter, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, PauseCircle, Plus, Search, Trash2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -203,6 +203,21 @@ function CandidateCard({
   if (candidate.status === "on_hold") { detailLabel = candidate.hold_reason || "On Hold"; detailValue = dateLabel(candidate.hold_application_date || candidate.application_date); }
   if (["teacher_academy", "active_teacher"].includes(candidate.status)) { detailLabel = "Accepted"; detailValue = dateLabel(candidate.final_decision_at || candidate.stage_changed_at); }
 
+  const overdue = Boolean(appointment?.is_overdue);
+  const passedInterview = candidate.status === "job_interview" && candidate.latest_interview_result === "passed" && !appointment;
+  const toneClass = overdue
+    ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/25"
+    : candidate.status === "on_hold"
+      ? "border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-900/40"
+      : passedInterview || candidate.status === "under_review"
+        ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-950/20"
+        : ["job_interview", "test_and_demo"].includes(candidate.status)
+          ? "border-amber-400 bg-amber-50 dark:border-amber-500/50 dark:bg-amber-950/20"
+          : "border-border bg-card";
+  if (overdue) { detailLabel = "Overdue"; detailValue = dateLabel(appointment?.starts_at); }
+  if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
+  const StatusIcon = overdue ? AlertTriangle : candidate.status === "on_hold" ? PauseCircle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
+
   return (
     <article
       data-candidate-card
@@ -214,12 +229,12 @@ function CandidateCard({
         onDragStart(candidate);
       }}
       onDragEnd={onDragEnd}
-      className={`rounded-lg border border-border bg-card shadow-sm transition-colors motion-reduce:transition-none hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/25 ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+      className={`rounded-lg border shadow-sm transition-colors motion-reduce:transition-none hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/25 ${toneClass} ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       <a href={`${basePath}/candidates/${candidate.id}?tab=overview&origin=pipeline`} onClick={() => rememberRecruitmentReturn("pipeline")} className="block rounded-t-lg px-3 pb-2 pt-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30" title={candidate.full_name}>
         <p className="truncate text-sm font-semibold text-foreground">{candidate.full_name}</p>
         <p className="mt-1 truncate text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p>
-        {detailLabel ? <div className="mt-2 rounded-md bg-muted/55 px-2 py-1.5 text-xs"><span className="block truncate font-medium text-foreground">{detailLabel}</span><span className="text-muted-foreground">{detailValue}</span></div> : null}
+        {detailLabel ? <div className="mt-2 rounded-md bg-background/65 px-2 py-1.5 text-xs"><span className="flex items-center gap-1.5 truncate font-semibold text-foreground"><StatusIcon className="h-3.5 w-3.5 shrink-0" />{detailLabel}</span><span className="mt-0.5 block text-muted-foreground">{detailValue}</span>{candidate.status === "test_and_demo" && appointment ? <span className="mt-1 block text-muted-foreground"><span className="block truncate">Evaluator: {appointment.responsible_name || "Not assigned"}</span>{appointment.topic ? <span className="block truncate">Topic: {appointment.topic}</span> : null}<span className={`block font-semibold ${overdue ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`}>{overdue ? "Overdue" : "Scheduled"}</span></span> : null}</div> : null}
       </a>
       {unscheduledType ? (
         <button type="button" onClick={() => onSchedule(candidate, unscheduledType)} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100">

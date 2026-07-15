@@ -18,7 +18,7 @@ def test_shared_modal_component_uses_portal_backdrop_scroll_lock_and_top_z_index
     assert "document.body" in source
     # z-index comes from the shared layer scale; the overlay layer stays high.
     assert "fixed inset-0 ${uiLayers.overlay}" in source
-    assert 'toast: "z-[80]"' in layers_source
+    assert 'toast: "z-[200]"' in layers_source
     assert 'overlay: "z-[100]"' in layers_source
     assert 'popover: "z-[120]"' in layers_source
     assert "export function BottomSheet" in source

@@ -5,8 +5,7 @@ import { humanize, type RecruitmentAppointment, type RecruitmentOptions } from "
 import { fieldClass } from "@/features/recruitment/ui";
 
 function tashkentInputValue(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
+  const date = value ? new Date(value) : new Date(Math.ceil((Date.now() + 60 * 60_000) / (15 * 60_000)) * (15 * 60_000));
   if (Number.isNaN(date.getTime())) return "";
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tashkent",
@@ -41,6 +40,9 @@ export function AppointmentForm({
 }) {
   const demo = appointmentType === "demo_lesson";
   const [format, setFormat] = useState(appointment?.appointment_format || "");
+  const initialStart = tashkentInputValue(appointment?.starts_at);
+  const [appointmentDate, setAppointmentDate] = useState(initialStart.slice(0, 10));
+  const [appointmentTime, setAppointmentTime] = useState(initialStart.slice(11, 16));
   const staff = (options?.staff || []).filter((person) => (
     demo
       ? ["academic_director", "head_of_department"].includes(person.role)
@@ -49,15 +51,30 @@ export function AppointmentForm({
   const defaultDuration = appointmentDuration(appointment) || (demo ? 45 : 30);
   return (
     <div className="grid gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+        <span>Appointment time</span><strong className="text-foreground">Asia/Tashkent (UTC+5)</strong>
+      </div>
+      <input type="hidden" name="starts_at" value={appointmentDate && appointmentTime ? `${appointmentDate}T${appointmentTime}` : ""} />
+      <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs font-semibold">
-          Date and start time
+          Date
           <input
             autoFocus
             required
-            name="starts_at"
-            type="datetime-local"
-            defaultValue={tashkentInputValue(appointment?.starts_at)}
+            type="date"
+            value={appointmentDate}
+            onChange={(event) => setAppointmentDate(event.target.value)}
+            className={`${fieldClass} mt-1`}
+          />
+        </label>
+        <label className="text-xs font-semibold">
+          Time
+          <input
+            required
+            type="time"
+            step={900}
+            value={appointmentTime}
+            onChange={(event) => setAppointmentTime(event.target.value)}
             className={`${fieldClass} mt-1`}
           />
         </label>
@@ -69,7 +86,7 @@ export function AppointmentForm({
             type="number"
             min={15}
             max={240}
-            step={1}
+            step={15}
             defaultValue={defaultDuration}
             className={`${fieldClass} mt-1`}
           />
@@ -89,10 +106,9 @@ export function AppointmentForm({
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs font-semibold">Format<select required name="appointment_format" value={format} onChange={(event) => setFormat(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select format</option><option value="Online">Online</option><option value="In person">In person</option>{!demo ? <option value="Phone">Phone</option> : null}</select></label>
-        <label className="text-xs font-semibold">{format === "Online" ? "Conference link" : format === "In person" ? "Location" : "Location or link"}<input required={["Online", "In person"].includes(format)} type={format === "Online" ? "url" : "text"} name="location_or_link" defaultValue={appointment?.location_or_link} placeholder={format === "Online" ? "https://meet.example/..." : ""} className={`${fieldClass} mt-1`} /></label>
+        <label className="text-xs font-semibold">{format === "Online" ? "Conference link (optional)" : format === "In person" ? "Location (optional)" : "Location or link (optional)"}<input type={format === "Online" ? "url" : "text"} name="location_or_link" defaultValue={appointment?.location_or_link} placeholder={format === "Online" ? "https://meet.example/..." : ""} className={`${fieldClass} mt-1`} /></label>
       </div>
       {demo ? <label className="text-xs font-semibold">Demo topic<input name="topic" defaultValue={appointment?.topic} className={`${fieldClass} mt-1`} /></label> : null}
-      <label className="text-xs font-semibold">Notes<textarea name="note" defaultValue={appointment?.note} className={`${fieldClass} mt-1 min-h-24`} /></label>
       {conflicts.length ? (
         <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Schedule conflict</p>

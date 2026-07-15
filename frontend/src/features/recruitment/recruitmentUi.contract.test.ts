@@ -91,6 +91,49 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /\{item\.percentage\}%/);
     assert.doesNotMatch(pipeline, /recharts|chart\.js/i);
   });
+
+  test("shows semantic appointment progress and overdue card states", () => {
+    assert.match(pipeline, /appointment\?\.is_overdue/);
+    assert.match(pipeline, /border-red-400 bg-red-50/);
+    assert.match(pipeline, /border-slate-400 bg-slate-100/);
+    assert.match(pipeline, /border-amber-400 bg-amber-50/);
+    assert.match(pipeline, /border-emerald-400 bg-emerald-50/);
+    assert.match(pipeline, /Evaluator:/);
+    assert.match(pipeline, /Topic:/);
+    assert.match(pipeline, /overdue \? "Overdue" : "Scheduled"/);
+  });
+});
+
+describe("recruitment scheduling and assigned-demo notifications", () => {
+  const appointmentForm = source("AppointmentForm.tsx");
+  const notifications = source("RecruitmentNotifications.tsx");
+  const telegram = source("TelegramConnectionCard.tsx");
+
+  test("uses separate Tashkent date/time controls and omits scheduling notes", () => {
+    assert.match(appointmentForm, /Asia\/Tashkent \(UTC\+5\)/);
+    assert.match(appointmentForm, /type="date"/);
+    assert.match(appointmentForm, /type="time"/);
+    assert.match(appointmentForm, /step=\{900\}/);
+    assert.match(appointmentForm, /step=\{15\}/);
+    assert.match(appointmentForm, /Conference link \(optional\)/);
+    assert.match(appointmentForm, /Location \(optional\)/);
+    assert.doesNotMatch(appointmentForm, /name="note"|>Notes</);
+  });
+
+  test("shows recipient-scoped demo notifications and unread recruitment badges", () => {
+    assert.match(notifications, /notifications\/unread-count/);
+    assert.match(notifications, /Assigned demo lessons/);
+    assert.match(notifications, /notifications\/\$\{id\}\/read/);
+    assert.match(notifications, /refetchInterval: 30_000/);
+  });
+
+  test("links Telegram only with Mini App initData and supports unlinking", () => {
+    assert.match(telegram, /Telegram\?\.WebApp\?\.initData/);
+    assert.match(telegram, /init_data: telegramInitData\(\)/);
+    assert.match(telegram, /method: "DELETE"/);
+    assert.match(telegram, /Open Telegram Mini App/);
+    assert.doesNotMatch(telegram, /telegram_user_id|raw Telegram/i);
+  });
 });
 
 describe("candidate navigation and progressive disclosure", () => {

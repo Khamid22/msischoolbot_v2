@@ -1,10 +1,11 @@
 """Canonical account API routes for MSI LMS Portal."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from backend.core.api import ApiSuccess, api_error, api_success
-from backend.modules.identity.schemas import PasswordChangeRequest, PasswordChangeResult
+from backend.modules.identity.schemas import PasswordChangeRequest, PasswordChangeResult, TelegramLinkRequest
 from backend.modules.identity.service import change_own_password
+from backend.modules.identity import telegram_linking
 from backend.core.access import CurrentUser, get_current_user as get_current_user_dependency, role_has_permission
 from backend.core.access.management_permissions import ALL_PERMISSIONS
 
@@ -67,6 +68,32 @@ def change_current_account_password(
             session_version=outcome.session_version,
         )
     )
+
+
+def _telegram_call(operation, *args):
+    try:
+        return operation(*args)
+    except telegram_linking.TelegramLinkError as exc:
+        detail = {"message": str(exc), "code": exc.code} if exc.code else str(exc)
+        raise HTTPException(status_code=exc.status_code, detail=detail) from exc
+
+
+@router.get("/api/v1/auth/telegram-link", response_model=ApiSuccess, tags=["identity"])
+def telegram_connection(user: CurrentUser = Depends(get_current_user_dependency)):
+    return api_success(_telegram_call(telegram_linking.get_connection, user))
+
+
+@router.post("/api/v1/auth/telegram-link", response_model=ApiSuccess, tags=["identity"])
+def link_telegram_connection(
+    payload: TelegramLinkRequest,
+    user: CurrentUser = Depends(get_current_user_dependency),
+):
+    return api_success(_telegram_call(telegram_linking.link_connection, user, payload.init_data))
+
+
+@router.delete("/api/v1/auth/telegram-link", response_model=ApiSuccess, tags=["identity"])
+def unlink_telegram_connection(user: CurrentUser = Depends(get_current_user_dependency)):
+    return api_success(_telegram_call(telegram_linking.unlink_connection, user))
 
 
 __all__ = ["change_current_account_password", "get_current_user", "router"]

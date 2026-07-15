@@ -300,6 +300,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                       ) : null}
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">{item.label}</span>
+                      {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
                     </a>
                   );
                 })}

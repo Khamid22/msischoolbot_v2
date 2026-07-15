@@ -37,12 +37,18 @@ _CANDIDATE_COLUMNS = """
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
     COALESCE(decision.origin_stage, '') AS decision_origin_stage,
+    COALESCE(decision.source_evaluation_type, '') AS decision_source_evaluation_type,
+    decision.source_evaluation_id AS decision_source_evaluation_id,
+    COALESCE(decision_actor.full_name, decision_actor.login, decision.decided_by_login, '')
+        AS final_decision_actor,
     decision.follow_up_at::text AS decision_follow_up_at,
     decision.created_at::text AS final_decision_at,
     COALESCE(active_hold.reason, '') AS hold_reason,
     COALESCE(active_hold.origin_stage, '') AS hold_origin_stage,
     active_hold.application_date::text AS hold_application_date,
     active_hold.placed_at::text AS hold_placed_at,
+    COALESCE(latest_interview.result, '') AS latest_interview_result,
+    latest_interview.interview_at::text AS latest_interview_at,
     task.id AS next_task_id,
     COALESCE(task.title, '') AS next_action,
     task.due_at::text AS next_action_at,
@@ -68,12 +74,15 @@ def _candidate_joins() -> str:
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN LATERAL (
             SELECT d.decision, d.rejection_reason, d.reason_detail,
-                   d.origin_stage, d.follow_up_at, d.created_at
+                   d.origin_stage, d.follow_up_at, d.created_at,
+                   d.decided_by_account_id, d.decided_by_login,
+                   d.source_evaluation_type, d.source_evaluation_id
             FROM msi_v2.teacher_candidate_final_decisions d
-            WHERE d.candidate_id = candidate.id
+            WHERE d.candidate_id = candidate.id AND d.voided_at IS NULL
             ORDER BY d.created_at DESC, d.id DESC
             LIMIT 1
         ) decision ON true
+        LEFT JOIN msi_v2.accounts decision_actor ON decision_actor.id = decision.decided_by_account_id
         LEFT JOIN LATERAL (
             SELECT hold.reason, hold.origin_stage, hold.application_date, hold.placed_at
             FROM msi_v2.teacher_candidate_holds hold
@@ -81,6 +90,14 @@ def _candidate_joins() -> str:
             ORDER BY hold.placed_at DESC, hold.id DESC
             LIMIT 1
         ) active_hold ON true
+        LEFT JOIN LATERAL (
+            SELECT interview.result, interview.interview_at
+            FROM msi_v2.teacher_candidate_interviews interview
+            WHERE interview.candidate_id = candidate.id
+              AND interview.voided_at IS NULL
+            ORDER BY interview.interview_at DESC NULLS LAST, interview.id DESC
+            LIMIT 1
+        ) latest_interview ON true
         LEFT JOIN LATERAL (
             SELECT t.id, t.title, t.due_at
             FROM msi_v2.teacher_candidate_tasks t
@@ -95,7 +112,11 @@ def _candidate_joins() -> str:
             FROM msi_v2.teacher_candidate_appointments a
             WHERE a.candidate_id = candidate.id
               AND a.status = 'scheduled'
-              AND a.starts_at >= now()
+              AND (
+                  (candidate.status = 'job_interview' AND a.appointment_type = 'job_interview')
+                  OR (candidate.status = 'test_and_demo' AND a.appointment_type = 'demo_lesson')
+                  OR candidate.status NOT IN ('job_interview', 'test_and_demo')
+              )
             ORDER BY a.starts_at ASC, a.id ASC
             LIMIT 1
         ) appointment ON true
@@ -837,6 +858,91 @@ def void_evaluation(
     ).fetchone()
 
 
+def get_evaluation_row(
+    conn: Any,
+    *,
+    table: str,
+    candidate_id: int,
+    attempt_id: int,
+    for_update: bool = False,
+) -> Any:
+    allowed_tables = {
+        "teacher_candidate_interviews",
+        "teacher_candidate_subject_tests",
+        "teacher_candidate_demo_lessons",
+    }
+    if table not in allowed_tables:
+        return None
+    lock = "FOR UPDATE" if for_update else ""
+    return conn.execute(
+        f"""
+        SELECT id, candidate_id, result, voided_at
+        FROM msi_v2.{table}
+        WHERE id = %s AND candidate_id = %s
+        LIMIT 1 {lock}
+        """,
+        (int(attempt_id), int(candidate_id)),
+    ).fetchone()
+
+
+def get_system_decision_for_evaluation(
+    conn: Any,
+    *,
+    candidate_id: int,
+    evaluation_type: str,
+    attempt_id: int,
+    for_update: bool = False,
+) -> Any:
+    lock = "FOR UPDATE" if for_update else ""
+    return conn.execute(
+        f"""
+        SELECT id, candidate_id, decision, origin_stage, created_at, voided_at
+        FROM msi_v2.teacher_candidate_final_decisions
+        WHERE candidate_id = %s
+          AND is_system_generated = true
+          AND source_evaluation_type = %s
+          AND source_evaluation_id = %s
+          AND voided_at IS NULL
+        LIMIT 1 {lock}
+        """,
+        (int(candidate_id), evaluation_type, int(attempt_id)),
+    ).fetchone()
+
+
+def latest_active_final_decision(conn: Any, candidate_id: int, *, for_update: bool = False) -> Any:
+    lock = "FOR UPDATE" if for_update else ""
+    return conn.execute(
+        f"""
+        SELECT id, decision, created_at
+        FROM msi_v2.teacher_candidate_final_decisions
+        WHERE candidate_id = %s AND voided_at IS NULL
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1 {lock}
+        """,
+        (int(candidate_id),),
+    ).fetchone()
+
+
+def void_system_final_decision(
+    conn: Any,
+    *,
+    decision_id: int,
+    actor_account_id: int | None,
+    reason: str,
+    now: str,
+) -> bool:
+    cursor = conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_final_decisions
+        SET voided_at = %s::timestamptz, voided_by_account_id = %s,
+            void_reason = %s
+        WHERE id = %s AND is_system_generated = true AND voided_at IS NULL
+        """,
+        (now, actor_account_id, reason, int(decision_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+
 def responsible_account_row(conn: Any, account_id: int) -> Any:
     return conn.execute(
         """
@@ -1013,9 +1119,12 @@ def list_decision_rows(conn: Any, candidate_id: int) -> list[Any]:
         SELECT decision.id, decision.candidate_id, decision.decision,
                decision.rejection_reason, decision.reason_detail,
                decision.origin_stage,
+               decision.is_system_generated, decision.source_evaluation_type,
+               decision.source_evaluation_id,
+               decision.voided_at::text AS voided_at,
                decision.follow_up_at::text AS follow_up_at,
                decision.approval_id, decision.decided_by_account_id,
-               COALESCE(account.login, decision.decided_by_login, '') AS decided_by,
+               COALESCE(account.full_name, account.login, decision.decided_by_login, '') AS decided_by,
                decision.created_at::text AS created_at
         FROM msi_v2.teacher_candidate_final_decisions decision
         LEFT JOIN msi_v2.accounts account ON account.id = decision.decided_by_account_id
@@ -1483,7 +1592,7 @@ def final_decision_for_approval(conn: Any, *, candidate_id: int, approval_id: in
         """
         SELECT id, decision
         FROM msi_v2.teacher_candidate_final_decisions
-        WHERE candidate_id = %s AND approval_id = %s
+        WHERE candidate_id = %s AND approval_id = %s AND voided_at IS NULL
         ORDER BY id DESC
         LIMIT 1
         """,
@@ -1532,8 +1641,12 @@ def insert_final_decision(conn: Any, *, candidate_id: int, values: dict[str, Any
         INSERT INTO msi_v2.teacher_candidate_final_decisions (
             candidate_id, decision, rejection_reason, reason_detail,
             origin_stage, follow_up_at, approval_id, decided_by_account_id,
-            decided_by_login, created_at
-        ) VALUES (%s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s, %s::timestamptz)
+            decided_by_login, created_at, is_system_generated,
+            source_evaluation_type, source_evaluation_id
+        ) VALUES (
+            %s, %s, %s, %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s,
+            %s::timestamptz, %s, %s, %s
+        )
         RETURNING id
         """,
         (
@@ -1541,6 +1654,9 @@ def insert_final_decision(conn: Any, *, candidate_id: int, values: dict[str, Any
             values.get("reason_detail", ""), values.get("origin_stage", ""),
             values.get("follow_up_at", ""),
             values.get("approval_id"), actor_account_id, actor_login, now,
+            bool(values.get("is_system_generated")),
+            values.get("source_evaluation_type", ""),
+            values.get("source_evaluation_id"),
         ),
     ).fetchone()
     return int(row["id"]) if row else 0
@@ -1644,7 +1760,7 @@ def list_recruitment_setting_rows(
     active_clause = "" if include_inactive else "WHERE is_active = true"
     return conn.execute(
         f"""
-        SELECT id, category, value, label, is_active, sort_order,
+        SELECT id, category, value, label, is_active, sort_order, is_system,
                created_at::text AS created_at, updated_at::text AS updated_at
         FROM msi_v2.teacher_recruitment_settings
         {active_clause}
@@ -1662,7 +1778,7 @@ def recruitment_setting_by_label_or_value(
 ) -> Any:
     return conn.execute(
         """
-        SELECT id, category, value, label, is_active, sort_order,
+        SELECT id, category, value, label, is_active, sort_order, is_system,
                created_at::text AS created_at, updated_at::text AS updated_at
         FROM msi_v2.teacher_recruitment_settings
         WHERE category = %s
@@ -1672,6 +1788,18 @@ def recruitment_setting_by_label_or_value(
         FOR UPDATE
         """,
         (category, value, label),
+    ).fetchone()
+
+
+def recruitment_setting_by_id(conn: Any, setting_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT id, category, value, label, is_active, sort_order, is_system
+        FROM msi_v2.teacher_recruitment_settings
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (int(setting_id),),
     ).fetchone()
 
 
@@ -1695,7 +1823,7 @@ def save_recruitment_setting(
                 updated_by_account_id = %s,
                 updated_at = %s::timestamptz
             WHERE id = %s
-            RETURNING id, category, value, label, is_active, sort_order,
+            RETURNING id, category, value, label, is_active, sort_order, is_system,
                       created_at::text AS created_at, updated_at::text AS updated_at
             """,
             (value, label, actor_account_id, now, int(existing_id)),
@@ -1714,7 +1842,7 @@ def save_recruitment_setting(
             ), 10),
             %s, %s, %s::timestamptz, %s::timestamptz
         )
-        RETURNING id, category, value, label, is_active, sort_order,
+        RETURNING id, category, value, label, is_active, sort_order, is_system,
                   created_at::text AS created_at, updated_at::text AS updated_at
         """,
         (
@@ -1737,8 +1865,8 @@ def deactivate_recruitment_setting(
         SET is_active = false,
             updated_by_account_id = %s,
             updated_at = %s::timestamptz
-        WHERE id = %s AND is_active = true
-        RETURNING id, category, value, label, is_active, sort_order,
+        WHERE id = %s AND is_active = true AND is_system = false
+        RETURNING id, category, value, label, is_active, sort_order, is_system,
                   created_at::text AS created_at, updated_at::text AS updated_at
         """,
         (actor_account_id, now, int(setting_id)),
@@ -1779,6 +1907,207 @@ def insert_recruitment_setting_audit(
             actor_staff_id, actor_account_id, event_type, setting_id,
             json.dumps(detail, ensure_ascii=False, default=str), now,
         ),
+    )
+
+
+def insert_recruitment_notification(conn: Any, *, values: dict[str, Any]) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.teacher_recruitment_notifications (
+            recipient_account_id, candidate_id, appointment_id,
+            notification_type, title, body, action_url, deliver_at,
+            telegram_status, telegram_next_attempt_at, dedupe_key,
+            created_at, updated_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s::timestamptz,
+            'pending', %s::timestamptz, %s, now(), now()
+        )
+        ON CONFLICT (dedupe_key) DO NOTHING
+        """,
+        (
+            int(values["recipient_account_id"]), int(values["candidate_id"]),
+            int(values["appointment_id"]), values["notification_type"],
+            values["title"], values["body"], values["action_url"],
+            values["deliver_at"], values["deliver_at"], values["dedupe_key"],
+        ),
+    )
+
+
+def cancel_recruitment_notification_reminders(conn: Any, appointment_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'cancelled', updated_at = now()
+        WHERE appointment_id = %s
+          AND notification_type IN ('demo_reminder_24h', 'demo_reminder_1h')
+          AND telegram_status IN ('pending', 'waiting_link', 'failed')
+        """,
+        (int(appointment_id),),
+    )
+
+
+def list_future_demo_appointments_for_recipient(conn: Any, account_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT appointment.id, appointment.candidate_id, appointment.appointment_type,
+               appointment.starts_at, appointment.topic,
+               appointment.responsible_account_id, candidate.full_name AS candidate_name,
+               account.role AS responsible_role
+        FROM msi_v2.teacher_candidate_appointments appointment
+        JOIN msi_v2.teacher_candidates candidate ON candidate.id = appointment.candidate_id
+        JOIN msi_v2.accounts account ON account.id = appointment.responsible_account_id
+        WHERE appointment.responsible_account_id = %s
+          AND appointment.appointment_type = 'demo_lesson'
+          AND appointment.status = 'scheduled'
+          AND appointment.starts_at > now()
+        ORDER BY appointment.starts_at ASC
+        """,
+        (int(account_id),),
+    ).fetchall()
+
+
+def list_recruitment_notification_rows(
+    conn: Any,
+    *,
+    account_id: int,
+    limit: int,
+    offset: int,
+) -> tuple[list[Any], int]:
+    total_row = conn.execute(
+        """
+        SELECT count(*) AS total
+        FROM msi_v2.teacher_recruitment_notifications
+        WHERE recipient_account_id = %s AND deliver_at <= now()
+        """,
+        (int(account_id),),
+    ).fetchone()
+    rows = conn.execute(
+        """
+        SELECT id, candidate_id, appointment_id, notification_type, title,
+               body, action_url, deliver_at, read_at, created_at
+        FROM msi_v2.teacher_recruitment_notifications
+        WHERE recipient_account_id = %s AND deliver_at <= now()
+        ORDER BY created_at DESC, id DESC
+        LIMIT %s OFFSET %s
+        """,
+        (int(account_id), int(limit), int(offset)),
+    ).fetchall()
+    return rows, int(total_row["total"] or 0) if total_row else 0
+
+
+def recruitment_notification_unread_count(conn: Any, account_id: int) -> int:
+    row = conn.execute(
+        """
+        SELECT count(*) AS total
+        FROM msi_v2.teacher_recruitment_notifications
+        WHERE recipient_account_id = %s AND read_at IS NULL AND deliver_at <= now()
+        """,
+        (int(account_id),),
+    ).fetchone()
+    return int(row["total"] or 0) if row else 0
+
+
+def mark_recruitment_notification_read(conn: Any, *, account_id: int, notification_id: int) -> bool:
+    cursor = conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET read_at = COALESCE(read_at, now()), updated_at = now()
+        WHERE id = %s AND recipient_account_id = %s
+        """,
+        (int(notification_id), int(account_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+
+def recover_stale_recruitment_notification_deliveries(conn: Any) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'failed', telegram_locked_at = NULL,
+            telegram_next_attempt_at = now(),
+            telegram_last_error = 'delivery_worker_recovered_after_restart',
+            updated_at = now()
+        WHERE telegram_status = 'sending'
+          AND telegram_locked_at < now() - interval '10 minutes'
+        """
+    )
+
+
+def claimable_recruitment_notification_rows(conn: Any, limit: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT notification.id, notification.title, notification.body,
+               notification.action_url, notification.telegram_attempts,
+               link.telegram_user_id
+        FROM msi_v2.teacher_recruitment_notifications notification
+        LEFT JOIN msi_v2.account_telegram_links link
+          ON link.account_id = notification.recipient_account_id
+         AND link.status = 'active'
+        WHERE notification.telegram_status IN ('pending', 'failed', 'waiting_link')
+          AND COALESCE(notification.telegram_next_attempt_at, notification.deliver_at) <= now()
+          AND notification.deliver_at <= now()
+        ORDER BY COALESCE(notification.telegram_next_attempt_at, notification.deliver_at), notification.id
+        LIMIT %s
+        FOR UPDATE OF notification SKIP LOCKED
+        """,
+        (int(limit),),
+    ).fetchall()
+
+
+def mark_recruitment_notification_waiting_link(conn: Any, notification_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'waiting_link',
+            telegram_next_attempt_at = now() + interval '6 hours',
+            telegram_last_error = 'telegram_account_not_linked', updated_at = now()
+        WHERE id = %s
+        """,
+        (int(notification_id),),
+    )
+
+
+def mark_recruitment_notification_sending(conn: Any, notification_id: int) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'sending', telegram_locked_at = now(), updated_at = now()
+        WHERE id = %s
+        """,
+        (int(notification_id),),
+    )
+
+
+def mark_recruitment_notification_sent(conn: Any, *, notification_id: int, attempts: int) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'sent', telegram_attempts = %s,
+            telegram_sent_at = now(), telegram_next_attempt_at = NULL,
+            telegram_last_error = '', telegram_locked_at = NULL, updated_at = now()
+        WHERE id = %s AND telegram_status = 'sending'
+        """,
+        (int(attempts), int(notification_id)),
+    )
+
+
+def mark_recruitment_notification_failed(
+    conn: Any,
+    *,
+    notification_id: int,
+    attempts: int,
+    retry_delay_minutes: int,
+    error: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_notifications
+        SET telegram_status = 'failed', telegram_attempts = %s,
+            telegram_next_attempt_at = now() + (%s || ' minutes')::interval,
+            telegram_last_error = %s, telegram_locked_at = NULL, updated_at = now()
+        WHERE id = %s AND telegram_status = 'sending'
+        """,
+        (int(attempts), str(retry_delay_minutes), error[:500], int(notification_id)),
     )
 
 

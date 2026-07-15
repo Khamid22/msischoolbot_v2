@@ -62,6 +62,7 @@ export type RecruitmentAppointment = {
   updated_at?: string;
   subject_id?: number | null;
   subject?: string;
+  is_overdue?: boolean;
 };
 
 export type RecruitmentCandidate = {
@@ -93,11 +94,16 @@ export type RecruitmentCandidate = {
   rejection_reason?: string;
   decision_reason_detail?: string;
   decision_origin_stage?: string;
+  decision_source_evaluation_type?: string;
+  decision_source_evaluation_id?: number | null;
+  final_decision_actor?: string;
   final_decision_at?: string;
   hold_reason?: string;
   hold_origin_stage?: string;
   hold_application_date?: string;
   hold_placed_at?: string;
+  latest_interview_result?: string;
+  latest_interview_at?: string;
   next_task?: RecruitmentTask | null;
   next_appointment?: RecruitmentAppointment | null;
   academy_teacher_id?: number | null;
@@ -144,6 +150,7 @@ export type RecruitmentSetting = {
   label: string;
   is_active: boolean;
   sort_order: number;
+  is_system?: boolean;
 };
 
 export type RecruitmentSettingsData = {

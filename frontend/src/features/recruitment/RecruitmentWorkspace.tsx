@@ -11,6 +11,7 @@ import { ScheduleView } from "@/features/recruitment/ScheduleView";
 import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
 import { TrashBinView } from "@/features/recruitment/TrashBinView";
+import { TelegramConnectionCard } from "@/features/recruitment/TelegramConnectionCard";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import { type RecruitmentCandidate, type RecruitmentOptions, type RecruitmentRole, type RecruitmentView } from "@/features/recruitment/model";
 import {
@@ -141,7 +142,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
-      {view === "profile" ? <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section> : null}
+      {view === "profile" ? <div className="space-y-3"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
 
       <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
     </RoleWorkspaceShell>

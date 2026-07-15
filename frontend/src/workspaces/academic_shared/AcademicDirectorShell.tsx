@@ -16,6 +16,8 @@ import type { ReactNode } from "react";
 import { routes } from "@/shared/lib/routes";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 import type { RoleNavItem } from "@/shared/ui/roleNav";
+import { useRecruitmentUnreadCount } from "@/features/recruitment/RecruitmentNotifications";
+import { TelegramConnectionCard } from "@/features/recruitment/TelegramConnectionCard";
 import {
   academicDirectorMobileNavConfig,
   academicDirectorNavConfig,
@@ -87,14 +89,17 @@ export function AcademicDirectorPageShell({
   maxWidthClass?: string;
   sectionClassName?: string;
 }) {
+  const unread = useRecruitmentUnreadCount();
+  const desktopItems = academicDirectorDesktopNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
+  const mobileItems = academicDirectorMobileNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
   return (
     <RoleWorkspaceShell
       authLogin={authLogin}
       csrfToken={csrfToken}
       active={active}
       homeHref={routes.academicDirectorOverview}
-      navItems={academicDirectorDesktopNavItems}
-      mobileNavItems={academicDirectorMobileNavItems}
+      navItems={desktopItems}
+      mobileNavItems={mobileItems}
       roleLabel="Academic Director"
       navLabel="Academic Director navigation"
       mobileNavLabel="Academic Director mobile navigation"
@@ -125,14 +130,17 @@ export function HeadOfDepartmentPageShell({
   maxWidthClass?: string;
   sectionClassName?: string;
 }) {
+  const unread = useRecruitmentUnreadCount();
+  const desktopItems = headOfDepartmentDesktopNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
+  const mobileItems = headOfDepartmentMobileNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
   return (
     <RoleWorkspaceShell
       authLogin={authLogin}
       csrfToken={csrfToken}
       active={active}
       homeHref={routes.headOfDepartmentOverview}
-      navItems={headOfDepartmentDesktopNavItems}
-      mobileNavItems={headOfDepartmentMobileNavItems}
+      navItems={desktopItems}
+      mobileNavItems={mobileItems}
       roleLabel="Head of Departments"
       navLabel="Head of Departments navigation"
       mobileNavLabel="Head of Departments mobile navigation"
@@ -202,6 +210,7 @@ function RoleProfileSection({
   csrfToken?: string;
 }) {
   return (
+    <div className="space-y-4">
     <section id={sectionId} className="rounded-2xl border border-border bg-surface p-5 shadow-card scroll-mt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-start gap-3">
@@ -226,6 +235,8 @@ function RoleProfileSection({
         </form>
       </div>
     </section>
+    <TelegramConnectionCard />
+    </div>
   );
 }
 

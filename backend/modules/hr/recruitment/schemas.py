@@ -74,7 +74,7 @@ class AppointmentFields(StrictModel):
     appointment_format: str = Field(default="", max_length=120)
     location_or_link: str = Field(default="", max_length=1000)
     topic: str = Field(default="", max_length=500)
-    note: str = Field(default="", max_length=5000)
+    note: str | None = Field(default=None, max_length=5000)
     allow_conflict: bool = False
 
 

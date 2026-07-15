@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 import os
 import re
@@ -317,6 +319,40 @@ app = FastAPI(
     ],
 )
 app.state.limiter = limiter
+
+
+async def _recruitment_notification_worker() -> None:
+    from backend.modules.hr.recruitment.notifications import process_due_notifications
+
+    while True:
+        try:
+            await asyncio.to_thread(process_due_notifications)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            LOGGER.exception("Recruitment notification delivery cycle failed")
+        await asyncio.sleep(60)
+
+
+@app.on_event("startup")
+async def start_recruitment_notification_worker() -> None:
+    enabled = os.getenv("RECRUITMENT_NOTIFICATION_WORKER_ENABLED", "1").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return
+    app.state.recruitment_notification_worker = asyncio.create_task(
+        _recruitment_notification_worker(),
+        name="recruitment-notification-worker",
+    )
+
+
+@app.on_event("shutdown")
+async def stop_recruitment_notification_worker() -> None:
+    task = getattr(app.state, "recruitment_notification_worker", None)
+    if not task:
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 app.name = "backend.server"
 app.static_folder = _STATIC_DIR

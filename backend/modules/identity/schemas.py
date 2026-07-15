@@ -1,6 +1,6 @@
 """Typed request/response contracts for account security."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PasswordChangeRequest(BaseModel):
@@ -15,4 +15,9 @@ class PasswordChangeResult(BaseModel):
     session_version: int = Field(ge=1)
 
 
-__all__ = ["PasswordChangeRequest", "PasswordChangeResult"]
+class TelegramLinkRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    init_data: str = Field(min_length=1, max_length=16384)
+
+
+__all__ = ["PasswordChangeRequest", "PasswordChangeResult", "TelegramLinkRequest"]

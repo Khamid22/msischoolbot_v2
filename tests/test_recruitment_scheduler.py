@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from backend.core.access import CurrentUser
-from backend.modules.hr.recruitment import repository, service
+from backend.modules.hr.recruitment import notifications, repository, service
 from backend.modules.hr.recruitment.schemas import AppointmentCreate
 
 
@@ -32,6 +32,13 @@ class _Connection:
 
     def commit(self):
         self.commits += 1
+
+
+class _DatabaseConnection(_Connection):
+    """Marks a mocked connection as production-like without executing SQL."""
+
+    def execute(self, *_args, **_kwargs):
+        raise AssertionError("This test must mock every repository operation.")
 
 
 def _connection_factory(conn):
@@ -82,6 +89,21 @@ def test_workflow_simplification_migration_preserves_history_and_enforces_one_ac
     assert "Superseded during recruitment workflow migration" in migration
     assert "DELETE FROM msi_v2.teacher_candidates" not in migration
     assert "DELETE FROM msi_v2.teacher_candidate_appointments" not in migration
+
+
+def test_notification_migration_preserves_history_and_protects_system_reasons():
+    migration = (ROOT / "database/alembic/versions/0020_recruitment_notifications_and_auto_outcomes.py").read_text()
+
+    assert 'revision = "0020_recruitment_notifications"' in migration
+    assert 'down_revision = "0019_recruitment_workflow"' in migration
+    assert "CREATE TABLE IF NOT EXISTS msi_v2.teacher_recruitment_notifications" in migration
+    assert "idx_teacher_recruitment_notifications_dedupe" in migration
+    assert "idx_account_telegram_links_active_identity" in migration
+    assert "failed_job_interview" in migration
+    assert "failed_subject_test" in migration
+    assert "failed_demo_lesson" in migration
+    assert "is_system_generated" in migration
+    assert "DELETE FROM msi_v2.teacher_candidates" not in migration
 
 
 def test_naive_form_time_is_interpreted_as_asia_tashkent():
@@ -437,6 +459,123 @@ def test_failed_evaluation_cancels_remaining_upcoming_appointments(monkeypatch):
     assert events[1][0] == "candidate.interview_recorded"
 
 
+def test_failed_interview_atomically_rejects_with_evaluator_origin_and_system_reason(monkeypatch):
+    conn = _DatabaseConnection()
+    stage_updates = []
+    decisions = []
+    events = []
+    candidate = {"id": 7, "status": "job_interview", "version": 4}
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: candidate)
+    monkeypatch.setattr(repository, "insert_interview", lambda *_args, **_kwargs: 108)
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [33])
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7})
+    monkeypatch.setattr(repository, "insert_final_decision", lambda *_args, **kwargs: decisions.append(kwargs) or 90)
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs)))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "rejected"})
+
+    result = service.add_interview(_user(), 7, {"result": "failed", "notes": "Insufficient interview result"})
+
+    assert result["status"] == "rejected"
+    assert stage_updates[0]["stage"] == "rejected"
+    assert stage_updates[0]["expected_version"] == 4
+    assert decisions[0]["values"]["rejection_reason"] == "failed_job_interview"
+    assert decisions[0]["values"]["origin_stage"] == "job_interview"
+    assert decisions[0]["values"]["source_evaluation_type"] == "interview"
+    assert decisions[0]["values"]["source_evaluation_id"] == 108
+    assert decisions[0]["actor_account_id"] == 41
+    assert [event for event, _kwargs in events] == [
+        "candidate.interview_recorded",
+        "candidate.final_decision_made",
+        "candidate.stage_changed",
+    ]
+    assert conn.commits == 1
+
+
+def test_passed_assigned_demo_moves_test_and_demo_to_under_review(monkeypatch):
+    conn = _DatabaseConnection()
+    stage_updates = []
+    events = []
+    appointment = {
+        "id": 92,
+        "candidate_id": 7,
+        "appointment_type": "demo_lesson",
+        "status": "scheduled",
+        "starts_at": "2099-07-16T05:00:00+00:00",
+        "responsible_account_id": 41,
+        "responsible_role": "academic_director",
+        "candidate_name": "Candidate Seven",
+        "topic": "Quadratic equations",
+        "version": 1,
+    }
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo", "version": 4})
+    monkeypatch.setattr(repository, "get_appointment_row", lambda *_args, **_kwargs: appointment)
+    monkeypatch.setattr(repository, "insert_demo", lambda *_args, **_kwargs: 109)
+    monkeypatch.setattr(repository, "complete_appointment", lambda *_args, **_kwargs: {"id": 92, "version": 2})
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7})
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append(kwargs["event_type"]))
+    monkeypatch.setattr(notifications, "cancel_demo_reminders", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(notifications, "enqueue_demo_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "under_review"})
+
+    result = service.add_demo(
+        _user("academic_director"),
+        7,
+        {"appointment_id": 92, "result": "passed", "score": 9, "topic": "Quadratic equations"},
+    )
+
+    assert result["status"] == "under_review"
+    assert stage_updates[0]["stage"] == "under_review"
+    assert stage_updates[0]["expected_version"] == 4
+    assert "candidate.demo_lesson_recorded" in events
+    assert "candidate.appointment_completed" in events
+    assert "candidate.stage_changed" in events
+    assert conn.commits == 1
+
+
+def test_demo_notifications_have_versioned_dedupe_keys_and_future_reminders():
+    class NotificationConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return self
+
+    conn = NotificationConnection()
+    appointment = {
+        "id": 92,
+        "candidate_id": 7,
+        "appointment_type": "demo_lesson",
+        "starts_at": datetime(2099, 7, 16, 5, 0, tzinfo=UTC),
+        "responsible_account_id": 41,
+        "responsible_role": "head_of_department",
+        "candidate_name": "Candidate Seven",
+        "topic": "Quadratic equations",
+    }
+
+    notifications.enqueue_demo_event(
+        conn,
+        appointment=appointment,
+        event_type="demo_assigned",
+        version_token=3,
+        include_reminders=True,
+    )
+
+    insert_params = [params for sql, params in conn.calls if "INSERT INTO msi_v2.teacher_recruitment_notifications" in sql]
+    assert len(insert_params) == 3
+    assert {params[-1] for params in insert_params} == {
+        "appointment:92:demo_assigned:3",
+        "appointment:92:demo_reminder_24h:3",
+        "appointment:92:demo_reminder_1h:3",
+    }
+    assert all(params[6].startswith("/head-of-departments/recruitment") for params in insert_params)
+
+
 def test_void_evaluation_is_audited_without_deleting_history(monkeypatch):
     conn = _Connection()
     events = []
@@ -461,6 +600,43 @@ def test_void_evaluation_is_audited_without_deleting_history(monkeypatch):
         "attempt_id": 108,
         "reason": "Entered for the wrong candidate",
     })]
+
+
+def test_void_failed_evaluation_restores_origin_when_system_rejection_is_latest(monkeypatch):
+    conn = _DatabaseConnection()
+    stage_updates = []
+    voided_decisions = []
+    events = []
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: {"id": 7, "status": "rejected", "version": 8})
+    monkeypatch.setattr(repository, "get_evaluation_row", lambda *_args, **_kwargs: {"id": 108, "result": "failed", "voided_at": None})
+    monkeypatch.setattr(repository, "get_system_decision_for_evaluation", lambda *_args, **_kwargs: {"id": 90, "origin_stage": "job_interview"})
+    monkeypatch.setattr(repository, "latest_active_final_decision", lambda *_args, **_kwargs: {"id": 90})
+    monkeypatch.setattr(repository, "void_evaluation", lambda *_args, **_kwargs: {"id": 108})
+    monkeypatch.setattr(repository, "void_system_final_decision", lambda *_args, **kwargs: voided_decisions.append(kwargs) or True)
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7})
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "job_interview"})
+
+    result = service.void_evaluation(
+        _user(),
+        7,
+        evaluation_type="interview",
+        attempt_id=108,
+        reason="Result entered for the wrong candidate",
+    )
+
+    assert result["status"] == "job_interview"
+    assert voided_decisions[0]["decision_id"] == 90
+    assert stage_updates[0]["stage"] == "job_interview"
+    assert stage_updates[0]["expected_version"] == 8
+    assert [event for event, _detail in events] == [
+        "candidate.system_rejection_voided",
+        "candidate.stage_changed",
+        "candidate.evaluation_voided",
+    ]
+    assert conn.commits == 1
 
 
 def test_on_hold_records_origin_reason_date_and_cancels_appointments(monkeypatch):

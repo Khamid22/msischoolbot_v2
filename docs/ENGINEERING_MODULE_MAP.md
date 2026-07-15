@@ -71,6 +71,7 @@ These existing stateful orchestrators remain above the target threshold after ex
 - `features/academics/timetable/Timetable.tsx`
 - `features/academics/timetable/ModernGroupTimetable.tsx`
 - `features/teacher-academy/TeacherAcademyPanel.tsx`
+- `features/recruitment/CandidateProfile.tsx` — retained recruitment profile orchestrator; its tab panels and form drawers should be extracted before adding another profile subdomain.
 - `features/finance/PaymentsPanel.tsx`
 - `features/reporting/overview/RoleOverviewPanel.tsx`
 - `features/reporting/overview/SchoolOverviewPanel.tsx`

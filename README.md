@@ -95,7 +95,7 @@ Required in deployed environments:
 - `MINI_APP_URL`
 - `APP_SECRET_KEY`
 
-Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool settings, `WEBAPP_INIT_DATA_TTL`, `REDIS_URL`, storage settings, and owner bootstrap credentials.
+Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool settings, `WEBAPP_INIT_DATA_TTL`, `TELEGRAM_BOT_USERNAME` (without `@`, used by staff account-link buttons), `RECRUITMENT_NOTIFICATION_WORKER_ENABLED`, `REDIS_URL`, storage settings, and owner bootstrap credentials.
 
 ## Documentation
 

@@ -19,6 +19,7 @@ import {
 import { MetricCard } from "@/shared/ui/MetricCard";
 import { MetricGrid } from "@/shared/ui/MetricGrid";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { RecruitmentNotificationsPanel } from "@/features/recruitment/RecruitmentNotifications";
 
 interface RoleHomeCard {
   label?: string;
@@ -130,6 +131,8 @@ function AcademicDirectorHome({
 
       <RoleMetricCards cards={normalizedCards} />
 
+      <RecruitmentNotificationsPanel basePath="/academic-director" />
+
       <AcademicDirectorTeacherAcademyCta />
     </AcademicDirectorPageShell>
   );
@@ -195,6 +198,8 @@ function HeadOfDepartmentHome({
       />
 
       <RoleMetricCards cards={normalizedCards} />
+
+      <RecruitmentNotificationsPanel basePath="/head-of-departments" />
 
       <HeadOfDepartmentTeacherAcademyCta />
     </HeadOfDepartmentPageShell>

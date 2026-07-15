@@ -40,13 +40,14 @@ export function RoleMobileNav<Key extends string = string>({
               key={item.key}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-center text-[10.5px] font-black leading-[1.05] transition-[background-color,color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none ${
+              className={`relative flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-lg px-1 py-1 text-center text-[10.5px] font-black leading-[1.05] transition-[background-color,color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 motion-reduce:transition-none ${
                 isActive
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
               }`}
             >
               <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
+              {item.badge ? <span className="absolute right-[18%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
               <span className="max-w-full break-words">{item.label}</span>
             </a>
           );

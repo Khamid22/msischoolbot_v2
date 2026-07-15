@@ -13,6 +13,8 @@ export type RoleNavItem<Key extends string = string> = {
   mobileLabel?: string;
   href: string;
   icon: LucideIcon;
+  /** Optional unread/work-item count rendered as a compact accessible badge. */
+  badge?: number;
 };
 
 /**

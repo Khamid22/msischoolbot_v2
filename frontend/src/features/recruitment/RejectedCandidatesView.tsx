@@ -75,12 +75,13 @@ export function RejectedCandidatesView({ basePath }: { basePath: string }) {
         <section className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-[13px]">
-              <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Candidate</th><th className="px-3 py-2.5">Failed / left at</th><th className="px-3 py-2.5">Reason</th><th className="px-3 py-2.5">Recorded</th></tr></thead>
+              <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Candidate</th><th className="px-3 py-2.5">Failed / left at</th><th className="px-3 py-2.5">Reason</th><th className="px-3 py-2.5">Evaluator / rejector</th><th className="px-3 py-2.5">Recorded</th></tr></thead>
               <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => (
                 <tr key={candidate.id} className="hover:bg-muted/30">
                   <td className="px-3 py-2.5"><a href={`${basePath}/candidates/${candidate.id}?tab=hiring&origin=rejected&return=${returnQuery}`} onClick={() => rememberRecruitmentReturn("rejected")} className="inline-flex min-h-11 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p></td>
                   <td className="px-3 py-2.5"><StatusBadge status={candidate.decision_origin_stage || "new_candidate"}>{stageLabels[candidate.decision_origin_stage || ""] || humanize(candidate.decision_origin_stage || "Unknown")}</StatusBadge></td>
                   <td className="max-w-md px-3 py-2.5"><p className="line-clamp-2">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>{candidate.rejection_reason && candidate.decision_reason_detail ? <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
+                  <td className="px-3 py-2.5"><p>{candidate.final_decision_actor || "System"}</p>{candidate.decision_source_evaluation_type ? <p className="text-xs text-muted-foreground">{humanize(candidate.decision_source_evaluation_type)} evaluation #{candidate.decision_source_evaluation_id}</p> : null}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</td>
                 </tr>
               ))}</tbody>
@@ -91,6 +92,7 @@ export function RejectedCandidatesView({ basePath }: { basePath: string }) {
               <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={tab}>{tab === "rejected" ? "Rejected" : "Withdrawn"}</StatusBadge></div>
               <p className="mt-1 text-xs text-muted-foreground">From {stageLabels[candidate.decision_origin_stage || ""] || humanize(candidate.decision_origin_stage || "Unknown stage")}</p>
               <p className="mt-1 line-clamp-2 text-[13px]">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">By {candidate.final_decision_actor || "System"} · {dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</p>
             </a>
           ))}</div>
           {!candidates.data.items.length ? <div className="p-4"><EmptyLine><span className="inline-flex items-center gap-2">{tab === "rejected" ? <Ban className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}{tab === "rejected" ? "No rejected candidates." : "No withdrawn candidates."}</span></EmptyLine></div> : null}
