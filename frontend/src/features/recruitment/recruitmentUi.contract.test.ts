@@ -32,7 +32,11 @@ describe("compact recruitment pipeline", () => {
 
   test("reveals CRM outcome targets during a drag and confirms audited decisions", () => {
     assert.match(pipeline, /Candidate outcome drop targets/);
-    assert.match(pipeline, /\["rejected", "on_hold", "candidate_withdrew"\]/);
+    assert.match(pipeline, /\["trash_bin", "on_hold", "candidate_withdrew", "rejected"\]/);
+    assert.match(pipeline, /label: "Trash Bin"/);
+    assert.match(pipeline, /border-blue-500\/40 bg-blue-500\/10/);
+    assert.match(pipeline, /border-rose-300\/60 bg-rose-100\/60/);
+    assert.match(pipeline, /move\.mutate\(\{ candidate, stage: decision \}\)/);
     assert.match(pipeline, /<OutcomeDialog/);
     assert.match(pipeline, /\/final-decisions/);
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
@@ -50,6 +54,8 @@ describe("candidate navigation and progressive disclosure", () => {
     }
     assert.match(profile, /url\.searchParams\.set\("tab", next\)/);
     assert.match(profile, /<Drawer/);
+    assert.match(profile, /value="trash_bin"/);
+    assert.match(profile, /Trash Bin is recoverable/);
   });
 
   test("keeps only search and stage visible while advanced filters use a drawer", () => {
@@ -62,6 +68,12 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /desktopSidebarMode="collapsible"/);
     assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
+  });
+
+  test("uses the shared fading toast instead of a full-width warning banner", () => {
+    assert.match(workspace, /useFloatingToast\(\)/);
+    assert.match(workspace, /<FloatingToast toast=\{toast\}/);
+    assert.doesNotMatch(workspace, /announcement \? <div/);
   });
 
   test("adds HR-only recruitment settings for dynamic sources and rejection reasons", () => {

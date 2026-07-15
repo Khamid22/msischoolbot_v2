@@ -8,7 +8,7 @@ PRIMARY_STAGES = (
     "teacher_academy",
     "active_teacher",
 )
-ALTERNATIVE_STAGES = ("rejected", "on_hold", "candidate_withdrew")
+ALTERNATIVE_STAGES = ("rejected", "on_hold", "candidate_withdrew", "trash_bin")
 ALL_STAGES = frozenset((*PRIMARY_STAGES, *ALTERNATIVE_STAGES))
 PROTECTED_HIRE_STAGES = frozenset({"teacher_academy", "active_teacher"})
 

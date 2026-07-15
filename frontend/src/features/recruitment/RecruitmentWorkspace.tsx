@@ -20,6 +20,7 @@ import {
   workspaceHome,
 } from "@/features/recruitment/ui";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
+import { FloatingToast, type FloatingToastTone, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 
 type Props = {
@@ -34,7 +35,7 @@ type Props = {
 
 type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
 
-function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolean; onClose: () => void; onCreated: (message: string) => void; options?: RecruitmentOptions }) {
+function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolean; onClose: () => void; onCreated: (message: string, tone?: FloatingToastTone) => void; options?: RecruitmentOptions }) {
   const queryClient = useQueryClient();
   const create = useMutation({
     mutationFn: (values: Record<string, string | number | null>) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates`, { method: "POST", body: jsonBody(values) }),
@@ -43,7 +44,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
       onClose();
       void queryClient.invalidateQueries({ queryKey: ["recruitment"] });
     },
-    onError: (error) => onCreated(queryError(error)),
+    onError: (error) => onCreated(queryError(error), "error"),
   });
   return (
     <Modal open={open} onClose={onClose} title="Add candidate" subtitle="Only the name is required; missing fields never block stage movement." size="md">
@@ -64,8 +65,8 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
 }
 
 export default function RecruitmentWorkspace({ authLogin = "", authRole = "", role = "hr_manager", view = "pipeline", basePath = "/hr-manager", candidateId = null, csrfToken = "" }: Props) {
-  const [announcement, setAnnouncement] = useState("");
   const [newCandidateOpen, setNewCandidateOpen] = useState(false);
+  const { toast, showToast, clearToast } = useFloatingToast();
   const options = useQuery({ queryKey: ["recruitment", "options"], queryFn: () => recruitmentRequest<RecruitmentOptions>(`${RECRUITMENT_API}/options`) });
   const effectiveRole = role || (authRole as RecruitmentRole);
   const active = view === "candidate" ? "candidates" : view === "profile" ? "profile" : view;
@@ -118,18 +119,17 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         </header>
       ) : null}
 
-      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
-      {announcement ? <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 text-[13px]" role="alert"><span>{announcement}</span><button className="min-h-11 px-2 font-semibold" onClick={() => setAnnouncement("")}>Dismiss</button></div> : null}
+      <FloatingToast toast={toast} onClose={clearToast} />
 
-      {view === "pipeline" ? <PipelineView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={setAnnouncement} /> : null}
+      {view === "pipeline" ? <PipelineView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
-      {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={setAnnouncement} /> : null}
-      {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={setAnnouncement} /> : null}
+      {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={showToast} /> : null}
+      {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
       {view === "profile" ? <section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section> : null}
 
-      <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={setAnnouncement} options={options.data} />
+      <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
     </RoleWorkspaceShell>
   );
 }

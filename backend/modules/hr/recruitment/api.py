@@ -181,7 +181,8 @@ def move_candidate(candidate_id: int, payload: StageChange, user: CurrentUser = 
         expected_version=payload.expected_version,
         reason=payload.reason,
     )
-    return api_success({"message": "Candidate moved.", "candidate": candidate})
+    message = "Candidate moved to Trash Bin." if payload.stage == "trash_bin" else "Candidate moved."
+    return api_success({"message": message, "candidate": candidate})
 
 
 @router.put("/candidates/{candidate_id}/assignments", operation_id="api_v1_recruitment_assign_candidate")

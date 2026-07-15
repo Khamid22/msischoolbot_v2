@@ -123,7 +123,7 @@ export const primaryStages = [
 ] as const;
 
 export const manualStages = ["new_candidate", "job_interview", "test_and_demo", "under_review"] as const;
-export const alternativeStages = ["rejected", "on_hold", "candidate_withdrew"] as const;
+export const alternativeStages = ["rejected", "on_hold", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
   new_candidate: "New Candidate",
@@ -135,6 +135,7 @@ export const stageLabels: Record<string, string> = {
   rejected: "Rejected",
   on_hold: "On Hold",
   candidate_withdrew: "Candidate Withdrew",
+  trash_bin: "Trash Bin",
 };
 
 export function humanize(value: unknown) {

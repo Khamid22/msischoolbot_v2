@@ -46,7 +46,7 @@ def test_stage_and_rejection_taxonomies_are_stable():
         "teacher_academy",
         "active_teacher",
     )
-    assert ALL_STAGES == {*PRIMARY_STAGES, "rejected", "on_hold", "candidate_withdrew"}
+    assert ALL_STAGES == {*PRIMARY_STAGES, "rejected", "on_hold", "candidate_withdrew", "trash_bin"}
     assert "other" in REJECTION_REASONS
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
@@ -111,6 +111,65 @@ def test_protected_stage_and_decision_rules_fail_before_persistence():
             status="returned",
             review_comment="",
         )
+
+
+def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "get_candidate_row",
+        lambda *_args, **_kwargs: {"id": 7, "status": "job_interview", "version": 4},
+    )
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: {
+            "id": kwargs["candidate_id"],
+            "status": kwargs["stage"],
+            "version": kwargs["expected_version"] + 1,
+        },
+    )
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [21])
+    monkeypatch.setattr(
+        repository,
+        "insert_audit",
+        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+    )
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "trash_bin"})
+
+    candidate = service.move_candidate(
+        _user(),
+        7,
+        stage="trash_bin",
+        expected_version=4,
+        reason="Pipeline trash drop",
+    )
+
+    assert candidate["status"] == "trash_bin"
+    assert conn.commits == 1
+    assert events == [
+        (
+            "candidate.hire_approvals_revoked",
+            {"approval_ids": [21], "reason": "Candidate moved to Trash Bin."},
+        ),
+        (
+            "candidate.moved_to_trash",
+            {"from": "job_interview", "to": "trash_bin", "reason": "Pipeline trash drop"},
+        ),
+    ]
 
 
 def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, monkeypatch):
@@ -295,6 +354,24 @@ def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candid
     assert "is_active BOOLEAN NOT NULL DEFAULT true" in upgrade_source
     assert "DELETE FROM" not in upgrade_source
     assert "teacher_candidates" not in upgrade_source
+
+
+def test_candidate_trash_bin_migration_is_soft_delete_only():
+    source = Path("database/alembic/versions/0017_candidate_trash_bin.py").read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    assert "Revision ID: 0017_candidate_trash_bin" in source
+    assert "Revises: 0016_recruitment_settings" in source
+    assert "'trash_bin'" in upgrade_source
+    assert "DELETE FROM" not in upgrade_source
+    assert "DROP TABLE" not in upgrade_source
+
+
+def test_trashed_candidates_are_archived_from_operational_queries():
+    source = Path("backend/modules/hr/recruitment/repository.py").read_text()
+
+    assert "else:\n        clauses.append(\"candidate.status <> 'trash_bin'\")" in source
+    assert source.count("WHERE candidate.status <> 'trash_bin' AND ({visibility})") == 2
 
 
 def test_recruitment_document_urls_never_use_public_resource_url():

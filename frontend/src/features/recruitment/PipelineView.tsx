@@ -1,4 +1,4 @@
-import { Ban, Clock3, Loader2, UserMinus } from "lucide-react";
+import { Ban, Clock3, Loader2, Trash2, UserMinus } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
@@ -15,6 +15,7 @@ import {
 } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, buttonClass, fieldClass, queryError, rememberRecruitmentReturn, replaceUrlParams, restoreRecruitmentReturn, secondaryButtonClass } from "@/features/recruitment/ui";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
+import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 
 type PipelineData = {
   stages: Record<string, RecruitmentCandidate[]>;
@@ -23,14 +24,36 @@ type PipelineData = {
 };
 
 type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
-type OutcomeDecision = "rejected" | "on_hold" | "candidate_withdrew";
-type OutcomeSelection = { candidate: RecruitmentCandidate; decision: OutcomeDecision };
+type FinalOutcomeDecision = "rejected" | "on_hold" | "candidate_withdrew";
+type DropTarget = FinalOutcomeDecision | "trash_bin";
+type OutcomeSelection = { candidate: RecruitmentCandidate; decision: FinalOutcomeDecision };
 const allStages = [...primaryStages, ...alternativeStages];
 
-const outcomeDetails: Record<OutcomeDecision, { label: string; icon: ReactNode; tone: string }> = {
-  rejected: { label: "Reject", icon: <Ban className="h-4 w-4" />, tone: "hover:border-destructive/60 hover:bg-destructive/10" },
-  on_hold: { label: "On Hold", icon: <Clock3 className="h-4 w-4" />, tone: "hover:border-amber-500/60 hover:bg-amber-500/10" },
-  candidate_withdrew: { label: "Withdraw", icon: <UserMinus className="h-4 w-4" />, tone: "hover:border-muted-foreground/50 hover:bg-muted" },
+const dropTargetDetails: Record<DropTarget, { label: string; icon: ReactNode; tone: string; activeTone: string }> = {
+  trash_bin: {
+    label: "Trash Bin",
+    icon: <Trash2 className="h-4 w-4" />,
+    tone: "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/15",
+    activeTone: "border-destructive bg-destructive/20 text-destructive ring-2 ring-destructive/25",
+  },
+  rejected: {
+    label: "Reject",
+    icon: <Ban className="h-4 w-4" />,
+    tone: "border-red-700/40 bg-red-700/5 text-red-800 hover:bg-red-700/10 dark:text-red-300",
+    activeTone: "border-red-700 bg-red-700/15 text-red-800 ring-2 ring-red-700/20 dark:text-red-300",
+  },
+  on_hold: {
+    label: "On Hold",
+    icon: <Clock3 className="h-4 w-4" />,
+    tone: "border-blue-500/40 bg-blue-500/10 text-blue-700 hover:bg-blue-500/15 dark:text-blue-300",
+    activeTone: "border-blue-500 bg-blue-500/20 text-blue-700 ring-2 ring-blue-500/25 dark:text-blue-300",
+  },
+  candidate_withdrew: {
+    label: "Withdraw",
+    icon: <UserMinus className="h-4 w-4" />,
+    tone: "border-rose-300/60 bg-rose-100/60 text-rose-700 hover:bg-rose-100/90 dark:border-rose-400/30 dark:bg-rose-400/10 dark:text-rose-300",
+    activeTone: "border-rose-400 bg-rose-100 text-rose-700 ring-2 ring-rose-400/25 dark:bg-rose-400/20 dark:text-rose-300",
+  },
 };
 
 function OutcomeDialog({
@@ -56,7 +79,7 @@ function OutcomeDialog({
   }, [selection]);
   if (!selection) return null;
   const { candidate, decision } = selection;
-  const detail = outcomeDetails[decision];
+  const detail = dropTargetDetails[decision];
   const reasons = options?.rejection_reason_options?.length
     ? options.rejection_reason_options
     : (options?.rejection_reasons || []).map((value) => ({ value, label: value.replace(/_/g, " ") }));
@@ -168,14 +191,14 @@ export function PipelineView({
   basePath: string;
   role: RecruitmentRole;
   options?: RecruitmentOptions;
-  onAnnouncement: (message: string) => void;
+  onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
 }) {
   const queryClient = useQueryClient();
   const initialStage = new URLSearchParams(window.location.search).get("stage") || primaryStages[0];
   const [mobileStage, setMobileStage] = useState((allStages as readonly string[]).includes(initialStage) ? initialStage : primaryStages[0]);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
-  const [dragOverOutcome, setDragOverOutcome] = useState<OutcomeDecision | null>(null);
+  const [dragOverOutcome, setDragOverOutcome] = useState<DropTarget | null>(null);
   const [outcomeSelection, setOutcomeSelection] = useState<OutcomeSelection | null>(null);
   const draggedCandidateRef = useRef<RecruitmentCandidate | null>(null);
   const pipeline = useQuery({
@@ -202,7 +225,7 @@ export function PipelineView({
     },
     onError: (error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(["recruitment", "pipeline"], context.previous);
-      onAnnouncement(`Move failed. ${queryError(error)}`);
+      onAnnouncement(`Move failed. ${queryError(error)}`, "error");
     },
     onSuccess: (result) => onAnnouncement(result.message || "Candidate moved."),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
@@ -217,7 +240,7 @@ export function PipelineView({
       setOutcomeSelection(null);
       onAnnouncement(result.message || "Candidate outcome recorded.");
     },
-    onError: (error) => onAnnouncement(queryError(error)),
+    onError: (error) => onAnnouncement(queryError(error), "error"),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
 
@@ -328,13 +351,15 @@ export function PipelineView({
 
       {draggedCandidate ? (
         <section aria-label="Candidate outcome drop targets" className="rounded-xl border border-dashed border-primary/30 bg-card/60 p-2 backdrop-blur">
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(["rejected", "on_hold", "candidate_withdrew"] as OutcomeDecision[]).map((decision) => {
-              const permitted = decision === "rejected"
-                ? Boolean(draggedCandidate.permissions?.can_reject)
-                : role === "hr_manager" || role === "ceo";
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {(["trash_bin", "on_hold", "candidate_withdrew", "rejected"] as DropTarget[]).map((decision) => {
+              const permitted = decision === "trash_bin"
+                ? Boolean(draggedCandidate.permissions?.can_move_stage)
+                : decision === "rejected"
+                  ? Boolean(draggedCandidate.permissions?.can_reject)
+                  : role === "hr_manager" || role === "ceo";
               if (!permitted) return null;
-              const detail = outcomeDetails[decision];
+              const detail = dropTargetDetails[decision];
               const highlighted = dragOverOutcome === decision;
               return (
                 <div
@@ -351,9 +376,14 @@ export function PipelineView({
                     draggedCandidateRef.current = null;
                     setDraggedCandidate(null);
                     setDragOverOutcome(null);
-                    if (candidate) setOutcomeSelection({ candidate, decision });
+                    if (!candidate) return;
+                    if (decision === "trash_bin") {
+                      move.mutate({ candidate, stage: decision });
+                    } else {
+                      setOutcomeSelection({ candidate, decision });
+                    }
                   }}
-                  className={`flex min-h-16 items-center justify-center gap-2 rounded-lg border border-dashed px-3 text-sm font-semibold transition-colors motion-reduce:transition-none ${detail.tone} ${highlighted ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-background/50 text-muted-foreground"}`}
+                  className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-3 text-sm font-semibold transition-colors motion-reduce:transition-none ${highlighted ? detail.activeTone : detail.tone}`}
                 >
                   {detail.icon}
                   {detail.label}
@@ -364,12 +394,12 @@ export function PipelineView({
         </section>
       ) : (
         <section aria-label="Alternative outcomes" className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="grid sm:grid-cols-3 sm:divide-x sm:divide-border">
+          <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
             {alternativeStages.map((stage) => (
               <a
                 key={stage}
                 href={`${basePath}/candidates?stage=${stage}`}
-                className="flex min-h-11 items-center justify-between border-b border-border px-3 text-[13px] font-semibold transition-colors last:border-b-0 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:border-b-0"
+                className="flex min-h-11 items-center justify-between bg-card px-3 text-[13px] font-semibold transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
               >
                 <span>{stageLabels[stage]}</span>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums">{pipeline.data.counts[stage] || 0}</span>

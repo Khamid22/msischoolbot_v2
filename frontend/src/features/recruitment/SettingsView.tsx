@@ -6,6 +6,7 @@ import { jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import type { RecruitmentSetting, RecruitmentSettingsData } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, buttonClass, fieldClass, queryError } from "@/features/recruitment/ui";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 
 type SettingCategory = "source" | "rejection_reason";
 type MutationPayload = { message: string; setting: RecruitmentSetting };
@@ -84,7 +85,7 @@ function SettingsPanel({
   );
 }
 
-export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: string) => void }) {
+export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: string, tone?: FloatingToastTone) => void }) {
   const queryClient = useQueryClient();
   const [removeSetting, setRemoveSetting] = useState<RecruitmentSetting | null>(null);
   const settings = useQuery({
@@ -100,7 +101,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
       void queryClient.invalidateQueries({ queryKey: ["recruitment", "settings"] });
       void queryClient.invalidateQueries({ queryKey: ["recruitment", "options"] });
     },
-    onError: (error) => onAnnouncement(queryError(error)),
+    onError: (error) => onAnnouncement(queryError(error), "error"),
   });
 
   if (settings.isLoading) return <PageState>Loading recruitment settings…</PageState>;

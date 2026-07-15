@@ -164,6 +164,8 @@ def list_candidate_rows(
     if stage:
         clauses.append("candidate.status = %s")
         params.append(stage)
+    else:
+        clauses.append("candidate.status <> 'trash_bin'")
     if source:
         clauses.append("candidate.source = %s")
         params.append(source)
@@ -235,7 +237,7 @@ def list_decision_queue_rows(
         f"""
         SELECT count(*) AS total
         FROM msi_v2.teacher_candidates candidate
-        WHERE {visibility}
+        WHERE candidate.status <> 'trash_bin' AND ({visibility})
         """,
         (int(account_id),),
     ).fetchone()
@@ -261,7 +263,7 @@ def list_decision_queue_rows(
                      approval.created_at DESC, approval.id DESC
             LIMIT 1
         ) actionable ON true
-        WHERE {visibility}
+        WHERE candidate.status <> 'trash_bin' AND ({visibility})
         ORDER BY CASE WHEN actionable.id IS NULL THEN 1 ELSE 0 END,
                  actionable.created_at DESC NULLS LAST,
                  candidate.updated_at DESC,
@@ -433,6 +435,8 @@ def list_task_rows(
     if candidate_id:
         clauses.append("task.candidate_id = %s")
         params.append(candidate_id)
+    else:
+        clauses.append("candidate.status <> 'trash_bin'")
     if visible_account_id:
         if visible_subject_ids is not None and not visible_subject_ids:
             clauses.append("FALSE")

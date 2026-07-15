@@ -17,7 +17,11 @@ export type KnownStatus =
   | "assessed"
   | "draft"
   | "published"
-  | "missing";
+  | "missing"
+  | "rejected"
+  | "on_hold"
+  | "candidate_withdrew"
+  | "trash_bin";
 
 export const statusToneMap: Record<KnownStatus, StatusTone> = {
   active: "success",
@@ -32,6 +36,10 @@ export const statusToneMap: Record<KnownStatus, StatusTone> = {
   draft: "neutral",
   published: "success",
   missing: "danger",
+  rejected: "danger",
+  on_hold: "info",
+  candidate_withdrew: "danger",
+  trash_bin: "danger",
 };
 
 const statusLabels: Record<KnownStatus, string> = {
@@ -47,6 +55,10 @@ const statusLabels: Record<KnownStatus, string> = {
   draft: "Draft",
   published: "Published",
   missing: "Missing",
+  rejected: "Rejected",
+  on_hold: "On Hold",
+  candidate_withdrew: "Candidate Withdrew",
+  trash_bin: "Trash Bin",
 };
 
 /** "In Training" / "in-training" / "IN_TRAINING" → "in_training". */

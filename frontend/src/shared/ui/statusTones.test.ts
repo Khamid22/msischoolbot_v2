@@ -15,6 +15,7 @@ const requiredStatuses = [
   "Draft",
   "Published",
   "Missing",
+  "Trash Bin",
 ];
 
 describe("statusToneMap", () => {

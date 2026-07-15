@@ -14,6 +14,7 @@ from backend.core.database import connect_auth_db
 from backend.modules.hr.recruitment import repository
 from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
+    ALTERNATIVE_STAGES,
     CANDIDATE_SOURCES,
     DEMO_RESULTS,
     DOCUMENT_TYPES,
@@ -134,7 +135,7 @@ def list_pipeline(user: CurrentUser) -> dict[str, Any]:
             include_decision_queue=user.role == "academic_director",
         )
     candidates = [{**_candidate_summary(row), "permissions": _permissions(user)} for row in rows]
-    grouped = {stage: [] for stage in (*PRIMARY_STAGES, "rejected", "on_hold", "candidate_withdrew")}
+    grouped = {stage: [] for stage in (*PRIMARY_STAGES, *ALTERNATIVE_STAGES)}
     for candidate in candidates:
         grouped.setdefault(_text(candidate.get("status")) or "new_candidate", []).append(candidate)
     return {
@@ -380,7 +381,7 @@ def options() -> dict[str, Any]:
     ])
     return {
         **values,
-        "stages": list(PRIMARY_STAGES) + ["rejected", "on_hold", "candidate_withdrew"],
+        "stages": list(PRIMARY_STAGES) + list(ALTERNATIVE_STAGES),
         "sources": configured_sources,
         "document_types": list(DOCUMENT_TYPES),
         "rejection_reasons": [item["value"] for item in configured_reasons],
@@ -582,10 +583,36 @@ def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
+        revoked_approval_ids: list[int] = []
+        if normalized_stage == "trash_bin":
+            revoked_approval_ids = repository.revoke_open_approvals(
+                conn,
+                candidate_id=int(candidate_id),
+                comment="Candidate moved to Trash Bin.",
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
+        if revoked_approval_ids:
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type="candidate.hire_approvals_revoked",
+                detail={"approval_ids": revoked_approval_ids, "reason": "Candidate moved to Trash Bin."},
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        event_type = (
+            "candidate.moved_to_trash"
+            if normalized_stage == "trash_bin"
+            else "candidate.restored_from_trash"
+            if _text(existing["status"]) == "trash_bin"
+            else "candidate.stage_changed"
+        )
         repository.insert_audit(
             conn,
             candidate_id=int(candidate_id),
-            event_type="candidate.stage_changed",
+            event_type=event_type,
             detail={"from": existing["status"], "to": normalized_stage, "reason": _text(reason)},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
