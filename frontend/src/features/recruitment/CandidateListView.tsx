@@ -51,6 +51,7 @@ function filterLabel(key: keyof CandidateFilters, value: string, options?: Recru
   if (key === "evaluator_account_id") return options?.staff.find((person) => String(person.id) === value)?.name || `Evaluator ${value}`;
   if (key === "subject_id") return options?.subjects.find((subject) => String(subject.id) === value)?.name || `Subject ${value}`;
   if (key === "source") return options?.sources.find((source) => String(source.id) === value)?.label || value;
+  if (key === "position") return options?.option_categories.position?.find((position) => String(position.id) === value)?.label || value;
   if (key === "application_from") return `From ${dateLabel(value)}`;
   if (key === "application_to") return `To ${dateLabel(value)}`;
   return value;
@@ -88,7 +89,7 @@ function AdvancedFilters({
       )}
     >
       <div className="grid gap-4">
-        <label className="text-xs font-semibold">Position<input className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)} /></label>
+        <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)}><option value="">All positions</option>{options?.option_categories.position?.map((position) => <option key={position.id} value={position.id}>{position.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         <label className="text-xs font-semibold">Final outcome<select className={`${fieldClass} mt-1`} value={draft.final_decision} onChange={(event) => update("final_decision", event.target.value)}><option value="">All outcomes</option>{["teacher_academy", "active_teacher", "rejected", "candidate_withdrew"].map((outcome) => <option key={outcome} value={outcome}>{stageLabels[outcome]}</option>)}</select></label>

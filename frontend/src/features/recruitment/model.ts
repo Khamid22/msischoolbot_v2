@@ -115,6 +115,7 @@ export type RecruitmentCandidate = {
   telegram_username?: string;
   subject_id?: number | null;
   subject?: string;
+  position_option_id?: number | null;
   applied_position?: string;
   application_date?: string;
   age?: number | null;
@@ -210,7 +211,7 @@ export type RecruitmentOptions = {
 
 export type RecruitmentSetting = {
   id: number;
-  category: "source" | "subsource" | "rejection_reason" | "english_level" | "schedule" | "availability" | "expected_salary" | "teaching_experience";
+  category: "source" | "subsource" | "rejection_reason" | "position" | "english_level" | "schedule" | "availability" | "expected_salary" | "teaching_experience";
   value: string;
   label: string;
   parent_id?: number | null;
@@ -224,6 +225,7 @@ export type RecruitmentSettingsData = {
   sources: RecruitmentSetting[];
   subsources: RecruitmentSetting[];
   rejection_reasons: RecruitmentSetting[];
+  positions: RecruitmentSetting[];
   english_levels: RecruitmentSetting[];
   schedules: RecruitmentSetting[];
   availabilitys: RecruitmentSetting[];

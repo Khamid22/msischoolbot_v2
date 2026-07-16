@@ -111,3 +111,21 @@ def test_standardized_option_and_interview_session_migrations_are_chained_and_de
     assert "started_at" in sessions and "in_progress" in sessions
     assert "idx_teacher_candidate_appointments_active_type" in sessions
     assert "idx_teacher_candidate_hire_approvals_one_actionable" in sessions
+
+
+def test_position_migration_seeds_canonical_values_and_rewrites_candidates_safely():
+    positions = Path("database/alembic/versions/0026_recruitment_positions.py").read_text()
+    assert 'down_revision = "0025_interview_sessions"' in positions
+    assert "position_option_id" in positions
+    assert "validate_candidate_recruitment_options" in positions
+    for label in (
+        "IGCSE Math Teacher",
+        "IGCSE Chemistry Teacher",
+        "IGCSE Physics Teacher",
+        "IGCSE Biology Teacher",
+        "IGCSE ESL Teacher",
+    ):
+        assert label in positions
+    assert "SET position_option_id = setting.id" in positions
+    assert "candidate.position_standardized" in positions
+    assert "DELETE FROM msi_v2.teacher_candidates" not in positions

@@ -35,8 +35,18 @@ def _candidate_filters(
             clauses.append(f"lower({alias}.source) = lower(%s)")
             params.append(source)
     if position:
-        clauses.append(f"{alias}.applied_position = %s")
-        params.append(position)
+        if str(position).isdigit():
+            clauses.append(f"{alias}.position_option_id = %s")
+            params.append(int(position))
+        else:
+            clauses.append(
+                f"""EXISTS (
+                    SELECT 1 FROM msi_v2.teacher_recruitment_settings position_filter
+                    WHERE position_filter.id = {alias}.position_option_id
+                      AND lower(position_filter.label) = lower(%s)
+                )"""
+            )
+            params.append(position)
     if subject_id:
         clauses.append(f"{alias}.subject_id = %s")
         params.append(int(subject_id))
@@ -61,7 +71,10 @@ def options_rows(conn: Any) -> dict[str, list[Any]]:
                ORDER BY setting.sort_order, lower(setting.label), setting.id"""
         ).fetchall(),
         "positions": conn.execute(
-            "SELECT DISTINCT applied_position AS value FROM msi_v2.teacher_candidates WHERE COALESCE(applied_position, '') <> '' ORDER BY applied_position"
+            """SELECT setting.id, setting.label AS value
+               FROM msi_v2.teacher_recruitment_settings setting
+               WHERE setting.category = 'position' AND setting.is_active
+               ORDER BY setting.sort_order, lower(setting.label), setting.id"""
         ).fetchall(),
         "subjects": conn.execute(
             """SELECT DISTINCT subject.id, subject.subject_name AS name

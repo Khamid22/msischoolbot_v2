@@ -661,11 +661,10 @@ function ActionFields({
           </label>
           <label className="text-xs font-semibold">
             Position
-            <input
-              name="applied_position"
-              defaultValue={candidate.applied_position}
-              className={`${fieldClass} mt-1`}
-            />
+            <select name="position_option_id" defaultValue={candidate.position_option_id || ""} className={`${fieldClass} mt-1`}>
+              <option value="">Not set</option>
+              {options?.option_categories.position?.map((position) => <option key={position.id} value={position.id}>{position.label}</option>)}
+            </select>
           </label>
           <label className="text-xs font-semibold">Subject<select name="subject_id" defaultValue={candidate.subject_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-xs font-semibold">
@@ -1275,7 +1274,7 @@ export function CandidateProfile({
     rawValue: string,
   ) => {
     let value: string | number | null = rawValue.trim() || null;
-    if (["age", "expected_salary_uzs", "subject_id", "source_option_id", "subsource_option_id", "english_level_option_id", "schedule_option_id", "availability_option_id", "expected_salary_option_id", "teaching_experience_option_id"].includes(field) && value !== null)
+    if (["age", "expected_salary_uzs", "subject_id", "position_option_id", "source_option_id", "subsource_option_id", "english_level_option_id", "schedule_option_id", "availability_option_id", "expected_salary_option_id", "teaching_experience_option_id"].includes(field) && value !== null)
       value = Number(value);
     mutation.mutate({
       url: `${RECRUITMENT_API}/candidates/${candidateId}`,
@@ -1820,10 +1819,12 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Position"
-                  {...inlineEditProps("applied_position", "Position")}
-                  value={candidate.applied_position}
+                  {...inlineEditProps("position_option_id", "Position")}
+                  value={candidate.position_option_id}
+                  displayValue={candidate.applied_position}
+                  options={(options.data?.option_categories.position || []).map((item) => ({ value: String(item.id), label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) => saveInlineField("applied_position", value)}
+                  onSave={(value) => saveInlineField("position_option_id", value)}
                 />
                 <InlineField
                   label="Subject"

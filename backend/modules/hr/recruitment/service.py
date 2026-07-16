@@ -861,6 +861,7 @@ def remove_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
 _CANDIDATE_OPTION_FIELDS = {
     "source_option_id": "source",
     "subsource_option_id": "subsource",
+    "position_option_id": "position",
     "english_level_option_id": "english_level",
     "schedule_option_id": "schedule",
     "availability_option_id": "availability",
@@ -879,8 +880,9 @@ def _validate_candidate_options(
     if "source_option_id" in prepared and "subsource_option_id" not in prepared:
         prepared["subsource_option_id"] = None
     resolved: dict[str, Any] = {}
+    current_values = _row_dict(current) if current is not None else {}
     for field, category in _CANDIDATE_OPTION_FIELDS.items():
-        raw = prepared.get(field) if field in prepared else (current[field] if current is not None else None)
+        raw = prepared.get(field) if field in prepared else current_values.get(field)
         if not raw:
             resolved[field] = None
             continue
@@ -899,6 +901,24 @@ def _validate_candidate_options(
         raise RecruitmentError("The selected subsource does not belong to this source.")
     if source and repository.active_subsource_exists(conn, int(source["id"])) and not subsource:
         raise RecruitmentError("Select a subsource for this source.")
+    if "position_option_id" in prepared:
+        position = resolved.get("position_option_id")
+        prepared["applied_position"] = _text(position.get("label")) if position else ""
+    elif "applied_position" in prepared:
+        legacy_label = " ".join(_text(prepared.get("applied_position")).split())
+        if legacy_label:
+            option = repository.recruitment_setting_by_label_or_value(
+                conn,
+                category="position",
+                value=_setting_value("position", legacy_label),
+                label=legacy_label,
+            )
+            if not option or not bool(option["is_active"]):
+                raise RecruitmentError("Select a standardized teacher position.")
+            prepared["position_option_id"] = int(option["id"])
+            prepared["applied_position"] = _text(option["label"])
+        else:
+            prepared["position_option_id"] = None
     return prepared
 
 

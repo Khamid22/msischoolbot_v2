@@ -61,6 +61,7 @@ def test_minimal_candidate_and_blank_optional_values_validate():
     candidate = CandidateCreate.model_validate({"full_name": "  Ada Teacher  ", "application_date": ""})
     assert candidate.full_name == "Ada Teacher"
     assert candidate.application_date is None
+    assert CandidateCreate.model_validate({"full_name": "Ada", "position_option_id": 3}).position_option_id == 3
 
     test = SubjectTestWrite.model_validate(
         {"result": "not_completed", "score": "", "maximum_score": ""}

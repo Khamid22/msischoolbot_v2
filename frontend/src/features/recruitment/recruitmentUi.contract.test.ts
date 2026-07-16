@@ -264,11 +264,13 @@ describe("candidate navigation and progressive disclosure", () => {
 
   test("adds HR-only immutable analytics dimensions and dependent subsources", () => {
     const settings = source("SettingsView.tsx");
+    const pipeline = source("PipelineView.tsx");
     assert.match(workspace, /effectiveRole === "hr_manager"/);
     assert.match(workspace, /key: "settings", label: "Settings"/);
     assert.match(workspace, /<SettingsView/);
     assert.match(settings, /Candidate sources/);
     assert.match(settings, /Source details/);
+    assert.match(settings, /Teacher positions/);
     assert.match(settings, /English levels/);
     assert.match(settings, /Expected salary/);
     assert.match(settings, /Teaching experience/);
@@ -277,6 +279,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /RECRUITMENT_API}\/settings/);
     assert.match(settings, /Stage SLA targets/);
     assert.match(settings, /sla-rules/);
+    assert.match(workspace, /name="position_option_id"/);
+    assert.match(profile, /position_option_id/);
+    assert.match(pipeline, /option_categories\.position/);
   });
 
   test("adds an essential HR and CEO recruitment analytics dashboard", () => {

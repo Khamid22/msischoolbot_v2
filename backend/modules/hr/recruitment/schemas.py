@@ -26,6 +26,7 @@ class CandidateCreate(StrictModel):
     phone: str = Field(default="", max_length=80)
     telegram_username: str = Field(default="", max_length=120)
     applied_position: str = Field(default="", max_length=200)
+    position_option_id: OptionalInt = Field(default=None, ge=1)
     subject_id: OptionalInt = Field(default=None, ge=1)
     application_date: OptionalDate = None
     source_option_id: OptionalInt = Field(default=None, ge=1)
@@ -38,6 +39,7 @@ class CandidateUpdate(StrictModel):
     phone: str | None = Field(default=None, max_length=80)
     telegram_username: str | None = Field(default=None, max_length=120)
     applied_position: str | None = Field(default=None, max_length=200)
+    position_option_id: OptionalInt = Field(default=None, ge=1)
     subject_id: OptionalInt = Field(default=None, ge=1)
     application_date: OptionalDate = None
     age: OptionalInt = Field(default=None, ge=14, le=100)
@@ -209,7 +211,7 @@ class EvaluationVoid(StrictModel):
 
 class RecruitmentSettingCreate(StrictModel):
     category: str = Field(
-        pattern="^(source|subsource|rejection_reason|english_level|schedule|availability|expected_salary|teaching_experience)$"
+        pattern="^(source|subsource|rejection_reason|position|english_level|schedule|availability|expected_salary|teaching_experience)$"
     )
     label: str = Field(min_length=1, max_length=120)
     parent_id: OptionalInt = Field(default=None, ge=1)

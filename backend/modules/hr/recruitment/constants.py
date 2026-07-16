@@ -39,6 +39,7 @@ RECRUITMENT_OPTION_CATEGORIES = frozenset(
         "source",
         "subsource",
         "rejection_reason",
+        "position",
         "english_level",
         "schedule",
         "availability",

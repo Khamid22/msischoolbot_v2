@@ -121,6 +121,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
   const panels: Array<{ category: SettingCategory; title: string; detail: string; icon: ReactNode }> = [
     { category: "source", title: "Candidate sources", detail: "Stable top-level analytics sources.", icon: <Link2 className="h-4 w-4" /> },
     { category: "subsource", title: "Source details", detail: "Predefined universities, referrals, and channels under a source.", icon: <Link2 className="h-4 w-4" /> },
+    { category: "position", title: "Teacher positions", detail: "Canonical teaching positions used by candidate forms, filters, and analytics.", icon: <Tags className="h-4 w-4" /> },
     { category: "english_level", title: "English levels", detail: "Standardized language levels used by filters and analytics.", icon: <Tags className="h-4 w-4" /> },
     { category: "schedule", title: "Schedules", detail: "Preferred teaching schedule options.", icon: <Clock3 className="h-4 w-4" /> },
     { category: "availability", title: "Availability", detail: "Standard employment availability options.", icon: <Clock3 className="h-4 w-4" /> },

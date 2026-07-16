@@ -13,7 +13,8 @@ _CANDIDATE_COLUMNS = """
     candidate.telegram_username,
     candidate.subject_id,
     COALESCE(subject.subject_name, '') AS subject,
-    candidate.applied_position,
+    candidate.position_option_id,
+    COALESCE(position_option.label, candidate.applied_position, '') AS applied_position,
     candidate.application_date::text AS application_date,
     candidate.age,
     candidate.address,
@@ -93,6 +94,8 @@ def _candidate_joins() -> str:
           ON source_option.id = candidate.source_option_id
         LEFT JOIN msi_v2.teacher_recruitment_settings subsource_option
           ON subsource_option.id = candidate.subsource_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings position_option
+          ON position_option.id = candidate.position_option_id
         LEFT JOIN msi_v2.teacher_recruitment_settings english_option
           ON english_option.id = candidate.english_level_option_id
         LEFT JOIN msi_v2.teacher_recruitment_settings schedule_option
@@ -227,8 +230,12 @@ def list_pipeline_rows(
         clauses.append("candidate.full_name ILIKE %s")
         params.append(f"%{search}%")
     if position:
-        clauses.append("candidate.applied_position ILIKE %s")
-        params.append(f"%{position}%")
+        if str(position).isdigit():
+            clauses.append("candidate.position_option_id = %s")
+            params.append(int(position))
+        else:
+            clauses.append("lower(COALESCE(position_option.label, candidate.applied_position)) = lower(%s)")
+            params.append(position)
     if source:
         if str(source).isdigit():
             clauses.append("candidate.source_option_id = %s")
@@ -300,8 +307,12 @@ def list_candidate_rows(
         clauses.append("candidate.full_name ILIKE %s")
         params.append(f"%{search}%")
     if position:
-        clauses.append("candidate.applied_position ILIKE %s")
-        params.append(f"%{position}%")
+        if str(position).isdigit():
+            clauses.append("candidate.position_option_id = %s")
+            params.append(int(position))
+        else:
+            clauses.append("lower(COALESCE(position_option.label, candidate.applied_position)) = lower(%s)")
+            params.append(position)
     if stage:
         clauses.append("candidate.status = %s")
         params.append(stage)
@@ -1359,13 +1370,14 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         """
         WITH inserted_candidate AS (
             INSERT INTO msi_v2.teacher_candidates (
-                full_name, phone, telegram_username, applied_position, subject_id,
+                full_name, phone, telegram_username, applied_position,
+                position_option_id, subject_id,
                 application_date, source_option_id, subsource_option_id,
                 source, source_detail, status, stage_changed_at,
                 version, updated_by_account_id, created_at, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
+                %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
                 'new_candidate', %s::timestamptz, 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
@@ -1391,7 +1403,8 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         """,
         (
             values["full_name"], values.get("phone", ""), values.get("telegram_username", ""),
-            values.get("applied_position", ""), values.get("subject_id"), values.get("application_date", ""),
+            values.get("applied_position", ""), values.get("position_option_id"),
+            values.get("subject_id"), values.get("application_date", ""),
             values.get("source_option_id"), values.get("subsource_option_id"), now,
             actor_account_id, now, now, now, actor_account_id, now,
         ),
@@ -1409,7 +1422,8 @@ def update_candidate(
     expected_version: int | None = None,
 ) -> bool:
     allowed = {
-        "full_name", "phone", "telegram_username", "applied_position", "subject_id", "application_date",
+        "full_name", "phone", "telegram_username", "applied_position", "position_option_id",
+        "subject_id", "application_date",
         "age", "address", "source_option_id", "subsource_option_id",
         "english_level_option_id", "motivation_expectations",
         "interests_hobbies", "schedule_option_id", "availability_option_id",
@@ -2600,7 +2614,7 @@ def list_recruitment_options(conn: Any) -> dict[str, Any]:
     option_categories = {
         category: [item for item in option_items if item["category"] == category]
         for category in (
-            "source", "subsource", "english_level", "schedule", "availability",
+            "source", "subsource", "position", "english_level", "schedule", "availability",
             "expected_salary", "teaching_experience",
         )
     }
