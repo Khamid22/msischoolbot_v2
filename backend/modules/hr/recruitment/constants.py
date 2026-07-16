@@ -22,7 +22,18 @@ DOCUMENT_TYPES = (
     "ielts",
     "sat",
     "diploma",
+    "certificate",
+    "recommendation",
     "other",
+)
+REQUIRED_DOCUMENT_TYPES = frozenset({"cv", "id_passport", "diploma"})
+OPTIONAL_DOCUMENT_TYPES = frozenset(set(DOCUMENT_TYPES) - REQUIRED_DOCUMENT_TYPES)
+SLA_STAGES = (
+    "new_candidate",
+    "responded",
+    "job_interview",
+    "test_and_demo",
+    "under_review",
 )
 CANDIDATE_SOURCES = (
     "hh.uz",
@@ -79,9 +90,12 @@ __all__ = [
     "INTERVIEW_RESULTS",
     "PRIMARY_STAGES",
     "PROTECTED_HIRE_STAGES",
+    "REQUIRED_DOCUMENT_TYPES",
     "RECRUITMENT_ROLES",
     "REJECTION_REASONS",
     "SCHEDULED_STAGE_TYPES",
+    "SLA_STAGES",
+    "OPTIONAL_DOCUMENT_TYPES",
     "SUBJECT_TEST_RESULTS",
     "TASK_STATUSES",
 ]

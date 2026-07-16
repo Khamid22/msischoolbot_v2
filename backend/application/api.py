@@ -11,6 +11,7 @@ from backend.workspaces.parent.api import router as parent_router
 from backend.workspaces.student.api import router as student_router
 from backend.modules.hr.recruitment.api import router as recruitment_router
 from backend.modules.hr.recruitment.handoff_api import router as recruitment_handoff_router
+from backend.modules.hr.analytics.api import router as hr_analytics_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -23,5 +24,6 @@ router.include_router(ceo_router)
 router.include_router(customer_support_router)
 router.include_router(recruitment_router)
 router.include_router(recruitment_handoff_router)
+router.include_router(hr_analytics_router)
 
 __all__ = ["router"]

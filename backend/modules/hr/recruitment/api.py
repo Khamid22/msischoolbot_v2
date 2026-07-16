@@ -38,6 +38,7 @@ from backend.modules.hr.recruitment.schemas import (
     InterviewWrite,
     NoteCreate,
     RecruitmentSettingCreate,
+    RecruitmentSlaRuleUpdate,
     ScheduledStageMove,
     StageChange,
     SubjectTestWrite,
@@ -65,6 +66,7 @@ def pipeline(
     search: str = "",
     position: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     evaluator_account_id: int | None = None,
@@ -77,6 +79,7 @@ def pipeline(
             search=search,
             position=position,
             source=source,
+            subject_id=subject_id,
             application_from=application_from,
             application_to=application_to,
             evaluator_account_id=evaluator_account_id,
@@ -92,6 +95,7 @@ def candidates(
     position: str = "",
     stage: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     final_decision: str = "",
@@ -108,6 +112,7 @@ def candidates(
             position=position,
             stage=stage,
             source=source,
+            subject_id=subject_id,
             application_from=application_from,
             application_to=application_to,
             final_decision=final_decision,
@@ -207,8 +212,26 @@ def options():
 
 @router.get("/settings", operation_id="api_v1_recruitment_settings")
 def settings(user: CurrentUser = Depends(get_current_user)):
-    ensure_hr_management(user)
     return api_success(_call(service.list_settings, user))
+
+
+@router.patch(
+    "/settings/sla-rules/{stage}",
+    operation_id="api_v1_recruitment_update_sla_rule",
+)
+def update_sla_rule(
+    stage: str,
+    payload: RecruitmentSlaRuleUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    rule = _call(
+        service.update_sla_rule,
+        user,
+        stage=stage,
+        target_days=payload.target_days,
+    )
+    return api_success({"message": "SLA target updated.", "rule": rule})
 
 
 @router.post("/settings", status_code=201, operation_id="api_v1_recruitment_create_setting")

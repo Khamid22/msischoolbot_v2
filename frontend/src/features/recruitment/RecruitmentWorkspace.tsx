@@ -1,8 +1,9 @@
-import { Ban, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
+import { Ban, BarChart3, BriefcaseBusiness, CalendarClock, CalendarDays, KanbanSquare, Loader2, Plus, Settings2, ShieldCheck, Trash2, UsersRound } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { CandidateListView } from "@/features/recruitment/CandidateListView";
+import { AnalyticsView } from "@/features/recruitment/AnalyticsView";
 import { CandidateProfile } from "@/features/recruitment/CandidateProfile";
 import { DecisionQueueView } from "@/features/recruitment/DecisionQueueView";
 import { PipelineView } from "@/features/recruitment/PipelineView";
@@ -58,8 +59,10 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
           <label className="text-xs font-semibold">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Phone<input name="phone" type="tel" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Applied position<input name="applied_position" className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold">Subject<select name="subject_id" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)} className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Source<select name="source" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
+          <label className="text-xs font-semibold">Source details<input name="source_detail" placeholder="University or referral context" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Initial note<textarea name="comment" className={`${fieldClass} mt-1 min-h-24`} /></label>
         </ModalBody>
         <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" onClick={onClose}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
@@ -83,6 +86,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       ];
     if (effectiveRole === "hr_manager") return [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+      { key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 },
       { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
       { key: "rejected", label: "Rejected", href: `${basePath}/rejected`, icon: Ban },
       { key: "trash", label: "Trash Bin", href: `${basePath}/trash`, icon: Trash2 },
@@ -90,13 +94,15 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
     ];
     const items = [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+      ...(effectiveRole === "ceo" ? [{ key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 }] : []),
       { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
       { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
       { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
+      ...(effectiveRole === "ceo" ? [{ key: "settings", label: "SLA Settings", href: `${basePath}/settings`, icon: Settings2 }] : []),
     ];
     return items;
   }, [basePath, effectiveRole]);
-  const title = { pipeline: "Recruitment Pipeline", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const title = { pipeline: "Recruitment Pipeline", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -134,12 +140,13 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       <FloatingToast toast={toast} onClose={clearToast} />
 
       {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} canAddCandidate={effectiveRole === "hr_manager"} onAddCandidate={() => setNewCandidateOpen(true)} onAnnouncement={showToast} /> : null}
+      {view === "analytics" && ["hr_manager", "ceo"].includes(effectiveRole) ? <AnalyticsView basePath={basePath} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
       {view === "rejected" && effectiveRole === "hr_manager" ? <RejectedCandidatesView basePath={basePath} /> : null}
-      {view === "settings" && effectiveRole === "hr_manager" ? <SettingsView onAnnouncement={showToast} /> : null}
+      {view === "settings" && ["hr_manager", "ceo"].includes(effectiveRole) ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
       {view === "profile" ? <div className="space-y-3"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}

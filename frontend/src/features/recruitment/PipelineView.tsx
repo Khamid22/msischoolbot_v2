@@ -52,6 +52,7 @@ type PipelineFilters = {
   search: string;
   position: string;
   source: string;
+  subject_id: string;
   application_from: string;
   application_to: string;
   evaluator_account_id: string;
@@ -65,6 +66,7 @@ const filterKeys: Array<keyof PipelineFilters> = [
   "search",
   "position",
   "source",
+  "subject_id",
   "application_from",
   "application_to",
   "evaluator_account_id",
@@ -167,6 +169,7 @@ function FiltersDrawer({
       <div className="grid gap-4">
         <label className="text-xs font-semibold">Position<input className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)} /></label>
         <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
+        <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label><label className="text-xs font-semibold">Applied to<input type="date" className={`${fieldClass} mt-1`} value={draft.application_to} onChange={(event) => update("application_to", event.target.value)} /></label></div>
         <label className="text-xs font-semibold">Evaluator<select className={`${fieldClass} mt-1`} value={draft.evaluator_account_id} onChange={(event) => update("evaluator_account_id", event.target.value)}><option value="">All evaluators</option>{options?.staff.filter((person) => ["academic_director", "head_of_department"].includes(person.role)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
       </div>
@@ -217,6 +220,9 @@ function CandidateCard({
   if (overdue) { detailLabel = "Overdue"; detailValue = dateLabel(appointment?.starts_at); }
   if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
   const StatusIcon = overdue ? AlertTriangle : candidate.status === "on_hold" ? PauseCircle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
+  const sla = candidate.current_sla;
+  const slaLabel = sla ? (sla.status === "red" ? "SLA overdue" : `${Math.max(0, Math.ceil(sla.remaining_seconds / 86400))}d SLA left`) : "";
+  const slaClass = sla?.status === "red" ? "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200" : sla?.status === "yellow" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100";
 
   return (
     <article
@@ -235,6 +241,7 @@ function CandidateCard({
         <p className="truncate text-sm font-semibold text-foreground">{candidate.full_name}</p>
         <p className="mt-1 truncate text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p>
         {detailLabel ? <div className="mt-2 rounded-md bg-background/65 px-2 py-1.5 text-xs"><span className="flex items-center gap-1.5 truncate font-semibold text-foreground"><StatusIcon className="h-3.5 w-3.5 shrink-0" />{detailLabel}</span><span className="mt-0.5 block text-muted-foreground">{detailValue}</span>{candidate.status === "test_and_demo" && appointment ? <span className="mt-1 block text-muted-foreground"><span className="block truncate">Evaluator: {appointment.responsible_name || "Not assigned"}</span>{appointment.topic ? <span className="block truncate">Topic: {appointment.topic}</span> : null}<span className={`block font-semibold ${overdue ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`}>{overdue ? "Overdue" : "Scheduled"}</span></span> : null}</div> : null}
+        {sla ? <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${slaClass}`} title={`SLA due ${dateLabel(sla.due_at)}`}>{slaLabel}</span> : null}
       </a>
       {unscheduledType ? (
         <button type="button" onClick={() => onSchedule(candidate, unscheduledType)} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100">

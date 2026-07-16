@@ -18,6 +18,7 @@ _CANDIDATE_COLUMNS = """
     candidate.age,
     candidate.address,
     candidate.source,
+    candidate.source_detail,
     candidate.status,
     candidate.english_level,
     candidate.motivation_expectations,
@@ -34,6 +35,15 @@ _CANDIDATE_COLUMNS = """
     candidate.version,
     candidate.created_at::text AS created_at,
     candidate.updated_at::text AS updated_at,
+    stage_history.id AS current_stage_history_id,
+    stage_history.entered_at::text AS current_stage_entered_at,
+    stage_history.responsible_account_id AS current_stage_responsible_account_id,
+    COALESCE(stage_responsible.full_name, stage_responsible.login, '')
+        AS current_stage_responsible_name,
+    stage_history.comment AS current_stage_comment,
+    stage_history.transition_source AS current_stage_transition_source,
+    stage_history.sla_target_days AS current_sla_target_days,
+    stage_history.sla_due_at::text AS current_sla_due_at,
     COALESCE(decision.decision, '') AS final_decision,
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
@@ -73,6 +83,17 @@ _CANDIDATE_COLUMNS = """
 def _candidate_joins() -> str:
     return """
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
+        LEFT JOIN LATERAL (
+            SELECT history.id, history.entered_at, history.responsible_account_id,
+                   history.comment, history.transition_source,
+                   history.sla_target_days, history.sla_due_at
+            FROM msi_v2.teacher_candidate_stage_history history
+            WHERE history.candidate_id = candidate.id AND history.exited_at IS NULL
+            ORDER BY history.entered_at DESC, history.id DESC
+            LIMIT 1
+        ) stage_history ON true
+        LEFT JOIN msi_v2.accounts stage_responsible
+          ON stage_responsible.id = stage_history.responsible_account_id
         LEFT JOIN LATERAL (
             SELECT d.decision, d.rejection_reason, d.reason_detail,
                    d.origin_stage, d.follow_up_at, d.created_at,
@@ -174,6 +195,7 @@ def list_pipeline_rows(
     search: str = "",
     position: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     evaluator_account_id: int | None = None,
@@ -197,6 +219,9 @@ def list_pipeline_rows(
     if source:
         clauses.append("candidate.source = %s")
         params.append(source)
+    if subject_id:
+        clauses.append("candidate.subject_id = %s")
+        params.append(int(subject_id))
     if application_from:
         clauses.append("candidate.application_date >= %s::date")
         params.append(application_from)
@@ -236,6 +261,7 @@ def list_candidate_rows(
     position: str = "",
     stage: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     final_decision: str = "",
@@ -267,6 +293,9 @@ def list_candidate_rows(
     if source:
         clauses.append("candidate.source = %s")
         params.append(source)
+    if subject_id:
+        clauses.append("candidate.subject_id = %s")
+        params.append(int(subject_id))
     if application_from:
         clauses.append("candidate.application_date >= %s::date")
         params.append(application_from)
@@ -491,10 +520,24 @@ def list_subject_test_rows(conn: Any, candidate_id: int) -> list[Any]:
                test.created_at::text AS created_at_text,
                test.updated_at::text AS updated_at_text,
                COALESCE(subject.subject_name, test.subject_label, '') AS subject,
-               COALESCE(evaluator.login, '') AS evaluator_login
+               COALESCE(evaluator.login, '') AS evaluator_login,
+               COALESCE(topics.items, '[]'::jsonb) AS topic_scores
         FROM msi_v2.teacher_candidate_subject_tests test
         LEFT JOIN msi_v2.subjects subject ON subject.id = test.subject_id
         LEFT JOIN msi_v2.accounts evaluator ON evaluator.id = test.evaluator_account_id
+        LEFT JOIN LATERAL (
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'id', topic.id,
+                    'topic', topic.topic,
+                    'score', topic.score,
+                    'maximum_score', topic.maximum_score,
+                    'percentage', round((topic.score / topic.maximum_score) * 100, 1)
+                ) ORDER BY topic.id
+            ) AS items
+            FROM msi_v2.teacher_candidate_subject_test_topics topic
+            WHERE topic.subject_test_id = test.id
+        ) topics ON true
         WHERE test.candidate_id = %s
         ORDER BY test.created_at DESC, test.id DESC
         """,
@@ -509,10 +552,23 @@ def list_demo_rows(conn: Any, candidate_id: int) -> list[Any]:
                demo.created_at::text AS created_at_text,
                demo.updated_at::text AS updated_at_text,
                COALESCE(subject.subject_name, demo.subject_label, '') AS subject,
-               COALESCE(evaluator.login, '') AS evaluator_login
+               COALESCE(evaluator.login, '') AS evaluator_login,
+               COALESCE(criteria.items, '[]'::jsonb) AS criteria_scores
         FROM msi_v2.teacher_candidate_demo_lessons demo
         LEFT JOIN msi_v2.subjects subject ON subject.id = demo.subject_id
         LEFT JOIN msi_v2.accounts evaluator ON evaluator.id = demo.evaluator_account_id
+        LEFT JOIN LATERAL (
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'id', criterion.id,
+                    'criterion', criterion.criterion,
+                    'score', criterion.score,
+                    'maximum_score', criterion.maximum_score
+                ) ORDER BY criterion.id
+            ) AS items
+            FROM msi_v2.teacher_candidate_demo_criteria criterion
+            WHERE criterion.demo_lesson_id = demo.id
+        ) criteria ON true
         WHERE demo.candidate_id = %s
         ORDER BY demo.created_at DESC, demo.id DESC
         """,
@@ -1041,6 +1097,7 @@ def list_task_rows(
         f"""
         SELECT task.id, task.candidate_id, task.title, task.due_at::text AS due_at,
                task.responsible_account_id, task.status, task.note,
+               task.task_key, task.task_origin, task.stage_history_id,
                task.completed_at::text AS completed_at,
                task.cancelled_at::text AS cancelled_at,
                task.created_at::text AS created_at,
@@ -1152,25 +1209,65 @@ def list_activity_rows(conn: Any, candidate_id: int) -> list[Any]:
     ).fetchall()
 
 
+def list_stage_history_rows(conn: Any, candidate_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT history.id, history.candidate_id, history.stage,
+               history.entered_at::text AS entered_at,
+               history.exited_at::text AS exited_at,
+               history.responsible_account_id,
+               COALESCE(account.full_name, account.login, '') AS responsible_name,
+               history.comment, history.transition_source,
+               history.sla_target_days,
+               history.sla_due_at::text AS sla_due_at
+        FROM msi_v2.teacher_candidate_stage_history history
+        LEFT JOIN msi_v2.accounts account ON account.id = history.responsible_account_id
+        WHERE history.candidate_id = %s
+        ORDER BY history.entered_at DESC, history.id DESC
+        """,
+        (int(candidate_id),),
+    ).fetchall()
+
+
 def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_account_id: int | None) -> int:
     row = conn.execute(
         """
-        INSERT INTO msi_v2.teacher_candidates (
-            full_name, phone, telegram_username, applied_position, subject_id,
-            application_date, source, status, stage_changed_at,
-            version, updated_by_account_id, created_at, updated_at
+        WITH inserted_candidate AS (
+            INSERT INTO msi_v2.teacher_candidates (
+                full_name, phone, telegram_username, applied_position, subject_id,
+                application_date, source, source_detail, status, stage_changed_at,
+                version, updated_by_account_id, created_at, updated_at
+            )
+            VALUES (
+                %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s,
+                'new_candidate', %s::timestamptz, 1, %s,
+                %s::timestamptz, %s::timestamptz
+            )
+            RETURNING id
+        ), inserted_history AS (
+            INSERT INTO msi_v2.teacher_candidate_stage_history (
+                candidate_id, stage, entered_at, responsible_account_id,
+                comment, transition_source, sla_target_days, sla_due_at
+            )
+            SELECT candidate.id, 'new_candidate', %s::timestamptz, %s,
+                   'Candidate created.', 'manual', rule.target_days,
+                   CASE WHEN rule.target_days IS NULL THEN NULL
+                        ELSE %s::timestamptz + make_interval(days => rule.target_days)
+                   END
+            FROM inserted_candidate candidate
+            LEFT JOIN msi_v2.teacher_recruitment_sla_rules rule
+              ON rule.stage = 'new_candidate' AND rule.is_active = true
+            RETURNING id
         )
-        VALUES (
-            %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s,
-            'new_candidate', %s::timestamptz, 1, %s,
-            %s::timestamptz, %s::timestamptz
-        )
-        RETURNING id
+        SELECT candidate.id
+        FROM inserted_candidate candidate
+        JOIN inserted_history history ON true
         """,
         (
             values["full_name"], values.get("phone", ""), values.get("telegram_username", ""),
             values.get("applied_position", ""), values.get("subject_id"), values.get("application_date", ""),
-            values.get("source", ""), now, actor_account_id, now, now,
+            values.get("source", ""), values.get("source_detail", ""), now,
+            actor_account_id, now, now, now, actor_account_id, now,
         ),
     ).fetchone()
     return int(row["id"]) if row else 0
@@ -1187,7 +1284,7 @@ def update_candidate(
 ) -> bool:
     allowed = {
         "full_name", "phone", "telegram_username", "applied_position", "subject_id", "application_date",
-        "age", "address", "source", "english_level", "motivation_expectations",
+        "age", "address", "source", "source_detail", "english_level", "motivation_expectations",
         "interests_hobbies", "preferred_schedule", "employment_availability",
         "education_background",
         "work_experience", "teaching_experience", "previous_workplace",
@@ -1227,17 +1324,56 @@ def update_candidate_stage(
     expected_version: int,
     actor_account_id: int | None,
     now: str,
+    comment: str = "",
+    transition_source: str = "manual",
 ) -> Any:
     return conn.execute(
         """
-        UPDATE msi_v2.teacher_candidates
-        SET status = %s, stage_changed_at = %s::timestamptz,
-            updated_at = %s::timestamptz, updated_by_account_id = %s,
-            version = version + 1
-        WHERE id = %s AND version = %s
-        RETURNING id, status, version
+        WITH current_candidate AS (
+            SELECT id, status, version
+            FROM msi_v2.teacher_candidates
+            WHERE id = %s
+            FOR UPDATE
+        ), updated_candidate AS (
+            UPDATE msi_v2.teacher_candidates candidate
+            SET status = %s, stage_changed_at = %s::timestamptz,
+                updated_at = %s::timestamptz, updated_by_account_id = %s,
+                version = candidate.version + 1
+            FROM current_candidate current
+            WHERE candidate.id = current.id AND current.version = %s
+            RETURNING candidate.id, candidate.status, candidate.version
+        ), closed_history AS (
+            UPDATE msi_v2.teacher_candidate_stage_history history
+            SET exited_at = %s::timestamptz
+            FROM updated_candidate updated
+            WHERE history.candidate_id = updated.id AND history.exited_at IS NULL
+            RETURNING history.id
+        ), new_history AS (
+            INSERT INTO msi_v2.teacher_candidate_stage_history (
+                candidate_id, stage, entered_at, responsible_account_id,
+                comment, transition_source, sla_target_days, sla_due_at
+            )
+            SELECT updated.id, %s, %s::timestamptz, %s, %s, %s,
+                   rule.target_days,
+                   CASE WHEN rule.target_days IS NULL THEN NULL
+                        ELSE %s::timestamptz + make_interval(days => rule.target_days)
+                   END
+            FROM updated_candidate updated
+            CROSS JOIN (SELECT count(*) FROM closed_history) closed
+            LEFT JOIN msi_v2.teacher_recruitment_sla_rules rule
+              ON rule.stage = %s AND rule.is_active = true
+            RETURNING id
+        )
+        SELECT updated.id, updated.status, updated.version,
+               history.id AS current_stage_history_id
+        FROM updated_candidate updated
+        JOIN new_history history ON true
         """,
-        (stage, now, now, actor_account_id, candidate_id, expected_version),
+        (
+            int(candidate_id), stage, now, now, actor_account_id,
+            int(expected_version), now, stage, now, actor_account_id,
+            comment, transition_source, now, stage,
+        ),
     ).fetchone()
 
 
@@ -1364,17 +1500,21 @@ def insert_interview(conn: Any, *, candidate_id: int, values: dict[str, Any], ac
         INSERT INTO msi_v2.teacher_candidate_interviews (
             candidate_id, appointment_id, interview_at, interviewer_account_id, interview_format,
             notes, english_level, strengths, concerns, hr_recommendation, result,
+            cefr_level, overall_score, communication_score, recommendation_code,
             created_by_account_id, updated_by_account_id, created_at, updated_at
         ) VALUES (
             %s, %s, NULLIF(%s, '')::timestamptz, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s::timestamptz, %s::timestamptz
+            %s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz
         ) RETURNING id
         """,
         (
             candidate_id, values.get("appointment_id"), values.get("interview_at", ""), values.get("interviewer_account_id"),
             values.get("interview_format", ""), values.get("notes", ""),
             values.get("english_level", ""), values.get("strengths", ""), values.get("concerns", ""),
-            values.get("hr_recommendation", ""), values["result"], actor_account_id,
+            values.get("hr_recommendation", ""), values["result"],
+            values.get("cefr_level", ""), values.get("overall_score"),
+            values.get("communication_score"), values.get("recommendation_code", ""),
+            actor_account_id,
             actor_account_id, now, now,
         ),
     ).fetchone()
@@ -1386,21 +1526,41 @@ def insert_subject_test(conn: Any, *, candidate_id: int, values: dict[str, Any],
         """
         INSERT INTO msi_v2.teacher_candidate_subject_tests (
             candidate_id, test_at, subject_id, subject_label, evaluator_account_id,
-            score, maximum_score, notes, result, created_by_account_id,
+            score, maximum_score, paper, notes, result, created_by_account_id,
             updated_by_account_id, created_at, updated_at
         ) VALUES (
             %s, NULLIF(%s, '')::timestamptz, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz
+            %s, %s, %s, %s, %s, %s, %s, %s::timestamptz, %s::timestamptz
         ) RETURNING id
         """,
         (
             candidate_id, values.get("test_at", ""), values.get("subject_id"),
             values.get("subject_label", ""), values.get("evaluator_account_id"),
-            values.get("score"), values.get("maximum_score"), values.get("notes", ""),
+            values.get("score"), values.get("maximum_score"), values.get("paper", ""),
+            values.get("notes", ""),
             values["result"], actor_account_id, actor_account_id, now, now,
         ),
     ).fetchone()
-    return int(row["id"]) if row else 0
+    attempt_id = int(row["id"]) if row else 0
+    topic_scores = list(values.get("topic_scores") or [])
+    if attempt_id and topic_scores:
+        conn.executemany(
+            """
+            INSERT INTO msi_v2.teacher_candidate_subject_test_topics (
+                subject_test_id, topic, score, maximum_score
+            ) VALUES (%s, %s, %s, %s)
+            """,
+            [
+                (
+                    attempt_id,
+                    item.get("topic", ""),
+                    item.get("score"),
+                    item.get("maximum_score"),
+                )
+                for item in topic_scores
+            ],
+        )
+    return attempt_id
 
 
 def insert_demo(conn: Any, *, candidate_id: int, values: dict[str, Any], actor_account_id: int | None, now: str) -> int:
@@ -1426,7 +1586,26 @@ def insert_demo(conn: Any, *, candidate_id: int, values: dict[str, Any], actor_a
             actor_account_id, actor_account_id, now, now,
         ),
     ).fetchone()
-    return int(row["id"]) if row else 0
+    attempt_id = int(row["id"]) if row else 0
+    criteria_scores = list(values.get("criteria_scores") or [])
+    if attempt_id and criteria_scores:
+        conn.executemany(
+            """
+            INSERT INTO msi_v2.teacher_candidate_demo_criteria (
+                demo_lesson_id, criterion, score, maximum_score
+            ) VALUES (%s, %s, %s, %s)
+            """,
+            [
+                (
+                    attempt_id,
+                    item.get("criterion", ""),
+                    item.get("score"),
+                    item.get("maximum_score", 10),
+                )
+                for item in criteria_scores
+            ],
+        )
+    return attempt_id
 
 
 def insert_task(conn: Any, *, candidate_id: int, values: dict[str, Any], actor_account_id: int | None, now: str) -> int:
@@ -1472,6 +1651,159 @@ def update_task(conn: Any, *, candidate_id: int, task_id: int, values: dict[str,
         ),
     )
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+
+def candidate_automation_state_row(conn: Any, candidate_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT candidate.id, candidate.status, candidate.updated_by_account_id,
+               history.id AS stage_history_id,
+               history.sla_due_at::text AS sla_due_at,
+               history.responsible_account_id AS stage_responsible_account_id,
+               interview.result AS interview_result,
+               subject_test.result AS subject_test_result,
+               demo.result AS demo_result,
+               interview_appointment.id AS interview_appointment_id,
+               interview_appointment.ends_at::text AS interview_appointment_ends_at,
+               demo_appointment.id AS demo_appointment_id,
+               demo_appointment.ends_at::text AS demo_appointment_ends_at,
+               COALESCE(documents.required_count, 0) AS required_document_count,
+               approval.id AS actionable_approval_id
+        FROM msi_v2.teacher_candidates candidate
+        LEFT JOIN LATERAL (
+            SELECT item.id, item.sla_due_at, item.responsible_account_id
+            FROM msi_v2.teacher_candidate_stage_history item
+            WHERE item.candidate_id = candidate.id AND item.exited_at IS NULL
+            ORDER BY item.entered_at DESC, item.id DESC
+            LIMIT 1
+        ) history ON true
+        LEFT JOIN LATERAL (
+            SELECT item.result
+            FROM msi_v2.teacher_candidate_interviews item
+            WHERE item.candidate_id = candidate.id AND item.voided_at IS NULL
+            ORDER BY item.created_at DESC, item.id DESC
+            LIMIT 1
+        ) interview ON true
+        LEFT JOIN LATERAL (
+            SELECT item.result
+            FROM msi_v2.teacher_candidate_subject_tests item
+            WHERE item.candidate_id = candidate.id AND item.voided_at IS NULL
+            ORDER BY item.created_at DESC, item.id DESC
+            LIMIT 1
+        ) subject_test ON true
+        LEFT JOIN LATERAL (
+            SELECT item.result
+            FROM msi_v2.teacher_candidate_demo_lessons item
+            WHERE item.candidate_id = candidate.id AND item.voided_at IS NULL
+            ORDER BY item.created_at DESC, item.id DESC
+            LIMIT 1
+        ) demo ON true
+        LEFT JOIN LATERAL (
+            SELECT item.id, item.ends_at
+            FROM msi_v2.teacher_candidate_appointments item
+            WHERE item.candidate_id = candidate.id
+              AND item.appointment_type = 'job_interview'
+              AND item.status = 'scheduled'
+            ORDER BY item.starts_at, item.id
+            LIMIT 1
+        ) interview_appointment ON true
+        LEFT JOIN LATERAL (
+            SELECT item.id, item.ends_at
+            FROM msi_v2.teacher_candidate_appointments item
+            WHERE item.candidate_id = candidate.id
+              AND item.appointment_type = 'demo_lesson'
+              AND item.status = 'scheduled'
+            ORDER BY item.starts_at, item.id
+            LIMIT 1
+        ) demo_appointment ON true
+        LEFT JOIN LATERAL (
+            SELECT count(DISTINCT item.document_type) AS required_count
+            FROM msi_v2.teacher_candidate_documents item
+            WHERE item.candidate_id = candidate.id
+              AND item.removed_at IS NULL
+              AND item.document_type IN ('cv', 'id_passport', 'diploma')
+        ) documents ON true
+        LEFT JOIN LATERAL (
+            SELECT item.id
+            FROM msi_v2.teacher_candidate_hire_approvals item
+            WHERE item.candidate_id = candidate.id
+              AND item.status IN ('requested', 'approved')
+            ORDER BY item.created_at DESC, item.id DESC
+            LIMIT 1
+        ) approval ON true
+        WHERE candidate.id = %s
+        LIMIT 1
+        """,
+        (int(candidate_id),),
+    ).fetchone()
+
+
+def replace_system_tasks(
+    conn: Any,
+    *,
+    candidate_id: int,
+    stage: str,
+    stage_history_id: int,
+    desired_tasks: list[dict[str, Any]],
+    actor_account_id: int | None,
+    now: str,
+) -> None:
+    desired_keys = [str(item["task_key"]) for item in desired_tasks]
+    terminal = stage in {
+        "on_hold", "teacher_academy", "active_teacher",
+        "rejected", "candidate_withdrew", "trash_bin",
+    }
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_tasks
+        SET status = CASE WHEN %s THEN 'cancelled' ELSE 'completed' END,
+            completed_at = CASE WHEN %s THEN NULL ELSE %s::timestamptz END,
+            cancelled_at = CASE WHEN %s THEN %s::timestamptz ELSE NULL END,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE candidate_id = %s
+          AND task_origin = 'system'
+          AND status = 'pending'
+          AND NOT (task_key = ANY(%s::text[]) AND stage_history_id = %s)
+        """,
+        (
+            terminal, terminal, now, terminal, now,
+            actor_account_id, now, int(candidate_id), desired_keys,
+            int(stage_history_id),
+        ),
+    )
+    if not desired_tasks:
+        return
+    conn.executemany(
+        """
+        INSERT INTO msi_v2.teacher_candidate_tasks (
+            candidate_id, title, due_at, responsible_account_id,
+            status, note, task_key, task_origin, stage_history_id,
+            created_by_account_id, updated_by_account_id, created_at, updated_at
+        ) VALUES (
+            %s, %s, NULLIF(%s, '')::timestamptz, %s,
+            'pending', '', %s, 'system', %s,
+            %s, %s, %s::timestamptz, %s::timestamptz
+        )
+        ON CONFLICT (candidate_id, task_key, stage_history_id)
+            WHERE task_origin = 'system' AND status = 'pending'
+        DO UPDATE SET
+            title = excluded.title,
+            due_at = excluded.due_at,
+            responsible_account_id = excluded.responsible_account_id,
+            updated_by_account_id = excluded.updated_by_account_id,
+            updated_at = excluded.updated_at
+        """,
+        [
+            (
+                int(candidate_id), item["title"], item.get("due_at", ""),
+                item.get("responsible_account_id"), item["task_key"],
+                int(stage_history_id), actor_account_id, actor_account_id,
+                now, now,
+            )
+            for item in desired_tasks
+        ],
+    )
 
 
 def replace_assignments(
@@ -1769,6 +2101,49 @@ def list_recruitment_setting_rows(
         ORDER BY category, sort_order, lower(label), id
         """
     ).fetchall()
+
+
+def list_sla_rule_rows(conn: Any) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT rule.stage, rule.target_days, rule.is_active,
+               rule.updated_by_account_id,
+               COALESCE(account.full_name, account.login, '') AS updated_by,
+               rule.updated_at::text AS updated_at
+        FROM msi_v2.teacher_recruitment_sla_rules rule
+        LEFT JOIN msi_v2.accounts account ON account.id = rule.updated_by_account_id
+        ORDER BY CASE rule.stage
+            WHEN 'new_candidate' THEN 1
+            WHEN 'responded' THEN 2
+            WHEN 'job_interview' THEN 3
+            WHEN 'test_and_demo' THEN 4
+            WHEN 'under_review' THEN 5
+            ELSE 99 END
+        """
+    ).fetchall()
+
+
+def update_sla_rule(
+    conn: Any,
+    *,
+    stage: str,
+    target_days: int,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_sla_rules
+        SET target_days = %s,
+            is_active = true,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE stage = %s
+        RETURNING stage, target_days, is_active, updated_by_account_id,
+                  updated_at::text AS updated_at
+        """,
+        (int(target_days), actor_account_id, now, stage),
+    ).fetchone()
 
 
 def recruitment_setting_by_label_or_value(

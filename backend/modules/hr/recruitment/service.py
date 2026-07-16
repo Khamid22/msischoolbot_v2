@@ -25,11 +25,14 @@ from backend.modules.hr.recruitment.constants import (
     INTERVIEW_RESULTS,
     PRIMARY_STAGES,
     PROTECTED_HIRE_STAGES,
+    REQUIRED_DOCUMENT_TYPES,
     RECRUITMENT_ROLES,
     REJECTION_REASONS,
     SCHEDULED_STAGE_TYPES,
+    SLA_STAGES,
     SUBJECT_TEST_RESULTS,
     TASK_STATUSES,
+    OPTIONAL_DOCUMENT_TYPES,
 )
 from backend.modules.hr.recruitment.policies import visible_account_id
 from backend.modules.teacher_academy.policies import hod_subject_ids_for_user
@@ -129,6 +132,7 @@ def _task_payload(row: Any) -> dict[str, Any]:
 
 def _candidate_summary(row: Any) -> dict[str, Any]:
     payload = _row_dict(row)
+    payload["current_sla"] = _sla_payload(payload)
     if payload.get("next_task_id"):
         payload["next_task"] = _task_payload(
             {
@@ -167,6 +171,183 @@ def _candidate_summary(row: Any) -> dict[str, Any]:
     return payload
 
 
+def _parse_datetime(value: Any) -> datetime | None:
+    raw = _text(value)
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _sla_payload(candidate: dict[str, Any], *, now: datetime | None = None) -> dict[str, Any] | None:
+    stage = _text(candidate.get("status"))
+    if stage not in SLA_STAGES:
+        return None
+    entered_at = _parse_datetime(candidate.get("current_stage_entered_at"))
+    due_at = _parse_datetime(candidate.get("current_sla_due_at"))
+    target_days = int(candidate.get("current_sla_target_days") or 0)
+    if not entered_at or not due_at or target_days <= 0:
+        return None
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    total_seconds = max((due_at - entered_at).total_seconds(), 1.0)
+    elapsed_seconds = max((current - entered_at).total_seconds(), 0.0)
+    elapsed_percentage = round((elapsed_seconds / total_seconds) * 100, 1)
+    if elapsed_percentage < 75:
+        status = "green"
+    elif current <= due_at:
+        status = "yellow"
+    else:
+        status = "red"
+    return {
+        "stage": stage,
+        "status": status,
+        "target_days": target_days,
+        "entered_at": entered_at.isoformat(),
+        "due_at": due_at.isoformat(),
+        "elapsed_percentage": elapsed_percentage,
+        "remaining_seconds": round((due_at - current).total_seconds()),
+        "responsible_account_id": candidate.get("current_stage_responsible_account_id"),
+        "responsible_name": candidate.get("current_stage_responsible_name") or "",
+    }
+
+
+def _database_features_available(conn: Any) -> bool:
+    return _text(getattr(conn, "db_backend", "")) == "postgres"
+
+
+def _sync_system_next_actions(
+    conn: Any,
+    *,
+    candidate_id: int,
+    actor_account_id: int | None,
+    now: str,
+) -> None:
+    if not _database_features_available(conn):
+        return
+    state_row = repository.candidate_automation_state_row(conn, int(candidate_id))
+    if not state_row:
+        return
+    state = _row_dict(state_row)
+    stage = _text(state.get("status"))
+    stage_history_id = int(state.get("stage_history_id") or 0)
+    if not stage_history_id:
+        return
+    due_at = _text(state.get("sla_due_at"))
+    responsible_account_id = (
+        int(state.get("stage_responsible_account_id") or actor_account_id or 0) or None
+    )
+    desired: list[dict[str, Any]] = []
+
+    def add(task_key: str, title: str, *, due: str = due_at) -> None:
+        desired.append(
+            {
+                "task_key": task_key,
+                "title": title,
+                "due_at": due,
+                "responsible_account_id": responsible_account_id,
+            }
+        )
+
+    if stage == "new_candidate":
+        add("contact_candidate", "Contact candidate")
+    elif stage == "responded":
+        add("schedule_interview", "Schedule job interview")
+    elif stage == "job_interview":
+        if state.get("interview_appointment_id"):
+            add(
+                "record_interview_result",
+                "Record job interview result",
+                due=_text(state.get("interview_appointment_ends_at")) or due_at,
+            )
+        elif _text(state.get("interview_result")) != "passed":
+            add("schedule_interview", "Schedule job interview")
+    elif stage == "test_and_demo":
+        if _text(state.get("subject_test_result")) != "passed":
+            add("record_subject_test", "Record subject test")
+        if state.get("demo_appointment_id"):
+            add(
+                "record_demo_result",
+                "Record demo lesson result",
+                due=_text(state.get("demo_appointment_ends_at")) or due_at,
+            )
+        elif _text(state.get("demo_result")) != "passed":
+            add("schedule_demo", "Schedule demo lesson")
+    elif stage == "under_review":
+        if int(state.get("required_document_count") or 0) < len(REQUIRED_DOCUMENT_TYPES):
+            add("collect_required_documents", "Collect required documents")
+        if not state.get("actionable_approval_id"):
+            add("send_academic_approval", "Send hiring request to Academic Director")
+
+    repository.replace_system_tasks(
+        conn,
+        candidate_id=int(candidate_id),
+        stage=stage,
+        stage_history_id=stage_history_id,
+        desired_tasks=desired,
+        actor_account_id=actor_account_id,
+        now=now,
+    )
+
+
+def _candidate_progress(
+    *,
+    candidate: dict[str, Any],
+    stage_history: list[dict[str, Any]],
+    documents: list[dict[str, Any]],
+    interviews: list[dict[str, Any]],
+    subject_tests: list[dict[str, Any]],
+    demos: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    reached_stages = {str(item.get("stage") or "") for item in stage_history}
+    uploaded_types = {str(item.get("document_type") or "") for item in documents}
+    active_interviews = [item for item in interviews if not item.get("voided_at")]
+    active_tests = [item for item in subject_tests if not item.get("voided_at")]
+    active_demos = [item for item in demos if not item.get("voided_at")]
+    stage = _text(candidate.get("status"))
+    completed = {
+        "contacted": "responded" in reached_stages or stage not in {"", "new_candidate"},
+        "interview": any(_text(item.get("result")) == "passed" for item in active_interviews),
+        "subject_test": any(_text(item.get("result")) == "passed" for item in active_tests),
+        "demo": any(_text(item.get("result")) == "passed" for item in active_demos),
+        "documents": REQUIRED_DOCUMENT_TYPES.issubset(uploaded_types),
+        "review": bool({"under_review", "teacher_academy", "active_teacher"} & reached_stages)
+        or stage in {"under_review", "teacher_academy", "active_teacher"},
+        "decision": bool(candidate.get("final_decision")),
+    }
+    labels = (
+        ("contacted", "Contacted"),
+        ("interview", "Interview"),
+        ("subject_test", "Subject Test"),
+        ("demo", "Demo"),
+        ("documents", "Documents"),
+        ("review", "Review"),
+        ("decision", "Decision"),
+    )
+    first_incomplete = next((key for key, _label in labels if not completed[key]), "")
+    progress = [
+        {
+            "key": key,
+            "label": label,
+            "status": "completed" if completed[key] else "current" if key == first_incomplete else "pending",
+        }
+        for key, label in labels
+    ]
+    required_uploaded = len(REQUIRED_DOCUMENT_TYPES & uploaded_types)
+    optional_uploaded = len(OPTIONAL_DOCUMENT_TYPES & uploaded_types)
+    document_progress = {
+        "required_uploaded": required_uploaded,
+        "required_total": len(REQUIRED_DOCUMENT_TYPES),
+        "optional_uploaded": optional_uploaded,
+        "optional_total": len(OPTIONAL_DOCUMENT_TYPES),
+        "completion_percentage": round(required_uploaded / len(REQUIRED_DOCUMENT_TYPES) * 100),
+        "missing_required_types": sorted(REQUIRED_DOCUMENT_TYPES - uploaded_types),
+    }
+    return progress, document_progress
+
+
 def _academic_visible_id(user: CurrentUser) -> int | None:
     value = visible_account_id(user)
     return value if value and value > 0 else None
@@ -184,6 +365,7 @@ def list_pipeline(
     search: str = "",
     position: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     evaluator_account_id: int | None = None,
@@ -198,6 +380,7 @@ def list_pipeline(
             search=_text(search),
             position=_text(position),
             source=_text(source),
+            subject_id=subject_id,
             application_from=_text(application_from),
             application_to=_text(application_to),
             evaluator_account_id=evaluator_account_id,
@@ -222,6 +405,7 @@ def list_candidates(
     position: str = "",
     stage: str = "",
     source: str = "",
+    subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
     final_decision: str = "",
@@ -242,6 +426,7 @@ def list_candidates(
             position=_text(position),
             stage=normalized_stage,
             source=_text(source),
+            subject_id=subject_id,
             application_from=_text(application_from),
             application_to=_text(application_to),
             final_decision=_text(final_decision),
@@ -384,12 +569,23 @@ def get_candidate(user: CurrentUser, candidate_id: int) -> dict[str, Any]:
         approvals = [_row_dict(item) for item in repository.list_approval_rows(conn, int(candidate_id))]
         decisions = [_row_dict(item) for item in repository.list_decision_rows(conn, int(candidate_id))]
         activity = [_row_dict(item) for item in repository.list_activity_rows(conn, int(candidate_id))]
+        stage_history = [
+            _row_dict(item) for item in repository.list_stage_history_rows(conn, int(candidate_id))
+        ]
 
     uploaded_types = {item["document_type"] for item in documents}
     pending_tasks = [item for item in tasks if item["effective_status"] in {"pending", "overdue"}]
     latest_interview = next((item for item in interviews if not item.get("voided_at")), None)
     latest_test = next((item for item in subject_tests if not item.get("voided_at")), None)
     latest_demo = next((item for item in demos if not item.get("voided_at")), None)
+    progress, document_progress = _candidate_progress(
+        candidate=candidate,
+        stage_history=stage_history,
+        documents=documents,
+        interviews=interviews,
+        subject_tests=subject_tests,
+        demos=demos,
+    )
     candidate.update(
         {
             "documents": documents,
@@ -403,7 +599,11 @@ def get_candidate(user: CurrentUser, candidate_id: int) -> dict[str, Any]:
             "approvals": approvals,
             "decisions": decisions,
             "activity": activity,
+            "stage_history": stage_history,
+            "progress": progress,
+            "document_progress": document_progress,
             "missing_document_types": [item for item in DOCUMENT_TYPES if item not in uploaded_types],
+            "missing_required_document_types": document_progress["missing_required_types"],
             "under_review": {
                 "interview_result": latest_interview.get("result") if latest_interview else "",
                 "subject_test_result": latest_test.get("result") if latest_test else "",
@@ -462,6 +662,8 @@ def options() -> dict[str, Any]:
         "stages": list(PRIMARY_STAGES) + list(ALTERNATIVE_STAGES),
         "sources": configured_sources,
         "document_types": list(DOCUMENT_TYPES),
+        "required_document_types": sorted(REQUIRED_DOCUMENT_TYPES),
+        "optional_document_types": sorted(OPTIONAL_DOCUMENT_TYPES),
         "rejection_reasons": [item["value"] for item in configured_reasons],
         "rejection_reason_options": configured_reasons,
         "document_upload_enabled": bool(is_r2_configured()),
@@ -482,16 +684,56 @@ def _setting_value(category: str, label: str) -> str:
 
 
 def list_settings(user: CurrentUser) -> dict[str, Any]:
-    if user.role != "hr_manager":
-        raise RecruitmentError("Only HR Manager can manage recruitment settings.", status_code=403)
+    if user.role not in {"hr_manager", "ceo"}:
+        raise RecruitmentError("Recruitment settings require HR or CEO access.", status_code=403)
     with connect_auth_db() as conn:
         rows = repository.list_recruitment_setting_rows(conn)
+        sla_rows = repository.list_sla_rule_rows(conn)
     items = [_row_dict(row) for row in rows]
     return {
         "items": items,
         "sources": [item for item in items if item["category"] == "source"],
         "rejection_reasons": [item for item in items if item["category"] == "rejection_reason"],
+        "sla_rules": [_row_dict(row) for row in sla_rows],
+        "read_only": user.role == "ceo",
     }
+
+
+def update_sla_rule(
+    user: CurrentUser,
+    *,
+    stage: str,
+    target_days: int,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError("Only HR Manager can change SLA targets.", status_code=403)
+    normalized_stage = _text(stage)
+    if normalized_stage not in SLA_STAGES:
+        raise RecruitmentError("This stage does not use an SLA target.")
+    if int(target_days) < 1 or int(target_days) > 90:
+        raise RecruitmentError("SLA target must be between 1 and 90 calendar days.")
+    now = _now()
+    with connect_auth_db() as conn:
+        saved = repository.update_sla_rule(
+            conn,
+            stage=normalized_stage,
+            target_days=int(target_days),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not saved:
+            raise RecruitmentError("SLA rule was not found.", status_code=404)
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=0,
+            event_type="recruitment.sla_rule_updated",
+            detail={"stage": normalized_stage, "target_days": int(target_days)},
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return _row_dict(saved)
 
 
 def add_setting(user: CurrentUser, *, category: str, label: str) -> dict[str, Any]:
@@ -611,6 +853,12 @@ def create_candidate(user: CurrentUser, values: dict[str, Any]) -> dict[str, Any
             detail={"stage": "new_candidate", "comment_added": bool(comment)},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=candidate_id,
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -851,6 +1099,8 @@ def schedule_stage_move(
             expected_version=int(values.get("expected_version") or 0),
             actor_account_id=_actor_account(user),
             now=now,
+            comment="Appointment scheduled",
+            transition_source="manual",
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
@@ -903,6 +1153,12 @@ def schedule_stage_move(
             detail={"from": candidate["status"], "to": stage, "reason": "Appointment scheduled"},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -983,6 +1239,12 @@ def create_appointment(user: CurrentUser, candidate_id: int, values: dict[str, A
                 version_token=int(saved_appointment["version"] or 1),
                 include_reminders=True,
             )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     result = get_candidate(user, int(candidate_id))
     appointment = next((item for item in result.get("appointments", []) if int(item.get("id") or 0) == appointment_id), None)
@@ -1113,6 +1375,12 @@ def update_appointment(
                 version_token=int(saved_appointment["version"] or 1),
                 include_reminders=True,
             )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     return {"candidate": get_candidate(user, int(candidate_id))}
 
@@ -1175,6 +1443,12 @@ def change_appointment_status(
                 event_type="demo_cancelled" if status == "cancelled" else "demo_no_show",
                 version_token=int(changed_appointment["version"] or 1),
             )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     return {"candidate": get_candidate(user, int(candidate_id))}
 
@@ -1208,6 +1482,8 @@ def hold_candidate(
             expected_version=int(expected_version),
             actor_account_id=_actor_account(user),
             now=now,
+            comment=normalized_reason,
+            transition_source="manual",
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
@@ -1261,6 +1537,12 @@ def hold_candidate(
             actor_staff_id=_actor_staff(user),
             now=now,
         )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     return get_candidate(user, int(candidate_id))
 
@@ -1285,6 +1567,12 @@ def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected
             expected_version=int(expected_version),
             actor_account_id=_actor_account(user),
             now=now,
+            comment=_text(reason) or f"Moved to {normalized_stage.replace('_', ' ')}.",
+            transition_source=(
+                "restored"
+                if _text(existing["status"]) in {"trash_bin", "rejected", "candidate_withdrew"}
+                else "manual"
+            ),
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
@@ -1371,6 +1659,12 @@ def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected
             detail=move_detail,
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -1610,6 +1904,8 @@ def _add_record(
                 expected_version=int(candidate["version"]),
                 actor_account_id=evaluator_account_id,
                 now=now,
+                comment=rejection_label,
+                transition_source="automatic",
             ):
                 raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
             stage_changed = True
@@ -1696,6 +1992,8 @@ def _add_record(
                 expected_version=int(candidate["version"]),
                 actor_account_id=_actor_account(user),
                 now=now,
+                comment="Passed assigned demo lesson",
+                transition_source="automatic",
             ):
                 raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
             stage_changed = True
@@ -1740,6 +2038,12 @@ def _add_record(
                 actor_account_id=_actor_account(user),
                 now=now,
             )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     return get_candidate(user, int(candidate_id))
 
@@ -1837,6 +2141,8 @@ def void_evaluation(
                 expected_version=int(candidate["version"]),
                 actor_account_id=_actor_account(user),
                 now=now,
+                comment="Failed evaluation voided",
+                transition_source="restored",
             ):
                 raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
             repository.insert_audit(
@@ -1884,6 +2190,12 @@ def void_evaluation(
             detail=void_detail,
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -2020,6 +2332,12 @@ def upload_document(user: CurrentUser, candidate_id: int, *, document_type: str,
                 actor_staff_id=_actor_staff(user),
                 now=now,
             )
+            _sync_system_next_actions(
+                conn,
+                candidate_id=int(candidate_id),
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
             conn.commit()
     except Exception:
         delete_private_candidate_document(uploaded.get("object_key"))
@@ -2044,6 +2362,12 @@ def remove_document(user: CurrentUser, candidate_id: int, document_id: int) -> d
             detail={"document_id": int(document_id), "document_type": document["document_type"], "file_name": document["original_file_name"]},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -2090,6 +2414,12 @@ def request_approval(user: CurrentUser, candidate_id: int, *, requested_outcome:
             detail={"approval_id": approval_id, "requested_outcome": outcome},
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -2190,6 +2520,8 @@ def _approve_and_finalize_request(
             expected_version=int(candidate["version"]),
             actor_account_id=_actor_account(user),
             now=now,
+            comment=review_comment or "Academic Director approved hiring outcome.",
+            transition_source="automatic",
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
@@ -2222,6 +2554,12 @@ def _approve_and_finalize_request(
             },
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()
@@ -2346,6 +2684,8 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
             expected_version=int(candidate["version"]),
             actor_account_id=_actor_account(user),
             now=now,
+            comment=reason_detail or rejection_reason or f"Finalized as {decision.replace('_', ' ')}.",
+            transition_source="manual",
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
@@ -2419,6 +2759,12 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
             },
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
             now=now,
         )
         conn.commit()

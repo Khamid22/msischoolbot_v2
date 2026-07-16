@@ -342,6 +342,10 @@ function AttemptList({
                   : " / 10"}
               </p>
             ) : null}
+            {item.overall_score !== null && item.overall_score !== undefined ? <p className="mt-2 text-[13px] font-semibold">Overall: {text(item.overall_score)} / 10{item.communication_score !== null && item.communication_score !== undefined ? ` · Communication: ${text(item.communication_score)} / 10` : ""}{item.cefr_level ? ` · CEFR ${text(item.cefr_level)}` : ""}</p> : null}
+            {item.paper ? <p className="mt-1 text-xs text-muted-foreground">Paper: {text(item.paper)}</p> : null}
+            {Array.isArray(item.topic_scores) && item.topic_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.topic_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.topic)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.topic)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
+            {Array.isArray(item.criteria_scores) && item.criteria_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.criteria_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.criterion)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.criterion)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
             <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-5 text-muted-foreground">
               {text(
                 item.notes ||
@@ -589,6 +593,7 @@ function ActionFields({
               className={`${fieldClass} mt-1`}
             />
           </label>
+          <label className="text-xs font-semibold">Subject<select name="subject_id" defaultValue={candidate.subject_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-xs font-semibold">
             Application date
             <input
@@ -610,6 +615,10 @@ function ActionFields({
                 <option key={source}>{source}</option>
               ))}
             </select>
+          </label>
+          <label className="text-xs font-semibold">
+            Source details
+            <input name="source_detail" defaultValue={candidate.source_detail} className={`${fieldClass} mt-1`} />
           </label>
           <label className="text-xs font-semibold">
             Age
@@ -788,6 +797,12 @@ function ActionFields({
               className={`${fieldClass} mt-1`}
             />
           </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="text-xs font-semibold">CEFR<select name="cefr_level" className={`${fieldClass} mt-1`}><option value="">Not set</option>{["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label className="text-xs font-semibold">Overall (0–10)<input name="overall_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
+            <label className="text-xs font-semibold">Communication (0–10)<input name="communication_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
+          </div>
+          <label className="text-xs font-semibold">Recommendation<select name="recommendation_code" className={`${fieldClass} mt-1`}><option value="">Not set</option><option value="proceed">Proceed</option><option value="hold">Hold</option><option value="reject">Reject</option></select></label>
           <label className="text-xs font-semibold">
             Notes
             <textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} />
@@ -804,6 +819,7 @@ function ActionFields({
     case "record_test":
       return (
         <div className="grid gap-3">
+          <label className="text-xs font-semibold">Paper / version<input name="paper" className={`${fieldClass} mt-1`} /></label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold">
               Score
@@ -826,6 +842,7 @@ function ActionFields({
               />
             </label>
           </div>
+          <fieldset className="rounded-lg border border-border p-3"><legend className="px-1 text-xs font-semibold">Topic result (optional)</legend><div className="grid gap-2 sm:grid-cols-3"><input name="topic_name" placeholder="Topic" className={fieldClass} /><input name="topic_score" aria-label="Topic score" type="number" min="0" step="0.1" placeholder="Score" className={fieldClass} /><input name="topic_maximum" aria-label="Topic maximum" type="number" min="0.1" step="0.1" placeholder="Maximum" className={fieldClass} /></div></fieldset>
           <label className="text-xs font-semibold">
             Result
             <select name="result" className={`${fieldClass} mt-1`}>
@@ -870,6 +887,7 @@ function ActionFields({
               className={`${fieldClass} mt-1`}
             />
           </label>
+          <fieldset className="rounded-lg border border-border p-3"><legend className="px-1 text-xs font-semibold">Criterion result (optional)</legend><div className="grid gap-2 sm:grid-cols-3"><input name="criterion_name" placeholder="Criterion" className={fieldClass} /><input name="criterion_score" aria-label="Criterion score" type="number" min="0" max="10" step="0.1" placeholder="Score" className={fieldClass} /><input name="criterion_maximum" aria-label="Criterion maximum" type="number" min="0.1" step="0.1" defaultValue="10" className={fieldClass} /></div></fieldset>
           <label className="text-xs font-semibold">
             Result
             <select name="result" className={`${fieldClass} mt-1`}>
@@ -1280,7 +1298,7 @@ export function CandidateProfile({
     rawValue: string,
   ) => {
     let value: string | number | null = rawValue.trim() || null;
-    if (["age", "expected_salary_uzs"].includes(field) && value !== null)
+    if (["age", "expected_salary_uzs", "subject_id"].includes(field) && value !== null)
       value = Number(value);
     mutation.mutate({
       url: `${RECRUITMENT_API}/candidates/${candidateId}`,
@@ -1438,14 +1456,30 @@ export function CandidateProfile({
     } else if (action.kind === "record_interview") {
       submit("/interviews", formValues(form));
     } else if (action.kind === "record_test") {
+      const values = formValues(form);
+      const topic = String(values.topic_name || "").trim();
+      const topicScore = Number(values.topic_score);
+      const topicMaximum = Number(values.topic_maximum);
+      delete values.topic_name;
+      delete values.topic_score;
+      delete values.topic_maximum;
       submit("/subject-tests", {
-        ...formValues(form),
+        ...values,
         subject_id: candidate.subject_id || null,
+        topic_scores: topic && Number.isFinite(topicScore) && topicMaximum > 0 ? [{ topic, score: topicScore, maximum_score: topicMaximum }] : [],
       });
     } else if (action.kind === "record_demo") {
+      const values = formValues(form);
+      const criterion = String(values.criterion_name || "").trim();
+      const criterionScore = Number(values.criterion_score);
+      const criterionMaximum = Number(values.criterion_maximum);
+      delete values.criterion_name;
+      delete values.criterion_score;
+      delete values.criterion_maximum;
       submit("/demo-lessons", {
-        ...formValues(form),
+        ...values,
         subject_id: candidate.subject_id || null,
+        criteria_scores: criterion && Number.isFinite(criterionScore) && criterionMaximum > 0 ? [{ criterion, score: criterionScore, maximum_score: criterionMaximum }] : [],
       });
     } else if (action.kind === "schedule_appointment") {
       submit("/appointments", {
@@ -1808,6 +1842,15 @@ export function CandidateProfile({
                   onSave={(value) => saveInlineField("applied_position", value)}
                 />
                 <InlineField
+                  label="Subject"
+                  {...inlineEditProps("subject_id", "Subject")}
+                  value={candidate.subject_id}
+                  displayValue={candidate.subject}
+                  options={(options.data?.subjects || []).map((item) => ({ value: String(item.id), label: item.name }))}
+                  busy={mutation.isPending}
+                  onSave={(value) => saveInlineField("subject_id", value)}
+                />
+                <InlineField
                   label="Phone"
                   {...inlineEditProps("phone", "Phone")}
                   value={candidate.phone}
@@ -1843,6 +1886,13 @@ export function CandidateProfile({
                   }))}
                   busy={mutation.isPending}
                   onSave={(value) => saveInlineField("source", value)}
+                />
+                <InlineField
+                  label="Source details"
+                  {...inlineEditProps("source_detail", "Source details")}
+                  value={candidate.source_detail}
+                  busy={mutation.isPending}
+                  onSave={(value) => saveInlineField("source_detail", value)}
                 />
                 <InlineField
                   label="Age"
@@ -1978,9 +2028,11 @@ export function CandidateProfile({
                 <DefinitionGrid
                   values={[
                     ["Phone", candidate.phone],
+                    ["Subject", candidate.subject],
                     ["Telegram", candidate.telegram_username],
                     ["Application date", dateLabel(candidate.application_date)],
                     ["Source", candidate.source],
+                    ["Source details", candidate.source_detail],
                     ["Age", candidate.age],
                     ["English", candidate.english_level],
                     ["Schedule", candidate.preferred_schedule],
@@ -2030,7 +2082,7 @@ export function CandidateProfile({
                       : ""}
                   </p>
                 </div>
-              ) : role !== "hr_manager" && candidate.next_task ? (
+              ) : candidate.next_task ? (
                 <div>
                   <p className="text-sm font-semibold">
                     {candidate.next_task.title}
@@ -2040,30 +2092,16 @@ export function CandidateProfile({
                   </p>
                 </div>
               ) : (
-                <EmptyLine>No appointment scheduled.</EmptyLine>
+                <EmptyLine>No next action.</EmptyLine>
               )}
+              {candidate.current_sla ? <div className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold ${candidate.current_sla.status === "red" ? "bg-red-50 text-red-700" : candidate.current_sla.status === "yellow" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>{candidate.current_sla.status === "red" ? "SLA overdue" : `Stage SLA due ${dateLabel(candidate.current_sla.due_at)}`}</div> : null}
             </Panel>
             <Panel
-              title="Readiness"
+              title="Recruitment progress"
               icon={<BriefcaseBusiness className="h-4 w-4" />}
             >
-              <DefinitionGrid
-                values={[
-                  [
-                    "Missing documents",
-                    candidate.missing_document_types?.length || 0,
-                  ],
-                  ["Interview", latestInterview?.result],
-                  ["Subject test", latestTest?.result],
-                  ["Demo", latestDemo?.result],
-                  ...(role === "hr_manager"
-                    ? []
-                    : ([["Open tasks", pendingTasks.length]] as Array<
-                        [string, unknown]
-                      >)),
-                  ["Final decision", candidate.final_decision || "Pending"],
-                ]}
-              />
+              <ol className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">{(candidate.progress || []).map((item) => <li key={item.key} className={`flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-xs font-semibold ${item.status === "completed" ? "bg-emerald-50 text-emerald-800" : item.status === "current" ? "bg-amber-50 text-amber-800" : "bg-muted/50 text-muted-foreground"}`}><span aria-hidden="true" className={`h-2 w-2 rounded-full ${item.status === "completed" ? "bg-emerald-500" : item.status === "current" ? "bg-amber-500" : "bg-slate-300"}`} />{item.label}</li>)}</ol>
+              {candidate.document_progress ? <p className="mt-3 text-xs text-muted-foreground">Required documents: <strong className="text-foreground">{candidate.document_progress.required_uploaded}/{candidate.document_progress.required_total}</strong> · Optional: {candidate.document_progress.optional_uploaded}/{candidate.document_progress.optional_total}</p> : null}
             </Panel>
           </div>
         </div>
@@ -2248,7 +2286,7 @@ export function CandidateProfile({
             icon={<FileText className="h-4 w-4" />}
             action={
               <span className="text-xs text-muted-foreground">
-                Missing: {candidate.missing_document_types?.length || 0}
+                Required: {candidate.document_progress?.required_uploaded || 0}/{candidate.document_progress?.required_total || 3}
               </span>
             }
           >
@@ -2290,13 +2328,8 @@ export function CandidateProfile({
             {!(candidate.documents || []).length ? (
               <EmptyLine>No documents uploaded.</EmptyLine>
             ) : null}
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Missing document types remain informational:{" "}
-              {(candidate.missing_document_types || [])
-                .map(humanize)
-                .join(", ") || "none"}
-              .
-            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2"><p className="rounded-lg bg-muted/50 p-2 text-xs leading-5"><strong className="block text-foreground">Required documents</strong>{candidate.document_progress?.missing_required_types.length ? `Missing: ${candidate.document_progress.missing_required_types.map(humanize).join(", ")}` : "Complete"}</p><p className="rounded-lg bg-muted/50 p-2 text-xs leading-5"><strong className="block text-foreground">Optional documents</strong>{candidate.document_progress?.optional_uploaded || 0} of {candidate.document_progress?.optional_total || 0} uploaded</p></div>
+            <p className="mt-2 text-xs text-muted-foreground">Document progress is informational and never blocks stage movement.</p>
           </Panel>
         </div>
       ) : null}
@@ -2625,6 +2658,9 @@ export function CandidateProfile({
         widthClass="sm:max-w-md"
       >
         <ol className="space-y-3">
+          {(candidate.stage_history || []).map((item) => (
+            <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[13px] font-semibold">Entered {stageLabels[item.stage] || humanize(item.stage)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
+          ))}
           {(candidate.activity || []).map((item) => (
             <li
               key={Number(item.id)}
@@ -2638,7 +2674,7 @@ export function CandidateProfile({
               </p>
             </li>
           ))}
-          {!(candidate.activity || []).length ? (
+          {!(candidate.activity || []).length && !(candidate.stage_history || []).length ? (
             <EmptyLine>No history yet.</EmptyLine>
           ) : null}
         </ol>

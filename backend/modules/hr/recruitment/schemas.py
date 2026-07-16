@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 
 def _blank_to_none(value: Any) -> Any:
@@ -29,6 +29,7 @@ class CandidateCreate(StrictModel):
     subject_id: OptionalInt = Field(default=None, ge=1)
     application_date: OptionalDate = None
     source: str = Field(default="", max_length=120)
+    source_detail: str = Field(default="", max_length=1000)
     comment: str = Field(default="", max_length=5000)
 
 
@@ -43,6 +44,7 @@ class CandidateUpdate(StrictModel):
     age: OptionalInt = Field(default=None, ge=14, le=100)
     address: str | None = Field(default=None, max_length=1000)
     source: str | None = Field(default=None, max_length=120)
+    source_detail: str | None = Field(default=None, max_length=1000)
     english_level: str | None = Field(default=None, max_length=120)
     motivation_expectations: str | None = Field(default=None, max_length=5000)
     interests_hobbies: str | None = Field(default=None, max_length=3000)
@@ -109,10 +111,34 @@ class InterviewWrite(StrictModel):
     interview_format: str = Field(default="", max_length=120)
     notes: str = Field(default="", max_length=10000)
     english_level: str = Field(default="", max_length=120)
+    cefr_level: str = Field(default="", max_length=20)
+    overall_score: OptionalDecimal = Field(default=None, ge=0, le=10)
+    communication_score: OptionalDecimal = Field(default=None, ge=0, le=10)
     strengths: str = Field(default="", max_length=5000)
     concerns: str = Field(default="", max_length=5000)
     hr_recommendation: str = Field(default="", max_length=5000)
+    recommendation_code: str = Field(default="", max_length=80)
     result: str = Field(min_length=1, max_length=80)
+
+
+class StructuredScore(StrictModel):
+    score: Decimal = Field(ge=0)
+    maximum_score: Decimal = Field(gt=0)
+
+    @model_validator(mode="after")
+    def score_does_not_exceed_maximum(self):
+        if self.score > self.maximum_score:
+            raise ValueError("Score cannot exceed maximum score.")
+        return self
+
+
+class TopicScore(StructuredScore):
+    topic: str = Field(min_length=1, max_length=200)
+
+
+class DemoCriterionScore(StructuredScore):
+    criterion: str = Field(min_length=1, max_length=200)
+    maximum_score: Decimal = Field(default=Decimal("10"), gt=0)
 
 
 class SubjectTestWrite(StrictModel):
@@ -122,6 +148,8 @@ class SubjectTestWrite(StrictModel):
     evaluator_account_id: OptionalInt = Field(default=None, ge=1)
     score: OptionalDecimal = Field(default=None, ge=0)
     maximum_score: OptionalDecimal = Field(default=None, gt=0)
+    paper: str = Field(default="", max_length=200)
+    topic_scores: list[TopicScore] = Field(default_factory=list, max_length=50)
     notes: str = Field(default="", max_length=10000)
     result: str = Field(min_length=1, max_length=80)
 
@@ -137,6 +165,7 @@ class DemoLessonWrite(StrictModel):
     strengths: str = Field(default="", max_length=5000)
     areas_for_improvement: str = Field(default="", max_length=5000)
     score: OptionalDecimal = Field(default=None, ge=0, le=10)
+    criteria_scores: list[DemoCriterionScore] = Field(default_factory=list, max_length=50)
     result: str = Field(min_length=1, max_length=80)
     recommendation: str = Field(default="", max_length=5000)
 
@@ -180,6 +209,10 @@ class RecruitmentSettingCreate(StrictModel):
     label: str = Field(min_length=1, max_length=120)
 
 
+class RecruitmentSlaRuleUpdate(StrictModel):
+    target_days: int = Field(ge=1, le=90)
+
+
 class RecruitmentMutationResult(BaseModel):
     message: str
     candidate: dict[str, Any] | None = None
@@ -207,6 +240,7 @@ __all__ = [
     "InterviewWrite",
     "NoteCreate",
     "RecruitmentSettingCreate",
+    "RecruitmentSlaRuleUpdate",
     "RecruitmentMutationResult",
     "ScheduledStageMove",
     "StageChange",

@@ -149,6 +149,8 @@
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/lessons | POST
 /api/v1/head-of-department/teacher-academy/{academy_teacher_id}/status | POST
+/api/v1/hr/analytics/dashboard | GET
+/api/v1/hr/analytics/options | GET
 /api/v1/recruitment/academy-intakes/{academy_teacher_id}/onboard | POST
 /api/v1/recruitment/active-teacher-intakes/{teacher_id}/provision-account | POST
 /api/v1/recruitment/appointments | GET
@@ -187,6 +189,7 @@
 /api/v1/recruitment/pipeline | GET
 /api/v1/recruitment/settings | GET
 /api/v1/recruitment/settings | POST
+/api/v1/recruitment/settings/sla-rules/{stage} | PATCH
 /api/v1/recruitment/settings/{setting_id} | DELETE
 /api/v1/recruitment/tasks | GET
 /api/v1/student/activity/ping | GET
@@ -204,11 +207,13 @@
 /auth/telegram | POST
 /ceo | GET
 /ceo/recruitment | GET
+/ceo/recruitment/analytics | GET
 /ceo/recruitment/candidates | GET
 /ceo/recruitment/candidates/{candidate_id} | GET
 /ceo/recruitment/pipeline | GET
 /ceo/recruitment/profile | GET
 /ceo/recruitment/schedule | GET
+/ceo/recruitment/settings | GET
 /ceo/recruitment/tasks | GET
 /customer-support | GET
 /dashboard/{student_id} | GET
@@ -237,6 +242,7 @@
 /health/live | GET
 /health/ready | GET
 /hr-manager | GET
+/hr-manager/analytics | GET
 /hr-manager/candidates | GET
 /hr-manager/candidates/{candidate_id} | GET
 /hr-manager/pipeline | GET

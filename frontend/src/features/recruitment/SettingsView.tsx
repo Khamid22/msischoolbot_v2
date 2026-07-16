@@ -1,4 +1,4 @@
-import { Link2, Loader2, LockKeyhole, Plus, Tags, Trash2 } from "lucide-react";
+import { Clock3, Link2, Loader2, LockKeyhole, Plus, Tags, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 
@@ -93,7 +93,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
     queryFn: () => recruitmentRequest<RecruitmentSettingsData>(`${RECRUITMENT_API}/settings`),
   });
   const mutation = useMutation({
-    mutationFn: ({ method, url, body }: { method: "POST" | "DELETE"; url: string; body?: unknown }) =>
+    mutationFn: ({ method, url, body }: { method: "POST" | "PATCH" | "DELETE"; url: string; body?: unknown }) =>
       recruitmentRequest<MutationPayload>(url, { method, body: body ? jsonBody(body) : undefined }),
     onSuccess: (result) => {
       onAnnouncement(result.message);
@@ -115,7 +115,14 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
 
   return (
     <>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <section className="mb-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex items-start gap-2"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Clock3 className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold">Stage SLA targets</h2><p className="mt-0.5 text-xs text-muted-foreground">Calendar days in Asia/Tashkent. Changes apply only to future stage entries.</p></div></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {settings.data.sla_rules.map((rule) => <label key={rule.stage} className="rounded-lg border border-border p-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{rule.stage.split("_").join(" ")}<div className="mt-1 flex items-center gap-2"><input type="number" min={1} max={90} defaultValue={rule.target_days} disabled={settings.data.read_only || mutation.isPending} className={`${fieldClass} min-w-0`} onBlur={(event) => { const target = Number(event.target.value); if (target !== rule.target_days && target >= 1 && target <= 90) mutation.mutate({ method: "PATCH", url: `${RECRUITMENT_API}/settings/sla-rules/${rule.stage}`, body: { target_days: target } }); }} /><span className="text-xs normal-case">days</span></div></label>)}
+        </div>
+        {settings.data.read_only ? <p className="mt-2 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
+      </section>
+      {!settings.data.read_only ? <div className="grid gap-3 lg:grid-cols-2">
         <SettingsPanel
           title="Candidate sources"
           detail="Shown when HR creates or filters candidates. Existing candidate values remain unchanged."
@@ -123,7 +130,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
           category="source"
           items={settings.data.sources}
           busy={mutation.isPending}
-          onAdd={add}
+          onAdd={settings.data.read_only ? () => undefined : add}
           onRemove={setRemoveSetting}
         />
         <SettingsPanel
@@ -133,10 +140,10 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
           category="rejection_reason"
           items={settings.data.rejection_reasons}
           busy={mutation.isPending}
-          onAdd={add}
+          onAdd={settings.data.read_only ? () => undefined : add}
           onRemove={setRemoveSetting}
         />
-      </div>
+      </div> : null}
       <ConfirmDialog
         open={Boolean(removeSetting)}
         title="Remove this option?"

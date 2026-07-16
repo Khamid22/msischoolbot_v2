@@ -98,6 +98,8 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /border-slate-400 bg-slate-100/);
     assert.match(pipeline, /border-amber-400 bg-amber-50/);
     assert.match(pipeline, /border-emerald-400 bg-emerald-50/);
+    assert.match(pipeline, /candidate\.current_sla/);
+    assert.match(pipeline, /SLA overdue/);
     assert.match(pipeline, /Evaluator:/);
     assert.match(pipeline, /Topic:/);
     assert.match(pipeline, /overdue \? "Overdue" : "Scheduled"/);
@@ -215,6 +217,19 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /Candidate sources/);
     assert.match(settings, /Rejection reasons/);
     assert.match(settings, /RECRUITMENT_API}\/settings/);
+    assert.match(settings, /Stage SLA targets/);
+    assert.match(settings, /sla-rules/);
+  });
+
+  test("adds an essential HR and CEO recruitment analytics dashboard", () => {
+    const analytics = source("AnalyticsView.tsx");
+    assert.match(workspace, /key: "analytics", label: "Analytics"/);
+    assert.match(workspace, /<AnalyticsView/);
+    assert.match(analytics, /\/api\/v1\/hr\/analytics/);
+    assert.match(analytics, /Active candidates/);
+    assert.match(analytics, /Recruitment funnel/);
+    assert.match(analytics, /Stage time and SLA/);
+    assert.match(analytics, /Source conversion/);
   });
 
   test("uses a dedicated HR-only Trash Bin that cannot expose active candidates", () => {

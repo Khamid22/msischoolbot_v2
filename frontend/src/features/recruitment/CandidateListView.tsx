@@ -22,6 +22,7 @@ type CandidateFilters = {
   position: string;
   stage: string;
   source: string;
+  subject_id: string;
   application_from: string;
   application_to: string;
   final_decision: string;
@@ -33,6 +34,7 @@ const filterKeys: Array<keyof CandidateFilters> = [
   "position",
   "stage",
   "source",
+  "subject_id",
   "application_from",
   "application_to",
   "final_decision",
@@ -47,6 +49,7 @@ function initialFilters(): CandidateFilters {
 function filterLabel(key: keyof CandidateFilters, value: string, options?: RecruitmentOptions) {
   if (key === "stage" || key === "final_decision") return stageLabels[value] || humanize(value);
   if (key === "evaluator_account_id") return options?.staff.find((person) => String(person.id) === value)?.name || `Evaluator ${value}`;
+  if (key === "subject_id") return options?.subjects.find((subject) => String(subject.id) === value)?.name || `Subject ${value}`;
   if (key === "application_from") return `From ${dateLabel(value)}`;
   if (key === "application_to") return `To ${dateLabel(value)}`;
   return value;
@@ -86,6 +89,7 @@ function AdvancedFilters({
       <div className="grid gap-4">
         <label className="text-xs font-semibold">Position<input className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)} /></label>
         <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
+        <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         <label className="text-xs font-semibold">Final outcome<select className={`${fieldClass} mt-1`} value={draft.final_decision} onChange={(event) => update("final_decision", event.target.value)}><option value="">All outcomes</option>{["teacher_academy", "active_teacher", "rejected", "on_hold", "candidate_withdrew"].map((outcome) => <option key={outcome} value={outcome}>{stageLabels[outcome]}</option>)}</select></label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label>

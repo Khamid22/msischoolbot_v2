@@ -39,6 +39,7 @@ def _register_role_routes(
     include_settings: bool = False,
     include_trash: bool = False,
     include_rejected: bool = False,
+    include_analytics: bool = False,
 ) -> None:
     router = APIRouter(dependencies=[Depends(require_role(role))])
 
@@ -104,6 +105,15 @@ def _register_role_routes(
         def trash():
             return _render(role=role, view="trash", base_path=base_path)
 
+    if include_analytics:
+
+        @router.get(
+            f"{base_path}/analytics",
+            operation_id=f"{operation_prefix}_recruitment_analytics",
+        )
+        def analytics():
+            return _render(role=role, view="analytics", base_path=base_path)
+
     @router.get(f"{base_path}/profile", operation_id=f"{operation_prefix}_recruitment_profile")
     def profile():
         return _render(role=role, view="profile", base_path=base_path)
@@ -132,12 +142,15 @@ def register_recruitment_page_routes(app) -> None:
         include_settings=True,
         include_trash=True,
         include_rejected=True,
+        include_analytics=True,
     )
     _register_role_routes(
         app,
         role="ceo",
         base_path="/ceo/recruitment",
         operation_prefix="ceo",
+        include_analytics=True,
+        include_settings=True,
     )
     _register_role_routes(
         app,

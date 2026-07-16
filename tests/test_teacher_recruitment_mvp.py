@@ -304,7 +304,7 @@ def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(clien
     assert overlapping.json()["details"][0]["candidate_name"] == "Existing candidate"
 
 
-def test_recruitment_settings_api_is_hr_only(client, monkeypatch):
+def test_recruitment_settings_api_is_hr_managed_and_ceo_read_only(client, monkeypatch):
     monkeypatch.setattr(
         service,
         "list_settings",
@@ -333,7 +333,9 @@ def test_recruitment_settings_api_is_hr_only(client, monkeypatch):
     assert client.delete("/api/v1/recruitment/settings/9", headers=XHR).status_code == 200
 
     _set_session(client, "ceo", account_id=11, staff_id=21)
-    assert client.get("/api/v1/recruitment/settings", headers=XHR).status_code == 403
+    response = client.get("/api/v1/recruitment/settings", headers=XHR)
+    assert response.status_code == 200
+    assert response.json()["data"]["role"] == "ceo"
     assert client.post(
         "/api/v1/recruitment/settings",
         headers=XHR,
