@@ -30,7 +30,6 @@ from backend.modules.hr.recruitment.constants import (
     REJECTION_REASONS,
     SCHEDULED_STAGE_TYPES,
     SLA_STAGES,
-    SUBJECT_TEST_RESULTS,
     TASK_STATUSES,
     OPTIONAL_DOCUMENT_TYPES,
 )
@@ -68,6 +67,21 @@ def _now() -> str:
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _subject_test_paper_title(candidate: Any) -> str:
+    subject = _text(candidate.get("subject"))
+    if not subject:
+        subject = re.sub(
+            r"\s+teachers?$",
+            "",
+            _text(candidate.get("applied_position")),
+            flags=re.IGNORECASE,
+        ).strip()
+    subject = subject or "Subject"
+    if not subject.lower().startswith("igcse"):
+        subject = f"IGCSE {subject}"
+    return f"{subject} Paper Test"
 
 
 def _iso(value: Any) -> str:
@@ -1832,12 +1846,16 @@ def add_interview(user: CurrentUser, candidate_id: int, values: dict[str, Any]) 
 
 
 def add_subject_test(user: CurrentUser, candidate_id: int, values: dict[str, Any]) -> dict[str, Any]:
-    if _text(values.get("result")) not in SUBJECT_TEST_RESULTS:
-        raise RecruitmentError("Unknown subject test result.")
-    score, maximum = values.get("score"), values.get("maximum_score")
+    if _text(values.get("result")) not in {"passed", "failed"}:
+        raise RecruitmentError("Subject test status must be Passed or Failed.")
+    prepared = {
+        **values,
+        "maximum_score": Decimal("100"),
+        "test_at": _iso(values.get("test_at")),
+    }
+    score, maximum = prepared.get("score"), prepared["maximum_score"]
     if score is not None and maximum is not None and Decimal(score) > Decimal(maximum):
-        raise RecruitmentError("Test score cannot exceed the maximum score.")
-    prepared = {**values, "test_at": _iso(values.get("test_at"))}
+        raise RecruitmentError("Subject test percentage cannot exceed 100.")
     prepared["evaluator_account_id"] = _actor_account(user)
     return _add_record(user, candidate_id, prepared, "candidate.subject_test_recorded", repository.insert_subject_test)
 
@@ -1885,6 +1903,18 @@ def _add_record(
         )
         if not candidate:
             raise RecruitmentError("Candidate was not found.", status_code=404)
+        if evaluation_type == "subject_test":
+            subject = _text(candidate.get("subject"))
+            values.update(
+                {
+                    "subject_id": candidate.get("subject_id"),
+                    "subject_label": subject,
+                    "paper": _subject_test_paper_title(candidate),
+                    "maximum_score": Decimal("100"),
+                    "topic_scores": [],
+                    "notes": "",
+                }
+            )
         appointment_id = int(values.get("appointment_id") or 0)
         appointment = None
         if appointment_id:

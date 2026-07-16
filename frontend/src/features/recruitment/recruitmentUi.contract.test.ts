@@ -187,6 +187,21 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /scheduledAppointments\.find\(\(item\) => item\.appointment_type === "demo_lesson"/);
   });
 
+  test("records a compact subject percentage and Passed or Failed status", () => {
+    const testFields = profile.split('case "record_test":')[1]?.split('case "record_demo":')[0] || "";
+    assert.match(profile, /open=\{action\?\.kind === "record_test"\}/);
+    assert.match(profile, /title="Record subject test"/);
+    assert.match(profile, /subjectTestPaperTitle\(candidate\)/);
+    assert.match(testFields, /Subject test/);
+    assert.match(testFields, /Percentage/);
+    assert.match(testFields, /Status/);
+    assert.match(testFields, /value="passed">Passed/);
+    assert.match(testFields, /value="failed">Failed/);
+    assert.doesNotMatch(testFields, /Paper \/ version|Maximum score|Topic result|Notes/);
+    assert.match(profile, /maximum_score: 100/);
+    assert.match(profile, /<SubjectTestList/);
+  });
+
   test("keeps inline editors dimensionally stable and protects unsaved field changes", () => {
     assert.match(profile, /relative h-16 min-h-16 min-w-0/);
     assert.match(profile, /absolute inset-x-0 top-0 z-20/);

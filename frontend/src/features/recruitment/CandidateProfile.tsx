@@ -127,6 +127,18 @@ function scheduledTimePart(value: unknown) {
     : new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone: "Asia/Tashkent" }).format(parsed);
 }
 
+function subjectTestPaperTitle(candidate: RecruitmentCandidate) {
+  let subject = text(candidate.subject).trim();
+  if (!subject) {
+    subject = text(candidate.applied_position)
+      .replace(/\s+teachers?$/i, "")
+      .trim();
+  }
+  subject ||= "Subject";
+  if (!/^igcse\b/i.test(subject)) subject = `IGCSE ${subject}`;
+  return `${subject} Paper Test`;
+}
+
 function Panel({
   title,
   icon,
@@ -371,6 +383,69 @@ function AttemptList({
                   "No notes",
               )}
             </p>
+            {isVoided ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Voided: {text(item.void_reason)} · {dateLabel(item.voided_at)}
+              </p>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function SubjectTestList({
+  items,
+  onVoid,
+}: {
+  items: Array<Record<string, unknown>>;
+  onVoid?: (item: Record<string, unknown>) => void;
+}) {
+  if (!items.length) return <EmptyLine>No subject knowledge tests recorded.</EmptyLine>;
+  return (
+    <div className="space-y-2">
+      {items.map((item) => {
+        const isVoided = Boolean(item.voided_at);
+        const maximum = item.maximum_score == null ? Number.NaN : Number(item.maximum_score);
+        const score = item.score == null ? Number.NaN : Number(item.score);
+        const percentage = item.percentage == null ? Number.NaN : Number(item.percentage);
+        const displayPercentage = Number.isFinite(percentage)
+          ? percentage
+          : Number.isFinite(score) && maximum > 0
+            ? Math.round((score / maximum) * 1000) / 10
+            : null;
+        const paper = text(item.paper) || `${text(item.subject) || "Subject"} Paper Test`;
+        return (
+          <article
+            key={text(item.id)}
+            className={`rounded-lg border p-3 ${text(item.result).toLowerCase() === "failed" && !isVoided ? "border-destructive/30 bg-destructive/5" : "border-border"} ${isVoided ? "opacity-60" : ""}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold">{paper}</p>
+                <p className="mt-1 flex items-center gap-2 text-xs font-semibold">
+                  <span className="text-muted-foreground">Status:</span>
+                  <StatusBadge status={isVoided ? "voided" : text(item.result)} />
+                </p>
+              </div>
+              <div className="flex shrink-0 items-start gap-1">
+                <div className="text-right">
+                  <strong className="block text-lg text-foreground">
+                    {displayPercentage === null ? "—" : `${displayPercentage}%`}
+                  </strong>
+                <span className="text-xs text-muted-foreground">
+                  {dateLabel(item.test_at || item.created_at)}
+                </span>
+                </div>
+                {onVoid && !isVoided ? (
+                  <ActionMenu
+                    items={[{ key: "void", label: "Void mistaken result", danger: true, onClick: () => onVoid(item) }]}
+                    label="Subject test actions"
+                  />
+                ) : null}
+              </div>
+            </div>
             {isVoided ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 Voided: {text(item.void_reason)} · {dateLabel(item.voided_at)}
@@ -759,42 +834,37 @@ function ActionFields({
     case "record_test":
       return (
         <div className="grid gap-3">
-          <label className="text-xs font-semibold">Paper / version<input name="paper" className={`${fieldClass} mt-1`} /></label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold">
-              Score
+          <div className="rounded-lg bg-muted/60 px-3 py-2.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Subject test
+            </span>
+            <strong className="mt-0.5 block text-sm">
+              {subjectTestPaperTitle(candidate)}
+            </strong>
+          </div>
+          <label className="text-xs font-semibold">
+            Percentage
+            <div className="relative mt-1">
               <input
-                name="score"
+                autoFocus
+                required
+                name="percentage"
                 type="number"
                 min="0"
-                step="0.01"
-                className={`${fieldClass} mt-1`}
+                max="100"
+                step="0.1"
+                inputMode="decimal"
+                className={`${fieldClass} pr-10`}
               />
-            </label>
-            <label className="text-xs font-semibold">
-              Maximum score
-              <input
-                name="maximum_score"
-                type="number"
-                min="0.01"
-                step="0.01"
-                className={`${fieldClass} mt-1`}
-              />
-            </label>
-          </div>
-          <fieldset className="rounded-lg border border-border p-3"><legend className="px-1 text-xs font-semibold">Topic result (optional)</legend><div className="grid gap-2 sm:grid-cols-3"><input name="topic_name" placeholder="Topic" className={fieldClass} /><input name="topic_score" aria-label="Topic score" type="number" min="0" step="0.1" placeholder="Score" className={fieldClass} /><input name="topic_maximum" aria-label="Topic maximum" type="number" min="0.1" step="0.1" placeholder="Maximum" className={fieldClass} /></div></fieldset>
-          <label className="text-xs font-semibold">
-            Result
-            <select name="result" className={`${fieldClass} mt-1`}>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-              <option value="retake_required">Retake required</option>
-              <option value="not_completed">Not completed</option>
-            </select>
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-muted-foreground">%</span>
+            </div>
           </label>
           <label className="text-xs font-semibold">
-            Notes
-            <textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} />
+            Status
+            <select required name="result" className={`${fieldClass} mt-1`}>
+              <option value="passed">Passed</option>
+              <option value="failed">Failed</option>
+            </select>
           </label>
         </div>
       );
@@ -1382,16 +1452,18 @@ export function CandidateProfile({
       submit("/interviews", formValues(form));
     } else if (action.kind === "record_test") {
       const values = formValues(form);
-      const topic = String(values.topic_name || "").trim();
-      const topicScore = Number(values.topic_score);
-      const topicMaximum = Number(values.topic_maximum);
-      delete values.topic_name;
-      delete values.topic_score;
-      delete values.topic_maximum;
+      const percentage = Number(values.percentage);
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100)
+        return;
       submit("/subject-tests", {
-        ...values,
+        result: values.result,
         subject_id: candidate.subject_id || null,
-        topic_scores: topic && Number.isFinite(topicScore) && topicMaximum > 0 ? [{ topic, score: topicScore, maximum_score: topicMaximum }] : [],
+        subject_label: candidate.subject || "",
+        paper: subjectTestPaperTitle(candidate),
+        score: percentage,
+        maximum_score: 100,
+        topic_scores: [],
+        notes: "",
       });
     } else if (action.kind === "record_demo") {
       const values = formValues(form);
@@ -2085,9 +2157,8 @@ export function CandidateProfile({
                   Record subject test
                 </button>
               ) : null}
-              <AttemptList
+              <SubjectTestList
                 items={candidate.subject_tests || []}
-                empty="No subject knowledge tests recorded."
                 onVoid={
                   permissions?.can_void_evaluations
                     ? (attempt) =>
@@ -2412,7 +2483,11 @@ export function CandidateProfile({
       ) : null}
 
       <Drawer
-        open={Boolean(action && action.kind !== "record_demo")}
+        open={Boolean(
+          action &&
+            action.kind !== "record_demo" &&
+            action.kind !== "record_test",
+        )}
         onClose={() => {
           if (!mutation.isPending) {
             mutation.reset();
@@ -2424,7 +2499,9 @@ export function CandidateProfile({
         description={candidate.full_name}
         widthClass="sm:max-w-xl"
         footer={
-          action && action.kind !== "record_demo" ? (
+          action &&
+          action.kind !== "record_demo" &&
+          action.kind !== "record_test" ? (
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -2467,7 +2544,9 @@ export function CandidateProfile({
             {queryError(mutation.error)}
           </div>
         ) : null}
-        {action && action.kind !== "record_demo" ? (
+        {action &&
+        action.kind !== "record_demo" &&
+        action.kind !== "record_test" ? (
           <form id={formId} onSubmit={submitAction}>
             <ActionFields
               action={action}
@@ -2478,6 +2557,46 @@ export function CandidateProfile({
           </form>
         ) : null}
       </Drawer>
+
+      <Modal
+        open={action?.kind === "record_test"}
+        onClose={() => {
+          if (!mutation.isPending) {
+            mutation.reset();
+            setAction(null);
+          }
+        }}
+        title="Record subject test"
+        subtitle={candidate.full_name}
+        size="sm"
+        mobileMode="sheet"
+        closeOnEscape={!mutation.isPending}
+        closeOnOutsideClick={!mutation.isPending}
+      >
+        <form id={`${formId}-subject-test`} onSubmit={submitAction}>
+          <ModalBody>
+            {mutation.error ? (
+              <div role="alert" className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                {queryError(mutation.error)}
+              </div>
+            ) : null}
+            {action?.kind === "record_test" ? (
+              <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} />
+            ) : null}
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex justify-end gap-2">
+              <button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); }}>
+                Cancel
+              </button>
+              <button type="submit" className={buttonClass} disabled={mutation.isPending}>
+                {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save
+              </button>
+            </div>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       <Modal
         open={action?.kind === "record_demo"}

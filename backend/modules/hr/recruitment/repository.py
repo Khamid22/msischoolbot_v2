@@ -540,6 +540,11 @@ def list_subject_test_rows(conn: Any, candidate_id: int) -> list[Any]:
         SELECT test.*, test.test_at::text AS test_at_text,
                test.created_at::text AS created_at_text,
                test.updated_at::text AS updated_at_text,
+               CASE
+                   WHEN test.score IS NOT NULL AND test.maximum_score > 0
+                   THEN round((test.score / test.maximum_score) * 100, 1)
+                   ELSE NULL
+               END AS percentage,
                COALESCE(subject.subject_name, test.subject_label, '') AS subject,
                COALESCE(evaluator.login, '') AS evaluator_login,
                COALESCE(topics.items, '[]'::jsonb) AS topic_scores

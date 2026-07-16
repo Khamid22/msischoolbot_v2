@@ -60,6 +60,15 @@ def test_structured_evaluation_contracts_validate_scores():
     assert demo.criteria_scores[0].maximum_score == 10
 
 
+def test_subject_test_title_is_derived_from_candidate_subject():
+    assert service._subject_test_paper_title(
+        {"subject": "Math", "applied_position": "Math Teacher"}
+    ) == "IGCSE Math Paper Test"
+    assert service._subject_test_paper_title(
+        {"subject": "", "applied_position": "English Teacher"}
+    ) == "IGCSE English Paper Test"
+
+
 def test_hr_and_ceo_can_read_analytics_but_ad_cannot(client, monkeypatch):
     monkeypatch.setattr(analytics_service, "options", lambda user: {"role": user.role})
     monkeypatch.setattr(analytics_service, "dashboard", lambda user, **filters: {"role": user.role, "filters": filters})
