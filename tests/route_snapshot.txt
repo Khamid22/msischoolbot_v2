@@ -8,10 +8,8 @@
 /academic-director/recruitment/candidates | GET
 /academic-director/recruitment/candidates/{candidate_id} | GET
 /academic-director/recruitment/decisions | GET
-/academic-director/recruitment/pipeline | GET
 /academic-director/recruitment/profile | GET
 /academic-director/recruitment/schedule | GET
-/academic-director/recruitment/tasks | GET
 /academic-director/subjects | GET
 /academic-director/teacher-academy | GET
 /academic-director/timetable | GET
@@ -161,7 +159,9 @@
 /api/v1/recruitment/candidates/{candidate_id}/appointments | POST
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id} | PATCH
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/cancel | POST
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/complete-interview | POST
 /api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/no-show | POST
+/api/v1/recruitment/candidates/{candidate_id}/appointments/{appointment_id}/start-interview | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests | POST
 /api/v1/recruitment/candidates/{candidate_id}/approval-requests/{approval_id}/review | POST
 /api/v1/recruitment/candidates/{candidate_id}/assignments | PUT
@@ -234,7 +234,6 @@
 /head-of-departments/recruitment/candidates/{candidate_id} | GET
 /head-of-departments/recruitment/profile | GET
 /head-of-departments/recruitment/schedule | GET
-/head-of-departments/recruitment/tasks | GET
 /head-of-departments/teacher-academy | GET
 /head-of-departments/timetable | GET
 /health/live | GET
@@ -249,6 +248,7 @@
 /hr-manager/schedule | GET
 /hr-manager/settings | GET
 /hr-manager/tasks | GET
+/hr-manager/teachers | GET
 /hr-manager/trash | GET
 /internal/operations | GET
 /login | POST

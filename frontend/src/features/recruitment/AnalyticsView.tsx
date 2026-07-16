@@ -6,7 +6,7 @@ import { recruitmentRequest } from "@/features/recruitment/api";
 import { dateLabel, humanize, type HrAnalyticsDashboard } from "@/features/recruitment/model";
 import { PageState, fieldClass, queryError, replaceUrlParams } from "@/features/recruitment/ui";
 
-type Options = { sources: string[]; positions: string[]; subjects: Array<{ id: number; name: string }>; responsible_people: Array<{ id: number; name: string }> };
+type Options = { sources: Array<{ id: number; label: string }>; positions: string[]; subjects: Array<{ id: number; name: string }>; responsible_people: Array<{ id: number; name: string }> };
 const api = "/api/v1/hr/analytics";
 const keys = ["date_from", "date_to", "source", "position", "subject_id", "responsible_account_id"] as const;
 
@@ -43,7 +43,7 @@ export function AnalyticsView({ basePath }: { basePath: string }) {
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
         <label className="text-[11px] font-semibold">From<input type="date" value={filters.date_from || data.range.from} onChange={(event) => update("date_from", event.target.value)} className={`${fieldClass} mt-1`} /></label>
         <label className="text-[11px] font-semibold">To<input type="date" value={filters.date_to || data.range.to} onChange={(event) => update("date_to", event.target.value)} className={`${fieldClass} mt-1`} /></label>
-        <label className="text-[11px] font-semibold">Source<select value={filters.source} onChange={(event) => update("source", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.sources.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="text-[11px] font-semibold">Source<select value={filters.source} onChange={(event) => update("source", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         <label className="text-[11px] font-semibold">Position<select value={filters.position} onChange={(event) => update("position", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.positions.map((item) => <option key={item}>{item}</option>)}</select></label>
         <label className="text-[11px] font-semibold">Subject<select value={filters.subject_id} onChange={(event) => update("subject_id", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label className="text-[11px] font-semibold">Responsible<select value={filters.responsible_account_id} onChange={(event) => update("responsible_account_id", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.responsible_people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

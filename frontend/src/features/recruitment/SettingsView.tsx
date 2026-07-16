@@ -8,7 +8,7 @@ import { RECRUITMENT_API, EmptyLine, PageState, buttonClass, fieldClass, queryEr
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 
-type SettingCategory = "source" | "rejection_reason";
+type SettingCategory = RecruitmentSetting["category"];
 type MutationPayload = { message: string; setting: RecruitmentSetting };
 
 function SettingsPanel({
@@ -20,6 +20,7 @@ function SettingsPanel({
   busy,
   onAdd,
   onRemove,
+  parentItems,
 }: {
   title: string;
   detail: string;
@@ -27,15 +28,18 @@ function SettingsPanel({
   category: SettingCategory;
   items: RecruitmentSetting[];
   busy: boolean;
-  onAdd: (category: SettingCategory, label: string) => void;
+  onAdd: (category: SettingCategory, label: string, parentId?: number) => void;
   onRemove: (setting: RecruitmentSetting) => void;
+  parentItems?: RecruitmentSetting[];
 }) {
   const [label, setLabel] = useState("");
+  const [parentId, setParentId] = useState("");
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = label.trim();
     if (!normalized) return;
-    onAdd(category, normalized);
+    if (parentItems?.length && !parentId) return;
+    onAdd(category, normalized, parentId ? Number(parentId) : undefined);
     setLabel("");
   };
   return (
@@ -48,6 +52,7 @@ function SettingsPanel({
         </div>
       </div>
       <form onSubmit={submit} className="mt-3 flex gap-2">
+        {parentItems?.length ? <label className="min-w-0 flex-1"><span className="sr-only">Parent source</span><select value={parentId} onChange={(event) => setParentId(event.target.value)} className={fieldClass} required><option value="">Select source</option>{parentItems.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label> : null}
         <label className="min-w-0 flex-1">
           <span className="sr-only">New {title.toLowerCase()}</span>
           <input
@@ -58,7 +63,7 @@ function SettingsPanel({
             className={fieldClass}
           />
         </label>
-        <button type="submit" className={buttonClass} disabled={busy || !label.trim()}>
+        <button type="submit" className={buttonClass} disabled={busy || !label.trim() || Boolean(parentItems?.length && !parentId)}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           <span className="hidden sm:inline">Add</span>
         </button>
@@ -107,11 +112,22 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
   if (settings.isLoading) return <PageState>Loading recruitment settings…</PageState>;
   if (settings.error || !settings.data) return <PageState tone="error">{queryError(settings.error)}</PageState>;
 
-  const add = (category: SettingCategory, label: string) => mutation.mutate({
+  const add = (category: SettingCategory, label: string, parentId?: number) => mutation.mutate({
     method: "POST",
     url: `${RECRUITMENT_API}/settings`,
-    body: { category, label },
+    body: { category, label, parent_id: parentId || null },
   });
+
+  const panels: Array<{ category: SettingCategory; title: string; detail: string; icon: ReactNode }> = [
+    { category: "source", title: "Candidate sources", detail: "Stable top-level analytics sources.", icon: <Link2 className="h-4 w-4" /> },
+    { category: "subsource", title: "Source details", detail: "Predefined universities, referrals, and channels under a source.", icon: <Link2 className="h-4 w-4" /> },
+    { category: "english_level", title: "English levels", detail: "Standardized language levels used by filters and analytics.", icon: <Tags className="h-4 w-4" /> },
+    { category: "schedule", title: "Schedules", detail: "Preferred teaching schedule options.", icon: <Clock3 className="h-4 w-4" /> },
+    { category: "availability", title: "Availability", detail: "Standard employment availability options.", icon: <Clock3 className="h-4 w-4" /> },
+    { category: "expected_salary", title: "Expected salary", detail: "Stable salary bands rather than free-form amounts.", icon: <Tags className="h-4 w-4" /> },
+    { category: "teaching_experience", title: "Teaching experience", detail: "Comparable experience ranges for reporting.", icon: <Tags className="h-4 w-4" /> },
+    { category: "rejection_reason", title: "Rejection reasons", detail: "Historical records remain intact when an option is disabled.", icon: <Tags className="h-4 w-4" /> },
+  ];
 
   return (
     <>
@@ -123,26 +139,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
         {settings.data.read_only ? <p className="mt-2 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
       </section>
       {!settings.data.read_only ? <div className="grid gap-3 lg:grid-cols-2">
-        <SettingsPanel
-          title="Candidate sources"
-          detail="Shown when HR creates or filters candidates. Existing candidate values remain unchanged."
-          icon={<Link2 className="h-4 w-4" />}
-          category="source"
-          items={settings.data.sources}
-          busy={mutation.isPending}
-          onAdd={settings.data.read_only ? () => undefined : add}
-          onRemove={setRemoveSetting}
-        />
-        <SettingsPanel
-          title="Rejection reasons"
-          detail="Used by Academic Director and CEO decisions. Removing an option keeps historical records."
-          icon={<Tags className="h-4 w-4" />}
-          category="rejection_reason"
-          items={settings.data.rejection_reasons}
-          busy={mutation.isPending}
-          onAdd={settings.data.read_only ? () => undefined : add}
-          onRemove={setRemoveSetting}
-        />
+        {panels.map((panel) => <SettingsPanel key={panel.category} {...panel} items={settings.data.items.filter((item) => item.category === panel.category)} parentItems={panel.category === "subsource" ? settings.data.sources : undefined} busy={mutation.isPending} onAdd={add} onRemove={setRemoveSetting} />)}
       </div> : null}
       <ConfirmDialog
         open={Boolean(removeSetting)}

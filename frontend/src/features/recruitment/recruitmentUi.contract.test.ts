@@ -23,7 +23,7 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
-  test("uses a single-stage mobile view and seven wider independently scrolling desktop columns", () => {
+  test("uses a single-stage mobile view and five independently scrolling active-stage columns", () => {
     assert.match(pipeline, /md:hidden/);
     assert.match(pipeline, /auto-cols-\[240px\]/);
     assert.match(pipeline, /no-scrollbar/);
@@ -59,11 +59,12 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /aria-label="Add candidate"/);
   });
 
-  test("reveals only Trash Bin and Reject targets during a drag", () => {
+  test("reveals Trash Bin, Reject, and Candidate Withdraw targets during a drag", () => {
     assert.match(pipeline, /Candidate outcome drop targets/);
-    assert.match(pipeline, /\["trash_bin", "rejected"\]/);
-    assert.match(pipeline, /target === "trash_bin" \? "Trash Bin" : "Reject"/);
+    assert.match(pipeline, /\["trash_bin", "rejected", "candidate_withdrew"\]/);
+    assert.match(pipeline, /target === "rejected" \? "Reject" : "Withdraw"/);
     assert.match(pipeline, /setRejectSelection/);
+    assert.match(pipeline, /setWithdrawSelection/);
     assert.match(pipeline, /\/final-decisions/);
     assert.doesNotMatch(pipeline, /on_hold|On Hold/);
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
@@ -159,7 +160,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /appointments are scheduled separately after the move/);
     assert.doesNotMatch(profile, /\/scheduled-stage-moves/);
     assert.match(profile, /candidate\.next_appointment/);
-    assert.match(profile, /Upcoming appointments/);
+    assert.doesNotMatch(profile, /title="Upcoming appointments"/);
+    assert.match(profile, /<InterviewSessionModal/);
+    assert.match(profile, /title="Job Interviews"/);
   });
 
   test("keeps inline editors dimensionally stable and protects unsaved field changes", () => {
@@ -208,12 +211,17 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(workspace, /announcement \? <div/);
   });
 
-  test("adds HR-only recruitment settings for dynamic sources and rejection reasons", () => {
+  test("adds HR-only immutable analytics dimensions and dependent subsources", () => {
     const settings = source("SettingsView.tsx");
     assert.match(workspace, /effectiveRole === "hr_manager"/);
     assert.match(workspace, /key: "settings", label: "Settings"/);
     assert.match(workspace, /<SettingsView/);
     assert.match(settings, /Candidate sources/);
+    assert.match(settings, /Source details/);
+    assert.match(settings, /English levels/);
+    assert.match(settings, /Expected salary/);
+    assert.match(settings, /Teaching experience/);
+    assert.match(settings, /parent_id/);
     assert.match(settings, /Rejection reasons/);
     assert.match(settings, /RECRUITMENT_API}\/settings/);
     assert.match(settings, /Stage SLA targets/);
@@ -249,11 +257,22 @@ describe("candidate navigation and progressive disclosure", () => {
   test("uses the lean HR navigation and dedicated Rejected/Withdrawn tabs", () => {
     const rejected = source("RejectedCandidatesView.tsx");
     const hrNav = workspace.match(/if \(effectiveRole === "hr_manager"\) return \[[\s\S]*?key: "settings"[\s\S]*?\];/)?.[0] || "";
-    for (const label of ["Pipeline", "Schedule", "Rejected", "Trash Bin", "Settings"]) assert.match(hrNav, new RegExp(`label: "${label}"`));
+    for (const label of ["Pipeline", "Teachers", "Analytics", "Schedule", "Rejected", "Trash Bin", "Settings"]) assert.match(hrNav, new RegExp(`label: "${label}"`));
     assert.doesNotMatch(hrNav, /label: "Candidates"|label: "Tasks"/);
     assert.match(rejected, /type OutcomeTab = "rejected" \| "candidate_withdrew"/);
     assert.match(rejected, /origin_stage/);
     assert.match(rejected, /reason_detail/);
+  });
+
+  test("moves Academy and Active outcomes into a dedicated Teachers switcher", () => {
+    const teachers = source("TeachersView.tsx");
+    const pipeline = source("PipelineView.tsx");
+    assert.match(workspace, /key: "teachers", label: "Teachers"/);
+    assert.match(teachers, /teacher_academy/);
+    assert.match(teachers, /active_teacher/);
+    assert.match(teachers, /Teacher Academy/);
+    assert.match(teachers, /Active Teachers/);
+    assert.doesNotMatch(pipeline, /boardStages.*teacher_academy/);
   });
 
   test("opens Academic Director Recruitment on a compact decision queue", () => {
@@ -267,8 +286,8 @@ describe("candidate navigation and progressive disclosure", () => {
 
   test("limits Head of Department Recruitment to assigned operational work", () => {
     const hodNav = workspace.match(/if \(effectiveRole === "head_of_department"\) return \[[\s\S]*?\];/)?.[0] || "";
-    for (const label of ["Assigned Candidates", "Assigned Schedule", "Tasks"]) assert.match(hodNav, new RegExp(`label: "${label}"`));
-    assert.doesNotMatch(hodNav, /Pipeline|Analytics|Rejected|Trash Bin|Settings|Decisions/);
+    for (const label of ["Assigned Candidates", "Assigned Schedule"]) assert.match(hodNav, new RegExp(`label: "${label}"`));
+    assert.doesNotMatch(hodNav, /Pipeline|Analytics|Rejected|Trash Bin|Settings|Decisions|Tasks/);
   });
 
   test("adds URL-backed agenda and week schedule views without a calendar dependency", () => {

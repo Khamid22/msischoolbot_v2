@@ -17,19 +17,28 @@ _CANDIDATE_COLUMNS = """
     candidate.application_date::text AS application_date,
     candidate.age,
     candidate.address,
-    candidate.source,
+    candidate.source_option_id,
+    candidate.subsource_option_id,
+    COALESCE(source_option.label, candidate.source, '') AS source,
+    COALESCE(subsource_option.label, '') AS subsource,
     candidate.source_detail,
     candidate.status,
-    candidate.english_level,
+    candidate.english_level_option_id,
+    COALESCE(english_option.label, candidate.english_level, '') AS english_level,
     candidate.motivation_expectations,
     candidate.interests_hobbies,
-    candidate.preferred_schedule,
-    candidate.employment_availability,
+    candidate.schedule_option_id,
+    COALESCE(schedule_option.label, candidate.preferred_schedule, '') AS preferred_schedule,
+    candidate.availability_option_id,
+    COALESCE(availability_option.label, candidate.employment_availability, '') AS employment_availability,
     candidate.education_background,
     candidate.work_experience,
-    candidate.teaching_experience,
+    candidate.teaching_experience_option_id,
+    COALESCE(teaching_experience_option.label, candidate.teaching_experience, '') AS teaching_experience,
     candidate.previous_workplace,
+    candidate.expected_salary_option_id,
     candidate.expected_salary_uzs,
+    COALESCE(expected_salary_option.label, '') AS expected_salary,
     candidate.available_start_date::text AS available_start_date,
     candidate.stage_changed_at::text AS stage_changed_at,
     candidate.version,
@@ -71,6 +80,7 @@ _CANDIDATE_COLUMNS = """
     appointment.topic AS next_appointment_topic,
     appointment.status AS next_appointment_status,
     appointment.version AS next_appointment_version,
+    appointment.started_at::text AS next_appointment_started_at,
     academy.id AS academy_teacher_id,
     teacher.id AS active_teacher_id
 """
@@ -79,6 +89,20 @@ _CANDIDATE_COLUMNS = """
 def _candidate_joins() -> str:
     return """
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings source_option
+          ON source_option.id = candidate.source_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings subsource_option
+          ON subsource_option.id = candidate.subsource_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings english_option
+          ON english_option.id = candidate.english_level_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings schedule_option
+          ON schedule_option.id = candidate.schedule_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings availability_option
+          ON availability_option.id = candidate.availability_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings expected_salary_option
+          ON expected_salary_option.id = candidate.expected_salary_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_settings teaching_experience_option
+          ON teaching_experience_option.id = candidate.teaching_experience_option_id
         LEFT JOIN LATERAL (
             SELECT history.id, history.entered_at, history.responsible_account_id,
                    history.comment, history.transition_source,
@@ -119,10 +143,10 @@ def _candidate_joins() -> str:
         LEFT JOIN LATERAL (
             SELECT a.id, a.appointment_type, a.starts_at, a.ends_at,
                    a.responsible_account_id, a.appointment_format,
-                   a.location_or_link, a.topic, a.status, a.version
+                   a.location_or_link, a.topic, a.status, a.version, a.started_at
             FROM msi_v2.teacher_candidate_appointments a
             WHERE a.candidate_id = candidate.id
-              AND a.status = 'scheduled'
+              AND a.status IN ('scheduled', 'in_progress')
               AND (
                   (candidate.status = 'job_interview' AND a.appointment_type = 'job_interview')
                   OR (candidate.status = 'test_and_demo' AND a.appointment_type = 'demo_lesson')
@@ -206,8 +230,12 @@ def list_pipeline_rows(
         clauses.append("candidate.applied_position ILIKE %s")
         params.append(f"%{position}%")
     if source:
-        clauses.append("candidate.source = %s")
-        params.append(source)
+        if str(source).isdigit():
+            clauses.append("candidate.source_option_id = %s")
+            params.append(int(source))
+        else:
+            clauses.append("COALESCE(source_option.label, candidate.source) = %s")
+            params.append(source)
     if subject_id:
         clauses.append("candidate.subject_id = %s")
         params.append(int(subject_id))
@@ -280,8 +308,12 @@ def list_candidate_rows(
     else:
         clauses.append("candidate.status <> 'trash_bin'")
     if source:
-        clauses.append("candidate.source = %s")
-        params.append(source)
+        if str(source).isdigit():
+            clauses.append("candidate.source_option_id = %s")
+            params.append(int(source))
+        else:
+            clauses.append("COALESCE(source_option.label, candidate.source) = %s")
+            params.append(source)
     if subject_id:
         clauses.append("candidate.subject_id = %s")
         params.append(int(subject_id))
@@ -576,6 +608,9 @@ def _appointment_columns() -> str:
         appointment.completed_at::text AS completed_at,
         appointment.cancelled_at::text AS cancelled_at,
         appointment.no_show_at::text AS no_show_at,
+        appointment.started_at::text AS started_at,
+        appointment.started_by_account_id,
+        COALESCE(started_by.full_name, started_by.login, '') AS started_by_name,
         appointment.created_at::text AS created_at,
         appointment.updated_at::text AS updated_at,
         candidate.full_name AS candidate_name,
@@ -648,6 +683,7 @@ def list_appointment_rows(
         JOIN msi_v2.teacher_candidates candidate ON candidate.id = appointment.candidate_id
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
+        LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
         {where_sql}
     """
     total_row = conn.execute(
@@ -681,6 +717,7 @@ def get_appointment_row(
         JOIN msi_v2.teacher_candidates candidate ON candidate.id = appointment.candidate_id
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
+        LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
         WHERE appointment.id = %s AND appointment.candidate_id = %s
         {suffix}
         """,
@@ -709,7 +746,7 @@ def list_appointment_conflicts(
         FROM msi_v2.teacher_candidate_appointments appointment
         JOIN msi_v2.teacher_candidates candidate ON candidate.id = appointment.candidate_id
         WHERE appointment.responsible_account_id = %s
-          AND appointment.status = 'scheduled'
+          AND appointment.status IN ('scheduled', 'in_progress')
           AND appointment.starts_at < %s::timestamptz
           AND appointment.ends_at > %s::timestamptz
           {exclude_sql}
@@ -750,7 +787,7 @@ def insert_appointment(
     return int(row["id"]) if row else 0
 
 
-def scheduled_appointment_for_type(
+def active_appointment_for_type(
     conn: Any,
     *,
     candidate_id: int,
@@ -758,9 +795,11 @@ def scheduled_appointment_for_type(
 ) -> Any:
     return conn.execute(
         """
-        SELECT id, version, starts_at::text AS starts_at
+        SELECT id, version, status, starts_at::text AS starts_at,
+               started_at::text AS started_at
         FROM msi_v2.teacher_candidate_appointments
-        WHERE candidate_id = %s AND appointment_type = %s AND status = 'scheduled'
+        WHERE candidate_id = %s AND appointment_type = %s
+          AND status IN ('scheduled', 'in_progress')
         ORDER BY starts_at ASC, id ASC
         LIMIT 1
         """,
@@ -819,7 +858,8 @@ def set_appointment_status(
             no_show_at = CASE WHEN %s = 'no_show' THEN %s::timestamptz ELSE no_show_at END,
             updated_by_account_id = %s, updated_at = %s::timestamptz,
             version = version + 1
-        WHERE id = %s AND candidate_id = %s AND status = 'scheduled' AND version = %s
+        WHERE id = %s AND candidate_id = %s
+          AND status IN ('scheduled', 'in_progress') AND version = %s
         RETURNING id, version
         """,
         (
@@ -843,14 +883,15 @@ def complete_appointment(
         SET status = 'completed', completed_at = %s::timestamptz,
             updated_by_account_id = %s, updated_at = %s::timestamptz,
             version = version + 1
-        WHERE id = %s AND candidate_id = %s AND status = 'scheduled'
+        WHERE id = %s AND candidate_id = %s
+          AND status IN ('scheduled', 'in_progress')
         RETURNING id, version
         """,
         (now, actor_account_id, now, int(appointment_id), int(candidate_id)),
     ).fetchone()
 
 
-def cancel_scheduled_appointments(
+def cancel_active_appointments(
     conn: Any,
     *,
     candidate_id: int,
@@ -864,12 +905,86 @@ def cancel_scheduled_appointments(
         SET status = 'cancelled', cancellation_reason = %s,
             cancelled_at = %s::timestamptz, updated_by_account_id = %s,
             updated_at = %s::timestamptz, version = version + 1
-        WHERE candidate_id = %s AND status = 'scheduled'
+        WHERE candidate_id = %s AND status IN ('scheduled', 'in_progress')
         RETURNING id
         """,
         (reason, now, actor_account_id, now, int(candidate_id)),
     ).fetchall()
     return [int(row["id"]) for row in rows]
+
+
+def cancel_scheduled_appointments(
+    conn: Any,
+    *,
+    candidate_id: int,
+    reason: str,
+    actor_account_id: int | None,
+    now: str,
+) -> list[int]:
+    """Compatibility name; active now includes scheduled and in-progress sessions."""
+    return cancel_active_appointments(
+        conn,
+        candidate_id=candidate_id,
+        reason=reason,
+        actor_account_id=actor_account_id,
+        now=now,
+    )
+
+
+def start_interview_session(
+    conn: Any,
+    *,
+    appointment_id: int,
+    candidate_id: int,
+    expected_version: int,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_appointments
+        SET status = 'in_progress', started_at = %s::timestamptz,
+            started_by_account_id = %s, updated_by_account_id = %s,
+            updated_at = %s::timestamptz, version = version + 1
+        WHERE id = %s AND candidate_id = %s
+          AND appointment_type = 'job_interview'
+          AND status = 'scheduled' AND version = %s
+          AND %s::timestamptz >= starts_at - interval '30 minutes'
+        RETURNING id, version, status, started_at::text AS started_at
+        """,
+        (
+            now, actor_account_id, actor_account_id, now,
+            int(appointment_id), int(candidate_id), int(expected_version), now,
+        ),
+    ).fetchone()
+
+
+def complete_interview_session(
+    conn: Any,
+    *,
+    appointment_id: int,
+    candidate_id: int,
+    expected_version: int,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_appointments
+        SET status = 'completed', completed_at = %s::timestamptz,
+            updated_by_account_id = %s, updated_at = %s::timestamptz,
+            version = version + 1
+        WHERE id = %s AND candidate_id = %s
+          AND appointment_type = 'job_interview'
+          AND status = 'in_progress' AND version = %s
+        RETURNING id, version, status, started_at::text AS started_at,
+                  completed_at::text AS completed_at
+        """,
+        (
+            now, actor_account_id, now, int(appointment_id),
+            int(candidate_id), int(expected_version),
+        ),
+    ).fetchone()
 
 
 def void_evaluation(
@@ -1224,11 +1339,12 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         WITH inserted_candidate AS (
             INSERT INTO msi_v2.teacher_candidates (
                 full_name, phone, telegram_username, applied_position, subject_id,
-                application_date, source, source_detail, status, stage_changed_at,
+                application_date, source_option_id, subsource_option_id,
+                source, source_detail, status, stage_changed_at,
                 version, updated_by_account_id, created_at, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s,
+                %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
                 'new_candidate', %s::timestamptz, 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
@@ -1255,7 +1371,7 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         (
             values["full_name"], values.get("phone", ""), values.get("telegram_username", ""),
             values.get("applied_position", ""), values.get("subject_id"), values.get("application_date", ""),
-            values.get("source", ""), values.get("source_detail", ""), now,
+            values.get("source_option_id"), values.get("subsource_option_id"), now,
             actor_account_id, now, now, now, actor_account_id, now,
         ),
     ).fetchone()
@@ -1273,11 +1389,13 @@ def update_candidate(
 ) -> bool:
     allowed = {
         "full_name", "phone", "telegram_username", "applied_position", "subject_id", "application_date",
-        "age", "address", "source", "source_detail", "english_level", "motivation_expectations",
-        "interests_hobbies", "preferred_schedule", "employment_availability",
+        "age", "address", "source_option_id", "subsource_option_id",
+        "english_level_option_id", "motivation_expectations",
+        "interests_hobbies", "schedule_option_id", "availability_option_id",
         "education_background",
-        "work_experience", "teaching_experience", "previous_workplace",
-        "expected_salary_uzs", "available_start_date",
+        "work_experience", "teaching_experience_option_id",
+        "previous_workplace", "expected_salary_option_id",
+        "available_start_date",
     }
     assignments: list[str] = []
     params: list[Any] = []
@@ -2021,11 +2139,12 @@ def list_recruitment_setting_rows(
     active_clause = "" if include_inactive else "WHERE is_active = true"
     return conn.execute(
         f"""
-        SELECT id, category, value, label, is_active, sort_order, is_system,
+        SELECT id, category, value, label, parent_id, is_active, sort_order,
+               is_system, is_legacy,
                created_at::text AS created_at, updated_at::text AS updated_at
         FROM msi_v2.teacher_recruitment_settings
         {active_clause}
-        ORDER BY category, sort_order, lower(label), id
+        ORDER BY category, parent_id NULLS FIRST, sort_order, lower(label), id
         """
     ).fetchall()
 
@@ -2079,26 +2198,43 @@ def recruitment_setting_by_label_or_value(
     category: str,
     value: str,
     label: str,
+    parent_id: int | None = None,
 ) -> Any:
     return conn.execute(
         """
-        SELECT id, category, value, label, is_active, sort_order, is_system,
+        SELECT id, category, value, label, parent_id, is_active, sort_order,
+               is_system, is_legacy,
                created_at::text AS created_at, updated_at::text AS updated_at
         FROM msi_v2.teacher_recruitment_settings
         WHERE category = %s
-          AND (value = %s OR lower(label) = lower(%s))
+          AND (value = %s OR lower(btrim(label)) = lower(btrim(%s)))
+          AND parent_id IS NOT DISTINCT FROM %s
         ORDER BY id
         LIMIT 1
         FOR UPDATE
         """,
-        (category, value, label),
+        (category, value, label, parent_id),
     ).fetchone()
+
+
+def active_subsource_exists(conn: Any, source_option_id: int) -> bool:
+    return bool(
+        conn.execute(
+            """
+            SELECT 1 FROM msi_v2.teacher_recruitment_settings
+            WHERE category = 'subsource' AND parent_id = %s AND is_active = true
+            LIMIT 1
+            """,
+            (int(source_option_id),),
+        ).fetchone()
+    )
 
 
 def recruitment_setting_by_id(conn: Any, setting_id: int) -> Any:
     return conn.execute(
         """
-        SELECT id, category, value, label, is_active, sort_order, is_system
+        SELECT id, category, value, label, parent_id, is_active, sort_order,
+               is_system, is_legacy
         FROM msi_v2.teacher_recruitment_settings
         WHERE id = %s
         LIMIT 1
@@ -2114,6 +2250,7 @@ def save_recruitment_setting(
     category: str,
     value: str,
     label: str,
+    parent_id: int | None,
     actor_account_id: int | None,
     now: str,
 ) -> Any:
@@ -2121,36 +2258,36 @@ def save_recruitment_setting(
         return conn.execute(
             """
             UPDATE msi_v2.teacher_recruitment_settings
-            SET value = %s,
-                label = %s,
-                is_active = true,
+            SET is_active = true,
                 updated_by_account_id = %s,
                 updated_at = %s::timestamptz
             WHERE id = %s
-            RETURNING id, category, value, label, is_active, sort_order, is_system,
+            RETURNING id, category, value, label, parent_id, is_active,
+                      sort_order, is_system, is_legacy,
                       created_at::text AS created_at, updated_at::text AS updated_at
             """,
-            (value, label, actor_account_id, now, int(existing_id)),
+            (actor_account_id, now, int(existing_id)),
         ).fetchone()
     return conn.execute(
         """
         INSERT INTO msi_v2.teacher_recruitment_settings (
-            category, value, label, sort_order,
+            category, value, label, parent_id, sort_order,
             created_by_account_id, updated_by_account_id, created_at, updated_at
         ) VALUES (
-            %s, %s, %s,
+            %s, %s, %s, %s,
             COALESCE((
                 SELECT max(sort_order) + 10
                 FROM msi_v2.teacher_recruitment_settings
-                WHERE category = %s
+                WHERE category = %s AND parent_id IS NOT DISTINCT FROM %s
             ), 10),
             %s, %s, %s::timestamptz, %s::timestamptz
         )
-        RETURNING id, category, value, label, is_active, sort_order, is_system,
+        RETURNING id, category, value, label, parent_id, is_active,
+                  sort_order, is_system, is_legacy,
                   created_at::text AS created_at, updated_at::text AS updated_at
         """,
         (
-            category, value, label, category,
+            category, value, label, parent_id, category, parent_id,
             actor_account_id, actor_account_id, now, now,
         ),
     ).fetchone()
@@ -2170,7 +2307,8 @@ def deactivate_recruitment_setting(
             updated_by_account_id = %s,
             updated_at = %s::timestamptz
         WHERE id = %s AND is_active = true AND is_system = false
-        RETURNING id, category, value, label, is_active, sort_order, is_system,
+        RETURNING id, category, value, label, parent_id, is_active,
+                  sort_order, is_system, is_legacy,
                   created_at::text AS created_at, updated_at::text AS updated_at
         """,
         (actor_account_id, now, int(setting_id)),
@@ -2433,7 +2571,14 @@ def list_recruitment_options(conn: Any) -> dict[str, Any]:
         """
     ).fetchall()
     setting_rows = list_recruitment_setting_rows(conn)
-    sources = [str(row["label"]) for row in setting_rows if row["category"] == "source"]
+    option_items = [dict(row) for row in setting_rows]
+    option_categories = {
+        category: [item for item in option_items if item["category"] == category]
+        for category in (
+            "source", "subsource", "english_level", "schedule", "availability",
+            "expected_salary", "teaching_experience",
+        )
+    }
     rejection_reason_options = [
         {"value": str(row["value"]), "label": str(row["label"])}
         for row in setting_rows
@@ -2442,7 +2587,9 @@ def list_recruitment_options(conn: Any) -> dict[str, Any]:
     return {
         "subjects": [dict(row) for row in subject_rows],
         "staff": [dict(row) for row in staff_rows],
-        "sources": sources,
+        "sources": option_categories["source"],
+        "subsources": option_categories["subsource"],
+        "option_categories": option_categories,
         "rejection_reason_options": rejection_reason_options,
     }
 

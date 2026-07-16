@@ -34,6 +34,8 @@ from backend.modules.hr.recruitment.schemas import (
     DemoLessonWrite,
     EvaluationVoid,
     FinalDecisionCreate,
+    InterviewSessionComplete,
+    InterviewSessionStart,
     InterviewWrite,
     NoteCreate,
     RecruitmentSettingCreate,
@@ -249,6 +251,7 @@ def create_setting(
         user,
         category=payload.category,
         label=payload.label,
+        parent_id=payload.parent_id,
     )
     return api_success(
         {"message": "Recruitment setting added.", "setting": setting},
@@ -412,6 +415,48 @@ def add_interview(candidate_id: int, payload: InterviewWrite, user: CurrentUser 
     ensure_hr_management(user)
     candidate = _call(service.add_interview, user, candidate_id, payload.model_dump())
     return api_success({"message": "Interview recorded.", "candidate": candidate}, status_code=201)
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/start-interview",
+    operation_id="api_v1_recruitment_start_interview",
+)
+def start_interview(
+    candidate_id: int,
+    appointment_id: int,
+    payload: InterviewSessionStart,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    result = _call(
+        service.start_interview_session,
+        user,
+        candidate_id,
+        appointment_id,
+        expected_version=payload.expected_version,
+    )
+    return api_success({"message": "Interview started.", **result})
+
+
+@router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/complete-interview",
+    operation_id="api_v1_recruitment_complete_interview",
+)
+def complete_interview(
+    candidate_id: int,
+    appointment_id: int,
+    payload: InterviewSessionComplete,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    candidate = _call(
+        service.complete_interview_session,
+        user,
+        candidate_id,
+        appointment_id,
+        payload.model_dump(),
+    )
+    return api_success({"message": "Interview completed.", "candidate": candidate})
 
 
 @router.post("/candidates/{candidate_id}/subject-tests", status_code=201, operation_id="api_v1_recruitment_add_subject_test")

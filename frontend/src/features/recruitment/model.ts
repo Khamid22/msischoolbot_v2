@@ -4,7 +4,18 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
-export type RecruitmentView = "pipeline" | "analytics" | "decisions" | "candidates" | "schedule" | "tasks" | "rejected" | "settings" | "trash" | "candidate" | "profile";
+export type RecruitmentView = "pipeline" | "teachers" | "analytics" | "decisions" | "candidates" | "schedule" | "tasks" | "rejected" | "settings" | "trash" | "candidate" | "profile";
+
+export type RecruitmentOption = {
+  id: number;
+  category: string;
+  value: string;
+  label: string;
+  parent_id?: number | null;
+  is_active?: boolean;
+  sort_order?: number;
+  is_legacy?: boolean;
+};
 
 export type RecruitmentSlaState = {
   stage: string;
@@ -76,12 +87,18 @@ export type RecruitmentAppointment = {
   location_or_link?: string;
   topic?: string;
   note?: string;
-  status: "scheduled" | "completed" | "cancelled" | "no_show";
+  status: "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show";
   version: number;
   cancellation_reason?: string;
   completed_at?: string;
   cancelled_at?: string;
   no_show_at?: string;
+  started_at?: string;
+  started_by_account_id?: number | null;
+  started_by_name?: string;
+  start_available_at?: string | null;
+  overdue_at?: string | null;
+  can_start?: boolean;
   created_at?: string;
   updated_at?: string;
   subject_id?: number | null;
@@ -101,18 +118,27 @@ export type RecruitmentCandidate = {
   age?: number | null;
   address?: string;
   source?: string;
+  source_option_id?: number | null;
+  subsource?: string;
+  subsource_option_id?: number | null;
   source_detail?: string;
   status: string;
   english_level?: string;
+  english_level_option_id?: number | null;
   motivation_expectations?: string;
   interests_hobbies?: string;
   preferred_schedule?: string;
+  schedule_option_id?: number | null;
   employment_availability?: string;
+  availability_option_id?: number | null;
   education_background?: string;
   work_experience?: string;
   teaching_experience?: string;
+  teaching_experience_option_id?: number | null;
   previous_workplace?: string;
   expected_salary_uzs?: number | null;
+  expected_salary?: string;
+  expected_salary_option_id?: number | null;
   available_start_date?: string;
   stage_changed_at?: string;
   version: number;
@@ -167,7 +193,9 @@ export type RecruitmentCandidate = {
 
 export type RecruitmentOptions = {
   stages: string[];
-  sources: string[];
+  sources: RecruitmentOption[];
+  subsources: RecruitmentOption[];
+  option_categories: Record<string, RecruitmentOption[]>;
   document_types: string[];
   required_document_types: string[];
   optional_document_types: string[];
@@ -180,9 +208,10 @@ export type RecruitmentOptions = {
 
 export type RecruitmentSetting = {
   id: number;
-  category: "source" | "rejection_reason";
+  category: "source" | "subsource" | "rejection_reason" | "english_level" | "schedule" | "availability" | "expected_salary" | "teaching_experience";
   value: string;
   label: string;
+  parent_id?: number | null;
   is_active: boolean;
   sort_order: number;
   is_system?: boolean;
@@ -191,7 +220,13 @@ export type RecruitmentSetting = {
 export type RecruitmentSettingsData = {
   items: RecruitmentSetting[];
   sources: RecruitmentSetting[];
+  subsources: RecruitmentSetting[];
   rejection_reasons: RecruitmentSetting[];
+  english_levels: RecruitmentSetting[];
+  schedules: RecruitmentSetting[];
+  availabilitys: RecruitmentSetting[];
+  expected_salarys: RecruitmentSetting[];
+  teaching_experiences: RecruitmentSetting[];
   sla_rules: Array<{ stage: string; target_days: number; updated_at?: string; updated_by_name?: string }>;
   read_only: boolean;
 };
@@ -217,7 +252,8 @@ export const primaryStages = [
   "active_teacher",
 ] as const;
 
-export const manualStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review"] as const;
+export const boardStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review"] as const;
+export const manualStages = boardStages;
 export const alternativeStages = ["rejected", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
@@ -245,5 +281,12 @@ export function dateLabel(value: unknown) {
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime())
     ? raw
-    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: raw.includes("T") ? "short" : undefined, timeZone: "Asia/Tashkent" }).format(parsed);
+    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: /[T ]\d{2}:\d{2}/.test(raw) ? "short" : undefined, timeZone: "Asia/Tashkent" }).format(parsed);
+}
+
+export function dateTimeLabel(value: unknown) {
+  const parsed = new Date(String(value || ""));
+  return Number.isNaN(parsed.getTime())
+    ? String(value || "Not set")
+    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Tashkent" }).format(parsed);
 }

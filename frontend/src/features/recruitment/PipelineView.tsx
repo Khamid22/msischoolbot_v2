@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, UserMinus, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -13,12 +13,14 @@ import {
 } from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
+import { InterviewSessionModal } from "@/features/recruitment/InterviewSessionModal";
 import { appointmentConflictDetails, formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import {
   dateLabel,
+  dateTimeLabel,
+  boardStages,
   humanize,
   manualStages,
-  primaryStages,
   stageLabels,
   type RecruitmentAppointment,
   type RecruitmentCandidate,
@@ -93,7 +95,7 @@ function matchingAppointment(candidate: RecruitmentCandidate) {
       : "";
   if (!expectedType) return null;
   const appointments = candidate.appointments || [];
-  return appointments.find((item) => item.status === "scheduled" && item.appointment_type === expectedType)
+  return appointments.find((item) => ["scheduled", "in_progress"].includes(item.status) && item.appointment_type === expectedType)
     || (candidate.next_appointment?.appointment_type === expectedType ? candidate.next_appointment : null);
 }
 
@@ -166,7 +168,7 @@ function FiltersDrawer({
     >
       <div className="grid gap-4">
         <label className="text-xs font-semibold">Position<input className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)} /></label>
-        <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
+        <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label><label className="text-xs font-semibold">Applied to<input type="date" className={`${fieldClass} mt-1`} value={draft.application_to} onChange={(event) => update("application_to", event.target.value)} /></label></div>
         <label className="text-xs font-semibold">Evaluator<select className={`${fieldClass} mt-1`} value={draft.evaluator_account_id} onChange={(event) => update("evaluator_account_id", event.target.value)}><option value="">All evaluators</option>{options?.staff.filter((person) => ["academic_director", "head_of_department"].includes(person.role)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
@@ -181,12 +183,14 @@ function CandidateCard({
   onDragStart,
   onDragEnd,
   onSchedule,
+  onInterview,
 }: {
   candidate: RecruitmentCandidate;
   basePath: string;
   onDragStart: (candidate: RecruitmentCandidate) => void;
   onDragEnd: () => void;
   onSchedule: (candidate: RecruitmentCandidate, appointmentType: "job_interview" | "demo_lesson") => void;
+  onInterview: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
 }) {
   const canMove = Boolean(candidate.permissions?.can_move_stage) && !["teacher_academy", "active_teacher"].includes(candidate.status);
   const appointment = matchingAppointment(candidate);
@@ -199,7 +203,7 @@ function CandidateCard({
   let detailValue = "";
   if (candidate.status === "new_candidate") { detailLabel = "Applied"; detailValue = dateLabel(candidate.application_date); }
   if (candidate.status === "responded") { detailLabel = "Responded"; detailValue = dateLabel(candidate.stage_changed_at); }
-  if (appointment) { detailLabel = appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"; detailValue = dateLabel(appointment.starts_at); }
+  if (appointment) { detailLabel = appointment.status === "in_progress" ? "Interview in progress" : appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"; detailValue = dateTimeLabel(appointment.started_at || appointment.starts_at); }
   if (candidate.status === "under_review") { detailLabel = "Under review since"; detailValue = dateLabel(candidate.stage_changed_at); }
   if (["teacher_academy", "active_teacher"].includes(candidate.status)) { detailLabel = "Accepted"; detailValue = dateLabel(candidate.final_decision_at || candidate.stage_changed_at); }
 
@@ -212,7 +216,7 @@ function CandidateCard({
         : ["job_interview", "test_and_demo"].includes(candidate.status)
           ? "border-amber-400 bg-amber-50 dark:border-amber-500/50 dark:bg-amber-950/20"
           : "border-border bg-card";
-  if (overdue) { detailLabel = "Overdue"; detailValue = dateLabel(appointment?.starts_at); }
+  if (overdue) { detailLabel = "Overdue"; detailValue = dateTimeLabel(appointment?.starts_at); }
   if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
   const StatusIcon = overdue ? AlertTriangle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
   const sla = candidate.current_sla;
@@ -239,10 +243,11 @@ function CandidateCard({
         {sla ? <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${slaClass}`} title={`SLA due ${dateLabel(sla.due_at)}`}>{slaLabel}</span> : null}
       </a>
       {unscheduledType ? (
-        <button type="button" onClick={() => onSchedule(candidate, unscheduledType)} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100">
+        <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onSchedule(candidate, unscheduledType); }} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center gap-2 rounded-md border border-amber-400/50 bg-amber-100 px-2 text-left text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 dark:bg-amber-400/15 dark:text-amber-100">
           <CalendarPlus className="h-4 w-4 shrink-0" />{unscheduledType === "job_interview" ? "Interview not scheduled" : "Demo lesson not scheduled"}
         </button>
       ) : null}
+      {appointment?.appointment_type === "job_interview" && ["scheduled", "in_progress"].includes(appointment.status) ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center justify-center gap-2 rounded-md bg-primary px-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button> : null}
     </article>
   );
 }
@@ -262,17 +267,19 @@ export function PipelineView({
 }) {
   const queryClient = useQueryClient();
   const initial = new URLSearchParams(window.location.search);
-  const initialStage = initial.get("stage") || primaryStages[0];
-  const [mobileStage, setMobileStage] = useState((primaryStages as readonly string[]).includes(initialStage) ? initialStage : primaryStages[0]);
+  const initialStage = initial.get("stage") || boardStages[0];
+  const [mobileStage, setMobileStage] = useState((boardStages as readonly string[]).includes(initialStage) ? initialStage : boardStages[0]);
   const [filters, setFilters] = useState<PipelineFilters>(initialFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [boardPanning, setBoardPanning] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
-  const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | null>(null);
+  const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | "candidate_withdrew" | null>(null);
   const [rejectSelection, setRejectSelection] = useState<RejectSelection | null>(null);
+  const [withdrawSelection, setWithdrawSelection] = useState<RejectSelection | null>(null);
   const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
+  const [interviewSelection, setInterviewSelection] = useState<{ candidate: RecruitmentCandidate; appointment: RecruitmentAppointment } | null>(null);
   const [scheduleConflicts, setScheduleConflicts] = useState<RecruitmentAppointment[]>([]);
   const [undoTrash, setUndoTrash] = useState<UndoTrash | null>(null);
   const draggedCandidateRef = useRef<RecruitmentCandidate | null>(null);
@@ -350,6 +357,12 @@ export function PipelineView({
     onError: (error) => onAnnouncement(queryError(error), "error"),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
+  const withdraw = useMutation({
+    mutationFn: ({ candidate, values }: { candidate: RecruitmentCandidate; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/final-decisions`, { method: "POST", body: jsonBody({ decision: "candidate_withdrew", ...values }) }),
+    onSuccess: (result) => { setWithdrawSelection(null); onAnnouncement(result.message || "Candidate marked as withdrawn."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
   const schedule = useMutation({
     mutationFn: ({ candidate, appointmentType, values }: { candidate: RecruitmentCandidate; appointmentType: ScheduleSelection["appointmentType"]; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments`, { method: "POST", body: jsonBody({ ...values, appointment_type: appointmentType, allow_conflict: Boolean(scheduleConflicts.length) }) }),
     onSuccess: (result) => { setScheduleSelection(null); setScheduleConflicts([]); onAnnouncement(result.message || "Appointment scheduled."); },
@@ -411,7 +424,7 @@ export function PipelineView({
 
   const cards = (items: RecruitmentCandidate[]) => (
     <div className="space-y-2">
-      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={(value) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }} onDragEnd={finishDrag} onSchedule={(value, appointmentType) => { setScheduleConflicts([]); setScheduleSelection({ candidate: value, appointmentType }); }} />)}
+      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={(value) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }} onDragEnd={finishDrag} onSchedule={(value, appointmentType) => { setScheduleConflicts([]); setScheduleSelection({ candidate: value, appointmentType }); }} onInterview={(value, appointment) => setInterviewSelection({ candidate: value, appointment })} />)}
       {!items.length ? <EmptyLine>No candidates in this stage.</EmptyLine> : null}
     </div>
   );
@@ -449,7 +462,7 @@ export function PipelineView({
       />
 
       <div className="md:hidden">
-        <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{primaryStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
+        <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{boardStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
         <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{cards(pipeline.data.stages[mobileStage] || [])}</section>
       </div>
 
@@ -470,7 +483,7 @@ export function PipelineView({
         }}
       >
         <div className="grid w-max grid-flow-col auto-cols-[240px] gap-3">
-          {primaryStages.map((stage) => {
+          {boardStages.map((stage) => {
             const acceptsDrop = (manualStages as readonly string[]).includes(stage);
             const highlighted = dragOverStage === stage;
             const items = pipeline.data.stages[stage] || [];
@@ -486,11 +499,13 @@ export function PipelineView({
 
       {draggedCandidate ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+1rem)] z-40 flex justify-center px-4">
-          <section aria-label="Candidate outcome drop targets" className="pointer-events-auto grid w-full max-w-md grid-cols-2 gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur">
-            {(["trash_bin", "rejected"] as const).map((target) => {
+          <section aria-label="Candidate outcome drop targets" className="pointer-events-auto grid w-full max-w-2xl grid-cols-3 gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur">
+            {(["trash_bin", "rejected", "candidate_withdrew"] as const).map((target) => {
               const danger = target === "trash_bin";
               const highlighted = dragOverOutcome === target;
-              return <div key={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragOverOutcome(null)} onDrop={(event) => { event.preventDefault(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else setRejectSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-3 text-sm font-semibold transition-colors ${danger ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300"} ${highlighted ? "ring-2 ring-current/20" : ""}`}>{target === "trash_bin" ? <Trash2 className="h-4 w-4" /> : <Ban className="h-4 w-4" />}{target === "trash_bin" ? "Trash Bin" : "Reject"}</div>;
+              const Icon = target === "trash_bin" ? Trash2 : target === "rejected" ? Ban : UserMinus;
+              const label = target === "trash_bin" ? "Trash Bin" : target === "rejected" ? "Reject" : "Withdraw";
+              return <div key={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragOverOutcome(null)} onDrop={(event) => { event.preventDefault(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else if (target === "rejected") setRejectSelection({ candidate }); else setWithdrawSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-2 text-center text-xs font-semibold transition-colors sm:text-sm ${danger ? "border-destructive/50 bg-destructive/10 text-destructive" : target === "rejected" ? "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300" : "border-rose-400/50 bg-rose-100/70 text-rose-800 dark:bg-rose-400/10 dark:text-rose-200"} ${highlighted ? "ring-2 ring-current/20" : ""}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
             })}
           </section>
         </div>
@@ -504,9 +519,14 @@ export function PipelineView({
         {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-3"><label className="text-xs font-semibold">Rejection reason<select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{(options?.rejection_reason_options || []).map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><label className="text-xs font-semibold">Explanation<textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {stageLabels[rejectSelection.candidate.status] || humanize(rejectSelection.candidate.status)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}
       </Modal>
 
+      <Modal open={Boolean(withdrawSelection)} onClose={() => { if (!withdraw.isPending) setWithdrawSelection(null); }} title="Candidate withdrew" subtitle={withdrawSelection?.candidate.full_name} size="sm">
+        {withdrawSelection ? <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); withdraw.mutate({ candidate: withdrawSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Withdrawal reason<textarea autoFocus required name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The system records that this candidate withdrew from {stageLabels[withdrawSelection.candidate.status] || humanize(withdrawSelection.candidate.status)} and cancels active appointments.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setWithdrawSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={withdraw.isPending}>{withdraw.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}Confirm withdrawal</button></div></ModalFooter></form> : null}
+      </Modal>
+
       <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) { setScheduleSelection(null); setScheduleConflicts([]); } }} title={scheduleSelection?.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">
         {scheduleSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); schedule.mutate({ candidate: scheduleSelection.candidate, appointmentType: scheduleSelection.appointmentType, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={scheduleSelection.appointmentType} options={options} conflicts={scheduleConflicts} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => { setScheduleSelection(null); setScheduleConflicts([]); }}>Cancel</button><button type="submit" className={buttonClass} disabled={schedule.isPending}>{schedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{scheduleConflicts.length ? "Schedule anyway" : "Schedule"}</button></div></ModalFooter></form> : null}
       </Modal>
+      {interviewSelection ? <InterviewSessionModal candidate={interviewSelection.candidate} appointment={interviewSelection.appointment} open onClose={() => setInterviewSelection(null)} onAnnouncement={onAnnouncement} /> : null}
     </div>
   );
 }

@@ -51,7 +51,7 @@ def options(user: CurrentUser) -> dict[str, Any]:
     with connect_auth_db() as conn:
         rows = repository.options_rows(conn)
     return {
-        "sources": [str(row["value"]) for row in rows["sources"]],
+        "sources": [_dict(row) for row in rows["sources"]],
         "positions": [str(row["value"]) for row in rows["positions"]],
         "subjects": [_dict(row) for row in rows["subjects"]],
         "responsible_people": [_dict(row) for row in rows["responsible_people"]],

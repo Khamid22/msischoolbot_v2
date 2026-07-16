@@ -72,6 +72,8 @@ def test_minimal_candidate_and_blank_optional_values_validate():
         {"education_background": "  BA in English Education  "}
     )
     assert update.education_background == "BA in English Education"
+    with pytest.raises(ValidationError):
+        CandidateUpdate.model_validate({"source": "free-form source"})
 
 
 def test_demo_score_is_restricted_to_zero_through_ten():

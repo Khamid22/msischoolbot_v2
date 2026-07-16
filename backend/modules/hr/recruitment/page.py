@@ -41,6 +41,8 @@ def _register_role_routes(
     include_trash: bool = False,
     include_rejected: bool = False,
     include_analytics: bool = False,
+    include_teachers: bool = False,
+    include_tasks: bool = True,
 ) -> None:
     router = APIRouter(dependencies=[Depends(require_role(role))])
 
@@ -54,6 +56,12 @@ def _register_role_routes(
         def pipeline():
             return _render(role=role, view="pipeline", base_path=base_path)
 
+    if include_teachers:
+
+        @router.get(f"{base_path}/teachers", operation_id=f"{operation_prefix}_recruitment_teachers")
+        def teachers():
+            return _render(role=role, view="teachers", base_path=base_path)
+
     @router.get(f"{base_path}/candidates", operation_id=f"{operation_prefix}_recruitment_candidates")
     def candidates(request: Request):
         if role == "hr_manager":
@@ -65,12 +73,14 @@ def _register_role_routes(
     def schedule():
         return _render(role=role, view="schedule", base_path=base_path)
 
-    @router.get(f"{base_path}/tasks", operation_id=f"{operation_prefix}_recruitment_tasks")
-    def tasks(request: Request):
-        if role == "hr_manager":
-            suffix = f"?{request.query_params}" if request.query_params else ""
-            return RedirectResponse(f"{base_path}/pipeline{suffix}", status_code=307)
-        return _render(role=role, view="tasks", base_path=base_path)
+    if include_tasks:
+
+        @router.get(f"{base_path}/tasks", operation_id=f"{operation_prefix}_recruitment_tasks")
+        def tasks(request: Request):
+            if role == "hr_manager":
+                suffix = f"?{request.query_params}" if request.query_params else ""
+                return RedirectResponse(f"{base_path}/pipeline{suffix}", status_code=307)
+            return _render(role=role, view="tasks", base_path=base_path)
 
     if include_rejected:
 
@@ -146,6 +156,7 @@ def register_recruitment_page_routes(app) -> None:
         include_trash=True,
         include_rejected=True,
         include_analytics=True,
+        include_teachers=True,
     )
     _register_role_routes(
         app,
@@ -161,7 +172,9 @@ def register_recruitment_page_routes(app) -> None:
         base_path="/academic-director/recruitment",
         operation_prefix="academic_director",
         root_view="decisions",
+        include_pipeline=False,
         include_decisions=True,
+        include_tasks=False,
     )
     _register_role_routes(
         app,
@@ -170,6 +183,7 @@ def register_recruitment_page_routes(app) -> None:
         operation_prefix="head_of_department",
         root_view="candidates",
         include_pipeline=False,
+        include_tasks=False,
     )
 
 

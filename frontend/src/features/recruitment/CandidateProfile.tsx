@@ -26,6 +26,7 @@ import {
 } from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
+import { InterviewSessionModal } from "@/features/recruitment/InterviewSessionModal";
 import {
   appointmentConflictDetails,
   formValues,
@@ -34,6 +35,7 @@ import {
 } from "@/features/recruitment/api";
 import {
   dateLabel,
+  dateTimeLabel,
   humanize,
   manualStages,
   stageLabels,
@@ -509,6 +511,23 @@ function MoveCandidateFields({
   );
 }
 
+function CandidateOptionFields({ candidate, options }: { candidate: RecruitmentCandidate; options?: RecruitmentOptions }) {
+  const [sourceId, setSourceId] = useState(String(candidate.source_option_id || ""));
+  const [subsourceId, setSubsourceId] = useState(String(candidate.subsource_option_id || ""));
+  const category = (name: string) => options?.option_categories?.[name] || [];
+  return (
+    <>
+      <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{(options?.sources || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && (options?.subsources || []).some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{(options?.subsources || []).filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold">English level<select name="english_level_option_id" defaultValue={candidate.english_level_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("english_level").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold">Schedule<select name="schedule_option_id" defaultValue={candidate.schedule_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("schedule").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold">Availability<select name="availability_option_id" defaultValue={candidate.availability_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("availability").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold">Expected salary<select name="expected_salary_option_id" defaultValue={candidate.expected_salary_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("expected_salary").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+      <label className="text-xs font-semibold sm:col-span-2">Teaching experience<select name="teaching_experience_option_id" defaultValue={candidate.teaching_experience_option_id || ""} className={`${fieldClass} mt-1`}><option value="">Not set</option>{category("teaching_experience").map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+    </>
+  );
+}
+
 function ActionFields({
   action,
   candidate,
@@ -568,23 +587,7 @@ function ActionFields({
               className={`${fieldClass} mt-1`}
             />
           </label>
-          <label className="text-xs font-semibold">
-            Source
-            <select
-              name="source"
-              defaultValue={candidate.source}
-              className={`${fieldClass} mt-1`}
-            >
-              <option value="">Not set</option>
-              {options?.sources.map((source) => (
-                <option key={source}>{source}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs font-semibold">
-            Source details
-            <input name="source_detail" defaultValue={candidate.source_detail} className={`${fieldClass} mt-1`} />
-          </label>
+          <CandidateOptionFields candidate={candidate} options={options} />
           <label className="text-xs font-semibold">
             Age
             <input
@@ -597,45 +600,11 @@ function ActionFields({
             />
           </label>
           <label className="text-xs font-semibold">
-            English level
-            <input
-              name="english_level"
-              defaultValue={candidate.english_level}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Preferred schedule
-            <input
-              name="preferred_schedule"
-              defaultValue={candidate.preferred_schedule}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Availability
-            <input
-              name="employment_availability"
-              defaultValue={candidate.employment_availability}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
             Available start date
             <input
               name="available_start_date"
               type="date"
               defaultValue={candidate.available_start_date?.slice(0, 10)}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Expected salary (UZS)
-            <input
-              name="expected_salary_uzs"
-              type="number"
-              min="0"
-              defaultValue={candidate.expected_salary_uzs || ""}
               className={`${fieldClass} mt-1`}
             />
           </label>
@@ -660,14 +629,6 @@ function ActionFields({
             <textarea
               name="work_experience"
               defaultValue={candidate.work_experience}
-              className={`${fieldClass} mt-1 min-h-20`}
-            />
-          </label>
-          <label className="text-xs font-semibold sm:col-span-2">
-            Teaching experience
-            <textarea
-              name="teaching_experience"
-              defaultValue={candidate.teaching_experience}
               className={`${fieldClass} mt-1 min-h-20`}
             />
           </label>
@@ -1154,6 +1115,7 @@ export function CandidateProfile({
       : "overview",
   );
   const [action, setAction] = useState<ProfileAction | null>(null);
+  const [interviewSession, setInterviewSession] = useState<RecruitmentAppointment | null>(null);
   const [appointmentConflicts, setAppointmentConflicts] = useState<
     RecruitmentAppointment[]
   >([]);
@@ -1250,7 +1212,7 @@ export function CandidateProfile({
   const latestTest = candidate.subject_tests?.find((item) => !item.voided_at);
   const latestDemo = candidate.demo_lessons?.find((item) => !item.voided_at);
   const scheduledAppointments = (candidate.appointments || []).filter(
-    (item) => item.status === "scheduled",
+    (item) => ["scheduled", "in_progress"].includes(item.status),
   );
   const pendingTasks = (candidate.tasks || []).filter((task) =>
     ["pending", "overdue"].includes(task.effective_status),
@@ -1261,12 +1223,29 @@ export function CandidateProfile({
     rawValue: string,
   ) => {
     let value: string | number | null = rawValue.trim() || null;
-    if (["age", "expected_salary_uzs", "subject_id"].includes(field) && value !== null)
+    if (["age", "expected_salary_uzs", "subject_id", "source_option_id", "subsource_option_id", "english_level_option_id", "schedule_option_id", "availability_option_id", "expected_salary_option_id", "teaching_experience_option_id"].includes(field) && value !== null)
       value = Number(value);
     mutation.mutate({
       url: `${RECRUITMENT_API}/candidates/${candidateId}`,
       method: "PATCH",
-      values: { [field]: value, expected_version: candidate.version },
+      values: {
+        [field]: value,
+        ...(field === "source_option_id" ? { subsource_option_id: null } : {}),
+        expected_version: candidate.version,
+      },
+    });
+  };
+
+  const saveInlineSource = (selection: string) => {
+    const [source, subsource] = selection.split(":");
+    mutation.mutate({
+      url: `${RECRUITMENT_API}/candidates/${candidateId}`,
+      method: "PATCH",
+      values: {
+        source_option_id: source ? Number(source) : null,
+        subsource_option_id: subsource ? Number(subsource) : null,
+        expected_version: candidate.version,
+      },
     });
   };
 
@@ -1352,8 +1331,10 @@ export function CandidateProfile({
       ? `${basePath}/pipeline`
       : origin === "decisions"
         ? `${basePath}/decisions`
-        : origin === "schedule"
+      : origin === "schedule"
           ? `${basePath}/schedule`
+          : origin === "teachers"
+            ? `${basePath}/teachers`
           : origin === "tasks"
             ? `${basePath}/tasks`
             : origin === "trash" ? `${basePath}/trash${safeReturn}`
@@ -1533,12 +1514,6 @@ export function CandidateProfile({
         },
       });
   }
-  if (permissions?.can_manage_interviews)
-    evaluationItems.push({
-      key: "interview",
-      label: "Record interview",
-      onClick: () => setAction({ kind: "record_interview" }),
-    });
   if (permissions?.can_add_academic_evaluation) {
     evaluationItems.push({
       key: "test",
@@ -1838,22 +1813,18 @@ export function CandidateProfile({
                   onSave={(value) => saveInlineField("application_date", value)}
                 />
                 <InlineField
-                  label="Source"
-                  {...inlineEditProps("source", "Source")}
-                  value={candidate.source}
-                  options={(options.data?.sources || []).map((value) => ({
-                    value,
-                    label: value,
-                  }))}
+                  label="Source → Subsource"
+                  {...inlineEditProps("source_selection", "Source and subsource")}
+                  value={candidate.source_option_id ? `${candidate.source_option_id}:${candidate.subsource_option_id || ""}` : ""}
+                  displayValue={[candidate.source, candidate.subsource].filter(Boolean).join(" → ")}
+                  options={(options.data?.sources || []).flatMap((source) => {
+                    const children = (options.data?.subsources || []).filter((item) => item.parent_id === source.id);
+                    return children.length
+                      ? children.map((child) => ({ value: `${source.id}:${child.id}`, label: `${source.label} → ${child.label}` }))
+                      : [{ value: `${source.id}:`, label: source.label }];
+                  })}
                   busy={mutation.isPending}
-                  onSave={(value) => saveInlineField("source", value)}
-                />
-                <InlineField
-                  label="Source details"
-                  {...inlineEditProps("source_detail", "Source details")}
-                  value={candidate.source_detail}
-                  busy={mutation.isPending}
-                  onSave={(value) => saveInlineField("source_detail", value)}
+                  onSave={saveInlineSource}
                 />
                 <InlineField
                   label="Age"
@@ -1865,28 +1836,30 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="English"
-                  {...inlineEditProps("english_level", "English")}
-                  value={candidate.english_level}
+                  {...inlineEditProps("english_level_option_id", "English")}
+                  value={candidate.english_level_option_id}
+                  displayValue={candidate.english_level}
+                  options={(options.data?.option_categories?.english_level || []).map((item) => ({ value: item.id, label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) => saveInlineField("english_level", value)}
+                  onSave={(value) => saveInlineField("english_level_option_id", value)}
                 />
                 <InlineField
                   label="Schedule"
-                  {...inlineEditProps("preferred_schedule", "Schedule")}
-                  value={candidate.preferred_schedule}
+                  {...inlineEditProps("schedule_option_id", "Schedule")}
+                  value={candidate.schedule_option_id}
+                  displayValue={candidate.preferred_schedule}
+                  options={(options.data?.option_categories?.schedule || []).map((item) => ({ value: item.id, label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) =>
-                    saveInlineField("preferred_schedule", value)
-                  }
+                  onSave={(value) => saveInlineField("schedule_option_id", value)}
                 />
                 <InlineField
                   label="Availability"
-                  {...inlineEditProps("employment_availability", "Availability")}
-                  value={candidate.employment_availability}
+                  {...inlineEditProps("availability_option_id", "Availability")}
+                  value={candidate.availability_option_id}
+                  displayValue={candidate.employment_availability}
+                  options={(options.data?.option_categories?.availability || []).map((item) => ({ value: item.id, label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) =>
-                    saveInlineField("employment_availability", value)
-                  }
+                  onSave={(value) => saveInlineField("availability_option_id", value)}
                 />
                 <InlineField
                   label="Start date"
@@ -1901,18 +1874,12 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Expected salary"
-                  {...inlineEditProps("expected_salary_uzs", "Expected salary")}
-                  value={candidate.expected_salary_uzs}
-                  displayValue={
-                    candidate.expected_salary_uzs
-                      ? `${Number(candidate.expected_salary_uzs).toLocaleString()} UZS`
-                      : ""
-                  }
-                  type="number"
+                  {...inlineEditProps("expected_salary_option_id", "Expected salary")}
+                  value={candidate.expected_salary_option_id}
+                  displayValue={candidate.expected_salary}
+                  options={(options.data?.option_categories?.expected_salary || []).map((item) => ({ value: item.id, label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) =>
-                    saveInlineField("expected_salary_uzs", value)
-                  }
+                  onSave={(value) => saveInlineField("expected_salary_option_id", value)}
                 />
                 <InlineField
                   label="Address"
@@ -1965,13 +1932,12 @@ export function CandidateProfile({
                 />
                 <InlineField
                   label="Teaching experience"
-                  {...inlineEditProps("teaching_experience", "Teaching experience")}
-                  value={candidate.teaching_experience}
-                  multiline
+                  {...inlineEditProps("teaching_experience_option_id", "Teaching experience")}
+                  value={candidate.teaching_experience_option_id}
+                  displayValue={candidate.teaching_experience}
+                  options={(options.data?.option_categories?.teaching_experience || []).map((item) => ({ value: item.id, label: item.label }))}
                   busy={mutation.isPending}
-                  onSave={(value) =>
-                    saveInlineField("teaching_experience", value)
-                  }
+                  onSave={(value) => saveInlineField("teaching_experience_option_id", value)}
                 />
                 <InlineField
                   label="Interests"
@@ -1993,7 +1959,7 @@ export function CandidateProfile({
                     ["Telegram", candidate.telegram_username],
                     ["Application date", dateLabel(candidate.application_date)],
                     ["Source", candidate.source],
-                    ["Source details", candidate.source_detail],
+                    ["Subsource", candidate.subsource],
                     ["Age", candidate.age],
                     ["English", candidate.english_level],
                     ["Schedule", candidate.preferred_schedule],
@@ -2029,7 +1995,16 @@ export function CandidateProfile({
               icon={<CalendarClock className="h-4 w-4" />}
             >
               {candidate.next_appointment ? (
-                <div>
+                <button
+                  type="button"
+                  className="w-full rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  onClick={() => {
+                    const next = candidate.next_appointment;
+                    if (!next) return;
+                    if (next.appointment_type === "job_interview") setInterviewSession(next);
+                    else setTab("evaluations");
+                  }}
+                >
                   <p className="text-sm font-semibold">
                     {candidate.next_appointment.appointment_type ===
                     "job_interview"
@@ -2037,12 +2012,12 @@ export function CandidateProfile({
                       : "Demo lesson"}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {dateLabel(candidate.next_appointment.starts_at)}
+                    {dateTimeLabel(candidate.next_appointment.starts_at)}
                     {candidate.next_appointment.responsible_name
                       ? ` · ${candidate.next_appointment.responsible_name}`
                       : ""}
                   </p>
-                </div>
+                </button>
               ) : candidate.next_task ? (
                 <div>
                   <p className="text-sm font-semibold">
@@ -2075,109 +2050,14 @@ export function CandidateProfile({
           aria-labelledby="candidate-tab-evaluations"
           className="space-y-3"
         >
-          <Panel
-            title="Upcoming appointments"
-            icon={<CalendarClock className="h-4 w-4" />}
-          >
-            <div className="divide-y divide-border rounded-lg border border-border">
-              {scheduledAppointments.map((appointment) => {
-                const appointmentItems: ActionMenuItem[] = [];
-                if (permissions?.can_manage_appointments) {
-                  appointmentItems.push({
-                    key: "reschedule",
-                    label: "Reschedule",
-                    onClick: () => {
-                      setAppointmentConflicts([]);
-                      setAction({
-                        kind: "reschedule_appointment",
-                        appointment,
-                      });
-                    },
-                  });
-                  appointmentItems.push({
-                    key: "no_show",
-                    label: "Mark no-show",
-                    onClick: () =>
-                      setAction({
-                        kind: "appointment_status",
-                        appointment,
-                        status: "no_show",
-                      }),
-                  });
-                  appointmentItems.push({ separator: true, key: "separator" });
-                  appointmentItems.push({
-                    key: "cancel",
-                    label: "Cancel appointment",
-                    danger: true,
-                    onClick: () =>
-                      setAction({
-                        kind: "appointment_status",
-                        appointment,
-                        status: "cancelled",
-                      }),
-                  });
-                }
-                if (
-                  appointment.appointment_type === "job_interview" &&
-                  permissions?.can_manage_interviews
-                )
-                  appointmentItems.unshift({
-                    key: "result",
-                    label: "Record interview result",
-                    onClick: () =>
-                      setAction({ kind: "record_interview", appointment }),
-                  });
-                if (
-                  appointment.appointment_type === "demo_lesson" &&
-                  permissions?.can_add_academic_evaluation
-                )
-                  appointmentItems.unshift({
-                    key: "result",
-                    label: "Record demo result",
-                    onClick: () =>
-                      setAction({ kind: "record_demo", appointment }),
-                  });
-                return (
-                  <article
-                    key={appointment.id}
-                    className={`flex min-h-16 items-center justify-between gap-3 px-3 py-2 ${appointment.is_overdue ? "bg-red-50 dark:bg-red-950/20" : ""}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold">
-                        {appointment.appointment_type === "job_interview"
-                          ? "Job interview"
-                          : "Demo lesson"}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {dateLabel(appointment.starts_at)}
-                        {appointment.responsible_name
-                          ? ` · ${appointment.responsible_name}`
-                          : ""}
-                      </p>
-                      {appointment.topic ? <p className="mt-0.5 truncate text-xs text-muted-foreground">Topic: {appointment.topic}</p> : null}
-                      {appointment.is_overdue ? <p className="mt-1 text-xs font-semibold text-destructive">Overdue — record a result, reschedule, cancel, or mark no-show.</p> : null}
-                    </div>
-                    {appointmentItems.length ? (
-                      <ActionMenu
-                        items={appointmentItems}
-                        label={`Actions for ${appointment.appointment_type}`}
-                      />
-                    ) : (
-                      <StatusBadge status={appointment.is_overdue ? "overdue" : appointment.status} />
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-            {!scheduledAppointments.length ? (
-              <EmptyLine>No upcoming appointments.</EmptyLine>
-            ) : null}
-          </Panel>
           <div className="grid gap-3 xl:grid-cols-3">
             <Panel
-              title="Interview history"
+              title="Job Interviews"
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
+              <div className="mb-3 space-y-2">
+                {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => <button key={appointment.id} type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>)}
+              </div>
               <AttemptList
                 items={candidate.interviews || []}
                 empty="No interviews recorded."
@@ -2195,28 +2075,12 @@ export function CandidateProfile({
               />
             </Panel>
             <Panel
-              title="Subject-test history"
+              title="Demo Lessons"
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
-              <AttemptList
-                items={candidate.subject_tests || []}
-                empty="No subject tests recorded."
-                onVoid={
-                  permissions?.can_void_evaluations
-                    ? (attempt) =>
-                        setAction({
-                          kind: "void_evaluation",
-                          evaluationType: "subject_test",
-                          attempt,
-                        })
-                    : undefined
-                }
-              />
-            </Panel>
-            <Panel
-              title="Demo history"
-              icon={<ClipboardCheck className="h-4 w-4" />}
-            >
+              <div className="mb-3 space-y-2">
+                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => <button key={appointment.id} type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>)}
+              </div>
               <AttemptList
                 items={candidate.demo_lessons || []}
                 empty="No demo lessons recorded."
@@ -2226,6 +2090,25 @@ export function CandidateProfile({
                         setAction({
                           kind: "void_evaluation",
                           evaluationType: "demo",
+                          attempt,
+                        })
+                    : undefined
+                }
+              />
+            </Panel>
+            <Panel
+              title="Subject Knowledge Tests"
+              icon={<ClipboardCheck className="h-4 w-4" />}
+            >
+              <AttemptList
+                items={candidate.subject_tests || []}
+                empty="No subject knowledge tests recorded."
+                onVoid={
+                  permissions?.can_void_evaluations
+                    ? (attempt) =>
+                        setAction({
+                          kind: "void_evaluation",
+                          evaluationType: "subject_test",
                           attempt,
                         })
                     : undefined
@@ -2640,6 +2523,16 @@ export function CandidateProfile({
           ) : null}
         </ol>
       </Drawer>
+
+      {interviewSession ? (
+        <InterviewSessionModal
+          open
+          candidate={candidate}
+          appointment={interviewSession}
+          onClose={() => setInterviewSession(null)}
+          onAnnouncement={onAnnouncement}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={Boolean(pendingInlineField || confirmInlineClose)}

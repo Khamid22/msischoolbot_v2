@@ -34,15 +34,17 @@ SLA_STAGES = (
     "test_and_demo",
     "under_review",
 )
-CANDIDATE_SOURCES = (
-    "hh.uz",
-    "Telegram",
-    "Referral",
-    "Instagram",
-    "LinkedIn",
-    "University",
-    "MSI website",
-    "Other",
+RECRUITMENT_OPTION_CATEGORIES = frozenset(
+    {
+        "source",
+        "subsource",
+        "rejection_reason",
+        "english_level",
+        "schedule",
+        "availability",
+        "expected_salary",
+        "teaching_experience",
+    }
 )
 
 REJECTION_REASONS = (
@@ -66,7 +68,9 @@ SUBJECT_TEST_RESULTS = frozenset({"passed", "failed", "retake_required", "not_co
 DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo"})
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
 APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
-APPOINTMENT_STATUSES = frozenset({"scheduled", "completed", "cancelled", "no_show"})
+APPOINTMENT_STATUSES = frozenset(
+    {"scheduled", "in_progress", "completed", "cancelled", "no_show"}
+)
 SCHEDULED_STAGE_TYPES = {"job_interview": "job_interview", "test_and_demo": "demo_lesson"}
 
 RECRUITMENT_ROLES = frozenset(
@@ -82,7 +86,6 @@ __all__ = [
     "APPOINTMENT_TYPES",
     "ALL_STAGES",
     "ALTERNATIVE_STAGES",
-    "CANDIDATE_SOURCES",
     "DEMO_RESULTS",
     "DOCUMENT_TYPES",
     "FULL_VIEW_ROLES",
@@ -91,6 +94,7 @@ __all__ = [
     "PROTECTED_HIRE_STAGES",
     "REQUIRED_DOCUMENT_TYPES",
     "RECRUITMENT_ROLES",
+    "RECRUITMENT_OPTION_CATEGORIES",
     "REJECTION_REASONS",
     "SCHEDULED_STAGE_TYPES",
     "SLA_STAGES",

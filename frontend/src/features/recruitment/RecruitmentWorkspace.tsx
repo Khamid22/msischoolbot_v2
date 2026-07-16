@@ -12,6 +12,7 @@ import { ScheduleView } from "@/features/recruitment/ScheduleView";
 import { SettingsView } from "@/features/recruitment/SettingsView";
 import { TasksView } from "@/features/recruitment/TasksView";
 import { TrashBinView } from "@/features/recruitment/TrashBinView";
+import { TeachersView } from "@/features/recruitment/TeachersView";
 import { TelegramConnectionCard } from "@/features/recruitment/TelegramConnectionCard";
 import { formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
 import { type RecruitmentCandidate, type RecruitmentOptions, type RecruitmentRole, type RecruitmentView } from "@/features/recruitment/model";
@@ -42,30 +43,43 @@ type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
 
 function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolean; onClose: () => void; onCreated: (message: string, tone?: FloatingToastTone) => void; options?: RecruitmentOptions }) {
   const queryClient = useQueryClient();
+  const [sourceId, setSourceId] = useState("");
+  const [subsourceId, setSubsourceId] = useState("");
+  const [dirty, setDirty] = useState(false);
   const create = useMutation({
     mutationFn: (values: Record<string, string | number | null>) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates`, { method: "POST", body: jsonBody(values) }),
     onSuccess: (result) => {
       onCreated(result.message);
+      setSourceId("");
+      setSubsourceId("");
+      setDirty(false);
       onClose();
       void queryClient.invalidateQueries({ queryKey: ["recruitment"] });
     },
     onError: (error) => onCreated(queryError(error), "error"),
   });
+  const close = () => {
+    if (create.isPending) return;
+    if (dirty && !window.confirm("Discard the candidate details you entered?")) return;
+    setSourceId("");
+    setSubsourceId("");
+    setDirty(false);
+    onClose();
+  };
   return (
-    <Modal open={open} onClose={onClose} title="Add candidate" subtitle="Only the name is required; missing fields never block stage movement." size="md">
-      <form onSubmit={(event) => { event.preventDefault(); create.mutate(formValues(event.currentTarget)); }}>
-        <ModalBody className="grid gap-3">
-          {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">{queryError(create.error)}</div> : null}
-          <label className="text-xs font-semibold">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
+    <Modal open={open} onClose={close} title="Add candidate" size="xl" mobileMode="fullscreen" closeOnEscape={!create.isPending} closeOnOutsideClick={!create.isPending}>
+      <form className="flex min-h-0 flex-1 flex-col" onChange={() => setDirty(true)} onSubmit={(event) => { event.preventDefault(); create.mutate(formValues(event.currentTarget)); }}>
+        <ModalBody className="grid content-start gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2 lg:col-span-3">{queryError(create.error)}</div> : null}
+          <label className="text-xs font-semibold lg:col-span-2">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Phone<input name="phone" type="tel" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Applied position<input name="applied_position" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Subject<select name="subject_id" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-          <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)} className={`${fieldClass} mt-1`} /></label>
-          <label className="text-xs font-semibold">Source<select name="source" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source}>{source}</option>)}</select></label>
-          <label className="text-xs font-semibold">Source details<input name="source_detail" placeholder="University or referral context" className={`${fieldClass} mt-1`} /></label>
-          <label className="text-xs font-semibold">Initial note<textarea name="comment" className={`${fieldClass} mt-1 min-h-24`} /></label>
+          <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date())} className={`${fieldClass} mt-1`} /></label>
+          <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
+          <label className="text-xs font-semibold md:col-span-1 lg:col-span-2">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
         </ModalBody>
-        <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" onClick={onClose}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
+        <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={create.isPending} onClick={close}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
       </form>
     </Modal>
   );
@@ -82,15 +96,14 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         { key: "decisions", label: "Decisions", href: `${basePath}/decisions`, icon: ShieldCheck },
         { key: "candidates", label: "Candidates", href: `${basePath}/candidates`, icon: UsersRound },
         { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
-        { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
       ];
     if (effectiveRole === "head_of_department") return [
       { key: "candidates", label: "Assigned Candidates", href: `${basePath}/candidates`, icon: UsersRound },
       { key: "schedule", label: "Assigned Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
-      { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
     ];
     if (effectiveRole === "hr_manager") return [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
+      { key: "teachers", label: "Teachers", href: `${basePath}/teachers`, icon: UsersRound },
       { key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 },
       { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
       { key: "rejected", label: "Rejected", href: `${basePath}/rejected`, icon: Ban },
@@ -107,7 +120,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
     ];
     return items;
   }, [basePath, effectiveRole]);
-  const title = { pipeline: "Recruitment Pipeline", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
+  const title = { pipeline: "Recruitment Pipeline", teachers: "Teachers", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
 
@@ -145,6 +158,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       <FloatingToast toast={toast} onClose={clearToast} />
 
       {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} canAddCandidate={effectiveRole === "hr_manager"} onAddCandidate={() => setNewCandidateOpen(true)} onAnnouncement={showToast} /> : null}
+      {view === "teachers" && effectiveRole === "hr_manager" ? <TeachersView basePath={basePath} /> : null}
       {view === "analytics" && ["hr_manager", "ceo"].includes(effectiveRole) ? <AnalyticsView basePath={basePath} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}

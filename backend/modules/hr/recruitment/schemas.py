@@ -28,9 +28,8 @@ class CandidateCreate(StrictModel):
     applied_position: str = Field(default="", max_length=200)
     subject_id: OptionalInt = Field(default=None, ge=1)
     application_date: OptionalDate = None
-    source: str = Field(default="", max_length=120)
-    source_detail: str = Field(default="", max_length=1000)
-    comment: str = Field(default="", max_length=5000)
+    source_option_id: OptionalInt = Field(default=None, ge=1)
+    subsource_option_id: OptionalInt = Field(default=None, ge=1)
 
 
 class CandidateUpdate(StrictModel):
@@ -43,18 +42,18 @@ class CandidateUpdate(StrictModel):
     application_date: OptionalDate = None
     age: OptionalInt = Field(default=None, ge=14, le=100)
     address: str | None = Field(default=None, max_length=1000)
-    source: str | None = Field(default=None, max_length=120)
-    source_detail: str | None = Field(default=None, max_length=1000)
-    english_level: str | None = Field(default=None, max_length=120)
+    source_option_id: OptionalInt = Field(default=None, ge=1)
+    subsource_option_id: OptionalInt = Field(default=None, ge=1)
+    english_level_option_id: OptionalInt = Field(default=None, ge=1)
     motivation_expectations: str | None = Field(default=None, max_length=5000)
     interests_hobbies: str | None = Field(default=None, max_length=3000)
-    preferred_schedule: str | None = Field(default=None, max_length=1000)
-    employment_availability: str | None = Field(default=None, max_length=120)
+    schedule_option_id: OptionalInt = Field(default=None, ge=1)
+    availability_option_id: OptionalInt = Field(default=None, ge=1)
     education_background: str | None = Field(default=None, max_length=5000)
     work_experience: str | None = Field(default=None, max_length=5000)
-    teaching_experience: str | None = Field(default=None, max_length=5000)
+    teaching_experience_option_id: OptionalInt = Field(default=None, ge=1)
     previous_workplace: str | None = Field(default=None, max_length=1000)
-    expected_salary_uzs: OptionalDecimal = Field(default=None, ge=0)
+    expected_salary_option_id: OptionalInt = Field(default=None, ge=1)
     available_start_date: OptionalDate = None
 
 
@@ -91,6 +90,16 @@ class AppointmentUpdate(AppointmentFields):
 class AppointmentStatusChange(StrictModel):
     expected_version: int = Field(ge=1)
     reason: str = Field(default="", max_length=2000)
+
+
+class InterviewSessionStart(StrictModel):
+    expected_version: int = Field(ge=1)
+
+
+class InterviewSessionComplete(StrictModel):
+    expected_version: int = Field(ge=1)
+    notes: str = Field(default="", max_length=10000)
+    result: str = Field(pattern="^(passed|failed)$")
 
 
 class AssignmentReplace(StrictModel):
@@ -199,8 +208,11 @@ class EvaluationVoid(StrictModel):
 
 
 class RecruitmentSettingCreate(StrictModel):
-    category: str = Field(pattern="^(source|rejection_reason)$")
+    category: str = Field(
+        pattern="^(source|subsource|rejection_reason|english_level|schedule|availability|expected_salary|teaching_experience)$"
+    )
     label: str = Field(min_length=1, max_length=120)
+    parent_id: OptionalInt = Field(default=None, ge=1)
 
 
 class RecruitmentSlaRuleUpdate(StrictModel):
@@ -231,6 +243,8 @@ __all__ = [
     "EvaluationVoid",
     "FinalDecisionCreate",
     "InterviewWrite",
+    "InterviewSessionComplete",
+    "InterviewSessionStart",
     "NoteCreate",
     "RecruitmentSettingCreate",
     "RecruitmentSlaRuleUpdate",

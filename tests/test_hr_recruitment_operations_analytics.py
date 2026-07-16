@@ -88,3 +88,17 @@ def test_on_hold_removal_migration_restores_candidates_and_tightens_stage_constr
     assert "candidate.stage_restored_after_on_hold_removal" in source
     active_constraint = source.split("def downgrade", 1)[0].split("teacher_candidates_stage_check", 1)[1]
     assert "'on_hold'" not in active_constraint
+
+
+def test_standardized_option_and_interview_session_migrations_are_chained_and_deduplicated():
+    options = Path("database/alembic/versions/0024_recruitment_standardized_options.py").read_text()
+    sessions = Path("database/alembic/versions/0025_recruitment_interview_sessions.py").read_text()
+    assert 'down_revision = "0023_remove_on_hold"' in options
+    assert "source_option_id" in options and "subsource_option_id" in options
+    assert "validate_candidate_recruitment_options" in options
+    assert "Recruitment option identity is immutable" in options
+    assert "backfill_candidate_text_option" in options
+    assert 'down_revision = "0024_recruitment_options"' in sessions
+    assert "started_at" in sessions and "in_progress" in sessions
+    assert "idx_teacher_candidate_appointments_active_type" in sessions
+    assert "idx_teacher_candidate_hire_approvals_one_actionable" in sessions

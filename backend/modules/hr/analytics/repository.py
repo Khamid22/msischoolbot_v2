@@ -27,8 +27,13 @@ def _candidate_filters(
     clauses = [f"{alias}.application_date BETWEEN %s::date AND %s::date"]
     params: list[Any] = [date_from, date_to]
     if source:
-        clauses.append(f"{alias}.source = %s")
-        params.append(source)
+        if str(source).isdigit():
+            clauses.append(f"{alias}.source_option_id = %s")
+            params.append(int(source))
+        else:
+            # Compatibility for bookmarked filters created before standardized IDs.
+            clauses.append(f"lower({alias}.source) = lower(%s)")
+            params.append(source)
     if position:
         clauses.append(f"{alias}.applied_position = %s")
         params.append(position)
@@ -50,7 +55,10 @@ def _candidate_filters(
 def options_rows(conn: Any) -> dict[str, list[Any]]:
     return {
         "sources": conn.execute(
-            "SELECT DISTINCT source AS value FROM msi_v2.teacher_candidates WHERE COALESCE(source, '') <> '' ORDER BY source"
+            """SELECT setting.id, setting.label
+               FROM msi_v2.teacher_recruitment_settings setting
+               WHERE setting.category = 'source' AND setting.is_active
+               ORDER BY setting.sort_order, lower(setting.label), setting.id"""
         ).fetchall(),
         "positions": conn.execute(
             "SELECT DISTINCT applied_position AS value FROM msi_v2.teacher_candidates WHERE COALESCE(applied_position, '') <> '' ORDER BY applied_position"
@@ -138,12 +146,14 @@ def dashboard_rows(
         tuple(params),
     ).fetchall()
     sources = conn.execute(
-        f"""SELECT COALESCE(candidate.source, 'Not set') AS source,
+        f"""SELECT COALESCE(source_setting.label, NULLIF(candidate.source, ''), 'Not set') AS source,
                    COUNT(*) AS candidates,
                    COUNT(*) FILTER (WHERE decision.decision IN {successful}) AS hired,
                    ROUND(100.0 * COUNT(*) FILTER (WHERE decision.decision IN {successful}) /
                          NULLIF(COUNT(*), 0), 1) AS conversion_percentage
             FROM msi_v2.teacher_candidates candidate
+            LEFT JOIN msi_v2.teacher_recruitment_settings source_setting
+              ON source_setting.id = candidate.source_option_id
             LEFT JOIN LATERAL (
               SELECT final_decision.decision
               FROM msi_v2.teacher_candidate_final_decisions final_decision
@@ -151,7 +161,7 @@ def dashboard_rows(
               ORDER BY final_decision.created_at DESC, final_decision.id DESC LIMIT 1
             ) decision ON true
             WHERE {where_sql}
-            GROUP BY COALESCE(candidate.source, 'Not set')
+            GROUP BY COALESCE(source_setting.label, NULLIF(candidate.source, ''), 'Not set')
             ORDER BY candidates DESC, source""",
         tuple(params),
     ).fetchall()
