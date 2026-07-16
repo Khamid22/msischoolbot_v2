@@ -259,11 +259,11 @@ export const manualStages = boardStages;
 export const alternativeStages = ["rejected", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
-  new_candidate: "New Candidate",
-  responded: "Responded",
+  new_candidate: "Application Received",
+  responded: "Interview Schedule",
   job_interview: "Job Interview",
   test_and_demo: "Test & Demo",
-  under_review: "Under Review",
+  under_review: "Final Decision",
   teacher_academy: "Teacher Academy",
   active_teacher: "Active Teacher",
   rejected: "Rejected",
