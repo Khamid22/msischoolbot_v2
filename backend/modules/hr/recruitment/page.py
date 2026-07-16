@@ -35,6 +35,7 @@ def _register_role_routes(
     base_path: str,
     operation_prefix: str,
     root_view: str = "pipeline",
+    include_pipeline: bool = True,
     include_decisions: bool = False,
     include_settings: bool = False,
     include_trash: bool = False,
@@ -47,9 +48,11 @@ def _register_role_routes(
     def root():
         return _render(role=role, view=root_view, base_path=base_path)
 
-    @router.get(f"{base_path}/pipeline", operation_id=f"{operation_prefix}_recruitment_pipeline")
-    def pipeline():
-        return _render(role=role, view="pipeline", base_path=base_path)
+    if include_pipeline:
+
+        @router.get(f"{base_path}/pipeline", operation_id=f"{operation_prefix}_recruitment_pipeline")
+        def pipeline():
+            return _render(role=role, view="pipeline", base_path=base_path)
 
     @router.get(f"{base_path}/candidates", operation_id=f"{operation_prefix}_recruitment_candidates")
     def candidates(request: Request):
@@ -165,6 +168,8 @@ def register_recruitment_page_routes(app) -> None:
         role="head_of_department",
         base_path="/head-of-departments/recruitment",
         operation_prefix="head_of_department",
+        root_view="candidates",
+        include_pipeline=False,
     )
 
 

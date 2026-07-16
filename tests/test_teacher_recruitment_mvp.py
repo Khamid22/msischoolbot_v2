@@ -210,6 +210,21 @@ def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, mon
         assert denied.status_code == 403
 
 
+def test_hod_recruitment_is_limited_to_assigned_work_without_pipeline(client, monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "list_pipeline",
+        lambda user, **_filters: {"role": user.role},
+    )
+    _set_session(client, "head_of_department", account_id=14, staff_id=24)
+
+    root = client.get("/head-of-departments/recruitment")
+    assert root.status_code == 200
+    assert '"view":"candidates"' in root.text
+    assert client.get("/head-of-departments/recruitment/pipeline").status_code == 404
+    assert client.get("/api/v1/recruitment/pipeline", headers=XHR).status_code == 403
+
+
 def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     _set_session(client, "hr_manager", account_id=10, staff_id=20)
     response = client.get("/hr-manager")

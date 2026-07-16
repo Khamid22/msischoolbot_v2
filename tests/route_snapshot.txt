@@ -233,7 +233,6 @@
 /head-of-departments/recruitment | GET
 /head-of-departments/recruitment/candidates | GET
 /head-of-departments/recruitment/candidates/{candidate_id} | GET
-/head-of-departments/recruitment/pipeline | GET
 /head-of-departments/recruitment/profile | GET
 /head-of-departments/recruitment/schedule | GET
 /head-of-departments/recruitment/tasks | GET

@@ -84,6 +84,11 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         { key: "schedule", label: "Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
         { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
       ];
+    if (effectiveRole === "head_of_department") return [
+      { key: "candidates", label: "Assigned Candidates", href: `${basePath}/candidates`, icon: UsersRound },
+      { key: "schedule", label: "Assigned Schedule", href: `${basePath}/schedule`, icon: CalendarDays },
+      { key: "tasks", label: "Tasks", href: `${basePath}/tasks`, icon: CalendarClock },
+    ];
     if (effectiveRole === "hr_manager") return [
       { key: "pipeline", label: "Pipeline", href: `${basePath}/pipeline`, icon: KanbanSquare },
       { key: "analytics", label: "Analytics", href: `${basePath}/analytics`, icon: BarChart3 },

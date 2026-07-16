@@ -72,6 +72,11 @@ def pipeline(
     evaluator_account_id: int | None = None,
     user: CurrentUser = Depends(get_current_user),
 ):
+    if user.role == "head_of_department":
+        raise HTTPException(
+            status_code=403,
+            detail="Head of Department access is limited to assigned candidates and appointments.",
+        )
     return api_success(
         _call(
             service.list_pipeline,

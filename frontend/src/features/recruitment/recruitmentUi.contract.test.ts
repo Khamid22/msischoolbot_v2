@@ -266,6 +266,12 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(decisions, /origin=decisions/);
   });
 
+  test("limits Head of Department Recruitment to assigned operational work", () => {
+    const hodNav = workspace.match(/if \(effectiveRole === "head_of_department"\) return \[[\s\S]*?\];/)?.[0] || "";
+    for (const label of ["Assigned Candidates", "Assigned Schedule", "Tasks"]) assert.match(hodNav, new RegExp(`label: "${label}"`));
+    assert.doesNotMatch(hodNav, /Pipeline|Analytics|Rejected|Trash Bin|Settings|Decisions/);
+  });
+
   test("adds URL-backed agenda and week schedule views without a calendar dependency", () => {
     const schedule = source("ScheduleView.tsx");
     assert.match(workspace, /key: "schedule", label: "Schedule"/);
