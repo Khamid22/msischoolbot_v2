@@ -167,6 +167,21 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /title="Job Interviews"/);
   });
 
+  test("records scheduled demo lessons in a compact Pass or Reject modal", () => {
+    const demoFields = profile.split('case "record_demo":')[1]?.split('case "schedule_appointment":')[0] || "";
+    assert.match(profile, /open=\{action\?\.kind === "record_demo"\}/);
+    assert.match(profile, /title="Record demo lesson"/);
+    assert.match(profile, /size="sm"/);
+    assert.match(demoFields, /Date/);
+    assert.match(demoFields, /Time/);
+    assert.match(demoFields, /Full name/);
+    assert.match(demoFields, /Evaluator's notes/);
+    assert.doesNotMatch(demoFields, /Score \(0–10\)|Criterion result|Academic recommendation|name="score"/);
+    assert.match(profile, /name="result" value="passed"[\s\S]*Pass/);
+    assert.match(profile, /name="result" value="failed"[\s\S]*Reject/);
+    assert.match(profile, /scheduledAppointments\.find\(\(item\) => item\.appointment_type === "demo_lesson"/);
+  });
+
   test("keeps inline editors dimensionally stable and protects unsaved field changes", () => {
     assert.match(profile, /relative h-16 min-h-16 min-w-0/);
     assert.match(profile, /absolute inset-x-0 top-0 z-20/);

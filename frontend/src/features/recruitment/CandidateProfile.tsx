@@ -59,6 +59,7 @@ import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Drawer } from "@/shared/ui/Drawer";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 import { IconButton } from "@/shared/ui/IconButton";
+import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type ProfileTab =
@@ -110,6 +111,20 @@ const hrProfileTabs = profileTabs.filter((item) => item.key !== "activity");
 
 function text(value: unknown) {
   return String(value ?? "");
+}
+
+function scheduledDatePart(value: unknown) {
+  const parsed = new Date(text(value));
+  return Number.isNaN(parsed.getTime())
+    ? "Not scheduled"
+    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Tashkent" }).format(parsed);
+}
+
+function scheduledTimePart(value: unknown) {
+  const parsed = new Date(text(value));
+  return Number.isNaN(parsed.getTime())
+    ? "Not scheduled"
+    : new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone: "Asia/Tashkent" }).format(parsed);
 }
 
 function Panel({
@@ -786,53 +801,20 @@ function ActionFields({
     case "record_demo":
       return (
         <div className="grid gap-3">
-          {action.appointment ? (
-            <input
-              type="hidden"
-              name="appointment_id"
-              value={action.appointment.id}
-            />
-          ) : null}
+          <input type="hidden" name="appointment_id" value={action.appointment?.id || ""} />
+          <input type="hidden" name="topic" value={action.appointment?.topic || ""} />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</span><strong className="mt-0.5 block text-sm">{scheduledDatePart(action.appointment?.starts_at)}</strong></div>
+            <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Time</span><strong className="mt-0.5 block text-sm">{scheduledTimePart(action.appointment?.starts_at)}</strong></div>
+          </div>
+          <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Full name</span><strong className="mt-0.5 block text-sm">{candidate.full_name}</strong></div>
           <label className="text-xs font-semibold">
-            Topic
-            <input
-              name="topic"
-              defaultValue={action.appointment?.topic}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Score (0–10)
-            <input
-              name="score"
-              type="number"
-              min="0"
-              max="10"
-              step="0.01"
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <fieldset className="rounded-lg border border-border p-3"><legend className="px-1 text-xs font-semibold">Criterion result (optional)</legend><div className="grid gap-2 sm:grid-cols-3"><input name="criterion_name" placeholder="Criterion" className={fieldClass} /><input name="criterion_score" aria-label="Criterion score" type="number" min="0" max="10" step="0.1" placeholder="Score" className={fieldClass} /><input name="criterion_maximum" aria-label="Criterion maximum" type="number" min="0.1" step="0.1" defaultValue="10" className={fieldClass} /></div></fieldset>
-          <label className="text-xs font-semibold">
-            Result
-            <select name="result" className={`${fieldClass} mt-1`}>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-              <option value="additional_demo">Additional demo</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold">
-            Overview
+            Evaluator's notes
             <textarea
+              autoFocus
+              required
               name="overview"
-              className={`${fieldClass} mt-1 min-h-24`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Academic recommendation
-            <textarea
-              name="recommendation"
-              className={`${fieldClass} mt-1 min-h-24`}
+              className={`${fieldClass} mt-1 min-h-28 resize-y`}
             />
           </label>
         </div>
@@ -1383,6 +1365,7 @@ export function CandidateProfile({
   const submitAction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!action) return;
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const form = event.currentTarget;
     if (action.kind === "upload_document") {
       mutation.mutate({
@@ -1412,16 +1395,13 @@ export function CandidateProfile({
       });
     } else if (action.kind === "record_demo") {
       const values = formValues(form);
-      const criterion = String(values.criterion_name || "").trim();
-      const criterionScore = Number(values.criterion_score);
-      const criterionMaximum = Number(values.criterion_maximum);
-      delete values.criterion_name;
-      delete values.criterion_score;
-      delete values.criterion_maximum;
+      const result = submitter?.name === "result" ? submitter.value : "";
+      if (!['passed', 'failed'].includes(result)) return;
       submit("/demo-lessons", {
         ...values,
+        result,
         subject_id: candidate.subject_id || null,
-        criteria_scores: criterion && Number.isFinite(criterionScore) && criterionMaximum > 0 ? [{ criterion, score: criterionScore, maximum_score: criterionMaximum }] : [],
+        criteria_scores: [],
       });
     } else if (action.kind === "schedule_appointment") {
       submit("/appointments", {
@@ -1520,10 +1500,11 @@ export function CandidateProfile({
       label: "Record subject test",
       onClick: () => setAction({ kind: "record_test" }),
     });
-    evaluationItems.push({
+    const scheduledDemo = scheduledAppointments.find((item) => item.appointment_type === "demo_lesson" && item.status === "scheduled");
+    if (scheduledDemo) evaluationItems.push({
       key: "demo",
       label: "Record demo lesson",
-      onClick: () => setAction({ kind: "record_demo" }),
+      onClick: () => setAction({ kind: "record_demo", appointment: scheduledDemo }),
     });
   }
   const hiringItems: ActionMenuItem[] = [];
@@ -2427,7 +2408,7 @@ export function CandidateProfile({
       ) : null}
 
       <Drawer
-        open={Boolean(action)}
+        open={Boolean(action && action.kind !== "record_demo")}
         onClose={() => {
           if (!mutation.isPending) {
             mutation.reset();
@@ -2439,7 +2420,7 @@ export function CandidateProfile({
         description={candidate.full_name}
         widthClass="sm:max-w-xl"
         footer={
-          action ? (
+          action && action.kind !== "record_demo" ? (
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -2482,7 +2463,7 @@ export function CandidateProfile({
             {queryError(mutation.error)}
           </div>
         ) : null}
-        {action ? (
+        {action && action.kind !== "record_demo" ? (
           <form id={formId} onSubmit={submitAction}>
             <ActionFields
               action={action}
@@ -2493,6 +2474,36 @@ export function CandidateProfile({
           </form>
         ) : null}
       </Drawer>
+
+      <Modal
+        open={action?.kind === "record_demo"}
+        onClose={() => {
+          if (!mutation.isPending) {
+            mutation.reset();
+            setAction(null);
+          }
+        }}
+        title="Record demo lesson"
+        subtitle={candidate.full_name}
+        size="sm"
+        mobileMode="sheet"
+        closeOnEscape={!mutation.isPending}
+        closeOnOutsideClick={!mutation.isPending}
+      >
+        <form id={`${formId}-demo`} onSubmit={submitAction}>
+          <ModalBody>
+            {mutation.error ? <div role="alert" className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">{queryError(mutation.error)}</div> : null}
+            {action?.kind === "record_demo" ? <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} /> : null}
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); }}>Cancel</button>
+              <button type="submit" name="result" value="passed" className="flex min-h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-60" disabled={mutation.isPending}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Pass</button>
+              <button type="submit" name="result" value="failed" className="flex min-h-11 items-center justify-center rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:opacity-60" disabled={mutation.isPending}><X className="h-4 w-4" />Reject</button>
+            </div>
+          </ModalFooter>
+        </form>
+      </Modal>
 
       <Drawer
         open={historyOpen}
