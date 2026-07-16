@@ -234,7 +234,7 @@ function CandidateCard({
         onDragStart(candidate);
       }}
       onDragEnd={onDragEnd}
-      className={`rounded-lg border shadow-sm transition-colors motion-reduce:transition-none hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/25 ${toneClass} ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
+      className={`w-full min-w-0 overflow-hidden rounded-lg border shadow-sm transition-colors motion-reduce:transition-none hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/25 ${toneClass} ${canMove ? "cursor-grab active:cursor-grabbing" : ""}`}
     >
       <a href={`${basePath}/candidates/${candidate.id}?tab=overview&origin=pipeline`} onClick={() => rememberRecruitmentReturn("pipeline")} className="block rounded-t-lg px-3 pb-2 pt-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30" title={candidate.full_name}>
         <p className="truncate text-sm font-semibold text-foreground">{candidate.full_name}</p>
@@ -461,14 +461,14 @@ export function PipelineView({
         )}
       />
 
-      <div className="md:hidden">
+      <div className="xl:hidden">
         <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{boardStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
         <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{cards(pipeline.data.stages[mobileStage] || [])}</section>
       </div>
 
       <div
         ref={boardViewportRef}
-        className={`no-scrollbar hidden overflow-x-auto pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 md:block ${boardPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}
+        className={`no-scrollbar hidden w-full min-w-0 max-w-full overflow-x-auto pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 xl:block ${boardPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}
         tabIndex={0}
         aria-label="Recruitment pipeline board. Use left and right arrow keys to move horizontally."
         onPointerDown={startBoardPan}
@@ -482,13 +482,13 @@ export function PipelineView({
           event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -240 : 240, behavior: "smooth" });
         }}
       >
-        <div className="grid w-full min-w-[1200px] grid-cols-[repeat(5,minmax(240px,1fr))] gap-3">
+        <div className="grid w-full min-w-0 grid-cols-5 gap-2 2xl:gap-3">
           {boardStages.map((stage) => {
             const acceptsDrop = (manualStages as readonly string[]).includes(stage);
             const highlighted = dragOverStage === stage;
             const items = pipeline.data.stages[stage] || [];
             return (
-              <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; move.mutate({ candidate, stage }); }} className={`flex h-[calc(100dvh-20rem)] min-h-[28rem] max-h-[52rem] flex-col overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
+              <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; move.mutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-20rem)] min-h-[28rem] max-h-[52rem] flex-col overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
                 <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
                 <div className="miniapp-scroll flex-1 overflow-y-auto p-2">{cards(items)}</div>
               </section>

@@ -23,10 +23,13 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
-  test("uses a single-stage mobile view and five independently scrolling active-stage columns", () => {
-    assert.match(pipeline, /md:hidden/);
-    assert.match(pipeline, /w-full min-w-\[1200px\] grid-cols-\[repeat\(5,minmax\(240px,1fr\)\)\]/);
+  test("uses a single-stage compact view and five screen-fitted desktop columns", () => {
+    assert.match(pipeline, /xl:hidden/);
+    assert.match(pipeline, /grid w-full min-w-0 grid-cols-5/);
+    assert.doesNotMatch(pipeline, /min-w-\[1200px\]|minmax\(240px,1fr\)/);
     assert.match(pipeline, /no-scrollbar/);
+    assert.match(pipeline, /xl:block/);
+    assert.match(pipeline, /w-full min-w-0 overflow-hidden rounded-lg border/);
     assert.match(pipeline, /overflow-y-auto/);
     assert.match(pipeline, /h-\[calc\(100dvh-20rem\)\]/);
     assert.match(pipeline, /dragOverStage/);
