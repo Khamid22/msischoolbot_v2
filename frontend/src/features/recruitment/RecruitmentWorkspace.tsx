@@ -67,7 +67,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
     onClose();
   };
   return (
-    <Modal open={open} onClose={close} title="Add candidate" size="xl" mobileMode="fullscreen" closeOnEscape={!create.isPending} closeOnOutsideClick={!create.isPending}>
+    <Modal open={open} onClose={close} title="Add candidate" size="lg" mobileMode="sheet" closeOnEscape={!create.isPending} closeOnOutsideClick={!create.isPending}>
       <form className="flex min-h-0 flex-1 flex-col" onChange={() => setDirty(true)} onSubmit={(event) => { event.preventDefault(); create.mutate(formValues(event.currentTarget)); }}>
         <ModalBody className="grid content-start gap-3 md:grid-cols-2 lg:grid-cols-3">
           {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2 lg:col-span-3">{queryError(create.error)}</div> : null}

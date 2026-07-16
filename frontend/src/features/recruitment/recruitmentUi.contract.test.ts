@@ -193,6 +193,11 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
   });
 
+  test("keeps Add Candidate compact and centered instead of fullscreen", () => {
+    assert.match(workspace, /title="Add candidate" size="lg" mobileMode="sheet"/);
+    assert.doesNotMatch(workspace, /title="Add candidate"[^>]*mobileMode="fullscreen"/);
+  });
+
   test("opens documents directly while keeping permission-scoped replace and remove controls", () => {
     const documentPanel = profile.split('{tab === "documents" ? (')[1]?.split('{tab === "hiring" ? (')[0] || "";
     assert.match(documentPanel, /href=\{`\$\{RECRUITMENT_API\}\/candidates\/\$\{candidateId\}\/documents\/\$\{text\(document\.id\)\}\/open`\}/);
