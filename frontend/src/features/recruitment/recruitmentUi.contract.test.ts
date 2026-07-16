@@ -25,7 +25,7 @@ describe("compact recruitment pipeline", () => {
 
   test("uses a single-stage mobile view and five independently scrolling active-stage columns", () => {
     assert.match(pipeline, /md:hidden/);
-    assert.match(pipeline, /auto-cols-\[240px\]/);
+    assert.match(pipeline, /w-full min-w-\[1200px\] grid-cols-\[repeat\(5,minmax\(240px,1fr\)\)\]/);
     assert.match(pipeline, /no-scrollbar/);
     assert.match(pipeline, /overflow-y-auto/);
     assert.match(pipeline, /h-\[calc\(100dvh-20rem\)\]/);

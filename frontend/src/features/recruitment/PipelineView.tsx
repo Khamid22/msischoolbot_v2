@@ -482,7 +482,7 @@ export function PipelineView({
           event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -240 : 240, behavior: "smooth" });
         }}
       >
-        <div className="grid w-max grid-flow-col auto-cols-[240px] gap-3">
+        <div className="grid w-full min-w-[1200px] grid-cols-[repeat(5,minmax(240px,1fr))] gap-3">
           {boardStages.map((stage) => {
             const acceptsDrop = (manualStages as readonly string[]).includes(stage);
             const highlighted = dragOverStage === stage;
