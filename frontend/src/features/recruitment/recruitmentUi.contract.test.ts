@@ -111,12 +111,14 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
   const notifications = source("RecruitmentNotifications.tsx");
   const telegram = source("TelegramConnectionCard.tsx");
 
-  test("uses separate Tashkent date/time controls and omits scheduling notes", () => {
-    assert.match(appointmentForm, /Asia\/Tashkent \(UTC\+5\)/);
+  test("uses compact date/time controls, auto-assigns HR interviews, and omits scheduling notes", () => {
     assert.match(appointmentForm, /type="date"/);
     assert.match(appointmentForm, /type="time"/);
     assert.match(appointmentForm, /step=\{900\}/);
     assert.match(appointmentForm, /step=\{15\}/);
+    assert.doesNotMatch(appointmentForm, /Appointment time|Asia\/Tashkent \(UTC\+5\)/);
+    assert.doesNotMatch(appointmentForm, /Responsible interviewer/);
+    assert.match(appointmentForm, /demo \? <label[\s\S]*Demo evaluator/);
     assert.match(appointmentForm, /Conference link \(optional\)/);
     assert.match(appointmentForm, /Location \(optional\)/);
     assert.doesNotMatch(appointmentForm, /name="note"|>Notes</);

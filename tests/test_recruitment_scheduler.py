@@ -147,6 +147,7 @@ def test_scheduled_stage_move_creates_appointment_and_stage_atomically(monkeypat
         "insert_appointment",
         lambda *_args, **kwargs: inserted.append(kwargs) or 91,
     )
+    monkeypatch.setattr(repository, "list_appointment_conflicts", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(
         repository,
         "insert_audit",
@@ -169,6 +170,7 @@ def test_scheduled_stage_move_creates_appointment_and_stage_atomically(monkeypat
     assert moved[0]["expected_version"] == 4
     assert inserted[0]["values"]["starts_at"] == "2099-07-16T05:00:00+00:00"
     assert inserted[0]["values"]["ends_at"] == "2099-07-16T05:30:00+00:00"
+    assert inserted[0]["values"]["responsible_account_id"] == 41
     assert result["appointment"]["id"] == 91
     assert [event for event, _detail in events] == [
         "candidate.appointment_scheduled",

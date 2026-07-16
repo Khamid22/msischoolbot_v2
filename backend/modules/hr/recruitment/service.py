@@ -1111,6 +1111,7 @@ def _prepare_appointment(
     values: dict[str, Any],
     exclude_appointment_id: int | None = None,
     existing_note: str = "",
+    job_interviewer_account_id: int | None = None,
 ) -> dict[str, Any]:
     if appointment_type not in APPOINTMENT_TYPES:
         raise RecruitmentError("Unknown appointment type.")
@@ -1121,9 +1122,19 @@ def _prepare_appointment(
     if duration < 15 or duration > 240:
         raise RecruitmentError("Appointment duration must be between 15 and 240 minutes.")
     ends_at = starts_at + timedelta(minutes=duration)
-    responsible_account_id = int(values.get("responsible_account_id") or 0)
-    responsible = repository.responsible_account_row(conn, responsible_account_id) if responsible_account_id else None
-    if responsible_account_id and not responsible:
+    responsible_account_id = (
+        int(job_interviewer_account_id or 0)
+        if appointment_type == "job_interview"
+        else int(values.get("responsible_account_id") or 0)
+    )
+    if appointment_type == "job_interview" and not responsible_account_id:
+        raise RecruitmentError("The HR account is not available for this interview.")
+    responsible = (
+        repository.responsible_account_row(conn, responsible_account_id)
+        if responsible_account_id and appointment_type == "demo_lesson"
+        else None
+    )
+    if appointment_type == "demo_lesson" and responsible_account_id and not responsible:
         raise RecruitmentError("Select an active responsible staff member.")
     if responsible and _text(responsible["status"]) != "active":
         raise RecruitmentError("Select an active responsible staff member.")
@@ -1282,6 +1293,7 @@ def schedule_stage_move(
             candidate=candidate,
             appointment_type=appointment_type,
             values=values,
+            job_interviewer_account_id=_actor_account(user),
         )
         updated = repository.update_candidate_stage(
             conn,
@@ -1391,6 +1403,7 @@ def create_appointment(user: CurrentUser, candidate_id: int, values: dict[str, A
             candidate=candidate,
             appointment_type=appointment_type,
             values=values,
+            job_interviewer_account_id=_actor_account(user),
         )
         _ensure_demo_assignment(
             conn,
@@ -1509,6 +1522,9 @@ def update_appointment(
             values=values,
             exclude_appointment_id=int(appointment_id),
             existing_note=_text(appointment["note"]),
+            job_interviewer_account_id=(
+                int(appointment["responsible_account_id"] or 0) or _actor_account(user)
+            ),
         )
         _ensure_demo_assignment(
             conn,
