@@ -1,4 +1,4 @@
-import { ArrowLeft, KeyRound, Menu, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, KeyRound, Menu, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isTelegramMiniApp } from "@/shared/lib/telegram";
 import { RoleMobileNav } from "@/shared/ui/RoleMobileNav";
@@ -95,6 +95,8 @@ export function RoleWorkspaceShell<Key extends string = string>({
 }: RoleWorkspaceShellProps<Key>) {
   const mobileItems = mobileNavItems ?? mobileNavItemsFrom(navItems);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeDrawerGroupKey = navItems.find((item) => item.key === active && item.children?.length)?.key ?? null;
+  const [openDrawerGroupKey, setOpenDrawerGroupKey] = useState<Key | null>(activeDrawerGroupKey);
   const desktopSidebarCollapsible = desktopSidebarMode === "collapsible";
   const [desktopSidebarPreferenceSet, setDesktopSidebarPreferenceSet] = useState(
     () => storedSidebarPreference(desktopSidebarStorageKey) !== null,
@@ -129,6 +131,10 @@ export function RoleWorkspaceShell<Key extends string = string>({
       setDrawerOpen(false);
     }
   }, [drawerOpen, shouldUseDrawer]);
+
+  useEffect(() => {
+    setOpenDrawerGroupKey(activeDrawerGroupKey);
+  }, [activeDrawerGroupKey]);
 
   useEffect(() => {
     if (!desktopSidebarCollapsible || desktopSidebarInitialState !== "adaptive" || desktopSidebarPreferenceSet) return;
@@ -281,48 +287,72 @@ export function RoleWorkspaceShell<Key extends string = string>({
                   const Icon = item.icon;
                   const isActive = active === item.key;
                   const childIsActive = Boolean(item.children?.some((child) => child.active));
+                  const hasChildren = Boolean(item.children?.length);
+                  const groupIsOpen = hasChildren && openDrawerGroupKey === item.key;
+                  const childGroupId = `mobile-role-nav-${String(item.key)}-children`;
+                  const itemClasses = `relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 pl-4 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
+                    isActive || groupIsOpen
+                      ? childIsActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  }`;
                   return (
                     <div key={item.key}>
-                      <a
-                        href={item.href}
-                        onClick={() => setDrawerOpen(false)}
-                        aria-current={isActive && !childIsActive ? "page" : undefined}
-                        className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 pl-4 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
-                          isActive
-                            ? childIsActive
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                              : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        }`}
-                      >
-                        {isActive ? (
-                          <span
-                            aria-hidden="true"
-                            className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80"
-                          />
-                        ) : null}
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="min-w-0 truncate">{item.label}</span>
-                        {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
-                      </a>
+                      {hasChildren ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenDrawerGroupKey((current) => current === item.key ? null : item.key)}
+                          aria-expanded={groupIsOpen}
+                          aria-controls={childGroupId}
+                          className={itemClasses}
+                        >
+                          {isActive ? <span aria-hidden="true" className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80" /> : null}
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="min-w-0 truncate">{item.label}</span>
+                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                          <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none ${groupIsOpen ? "rotate-180" : ""}`} />
+                        </button>
+                      ) : (
+                        <a
+                          href={item.href}
+                          onClick={() => { setOpenDrawerGroupKey(null); setDrawerOpen(false); }}
+                          aria-current={isActive ? "page" : undefined}
+                          className={itemClasses}
+                        >
+                          {isActive ? <span aria-hidden="true" className="absolute left-1.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-white/80" /> : null}
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="min-w-0 truncate">{item.label}</span>
+                          {item.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                        </a>
+                      )}
                       {item.children?.length ? (
-                        <div role="group" className="ml-7 mt-1 space-y-1 border-l border-white/15 pl-2" aria-label={`${item.label} pages`}>
-                          {item.children.map((child) => {
-                            const ChildIcon = child.icon;
-                            return (
-                              <a
-                                key={child.key}
-                                href={child.href}
-                                onClick={() => setDrawerOpen(false)}
-                                aria-current={child.active ? "page" : undefined}
-                                className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${child.active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-slate-300 hover:bg-sidebar-accent hover:text-white"}`}
-                              >
-                                {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
-                                <span className="min-w-0 truncate">{child.label}</span>
-                                {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
-                              </a>
-                            );
-                          })}
+                        <div
+                          id={childGroupId}
+                          className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none ${groupIsOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "pointer-events-none mt-0 grid-rows-[0fr] opacity-0"}`}
+                          aria-hidden={!groupIsOpen}
+                        >
+                          <div className="overflow-hidden">
+                            <div role="group" className="ml-7 space-y-1 border-l border-white/15 pl-2" aria-label={`${item.label} pages`}>
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon;
+                                return (
+                                  <a
+                                    key={child.key}
+                                    href={child.href}
+                                    onClick={() => setDrawerOpen(false)}
+                                    tabIndex={groupIsOpen ? 0 : -1}
+                                    aria-current={child.active ? "page" : undefined}
+                                    className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${child.active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-slate-300 hover:bg-sidebar-accent hover:text-white"}`}
+                                  >
+                                    {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
+                                    <span className="min-w-0 truncate">{child.label}</span>
+                                    {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       ) : null}
                     </div>

@@ -63,6 +63,14 @@ describe("RoleWorkspaceShell", () => {
     );
   });
 
+  it("toggles nested links inside the mobile drawer", () => {
+    assert.match(src, /setOpenDrawerGroupKey/);
+    assert.match(src, /aria-expanded=\{groupIsOpen\}/);
+    assert.match(src, /mobile-role-nav-/);
+    assert.match(src, /grid-rows-\[1fr\]/);
+    assert.match(src, /tabIndex=\{groupIsOpen \? 0 : -1\}/);
+  });
+
   it("keeps Telegram Mini App detection safe for browser builds", () => {
     assert.match(telegramSrc, /export function isTelegramMiniApp/);
     assert.match(telegramSrc, /typeof window === "undefined"/);
@@ -74,12 +82,19 @@ describe("RoleSidebar", () => {
   const src = source("RoleSidebar.tsx");
 
   it("marks the active link and labels the logout icon button", () => {
-    assert.match(src, /aria-current=\{isActive && !childIsActive \? "page" : undefined\}/);
+    assert.match(src, /aria-current=\{isActive \? "page" : undefined\}/);
     assert.match(src, /aria-label="Logout"/);
   });
 
-  it("renders accessible nested workspace links without replacing the parent shell", () => {
+  it("toggles accessible nested workspace links with reduced-motion-safe animation", () => {
     assert.match(src, /item\.children\?\.length/);
+    assert.match(src, /setOpenGroupKey/);
+    assert.match(src, /aria-expanded=\{groupIsOpen\}/);
+    assert.match(src, /aria-controls=\{childGroupId\}/);
+    assert.match(src, /grid-rows-\[1fr\]/);
+    assert.match(src, /grid-rows-\[0fr\]/);
+    assert.match(src, /motion-reduce:transition-none/);
+    assert.match(src, /tabIndex=\{groupIsOpen \? 0 : -1\}/);
     assert.match(src, /aria-current=\{child\.active \? "page" : undefined\}/);
     assert.match(src, /aria-label=\{`\$\{item\.label\} pages`\}/);
   });
