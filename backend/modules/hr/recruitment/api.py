@@ -185,13 +185,17 @@ def appointments(
 def notifications(
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 25,
+    unread_only: bool = False,
     user: CurrentUser = Depends(get_current_user),
 ):
     if not user.account_id:
         raise HTTPException(status_code=403, detail="An account is required for notifications.")
     return api_success(
         recruitment_notifications.list_notifications(
-            int(user.account_id), page=page, per_page=per_page
+            int(user.account_id),
+            page=page,
+            per_page=per_page,
+            unread_only=unread_only,
         )
     )
 

@@ -28,6 +28,11 @@ import {
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { FloatingToast, type FloatingToastTone, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
+import {
+  AcademicDirectorPageShell,
+  HeadOfDepartmentPageShell,
+  type AcademicRecruitmentView,
+} from "@/workspaces/academic_shared/AcademicDirectorShell";
 
 type Props = {
   authLogin?: string;
@@ -123,26 +128,13 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const title = { pipeline: "Recruitment Pipeline", teachers: "Teachers", analytics: "Recruitment Analytics", decisions: "Hiring Decisions", candidates: "Candidates", schedule: "Interview & Demo Schedule", tasks: "Recruitment Tasks", rejected: "Closed Candidates", settings: "Recruitment Settings", trash: "Trash Bin", candidate: "Candidate Profile", profile: "Profile" }[view];
   const home = workspaceHome(effectiveRole);
   const workspaceBackLink = effectiveRole === "hr_manager" ? undefined : { href: home, label: `Back to ${roleLabel(effectiveRole)} workspace` };
+  const academicRecruitmentView: AcademicRecruitmentView | undefined =
+    view === "decisions" || view === "candidates" || view === "schedule" || view === "candidate"
+      ? view
+      : undefined;
 
-  return (
-    <RoleWorkspaceShell
-      authLogin={authLogin}
-      csrfToken={csrfToken}
-      active={active}
-      homeHref={home}
-      navItems={navItems}
-      roleLabel={roleLabel(effectiveRole)}
-      sectionLabel="Recruitment"
-      workspaceLabel="Teacher Recruitment"
-      mobileNavigationMode="drawer"
-      desktopSidebarMode="collapsible"
-      desktopSidebarInitialState="adaptive"
-      desktopSidebarStorageKey="msi:recruitment:sidebar:v1"
-      workspaceBackLink={workspaceBackLink}
-      profileHref={`${basePath}/profile`}
-      maxWidthClass="max-w-[1600px]"
-      sectionClassName="gap-3"
-    >
+  const content = (
+    <>
       {view !== "candidate" ? (
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
@@ -171,6 +163,59 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "profile" ? <div className="space-y-3"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
 
       <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
+    </>
+  );
+
+  if (effectiveRole === "academic_director") {
+    return (
+      <AcademicDirectorPageShell
+        authLogin={authLogin}
+        csrfToken={csrfToken}
+        active="recruitment"
+        recruitmentView={academicRecruitmentView}
+        maxWidthClass="max-w-[1600px]"
+        sectionClassName="gap-3"
+      >
+        {content}
+      </AcademicDirectorPageShell>
+    );
+  }
+
+  if (effectiveRole === "head_of_department") {
+    return (
+      <HeadOfDepartmentPageShell
+        authLogin={authLogin}
+        csrfToken={csrfToken}
+        active="recruitment"
+        recruitmentView={academicRecruitmentView}
+        maxWidthClass="max-w-[1600px]"
+        sectionClassName="gap-3"
+      >
+        {content}
+      </HeadOfDepartmentPageShell>
+    );
+  }
+
+  return (
+    <RoleWorkspaceShell
+      authLogin={authLogin}
+      csrfToken={csrfToken}
+      active={active}
+      homeHref={home}
+      navItems={navItems}
+      roleLabel={roleLabel(effectiveRole)}
+      sectionLabel="Recruitment"
+      workspaceLabel="Teacher Recruitment"
+      mobileNavigationMode="drawer"
+      desktopSidebarMode="collapsible"
+      desktopSidebarInitialState="adaptive"
+      desktopSidebarStorageKey="msi:recruitment:sidebar:v1"
+      workspaceBackLink={workspaceBackLink}
+      profileHref={`${basePath}/profile`}
+      maxWidthClass="max-w-[1600px]"
+      sectionClassName="gap-3"
+    >
+      {content}
     </RoleWorkspaceShell>
   );
 }

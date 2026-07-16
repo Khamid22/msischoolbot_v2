@@ -183,7 +183,13 @@ def enqueue_linked_account_summary(conn: Any, account_id: int) -> None:
         )
 
 
-def list_notifications(account_id: int, *, page: int = 1, per_page: int = 25) -> dict[str, Any]:
+def list_notifications(
+    account_id: int,
+    *,
+    page: int = 1,
+    per_page: int = 25,
+    unread_only: bool = False,
+) -> dict[str, Any]:
     offset = (max(1, page) - 1) * per_page
     with connect_auth_db() as conn:
         rows, total = repository.list_recruitment_notification_rows(
@@ -191,6 +197,7 @@ def list_notifications(account_id: int, *, page: int = 1, per_page: int = 25) ->
             account_id=int(account_id),
             limit=int(per_page),
             offset=int(offset),
+            unread_only=bool(unread_only),
         )
     return {
         "items": [

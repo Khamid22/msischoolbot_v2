@@ -41,6 +41,29 @@ class _DatabaseConnection(_Connection):
         raise AssertionError("This test must mock every repository operation.")
 
 
+class _QueryResult:
+    def __init__(self, *, row=None, rows=None):
+        self._row = row
+        self._rows = rows or []
+
+    def fetchone(self):
+        return self._row
+
+    def fetchall(self):
+        return self._rows
+
+
+class _NotificationListConnection:
+    def __init__(self):
+        self.queries: list[str] = []
+
+    def execute(self, query, _params):
+        self.queries.append(str(query))
+        if "count(*)" in str(query):
+            return _QueryResult(row={"total": 0})
+        return _QueryResult(rows=[])
+
+
 def _connection_factory(conn):
     @contextmanager
     def connect():
@@ -104,6 +127,23 @@ def test_notification_migration_preserves_history_and_protects_system_reasons():
     assert "failed_demo_lesson" in migration
     assert "is_system_generated" in migration
     assert "DELETE FROM msi_v2.teacher_candidates" not in migration
+
+
+def test_notification_dashboard_can_request_unread_rows_only():
+    conn = _NotificationListConnection()
+
+    rows, total = repository.list_recruitment_notification_rows(
+        conn,
+        account_id=41,
+        limit=8,
+        offset=0,
+        unread_only=True,
+    )
+
+    assert rows == []
+    assert total == 0
+    assert len(conn.queries) == 2
+    assert all("read_at IS NULL" in query for query in conn.queries)
 
 
 def test_naive_form_time_is_interpreted_as_asia_tashkent():

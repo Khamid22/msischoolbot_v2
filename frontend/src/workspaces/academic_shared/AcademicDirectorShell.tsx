@@ -74,6 +74,53 @@ export const headOfDepartmentDesktopNavItems: ReadonlyArray<RoleNavItem<HeadOfDe
 export const headOfDepartmentMobileNavItems: ReadonlyArray<RoleNavItem<HeadOfDepartmentNavKey>> =
   withIcons(headOfDepartmentMobileNavConfig, headOfDepartmentNavIcons);
 
+export type AcademicRecruitmentView = "decisions" | "candidates" | "schedule" | "candidate";
+
+function academicDirectorRecruitmentChildren(view?: AcademicRecruitmentView) {
+  return [
+    {
+      key: "recruitment-decisions",
+      label: "Decisions",
+      href: `${routes.academicDirectorRecruitment}/decisions`,
+      icon: ShieldCheck,
+      active: view === "decisions",
+    },
+    {
+      key: "recruitment-candidates",
+      label: "Assigned Candidates",
+      href: `${routes.academicDirectorRecruitment}/candidates`,
+      icon: UsersRound,
+      active: view === "candidates" || view === "candidate",
+    },
+    {
+      key: "recruitment-schedule",
+      label: "Demo Schedule",
+      href: `${routes.academicDirectorRecruitment}/schedule`,
+      icon: CalendarDays,
+      active: view === "schedule",
+    },
+  ];
+}
+
+function headOfDepartmentRecruitmentChildren(view?: AcademicRecruitmentView) {
+  return [
+    {
+      key: "recruitment-candidates",
+      label: "Assigned Candidates",
+      href: `${routes.headOfDepartmentRecruitment}/candidates`,
+      icon: UsersRound,
+      active: view === "candidates" || view === "candidate",
+    },
+    {
+      key: "recruitment-schedule",
+      label: "Demo Schedule",
+      href: `${routes.headOfDepartmentRecruitment}/schedule`,
+      icon: CalendarDays,
+      active: view === "schedule",
+    },
+  ];
+}
+
 export function AcademicDirectorPageShell({
   authLogin,
   csrfToken,
@@ -81,6 +128,7 @@ export function AcademicDirectorPageShell({
   children,
   maxWidthClass,
   sectionClassName,
+  recruitmentView,
 }: {
   authLogin?: string;
   csrfToken?: string;
@@ -88,9 +136,14 @@ export function AcademicDirectorPageShell({
   children: ReactNode;
   maxWidthClass?: string;
   sectionClassName?: string;
+  recruitmentView?: AcademicRecruitmentView;
 }) {
   const unread = useRecruitmentUnreadCount();
-  const desktopItems = academicDirectorDesktopNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
+  const desktopItems = academicDirectorDesktopNavItems.map((item) => item.key === "recruitment" ? {
+    ...item,
+    badge: unread,
+    children: academicDirectorRecruitmentChildren(recruitmentView),
+  } : item);
   const mobileItems = academicDirectorMobileNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
   return (
     <RoleWorkspaceShell
@@ -122,6 +175,7 @@ export function HeadOfDepartmentPageShell({
   children,
   maxWidthClass,
   sectionClassName,
+  recruitmentView,
 }: {
   authLogin?: string;
   csrfToken?: string;
@@ -129,9 +183,14 @@ export function HeadOfDepartmentPageShell({
   children: ReactNode;
   maxWidthClass?: string;
   sectionClassName?: string;
+  recruitmentView?: AcademicRecruitmentView;
 }) {
   const unread = useRecruitmentUnreadCount();
-  const desktopItems = headOfDepartmentDesktopNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
+  const desktopItems = headOfDepartmentDesktopNavItems.map((item) => item.key === "recruitment" ? {
+    ...item,
+    badge: unread,
+    children: headOfDepartmentRecruitmentChildren(recruitmentView),
+  } : item);
   const mobileItems = headOfDepartmentMobileNavItems.map((item) => item.key === "recruitment" ? { ...item, badge: unread } : item);
   return (
     <RoleWorkspaceShell

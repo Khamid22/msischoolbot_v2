@@ -131,6 +131,11 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
     assert.match(notifications, /notifications\/unread-count/);
     assert.match(notifications, /Assigned demo lessons/);
     assert.match(notifications, /notifications\/\$\{id\}\/read/);
+    assert.match(notifications, /unread_only=true/);
+    assert.match(notifications, /onMutate/);
+    assert.match(notifications, /setQueryData<NotificationPage>/);
+    assert.match(notifications, /event\.preventDefault\(\)/);
+    assert.match(notifications, /window\.location\.assign/);
     assert.match(notifications, /refetchInterval: 30_000/);
   });
 
@@ -227,6 +232,9 @@ describe("candidate navigation and progressive disclosure", () => {
   test("opts Recruitment into adaptive collapsible navigation without a Profile nav item", () => {
     assert.match(workspace, /desktopSidebarMode="collapsible"/);
     assert.match(workspace, /desktopSidebarInitialState="adaptive"/);
+    assert.match(workspace, /<AcademicDirectorPageShell/);
+    assert.match(workspace, /<HeadOfDepartmentPageShell/);
+    assert.match(workspace, /recruitmentView=\{academicRecruitmentView\}/);
     assert.doesNotMatch(workspace, /key: "profile", label: "Profile"/);
   });
 

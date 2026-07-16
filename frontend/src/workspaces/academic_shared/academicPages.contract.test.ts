@@ -38,6 +38,25 @@ describe("AD/HOD pages use the shared role shell — no admin chrome", () => {
   }
 });
 
+describe("Recruitment stays inside the academic workspace navigation", () => {
+  const shell = pageSource("workspaces/academic_shared/AcademicDirectorShell.tsx");
+  const workspace = pageSource("features/recruitment/RecruitmentWorkspace.tsx");
+
+  it("nests the role-scoped Recruitment pages under the academic sidebar", () => {
+    for (const label of ["Decisions", "Assigned Candidates", "Demo Schedule"]) {
+      assert.match(shell, new RegExp(label));
+    }
+    assert.match(shell, /children: academicDirectorRecruitmentChildren/);
+    assert.match(shell, /children: headOfDepartmentRecruitmentChildren/);
+  });
+
+  it("reuses the Academic Director and HOD shells for Recruitment content", () => {
+    assert.match(workspace, /<AcademicDirectorPageShell/);
+    assert.match(workspace, /<HeadOfDepartmentPageShell/);
+    assert.match(workspace, /active="recruitment"/);
+  });
+});
+
 describe("Head of Departments page", () => {
   const src = rolePages["AD HeadOfDepartments"];
 

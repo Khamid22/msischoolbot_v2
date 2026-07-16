@@ -2419,21 +2419,25 @@ def list_recruitment_notification_rows(
     account_id: int,
     limit: int,
     offset: int,
+    unread_only: bool = False,
 ) -> tuple[list[Any], int]:
+    unread_filter = " AND read_at IS NULL" if unread_only else ""
     total_row = conn.execute(
-        """
+        f"""
         SELECT count(*) AS total
         FROM msi_v2.teacher_recruitment_notifications
         WHERE recipient_account_id = %s AND deliver_at <= now()
+        {unread_filter}
         """,
         (int(account_id),),
     ).fetchone()
     rows = conn.execute(
-        """
+        f"""
         SELECT id, candidate_id, appointment_id, notification_type, title,
                body, action_url, deliver_at, read_at, created_at
         FROM msi_v2.teacher_recruitment_notifications
         WHERE recipient_account_id = %s AND deliver_at <= now()
+        {unread_filter}
         ORDER BY created_at DESC, id DESC
         LIMIT %s OFFSET %s
         """,

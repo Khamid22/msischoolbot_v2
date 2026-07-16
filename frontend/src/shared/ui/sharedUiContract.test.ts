@@ -74,8 +74,14 @@ describe("RoleSidebar", () => {
   const src = source("RoleSidebar.tsx");
 
   it("marks the active link and labels the logout icon button", () => {
-    assert.match(src, /aria-current=\{isActive \? "page" : undefined\}/);
+    assert.match(src, /aria-current=\{isActive && !childIsActive \? "page" : undefined\}/);
     assert.match(src, /aria-label="Logout"/);
+  });
+
+  it("renders accessible nested workspace links without replacing the parent shell", () => {
+    assert.match(src, /item\.children\?\.length/);
+    assert.match(src, /aria-current=\{child\.active \? "page" : undefined\}/);
+    assert.match(src, /aria-label=\{`\$\{item\.label\} pages`\}/);
   });
 
   it("uses the shared sidebar layer and hides below lg", () => {

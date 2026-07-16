@@ -115,29 +115,52 @@ export function RoleSidebar<Key extends string = string>({
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = active === item.key;
+              const childIsActive = Boolean(item.children?.some((child) => child.active));
               return (
-                <a
-                  key={item.key}
-                  href={item.href}
-                  aria-current={isActive ? "page" : undefined}
-                  aria-label={compact ? item.label : undefined}
-                  title={compact ? item.label : undefined}
-                  className={`relative flex min-h-11 w-full items-center rounded-lg text-left text-[13px] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${navItemClass} ${
-                    isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  {isActive ? (
-                    <span
-                      aria-hidden="true"
-                      className={`absolute top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white/80 ${compact ? "left-0" : "left-1"}`}
-                    />
+                <div key={item.key}>
+                  <a
+                    href={item.href}
+                    aria-current={isActive && !childIsActive ? "page" : undefined}
+                    aria-label={compact ? item.label : undefined}
+                    title={compact ? item.label : undefined}
+                    className={`relative flex min-h-11 w-full items-center rounded-lg text-left text-[13px] font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${navItemClass} ${
+                      isActive
+                        ? childIsActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    {isActive ? (
+                      <span
+                        aria-hidden="true"
+                        className={`absolute top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white/80 ${compact ? "left-0" : "left-1"}`}
+                      />
+                    ) : null}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!compact ? <span className="min-w-0 truncate">{item.label}</span> : null}
+                    {item.badge ? <span className={`${compact ? "absolute right-0.5 top-0.5" : "ml-auto"} flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950`} aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
+                  </a>
+                  {!compact && item.children?.length ? (
+                    <div role="group" className="ml-5 mt-1 space-y-1 border-l border-white/15 pl-2" aria-label={`${item.label} pages`}>
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        return (
+                          <a
+                            key={child.key}
+                            href={child.href}
+                            aria-current={child.active ? "page" : undefined}
+                            className={`flex min-h-11 items-center gap-2 rounded-lg px-2.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${child.active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-slate-300 hover:bg-sidebar-accent hover:text-white"}`}
+                          >
+                            {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
+                            <span className="min-w-0 truncate">{child.label}</span>
+                            {child.badge ? <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950" aria-label={`${child.badge} unread`}>{child.badge > 99 ? "99+" : child.badge}</span> : null}
+                          </a>
+                        );
+                      })}
+                    </div>
                   ) : null}
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!compact ? <span className="min-w-0 truncate">{item.label}</span> : null}
-                  {item.badge ? <span className={`${compact ? "absolute right-0.5 top-0.5" : "ml-auto"} flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold text-slate-950`} aria-label={`${item.badge} unread`}>{item.badge > 99 ? "99+" : item.badge}</span> : null}
-                </a>
+                </div>
               );
             })}
           </div>

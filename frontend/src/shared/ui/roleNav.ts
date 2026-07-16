@@ -15,6 +15,15 @@ export type RoleNavItem<Key extends string = string> = {
   icon: LucideIcon;
   /** Optional unread/work-item count rendered as a compact accessible badge. */
   badge?: number;
+  /** Optional second-level links rendered beneath this workspace item. */
+  children?: ReadonlyArray<{
+    key: string;
+    label: string;
+    href: string;
+    icon?: LucideIcon;
+    badge?: number;
+    active?: boolean;
+  }>;
 };
 
 /**
