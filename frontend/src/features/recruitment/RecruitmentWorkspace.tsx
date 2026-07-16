@@ -141,7 +141,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Teacher Recruitment</p>
             <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
-            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Manage upcoming job interviews and demo lessons in Asia/Tashkent time.</p> : null}
+            {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review current and completed interviews and demo lessons in Asia/Tashkent time.</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
           </div>
         </header>

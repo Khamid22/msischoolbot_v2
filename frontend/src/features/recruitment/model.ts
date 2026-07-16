@@ -84,6 +84,7 @@ export type RecruitmentAppointment = {
   responsible_account_id?: number | null;
   responsible_name?: string;
   responsible_role?: string;
+  evaluated_by_name?: string;
   appointment_format?: string;
   location_or_link?: string;
   topic?: string;

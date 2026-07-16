@@ -34,7 +34,6 @@ from backend.modules.hr.recruitment.constants import (
     OPTIONAL_DOCUMENT_TYPES,
 )
 from backend.modules.hr.recruitment.policies import visible_account_id
-from backend.modules.teacher_academy.policies import hod_subject_ids_for_user
 from backend.platform.storage.r2 import (
     build_private_candidate_document_url,
     delete_private_candidate_document,
@@ -369,9 +368,9 @@ def _academic_visible_id(user: CurrentUser) -> int | None:
 
 
 def _visible_subject_ids(user: CurrentUser, conn: Any | None = None) -> set[int] | None:
-    if user.role != "head_of_department":
-        return None
-    return hod_subject_ids_for_user(user, conn=conn)
+    # Recruitment visibility is assignment-scoped for both academic roles.
+    # HOD subject scopes continue to apply inside Teacher Academy, not here.
+    return None
 
 
 def list_pipeline(
@@ -1160,14 +1159,6 @@ def _prepare_appointment(
             raise RecruitmentError("Select an Academic Director or HOD for the demo lesson.")
         if _text(responsible["role"]) not in {"academic_director", "head_of_department"}:
             raise RecruitmentError("Demo evaluator must be an Academic Director or HOD.")
-        if _text(responsible["role"]) == "head_of_department":
-            subject_id = int(candidate["subject_id"] or 0)
-            if not subject_id or not repository.hod_account_has_subject_scope(
-                conn,
-                account_id=responsible_account_id,
-                subject_id=subject_id,
-            ):
-                raise RecruitmentError("Selected HOD is outside this candidate's subject scope.", status_code=403)
     prepared = {
         **values,
         "appointment_type": appointment_type,
@@ -1478,12 +1469,13 @@ def list_appointments(
     starts_from: str = "",
     starts_to: str = "",
     appointment_type: str = "",
-    status: str = "scheduled",
+    status: str = "scheduled,in_progress,completed",
     responsible_account_id: int | None = None,
 ) -> dict[str, Any]:
     if appointment_type and appointment_type not in APPOINTMENT_TYPES:
         raise RecruitmentError("Unknown appointment type.")
-    if status and status not in APPOINTMENT_STATUSES:
+    appointment_statuses = [_text(item) for item in _text(status).split(",") if _text(item)]
+    if any(item not in APPOINTMENT_STATUSES for item in appointment_statuses):
         raise RecruitmentError("Unknown appointment status.")
     safe_page = max(1, int(page or 1))
     safe_per_page = max(1, min(int(per_page or 50), 100))
@@ -1497,7 +1489,7 @@ def list_appointments(
             starts_from=normalized_from,
             starts_to=normalized_to,
             appointment_type=appointment_type,
-            status=status,
+            status=",".join(appointment_statuses),
             responsible_account_id=responsible_account_id,
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
@@ -1942,10 +1934,10 @@ def _add_record(
                 )
             if appointment_type == "job_interview" and appointment["responsible_account_id"]:
                 values["interviewer_account_id"] = int(appointment["responsible_account_id"])
-            if appointment_type == "demo_lesson" and _text(values.get("result")) == "passed":
+            if appointment_type == "demo_lesson":
                 if int(appointment["responsible_account_id"] or 0) != int(_actor_account(user) or 0):
                     raise RecruitmentError(
-                        "Only the assigned demo evaluator can submit the passing result.",
+                        "Only the assigned demo evaluator can submit this result.",
                         status_code=403,
                     )
         record_id = inserter(

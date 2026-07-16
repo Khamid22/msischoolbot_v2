@@ -206,6 +206,27 @@ def test_approval_visibility_does_not_grant_academic_evaluation_write(monkeypatc
     assert exc.value.status_code == 403
 
 
+def test_assigned_hod_can_view_and_evaluate_recruitment_candidate(monkeypatch):
+    conn = _Connection()
+    assignment = {
+        "candidate_id": 8,
+        "assignee_account_id": 41,
+        "subject_id": 999,
+        "status": "active",
+    }
+    monkeypatch.setattr(policies, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "candidate_assignment_row",
+        lambda *_args, **_kwargs: assignment,
+    )
+
+    hod = _user("head_of_department")
+    policies.ensure_candidate_view(hod, 8)
+    policies.ensure_academic_write(hod, 8)
+    policies.ensure_subject_test_write(hod, 8)
+
+
 def test_hr_can_record_subject_tests_without_academic_assignment():
     policies.ensure_subject_test_write(_user("hr_manager"), 8)
     permissions = service._permissions(_user("hr_manager"))

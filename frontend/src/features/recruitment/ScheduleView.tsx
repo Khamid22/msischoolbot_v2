@@ -17,6 +17,8 @@ type ScheduleMode = "agenda" | "week";
 type AppointmentData = { items: RecruitmentAppointment[]; total: number; page: number; total_pages: number };
 type MutationPayload = { message: string };
 
+const defaultStatusFilter = "scheduled,in_progress,completed";
+
 const scheduleDayFormatter = new Intl.DateTimeFormat("en", {
   weekday: "short",
   month: "short",
@@ -84,7 +86,14 @@ function AppointmentCard({
     : [];
   const candidateName = item.candidate_name || "Candidate";
   const effectiveStatus = item.is_overdue && item.status === "scheduled" ? "overdue" : item.status;
-  const overdueClass = effectiveStatus === "overdue" ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/20" : "border-border bg-card";
+  const evaluatorLabel = effectiveStatus === "completed" && item.appointment_type === "demo_lesson"
+    ? `Evaluated by ${item.evaluated_by_name || item.responsible_name || "assigned evaluator"}`
+    : item.responsible_name || "Staff not assigned";
+  const overdueClass = effectiveStatus === "overdue"
+    ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/20"
+    : effectiveStatus === "completed"
+      ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-500/40 dark:bg-emerald-950/20"
+      : "border-border bg-card";
 
   if (compact) {
     return (
@@ -103,8 +112,8 @@ function AppointmentCard({
         <p className="mt-1 text-xs font-medium text-muted-foreground">{appointmentTitle(item)}</p>
         <p className="mt-1 text-[13px] font-semibold tabular-nums text-foreground">{appointmentTimeLabel(item)}</p>
         <div className="mt-2 flex min-w-0 items-center justify-between gap-1.5">
-          <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={item.responsible_name || "Staff not assigned"}>
-            {item.responsible_name || "Staff not assigned"}
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground" title={evaluatorLabel}>
+            {evaluatorLabel}
           </span>
           <StatusBadge status={effectiveStatus} className="shrink-0 text-[9px]" />
         </div>
@@ -124,7 +133,7 @@ function AppointmentCard({
         <div className="flex shrink-0 items-center gap-1"><StatusBadge status={effectiveStatus} />{actions.length ? <ActionMenu items={actions} label={`Actions for ${candidateName}`} /> : null}</div>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>{item.responsible_name || "Staff not assigned"}</span>
+        <span>{evaluatorLabel}</span>
         {item.appointment_format ? <span>{item.appointment_format}</span> : null}
         {item.location_or_link ? <span className="max-w-full truncate">{item.location_or_link}</span> : null}
         {item.topic ? <span className="max-w-full truncate">Topic: {item.topic}</span> : null}
@@ -149,7 +158,7 @@ export function ScheduleView({
   const [mode, setMode] = useState<ScheduleMode>(initial.get("mode") === "week" ? "week" : "agenda");
   const [anchor, setAnchor] = useState(() => schoolDateKeyFromValue(initial.get("date")) || schoolDateKey());
   const [type, setType] = useState(initial.get("appointment_type") || "");
-  const [status, setStatus] = useState(initial.get("status") || "scheduled");
+  const [status, setStatus] = useState(initial.get("status") || defaultStatusFilter);
   const [staffId, setStaffId] = useState(initial.get("responsible_account_id") || "");
   const [editing, setEditing] = useState<RecruitmentAppointment | null>(null);
   const [statusAction, setStatusAction] = useState<{ item: RecruitmentAppointment; status: "cancelled" | "no_show" } | null>(null);
@@ -191,7 +200,7 @@ export function ScheduleView({
       mode: mode === "agenda" ? "" : mode,
       date: anchor === schoolDateKey() ? "" : anchor,
       appointment_type: type,
-      status: status === "scheduled" ? "" : status,
+      status: status === defaultStatusFilter ? "" : status,
       responsible_account_id: staffId,
     });
   }, [anchor, mode, staffId, status, type]);
@@ -236,7 +245,7 @@ export function ScheduleView({
             <button type="button" className="flex h-11 w-11 items-center justify-center" onClick={() => moveRange(1)} aria-label="Next schedule period"><ChevronRight className="h-4 w-4" /></button>
           </div>
           <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Type<select className={`${fieldClass} mt-1`} value={type} onChange={(event) => setType(event.target.value)}><option value="">All types</option><option value="job_interview">Job interviews</option><option value="demo_lesson">Demo lessons</option></select></label>
-          <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Status<select className={`${fieldClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-show</option><option value="">All statuses</option></select></label>
+          <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Status<select className={`${fieldClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value={defaultStatusFilter}>Current & completed</option><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-show</option><option value="">All statuses</option></select></label>
           <label className="min-w-44 flex-1 text-xs font-semibold text-muted-foreground">Staff<select className={`${fieldClass} mt-1`} value={staffId} onChange={(event) => setStaffId(event.target.value)}><option value="">All staff</option>{options?.staff.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{scheduleDateLabel(bounds.start)} – {scheduleDateLabel(bounds.end)} · Asia/Tashkent</p>

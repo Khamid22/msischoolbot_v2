@@ -353,6 +353,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /Asia\/Tashkent/);
     assert.match(schedule, /scheduleDayLabel\(day\)/);
     assert.match(schedule, /appointmentTimeLabel\(item\)/);
+    assert.match(schedule, /scheduled,in_progress,completed/);
+    assert.match(schedule, /Current & completed/);
+    assert.match(schedule, /Evaluated by/);
+    assert.match(schedule, /evaluated_by_name/);
     assert.match(schedule, /min-w-\[70rem\]/);
     assert.doesNotMatch(schedule, /dateLabel\(schoolDayStartIso\(day\)\)/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);

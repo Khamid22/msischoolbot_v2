@@ -623,7 +623,8 @@ def _appointment_columns() -> str:
         candidate.subject_id,
         COALESCE(subject.subject_name, '') AS subject,
         COALESCE(responsible.full_name, responsible.login, '') AS responsible_name,
-        responsible.role AS responsible_role
+        responsible.role AS responsible_role,
+        COALESCE(demo_evaluator.full_name, demo_evaluator.login, '') AS evaluated_by_name
     """
 
 
@@ -677,8 +678,13 @@ def list_appointment_rows(
         clauses.append("appointment.appointment_type = %s")
         params.append(appointment_type)
     if status:
-        clauses.append("appointment.status = %s")
-        params.append(status)
+        status_values = [item.strip() for item in str(status).split(",") if item.strip()]
+        if len(status_values) == 1:
+            clauses.append("appointment.status = %s")
+            params.append(status_values[0])
+        elif status_values:
+            clauses.append("appointment.status = ANY(%s::text[])")
+            params.append(status_values)
     if responsible_account_id:
         clauses.append("appointment.responsible_account_id = %s")
         params.append(int(responsible_account_id))
@@ -689,6 +695,11 @@ def list_appointment_rows(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.teacher_candidate_demo_lessons demo_evaluation
+          ON demo_evaluation.appointment_id = appointment.id
+         AND demo_evaluation.voided_at IS NULL
+        LEFT JOIN msi_v2.accounts demo_evaluator
+          ON demo_evaluator.id = demo_evaluation.evaluator_account_id
         {where_sql}
     """
     total_row = conn.execute(
@@ -723,6 +734,11 @@ def get_appointment_row(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.teacher_candidate_demo_lessons demo_evaluation
+          ON demo_evaluation.appointment_id = appointment.id
+         AND demo_evaluation.voided_at IS NULL
+        LEFT JOIN msi_v2.accounts demo_evaluator
+          ON demo_evaluator.id = demo_evaluation.evaluator_account_id
         WHERE appointment.id = %s AND appointment.candidate_id = %s
         {suffix}
         """,

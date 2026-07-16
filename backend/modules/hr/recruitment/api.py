@@ -162,7 +162,7 @@ def appointments(
     starts_from: Annotated[str, Query(alias="from")] = "",
     starts_to: Annotated[str, Query(alias="to")] = "",
     appointment_type: str = "",
-    status: str = "scheduled",
+    status: str = "scheduled,in_progress,completed",
     responsible_account_id: int | None = None,
     user: CurrentUser = Depends(get_current_user),
 ):

@@ -312,8 +312,9 @@ def test_overlap_returns_structured_conflict_before_stage_change(monkeypatch):
     assert conn.commits == 0
 
 
-def test_hod_demo_evaluator_must_cover_the_candidate_subject(monkeypatch):
+def test_hod_demo_evaluator_is_assigned_without_teacher_academy_scope_check(monkeypatch):
     conn = _Connection()
+    assignments = []
     candidate = {"id": 7, "status": "job_interview", "version": 4, "subject_id": 3}
 
     monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
@@ -323,17 +324,48 @@ def test_hod_demo_evaluator_must_cover_the_candidate_subject(monkeypatch):
         "responsible_account_row",
         lambda *_args, **_kwargs: {"id": 72, "role": "head_of_department", "status": "active"},
     )
-    monkeypatch.setattr(repository, "hod_account_has_subject_scope", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(repository, "list_appointment_conflicts", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **_kwargs: {"id": 7, "version": 5})
+    monkeypatch.setattr(
+        repository,
+        "ensure_candidate_assignment",
+        lambda *_args, **kwargs: assignments.append(kwargs),
+    )
+    monkeypatch.setattr(repository, "insert_appointment", lambda *_args, **_kwargs: 92)
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args, **_kwargs: {"id": 7, "appointments": [{"id": 92}]},
+    )
 
-    with pytest.raises(service.RecruitmentError, match="outside this candidate's subject scope") as raised:
-        service.schedule_stage_move(
-            _user(),
-            7,
-            _future_values(stage="test_and_demo", responsible_account_id=72),
-        )
+    result = service.schedule_stage_move(
+        _user(),
+        7,
+        _future_values(stage="test_and_demo", responsible_account_id=72),
+    )
 
-    assert raised.value.status_code == 403
-    assert conn.commits == 0
+    assert result["appointment"]["id"] == 92
+    assert assignments[0]["assignee_account_id"] == 72
+    assert assignments[0]["subject_id"] == 3
+    assert conn.commits == 1
+
+
+def test_appointment_list_accepts_current_and_completed_statuses_and_loads_evaluator():
+    conn = _NotificationListConnection()
+
+    rows, total = repository.list_appointment_rows(
+        conn,
+        status="scheduled,in_progress,completed",
+        limit=25,
+        offset=0,
+    )
+
+    assert rows == []
+    assert total == 0
+    assert all("appointment.status = ANY(%s::text[])" in query for query in conn.queries)
+    assert all("teacher_candidate_demo_lessons demo_evaluation" in query for query in conn.queries)
+    assert all("demo_evaluator" in query for query in conn.queries)
 
 
 @pytest.mark.parametrize("stage", ["job_interview", "test_and_demo"])

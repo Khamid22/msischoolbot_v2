@@ -10,7 +10,6 @@ from backend.modules.hr.recruitment.constants import (
     FULL_VIEW_ROLES,
     RECRUITMENT_ROLES,
 )
-from backend.modules.teacher_academy.policies import hod_subject_ids_for_user
 
 
 def require_recruitment_role(user: CurrentUser) -> CurrentUser:
@@ -49,10 +48,8 @@ def ensure_candidate_view(user: CurrentUser, candidate_id: int) -> None:
         return
     if not assignment:
         raise HTTPException(status_code=403, detail="This candidate is not assigned to you.")
-    if user.role == "head_of_department":
-        subject_id = int(assignment["subject_id"] or 0)
-        if not subject_id or subject_id not in hod_subject_ids_for_user(user):
-            raise HTTPException(status_code=403, detail="This candidate is outside your subject scope.")
+    # Recruitment access is granted by an explicit candidate assignment.
+    # Teacher Academy's broader HOD subject scope remains enforced in that domain.
 
 
 def ensure_hr_management(user: CurrentUser) -> None:
@@ -83,10 +80,7 @@ def ensure_academic_write(user: CurrentUser, candidate_id: int) -> None:
         )
     if not assignment:
         raise HTTPException(status_code=403, detail="This candidate is not assigned to you.")
-    if user.role == "head_of_department":
-        subject_id = int(assignment["subject_id"] or 0)
-        if not subject_id or subject_id not in hod_subject_ids_for_user(user):
-            raise HTTPException(status_code=403, detail="This candidate is outside your subject scope.")
+    # Explicit recruitment assignment is sufficient for AD and HOD evaluation writes.
 
 
 def ensure_subject_test_write(user: CurrentUser, candidate_id: int) -> None:
