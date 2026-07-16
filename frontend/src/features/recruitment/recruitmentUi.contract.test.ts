@@ -168,6 +168,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(profile, /title="Upcoming appointments"/);
     assert.match(profile, /<InterviewSessionModal/);
     assert.match(profile, /title="Job Interviews"/);
+    assert.match(profile, /can_add_subject_test/);
+    assert.match(profile, /Record subject test/);
   });
 
   test("records scheduled demo lessons in a compact Pass or Reject modal", () => {

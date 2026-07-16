@@ -89,6 +89,13 @@ def ensure_academic_write(user: CurrentUser, candidate_id: int) -> None:
             raise HTTPException(status_code=403, detail="This candidate is outside your subject scope.")
 
 
+def ensure_subject_test_write(user: CurrentUser, candidate_id: int) -> None:
+    """Allow HR to administer tests while retaining assigned academic access."""
+    if user.role == "hr_manager":
+        return
+    ensure_academic_write(user, candidate_id)
+
+
 def ensure_approval_request(user: CurrentUser) -> None:
     if user.role not in {"hr_manager", "ceo"}:
         raise HTTPException(status_code=403, detail="You cannot request a hiring approval.")

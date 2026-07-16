@@ -206,6 +206,21 @@ def test_approval_visibility_does_not_grant_academic_evaluation_write(monkeypatc
     assert exc.value.status_code == 403
 
 
+def test_hr_can_record_subject_tests_without_academic_assignment():
+    policies.ensure_subject_test_write(_user("hr_manager"), 8)
+    permissions = service._permissions(_user("hr_manager"))
+
+    assert permissions["can_add_subject_test"] is True
+    assert permissions["can_add_academic_evaluation"] is False
+
+
+def test_subject_test_write_remains_fail_closed_for_unrelated_roles():
+    with pytest.raises(HTTPException) as exc:
+        policies.ensure_subject_test_write(_user("ceo"), 8)
+
+    assert exc.value.status_code == 403
+
+
 def _patch_approval_transaction(monkeypatch, *, approval_status: str = "requested"):
     conn = _Connection()
     events: list[tuple[str, object]] = []

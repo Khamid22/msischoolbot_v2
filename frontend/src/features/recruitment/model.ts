@@ -50,6 +50,7 @@ export type RecruitmentPermissions = {
   can_view_schedule: boolean;
   can_manage_assignments: boolean;
   can_move_stage: boolean;
+  can_add_subject_test: boolean;
   can_add_academic_evaluation: boolean;
   can_request_approval: boolean;
   can_review_approval: boolean;

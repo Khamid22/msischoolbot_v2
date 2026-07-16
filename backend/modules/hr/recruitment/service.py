@@ -529,6 +529,7 @@ def _permissions(
         "can_view_schedule": role in RECRUITMENT_ROLES,
         "can_manage_assignments": role in {"hr_manager", "ceo"},
         "can_move_stage": role in {"hr_manager", "ceo"},
+        "can_add_subject_test": role == "hr_manager" or academic_evaluation,
         "can_add_academic_evaluation": academic_evaluation,
         "can_request_approval": role in {"hr_manager", "ceo"},
         "can_review_approval": role == "academic_director",

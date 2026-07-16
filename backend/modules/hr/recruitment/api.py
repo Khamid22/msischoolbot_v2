@@ -21,6 +21,7 @@ from backend.modules.hr.recruitment.policies import (
     ensure_final_decision,
     ensure_hr_management,
     ensure_pipeline_management,
+    ensure_subject_test_write,
 )
 from backend.modules.hr.recruitment.schemas import (
     ApprovalRequestCreate,
@@ -461,7 +462,7 @@ def complete_interview(
 
 @router.post("/candidates/{candidate_id}/subject-tests", status_code=201, operation_id="api_v1_recruitment_add_subject_test")
 def add_subject_test(candidate_id: int, payload: SubjectTestWrite, user: CurrentUser = Depends(get_current_user)):
-    ensure_academic_write(user, candidate_id)
+    ensure_subject_test_write(user, candidate_id)
     candidate = _call(service.add_subject_test, user, candidate_id, payload.model_dump())
     return api_success({"message": "Subject test recorded.", "candidate": candidate}, status_code=201)
 

@@ -1495,11 +1495,6 @@ export function CandidateProfile({
       });
   }
   if (permissions?.can_add_academic_evaluation) {
-    evaluationItems.push({
-      key: "test",
-      label: "Record subject test",
-      onClick: () => setAction({ kind: "record_test" }),
-    });
     const scheduledDemo = scheduledAppointments.find((item) => item.appointment_type === "demo_lesson" && item.status === "scheduled");
     if (scheduledDemo) evaluationItems.push({
       key: "demo",
@@ -2081,6 +2076,15 @@ export function CandidateProfile({
               title="Subject Knowledge Tests"
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
+              {permissions?.can_add_subject_test ? (
+                <button
+                  type="button"
+                  onClick={() => setAction({ kind: "record_test" })}
+                  className="mb-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  Record subject test
+                </button>
+              ) : null}
               <AttemptList
                 items={candidate.subject_tests || []}
                 empty="No subject knowledge tests recorded."
