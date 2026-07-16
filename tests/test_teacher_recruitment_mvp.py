@@ -49,7 +49,6 @@ def test_stage_and_rejection_taxonomies_are_stable():
         "job_interview",
         "test_and_demo",
         "under_review",
-        "on_hold",
         "teacher_academy",
         "active_teacher",
     )

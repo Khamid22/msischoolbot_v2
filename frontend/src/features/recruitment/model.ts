@@ -124,10 +124,6 @@ export type RecruitmentCandidate = {
   decision_source_evaluation_id?: number | null;
   final_decision_actor?: string;
   final_decision_at?: string;
-  hold_reason?: string;
-  hold_origin_stage?: string;
-  hold_application_date?: string;
-  hold_placed_at?: string;
   latest_interview_result?: string;
   latest_interview_at?: string;
   next_task?: RecruitmentTask | null;
@@ -217,12 +213,11 @@ export const primaryStages = [
   "job_interview",
   "test_and_demo",
   "under_review",
-  "on_hold",
   "teacher_academy",
   "active_teacher",
 ] as const;
 
-export const manualStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review", "on_hold"] as const;
+export const manualStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review"] as const;
 export const alternativeStages = ["rejected", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
@@ -234,7 +229,6 @@ export const stageLabels: Record<string, string> = {
   teacher_academy: "Teacher Academy",
   active_teacher: "Active Teacher",
   rejected: "Rejected",
-  on_hold: "On Hold",
   candidate_withdrew: "Candidate Withdrew",
   trash_bin: "Trash Bin",
 };

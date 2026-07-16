@@ -6,7 +6,6 @@ PRIMARY_STAGES = (
     "job_interview",
     "test_and_demo",
     "under_review",
-    "on_hold",
     "teacher_academy",
     "active_teacher",
 )
@@ -61,10 +60,10 @@ REJECTION_REASONS = (
 )
 
 INTERVIEW_RESULTS = frozenset(
-    {"passed", "failed", "on_hold", "additional_interview", "candidate_withdrew"}
+    {"passed", "failed", "additional_interview", "candidate_withdrew"}
 )
 SUBJECT_TEST_RESULTS = frozenset({"passed", "failed", "retake_required", "not_completed"})
-DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo", "on_hold"})
+DEMO_RESULTS = frozenset({"passed", "failed", "additional_demo"})
 TASK_STATUSES = frozenset({"pending", "completed", "cancelled"})
 APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
 APPOINTMENT_STATUSES = frozenset({"scheduled", "completed", "cancelled", "no_show"})

@@ -323,10 +323,10 @@ def test_terminal_candidate_must_be_reopened_before_an_additional_appointment(mo
     monkeypatch.setattr(
         repository,
         "get_candidate_row",
-        lambda *_args, **_kwargs: {"id": 7, "status": "on_hold", "subject_id": 3},
+        lambda *_args, **_kwargs: {"id": 7, "status": "rejected", "subject_id": 3},
     )
 
-    with pytest.raises(service.RecruitmentError, match="Move the candidate to Job Interview"):
+    with pytest.raises(service.RecruitmentError, match="Reopen this candidate"):
         service.create_appointment(
             _user(),
             7,
@@ -639,31 +639,9 @@ def test_void_failed_evaluation_restores_origin_when_system_rejection_is_latest(
     assert conn.commits == 1
 
 
-def test_on_hold_records_origin_reason_date_and_cancels_appointments(monkeypatch):
-    conn = _Connection()
-    holds = []
-    events = []
-    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
-    monkeypatch.setattr(repository, "get_candidate_row", lambda *_args, **_kwargs: {"id": 7, "status": "job_interview", "application_date": "2026-07-01"})
-    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **_kwargs: {"id": 7, "status": "on_hold", "version": 5})
-    monkeypatch.setattr(repository, "release_open_hold", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(repository, "insert_candidate_hold", lambda *_args, **kwargs: holds.append(kwargs) or 12)
-    monkeypatch.setattr(repository, "set_candidate_application_date", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [91])
-    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
-    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "on_hold"})
+def test_on_hold_is_not_an_available_stage_or_final_decision():
+    with pytest.raises(service.RecruitmentError, match="Unknown candidate stage"):
+        service.move_candidate(_user(), 7, stage="on_hold", expected_version=4)
 
-    result = service.hold_candidate(
-        _user(),
-        7,
-        expected_version=4,
-        reason="Waiting for availability",
-        application_date="2026-07-03",
-    )
-
-    assert result["status"] == "on_hold"
-    assert holds[0]["origin_stage"] == "job_interview"
-    assert holds[0]["reason"] == "Waiting for availability"
-    assert holds[0]["application_date"] == "2026-07-03"
-    assert events[0][1]["cancelled_appointment_ids"] == [91]
-    assert conn.commits == 1
+    with pytest.raises(service.RecruitmentError, match="Unknown final decision"):
+        service.make_final_decision(_user(), 7, {"decision": "on_hold"})

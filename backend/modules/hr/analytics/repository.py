@@ -11,7 +11,6 @@ ACTIVE_STAGES = (
     "job_interview",
     "test_and_demo",
     "under_review",
-    "on_hold",
 )
 
 

@@ -171,7 +171,6 @@
 /api/v1/recruitment/candidates/{candidate_id}/documents/{document_id} | DELETE
 /api/v1/recruitment/candidates/{candidate_id}/documents/{document_id}/open | GET
 /api/v1/recruitment/candidates/{candidate_id}/final-decisions | POST
-/api/v1/recruitment/candidates/{candidate_id}/hold | POST
 /api/v1/recruitment/candidates/{candidate_id}/interviews | POST
 /api/v1/recruitment/candidates/{candidate_id}/interviews/{attempt_id}/void | POST
 /api/v1/recruitment/candidates/{candidate_id}/notes | POST

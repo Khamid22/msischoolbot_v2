@@ -423,7 +423,7 @@ def test_academic_director_rejection_revokes_open_requests_and_audits(monkeypatc
     assert conn.commits == 1
 
 
-@pytest.mark.parametrize("decision", ["on_hold", "candidate_withdrew"])
+@pytest.mark.parametrize("decision", ["candidate_withdrew"])
 def test_academic_director_cannot_record_hr_operational_outcomes(decision):
     with pytest.raises(service.RecruitmentError) as exc:
         service.make_final_decision(

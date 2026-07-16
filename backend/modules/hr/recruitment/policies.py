@@ -106,7 +106,7 @@ def ensure_final_decision(user: CurrentUser, decision: str) -> None:
         return
     if user.role in {"hr_manager", "academic_director"} and normalized == "rejected":
         return
-    if user.role == "hr_manager" and normalized in {"on_hold", "candidate_withdrew"}:
+    if user.role == "hr_manager" and normalized == "candidate_withdrew":
         return
     raise HTTPException(status_code=403, detail="You cannot finalize this recruitment decision.")
 

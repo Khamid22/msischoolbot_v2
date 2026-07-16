@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, PauseCircle, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -57,7 +57,6 @@ type PipelineFilters = {
   application_to: string;
   evaluator_account_id: string;
 };
-type HoldSelection = { candidate: RecruitmentCandidate };
 type RejectSelection = { candidate: RecruitmentCandidate };
 type ScheduleSelection = { candidate: RecruitmentCandidate; appointmentType: "job_interview" | "demo_lesson" };
 type UndoTrash = { candidate: RecruitmentCandidate; previousCandidate: RecruitmentCandidate };
@@ -75,7 +74,6 @@ const filterKeys: Array<keyof PipelineFilters> = [
 const chartStages = [
   { stage: "new_candidate", label: "New", color: "bg-white ring-1 ring-inset ring-slate-400 dark:bg-slate-100", legend: "bg-white border border-slate-400" },
   { stage: "responded", label: "Responded", color: "bg-blue-600", legend: "bg-blue-600" },
-  { stage: "on_hold", label: "On Hold", color: "bg-slate-400", legend: "bg-slate-400" },
   { stage: "job_interview", label: "Job Interview", color: "bg-emerald-300", legend: "bg-emerald-300" },
   { stage: "test_and_demo", label: "Demo & Test", color: "bg-emerald-600", legend: "bg-emerald-600" },
   { stage: "teacher_academy", label: "Teacher Academy", color: "bg-amber-500", legend: "bg-amber-500" },
@@ -203,23 +201,20 @@ function CandidateCard({
   if (candidate.status === "responded") { detailLabel = "Responded"; detailValue = dateLabel(candidate.stage_changed_at); }
   if (appointment) { detailLabel = appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"; detailValue = dateLabel(appointment.starts_at); }
   if (candidate.status === "under_review") { detailLabel = "Under review since"; detailValue = dateLabel(candidate.stage_changed_at); }
-  if (candidate.status === "on_hold") { detailLabel = candidate.hold_reason || "On Hold"; detailValue = dateLabel(candidate.hold_application_date || candidate.application_date); }
   if (["teacher_academy", "active_teacher"].includes(candidate.status)) { detailLabel = "Accepted"; detailValue = dateLabel(candidate.final_decision_at || candidate.stage_changed_at); }
 
   const overdue = Boolean(appointment?.is_overdue);
   const passedInterview = candidate.status === "job_interview" && candidate.latest_interview_result === "passed" && !appointment;
   const toneClass = overdue
     ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/25"
-    : candidate.status === "on_hold"
-      ? "border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-900/40"
-      : passedInterview || candidate.status === "under_review"
+    : passedInterview || candidate.status === "under_review"
         ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-950/20"
         : ["job_interview", "test_and_demo"].includes(candidate.status)
           ? "border-amber-400 bg-amber-50 dark:border-amber-500/50 dark:bg-amber-950/20"
           : "border-border bg-card";
   if (overdue) { detailLabel = "Overdue"; detailValue = dateLabel(appointment?.starts_at); }
   if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
-  const StatusIcon = overdue ? AlertTriangle : candidate.status === "on_hold" ? PauseCircle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
+  const StatusIcon = overdue ? AlertTriangle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
   const sla = candidate.current_sla;
   const slaLabel = sla ? (sla.status === "red" ? "SLA overdue" : `${Math.max(0, Math.ceil(sla.remaining_seconds / 86400))}d SLA left`) : "";
   const slaClass = sla?.status === "red" ? "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200" : sla?.status === "yellow" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100";
@@ -276,7 +271,6 @@ export function PipelineView({
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | null>(null);
-  const [holdSelection, setHoldSelection] = useState<HoldSelection | null>(null);
   const [rejectSelection, setRejectSelection] = useState<RejectSelection | null>(null);
   const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
   const [scheduleConflicts, setScheduleConflicts] = useState<RecruitmentAppointment[]>([]);
@@ -348,12 +342,6 @@ export function PipelineView({
       onAnnouncement(result.message || "Candidate moved.");
       if (variables.stage === "trash_bin" && result.candidate) setUndoTrash({ candidate: result.candidate, previousCandidate: variables.candidate });
     },
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
-  });
-  const hold = useMutation({
-    mutationFn: ({ candidate, values }: { candidate: RecruitmentCandidate; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/hold`, { method: "POST", body: jsonBody({ ...values, expected_version: candidate.version }) }),
-    onSuccess: (result) => { setHoldSelection(null); onAnnouncement(result.message || "Candidate placed On Hold."); },
-    onError: (error) => onAnnouncement(queryError(error), "error"),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
   const reject = useMutation({
@@ -487,7 +475,7 @@ export function PipelineView({
             const highlighted = dragOverStage === stage;
             const items = pipeline.data.stages[stage] || [];
             return (
-              <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; if (stage === "on_hold") setHoldSelection({ candidate }); else move.mutate({ candidate, stage }); }} className={`flex h-[calc(100dvh-20rem)] min-h-[28rem] max-h-[52rem] flex-col overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
+              <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; move.mutate({ candidate, stage }); }} className={`flex h-[calc(100dvh-20rem)] min-h-[28rem] max-h-[52rem] flex-col overflow-hidden rounded-xl border transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
                 <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
                 <div className="miniapp-scroll flex-1 overflow-y-auto p-2">{cards(items)}</div>
               </section>
@@ -508,13 +496,9 @@ export function PipelineView({
         </div>
       ) : null}
 
-      {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-foreground px-3 py-2 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-11 rounded-md px-2 text-primary underline" onClick={() => { if (undoTrash.previousCandidate.status === "on_hold") hold.mutate({ candidate: undoTrash.candidate, values: { reason: undoTrash.previousCandidate.hold_reason || "Restored after undoing Trash Bin move.", application_date: undoTrash.previousCandidate.hold_application_date || undoTrash.previousCandidate.application_date || "" } }); else move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
+      {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg bg-foreground px-3 py-2 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-11 rounded-md px-2 text-primary underline" onClick={() => { move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
 
       <FiltersDrawer open={filtersOpen} filters={filters} options={options} onClose={closeFilters} onApply={(next) => { setFilters(next); closeFilters(); }} />
-
-      <Modal open={Boolean(holdSelection)} onClose={() => { if (!hold.isPending) setHoldSelection(null); }} title="Place candidate On Hold" subtitle={holdSelection?.candidate.full_name} size="sm">
-        {holdSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); hold.mutate({ candidate: holdSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-3"><label className="text-xs font-semibold">Reason<textarea autoFocus required name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label><label className="text-xs font-semibold">Application date<input required type="date" name="application_date" defaultValue={holdSelection.candidate.application_date?.slice(0, 10)} className={`${fieldClass} mt-1`} /></label></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setHoldSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={hold.isPending}>{hold.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Place On Hold</button></div></ModalFooter></form> : null}
-      </Modal>
 
       <Modal open={Boolean(rejectSelection)} onClose={() => { if (!reject.isPending) setRejectSelection(null); }} title="Reject candidate" subtitle={rejectSelection?.candidate.full_name} size="sm">
         {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-3"><label className="text-xs font-semibold">Rejection reason<select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{(options?.rejection_reason_options || []).map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><label className="text-xs font-semibold">Explanation<textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {stageLabels[rejectSelection.candidate.status] || humanize(rejectSelection.candidate.status)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}

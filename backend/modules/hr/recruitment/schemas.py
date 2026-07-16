@@ -64,12 +64,6 @@ class StageChange(StrictModel):
     reason: str = Field(default="", max_length=2000)
 
 
-class CandidateHold(StrictModel):
-    expected_version: int = Field(ge=1)
-    reason: str = Field(min_length=1, max_length=5000)
-    application_date: OptionalDate = None
-
-
 class AppointmentFields(StrictModel):
     starts_at: datetime
     duration_minutes: OptionalInt = Field(default=None, ge=15, le=240)
@@ -232,7 +226,6 @@ __all__ = [
     "AppointmentUpdate",
     "AssignmentReplace",
     "CandidateCreate",
-    "CandidateHold",
     "CandidateUpdate",
     "DemoLessonWrite",
     "EvaluationVoid",

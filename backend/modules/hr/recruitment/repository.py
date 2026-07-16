@@ -54,10 +54,6 @@ _CANDIDATE_COLUMNS = """
         AS final_decision_actor,
     decision.follow_up_at::text AS decision_follow_up_at,
     decision.created_at::text AS final_decision_at,
-    COALESCE(active_hold.reason, '') AS hold_reason,
-    COALESCE(active_hold.origin_stage, '') AS hold_origin_stage,
-    active_hold.application_date::text AS hold_application_date,
-    active_hold.placed_at::text AS hold_placed_at,
     COALESCE(latest_interview.result, '') AS latest_interview_result,
     latest_interview.interview_at::text AS latest_interview_at,
     task.id AS next_task_id,
@@ -105,13 +101,6 @@ def _candidate_joins() -> str:
             LIMIT 1
         ) decision ON true
         LEFT JOIN msi_v2.accounts decision_actor ON decision_actor.id = decision.decided_by_account_id
-        LEFT JOIN LATERAL (
-            SELECT hold.reason, hold.origin_stage, hold.application_date, hold.placed_at
-            FROM msi_v2.teacher_candidate_holds hold
-            WHERE hold.candidate_id = candidate.id AND hold.released_at IS NULL
-            ORDER BY hold.placed_at DESC, hold.id DESC
-            LIMIT 1
-        ) active_hold ON true
         LEFT JOIN LATERAL (
             SELECT interview.result, interview.interview_at
             FROM msi_v2.teacher_candidate_interviews interview
@@ -1388,68 +1377,6 @@ def touch_candidate(conn: Any, *, candidate_id: int, actor_account_id: int | Non
     )
 
 
-def insert_candidate_hold(
-    conn: Any,
-    *,
-    candidate_id: int,
-    origin_stage: str,
-    reason: str,
-    application_date: str,
-    actor_account_id: int | None,
-    now: str,
-) -> int:
-    row = conn.execute(
-        """
-        INSERT INTO msi_v2.teacher_candidate_holds (
-            candidate_id, origin_stage, reason, application_date,
-            placed_by_account_id, placed_at
-        ) VALUES (%s, %s, %s, NULLIF(%s, '')::date, %s, %s::timestamptz)
-        RETURNING id
-        """,
-        (candidate_id, origin_stage, reason, application_date, actor_account_id, now),
-    ).fetchone()
-    return int(row["id"]) if row else 0
-
-
-def set_candidate_application_date(
-    conn: Any,
-    *,
-    candidate_id: int,
-    application_date: str,
-    actor_account_id: int | None,
-    now: str,
-) -> None:
-    conn.execute(
-        """
-        UPDATE msi_v2.teacher_candidates
-        SET application_date = NULLIF(%s, '')::date,
-            updated_by_account_id = %s,
-            updated_at = %s::timestamptz
-        WHERE id = %s
-        """,
-        (application_date, actor_account_id, now, candidate_id),
-    )
-
-
-def release_open_hold(
-    conn: Any,
-    *,
-    candidate_id: int,
-    actor_account_id: int | None,
-    now: str,
-) -> list[int]:
-    rows = conn.execute(
-        """
-        UPDATE msi_v2.teacher_candidate_holds
-        SET released_at = %s::timestamptz, released_by_account_id = %s
-        WHERE candidate_id = %s AND released_at IS NULL
-        RETURNING id
-        """,
-        (now, actor_account_id, candidate_id),
-    ).fetchall()
-    return [int(row["id"]) for row in rows]
-
-
 def insert_note(conn: Any, *, candidate_id: int, body: str, actor_account_id: int | None, actor_login: str, now: str) -> int:
     row = conn.execute(
         """
@@ -1750,7 +1677,7 @@ def replace_system_tasks(
 ) -> None:
     desired_keys = [str(item["task_key"]) for item in desired_tasks]
     terminal = stage in {
-        "on_hold", "teacher_academy", "active_teacher",
+        "teacher_academy", "active_teacher",
         "rejected", "candidate_withdrew", "trash_bin",
     }
     conn.execute(

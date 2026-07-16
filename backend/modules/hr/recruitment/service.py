@@ -1453,105 +1453,11 @@ def change_appointment_status(
     return {"candidate": get_candidate(user, int(candidate_id))}
 
 
-def hold_candidate(
-    user: CurrentUser,
-    candidate_id: int,
-    *,
-    expected_version: int,
-    reason: str,
-    application_date: Any = None,
-) -> dict[str, Any]:
-    normalized_reason = _text(reason)
-    if not normalized_reason:
-        raise RecruitmentError("Add an On Hold reason.")
-    now = _now()
-    with connect_auth_db() as conn:
-        candidate = repository.get_candidate_row(conn, int(candidate_id))
-        if not candidate:
-            raise RecruitmentError("Candidate was not found.", status_code=404)
-        origin_stage = _text(candidate["status"])
-        if origin_stage == "on_hold":
-            raise RecruitmentError("Candidate is already On Hold.", status_code=409)
-        if origin_stage in PROTECTED_HIRE_STAGES:
-            raise RecruitmentError("Accepted candidates cannot be placed On Hold.", status_code=409)
-        normalized_application_date = _iso(application_date) or _text(candidate.get("application_date") if hasattr(candidate, "get") else candidate["application_date"])
-        updated = repository.update_candidate_stage(
-            conn,
-            candidate_id=int(candidate_id),
-            stage="on_hold",
-            expected_version=int(expected_version),
-            actor_account_id=_actor_account(user),
-            now=now,
-            comment=normalized_reason,
-            transition_source="manual",
-        )
-        if not updated:
-            raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
-        repository.release_open_hold(
-            conn,
-            candidate_id=int(candidate_id),
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        hold_id = repository.insert_candidate_hold(
-            conn,
-            candidate_id=int(candidate_id),
-            origin_stage=origin_stage,
-            reason=normalized_reason,
-            application_date=normalized_application_date,
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        repository.set_candidate_application_date(
-            conn,
-            candidate_id=int(candidate_id),
-            application_date=normalized_application_date,
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        cancelled = repository.cancel_scheduled_appointments(
-            conn,
-            candidate_id=int(candidate_id),
-            reason="Candidate placed On Hold.",
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        _notify_cancelled_appointments(
-            conn,
-            candidate_id=int(candidate_id),
-            appointment_ids=cancelled,
-        )
-        repository.insert_audit(
-            conn,
-            candidate_id=int(candidate_id),
-            event_type="candidate.placed_on_hold",
-            detail={
-                "hold_id": hold_id,
-                "from": origin_stage,
-                "to": "on_hold",
-                "reason": normalized_reason,
-                "application_date": normalized_application_date,
-                "cancelled_appointment_ids": cancelled,
-            },
-            actor_account_id=_actor_account(user),
-            actor_staff_id=_actor_staff(user),
-            now=now,
-        )
-        _sync_system_next_actions(
-            conn,
-            candidate_id=int(candidate_id),
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        conn.commit()
-    return get_candidate(user, int(candidate_id))
-
-
 def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected_version: int, reason: str = "") -> dict[str, Any]:
     normalized_stage = _text(stage)
     if normalized_stage not in ALL_STAGES:
         raise RecruitmentError("Unknown candidate stage.")
-    if normalized_stage in PROTECTED_HIRE_STAGES or normalized_stage in {"rejected", "on_hold", "candidate_withdrew"}:
+    if normalized_stage in PROTECTED_HIRE_STAGES or normalized_stage in {"rejected", "candidate_withdrew"}:
         raise RecruitmentError("Use the protected outcome action for this stage.")
     now = _now()
     with connect_auth_db() as conn:
@@ -1576,14 +1482,6 @@ def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected
         )
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
-        released_hold_ids: list[int] = []
-        if _text(existing["status"]) == "on_hold" and normalized_stage != "on_hold":
-            released_hold_ids = repository.release_open_hold(
-                conn,
-                candidate_id=int(candidate_id),
-                actor_account_id=_actor_account(user),
-                now=now,
-            )
         revoked_approval_ids: list[int] = []
         if normalized_stage == "trash_bin":
             revoked_approval_ids = repository.revoke_open_approvals(
@@ -1650,8 +1548,6 @@ def move_candidate(user: CurrentUser, candidate_id: int, *, stage: str, expected
         }
         if normalized_stage == "responded":
             move_detail["responded_at"] = now
-        if released_hold_ids:
-            move_detail["released_hold_ids"] = released_hold_ids
         repository.insert_audit(
             conn,
             candidate_id=int(candidate_id),
@@ -2608,14 +2504,14 @@ def review_approval(user: CurrentUser, candidate_id: int, approval_id: int, *, s
 
 def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, Any]) -> dict[str, Any]:
     decision = _text(values.get("decision"))
-    allowed = {*PROTECTED_HIRE_STAGES, "rejected", "on_hold", "candidate_withdrew"}
+    allowed = {*PROTECTED_HIRE_STAGES, "rejected", "candidate_withdrew"}
     if decision not in allowed:
         raise RecruitmentError("Unknown final decision.")
     if decision in PROTECTED_HIRE_STAGES and user.role != "ceo":
         raise RecruitmentError("Only CEO can directly finalize this hiring outcome.", status_code=403)
     if decision == "rejected" and user.role not in {"hr_manager", "academic_director", "ceo"}:
         raise RecruitmentError("You cannot reject this candidate.", status_code=403)
-    if decision in {"on_hold", "candidate_withdrew"} and user.role not in {"hr_manager", "ceo"}:
+    if decision == "candidate_withdrew" and user.role not in {"hr_manager", "ceo"}:
         raise RecruitmentError("You cannot record this outcome.", status_code=403)
 
     rejection_reason = _text(values.get("rejection_reason"))
@@ -2625,9 +2521,6 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
             raise RecruitmentError("Select a rejection reason.")
         if rejection_reason == "other" and not reason_detail:
             raise RecruitmentError("Explain the other rejection reason.")
-    if decision == "on_hold" and not reason_detail:
-        raise RecruitmentError("Add an On Hold reason.")
-
     now = _now()
     approval_id = int(values.get("approval_id") or 0)
     with connect_auth_db() as conn:
@@ -2690,7 +2583,7 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
         if not updated:
             raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
         cancelled_appointment_ids: list[int] = []
-        if decision in {"rejected", "on_hold", "candidate_withdrew"}:
+        if decision in {"rejected", "candidate_withdrew"}:
             cancelled_appointment_ids = repository.cancel_scheduled_appointments(
                 conn,
                 candidate_id=int(candidate_id),

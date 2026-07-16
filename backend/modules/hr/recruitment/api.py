@@ -30,7 +30,6 @@ from backend.modules.hr.recruitment.schemas import (
     AppointmentUpdate,
     AssignmentReplace,
     CandidateCreate,
-    CandidateHold,
     CandidateUpdate,
     DemoLessonWrite,
     EvaluationVoid,
@@ -297,25 +296,6 @@ def move_candidate(candidate_id: int, payload: StageChange, user: CurrentUser = 
     )
     message = "Candidate moved to Trash Bin." if payload.stage == "trash_bin" else "Candidate moved."
     return api_success({"message": message, "candidate": candidate})
-
-
-@router.post("/candidates/{candidate_id}/hold", operation_id="api_v1_recruitment_hold_candidate")
-def hold_candidate(
-    candidate_id: int,
-    payload: CandidateHold,
-    user: CurrentUser = Depends(get_current_user),
-):
-    ensure_pipeline_management(user)
-    ensure_candidate_view(user, candidate_id)
-    candidate = _call(
-        service.hold_candidate,
-        user,
-        candidate_id,
-        expected_version=payload.expected_version,
-        reason=payload.reason,
-        application_date=payload.application_date,
-    )
-    return api_success({"message": "Candidate placed On Hold.", "candidate": candidate})
 
 
 @router.post(

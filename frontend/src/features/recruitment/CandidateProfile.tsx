@@ -377,7 +377,6 @@ function OutcomeFields({
   const canReject = Boolean(candidate.permissions?.can_reject);
   const availableDecisions = canFinalize
     ? [
-        "on_hold",
         "candidate_withdrew",
         "rejected",
         "teacher_academy",
@@ -385,7 +384,7 @@ function OutcomeFields({
       ]
     : canReject
       ? ["rejected"]
-      : ["on_hold", "candidate_withdrew"];
+      : ["candidate_withdrew"];
   const [decision, setDecision] = useState(availableDecisions[0]);
   const [rejectionReason, setRejectionReason] = useState("");
   const rejectionReasons = options?.rejection_reason_options?.length
@@ -450,23 +449,13 @@ function OutcomeFields({
           </select>
         </label>
       ) : null}
-      {["rejected", "on_hold", "candidate_withdrew"].includes(decision) ? (
+      {["rejected", "candidate_withdrew"].includes(decision) ? (
         <label className="text-xs font-semibold">
           Reason / explanation
           <textarea
             name="reason_detail"
-            required={decision === "on_hold" || rejectionReason === "other"}
+            required={rejectionReason === "other"}
             className={`${fieldClass} mt-1 min-h-24`}
-          />
-        </label>
-      ) : null}
-      {decision === "on_hold" ? (
-        <label className="text-xs font-semibold">
-          Follow-up date
-          <input
-            name="follow_up_at"
-            type="datetime-local"
-            className={`${fieldClass} mt-1`}
           />
         </label>
       ) : null}
@@ -504,38 +493,14 @@ function MoveCandidateFields({
           ) : null}
         </select>
       </label>
-      {stage === "on_hold" ? (
-        <>
-          <label className="text-xs font-semibold">
-            On Hold reason
-            <textarea
-              autoFocus
-              required
-              name="reason"
-              className={`${fieldClass} mt-1 min-h-20`}
-            />
-          </label>
-          <label className="text-xs font-semibold">
-            Application date
-            <input
-              required
-              name="application_date"
-              type="date"
-              defaultValue={candidate.application_date?.slice(0, 10)}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-        </>
-      ) : (
-        <label className="text-xs font-semibold">
-          Reason
-          <textarea
-            name="reason"
-            defaultValue="Candidate profile move"
-            className={`${fieldClass} mt-1 min-h-20`}
-          />
-        </label>
-      )}
+      <label className="text-xs font-semibold">
+        Reason
+        <textarea
+          name="reason"
+          defaultValue="Candidate profile move"
+          className={`${fieldClass} mt-1 min-h-20`}
+        />
+      </label>
       <p className="text-xs leading-5 text-muted-foreground">
         Interview and demo appointments are scheduled separately after the move.
         Protected Academy/Active outcomes continue through Hiring.
@@ -784,7 +749,6 @@ function ActionFields({
             <select required name="result" className={`${fieldClass} mt-1`}>
               <option value="passed">Passed</option>
               <option value="failed">Failed</option>
-              <option value="on_hold">On hold</option>
               <option value="additional_interview">Additional interview</option>
               <option value="candidate_withdrew">Candidate withdrew</option>
             </select>
@@ -894,7 +858,6 @@ function ActionFields({
               <option value="passed">Passed</option>
               <option value="failed">Failed</option>
               <option value="additional_demo">Additional demo</option>
-              <option value="on_hold">On hold</option>
             </select>
           </label>
           <label className="text-xs font-semibold">
@@ -1450,9 +1413,7 @@ export function CandidateProfile({
       submit("", formValues(form), "PATCH");
     } else if (action.kind === "move_candidate") {
       const values = formValues(form);
-      if (values.stage === "on_hold")
-        submit("/hold", { ...values, expected_version: candidate.version });
-      else submit("/stage", { ...values, expected_version: candidate.version });
+      submit("/stage", { ...values, expected_version: candidate.version });
     } else if (action.kind === "record_interview") {
       submit("/interviews", formValues(form));
     } else if (action.kind === "record_test") {

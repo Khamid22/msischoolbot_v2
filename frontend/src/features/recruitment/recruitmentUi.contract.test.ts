@@ -23,7 +23,7 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
   });
 
-  test("uses a single-stage mobile view and eight wider independently scrolling desktop columns", () => {
+  test("uses a single-stage mobile view and seven wider independently scrolling desktop columns", () => {
     assert.match(pipeline, /md:hidden/);
     assert.match(pipeline, /auto-cols-\[240px\]/);
     assert.match(pipeline, /no-scrollbar/);
@@ -65,7 +65,7 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /target === "trash_bin" \? "Trash Bin" : "Reject"/);
     assert.match(pipeline, /setRejectSelection/);
     assert.match(pipeline, /\/final-decisions/);
-    assert.doesNotMatch(pipeline, /\["trash_bin", "on_hold", "candidate_withdrew", "rejected"\]/);
+    assert.doesNotMatch(pipeline, /on_hold|On Hold/);
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
   });
 
@@ -80,9 +80,9 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /setScheduleSelection/);
   });
 
-  test("renders the seven-segment filtered percentage summary without a chart dependency", () => {
+  test("renders the six-segment filtered percentage summary without a chart dependency", () => {
     assert.match(pipeline, /const chartStages = \[/);
-    for (const stage of ["new_candidate", "responded", "on_hold", "job_interview", "test_and_demo", "teacher_academy", "active_teacher"]) {
+    for (const stage of ["new_candidate", "responded", "job_interview", "test_and_demo", "teacher_academy", "active_teacher"]) {
       assert.match(pipeline, new RegExp(`stage: "${stage}"`));
     }
     assert.match(pipeline, /Pipeline distribution\. Total/);
@@ -95,7 +95,6 @@ describe("compact recruitment pipeline", () => {
   test("shows semantic appointment progress and overdue card states", () => {
     assert.match(pipeline, /appointment\?\.is_overdue/);
     assert.match(pipeline, /border-red-400 bg-red-50/);
-    assert.match(pipeline, /border-slate-400 bg-slate-100/);
     assert.match(pipeline, /border-amber-400 bg-amber-50/);
     assert.match(pipeline, /border-emerald-400 bg-emerald-50/);
     assert.match(pipeline, /candidate\.current_sla/);

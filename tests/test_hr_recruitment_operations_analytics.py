@@ -33,7 +33,7 @@ def test_sla_boundaries_and_inactive_stages():
     assert service._sla_payload(candidate, now=entered + timedelta(hours=17))["status"] == "green"
     assert service._sla_payload(candidate, now=entered + timedelta(hours=18))["status"] == "yellow"
     assert service._sla_payload(candidate, now=entered + timedelta(days=1, seconds=1))["status"] == "red"
-    assert service._sla_payload({**candidate, "status": "on_hold"}, now=entered) is None
+    assert service._sla_payload({**candidate, "status": "candidate_withdrew"}, now=entered) is None
 
 
 def test_progress_and_required_documents_are_derived_without_blocking():
@@ -78,3 +78,13 @@ def test_migration_contains_append_only_history_and_snapshotted_sla():
     assert "sla_target_days" in source and "sla_due_at" in source
     assert "teacher_candidate_subject_test_topics" in source
     assert "teacher_candidate_demo_criteria" in source
+
+
+def test_on_hold_removal_migration_restores_candidates_and_tightens_stage_constraint():
+    source = Path("database/alembic/versions/0023_remove_recruitment_on_hold.py").read_text()
+    assert "recruitment_on_hold_restore" in source
+    assert "hold.origin_stage" in source
+    assert "ELSE 'responded'" in source
+    assert "candidate.stage_restored_after_on_hold_removal" in source
+    active_constraint = source.split("def downgrade", 1)[0].split("teacher_candidates_stage_check", 1)[1]
+    assert "'on_hold'" not in active_constraint
