@@ -539,6 +539,35 @@ def test_passed_assigned_demo_moves_test_and_demo_to_under_review(monkeypatch):
     assert conn.commits == 1
 
 
+def test_passed_interview_moves_job_interview_to_test_and_demo(monkeypatch):
+    conn = _DatabaseConnection()
+    stage_updates = []
+    events = []
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_args, **_kwargs: {"id": 7, "status": "job_interview", "version": 4})
+    monkeypatch.setattr(repository, "insert_interview", lambda *_args, **_kwargs: 110)
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **kwargs: stage_updates.append(kwargs) or {"id": 7, "status": "test_and_demo", "version": 5})
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])))
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo"})
+
+    result = service.add_interview(
+        _user(),
+        7,
+        {"result": "passed", "notes": "Candidate passed the interview."},
+    )
+
+    assert result["status"] == "test_and_demo"
+    assert stage_updates[0]["stage"] == "test_and_demo"
+    assert stage_updates[0]["expected_version"] == 4
+    assert stage_updates[0]["transition_source"] == "automatic"
+    assert events == [
+        ("candidate.interview_recorded", {"record_id": 110, "result": "passed"}),
+        ("candidate.stage_changed", {"from": "job_interview", "to": "test_and_demo", "reason": "Passed job interview"}),
+    ]
+    assert conn.commits == 1
+
+
 def test_demo_notifications_have_versioned_dedupe_keys_and_future_reminders():
     class NotificationConnection:
         def __init__(self):

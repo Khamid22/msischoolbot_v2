@@ -2112,6 +2112,32 @@ def _add_record(
                 now=now,
             )
         elif (
+            evaluation_type == "interview"
+            and result == "passed"
+            and _text(candidate.get("status")) == "job_interview"
+        ):
+            if not repository.update_candidate_stage(
+                conn,
+                candidate_id=int(candidate_id),
+                stage="test_and_demo",
+                expected_version=int(candidate["version"]),
+                actor_account_id=_actor_account(user),
+                now=now,
+                comment="Passed job interview",
+                transition_source="automatic",
+            ):
+                raise RecruitmentError("This candidate changed elsewhere. Refresh and try again.", status_code=409)
+            stage_changed = True
+            repository.insert_audit(
+                conn,
+                candidate_id=int(candidate_id),
+                event_type="candidate.stage_changed",
+                detail={"from": "job_interview", "to": "test_and_demo", "reason": "Passed job interview"},
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        elif (
             evaluation_type == "demo"
             and result == "passed"
             and appointment_id
