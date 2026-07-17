@@ -457,6 +457,54 @@ def list_candidates(
     }
 
 
+def list_teacher_handoffs(
+    user: CurrentUser,
+    *,
+    kind: str,
+    page: int = 1,
+    per_page: int = 100,
+    search: str = "",
+) -> dict[str, Any]:
+    if user.role not in {"hr_manager", "ceo"}:
+        raise RecruitmentError(
+            "Teacher handoff records require HR Manager or CEO access.",
+            status_code=403,
+        )
+    normalized_kind = _text(kind)
+    if normalized_kind not in {"teacher_academy", "active_teacher"}:
+        raise RecruitmentError("Unknown teacher handoff type.")
+    safe_page = max(1, int(page or 1))
+    safe_per_page = max(1, min(int(per_page or 100), 100))
+    with connect_auth_db() as conn:
+        rows, total = repository.list_teacher_handoff_rows(
+            conn,
+            kind=normalized_kind,
+            search=_text(search),
+            limit=safe_per_page,
+            offset=(safe_page - 1) * safe_per_page,
+        )
+    return {
+        "items": [
+            {
+                "kind": _text(row["kind"]),
+                "record_id": int(row["record_id"]),
+                "recruitment_candidate_id": int(row["recruitment_candidate_id"] or 0),
+                "full_name": _text(row["full_name"]),
+                "position": _text(row["position"]),
+                "subject": _text(row["subject"]),
+                "status": _text(row["status"]),
+                "onboarding_status": _text(row["onboarding_status"]),
+                "joined_at": _iso(row["joined_at"]),
+            }
+            for row in rows
+        ],
+        "page": safe_page,
+        "per_page": safe_per_page,
+        "total": total,
+        "total_pages": max(1, ceil(total / safe_per_page)) if total else 1,
+    }
+
+
 def list_decision_queue(
     user: CurrentUser,
     *,

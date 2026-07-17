@@ -333,6 +333,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(teachers, /active_teacher/);
     assert.match(teachers, /Teacher Academy/);
     assert.match(teachers, /Active Teachers/);
+    assert.match(teachers, /\/teachers\?kind=teacher_academy/);
+    assert.match(teachers, /\/teachers\?kind=active_teacher/);
+    assert.match(teachers, /recruitment_candidate_id/);
     assert.match(teachers, /role="tablist"/);
     assert.match(teachers, /role="tab"/);
     assert.match(teachers, /role="tabpanel"/);

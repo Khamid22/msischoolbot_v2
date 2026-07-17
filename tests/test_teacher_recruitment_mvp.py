@@ -57,6 +57,92 @@ def test_stage_and_rejection_taxonomies_are_stable():
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
 
+def test_teacher_handoff_repository_reads_canonical_tables_and_keeps_legacy_fallbacks():
+    class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def fetchone(self):
+            return self.rows[0] if self.rows else None
+
+        def fetchall(self):
+            return self.rows
+
+    class Connection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return Result([{"total": 0}]) if "count(*) AS total" in sql else Result([])
+
+    academy_conn = Connection()
+    assert repository.list_teacher_handoff_rows(
+        academy_conn,
+        kind="teacher_academy",
+        search="Math",
+    ) == ([], 0)
+    academy_sql = "\n".join(sql for sql, _params in academy_conn.calls)
+    assert "FROM msi_v2.academy_teachers academy" in academy_sql
+    assert "academy.promoted_teacher_id IS NULL" in academy_sql
+    assert "candidate.status = 'teacher_academy'" in academy_sql
+    assert "linked.recruitment_candidate_id = candidate.id" in academy_sql
+
+    active_conn = Connection()
+    assert repository.list_teacher_handoff_rows(
+        active_conn,
+        kind="active_teacher",
+    ) == ([], 0)
+    active_sql = "\n".join(sql for sql, _params in active_conn.calls)
+    assert "FROM msi_v2.teachers teacher" in active_sql
+    assert "teacher.status = 'active'" in active_sql
+    assert "FROM msi_v2.teacher_subjects teacher_subject_link" in active_sql
+    assert "candidate.status = 'active_teacher'" in active_sql
+
+
+def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(monkeypatch):
+    @contextmanager
+    def connect():
+        yield object()
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "list_teacher_handoff_rows",
+        lambda *_args, **_kwargs: (
+            [
+                {
+                    "kind": "teacher_academy",
+                    "record_id": 17,
+                    "recruitment_candidate_id": None,
+                    "full_name": "Existing Math Teacher",
+                    "position": "IGCSE Math Teacher",
+                    "subject": "Mathematics",
+                    "status": "in_training",
+                    "onboarding_status": "complete",
+                    "joined_at": "2026-07-17T10:00:00+00:00",
+                }
+            ],
+            1,
+        ),
+    )
+    result = service.list_teacher_handoffs(
+        _user(),
+        kind="teacher_academy",
+        search="Math",
+    )
+    assert result["total"] == 1
+    assert result["items"][0]["record_id"] == 17
+    assert result["items"][0]["recruitment_candidate_id"] == 0
+    assert result["items"][0]["position"] == "IGCSE Math Teacher"
+
+    with pytest.raises(service.RecruitmentError, match="HR Manager or CEO"):
+        service.list_teacher_handoffs(
+            _user("academic_director"),
+            kind="teacher_academy",
+        )
+
+
 def test_minimal_candidate_and_blank_optional_values_validate():
     candidate = CandidateCreate.model_validate({"full_name": "  Ada Teacher  ", "application_date": ""})
     assert candidate.full_name == "Ada Teacher"

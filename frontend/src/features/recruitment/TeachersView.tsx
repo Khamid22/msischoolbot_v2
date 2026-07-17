@@ -3,21 +3,58 @@ import { GraduationCap, Search, UserCheck } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent } from "react";
 
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { dateTimeLabel, type RecruitmentCandidate } from "@/features/recruitment/model";
+import { dateTimeLabel } from "@/features/recruitment/model";
 import { RECRUITMENT_API, fieldClass, queryError } from "@/features/recruitment/ui";
 
-type CandidatePage = { items: RecruitmentCandidate[]; total: number };
+type RecruitmentTeacher = {
+  kind: "teacher_academy" | "active_teacher";
+  record_id: number;
+  recruitment_candidate_id: number;
+  full_name: string;
+  position: string;
+  subject: string;
+  status: string;
+  onboarding_status: string;
+  joined_at: string;
+};
+
+type TeacherPage = { items: RecruitmentTeacher[]; total: number };
+
+function statusLabel(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function TeacherCard({ teacher, basePath }: { teacher: RecruitmentTeacher; basePath: string }) {
+  const content = (
+    <>
+      <span className="flex items-start justify-between gap-2">
+        <strong className="block min-w-0 truncate text-sm">{teacher.full_name}</strong>
+        {teacher.onboarding_status === "pending" ? <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Onboarding pending</span> : null}
+      </span>
+      <span className="mt-1 block truncate text-xs text-muted-foreground">{teacher.position || teacher.subject || "Position not set"}</span>
+      <span className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-muted-foreground">
+        <span>{teacher.kind === "teacher_academy" ? "Academy since" : "Active since"} {dateTimeLabel(teacher.joined_at)}</span>
+        {teacher.status ? <span aria-label={`Status: ${statusLabel(teacher.status)}`}>· {statusLabel(teacher.status)}</span> : null}
+      </span>
+    </>
+  );
+  const classes = "rounded-xl border border-border bg-card p-4 transition-[transform,box-shadow,border-color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transform-none motion-reduce:transition-none";
+  if (teacher.recruitment_candidate_id) {
+    return <a href={`${basePath}/candidates/${teacher.recruitment_candidate_id}?origin=teachers`} className={`${classes} hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover`}>{content}</a>;
+  }
+  return <article className={classes}>{content}</article>;
+}
 
 export function TeachersView({ basePath }: { basePath: string }) {
   const [stage, setStage] = useState<"teacher_academy" | "active_teacher">("teacher_academy");
   const [search, setSearch] = useState("");
   const academy = useQuery({
     queryKey: ["recruitment", "teachers", "teacher_academy", search],
-    queryFn: () => recruitmentRequest<CandidatePage>(`${RECRUITMENT_API}/candidates?stage=teacher_academy&per_page=100&search=${encodeURIComponent(search)}`),
+    queryFn: () => recruitmentRequest<TeacherPage>(`${RECRUITMENT_API}/teachers?kind=teacher_academy&per_page=100&search=${encodeURIComponent(search)}`),
   });
   const active = useQuery({
     queryKey: ["recruitment", "teachers", "active_teacher", search],
-    queryFn: () => recruitmentRequest<CandidatePage>(`${RECRUITMENT_API}/candidates?stage=active_teacher&per_page=100&search=${encodeURIComponent(search)}`),
+    queryFn: () => recruitmentRequest<TeacherPage>(`${RECRUITMENT_API}/teachers?kind=active_teacher&per_page=100&search=${encodeURIComponent(search)}`),
   });
   const selected = stage === "teacher_academy" ? academy : active;
   const items = useMemo(() => selected.data?.items || [], [selected.data]);
@@ -51,8 +88,8 @@ export function TeachersView({ basePath }: { basePath: string }) {
         {selected.error ? <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{queryError(selected.error)}</div> : null}
         {!selected.isLoading && !selected.error ? (
           <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((candidate) => <a key={candidate.id} href={`${basePath}/candidates/${candidate.id}?origin=teachers`} className="rounded-xl border border-border bg-card p-4 transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transform-none motion-reduce:transition-none"><strong className="block truncate text-sm">{candidate.full_name}</strong><span className="mt-1 block truncate text-xs text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</span><span className="mt-3 block text-[11px] font-medium text-muted-foreground">Finalized {dateTimeLabel(candidate.final_decision_at)}</span></a>)}
-            {!items.length ? <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No recruitment-linked teachers in this view.</div> : null}
+            {items.map((teacher) => <TeacherCard key={`${teacher.kind}:${teacher.record_id}`} teacher={teacher} basePath={basePath} />)}
+            {!items.length ? <div className="col-span-full rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No teachers in this view.</div> : null}
           </section>
         ) : null}
       </div>

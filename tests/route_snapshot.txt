@@ -191,6 +191,7 @@
 /api/v1/recruitment/settings/sla-rules/{stage} | PATCH
 /api/v1/recruitment/settings/{setting_id} | DELETE
 /api/v1/recruitment/tasks | GET
+/api/v1/recruitment/teachers | GET
 /api/v1/student/activity/ping | GET
 /api/v1/student/chat/messages | GET
 /api/v1/student/chat/messages | POST

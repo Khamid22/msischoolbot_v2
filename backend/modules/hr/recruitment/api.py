@@ -128,6 +128,29 @@ def candidates(
     )
 
 
+@router.get("/teachers", operation_id="api_v1_recruitment_teachers")
+def teachers(
+    kind: Annotated[
+        str,
+        Query(pattern="^(teacher_academy|active_teacher)$"),
+    ] = "teacher_academy",
+    page: Annotated[int, Query(ge=1)] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100)] = 100,
+    search: str = "",
+    user: CurrentUser = Depends(get_current_user),
+):
+    return api_success(
+        _call(
+            service.list_teacher_handoffs,
+            user,
+            kind=kind,
+            page=page,
+            per_page=per_page,
+            search=search,
+        )
+    )
+
+
 @router.get("/decision-queue", operation_id="api_v1_recruitment_decision_queue")
 def decision_queue(
     page: Annotated[int, Query(ge=1)] = 1,

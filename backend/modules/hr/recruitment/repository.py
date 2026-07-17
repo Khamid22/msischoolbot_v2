@@ -370,6 +370,182 @@ def list_candidate_rows(
     return rows, int(total_row["total"] or 0) if total_row else 0
 
 
+def list_teacher_handoff_rows(
+    conn: Any,
+    *,
+    kind: str,
+    search: str = "",
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[Any], int]:
+    """List canonical Academy/active teachers, retaining unlinked legacy outcomes.
+
+    The canonical business tables are the source of truth. Recruitment candidates
+    are included only as a compatibility fallback when an older final outcome has
+    no linked handoff record.
+    """
+
+    if kind == "teacher_academy":
+        records_sql = """
+            SELECT
+                'teacher_academy'::text AS kind,
+                academy.id AS record_id,
+                academy.recruitment_candidate_id,
+                academy.full_name,
+                COALESCE(
+                    NULLIF(academy.position, ''),
+                    NULLIF(program.program_name, ''),
+                    NULLIF(subject.subject_name, ''),
+                    'Position not set'
+                ) AS position,
+                COALESCE(subject.subject_name, '') AS subject,
+                COALESCE(academy.academy_status, 'in_training') AS status,
+                COALESCE(academy.account_onboarding_status, 'complete') AS onboarding_status,
+                COALESCE(
+                    academy.academy_start_date::timestamptz,
+                    academy.created_at
+                ) AS joined_at
+            FROM msi_v2.academy_teachers academy
+            LEFT JOIN msi_v2.subjects subject ON subject.id = academy.subject_id
+            LEFT JOIN msi_v2.subject_programs program
+              ON program.id = academy.subject_program_id
+            WHERE academy.promoted_teacher_id IS NULL
+
+            UNION ALL
+
+            SELECT
+                'teacher_academy'::text AS kind,
+                candidate.id AS record_id,
+                candidate.id AS recruitment_candidate_id,
+                candidate.full_name,
+                COALESCE(
+                    NULLIF(candidate.applied_position, ''),
+                    NULLIF(subject.subject_name, ''),
+                    'Position not set'
+                ) AS position,
+                COALESCE(subject.subject_name, '') AS subject,
+                candidate.status,
+                'missing_handoff'::text AS onboarding_status,
+                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at
+            FROM msi_v2.teacher_candidates candidate
+            LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
+            WHERE candidate.status = 'teacher_academy'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM msi_v2.academy_teachers linked
+                  WHERE linked.recruitment_candidate_id = candidate.id
+              )
+        """
+    elif kind == "active_teacher":
+        records_sql = """
+            SELECT
+                'active_teacher'::text AS kind,
+                teacher.id AS record_id,
+                teacher.recruitment_candidate_id,
+                teacher.full_name,
+                COALESCE(
+                    NULLIF(candidate.applied_position, ''),
+                    NULLIF(teacher_subject.subject_name, ''),
+                    'Position not set'
+                ) AS position,
+                COALESCE(teacher_subject.subject_name, '') AS subject,
+                teacher.status,
+                COALESCE(teacher.account_onboarding_status, 'complete') AS onboarding_status,
+                teacher.created_at AS joined_at
+            FROM msi_v2.teachers teacher
+            LEFT JOIN msi_v2.teacher_candidates candidate
+              ON candidate.id = teacher.recruitment_candidate_id
+            LEFT JOIN LATERAL (
+                SELECT string_agg(
+                    DISTINCT available_subject.subject_name,
+                    ', ' ORDER BY available_subject.subject_name
+                ) AS subject_name
+                FROM (
+                    SELECT direct_subject.subject_name
+                    FROM msi_v2.teacher_subjects teacher_subject_link
+                    JOIN msi_v2.subjects direct_subject
+                      ON direct_subject.id = teacher_subject_link.subject_id
+                    WHERE teacher_subject_link.teacher_id = teacher.id
+                      AND teacher_subject_link.status = 'active'
+
+                    UNION ALL
+
+                    SELECT group_subject.subject_name
+                    FROM msi_v2.group_teachers group_teacher
+                    JOIN msi_v2.groups teacher_group ON teacher_group.id = group_teacher.group_id
+                    JOIN msi_v2.subject_programs group_program
+                      ON group_program.id = teacher_group.program_id
+                    JOIN msi_v2.subjects group_subject
+                      ON group_subject.id = group_program.subject_id
+                    WHERE group_teacher.teacher_id = teacher.id
+                      AND group_teacher.status = 'active'
+                ) available_subject
+            ) teacher_subject ON true
+            WHERE teacher.status = 'active'
+
+            UNION ALL
+
+            SELECT
+                'active_teacher'::text AS kind,
+                candidate.id AS record_id,
+                candidate.id AS recruitment_candidate_id,
+                candidate.full_name,
+                COALESCE(
+                    NULLIF(candidate.applied_position, ''),
+                    NULLIF(subject.subject_name, ''),
+                    'Position not set'
+                ) AS position,
+                COALESCE(subject.subject_name, '') AS subject,
+                candidate.status,
+                'missing_handoff'::text AS onboarding_status,
+                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at
+            FROM msi_v2.teacher_candidates candidate
+            LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
+            WHERE candidate.status = 'active_teacher'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM msi_v2.teachers linked
+                  WHERE linked.recruitment_candidate_id = candidate.id
+              )
+        """
+    else:
+        raise ValueError("Unknown teacher handoff kind.")
+
+    filters: list[str] = []
+    params: list[Any] = []
+    normalized_search = str(search or "").strip()
+    if normalized_search:
+        filters.append(
+            "(record.full_name ILIKE %s OR record.position ILIKE %s OR record.subject ILIKE %s)"
+        )
+        search_term = f"%{normalized_search}%"
+        params.extend((search_term, search_term, search_term))
+    where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+    total_row = conn.execute(
+        f"""
+        WITH record AS ({records_sql})
+        SELECT count(*) AS total
+        FROM record
+        {where_sql}
+        """,
+        tuple(params) if params else None,
+    ).fetchone()
+    rows = conn.execute(
+        f"""
+        WITH record AS ({records_sql})
+        SELECT record.kind, record.record_id, record.recruitment_candidate_id,
+               record.full_name, record.position, record.subject, record.status,
+               record.onboarding_status, record.joined_at::text AS joined_at
+        FROM record
+        {where_sql}
+        ORDER BY record.joined_at DESC NULLS LAST, lower(record.full_name), record.record_id
+        LIMIT %s OFFSET %s
+        """,
+        tuple([*params, int(limit), int(offset)]),
+    ).fetchall()
+    return rows, int(total_row["total"] or 0) if total_row else 0
+
+
 def list_decision_queue_rows(
     conn: Any,
     *,
