@@ -236,14 +236,68 @@ export type RecruitmentSettingsData = {
 };
 
 export type HrAnalyticsDashboard = {
-  range: { from: string; to: string; timezone: string };
+  role: "hr_manager" | "ceo";
+  range: {
+    from: string;
+    to: string;
+    timezone: string;
+    period: "today" | "week" | "month" | "quarter" | "year" | "custom";
+    comparison_from: string;
+    comparison_to: string;
+    bucket: "day" | "week" | "month";
+  };
+  filters: {
+    source: string;
+    subsource: string;
+    position: string;
+    subject_id?: number | null;
+    responsible_account_id?: number | null;
+  };
+  summary_cards: Record<"applications" | "shortlisted" | "hired" | "rejected", {
+    value: number;
+    previous: number;
+    delta_percentage?: number | null;
+  }>;
+  secondary_kpis: {
+    academy_accepted: number;
+    withdrawn: number;
+    active_candidates: number;
+    average_time_to_hire_days?: number | null;
+    overall_conversion_percentage?: number | null;
+    sla_breaches: number;
+  };
   kpis: { active_candidates: number; new_this_month: number; hired_this_month: number; average_time_to_hire_days?: number | null; overall_conversion_percentage?: number | null };
   funnel: Array<{ stage: string; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
+  journey: Array<{ stage: string; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
+  outcomes: Array<{ outcome: string; candidates: number }>;
+  activity_trend: Array<{ bucket: string; applications: number; shortlisted: number; hired: number; rejected: number }>;
+  position_distribution: Array<{ position: string; candidates: number }>;
+  source_distribution: Array<{ source: string; candidates: number; shortlisted: number; hired: number; percentage: number }>;
+  source_quality: Array<{ source: string; subsource: string; candidates: number; shortlisted: number; hired: number; conversion_percentage: number }>;
   source_conversion: Array<{ source: string; candidates: number; hired: number; conversion_percentage: number }>;
-  time_in_stage: Array<{ stage: string; average_days: number; sla_breaches: number; entries: number }>;
+  time_in_stage: Array<{ stage: string; average_days: number; sla_target_days?: number | null; sla_breaches: number; entries: number }>;
   sla: { breaches: number; bottlenecks: Array<{ stage: string; average_days: number; sla_breaches: number }> };
   overdue_actions: Array<{ id: number; candidate_id: number; candidate_name: string; title: string; due_at: string }>;
   upcoming_appointments: Array<{ id: number; candidate_id: number; candidate_name: string; appointment_type: string; starts_at: string; responsible_name?: string }>;
+  recent_candidates: Array<{
+    id: number;
+    full_name: string;
+    position: string;
+    source: string;
+    subsource?: string;
+    application_date?: string;
+    status: string;
+    next_action?: string;
+  }>;
+  recent_activity: Array<{
+    id: number;
+    event_type: string;
+    detail_json?: Record<string, unknown>;
+    created_at: string;
+    candidate_id: number;
+    candidate_name: string;
+    actor: string;
+  }>;
 };
 
 export const primaryStages = [

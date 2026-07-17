@@ -32,9 +32,11 @@ def options(user: CurrentUser = Depends(get_current_user)):
 
 @router.get("/dashboard", operation_id="api_v1_hr_analytics_dashboard")
 def dashboard(
+    period: str = "",
     date_from: str = "",
     date_to: str = "",
     source: str = "",
+    subsource: str = "",
     position: str = "",
     subject_id: int | None = None,
     responsible_account_id: int | None = None,
@@ -44,9 +46,11 @@ def dashboard(
         _call(
             service.dashboard,
             user,
+            period=period,
             date_from=date_from,
             date_to=date_to,
             source=source,
+            subsource=subsource,
             position=position,
             subject_id=subject_id,
             responsible_account_id=responsible_account_id,

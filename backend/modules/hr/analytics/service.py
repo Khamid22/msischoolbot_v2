@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from calendar import monthrange
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -14,6 +15,15 @@ from backend.modules.hr.analytics import repository
 
 TASHKENT = ZoneInfo("Asia/Tashkent")
 ANALYTICS_ROLES = frozenset({"hr_manager", "ceo"})
+PERIODS = frozenset({"today", "week", "month", "quarter", "year", "custom"})
+JOURNEY_STAGES = (
+    "new_candidate",
+    "responded",
+    "job_interview",
+    "test_and_demo",
+    "under_review",
+)
+OUTCOMES = ("teacher_academy", "active_teacher", "rejected", "candidate_withdrew")
 
 
 class HrAnalyticsError(ValueError):
@@ -37,22 +47,165 @@ def _dict(row: Any) -> dict[str, Any]:
     return result
 
 
-def _parse_date(value: str, fallback: date) -> date:
-    if not value:
-        return fallback
+def _parse_date(value: str, *, field: str) -> date:
     try:
         return date.fromisoformat(value)
-    except ValueError as exc:
-        raise HrAnalyticsError("Analytics dates must use YYYY-MM-DD.") from exc
+    except (TypeError, ValueError) as exc:
+        raise HrAnalyticsError(f"{field} must use YYYY-MM-DD.") from exc
+
+
+def _month_start(value: date) -> date:
+    return value.replace(day=1)
+
+
+def _month_end(value: date) -> date:
+    return value.replace(day=monthrange(value.year, value.month)[1])
+
+
+def _previous_month(value: date) -> date:
+    return (value.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+
+def _period_bounds(
+    *,
+    today: date,
+    period: str,
+    date_from: str,
+    date_to: str,
+) -> tuple[date, date, date, date, str]:
+    normalized = (period or "").strip().lower()
+    if date_from or date_to:
+        normalized = "custom"
+    if normalized not in PERIODS:
+        raise HrAnalyticsError("Analytics period must be today, week, month, quarter, year, or custom.")
+
+    if normalized == "custom":
+        if not date_from or not date_to:
+            raise HrAnalyticsError("Custom analytics ranges require both start and end dates.")
+        start = _parse_date(date_from, field="Analytics start date")
+        end = _parse_date(date_to, field="Analytics end date")
+    elif normalized == "today":
+        start = end = today
+    elif normalized == "week":
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+    elif normalized == "month":
+        start = _month_start(today)
+        end = _month_end(today)
+    elif normalized == "quarter":
+        quarter_month = ((today.month - 1) // 3) * 3 + 1
+        start = date(today.year, quarter_month, 1)
+        end_month = quarter_month + 2
+        end = date(today.year, end_month, monthrange(today.year, end_month)[1])
+    else:
+        start = date(today.year, 1, 1)
+        end = date(today.year, 12, 31)
+
+    if start > end:
+        raise HrAnalyticsError("The start date cannot be after the end date.")
+    if (end - start).days > 3660:
+        raise HrAnalyticsError("Analytics date range cannot exceed ten years.")
+
+    if normalized == "today":
+        comparison_start = comparison_end = start - timedelta(days=1)
+    elif normalized == "week":
+        comparison_start = start - timedelta(days=7)
+        comparison_end = start - timedelta(days=1)
+    elif normalized == "month":
+        comparison_start = _previous_month(start)
+        comparison_end = _month_end(comparison_start)
+    elif normalized == "quarter":
+        comparison_end = start - timedelta(days=1)
+        comparison_start = date(
+            comparison_end.year,
+            ((comparison_end.month - 1) // 3) * 3 + 1,
+            1,
+        )
+    elif normalized == "year":
+        comparison_start = date(start.year - 1, 1, 1)
+        comparison_end = date(start.year - 1, 12, 31)
+    else:
+        span = end - start
+        comparison_end = start - timedelta(days=1)
+        comparison_start = comparison_end - span
+
+    return start, end, comparison_start, comparison_end, normalized
+
+
+def _bucket_for(start: date, end: date) -> str:
+    days = (end - start).days + 1
+    if days <= 31:
+        return "day"
+    if days <= 180:
+        return "week"
+    return "month"
+
+
+def _bucket_start(value: date, bucket: str) -> date:
+    if bucket == "week":
+        return value - timedelta(days=value.weekday())
+    if bucket == "month":
+        return value.replace(day=1)
+    return value
+
+
+def _next_bucket(value: date, bucket: str) -> date:
+    if bucket == "day":
+        return value + timedelta(days=1)
+    if bucket == "week":
+        return value + timedelta(days=7)
+    if value.month == 12:
+        return date(value.year + 1, 1, 1)
+    return date(value.year, value.month + 1, 1)
+
+
+def _trend(rows: list[Any], *, start: date, end: date, bucket: str) -> list[dict[str, Any]]:
+    counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        item = _dict(row)
+        counts[(str(item["bucket"]), str(item["event_type"]))] = int(item["candidates"] or 0)
+    result: list[dict[str, Any]] = []
+    cursor = _bucket_start(start, bucket)
+    final_bucket = _bucket_start(end, bucket)
+    while cursor <= final_bucket:
+        key = cursor.isoformat()
+        result.append(
+            {
+                "bucket": key,
+                "applications": counts.get((key, "applications"), 0),
+                "shortlisted": counts.get((key, "shortlisted"), 0),
+                "hired": counts.get((key, "hired"), 0),
+                "rejected": counts.get((key, "rejected"), 0),
+            }
+        )
+        cursor = _next_bucket(cursor, bucket)
+    return result
+
+
+def _comparison_metric(current: Any, previous: Any) -> dict[str, Any]:
+    current_value = float(current or 0)
+    previous_value = float(previous or 0)
+    delta = None
+    if previous_value:
+        delta = round((current_value - previous_value) / previous_value * 100, 1)
+    return {
+        "value": int(current_value),
+        "previous": int(previous_value),
+        "delta_percentage": delta,
+    }
 
 
 def options(user: CurrentUser) -> dict[str, Any]:
     _ensure_access(user)
     with connect_auth_db() as conn:
         rows = repository.options_rows(conn)
+    positions = [_dict(row) for row in rows["positions"]]
     return {
         "sources": [_dict(row) for row in rows["sources"]],
-        "positions": [str(row["value"]) for row in rows["positions"]],
+        "subsources": [_dict(row) for row in rows["subsources"]],
+        # Retain the original string list while exposing immutable IDs to the new UI.
+        "positions": [str(row["label"]) for row in positions],
+        "position_options": positions,
         "subjects": [_dict(row) for row in rows["subjects"]],
         "responsible_people": [_dict(row) for row in rows["responsible_people"]],
     }
@@ -61,78 +214,174 @@ def options(user: CurrentUser) -> dict[str, Any]:
 def dashboard(
     user: CurrentUser,
     *,
+    period: str = "",
     date_from: str = "",
     date_to: str = "",
     source: str = "",
+    subsource: str = "",
     position: str = "",
     subject_id: int | None = None,
     responsible_account_id: int | None = None,
 ) -> dict[str, Any]:
     _ensure_access(user)
     today = datetime.now(TASHKENT).date()
-    end = _parse_date(date_to, today)
-    start = _parse_date(date_from, end - timedelta(days=365))
-    if start > end:
-        raise HrAnalyticsError("The start date cannot be after the end date.")
-    if (end - start).days > 3660:
-        raise HrAnalyticsError("Analytics date range cannot exceed ten years.")
-    month_from = today.replace(day=1)
-    month_to = (month_from.replace(day=28) + timedelta(days=4)).replace(day=1)
+    selected_period = period.strip().lower() or ("month" if user.role == "hr_manager" else "year")
+    start, end, comparison_start, comparison_end, selected_period = _period_bounds(
+        today=today,
+        period=selected_period,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    bucket = _bucket_for(start, end)
     now = datetime.now(UTC).isoformat()
     with connect_auth_db() as conn:
         rows = repository.dashboard_rows(
             conn,
             date_from=start.isoformat(),
             date_to=end.isoformat(),
-            month_from=month_from.isoformat(),
-            month_to=month_to.isoformat(),
+            comparison_from=comparison_start.isoformat(),
+            comparison_to=comparison_end.isoformat(),
+            bucket=bucket,
             now=now,
             source=source.strip(),
+            subsource=subsource.strip(),
             position=position.strip(),
             subject_id=subject_id,
             responsible_account_id=responsible_account_id,
         )
+
+    current = _dict(rows["current_summary"])
+    comparison = _dict(rows["comparison_summary"])
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
-    funnel_counts = {str(row["stage"]): int(row["candidates"] or 0) for row in rows["funnel"]}
-    funnel_order = (
-        "new_candidate", "responded", "job_interview", "test_and_demo",
-        "under_review", "teacher_academy", "active_teacher",
-    )
-    funnel: list[dict[str, Any]] = []
+    journey_counts = {
+        str(row["stage"]): int(row["candidates"] or 0)
+        for row in rows["journey"]
+    }
+    journey: list[dict[str, Any]] = []
     previous_count: int | None = None
-    for stage in funnel_order:
-        count = funnel_counts.get(stage, 0)
-        funnel.append(
+    for stage in JOURNEY_STAGES:
+        count = journey_counts.get(stage, 0)
+        journey.append(
             {
                 "stage": stage,
                 "candidates": count,
                 "previous_stage_candidates": previous_count,
                 "conversion_percentage": (
                     round(count / previous_count * 100, 1)
-                    if previous_count and previous_count > 0
+                    if previous_count
                     else None
                 ),
             }
         )
         previous_count = count
+
+    outcome_counts = {
+        str(row["outcome"]): int(row["candidates"] or 0)
+        for row in rows["outcomes"]
+    }
+    outcomes = [
+        {"outcome": outcome, "candidates": outcome_counts.get(outcome, 0)}
+        for outcome in OUTCOMES
+    ]
+
+    source_quality = [_dict(row) for row in rows["source_quality"]]
+    source_totals: dict[str, dict[str, Any]] = {}
+    for item in source_quality:
+        source_name = str(item["source"])
+        total = source_totals.setdefault(
+            source_name,
+            {"source": source_name, "candidates": 0, "shortlisted": 0, "hired": 0},
+        )
+        total["candidates"] += int(item.get("candidates") or 0)
+        total["shortlisted"] += int(item.get("shortlisted") or 0)
+        total["hired"] += int(item.get("hired") or 0)
+    application_total = int(current.get("applications") or 0)
+    source_distribution = sorted(
+        (
+            {
+                **item,
+                "percentage": round(item["candidates"] / application_total * 100, 1)
+                if application_total
+                else 0,
+            }
+            for item in source_totals.values()
+        ),
+        key=lambda item: (-item["candidates"], item["source"]),
+    )
+    source_conversion = [
+        {
+            "source": item["source"],
+            "candidates": item["candidates"],
+            "hired": item["hired"],
+            "conversion_percentage": (
+                round(item["hired"] / item["candidates"] * 100, 1)
+                if item["candidates"]
+                else 0
+            ),
+        }
+        for item in source_distribution
+    ]
+
     return {
-        "range": {"from": start.isoformat(), "to": end.isoformat(), "timezone": "Asia/Tashkent"},
+        "role": user.role,
+        "range": {
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "timezone": "Asia/Tashkent",
+            "period": selected_period,
+            "comparison_from": comparison_start.isoformat(),
+            "comparison_to": comparison_end.isoformat(),
+            "bucket": bucket,
+        },
         "filters": {
             "source": source,
+            "subsource": subsource,
             "position": position,
             "subject_id": subject_id,
             "responsible_account_id": responsible_account_id,
         },
-        "kpis": _dict(rows["kpis"]),
-        "funnel": funnel,
-        "source_conversion": [_dict(row) for row in rows["source_conversion"]],
+        "summary_cards": {
+            key: _comparison_metric(current.get(key), comparison.get(key))
+            for key in ("applications", "shortlisted", "hired", "rejected")
+        },
+        "secondary_kpis": {
+            "academy_accepted": int(current.get("academy_accepted") or 0),
+            "withdrawn": int(current.get("withdrawn") or 0),
+            "active_candidates": int(current.get("active_candidates") or 0),
+            "average_time_to_hire_days": current.get("average_time_to_hire_days"),
+            "overall_conversion_percentage": current.get("overall_conversion_percentage"),
+            "sla_breaches": int(current.get("sla_breaches") or 0),
+        },
+        # Compatibility for clients using the first analytics contract.
+        "kpis": {
+            "active_candidates": int(current.get("active_candidates") or 0),
+            "new_this_month": int(current.get("applications") or 0),
+            "hired_this_month": int(current.get("hired") or 0),
+            "average_time_to_hire_days": current.get("average_time_to_hire_days"),
+            "overall_conversion_percentage": current.get("overall_conversion_percentage"),
+        },
+        "funnel": journey,
+        "journey": journey,
+        "outcomes": outcomes,
+        "activity_trend": _trend(
+            rows["activity_trend"],
+            start=start,
+            end=end,
+            bucket=bucket,
+        ),
+        "position_distribution": [_dict(row) for row in rows["position_distribution"]],
+        "source_distribution": source_distribution,
+        "source_quality": source_quality,
+        "source_conversion": source_conversion,
         "time_in_stage": stage_time,
         "sla": {
-            "breaches": sum(int(item.get("sla_breaches") or 0) for item in stage_time),
+            "breaches": int(current.get("sla_breaches") or 0),
             "bottlenecks": stage_time[:3],
         },
         "overdue_actions": [_dict(row) for row in rows["overdue_actions"]],
         "upcoming_appointments": [_dict(row) for row in rows["upcoming_appointments"]],
+        "recent_candidates": [_dict(row) for row in rows["recent_candidates"]],
+        "recent_activity": [_dict(row) for row in rows["recent_activity"]],
     }
 
 

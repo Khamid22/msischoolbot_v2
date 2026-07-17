@@ -1073,12 +1073,13 @@ def _appointment_payload(row: Any) -> dict[str, Any]:
 
 def _lock_candidate(conn: Any, candidate_id: int) -> Any:
     """Use a row lock in PostgreSQL while keeping lightweight repository test doubles usable."""
-    if hasattr(conn, "execute"):
-        return repository.lock_candidate_decision_row(conn, int(candidate_id))
     try:
-        return repository.get_candidate_row(conn, int(candidate_id))
+        return repository.lock_candidate_decision_row(conn, int(candidate_id))
     except AttributeError:
-        return {"id": int(candidate_id)}
+        try:
+            return repository.get_candidate_row(conn, int(candidate_id))
+        except AttributeError:
+            return {"id": int(candidate_id)}
 
 
 def start_interview_session(

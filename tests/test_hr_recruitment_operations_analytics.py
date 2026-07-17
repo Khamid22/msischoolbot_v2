@@ -3,11 +3,14 @@
 import json
 import os
 from base64 import b64encode
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from itsdangerous import TimestampSigner
 
+from backend.core.access import CurrentUser
+from backend.modules.hr.analytics import repository as analytics_repository
 from backend.modules.hr.analytics import service as analytics_service
 from backend.modules.hr.recruitment import service
 from backend.modules.hr.recruitment.schemas import DemoLessonWrite, InterviewWrite, SubjectTestWrite
@@ -78,6 +81,140 @@ def test_hr_and_ceo_can_read_analytics_but_ad_cannot(client, monkeypatch):
         assert client.get("/api/v1/hr/analytics/dashboard", headers=XHR).json()["data"]["role"] == role
     client.cookies.set("session", _session("academic_director"))
     assert client.get("/api/v1/hr/analytics/dashboard", headers=XHR).status_code == 403
+
+
+def test_analytics_calendar_periods_use_tashkent_boundaries():
+    today = datetime(2026, 7, 17).date()
+    assert analytics_service._period_bounds(
+        today=today, period="month", date_from="", date_to=""
+    ) == (
+        datetime(2026, 7, 1).date(),
+        datetime(2026, 7, 31).date(),
+        datetime(2026, 6, 1).date(),
+        datetime(2026, 6, 30).date(),
+        "month",
+    )
+    assert analytics_service._period_bounds(
+        today=today, period="custom", date_from="2026-07-10", date_to="2026-07-17"
+    ) == (
+        datetime(2026, 7, 10).date(),
+        datetime(2026, 7, 17).date(),
+        datetime(2026, 7, 2).date(),
+        datetime(2026, 7, 9).date(),
+        "custom",
+    )
+
+
+def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch):
+    @contextmanager
+    def fake_connection():
+        yield object()
+
+    rows = {
+        "current_summary": {
+            "applications": 10,
+            "shortlisted": 6,
+            "hired": 2,
+            "rejected": 3,
+            "academy_accepted": 1,
+            "withdrawn": 1,
+            "active_candidates": 4,
+            "average_time_to_hire_days": 12.5,
+            "overall_conversion_percentage": 20,
+            "sla_breaches": 2,
+        },
+        "comparison_summary": {
+            "applications": 5,
+            "shortlisted": 4,
+            "hired": 1,
+            "rejected": 1,
+        },
+        "journey": [
+            {"stage": "new_candidate", "candidates": 10},
+            {"stage": "under_review", "candidates": 6},
+        ],
+        "outcomes": [
+            {"outcome": "teacher_academy", "candidates": 1},
+            {"outcome": "active_teacher", "candidates": 2},
+            {"outcome": "rejected", "candidates": 3},
+        ],
+        "activity_trend": [],
+        "position_distribution": [],
+        "source_quality": [],
+        "time_in_stage": [],
+        "overdue_actions": [],
+        "upcoming_appointments": [],
+        "recent_candidates": [],
+        "recent_activity": [],
+    }
+    monkeypatch.setattr(analytics_service, "connect_auth_db", fake_connection)
+    monkeypatch.setattr(
+        analytics_service.repository,
+        "dashboard_rows",
+        lambda _conn, **_kwargs: rows,
+    )
+    result = analytics_service.dashboard(
+        CurrentUser(login="HR0001", role="hr_manager"),
+        period="custom",
+        date_from="2026-07-01",
+        date_to="2026-07-31",
+    )
+    assert result["summary_cards"]["applications"]["delta_percentage"] == 100.0
+    assert result["summary_cards"]["hired"]["value"] == 2
+    assert result["secondary_kpis"]["academy_accepted"] == 1
+    assert result["secondary_kpis"]["overall_conversion_percentage"] == 20
+    assert result["outcomes"] == [
+        {"outcome": "teacher_academy", "candidates": 1},
+        {"outcome": "active_teacher", "candidates": 2},
+        {"outcome": "rejected", "candidates": 3},
+        {"outcome": "candidate_withdrew", "candidates": 0},
+    ]
+
+
+def test_analytics_trend_fills_empty_buckets_and_zero_comparison_is_safe():
+    trend = analytics_service._trend(
+        [{"bucket": "2026-07-02", "event_type": "applications", "candidates": 3}],
+        start=datetime(2026, 7, 1).date(),
+        end=datetime(2026, 7, 3).date(),
+        bucket="day",
+    )
+    assert [item["applications"] for item in trend] == [0, 3, 0]
+    assert analytics_service._comparison_metric(4, 0) == {
+        "value": 4,
+        "previous": 0,
+        "delta_percentage": None,
+    }
+
+
+def test_analytics_repository_queries_bind_every_placeholder():
+    class Cursor:
+        def fetchone(self):
+            return {}
+
+        def fetchall(self):
+            return []
+
+    class Connection:
+        def execute(self, query, params=()):
+            assert query.count("%s") == len(params), query
+            return Cursor()
+
+    result = analytics_repository.dashboard_rows(
+        Connection(),
+        date_from="2026-07-01",
+        date_to="2026-07-31",
+        comparison_from="2026-06-01",
+        comparison_to="2026-06-30",
+        bucket="day",
+        now="2026-07-17T10:00:00+00:00",
+        source="1",
+        subsource="2",
+        position="3",
+        subject_id=4,
+        responsible_account_id=5,
+    )
+    assert result["journey"] == []
+    assert result["recent_activity"] == []
 
 
 def test_migration_contains_append_only_history_and_snapshotted_sla():

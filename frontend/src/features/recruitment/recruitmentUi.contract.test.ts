@@ -294,10 +294,21 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /key: "analytics", label: "Analytics"/);
     assert.match(workspace, /<AnalyticsView/);
     assert.match(analytics, /\/api\/v1\/hr\/analytics/);
+    assert.match(analytics, /Applications/);
+    assert.match(analytics, /Shortlisted/);
+    assert.match(analytics, /Academy accepted/);
     assert.match(analytics, /Active candidates/);
-    assert.match(analytics, /Recruitment funnel/);
+    assert.match(analytics, /Recruitment journey/);
+    assert.match(analytics, /Applicant sources/);
+    assert.match(analytics, /Applications by position/);
     assert.match(analytics, /Stage time and SLA/);
-    assert.match(analytics, /Source conversion/);
+    assert.match(analytics, /Source quality/);
+    assert.match(analytics, /Recent candidates/);
+    assert.match(analytics, /Recent activity/);
+    assert.match(analytics, /<Drawer/);
+    assert.match(analytics, /roleIsHr/);
+    assert.match(analytics, /motion-reduce/);
+    assert.doesNotMatch(analytics, /Current Vacanc|Recruitment cost|Salary budget/);
   });
 
   test("uses a dedicated HR-only Trash Bin that cannot expose active candidates", () => {

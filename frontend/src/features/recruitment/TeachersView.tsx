@@ -21,7 +21,7 @@ type RecruitmentTeacher = {
 type TeacherPage = { items: RecruitmentTeacher[]; total: number };
 
 function statusLabel(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+  return value.replace(/_/g, " ").replace(/\b\w/g, (character: string) => character.toUpperCase());
 }
 
 function TeacherCard({ teacher, basePath }: { teacher: RecruitmentTeacher; basePath: string }) {

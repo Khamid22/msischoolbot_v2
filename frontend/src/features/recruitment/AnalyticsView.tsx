@@ -1,66 +1,678 @@
-import { AlertTriangle, CalendarClock, Clock3, Filter, Loader2, TrendingUp, UsersRound } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  CircleDot,
+  Clock3,
+  Filter,
+  RotateCcw,
+  SearchCheck,
+  ShieldCheck,
+  TrendingUp,
+  UserCheck,
+  UserMinus,
+  UsersRound,
+  XCircle,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState, type ReactNode } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, type HrAnalyticsDashboard } from "@/features/recruitment/model";
-import { PageState, fieldClass, queryError, replaceUrlParams } from "@/features/recruitment/ui";
+import {
+  dateLabel,
+  humanize,
+  stageLabels,
+  type HrAnalyticsDashboard,
+  type RecruitmentRole,
+} from "@/features/recruitment/model";
+import {
+  PageState,
+  fieldClass,
+  queryError,
+  replaceUrlParams,
+  secondaryButtonClass,
+} from "@/features/recruitment/ui";
+import { Drawer } from "@/shared/ui/Drawer";
 
-type Options = { sources: Array<{ id: number; label: string }>; positions: string[]; subjects: Array<{ id: number; name: string }>; responsible_people: Array<{ id: number; name: string }> };
+type AnalyticsPeriod = "today" | "week" | "month" | "quarter" | "year" | "custom";
+type Filters = {
+  period: AnalyticsPeriod;
+  date_from: string;
+  date_to: string;
+  source: string;
+  subsource: string;
+  position: string;
+  subject_id: string;
+  responsible_account_id: string;
+};
+type Options = {
+  sources: Array<{ id: number; label: string }>;
+  subsources: Array<{ id: number; parent_id: number; label: string }>;
+  positions: string[];
+  position_options: Array<{ id: number; label: string }>;
+  subjects: Array<{ id: number; name: string }>;
+  responsible_people: Array<{ id: number; name: string }>;
+};
+
 const api = "/api/v1/hr/analytics";
-const keys = ["date_from", "date_to", "source", "position", "subject_id", "responsible_account_id"] as const;
+const periods: Array<{ key: AnalyticsPeriod; label: string }> = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "Week" },
+  { key: "month", label: "Month" },
+  { key: "quarter", label: "Quarter" },
+  { key: "year", label: "Year" },
+  { key: "custom", label: "Custom" },
+];
+const filterKeys = [
+  "period",
+  "date_from",
+  "date_to",
+  "source",
+  "subsource",
+  "position",
+  "subject_id",
+  "responsible_account_id",
+] as const;
+const chartColors = {
+  primary: "hsl(var(--primary))",
+  secondary: "#8B9CF6",
+  lime: "#B7F34A",
+  success: "hsl(var(--success))",
+  destructive: "hsl(var(--destructive))",
+  amber: "#F59E0B",
+  muted: "#CBD5E1",
+};
+const sourcePalette = [
+  chartColors.primary,
+  chartColors.lime,
+  chartColors.secondary,
+  chartColors.amber,
+  chartColors.success,
+  chartColors.muted,
+];
 
-function initialFilters() {
+function initialFilters(role: RecruitmentRole): Filters {
   const params = new URLSearchParams(window.location.search);
-  return Object.fromEntries(keys.map((key) => [key, params.get(key) || ""])) as Record<(typeof keys)[number], string>;
+  const defaultPeriod = role === "ceo" ? "year" : "month";
+  const requestedPeriod = params.get("period") as AnalyticsPeriod | null;
+  const period = periods.some((item) => item.key === requestedPeriod) ? requestedPeriod! : defaultPeriod;
+  return Object.fromEntries(
+    filterKeys.map((key) => [key, key === "period" ? period : params.get(key) || ""]),
+  ) as Filters;
 }
 
-function Metric({ label, value, icon }: { label: string; value: string | number; icon: ReactNode }) {
-  return <article className="rounded-xl border border-border bg-card p-3 shadow-sm"><div className="flex items-center justify-between gap-2"><p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p><span className="text-primary">{icon}</span></div><p className="mt-2 text-2xl font-bold tracking-tight">{value}</p></article>;
+function numberValue(value: unknown, suffix = "") {
+  if (value === null || value === undefined || value === "") return "—";
+  return `${new Intl.NumberFormat("en").format(Number(value))}${suffix}`;
 }
 
-export function AnalyticsView({ basePath }: { basePath: string }) {
-  const [filters, setFilters] = useState(initialFilters);
-  const options = useQuery({ queryKey: ["hr-analytics", "options"], queryFn: () => recruitmentRequest<Options>(`${api}/options`) });
+function periodLabel(data: HrAnalyticsDashboard) {
+  const current = `${dateLabel(data.range.from)} – ${dateLabel(data.range.to)}`;
+  const comparison = `${dateLabel(data.range.comparison_from)} – ${dateLabel(data.range.comparison_to)}`;
+  return `${current} compared with ${comparison}`;
+}
+
+function trendBucketLabel(value: string, bucket: HrAnalyticsDashboard["range"]["bucket"]) {
+  const parsed = new Date(`${value}T00:00:00+05:00`);
+  if (bucket === "month") return new Intl.DateTimeFormat("en", { month: "short", year: "2-digit", timeZone: "Asia/Tashkent" }).format(parsed);
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "Asia/Tashkent" }).format(parsed);
+}
+
+function KpiCard({
+  label,
+  metric,
+  icon,
+  accent,
+}: {
+  label: string;
+  metric: { value: number; previous: number; delta_percentage?: number | null };
+  icon: ReactNode;
+  accent?: boolean;
+}) {
+  const delta = metric.delta_percentage;
+  const positive = delta !== null && delta !== undefined && delta >= 0;
+  return (
+    <article className={`min-h-[116px] rounded-xl border p-3 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${accent ? "text-slate-700" : "text-muted-foreground"}`}>{label}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">{numberValue(metric.value)}</p>
+        </div>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${accent ? "bg-white/65 text-slate-900" : "bg-primary/8 text-primary"}`}>{icon}</span>
+      </div>
+      <div className={`mt-2 flex items-center gap-1.5 text-[11px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
+        {delta === null || delta === undefined ? (
+          <span>No prior data</span>
+        ) : (
+          <>
+            {positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+            <span>{Math.abs(delta)}% vs previous period</span>
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function SecondaryMetric({
+  label,
+  value,
+  icon,
+  tone = "primary",
+}: {
+  label: string;
+  value: string | number;
+  icon: ReactNode;
+  tone?: "primary" | "success" | "warning" | "danger";
+}) {
+  const toneClass = {
+    primary: "bg-primary/8 text-primary",
+    success: "bg-success/10 text-success",
+    warning: "bg-amber-100 text-amber-800",
+    danger: "bg-destructive/8 text-destructive",
+  }[tone];
+  return (
+    <article className="flex min-h-[78px] items-center gap-3 rounded-xl border border-border bg-card p-3">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-0.5 text-xl font-bold tabular-nums">{value}</p>
+      </div>
+    </article>
+  );
+}
+
+function Panel({
+  title,
+  description,
+  icon,
+  className = "",
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className}`}>
+      <header className="flex min-h-14 items-start justify-between gap-3 border-b border-border/70 px-3 py-3 sm:px-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">{icon}{title}</h2>
+          {description ? <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p> : null}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function EmptyChart({ children }: { children: ReactNode }) {
+  return <div className="flex min-h-52 items-center justify-center px-4 text-center text-sm text-muted-foreground">{children}</div>;
+}
+
+function AnalyticsSkeleton() {
+  return (
+    <div className="space-y-3" aria-label="Loading HR analytics">
+      <div className="h-20 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-[116px] animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />)}
+      </div>
+      <div className="grid gap-3 xl:grid-cols-12">
+        <div className="h-80 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-8" />
+        <div className="h-80 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-4" />
+      </div>
+    </div>
+  );
+}
+
+function FilterDrawer({
+  open,
+  filters,
+  options,
+  onClose,
+  onApply,
+}: {
+  open: boolean;
+  filters: Filters;
+  options?: Options;
+  onClose: () => void;
+  onApply: (filters: Filters) => void;
+}) {
+  const [draft, setDraft] = useState(filters);
+  const update = (key: keyof Filters, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === "source" ? { subsource: "" } : {}),
+    }));
+  };
+  const relevantSubsources = options?.subsources.filter((item) => String(item.parent_id) === draft.source) || [];
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title="Analytics filters"
+      description="Use standardized recruitment values for reliable comparisons."
+      footer={(
+        <div className="flex justify-end gap-2">
+          <button type="button" className={secondaryButtonClass} onClick={() => {
+            const cleared = { ...draft, source: "", subsource: "", position: "", subject_id: "", responsible_account_id: "" };
+            setDraft(cleared);
+          }}>Clear</button>
+          <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => onApply(draft)}>
+            <Check className="h-4 w-4" />Apply
+          </button>
+        </div>
+      )}
+    >
+      <div className="grid gap-4">
+        <label className="text-xs font-semibold">Source
+          <select autoFocus value={draft.source} onChange={(event) => update("source", event.target.value)} className={`${fieldClass} mt-1`}>
+            <option value="">All sources</option>
+            {options?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold">Subsource
+          <select value={draft.subsource} onChange={(event) => update("subsource", event.target.value)} disabled={!draft.source} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}>
+            <option value="">All subsources</option>
+            {relevantSubsources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold">Position
+          <select value={draft.position} onChange={(event) => update("position", event.target.value)} className={`${fieldClass} mt-1`}>
+            <option value="">All positions</option>
+            {options?.position_options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold">Subject
+          <select value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)} className={`${fieldClass} mt-1`}>
+            <option value="">All subjects</option>
+            {options?.subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+        <label className="text-xs font-semibold">Handled by
+          <select value={draft.responsible_account_id} onChange={(event) => update("responsible_account_id", event.target.value)} className={`${fieldClass} mt-1`}>
+            <option value="">All responsible people</option>
+            {options?.responsible_people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <span className="mt-1 block text-[11px] font-normal text-muted-foreground">Includes anyone responsible during at least one recruitment stage.</span>
+        </label>
+      </div>
+    </Drawer>
+  );
+}
+
+function activityLabel(eventType: string) {
+  const known: Record<string, string> = {
+    "candidate.created": "Application received",
+    "candidate.stage_changed": "Recruitment stage changed",
+    "candidate.final_decision_made": "Final decision recorded",
+    "candidate.interview_recorded": "Job interview recorded",
+    "candidate.subject_test_recorded": "Subject test recorded",
+    "candidate.demo_recorded": "Demo lesson evaluated",
+    "candidate.appointment_scheduled": "Appointment scheduled",
+    "candidate.document_uploaded": "Document uploaded",
+    "candidate.profile_updated": "Candidate profile updated",
+  };
+  return known[eventType] || humanize(eventType.replace(/^candidate\./, ""));
+}
+
+export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: string; role?: RecruitmentRole }) {
+  const [filters, setFilters] = useState(() => initialFilters(role));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const options = useQuery({
+    queryKey: ["hr-analytics", "options"],
+    queryFn: () => recruitmentRequest<Options>(`${api}/options`),
+  });
   const params = useMemo(() => {
     const value = new URLSearchParams();
     Object.entries(filters).forEach(([key, entry]) => { if (entry) value.set(key, entry); });
     return value;
   }, [filters]);
-  const dashboard = useQuery({ queryKey: ["hr-analytics", "dashboard", params.toString()], queryFn: () => recruitmentRequest<HrAnalyticsDashboard>(`${api}/dashboard${params.size ? `?${params}` : ""}`) });
-  const update = (key: keyof typeof filters, value: string) => {
-    const next = { ...filters, [key]: value };
+  const dashboard = useQuery({
+    queryKey: ["hr-analytics", "dashboard", params.toString()],
+    queryFn: () => recruitmentRequest<HrAnalyticsDashboard>(`${api}/dashboard?${params}`),
+  });
+
+  const replaceFilters = (next: Filters) => {
     setFilters(next);
     replaceUrlParams(next);
   };
-  if (dashboard.isLoading) return <PageState><span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Loading HR analytics…</span></PageState>;
-  if (dashboard.error || !dashboard.data) return <PageState tone="error">{queryError(dashboard.error)}</PageState>;
+  const selectPeriod = (period: AnalyticsPeriod) => {
+    if (period === "custom") {
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
+      replaceFilters({ ...filters, period, date_from: filters.date_from || today, date_to: filters.date_to || today });
+      return;
+    }
+    replaceFilters({ ...filters, period, date_from: "", date_to: "" });
+  };
+  const updateCustomDate = (key: "date_from" | "date_to", value: string) => {
+    replaceFilters({ ...filters, period: "custom", [key]: value });
+  };
+  const clearFilters = () => {
+    replaceFilters({
+      ...filters,
+      source: "",
+      subsource: "",
+      position: "",
+      subject_id: "",
+      responsible_account_id: "",
+    });
+  };
+  const activeFilterCount = ["source", "subsource", "position", "subject_id", "responsible_account_id"]
+    .filter((key) => Boolean(filters[key as keyof Filters])).length;
+
+  if (dashboard.isLoading) return <AnalyticsSkeleton />;
+  if (dashboard.error || !dashboard.data) {
+    return (
+      <PageState tone="error">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>{queryError(dashboard.error)}</span>
+          <button type="button" className={secondaryButtonClass} onClick={() => void dashboard.refetch()}><RotateCcw className="h-4 w-4" />Retry</button>
+        </div>
+      </PageState>
+    );
+  }
+
   const data = dashboard.data;
-  const funnelMax = Math.max(1, ...data.funnel.map((item) => Number(item.candidates || 0)));
-  return <div className="space-y-3">
-    <section className="rounded-xl border border-border bg-card p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Filter className="h-4 w-4" />Dashboard filters · {data.range.timezone}</div>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-        <label className="text-[11px] font-semibold">From<input type="date" value={filters.date_from || data.range.from} onChange={(event) => update("date_from", event.target.value)} className={`${fieldClass} mt-1`} /></label>
-        <label className="text-[11px] font-semibold">To<input type="date" value={filters.date_to || data.range.to} onChange={(event) => update("date_to", event.target.value)} className={`${fieldClass} mt-1`} /></label>
-        <label className="text-[11px] font-semibold">Source<select value={filters.source} onChange={(event) => update("source", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-        <label className="text-[11px] font-semibold">Position<select value={filters.position} onChange={(event) => update("position", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.positions.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label className="text-[11px] font-semibold">Subject<select value={filters.subject_id} onChange={(event) => update("subject_id", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="text-[11px] font-semibold">Responsible<select value={filters.responsible_account_id} onChange={(event) => update("responsible_account_id", event.target.value)} className={`${fieldClass} mt-1`}><option value="">All</option>{options.data?.responsible_people.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+  const topSources = data.source_distribution.slice(0, 6);
+  const hasTrend = data.activity_trend.some((item) => item.applications || item.shortlisted || item.hired || item.rejected);
+  const maxJourney = Math.max(1, ...data.journey.map((item) => item.candidates));
+  const roleIsHr = data.role === "hr_manager";
+  const filterNames: Array<[keyof Filters, string]> = [
+    ["source", "Source"],
+    ["subsource", "Subsource"],
+    ["position", "Position"],
+    ["subject_id", "Subject"],
+    ["responsible_account_id", "Handled by"],
+  ];
+  const optionLabel = (key: keyof Filters, value: string) => {
+    if (key === "source") return options.data?.sources.find((item) => String(item.id) === value)?.label || value;
+    if (key === "subsource") return options.data?.subsources.find((item) => String(item.id) === value)?.label || value;
+    if (key === "position") return options.data?.position_options.find((item) => String(item.id) === value)?.label || value;
+    if (key === "subject_id") return options.data?.subjects.find((item) => String(item.id) === value)?.name || value;
+    if (key === "responsible_account_id") return options.data?.responsible_people.find((item) => String(item.id) === value)?.name || value;
+    return value;
+  };
+
+  return (
+    <div className="space-y-3">
+      <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto" role="group" aria-label="Analytics period">
+            {periods.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                aria-pressed={filters.period === item.key}
+                onClick={() => selectPeriod(item.key)}
+                className={`min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${filters.period === item.key ? "bg-primary text-primary-foreground" : "bg-muted/55 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.period === "custom" ? (
+              <>
+                <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">From
+                  <input type="date" value={filters.date_from} onChange={(event) => updateCustomDate("date_from", event.target.value)} className={`${fieldClass} mt-1`} />
+                </label>
+                <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">To
+                  <input type="date" value={filters.date_to} onChange={(event) => updateCustomDate("date_to", event.target.value)} className={`${fieldClass} mt-1`} />
+                </label>
+              </>
+            ) : null}
+            <button type="button" className={`${secondaryButtonClass} relative`} onClick={() => setFiltersOpen(true)}>
+              <Filter className="h-4 w-4" />Filters
+              {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span> : null}
+            </button>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2">
+          <p className="mr-auto text-[11px] text-muted-foreground">{periodLabel(data)} · {data.range.timezone}</p>
+          {filterNames.filter(([key]) => filters[key]).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => replaceFilters({ ...filters, [key]: "" })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+              {label}: {optionLabel(key, filters[key])}<XCircle className="ml-1.5 h-3.5 w-3.5" />
+            </button>
+          ))}
+          {activeFilterCount ? <button type="button" onClick={clearFilters} className="min-h-9 px-2 text-[11px] font-semibold text-primary hover:underline">Clear all</button> : null}
+        </div>
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Primary recruitment metrics">
+        <KpiCard label="Applications" metric={data.summary_cards.applications} icon={<UsersRound className="h-4 w-4" />} accent />
+        <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} icon={<SearchCheck className="h-4 w-4" />} />
+        <KpiCard label="Hired" metric={data.summary_cards.hired} icon={<UserCheck className="h-4 w-4" />} />
+        <KpiCard label="Rejected" metric={data.summary_cards.rejected} icon={<UserMinus className="h-4 w-4" />} />
+      </section>
+
+      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Additional recruitment metrics">
+        <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
+        <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} icon={<UserMinus className="h-4 w-4" />} />
+        <SecondaryMetric label="Active candidates" value={numberValue(data.secondary_kpis.active_candidates)} icon={<UsersRound className="h-4 w-4" />} />
+        <SecondaryMetric label="Avg time to hire" value={numberValue(data.secondary_kpis.average_time_to_hire_days, "d")} icon={<Clock3 className="h-4 w-4" />} />
+        <SecondaryMetric label="Active conversion" value={numberValue(data.secondary_kpis.overall_conversion_percentage, "%")} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
+        <SecondaryMetric label="SLA breaches" value={numberValue(data.secondary_kpis.sla_breaches)} icon={<AlertTriangle className="h-4 w-4" />} tone={data.secondary_kpis.sla_breaches ? "danger" : "success"} />
+      </section>
+
+      <div className="grid gap-3 xl:grid-cols-12">
+        <Panel title="Recruitment activity" description="Applications use application date; other series use the actual event date." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
+          {hasTrend ? (
+            <div className="h-[300px] min-w-0 px-1 pb-2 pt-3 sm:px-3">
+              <p className="sr-only">Recruitment activity chart. Applications, shortlisted candidates, active hires and rejections over the selected period.</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.activity_trend} margin={{ top: 8, right: 14, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="bucket" tickFormatter={(value) => trendBucketLabel(String(value), data.range.bucket)} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} minTickGap={20} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip labelFormatter={(value) => trendBucketLabel(String(value), data.range.bucket)} contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12, maxWidth: 260 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="applications" name="Applications" stroke={chartColors.primary} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="shortlisted" name="Shortlisted" stroke={chartColors.secondary} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="hired" name="Hired" stroke={chartColors.success} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="rejected" name="Rejected" stroke={chartColors.destructive} strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <EmptyChart>No recruitment events in this period.</EmptyChart>}
+        </Panel>
+
+        <Panel title="Applicant sources" description={`${data.summary_cards.applications.value} cohort applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
+          {topSources.length ? (
+            <div className="grid min-h-[300px] grid-cols-1 items-center gap-1 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)]">
+              <div className="h-48 min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={topSources} dataKey="candidates" nameKey="source" innerRadius="54%" outerRadius="82%" paddingAngle={2} stroke="hsl(var(--card))" strokeWidth={2}>
+                      {topSources.map((item, index) => <Cell key={item.source} fill={sourcePalette[index % sourcePalette.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12 }} formatter={(value, _name, item) => [`${value} · ${item.payload.percentage}%`, item.payload.source]} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="grid gap-2 text-[11px]" aria-label="Applicant source counts">
+                {topSources.map((item, index) => (
+                  <li key={item.source} className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: sourcePalette[index % sourcePalette.length] }} /><span className="truncate">{item.source}</span></span>
+                    <strong className="tabular-nums">{item.candidates} · {item.percentage}%</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : <EmptyChart>No source data in this cohort.</EmptyChart>}
+        </Panel>
+
+        <Panel title="Recruitment journey" description="Distinct applicants who reached each stage." icon={<BarChart3 className="h-4 w-4 text-primary" />} className="xl:col-span-7">
+          <div className="space-y-3 p-3 sm:p-4">
+            {data.journey.map((item) => (
+              <div key={item.stage}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                  <span className="font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</span>
+                  <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
+                    {item.conversion_percentage !== null && item.conversion_percentage !== undefined ? `${item.conversion_percentage}% from prior` : "Entry stage"}
+                    <strong className="text-foreground">{item.candidates}</strong>
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${item.candidates / maxJourney * 100}%` }} />
+                </div>
+              </div>
+            ))}
+            <div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+              {data.outcomes.map((item) => (
+                <div key={item.outcome} className="flex min-h-11 items-center justify-between rounded-lg bg-muted/45 px-3 text-xs">
+                  <span className="font-semibold">{stageLabels[item.outcome] || humanize(item.outcome)}</span>
+                  <strong className="tabular-nums">{item.candidates}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="Applications by position" description="Standardized positions in the selected cohort." icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
+          {data.position_distribution.length ? (
+            <div className="h-[330px] min-w-0 p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.position_distribution.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 24, left: 16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                  <XAxis type="number" allowDecimals={false} hide />
+                  <YAxis type="category" dataKey="position" width={132} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12 }} />
+                  <Bar dataKey="candidates" name="Applications" fill={chartColors.primary} radius={[0, 6, 6, 0]} maxBarSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : <EmptyChart>No position data in this cohort.</EmptyChart>}
+        </Panel>
+
+        <Panel title="Stage time and SLA" description="Average calendar days across historical stage entries." icon={<Clock3 className="h-4 w-4 text-primary" />} className="xl:col-span-6">
+          <div className="divide-y divide-border/70">
+            {data.time_in_stage.length ? data.time_in_stage.map((item) => {
+              const target = Number(item.sla_target_days || 0);
+              const ratio = target ? Math.min(100, Number(item.average_days || 0) / target * 100) : 0;
+              return (
+                <div key={item.stage} className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center sm:px-4">
+                  <div>
+                    <p className="text-xs font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</p>
+                    <p className="text-[11px] text-muted-foreground">{item.entries} stage entries</p>
+                  </div>
+                  <div>
+                    <div className="mb-1 flex justify-between text-[10px] text-muted-foreground"><span>{item.average_days ?? 0}d average</span><span>{target ? `${target}d target` : "No SLA"}</span></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${ratio > 100 ? "bg-destructive" : ratio >= 75 ? "bg-amber-500" : "bg-success"}`} style={{ width: `${target ? Math.max(4, ratio) : 0}%` }} /></div>
+                  </div>
+                  <span className={`inline-flex min-h-8 items-center justify-center rounded-full px-2 text-[10px] font-semibold ${item.sla_breaches ? "bg-destructive/8 text-destructive" : "bg-success/10 text-success"}`}>{item.sla_breaches ? `${item.sla_breaches} late` : "On track"}</span>
+                </div>
+              );
+            }) : <EmptyChart>No stage-time data in this cohort.</EmptyChart>}
+          </div>
+        </Panel>
+
+        <Panel title="Source quality" description="Subsource-level shortlisting and Active Teacher conversion." icon={<TrendingUp className="h-4 w-4 text-primary" />} className="xl:col-span-6">
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[540px] text-left text-xs">
+              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Source</th><th className="px-3 py-2.5">Applicants</th><th className="px-3 py-2.5">Shortlisted</th><th className="px-3 py-2.5">Hired</th><th className="px-3 py-2.5">Conversion</th></tr></thead>
+              <tbody className="divide-y divide-border/70">
+                {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-2.5"><strong className="block">{item.source}</strong><span className="text-[10px] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-2.5 tabular-nums">{item.candidates}</td><td className="px-3 py-2.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-2.5 tabular-nums">{item.hired}</td><td className="px-3 py-2.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+          <div className="divide-y divide-border/70 sm:hidden">
+            {data.source_quality.slice(0, 10).map((item) => <div key={`${item.source}:${item.subsource}`} className="px-3 py-3 text-xs"><div className="flex justify-between gap-2"><strong>{item.source} · {item.subsource}</strong><strong>{item.conversion_percentage ?? 0}%</strong></div><p className="mt-1 text-muted-foreground">{item.candidates} applicants · {item.shortlisted} shortlisted · {item.hired} hired</p></div>)}
+          </div>
+          {!data.source_quality.length ? <EmptyChart>No source-quality data in this cohort.</EmptyChart> : null}
+        </Panel>
+
+        <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Open the candidate to resolve the next action." : "Read-only overview of recruitment work requiring attention."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="xl:col-span-5">
+          <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+            <div>
+              <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
+              <div className="space-y-1">
+                {data.overdue_actions.slice(0, 5).map((item) => {
+                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{item.title} · {dateLabel(item.due_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
+                  return roleIsHr ? <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-xs hover:bg-muted/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{content}</a> : <div key={item.id} className="flex min-h-12 items-center gap-2 rounded-lg px-2 text-xs">{content}</div>;
+                })}
+                {!data.overdue_actions.length ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">No overdue actions.</p> : null}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Upcoming</span><span className="rounded-full bg-primary/8 px-2 py-1 text-primary">{data.upcoming_appointments.length}</span></p>
+              <div className="space-y-1">
+                {data.upcoming_appointments.slice(0, 5).map((item) => {
+                  const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{humanize(item.appointment_type)} · {dateLabel(item.starts_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
+                  return roleIsHr ? <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations`} className="flex min-h-12 items-center justify-between gap-2 rounded-lg px-2 text-xs hover:bg-muted/55 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{content}</a> : <div key={item.id} className="flex min-h-12 items-center gap-2 rounded-lg px-2 text-xs">{content}</div>;
+                })}
+                {!data.upcoming_appointments.length ? <p className="rounded-lg border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">No upcoming appointments.</p> : null}
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="Recent candidates" description="Latest applications in the selected cohort." icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-7">
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[720px] text-left text-xs">
+              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Candidate</th><th className="px-3 py-2.5">Position</th><th className="px-3 py-2.5">Source</th><th className="px-3 py-2.5">Applied</th><th className="px-3 py-2.5">Stage</th><th className="px-3 py-2.5">Next action</th></tr></thead>
+              <tbody className="divide-y divide-border/70">
+                {data.recent_candidates.map((item) => <tr key={item.id} className="hover:bg-muted/25"><td className="px-3 py-2.5"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="px-3 py-2.5">{item.position}</td><td className="px-3 py-2.5"><span className="block">{item.source}</span>{item.subsource ? <span className="text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="px-3 py-2.5">{dateLabel(item.application_date)}</td><td className="px-3 py-2.5">{stageLabels[item.status] || humanize(item.status)}</td><td className="max-w-48 truncate px-3 py-2.5">{item.next_action || "—"}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+          <div className="divide-y divide-border/70 md:hidden">
+            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-14 px-3 py-3 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="text-sm">{item.full_name}</strong><span className="text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-1 text-[11px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
+          </div>
+          {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
+        </Panel>
+
+        <Panel title="Recent activity" description="Actor-attributed recruitment history." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
+          <ol className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
+            {data.recent_activity.map((item) => (
+              <li key={item.id} className="flex min-h-[86px] gap-3 bg-card px-3 py-3 sm:px-4">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary"><Activity className="h-4 w-4" /></span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold">{activityLabel(item.event_type)}</p>
+                  <a href={`${basePath}/candidates/${item.candidate_id}`} className="mt-0.5 block truncate text-xs text-primary hover:underline">{item.candidate_name}</a>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{item.actor} · {dateLabel(item.created_at)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {!data.recent_activity.length ? <EmptyChart>No recent recruitment activity in this period.</EmptyChart> : null}
+        </Panel>
       </div>
-    </section>
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <Metric label="Active candidates" value={data.kpis.active_candidates || 0} icon={<UsersRound className="h-4 w-4" />} />
-      <Metric label="New this month" value={data.kpis.new_this_month || 0} icon={<TrendingUp className="h-4 w-4" />} />
-      <Metric label="Hired this month" value={data.kpis.hired_this_month || 0} icon={<UsersRound className="h-4 w-4" />} />
-      <Metric label="Average time to hire" value={`${data.kpis.average_time_to_hire_days ?? 0}d`} icon={<Clock3 className="h-4 w-4" />} />
-      <Metric label="Overall conversion" value={`${data.kpis.overall_conversion_percentage ?? 0}%`} icon={<TrendingUp className="h-4 w-4" />} />
+
+      <FilterDrawer
+        key={`${filtersOpen}:${filters.source}:${filters.subsource}:${filters.position}:${filters.subject_id}:${filters.responsible_account_id}`}
+        open={filtersOpen}
+        filters={filters}
+        options={options.data}
+        onClose={() => setFiltersOpen(false)}
+        onApply={(next) => {
+          replaceFilters(next);
+          setFiltersOpen(false);
+        }}
+      />
     </div>
-    <div className="grid gap-3 xl:grid-cols-2">
-      <section className="rounded-xl border border-border bg-card p-3"><h2 className="text-sm font-semibold">Recruitment funnel</h2><div className="mt-3 space-y-2">{data.funnel.length ? data.funnel.map((item) => <div key={item.stage}><div className="mb-1 flex justify-between text-xs"><span>{humanize(item.stage)}{item.conversion_percentage !== null && item.conversion_percentage !== undefined ? ` · ${item.conversion_percentage}% from prior stage` : ""}</span><strong>{item.candidates}</strong></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Number(item.candidates) / funnelMax * 100}%` }} /></div></div>) : <p className="text-sm text-muted-foreground">No stage activity in this period.</p>}</div></section>
-      <section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Stage time and SLA</h2><span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"><AlertTriangle className="h-3.5 w-3.5" />{data.sla.breaches} breaches</span></div><div className="mt-3 divide-y divide-border">{data.time_in_stage.map((item) => <div key={item.stage} className="grid grid-cols-[1fr_auto_auto] gap-3 py-2 text-xs"><span className="font-medium">{humanize(item.stage)}</span><span>{item.average_days ?? 0} days</span><span className={item.sla_breaches ? "font-semibold text-red-600" : "text-muted-foreground"}>{item.sla_breaches} late</span></div>)}</div></section>
-      <section className="rounded-xl border border-border bg-card p-3"><h2 className="text-sm font-semibold">Source conversion</h2><div className="mt-3 divide-y divide-border">{data.source_conversion.map((item) => <div key={item.source} className="grid grid-cols-[1fr_auto_auto] gap-3 py-2 text-xs"><span className="font-medium">{item.source}</span><span>{item.hired}/{item.candidates} hired</span><strong>{item.conversion_percentage ?? 0}%</strong></div>)}</div></section>
-      <section className="rounded-xl border border-border bg-card p-3"><h2 className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4" />Operational attention</h2><div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">Overdue actions</p>{data.overdue_actions.slice(0, 5).map((item) => <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}`} className="block border-b border-border py-2 text-xs hover:text-primary"><strong className="block truncate">{item.candidate_name}</strong>{item.title} · {dateLabel(item.due_at)}</a>)}</div><div><p className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">Upcoming appointments</p>{data.upcoming_appointments.slice(0, 5).map((item) => <a key={item.id} href={`${basePath}/candidates/${item.candidate_id}?tab=evaluations`} className="block border-b border-border py-2 text-xs hover:text-primary"><strong className="block truncate">{item.candidate_name}</strong>{humanize(item.appointment_type)} · {dateLabel(item.starts_at)}</a>)}</div></div></section>
-    </div>
-  </div>;
+  );
 }
