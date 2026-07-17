@@ -1,9 +1,11 @@
 import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, UserMinus, X } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  memo,
   useCallback,
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -177,7 +179,7 @@ function FiltersDrawer({
   );
 }
 
-function CandidateCard({
+const CandidateCard = memo(function CandidateCard({
   candidate,
   basePath,
   onDragStart,
@@ -250,7 +252,7 @@ function CandidateCard({
       {appointment?.appointment_type === "job_interview" && ["scheduled", "in_progress"].includes(appointment.status) ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center justify-center gap-2 rounded-md bg-primary px-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button> : null}
     </article>
   );
-}
+});
 
 export function PipelineView({
   basePath,
@@ -299,6 +301,7 @@ export function PipelineView({
   const pipeline = useQuery({
     queryKey: ["recruitment", "pipeline", { ...filters, search: deferredSearch }],
     queryFn: () => recruitmentRequest<PipelineData>(`${RECRUITMENT_API}/pipeline${requestParams.size ? `?${requestParams}` : ""}`),
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {
@@ -377,7 +380,10 @@ export function PipelineView({
     setFiltersOpen(false);
     window.requestAnimationFrame(() => searchTriggerRef.current?.focus());
   };
-  const finishDrag = () => { draggedCandidateRef.current = null; setDraggedCandidate(null); setDragOverStage(null); setDragOverOutcome(null); };
+  const finishDrag = useCallback(() => { draggedCandidateRef.current = null; setDraggedCandidate(null); setDragOverStage(null); setDragOverOutcome(null); }, []);
+  const handleCardDragStart = useCallback((value: RecruitmentCandidate) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }, []);
+  const handleCardSchedule = useCallback((value: RecruitmentCandidate, appointmentType: "job_interview" | "demo_lesson") => { setScheduleConflicts([]); setScheduleSelection({ candidate: value, appointmentType }); }, []);
+  const handleCardInterview = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setInterviewSelection({ candidate: value, appointment }), []);
 
   const canStartBoardPan = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return true;
@@ -419,15 +425,37 @@ export function PipelineView({
     event.preventDefault();
   };
 
-  if (pipeline.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
-  if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
-
-  const cards = (items: RecruitmentCandidate[]) => (
+  const cards = useCallback((items: RecruitmentCandidate[]) => (
     <div className="space-y-2">
-      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={(value) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }} onDragEnd={finishDrag} onSchedule={(value, appointmentType) => { setScheduleConflicts([]); setScheduleSelection({ candidate: value, appointmentType }); }} onInterview={(value, appointment) => setInterviewSelection({ candidate: value, appointment })} />)}
+      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} />)}
       {!items.length ? <EmptyLine>No candidates in this stage.</EmptyLine> : null}
     </div>
-  );
+  ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview]);
+
+  const data = pipeline.data;
+  const moveMutate = move.mutate;
+  const desktopBoard = useMemo(() => {
+    if (!data) return null;
+    return (
+      <div className="grid w-full min-w-0 grid-cols-5 gap-2 2xl:gap-3">
+        {boardStages.map((stage) => {
+          const acceptsDrop = (manualStages as readonly string[]).includes(stage);
+          const highlighted = dragOverStage === stage;
+          const items = data.stages[stage] || [];
+          return (
+            <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; moveMutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-12rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
+              <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
+              <div className="miniapp-scroll flex-1 overflow-y-auto p-2">{cards(items)}</div>
+            </section>
+          );
+        })}
+      </div>
+    );
+  }, [data, dragOverStage, canAddCandidate, onAddCandidate, cards, moveMutate, finishDrag]);
+  const mobileCards = useMemo(() => (data ? cards(data.stages[mobileStage] || []) : null), [data, mobileStage, cards]);
+
+  if (pipeline.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
+  if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
 
   return (
     <div className="space-y-3">
@@ -463,7 +491,7 @@ export function PipelineView({
 
       <div className="xl:hidden">
         <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{boardStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
-        <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{cards(pipeline.data.stages[mobileStage] || [])}</section>
+        <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-11 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{mobileCards}</section>
       </div>
 
       <div
@@ -482,19 +510,7 @@ export function PipelineView({
           event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -240 : 240, behavior: "smooth" });
         }}
       >
-        <div className="grid w-full min-w-0 grid-cols-5 gap-2 2xl:gap-3">
-          {boardStages.map((stage) => {
-            const acceptsDrop = (manualStages as readonly string[]).includes(stage);
-            const highlighted = dragOverStage === stage;
-            const items = pipeline.data.stages[stage] || [];
-            return (
-              <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; move.mutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-12rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
-                <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
-                <div className="miniapp-scroll flex-1 overflow-y-auto p-2">{cards(items)}</div>
-              </section>
-            );
-          })}
-        </div>
+        {desktopBoard}
       </div>
 
       {draggedCandidate ? (

@@ -31,7 +31,7 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /xl:block/);
     assert.match(pipeline, /w-full min-w-0 overflow-hidden rounded-lg border/);
     assert.match(pipeline, /overflow-y-auto/);
-    assert.match(pipeline, /h-\[calc\(100dvh-20rem\)\]/);
+    assert.match(pipeline, /h-\[calc\(100dvh-12rem\)\]/);
     assert.match(pipeline, /rounded-t-xl border-x border-t/);
     assert.doesNotMatch(pipeline, /max-h-\[52rem\]/);
     assert.match(pipeline, /dragOverStage/);
