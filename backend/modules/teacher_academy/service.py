@@ -215,7 +215,7 @@ def onboard_recruitment_academy_teacher(
         )
         if not staff_id:
             return False, "Unable to provision the Academy teacher login.", {}
-        _provision_teacher_account_v2(
+        account_id = _provision_teacher_account_v2(
             conn,
             teacher_id=teacher_id,
             staff_id=staff_id,
@@ -223,6 +223,8 @@ def onboard_recruitment_academy_teacher(
             password_hash=password_hash,
             full_name=str(intake["full_name"] or login),
         )
+        if not account_id:
+            return False, "Unable to provision the Academy teacher account.", {}
         for sequence_no, lesson in enumerate(lessons, start=1):
             mutations_repository.insert_academy_lesson_assignment(
                 conn,
@@ -243,6 +245,12 @@ def onboard_recruitment_academy_teacher(
             staff_id=staff_id,
             subject_id=int(program["subject_id"]),
             subject_program_id=int(program["id"]),
+            updated_at=now,
+        )
+        mutations_repository.attach_lifecycle_profile_account(
+            conn,
+            candidate_id=int(intake["recruitment_candidate_id"]),
+            account_id=int(account_id),
             updated_at=now,
         )
         mutations_repository.insert_recruitment_academy_onboarding_audit(

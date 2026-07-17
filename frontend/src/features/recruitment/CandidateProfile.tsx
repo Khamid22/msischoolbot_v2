@@ -6,6 +6,7 @@ import {
   Check,
   ClipboardCheck,
   FileText,
+  GraduationCap,
   Loader2,
   MessageSquareText,
   Pencil,
@@ -1844,6 +1845,14 @@ export function CandidateProfile({
                   onSave={(value) => saveInlineField("phone", value)}
                 />
                 <InlineField
+                  label="Email"
+                  {...inlineEditProps("email", "Email")}
+                  value={candidate.email}
+                  type="email"
+                  busy={mutation.isPending}
+                  onSave={(value) => saveInlineField("email", value)}
+                />
+                <InlineField
                   label="Telegram"
                   {...inlineEditProps("telegram_username", "Telegram")}
                   value={candidate.telegram_username}
@@ -2004,6 +2013,7 @@ export function CandidateProfile({
                 <DefinitionGrid
                   values={[
                     ["Phone", candidate.phone],
+                    ["Email", candidate.email],
                     ["Subject", candidate.subject],
                     ["Telegram", candidate.telegram_username],
                     ["Application date", dateLabel(candidate.application_date)],
@@ -2039,6 +2049,30 @@ export function CandidateProfile({
             )}
           </Panel>
           <div className="space-y-3">
+            {candidate.academy ? (
+              <Panel
+                title="Teacher Academy"
+                icon={<GraduationCap className="h-4 w-4" />}
+              >
+                <DefinitionGrid
+                  values={[
+                    ["Status", humanize(candidate.academy.status || "not_set")],
+                    ["Academy since", dateLabel(candidate.academy.start_date)],
+                    ["Subject", candidate.academy.subject],
+                    ["Curriculum", candidate.academy.curriculum],
+                    ["Lessons", candidate.academy.lesson_count ?? 0],
+                    ["Assessments", candidate.academy.assessment_count ?? 0],
+                    ["Onboarding", humanize(candidate.academy.onboarding_status || "pending")],
+                    ["Account", candidate.academy.login || (candidate.academy.account_state === "onboarding_pending" ? "Onboarding pending" : "Not linked")],
+                  ]}
+                />
+                {candidate.profile_origin === "academy_direct" ? (
+                  <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    Created directly from Teacher Academy. No application history has been generated.
+                  </p>
+                ) : null}
+              </Panel>
+            ) : null}
             <Panel
               title="Next action"
               icon={<CalendarClock className="h-4 w-4" />}

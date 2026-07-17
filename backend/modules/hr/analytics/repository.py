@@ -25,7 +25,10 @@ def _candidate_filters(
     responsible_account_id: int | None = None,
     alias: str = "candidate",
 ) -> tuple[str, list[Any]]:
-    clauses = [f"{alias}.status <> 'trash_bin'"]
+    clauses = [
+        f"{alias}.status <> 'trash_bin'",
+        f"{alias}.is_application_received = true",
+    ]
     params: list[Any] = []
     if date_from and date_to:
         clauses.append(f"{alias}.application_date BETWEEN %s::date AND %s::date")
@@ -94,13 +97,16 @@ def options_rows(conn: Any) -> dict[str, list[Any]]:
             """SELECT DISTINCT subject.id, subject.subject_name AS name
                FROM msi_v2.teacher_candidates candidate
                JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
+               WHERE candidate.is_application_received = true
                ORDER BY subject.subject_name"""
         ).fetchall(),
         "responsible_people": conn.execute(
             """SELECT DISTINCT account.id,
                       COALESCE(account.full_name, account.login) AS name
                FROM msi_v2.teacher_candidate_stage_history history
+               JOIN msi_v2.teacher_candidates candidate ON candidate.id = history.candidate_id
                JOIN msi_v2.accounts account ON account.id = history.responsible_account_id
+               WHERE candidate.is_application_received = true
                ORDER BY name"""
         ).fetchall(),
     }

@@ -24,6 +24,7 @@ class StrictModel(BaseModel):
 class CandidateCreate(StrictModel):
     full_name: str = Field(min_length=1, max_length=200)
     phone: str = Field(default="", max_length=80)
+    email: str = Field(default="", max_length=254)
     telegram_username: str = Field(default="", max_length=120)
     applied_position: str = Field(default="", max_length=200)
     position_option_id: OptionalInt = Field(default=None, ge=1)
@@ -37,6 +38,7 @@ class CandidateUpdate(StrictModel):
     expected_version: OptionalInt = Field(default=None, ge=1)
     full_name: str | None = Field(default=None, min_length=1, max_length=200)
     phone: str | None = Field(default=None, max_length=80)
+    email: str | None = Field(default=None, max_length=254)
     telegram_username: str | None = Field(default=None, max_length=120)
     applied_position: str | None = Field(default=None, max_length=200)
     position_option_id: OptionalInt = Field(default=None, ge=1)

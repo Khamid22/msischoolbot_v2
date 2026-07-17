@@ -10,7 +10,11 @@ _CANDIDATE_COLUMNS = """
     candidate.id,
     candidate.full_name,
     candidate.phone,
+    candidate.email,
     candidate.telegram_username,
+    candidate.linked_account_id,
+    candidate.is_application_received,
+    candidate.profile_origin,
     candidate.subject_id,
     COALESCE(subject.subject_name, '') AS subject,
     candidate.position_option_id,
@@ -83,6 +87,17 @@ _CANDIDATE_COLUMNS = """
     appointment.version AS next_appointment_version,
     appointment.started_at::text AS next_appointment_started_at,
     academy.id AS academy_teacher_id,
+    academy.academy_status AS academy_status,
+    academy.academy_start_date::text AS academy_start_date,
+    academy.account_onboarding_status AS academy_onboarding_status,
+    academy.subject_id AS academy_subject_id,
+    COALESCE(academy_subject.subject_name, '') AS academy_subject,
+    academy.subject_program_id AS academy_subject_program_id,
+    COALESCE(academy_program.program_name, '') AS academy_curriculum,
+    academy.user_id AS academy_staff_id,
+    COALESCE(academy_staff.login, '') AS academy_login,
+    academy_counts.lesson_count AS academy_lesson_count,
+    academy_counts.assessment_count AS academy_assessment_count,
     teacher.id AS active_teacher_id
 """
 
@@ -162,6 +177,25 @@ def _candidate_joins() -> str:
           ON appointment_responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.academy_teachers academy
           ON academy.recruitment_candidate_id = candidate.id
+        LEFT JOIN msi_v2.subjects academy_subject
+          ON academy_subject.id = academy.subject_id
+        LEFT JOIN msi_v2.subject_programs academy_program
+          ON academy_program.id = academy.subject_program_id
+        LEFT JOIN msi_v2.msi_staff academy_staff
+          ON academy_staff.id = academy.user_id
+        LEFT JOIN LATERAL (
+            SELECT
+                (
+                    SELECT COUNT(*)::integer
+                    FROM msi_v2.academy_lesson_assignments lesson
+                    WHERE lesson.academy_teacher_id = academy.id
+                ) AS lesson_count,
+                (
+                    SELECT COUNT(*)::integer
+                    FROM msi_v2.academy_assessments assessment
+                    WHERE assessment.academy_teacher_id = academy.id
+                ) AS assessment_count
+        ) academy_counts ON academy.id IS NOT NULL
         LEFT JOIN msi_v2.teachers teacher
           ON teacher.recruitment_candidate_id = candidate.id
     """
@@ -221,7 +255,10 @@ def list_pipeline_rows(
         visible_subject_ids,
         include_decision_queue,
     )
-    clauses: list[str] = []
+    clauses: list[str] = [
+        "candidate.is_application_received = true",
+        "candidate.status IN ('new_candidate', 'responded', 'job_interview', 'test_and_demo', 'under_review')",
+    ]
     params: list[Any] = []
     if visibility:
         clauses.append(visibility)
@@ -293,7 +330,7 @@ def list_candidate_rows(
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
-    clauses: list[str] = []
+    clauses: list[str] = ["candidate.is_application_received = true"]
     params: list[Any] = []
     visibility, visibility_params = _visibility_clause(
         visible_account_id,
@@ -623,12 +660,125 @@ def get_candidate_row(conn: Any, candidate_id: int) -> Any:
     ).fetchone()
 
 
+def list_academy_lifecycle_lesson_rows(conn: Any, academy_teacher_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT assignment.id, assignment.sequence_no, assignment.lesson_number,
+               assignment.lesson_topic, assignment.assignment_type,
+               assignment.deadline_date::text AS deadline_date,
+               assignment.session_datetime::text AS session_datetime,
+               assignment.status,
+               COALESCE(evaluator.full_name, '') AS evaluator_name
+        FROM msi_v2.academy_lesson_assignments assignment
+        LEFT JOIN msi_v2.teachers evaluator ON evaluator.id = assignment.evaluator_id
+        WHERE assignment.academy_teacher_id = %s
+        ORDER BY assignment.sequence_no, assignment.id
+        """,
+        (int(academy_teacher_id),),
+    ).fetchall()
+
+
+def list_academy_lifecycle_assessment_rows(conn: Any, academy_teacher_id: int) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT assessment.id, assessment.lesson_assignment_id,
+               assessment.assessment_type, assessment.lesson_number,
+               assessment.lesson_topic,
+               assessment.assessment_datetime::text AS assessment_datetime,
+               assessment.weighted_overall_score,
+               assessment.final_recommendation, assessment.decision,
+               COALESCE(evaluator.full_name, '') AS evaluator_name
+        FROM msi_v2.academy_assessments assessment
+        LEFT JOIN msi_v2.teachers evaluator ON evaluator.id = assessment.evaluator_id
+        WHERE assessment.academy_teacher_id = %s
+        ORDER BY assessment.created_at, assessment.id
+        """,
+        (int(academy_teacher_id),),
+    ).fetchall()
+
+
+def exact_academy_identity_match(
+    conn: Any,
+    *,
+    phone: str = "",
+    email: str = "",
+    telegram_username: str = "",
+    linked_account_id: int | None = None,
+) -> Any:
+    """Return an existing Academy lifecycle profile matched by exact identity.
+
+    Names are intentionally excluded. A person may share a name with another
+    applicant and name similarity must never block a real application.
+    """
+
+    normalized_phone = "".join(character for character in str(phone or "") if character.isdigit())
+    normalized_email = str(email or "").strip().lower()
+    normalized_telegram = str(telegram_username or "").strip().lstrip("@").lower()
+    if not any((normalized_phone, normalized_email, normalized_telegram, linked_account_id)):
+        return None
+    return conn.execute(
+        """
+        SELECT candidate.id AS profile_id, academy.id AS academy_teacher_id,
+               candidate.full_name, candidate.profile_origin,
+               candidate.is_application_received
+        FROM msi_v2.academy_teachers academy
+        JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = academy.recruitment_candidate_id
+        WHERE
+            (
+                %s <> ''
+                AND (
+                    regexp_replace(COALESCE(candidate.phone, ''), '[^0-9]+', '', 'g') = %s
+                    OR regexp_replace(COALESCE(academy.phone, ''), '[^0-9]+', '', 'g') = %s
+                )
+            )
+            OR (
+                %s <> ''
+                AND (
+                    lower(COALESCE(candidate.email, '')) = %s
+                    OR lower(COALESCE(academy.email, '')) = %s
+                )
+            )
+            OR (
+                %s <> ''
+                AND (
+                    lower(ltrim(COALESCE(candidate.telegram_username, ''), '@')) = %s
+                    OR lower(ltrim(COALESCE(academy.telegram_username, ''), '@')) = %s
+                )
+            )
+            OR (
+                %s IS NOT NULL
+                AND (
+                    candidate.linked_account_id = %s
+                    OR EXISTS (
+                        SELECT 1
+                        FROM msi_v2.accounts account
+                        WHERE account.id = %s
+                          AND account.legacy_source_table = 'msi_staff'
+                          AND account.legacy_source_id = academy.user_id
+                    )
+                )
+            )
+        ORDER BY candidate.id
+        LIMIT 1
+        """,
+        (
+            normalized_phone, normalized_phone, normalized_phone,
+            normalized_email, normalized_email, normalized_email,
+            normalized_telegram, normalized_telegram, normalized_telegram,
+            linked_account_id, linked_account_id, linked_account_id,
+        ),
+    ).fetchone()
+
+
 def lock_candidate_decision_row(conn: Any, candidate_id: int) -> Any:
     return conn.execute(
         """
         SELECT candidate.id, candidate.full_name, candidate.phone,
-               candidate.telegram_username, candidate.subject_id,
+               candidate.email, candidate.telegram_username, candidate.subject_id,
                candidate.applied_position, candidate.status, candidate.version,
+               candidate.profile_origin, candidate.is_application_received,
+               candidate.linked_account_id,
                academy.id AS academy_teacher_id,
                teacher.id AS active_teacher_id
         FROM msi_v2.teacher_candidates candidate
@@ -1546,15 +1696,16 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         """
         WITH inserted_candidate AS (
             INSERT INTO msi_v2.teacher_candidates (
-                full_name, phone, telegram_username, applied_position,
+                full_name, phone, email, telegram_username, applied_position,
                 position_option_id, subject_id,
                 application_date, source_option_id, subsource_option_id,
                 source, source_detail, status, stage_changed_at,
+                is_application_received, profile_origin,
                 version, updated_by_account_id, created_at, updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
-                'new_candidate', %s::timestamptz, 1, %s,
+                %s, %s, %s, %s, %s, %s, %s, NULLIF(%s, '')::date, %s, %s, '', '',
+                'new_candidate', %s::timestamptz, true, 'application', 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
             RETURNING id
@@ -1578,14 +1729,116 @@ def insert_candidate(conn: Any, *, values: dict[str, Any], now: str, actor_accou
         JOIN inserted_history history ON true
         """,
         (
-            values["full_name"], values.get("phone", ""), values.get("telegram_username", ""),
-            values.get("applied_position", ""), values.get("position_option_id"),
+            values["full_name"], values.get("phone", ""), values.get("email", ""),
+            values.get("telegram_username", ""), values.get("applied_position", ""),
+            values.get("position_option_id"),
             values.get("subject_id"), values.get("application_date", ""),
             values.get("source_option_id"), values.get("subsource_option_id"), now,
             actor_account_id, now, now, now, actor_account_id, now,
         ),
     ).fetchone()
     return int(row["id"]) if row else 0
+
+
+def insert_academy_direct_profile(
+    conn: Any,
+    *,
+    full_name: str,
+    subject_id: int | None,
+    applied_position: str,
+    phone: str,
+    email: str,
+    telegram_username: str,
+    linked_account_id: int | None,
+    now: str,
+    actor_account_id: int | None,
+) -> int:
+    """Create a lifecycle profile without fabricating a recruitment application."""
+
+    row = conn.execute(
+        """
+        WITH inserted_profile AS (
+            INSERT INTO msi_v2.teacher_candidates (
+                full_name, phone, email, telegram_username, subject_id,
+                applied_position, application_date, source, source_detail,
+                status, stage_changed_at, linked_account_id,
+                is_application_received, profile_origin, version,
+                updated_by_account_id, created_at, updated_at
+            ) VALUES (
+                %s, %s, %s, %s, NULLIF(%s::bigint, 0), %s,
+                NULL, '', '', 'teacher_academy', %s::timestamptz, %s,
+                false, 'academy_direct', 1, %s, %s::timestamptz, %s::timestamptz
+            )
+            RETURNING id
+        ), inserted_history AS (
+            INSERT INTO msi_v2.teacher_candidate_stage_history (
+                candidate_id, stage, entered_at, responsible_account_id,
+                comment, transition_source, sla_target_days, sla_due_at
+            )
+            SELECT id, 'teacher_academy', %s::timestamptz, %s,
+                   'Lifecycle profile created from an existing Teacher Academy record.',
+                   'academy_reconciliation', NULL, NULL
+            FROM inserted_profile
+            RETURNING candidate_id
+        )
+        SELECT candidate_id AS id FROM inserted_history
+        """,
+        (
+            full_name, phone, email, telegram_username, int(subject_id or 0),
+            applied_position, now, linked_account_id, actor_account_id, now, now,
+            now, actor_account_id,
+        ),
+    ).fetchone()
+    return int(row["id"]) if row else 0
+
+
+def link_academy_profile(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
+    candidate_id: int,
+    full_name: str,
+    linked_account_id: int | None,
+    now: str,
+) -> bool:
+    """Attach one Academy block to one lifecycle profile, failing on conflicts."""
+
+    row = conn.execute(
+        """
+        UPDATE msi_v2.academy_teachers academy
+        SET recruitment_candidate_id = %s,
+            full_name = %s,
+            updated_at = %s::timestamptz
+        WHERE academy.id = %s
+          AND (academy.recruitment_candidate_id IS NULL OR academy.recruitment_candidate_id = %s)
+          AND NOT EXISTS (
+              SELECT 1
+              FROM msi_v2.academy_teachers other
+              WHERE other.recruitment_candidate_id = %s
+                AND other.id <> academy.id
+          )
+        RETURNING academy.id
+        """,
+        (
+            int(candidate_id), full_name, now, int(academy_teacher_id),
+            int(candidate_id), int(candidate_id),
+        ),
+    ).fetchone()
+    if not row:
+        return False
+    if linked_account_id:
+        linked = conn.execute(
+            """
+            UPDATE msi_v2.teacher_candidates
+            SET linked_account_id = %s, updated_at = %s::timestamptz
+            WHERE id = %s
+              AND (linked_account_id IS NULL OR linked_account_id = %s)
+            """,
+            (int(linked_account_id), now, int(candidate_id), int(linked_account_id)),
+        )
+        if int(getattr(linked, "rowcount", 0) or 0) < 1:
+            return False
+    return True
 
 
 def update_candidate(
@@ -1598,7 +1851,7 @@ def update_candidate(
     expected_version: int | None = None,
 ) -> bool:
     allowed = {
-        "full_name", "phone", "telegram_username", "applied_position", "position_option_id",
+        "full_name", "phone", "email", "telegram_username", "applied_position", "position_option_id",
         "subject_id", "application_date",
         "age", "address", "source_option_id", "subsource_option_id",
         "english_level_option_id", "motivation_expectations",
@@ -2263,20 +2516,25 @@ def ensure_academy_intake(conn: Any, *, candidate: Any, actor_login: str, now: s
         """
         INSERT INTO msi_v2.academy_teachers (
             user_id, full_name, subject_id, subject_program_id, position,
-            employment_type, telegram_username, phone, academy_status,
+            employment_type, telegram_username, phone, email, academy_status,
             notes, created_by, recruitment_candidate_id,
             account_onboarding_status, created_at, updated_at
         ) VALUES (
             NULL, %s, NULLIF(%s::bigint, 0), NULL, %s,
-            'academy', %s, %s, 'new_academy_teacher',
+            'academy', %s, %s, %s, 'new_academy_teacher',
             %s, %s, %s, 'pending', %s::timestamptz, %s::timestamptz
         ) RETURNING id
         """,
         (
             candidate["full_name"], int(candidate["subject_id"] or 0),
             candidate["applied_position"] or "Trainee Teacher",
-            candidate["telegram_username"], candidate["phone"],
-            f"Accepted from recruitment candidate #{candidate['id']}.", actor_login,
+            candidate["telegram_username"], candidate["phone"], candidate.get("email", ""),
+            (
+                f"Linked to Academy-direct lifecycle profile #{candidate['id']}."
+                if candidate.get("profile_origin") == "academy_direct"
+                else f"Accepted from recruitment candidate #{candidate['id']}."
+            ),
+            actor_login,
             candidate["id"], now, now,
         ),
     ).fetchone()

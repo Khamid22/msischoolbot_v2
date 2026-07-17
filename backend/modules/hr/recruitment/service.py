@@ -145,6 +145,41 @@ def _task_payload(row: Any) -> dict[str, Any]:
 
 def _candidate_summary(row: Any) -> dict[str, Any]:
     payload = _row_dict(row)
+    academy_fields = {
+        "academy_teacher_id": "id",
+        "academy_status": "status",
+        "academy_start_date": "start_date",
+        "academy_onboarding_status": "onboarding_status",
+        "academy_subject_id": "subject_id",
+        "academy_subject": "subject",
+        "academy_subject_program_id": "subject_program_id",
+        "academy_curriculum": "curriculum",
+        "academy_staff_id": "staff_id",
+        "academy_login": "login",
+        "academy_lesson_count": "lesson_count",
+        "academy_assessment_count": "assessment_count",
+    }
+    payload["academy"] = (
+        {
+            **{target: payload.get(source) for source, target in academy_fields.items()},
+            "account_state": (
+                "connected"
+                if payload.get("academy_staff_id") and payload.get("academy_login")
+                else "onboarding_pending"
+            ),
+        }
+        if payload.get("academy_teacher_id")
+        else None
+    )
+    payload["exact_identity"] = {
+        "has_phone": bool(_text(payload.get("phone"))),
+        "has_email": bool(_text(payload.get("email"))),
+        "has_telegram": bool(_text(payload.get("telegram_username"))),
+        "has_linked_account": bool(payload.get("linked_account_id")),
+    }
+    for source in academy_fields:
+        if source != "academy_teacher_id":
+            payload.pop(source, None)
     payload["current_sla"] = _sla_payload(payload)
     if payload.get("next_task_id"):
         payload["next_task"] = _task_payload(
@@ -635,6 +670,18 @@ def get_candidate(user: CurrentUser, candidate_id: int) -> dict[str, Any]:
         stage_history = [
             _row_dict(item) for item in repository.list_stage_history_rows(conn, int(candidate_id))
         ]
+        academy_lessons: list[dict[str, Any]] = []
+        academy_assessments: list[dict[str, Any]] = []
+        if candidate.get("academy_teacher_id"):
+            academy_id = int(candidate["academy_teacher_id"])
+            academy_lessons = [
+                _row_dict(item)
+                for item in repository.list_academy_lifecycle_lesson_rows(conn, academy_id)
+            ]
+            academy_assessments = [
+                _row_dict(item)
+                for item in repository.list_academy_lifecycle_assessment_rows(conn, academy_id)
+            ]
 
     uploaded_types = {item["document_type"] for item in documents}
     pending_tasks = [item for item in tasks if item["effective_status"] in {"pending", "overdue"}]
@@ -689,6 +736,9 @@ def get_candidate(user: CurrentUser, candidate_id: int) -> dict[str, Any]:
             ),
         }
     )
+    if candidate.get("academy"):
+        candidate["academy"]["lessons"] = academy_lessons
+        candidate["academy"]["assessments"] = academy_assessments
     return candidate
 
 
@@ -982,6 +1032,26 @@ def create_candidate(user: CurrentUser, values: dict[str, Any]) -> dict[str, Any
     now = _now()
     with connect_auth_db() as conn:
         normalized = _validate_candidate_options(conn, normalized)
+        identity_match = repository.exact_academy_identity_match(
+            conn,
+            phone=_text(normalized.get("phone")),
+            email=_text(normalized.get("email")),
+            telegram_username=_text(normalized.get("telegram_username")),
+            linked_account_id=normalized.get("linked_account_id"),
+        )
+        if identity_match:
+            existing = _row_dict(identity_match)
+            raise RecruitmentError(
+                "This identity is already linked to a Teacher Academy profile.",
+                status_code=409,
+                code="existing_academy_profile",
+                details={
+                    "profile_id": int(existing["profile_id"]),
+                    "academy_teacher_id": int(existing["academy_teacher_id"]),
+                    "full_name": existing.get("full_name") or "",
+                    "profile_url": f"/hr-manager/candidates/{int(existing['profile_id'])}?origin=teachers",
+                },
+            )
         candidate_id = repository.insert_candidate(
             conn,
             values=normalized,

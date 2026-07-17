@@ -112,7 +112,17 @@ export type RecruitmentCandidate = {
   id: number;
   full_name: string;
   phone?: string;
+  email?: string;
   telegram_username?: string;
+  linked_account_id?: number | null;
+  is_application_received?: boolean;
+  profile_origin?: "application" | "academy_direct";
+  exact_identity?: {
+    has_phone: boolean;
+    has_email: boolean;
+    has_telegram: boolean;
+    has_linked_account: boolean;
+  };
   subject_id?: number | null;
   subject?: string;
   position_option_id?: number | null;
@@ -158,6 +168,23 @@ export type RecruitmentCandidate = {
   next_task?: RecruitmentTask | null;
   next_appointment?: RecruitmentAppointment | null;
   academy_teacher_id?: number | null;
+  academy?: {
+    id: number;
+    status?: string;
+    start_date?: string | null;
+    onboarding_status?: string;
+    subject_id?: number | null;
+    subject?: string;
+    subject_program_id?: number | null;
+    curriculum?: string;
+    staff_id?: number | null;
+    login?: string;
+    lesson_count?: number;
+    assessment_count?: number;
+    lessons?: Array<Record<string, unknown>>;
+    assessments?: Array<Record<string, unknown>>;
+    account_state?: "connected" | "onboarding_pending";
+  } | null;
   active_teacher_id?: number | null;
   permissions?: RecruitmentPermissions;
   documents?: Array<Record<string, unknown>>;

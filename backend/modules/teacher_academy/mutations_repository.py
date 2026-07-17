@@ -107,6 +107,24 @@ def complete_recruitment_academy_intake(
     )
 
 
+def attach_lifecycle_profile_account(
+    conn: Any,
+    *,
+    candidate_id: int,
+    account_id: int,
+    updated_at: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidates
+        SET linked_account_id = %s, updated_at = %s::timestamptz
+        WHERE id = %s
+          AND (linked_account_id IS NULL OR linked_account_id = %s)
+        """,
+        (int(account_id), updated_at, int(candidate_id), int(account_id)),
+    )
+
+
 def insert_recruitment_academy_onboarding_audit(
     conn: Any,
     *,
