@@ -74,8 +74,8 @@ const filterKeys: Array<keyof PipelineFilters> = [
 ];
 
 const chartStages = [
-  { stage: "new_candidate", label: "New", color: "bg-white ring-1 ring-inset ring-slate-400 dark:bg-slate-100", legend: "bg-white border border-slate-400" },
-  { stage: "responded", label: "Responded", color: "bg-blue-600", legend: "bg-blue-600" },
+  { stage: "new_candidate", label: "Application Received", color: "bg-white ring-1 ring-inset ring-slate-400 dark:bg-slate-100", legend: "bg-white border border-slate-400" },
+  { stage: "responded", label: "Interview Schedule", color: "bg-blue-600", legend: "bg-blue-600" },
   { stage: "job_interview", label: "Job Interview", color: "bg-emerald-300", legend: "bg-emerald-300" },
   { stage: "test_and_demo", label: "Demo & Test", color: "bg-emerald-600", legend: "bg-emerald-600" },
   { stage: "teacher_academy", label: "Teacher Academy", color: "bg-amber-500", legend: "bg-amber-500" },
