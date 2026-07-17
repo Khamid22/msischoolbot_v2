@@ -290,9 +290,9 @@ def dashboard_rows(
                    COUNT(*) AS candidates
             FROM events event
             WHERE event.event_date BETWEEN %s::date AND %s::date
-            GROUP BY date_trunc(%s, event.event_date::timestamp)::date, event.event_type
-            ORDER BY date_trunc(%s, event.event_date::timestamp)::date, event.event_type""",
-        tuple([*base_params, bucket, date_from, date_to, bucket, bucket]),
+            GROUP BY 1, 2
+            ORDER BY 1, 2""",
+        tuple([*base_params, bucket, date_from, date_to]),
     ).fetchall()
 
     positions = conn.execute(

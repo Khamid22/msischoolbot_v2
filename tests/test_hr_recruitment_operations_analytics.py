@@ -187,6 +187,8 @@ def test_analytics_trend_fills_empty_buckets_and_zero_comparison_is_safe():
 
 
 def test_analytics_repository_queries_bind_every_placeholder():
+    executed_queries = []
+
     class Cursor:
         def fetchone(self):
             return {}
@@ -197,6 +199,7 @@ def test_analytics_repository_queries_bind_every_placeholder():
     class Connection:
         def execute(self, query, params=()):
             assert query.count("%s") == len(params), query
+            executed_queries.append(query)
             return Cursor()
 
     result = analytics_repository.dashboard_rows(
@@ -215,6 +218,9 @@ def test_analytics_repository_queries_bind_every_placeholder():
     )
     assert result["journey"] == []
     assert result["recent_activity"] == []
+    trend_query = next(query for query in executed_queries if "WITH filtered_candidates AS" in query)
+    assert "GROUP BY 1, 2" in trend_query
+    assert "GROUP BY date_trunc" not in trend_query
 
 
 def test_migration_contains_append_only_history_and_snapshotted_sla():
