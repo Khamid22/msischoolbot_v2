@@ -45,6 +45,10 @@ type Props = {
 };
 
 type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
+type NewCandidateSubmission = { values: Record<string, string | number | null>; cv?: File };
+type NewCandidateResult = MutationPayload & { cvUploadError?: string };
+
+const candidateCvExtensions = new Set(["pdf", "doc", "docx", "jpg", "jpeg", "png"]);
 
 function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolean; onClose: () => void; onCreated: (message: string, tone?: FloatingToastTone) => void; options?: RecruitmentOptions }) {
   const queryClient = useQueryClient();
@@ -52,9 +56,29 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
   const [subsourceId, setSubsourceId] = useState("");
   const [dirty, setDirty] = useState(false);
   const create = useMutation({
-    mutationFn: (values: Record<string, string | number | null>) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates`, { method: "POST", body: jsonBody(values) }),
+    mutationFn: async ({ values, cv }: NewCandidateSubmission): Promise<NewCandidateResult> => {
+      if (cv) {
+        const extension = cv.name.split(".").pop()?.toLowerCase() || "";
+        if (!candidateCvExtensions.has(extension)) throw new Error("CV must be a PDF, DOC, DOCX, JPG, JPEG, or PNG file.");
+        if (cv.size > 20 * 1024 * 1024) throw new Error("CV must be 20 MB or smaller.");
+      }
+      const result = await recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates`, { method: "POST", body: jsonBody(values) });
+      if (!cv || !result.candidate?.id) return result;
+      const documentData = new FormData();
+      documentData.append("document_type", "cv");
+      documentData.append("document", cv);
+      try {
+        await recruitmentRequest(`${RECRUITMENT_API}/candidates/${result.candidate.id}/documents`, { method: "POST", body: documentData });
+        return { ...result, message: "Candidate and CV added." };
+      } catch (error) {
+        return { ...result, cvUploadError: queryError(error) };
+      }
+    },
     onSuccess: (result) => {
-      onCreated(result.message);
+      onCreated(
+        result.cvUploadError ? `Candidate created, but the CV was not uploaded: ${result.cvUploadError}` : result.message,
+        result.cvUploadError ? "error" : undefined,
+      );
       setSourceId("");
       setSubsourceId("");
       setDirty(false);
@@ -73,7 +97,14 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
   };
   return (
     <Modal open={open} onClose={close} title="Add candidate" size="lg" mobileMode="sheet" closeOnEscape={!create.isPending} closeOnOutsideClick={!create.isPending}>
-      <form className="flex min-h-0 flex-1 flex-col" onChange={() => setDirty(true)} onSubmit={(event) => { event.preventDefault(); create.mutate(formValues(event.currentTarget)); }}>
+      <form className="flex min-h-0 flex-1 flex-col" onChange={() => setDirty(true)} onSubmit={(event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const cvInput = form.elements.namedItem("candidate_cv") as HTMLInputElement | null;
+        const values = formValues(form);
+        delete values.candidate_cv;
+        create.mutate({ values, cv: cvInput?.files?.[0] });
+      }}>
         <ModalBody className="grid content-start gap-3 md:grid-cols-2 lg:grid-cols-3">
           {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2 lg:col-span-3">{queryError(create.error)}</div> : null}
           <label className="text-xs font-semibold lg:col-span-2">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
@@ -82,7 +113,8 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
           <label className="text-xs font-semibold">Subject<select name="subject_id" className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
           <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date())} className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
-          <label className="text-xs font-semibold md:col-span-1 lg:col-span-2">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+          <label className="text-xs font-semibold">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
+          <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-2 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
         </ModalBody>
         <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={create.isPending} onClick={close}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
       </form>

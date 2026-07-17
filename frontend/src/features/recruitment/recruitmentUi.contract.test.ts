@@ -242,6 +242,10 @@ describe("candidate navigation and progressive disclosure", () => {
   test("keeps Add Candidate compact and centered instead of fullscreen", () => {
     assert.match(workspace, /title="Add candidate" size="lg" mobileMode="sheet"/);
     assert.doesNotMatch(workspace, /title="Add candidate"[^>]*mobileMode="fullscreen"/);
+    assert.match(workspace, /name="candidate_cv" type="file"/);
+    assert.match(workspace, /documentData\.append\("document_type", "cv"\)/);
+    assert.match(workspace, /Candidate and CV added/);
+    assert.match(workspace, /CV must be 20 MB or smaller/);
   });
 
   test("opens documents directly while keeping permission-scoped replace and remove controls", () => {
