@@ -119,11 +119,11 @@ function PipelineSummary({ counts, action }: { counts: Record<string, number>; a
   }));
   const summary = values.map((item) => `${item.label}: ${item.count} (${item.percentage}%)`).join(", ");
   return (
-    <section className="rounded-xl border border-border bg-card px-3 py-2.5" aria-label={`Pipeline distribution. Total ${total}. ${summary}`}>
+    <section className="rounded-xl border border-border bg-card px-3 py-1.5" aria-label={`Pipeline distribution. Total ${total}. ${summary}`}>
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="shrink-0 text-xs font-semibold text-foreground"><span className="text-muted-foreground">Total</span> <span className="tabular-nums">{total}</span></div>
-          <div className="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full border border-slate-300 bg-muted" aria-hidden="true">
+          <div className="flex h-2 min-w-0 flex-1 overflow-hidden rounded-full border border-slate-300 bg-muted" aria-hidden="true">
             {values.filter((item) => item.count > 0).map((item) => (
               <span key={item.stage} className={`${item.color} first:rounded-l-full last:rounded-r-full`} style={{ width: `${item.rawPercentage}%` }} />
             ))}
@@ -131,7 +131,7 @@ function PipelineSummary({ counts, action }: { counts: Record<string, number>; a
         </div>
         {action}
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] leading-4 text-muted-foreground sm:text-[11px]">
         {values.map((item) => (
           <li key={item.stage} className="inline-flex items-center gap-1.5 whitespace-nowrap">
             <span className={`h-2.5 w-2.5 rounded-sm ${item.legend}`} aria-hidden="true" />
@@ -449,7 +449,7 @@ export function PipelineView({
           const highlighted = dragOverStage === stage;
           const items = data.stages[stage] || [];
           return (
-            <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; moveMutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-12rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
+            <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; moveMutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-9.75rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
               <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
               <div className="miniapp-scroll flex-1 overflow-y-auto p-1.5">{cards(items, true)}</div>
             </section>
@@ -464,7 +464,7 @@ export function PipelineView({
   if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <PipelineSummary
         counts={pipeline.data.counts}
         action={(

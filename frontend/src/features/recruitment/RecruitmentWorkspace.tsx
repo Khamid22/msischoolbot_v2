@@ -169,10 +169,10 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const content = (
     <>
       {view !== "candidate" ? (
-        <header className="flex flex-wrap items-center justify-between gap-3">
+        <header className={`flex flex-wrap items-center justify-between ${view === "pipeline" ? "gap-2" : "gap-3"}`}>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Teacher Recruitment</p>
-            <h1 className="mt-0.5 text-xl font-bold tracking-tight sm:text-2xl">{title}</h1>
+            <p className={`${view === "pipeline" ? "text-[10px] leading-3" : "text-[11px]"} font-semibold uppercase tracking-[0.14em] text-primary`}>Teacher Recruitment</p>
+            <h1 className={`${view === "pipeline" ? "mt-0 text-lg leading-6 sm:text-xl" : "mt-0.5 text-xl sm:text-2xl"} font-bold tracking-tight`}>{title}</h1>
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
             {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review current and completed interviews and demo lessons in Asia/Tashkent time.</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
@@ -207,7 +207,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         active="recruitment"
         recruitmentView={academicRecruitmentView}
         maxWidthClass="max-w-[1600px]"
-        sectionClassName="gap-3"
+        sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
       >
         {content}
       </AcademicDirectorPageShell>
@@ -222,7 +222,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         active="recruitment"
         recruitmentView={academicRecruitmentView}
         maxWidthClass="max-w-[1600px]"
-        sectionClassName="gap-3"
+        sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
       >
         {content}
       </HeadOfDepartmentPageShell>
@@ -246,7 +246,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       workspaceBackLink={workspaceBackLink}
       profileHref={`${basePath}/profile`}
       maxWidthClass="max-w-[1600px]"
-      sectionClassName="gap-3"
+      sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
     >
       {content}
     </RoleWorkspaceShell>
