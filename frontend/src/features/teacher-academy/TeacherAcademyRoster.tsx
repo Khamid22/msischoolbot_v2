@@ -14,6 +14,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 
@@ -99,12 +100,14 @@ type TeacherAcademyRosterProps = {
   onRemoved?: (teacher: TeacherRosterItem) => void;
   onTotalChange?: (total: number) => void;
   onAnnouncement: (message: string, tone?: RosterMessageTone) => void;
+  toolbarLeading?: ReactNode;
 };
 
-const DESKTOP_ROW_HEIGHT = 72;
-const DESKTOP_HEADER_HEIGHT = 45;
-const PAGINATION_HEIGHT = 54;
+const DESKTOP_ROW_HEIGHT = 56;
+const DESKTOP_HEADER_HEIGHT = 40;
+const PAGINATION_HEIGHT = 48;
 const VIEWPORT_GUTTER = 16;
+const DESKTOP_MIN_PAGE_SIZE = 10;
 const MOBILE_PAGE_SIZE = 5;
 
 function statusLabel(value: string) {
@@ -195,10 +198,11 @@ function AverageScore({ teacher }: { teacher: TeacherRosterItem }) {
 
 function useViewportPageSize(
   tableRef: RefObject<HTMLDivElement | null>,
-  total: number,
 ) {
   const [perPage, setPerPage] = useState(() => (
-    typeof window !== "undefined" && window.innerWidth < 1024 ? MOBILE_PAGE_SIZE : 8
+    typeof window !== "undefined" && window.innerWidth < 1024
+      ? MOBILE_PAGE_SIZE
+      : DESKTOP_MIN_PAGE_SIZE
   ));
 
   useEffect(() => {
@@ -216,20 +220,15 @@ function useViewportPageSize(
           DESKTOP_HEADER_HEIGHT + DESKTOP_ROW_HEIGHT,
           viewportHeight - Math.max(0, tableTop) - VIEWPORT_GUTTER,
         );
-        const rowsWithoutPager = Math.max(
-          1,
-          Math.floor((available - DESKTOP_HEADER_HEIGHT) / DESKTOP_ROW_HEIGHT),
-        );
-        const requiresPager = total > rowsWithoutPager;
         const next = Math.max(
-          1,
+          DESKTOP_MIN_PAGE_SIZE,
           Math.min(
             100,
             Math.floor(
               (
                 available
                 - DESKTOP_HEADER_HEIGHT
-                - (requiresPager ? PAGINATION_HEIGHT : 0)
+                - PAGINATION_HEIGHT
               ) / DESKTOP_ROW_HEIGHT,
             ),
           ),
@@ -251,7 +250,7 @@ function useViewportPageSize(
       window.removeEventListener("resize", calculate);
       window.visualViewport?.removeEventListener("resize", calculate);
     };
-  }, [tableRef, total]);
+  }, [tableRef]);
 
   return perPage;
 }
@@ -353,6 +352,7 @@ export function TeacherAcademyRoster({
   onRemoved,
   onTotalChange,
   onAnnouncement,
+  toolbarLeading,
 }: TeacherAcademyRosterProps) {
   const initial = useMemo(initialRosterFilters, []);
   const [search, setSearch] = useState(initial.search);
@@ -366,7 +366,7 @@ export function TeacherAcademyRoster({
   const [rejectionReason, setRejectionReason] = useState("");
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const previousPerPageRef = useRef(0);
-  const perPage = useViewportPageSize(tableViewportRef, knownTotal);
+  const perPage = useViewportPageSize(tableViewportRef);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -524,60 +524,67 @@ export function TeacherAcademyRoster({
 
   return (
     <div className="space-y-3">
-      <div className={`grid gap-2 ${
-        kind === "teacher_academy"
-          ? "sm:grid-cols-2 xl:grid-cols-[13rem_13rem_minmax(14rem,1fr)]"
-          : "sm:grid-cols-[13rem_minmax(14rem,1fr)]"
+      <div className={`flex flex-col gap-2 xl:flex-row xl:items-end ${
+        toolbarLeading ? "border-b-2 border-amber-500" : ""
       }`}>
-        {kind === "teacher_academy" ? (
-          <label className="relative">
-            <span className="sr-only">Sort Teacher Academy teachers</span>
-            <ArrowDownWideNarrow className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        {toolbarLeading ? (
+          <div className="min-w-0 flex-1">{toolbarLeading}</div>
+        ) : null}
+        <div className={`grid shrink-0 gap-2 pb-2 sm:grid-cols-2 xl:pb-1 ${
+          kind === "teacher_academy"
+            ? "xl:grid-cols-[10.5rem_10.5rem_15rem]"
+            : "xl:grid-cols-[10.5rem_15rem]"
+        }`}>
+          {kind === "teacher_academy" ? (
+            <label className="relative">
+              <span className="sr-only">Sort Teacher Academy teachers</span>
+              <ArrowDownWideNarrow className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <select
+                value={sort}
+                onChange={(event) => updateSort(event.target.value as TeacherRosterSort)}
+                className={`${fieldClass} min-h-11 pl-9 text-xs`}
+                aria-label="Sort Teacher Academy teachers"
+              >
+                <option value="average_score">Average score</option>
+                <option value="lessons">Lessons completed</option>
+                <option value="date">Date added</option>
+              </select>
+            </label>
+          ) : null}
+          <label>
+            <span className="sr-only">Filter teachers by subject</span>
             <select
-              value={sort}
-              onChange={(event) => updateSort(event.target.value as TeacherRosterSort)}
-              className={`${fieldClass} min-h-11 pl-9`}
-              aria-label="Sort Teacher Academy teachers"
+              value={subjectId}
+              onChange={(event) => updateSubject(event.target.value)}
+              className={`${fieldClass} min-h-11 text-xs`}
+              aria-label="Filter teachers by subject"
             >
-              <option value="average_score">Average score</option>
-              <option value="lessons">Lessons completed</option>
-              <option value="date">Date added</option>
+              <option value="">All subjects</option>
+              {(options.data?.subjects || []).map((subject) => (
+                <option key={subject.id} value={subject.id}>{subject.name}</option>
+              ))}
             </select>
           </label>
-        ) : null}
-        <label>
-          <span className="sr-only">Filter teachers by subject</span>
-          <select
-            value={subjectId}
-            onChange={(event) => updateSubject(event.target.value)}
-            className={`${fieldClass} min-h-11`}
-            aria-label="Filter teachers by subject"
-          >
-            <option value="">All subjects</option>
-            {(options.data?.subjects || []).map((subject) => (
-              <option key={subject.id} value={subject.id}>{subject.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="relative sm:col-span-2 xl:col-span-1">
-          <span className="sr-only">Search teachers</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => updateSearch(event.target.value)}
-            className={`${fieldClass} min-h-11 pl-9`}
-            placeholder="Search teachers"
-          />
-        </label>
+          <label className="relative sm:col-span-2 xl:col-span-1">
+            <span className="sr-only">Search teachers</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => updateSearch(event.target.value)}
+              className={`${fieldClass} min-h-11 pl-9 text-xs`}
+              placeholder="Search teachers"
+            />
+          </label>
+        </div>
       </div>
 
       <div ref={tableViewportRef}>
         {teachers.isLoading ? (
           <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block" aria-label="Loading teachers">
-            <div className="h-[45px] animate-pulse border-b border-border bg-muted/60 motion-reduce:animate-none" />
+            <div className="h-10 animate-pulse border-b border-border bg-muted/60 motion-reduce:animate-none" />
             {Array.from({ length: perPage }, (_, row) => (
-              <div key={row} className="h-[72px] animate-pulse border-b border-border/70 bg-muted/25 last:border-0 motion-reduce:animate-none" />
+              <div key={row} className="h-14 animate-pulse border-b border-border/70 bg-muted/25 last:border-0 motion-reduce:animate-none" />
             ))}
           </div>
         ) : null}
@@ -595,7 +602,7 @@ export function TeacherAcademyRoster({
             >
               <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
                 <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <tr className="h-[45px]">
+                  <tr className="h-10">
                     <th scope="col" className="w-[18%] px-4 font-semibold">Teacher</th>
                     <th scope="col" className="w-[14%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
@@ -617,9 +624,9 @@ export function TeacherAcademyRoster({
                       tabIndex={0}
                       onClick={(event) => handleRowClick(event, teacher)}
                       onKeyDown={(event) => handleRowKeyboard(event, teacher)}
-                      className="group h-[72px] cursor-pointer bg-card transition-colors duration-150 hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none"
+                      className="group h-14 cursor-pointer bg-card transition-colors duration-150 hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none"
                     >
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-1.5">
                         <button
                           type="button"
                           onClick={() => openTeacher(teacher)}
@@ -633,23 +640,23 @@ export function TeacherAcademyRoster({
                           </span>
                         </button>
                       </td>
-                      <td className="px-3 py-2 text-xs font-medium text-foreground">
+                      <td className="px-3 py-1.5 text-xs font-medium text-foreground">
                         {teacher.added_on ? dateLabel(teacher.added_on) : "Not recorded"}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5">
                         <span className="line-clamp-2 text-xs text-foreground">
                           {teacher.position || "Position not set"}
                         </span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-1.5">
                         {kind === "teacher_academy"
                           ? <AcademyStatus status={teacher.status} />
                           : <span className="text-xs font-medium">{statusLabel(teacher.status)}</span>}
                       </td>
-                      <td className="px-3 py-2"><LessonsCompleted teacher={teacher} /></td>
-                      <td className="px-3 py-2"><AverageScore teacher={teacher} /></td>
-                      <td className="px-3 py-2"><AccountStatus teacher={teacher} /></td>
-                      <td className="px-2 py-2 text-center">
+                      <td className="px-3 py-1.5"><LessonsCompleted teacher={teacher} /></td>
+                      <td className="px-3 py-1.5"><AverageScore teacher={teacher} /></td>
+                      <td className="px-3 py-1.5"><AccountStatus teacher={teacher} /></td>
+                      <td className="px-2 py-1.5 text-center">
                         <ActionMenu
                           label={`Actions for ${teacher.full_name}`}
                           items={teacherActions(teacher)}

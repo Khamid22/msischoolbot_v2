@@ -47,9 +47,8 @@ export function TeachersView({ basePath, onAnnouncement }: TeachersViewProps) {
     });
   };
 
-  return (
-    <section aria-label="Teachers" className="space-y-3">
-      <div className="flex items-end border-b-2 border-amber-500" role="tablist" aria-label="Teacher roster type">
+  const teacherTabs = (
+    <div className="flex items-end" role="tablist" aria-label="Teacher roster type">
         {tabs.map((tab, index) => {
           const active = stage === tab.key;
           const Icon = tab.icon;
@@ -60,7 +59,7 @@ export function TeachersView({ basePath, onAnnouncement }: TeachersViewProps) {
               role="tab"
               aria-selected={active}
               onClick={() => selectTab(tab.key)}
-              className={`relative inline-flex min-h-11 items-center gap-2 px-5 py-2 text-sm font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none sm:min-w-52 ${
+              className={`relative inline-flex min-h-11 items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none sm:min-w-44 ${
                 active
                   ? "z-10 bg-amber-500 text-amber-950"
                   : "bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -84,13 +83,17 @@ export function TeachersView({ basePath, onAnnouncement }: TeachersViewProps) {
             </button>
           );
         })}
-      </div>
+    </div>
+  );
 
+  return (
+    <section aria-label="Teachers">
       <TeacherAcademyRoster
         key={stage}
         kind={stage}
         basePath={basePath}
         onAnnouncement={onAnnouncement}
+        toolbarLeading={teacherTabs}
       />
     </section>
   );

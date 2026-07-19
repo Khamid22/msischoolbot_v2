@@ -359,7 +359,11 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /teacher_subject/);
     assert.match(roster, /teacher_sort/);
     assert.match(roster, /teacher_page/);
+    assert.match(roster, /DESKTOP_MIN_PAGE_SIZE = 10/);
     assert.match(roster, /MOBILE_PAGE_SIZE = 5/);
+    assert.match(roster, /className="group h-14/);
+    assert.match(roster, /toolbarLeading/);
+    assert.match(teachers, /toolbarLeading=\{teacherTabs\}/);
     assert.match(roster, /ResponsiveTable/);
     assert.match(roster, /MobileCardList/);
     assert.match(academyPanel, /<TeacherAcademyRoster/);
