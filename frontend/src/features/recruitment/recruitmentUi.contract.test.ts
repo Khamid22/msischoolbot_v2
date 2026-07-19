@@ -344,15 +344,26 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(teachers, /active_teacher/);
     assert.match(teachers, /Teacher Academy/);
     assert.match(teachers, /Active Teachers/);
-    assert.match(teachers, /\/teachers\?kind=teacher_academy/);
-    assert.match(teachers, /\/teachers\?kind=active_teacher/);
+    assert.match(teachers, /teacherQuery\("teacher_academy"\)/);
+    assert.match(teachers, /teacherQuery\("active_teacher"\)/);
     assert.match(teachers, /recruitment_candidate_id/);
     assert.match(teachers, /role="tablist"/);
     assert.match(teachers, /role="tab"/);
     assert.match(teachers, /role="tabpanel"/);
     assert.match(teachers, /clip-path:polygon/);
     assert.match(teachers, /ArrowLeft/);
+    assert.match(teachers, /Added to Teacher Academy/);
+    assert.match(teachers, /Academy status/);
+    assert.match(teachers, /assigned_count/);
+    assert.match(teachers, /passed_count/);
+    assert.match(teachers, /ProgressBar/);
+    assert.match(teachers, /ActionMenu/);
+    assert.match(teachers, /All subjects/);
+    assert.match(teachers, /teacher_subject/);
+    assert.match(teachers, /ResponsiveTable/);
+    assert.match(teachers, /MobileCardList/);
     assert.doesNotMatch(teachers, /min-h-20/);
+    assert.doesNotMatch(teachers, /TeacherCard/);
     assert.doesNotMatch(pipeline, /boardStages.*teacher_academy/);
   });
 

@@ -81,12 +81,18 @@ def test_teacher_handoff_repository_reads_canonical_tables_and_keeps_legacy_fall
         academy_conn,
         kind="teacher_academy",
         search="Math",
+        subject_id=4,
     ) == ([], 0)
     academy_sql = "\n".join(sql for sql, _params in academy_conn.calls)
     assert "FROM msi_v2.academy_teachers academy" in academy_sql
     assert "academy.promoted_teacher_id IS NULL" in academy_sql
     assert "candidate.status = 'teacher_academy'" in academy_sql
     assert "linked.recruitment_candidate_id = candidate.id" in academy_sql
+    assert "academy.created_at AT TIME ZONE 'Asia/Tashkent'" in academy_sql
+    assert "FROM msi_v2.academy_lesson_assignments assignment" in academy_sql
+    assert "FROM msi_v2.academy_assessments assessment" in academy_sql
+    assert "%s = ANY(record.subject_ids)" in academy_sql
+    assert academy_conn.calls[0][1] == ("%Math%", "%Math%", "%Math%", 4)
 
     active_conn = Connection()
     assert repository.list_teacher_handoff_rows(
@@ -121,6 +127,10 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
                     "status": "in_training",
                     "onboarding_status": "complete",
                     "joined_at": "2026-07-17T10:00:00+00:00",
+                    "added_on": "2026-07-17",
+                    "assigned_count": 12,
+                    "passed_count": 8,
+                    "average_score": 7.24,
                 }
             ],
             1,
@@ -130,11 +140,16 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
         _user(),
         kind="teacher_academy",
         search="Math",
+        subject_id=4,
     )
     assert result["total"] == 1
     assert result["items"][0]["record_id"] == 17
     assert result["items"][0]["recruitment_candidate_id"] == 0
     assert result["items"][0]["position"] == "IGCSE Math Teacher"
+    assert result["items"][0]["added_on"] == "2026-07-17"
+    assert result["items"][0]["assigned_count"] == 12
+    assert result["items"][0]["passed_count"] == 8
+    assert result["items"][0]["average_score"] == 7.2
 
     with pytest.raises(service.RecruitmentError, match="HR Manager or CEO"):
         service.list_teacher_handoffs(

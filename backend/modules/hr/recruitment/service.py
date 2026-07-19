@@ -499,6 +499,7 @@ def list_teacher_handoffs(
     page: int = 1,
     per_page: int = 100,
     search: str = "",
+    subject_id: int | None = None,
 ) -> dict[str, Any]:
     if user.role not in {"hr_manager", "ceo"}:
         raise RecruitmentError(
@@ -515,6 +516,7 @@ def list_teacher_handoffs(
             conn,
             kind=normalized_kind,
             search=_text(search),
+            subject_id=subject_id,
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
         )
@@ -531,6 +533,14 @@ def list_teacher_handoffs(
                 "status": _text(row["status"]),
                 "onboarding_status": _text(row["onboarding_status"]),
                 "joined_at": _iso(row["joined_at"]),
+                "added_on": _text(row.get("added_on")),
+                "assigned_count": int(row.get("assigned_count") or 0),
+                "passed_count": int(row.get("passed_count") or 0),
+                "average_score": (
+                    round(float(row["average_score"]), 1)
+                    if row.get("average_score") is not None
+                    else None
+                ),
                 "can_remove": user.role == "hr_manager" and normalized_kind == "teacher_academy",
                 "generated_login_will_be_deleted": bool(
                     row.get("generated_login_will_be_deleted")

@@ -138,6 +138,7 @@ def teachers(
     page: Annotated[int, Query(ge=1)] = 1,
     per_page: Annotated[int, Query(ge=1, le=100)] = 100,
     search: str = "",
+    subject_id: Annotated[int | None, Query(ge=1)] = None,
     user: CurrentUser = Depends(get_current_user),
 ):
     return api_success(
@@ -148,6 +149,7 @@ def teachers(
             page=page,
             per_page=per_page,
             search=search,
+            subject_id=subject_id,
         )
     )
 

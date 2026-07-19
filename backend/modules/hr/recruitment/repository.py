@@ -418,6 +418,7 @@ def list_teacher_handoff_rows(
     *,
     kind: str,
     search: str = "",
+    subject_id: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
@@ -442,9 +443,22 @@ def list_teacher_handoff_rows(
                     'Position not set'
                 ) AS position,
                 COALESCE(subject.subject_name, '') AS subject,
+                CASE
+                    WHEN academy.subject_id IS NULL THEN ARRAY[]::bigint[]
+                    ELSE ARRAY[academy.subject_id]::bigint[]
+                END AS subject_ids,
                 COALESCE(academy.academy_status, 'in_training') AS status,
                 COALESCE(academy.account_onboarding_status, 'complete') AS onboarding_status,
                 academy.academy_start_date::timestamptz AS joined_at,
+                COALESCE(
+                    academy.academy_start_date::text,
+                    (academy.created_at AT TIME ZONE 'Asia/Tashkent')::date::text
+                ) AS added_on,
+                COALESCE(academy.academy_start_date::timestamptz, academy.created_at)
+                    AS sort_at,
+                COALESCE(academy_progress.assigned_count, 0)::integer AS assigned_count,
+                COALESCE(academy_progress.passed_count, 0)::integer AS passed_count,
+                academy_progress.average_score,
                 (
                     academy.user_id IS NOT NULL
                     AND academy.promoted_teacher_id IS NULL
@@ -459,6 +473,31 @@ def list_teacher_handoff_rows(
               ON identity_staff.id = academy.user_id
             LEFT JOIN msi_v2.teachers identity_teacher
               ON identity_teacher.id = identity_staff.teacher_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    (
+                        SELECT COUNT(*)::integer
+                        FROM msi_v2.academy_lesson_assignments assignment
+                        WHERE assignment.academy_teacher_id = academy.id
+                    ) AS assigned_count,
+                    (
+                        SELECT COUNT(DISTINCT assessment.lesson_assignment_id)::integer
+                        FROM msi_v2.academy_assessments assessment
+                        WHERE assessment.academy_teacher_id = academy.id
+                          AND assessment.lesson_assignment_id IS NOT NULL
+                          AND assessment.decision IN (
+                              'passed',
+                              'ready_for_final_evaluation',
+                              'approved_for_active_teacher'
+                          )
+                    ) AS passed_count,
+                    (
+                        SELECT AVG(assessment.weighted_overall_score)
+                        FROM msi_v2.academy_assessments assessment
+                        WHERE assessment.academy_teacher_id = academy.id
+                          AND assessment.weighted_overall_score > 0
+                    ) AS average_score
+            ) academy_progress ON true
             WHERE academy.promoted_teacher_id IS NULL
               AND COALESCE(academy.academy_status, '') <> 'rejected'
 
@@ -475,9 +514,19 @@ def list_teacher_handoff_rows(
                     'Position not set'
                 ) AS position,
                 COALESCE(subject.subject_name, '') AS subject,
+                CASE
+                    WHEN candidate.subject_id IS NULL THEN ARRAY[]::bigint[]
+                    ELSE ARRAY[candidate.subject_id]::bigint[]
+                END AS subject_ids,
                 candidate.status,
                 'missing_handoff'::text AS onboarding_status,
                 NULL::timestamptz AS joined_at,
+                (candidate.stage_changed_at AT TIME ZONE 'Asia/Tashkent')::date::text
+                    AS added_on,
+                candidate.stage_changed_at AS sort_at,
+                0::integer AS assigned_count,
+                0::integer AS passed_count,
+                NULL::numeric AS average_score,
                 false AS generated_login_will_be_deleted
             FROM msi_v2.teacher_candidates candidate
             LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
@@ -501,9 +550,15 @@ def list_teacher_handoff_rows(
                     'Position not set'
                 ) AS position,
                 COALESCE(teacher_subject.subject_name, '') AS subject,
+                COALESCE(teacher_subject.subject_ids, ARRAY[]::bigint[]) AS subject_ids,
                 teacher.status,
                 COALESCE(teacher.account_onboarding_status, 'complete') AS onboarding_status,
                 teacher.created_at AS joined_at,
+                (teacher.created_at AT TIME ZONE 'Asia/Tashkent')::date::text AS added_on,
+                teacher.created_at AS sort_at,
+                0::integer AS assigned_count,
+                0::integer AS passed_count,
+                NULL::numeric AS average_score,
                 false AS generated_login_will_be_deleted
             FROM msi_v2.teachers teacher
             LEFT JOIN msi_v2.teacher_candidates candidate
@@ -512,9 +567,13 @@ def list_teacher_handoff_rows(
                 SELECT string_agg(
                     DISTINCT available_subject.subject_name,
                     ', ' ORDER BY available_subject.subject_name
-                ) AS subject_name
+                ) AS subject_name,
+                array_agg(
+                    DISTINCT available_subject.subject_id
+                    ORDER BY available_subject.subject_id
+                ) FILTER (WHERE available_subject.subject_id IS NOT NULL) AS subject_ids
                 FROM (
-                    SELECT direct_subject.subject_name
+                    SELECT direct_subject.id AS subject_id, direct_subject.subject_name
                     FROM msi_v2.teacher_subjects teacher_subject_link
                     JOIN msi_v2.subjects direct_subject
                       ON direct_subject.id = teacher_subject_link.subject_id
@@ -523,7 +582,7 @@ def list_teacher_handoff_rows(
 
                     UNION ALL
 
-                    SELECT group_subject.subject_name
+                    SELECT group_subject.id AS subject_id, group_subject.subject_name
                     FROM msi_v2.group_teachers group_teacher
                     JOIN msi_v2.groups teacher_group ON teacher_group.id = group_teacher.group_id
                     JOIN msi_v2.subject_programs group_program
@@ -549,9 +608,28 @@ def list_teacher_handoff_rows(
                     'Position not set'
                 ) AS position,
                 COALESCE(subject.subject_name, '') AS subject,
+                CASE
+                    WHEN candidate.subject_id IS NULL THEN ARRAY[]::bigint[]
+                    ELSE ARRAY[candidate.subject_id]::bigint[]
+                END AS subject_ids,
                 candidate.status,
                 'missing_handoff'::text AS onboarding_status,
                 COALESCE(candidate.updated_at, candidate.created_at) AS joined_at,
+                (
+                    COALESCE(
+                        candidate.stage_changed_at,
+                        candidate.updated_at,
+                        candidate.created_at
+                    ) AT TIME ZONE 'Asia/Tashkent'
+                )::date::text AS added_on,
+                COALESCE(
+                    candidate.stage_changed_at,
+                    candidate.updated_at,
+                    candidate.created_at
+                ) AS sort_at,
+                0::integer AS assigned_count,
+                0::integer AS passed_count,
+                NULL::numeric AS average_score,
                 false AS generated_login_will_be_deleted
             FROM msi_v2.teacher_candidates candidate
             LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
@@ -574,6 +652,9 @@ def list_teacher_handoff_rows(
         )
         search_term = f"%{normalized_search}%"
         params.extend((search_term, search_term, search_term))
+    if subject_id is not None:
+        filters.append("%s = ANY(record.subject_ids)")
+        params.append(int(subject_id))
     where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
     total_row = conn.execute(
         f"""
@@ -590,10 +671,12 @@ def list_teacher_handoff_rows(
         SELECT record.kind, record.record_id, record.recruitment_candidate_id,
                record.full_name, record.position, record.subject, record.status,
                record.onboarding_status, record.joined_at::text AS joined_at,
+               record.added_on, record.assigned_count, record.passed_count,
+               record.average_score,
                record.generated_login_will_be_deleted
         FROM record
         {where_sql}
-        ORDER BY record.joined_at DESC NULLS LAST, lower(record.full_name), record.record_id
+        ORDER BY record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id
         LIMIT %s OFFSET %s
         """,
         tuple([*params, int(limit), int(offset)]),
