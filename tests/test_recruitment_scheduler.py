@@ -168,6 +168,189 @@ def test_api_allows_server_default_duration_and_rejects_out_of_range_values():
         )
 
 
+def test_past_appointment_requires_hr_historical_result_and_skips_future_requirements(monkeypatch):
+    conn = _Connection()
+    conflicts = []
+    monkeypatch.setattr(
+        repository,
+        "list_appointment_conflicts",
+        lambda *_args, **_kwargs: conflicts.append(True) or [],
+    )
+
+    prepared = service._prepare_appointment(
+        conn,
+        user=_user(),
+        candidate={"id": 7, "subject_id": 3},
+        appointment_type="demo_lesson",
+        values={
+            "starts_at": datetime(2020, 7, 16, 10, 0),
+            "historical_result": "passed",
+        },
+    )
+
+    assert prepared["is_historical"] is True
+    assert prepared["historical_result"] == "passed"
+    assert prepared["responsible_account_id"] == 41
+    assert prepared["appointment_format"] == ""
+    assert conflicts == []
+
+    with pytest.raises(service.RecruitmentError, match="Only HR Manager"):
+        service._prepare_appointment(
+            conn,
+            user=_user("ceo"),
+            candidate={"id": 7, "subject_id": 3},
+            appointment_type="job_interview",
+            values={
+                "starts_at": datetime(2020, 7, 16, 10, 0),
+                "historical_result": "passed",
+            },
+        )
+
+
+def test_historical_interview_is_completed_and_advances_atomically(monkeypatch):
+    conn = _Connection()
+    candidate = {
+        "id": 7,
+        "status": "job_interview",
+        "version": 4,
+        "subject_id": 3,
+        "subject": "Mathematics",
+    }
+    appointments = []
+    evaluations = []
+    movements = []
+    notifications_sent = []
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(service, "_lock_candidate", lambda *_args, **_kwargs: candidate)
+    monkeypatch.setattr(repository, "active_appointment_for_type", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        repository,
+        "insert_appointment",
+        lambda *_args, **kwargs: appointments.append(kwargs["values"]) or 91,
+    )
+    monkeypatch.setattr(
+        repository,
+        "complete_historical_appointment",
+        lambda *_args, **kwargs: appointments.append(kwargs) or {"id": 91, "version": 2},
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_interview",
+        lambda *_args, **kwargs: evaluations.append(kwargs["values"]) or 108,
+    )
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: movements.append(kwargs) or {"id": 7, "version": 5},
+    )
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        notifications,
+        "enqueue_demo_event",
+        lambda *_args, **_kwargs: notifications_sent.append(True),
+    )
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "appointments": []})
+
+    service.create_appointment(
+        _user(),
+        7,
+        {
+            "appointment_type": "job_interview",
+            "starts_at": datetime(2020, 7, 16, 10, 0),
+            "historical_result": "passed",
+        },
+    )
+
+    assert conn.commits == 1
+    assert evaluations == [
+        {
+            "appointment_id": 91,
+            "interview_at": "2020-07-16T05:00:00+00:00",
+            "interviewer_account_id": 41,
+            "interview_format": "",
+            "notes": "",
+            "result": "passed",
+        }
+    ]
+    assert movements[0]["stage"] == "test_and_demo"
+    assert movements[0]["transition_source"] == "historical_restoration"
+    assert notifications_sent == []
+
+
+def test_failed_historical_demo_uses_existing_automatic_rejection_shape(monkeypatch):
+    conn = _Connection()
+    candidate = {
+        "id": 7,
+        "status": "test_and_demo",
+        "version": 4,
+        "subject_id": 3,
+        "subject": "Mathematics",
+    }
+    movements = []
+    decisions = []
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(service, "_lock_candidate", lambda *_args, **_kwargs: candidate)
+    monkeypatch.setattr(repository, "active_appointment_for_type", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(repository, "insert_appointment", lambda *_args, **_kwargs: 92)
+    monkeypatch.setattr(
+        repository,
+        "complete_historical_appointment",
+        lambda *_args, **_kwargs: {"id": 92, "version": 2},
+    )
+    monkeypatch.setattr(repository, "insert_demo", lambda *_args, **_kwargs: 109)
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [55])
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: movements.append(kwargs) or {"id": 7, "version": 5},
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_final_decision",
+        lambda *_args, **kwargs: decisions.append(kwargs["values"]) or 66,
+    )
+    monkeypatch.setattr(repository, "insert_audit", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "appointments": []})
+
+    service.create_appointment(
+        _user(),
+        7,
+        {
+            "appointment_type": "demo_lesson",
+            "starts_at": datetime(2020, 7, 16, 10, 0),
+            "historical_result": "failed",
+        },
+    )
+
+    assert conn.commits == 1
+    assert movements[0]["stage"] == "rejected"
+    assert movements[0]["transition_source"] == "historical_restoration"
+    assert decisions[0]["rejection_reason"] == "failed_demo_lesson"
+    assert decisions[0]["origin_stage"] == "test_and_demo"
+    assert decisions[0]["source_evaluation_type"] == "demo"
+    assert decisions[0]["source_evaluation_id"] == 109
+
+
+def test_forward_stage_progress_derives_passes_but_never_subject_knowledge():
+    states = service._derived_evaluation_states(
+        {
+            "status": "under_review",
+            "latest_interview_result": "",
+            "latest_demo_result": "",
+            "latest_subject_test_result": "",
+        }
+    )
+
+    assert states == {
+        "interview": "passed",
+        "demo": "passed",
+        "subject_test": "missing",
+    }
+
+
 def test_scheduled_stage_move_creates_appointment_and_stage_atomically(monkeypatch):
     conn = _Connection()
     events = []

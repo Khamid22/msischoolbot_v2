@@ -29,7 +29,8 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /min-w-\[1200px\]|minmax\(240px,1fr\)/);
     assert.match(pipeline, /no-scrollbar/);
     assert.match(pipeline, /xl:block/);
-    assert.match(pipeline, /w-full min-w-0 overflow-hidden rounded-lg border/);
+    assert.match(pipeline, /w-full min-w-0 overflow-hidden border/);
+    assert.match(pipeline, /compact \? "rounded-md" : "rounded-lg"/);
     assert.match(pipeline, /overflow-y-auto/);
     assert.match(pipeline, /h-\[calc\(100dvh-12rem\)\]/);
     assert.match(pipeline, /rounded-t-xl border-x border-t/);
@@ -113,6 +114,8 @@ describe("compact recruitment pipeline", () => {
 
 describe("recruitment scheduling and assigned-demo notifications", () => {
   const appointmentForm = source("AppointmentForm.tsx");
+  const pipeline = source("PipelineView.tsx");
+  const profile = source("CandidateProfile.tsx");
   const notifications = source("RecruitmentNotifications.tsx");
   const telegram = source("TelegramConnectionCard.tsx");
 
@@ -123,10 +126,21 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
     assert.match(appointmentForm, /step=\{15\}/);
     assert.doesNotMatch(appointmentForm, /Appointment time|Asia\/Tashkent \(UTC\+5\)/);
     assert.doesNotMatch(appointmentForm, /Responsible interviewer/);
-    assert.match(appointmentForm, /demo \? <label[\s\S]*Demo evaluator/);
+    assert.match(appointmentForm, /demo && !historical \? <label[\s\S]*Demo evaluator/);
     assert.match(appointmentForm, /Conference link \(optional\)/);
     assert.match(appointmentForm, /Location \(optional\)/);
     assert.doesNotMatch(appointmentForm, /name="note"|>Notes</);
+    assert.match(appointmentForm, /Historical result/);
+    assert.match(appointmentForm, /name="historical_result"/);
+    assert.match(appointmentForm, /isPastTashkentAppointment/);
+  });
+
+  test("keeps pipeline-only cards compact and warns about missing subject knowledge", () => {
+    assert.match(pipeline, /compact=\{compact\}/);
+    assert.match(pipeline, /space-y-1\.5/);
+    assert.match(pipeline, /px-2\.5 pb-1\.5 pt-2/);
+    assert.match(pipeline, /Subject test missing\/not passed/);
+    assert.match(profile, /Subject test missing\/not passed/);
   });
 
   test("shows recipient-scoped demo notifications and unread recruitment badges", () => {

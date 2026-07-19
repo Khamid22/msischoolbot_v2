@@ -27,34 +27,45 @@ function appointmentDuration(appointment?: RecruitmentAppointment) {
   return Number.isFinite(starts) && Number.isFinite(ends) ? Math.round((ends - starts) / 60_000) : 0;
 }
 
+function isPastTashkentAppointment(date: string, time: string) {
+  if (!date || !time) return false;
+  const timestamp = new Date(`${date}T${time}:00+05:00`).getTime();
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+}
+
 export function AppointmentForm({
   appointmentType,
   options,
   appointment,
   conflicts = [],
+  allowHistoricalRestoration = false,
 }: {
   appointmentType: "job_interview" | "demo_lesson";
   options?: RecruitmentOptions;
   appointment?: RecruitmentAppointment;
   conflicts?: RecruitmentAppointment[];
+  allowHistoricalRestoration?: boolean;
 }) {
   const demo = appointmentType === "demo_lesson";
   const [format, setFormat] = useState(appointment?.appointment_format || "");
   const initialStart = tashkentInputValue(appointment?.starts_at);
   const [appointmentDate, setAppointmentDate] = useState(initialStart.slice(0, 10));
   const [appointmentTime, setAppointmentTime] = useState(initialStart.slice(11, 16));
+  const historical = allowHistoricalRestoration && isPastTashkentAppointment(appointmentDate, appointmentTime);
+  const earliestAllowedDate = allowHistoricalRestoration ? undefined : tashkentInputValue().slice(0, 10);
   const staff = (options?.staff || []).filter((person) => ["academic_director", "head_of_department"].includes(person.role));
   const defaultDuration = appointmentDuration(appointment) || (demo ? 45 : 30);
   return (
     <div className="grid gap-3">
       <input type="hidden" name="starts_at" value={appointmentDate && appointmentTime ? `${appointmentDate}T${appointmentTime}` : ""} />
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`grid gap-3 ${historical ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
         <label className="text-xs font-semibold">
           Date
           <input
             autoFocus
             required
             type="date"
+            min={earliestAllowedDate}
             value={appointmentDate}
             onChange={(event) => setAppointmentDate(event.target.value)}
             className={`${fieldClass} mt-1`}
@@ -71,7 +82,7 @@ export function AppointmentForm({
             className={`${fieldClass} mt-1`}
           />
         </label>
-        <label className="text-xs font-semibold">
+        {!historical ? <label className="text-xs font-semibold">
           Duration (minutes)
           <input
             required
@@ -83,9 +94,27 @@ export function AppointmentForm({
             defaultValue={defaultDuration}
             className={`${fieldClass} mt-1`}
           />
-        </label>
+        </label> : null}
       </div>
-      {demo ? <label className="text-xs font-semibold">
+      {historical ? (
+        <fieldset className="rounded-lg border border-amber-400/50 bg-amber-50 p-3 dark:bg-amber-950/20">
+          <legend className="px-1 text-xs font-semibold text-amber-950 dark:text-amber-100">
+            Historical result
+          </legend>
+          <p className="mb-2 text-xs text-amber-800 dark:text-amber-200">
+            This past appointment will be saved as completed in Asia/Tashkent time.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["passed", "failed"] as const).map((result) => (
+              <label key={result} className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40">
+                <input required type="radio" name="historical_result" value={result} className="h-4 w-4" />
+                {result === "passed" ? "Passed" : "Failed"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      {demo && !historical ? <label className="text-xs font-semibold">
         Demo evaluator
         <select
           name="responsible_account_id"
@@ -97,12 +126,12 @@ export function AppointmentForm({
           {staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {humanize(person.role)}</option>)}
         </select>
       </label> : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      {!historical ? <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs font-semibold">Format<select required name="appointment_format" value={format} onChange={(event) => setFormat(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select format</option><option value="Online">Online</option><option value="In person">In person</option>{!demo ? <option value="Phone">Phone</option> : null}</select></label>
         <label className="text-xs font-semibold">{format === "Online" ? "Conference link (optional)" : format === "In person" ? "Location (optional)" : "Location or link (optional)"}<input type={format === "Online" ? "url" : "text"} name="location_or_link" defaultValue={appointment?.location_or_link} placeholder={format === "Online" ? "https://meet.example/..." : ""} className={`${fieldClass} mt-1`} /></label>
-      </div>
-      {demo ? <label className="text-xs font-semibold">Demo topic<input name="topic" defaultValue={appointment?.topic} className={`${fieldClass} mt-1`} /></label> : null}
-      {conflicts.length ? (
+      </div> : null}
+      {demo && !historical ? <label className="text-xs font-semibold">Demo topic<input name="topic" defaultValue={appointment?.topic} className={`${fieldClass} mt-1`} /></label> : null}
+      {!historical && conflicts.length ? (
         <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
           <p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Schedule conflict</p>
           <p className="mt-1 text-xs leading-5">The responsible staff member already has {conflicts.length} overlapping recruitment appointment{conflicts.length === 1 ? "" : "s"}. Submit again to schedule anyway.</p>

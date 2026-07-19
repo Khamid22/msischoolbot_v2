@@ -271,7 +271,7 @@ export function ScheduleView({
       </div>
 
       <Drawer open={Boolean(editing)} onClose={() => { if (!mutation.isPending) { setEditing(null); setConflicts([]); } }} title="Reschedule appointment" description={editing?.candidate_name} footer={<div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setEditing(null)} disabled={mutation.isPending}>Cancel</button><button type="submit" form="schedule-edit-form" className={buttonClass} disabled={mutation.isPending}>{conflicts.length ? "Schedule anyway" : "Save appointment"}</button></div>}>
-        {editing ? <form id="schedule-edit-form" onSubmit={submitEdit}><AppointmentForm appointmentType={editing.appointment_type} appointment={editing} options={options} conflicts={conflicts} /></form> : null}
+        {editing ? <form id="schedule-edit-form" onSubmit={submitEdit}><AppointmentForm appointmentType={editing.appointment_type} appointment={editing} options={options} conflicts={conflicts} allowHistoricalRestoration={role === "hr_manager"} /></form> : null}
       </Drawer>
 
       <Modal open={Boolean(statusAction)} onClose={() => { if (!mutation.isPending) setStatusAction(null); }} title={statusAction?.status === "cancelled" ? "Cancel appointment" : "Mark no-show"} subtitle={statusAction?.item.candidate_name} size="sm">

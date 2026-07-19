@@ -76,6 +76,7 @@ class AppointmentFields(StrictModel):
     topic: str = Field(default="", max_length=500)
     note: str | None = Field(default=None, max_length=5000)
     allow_conflict: bool = False
+    historical_result: str = Field(default="", pattern="^(|passed|failed)$")
 
 
 class ScheduledStageMove(AppointmentFields):

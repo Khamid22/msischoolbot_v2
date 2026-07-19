@@ -219,18 +219,56 @@ def dashboard_rows(
 
     journey = conn.execute(
         f"""WITH cohort AS (
-              SELECT candidate.id
+              SELECT candidate.id,
+                     CASE candidate.status
+                       WHEN 'new_candidate' THEN 0
+                       WHEN 'responded' THEN 1
+                       WHEN 'job_interview' THEN 2
+                       WHEN 'test_and_demo' THEN 3
+                       WHEN 'under_review' THEN 4
+                       WHEN 'teacher_academy' THEN 5
+                       WHEN 'active_teacher' THEN 5
+                       ELSE -1
+                     END AS current_rank
               FROM msi_v2.teacher_candidates candidate
               WHERE {where_sql}
+            ), reached AS (
+              SELECT cohort.id,
+                     GREATEST(
+                       cohort.current_rank,
+                       COALESCE(MAX(
+                         CASE history.stage
+                           WHEN 'new_candidate' THEN 0
+                           WHEN 'responded' THEN 1
+                           WHEN 'job_interview' THEN 2
+                           WHEN 'test_and_demo' THEN 3
+                           WHEN 'under_review' THEN 4
+                           WHEN 'teacher_academy' THEN 5
+                           WHEN 'active_teacher' THEN 5
+                           ELSE -1
+                         END
+                       ), -1)
+                     ) AS furthest_rank
+              FROM cohort
+              LEFT JOIN msi_v2.teacher_candidate_stage_history history
+                ON history.candidate_id = cohort.id
+              GROUP BY cohort.id, cohort.current_rank
+            ), stages(stage, stage_rank) AS (
+              VALUES
+                ('new_candidate'::text, 0),
+                ('responded'::text, 1),
+                ('job_interview'::text, 2),
+                ('test_and_demo'::text, 3),
+                ('under_review'::text, 4)
             )
-            SELECT history.stage, COUNT(DISTINCT history.candidate_id) AS candidates
-            FROM msi_v2.teacher_candidate_stage_history history
-            JOIN cohort ON cohort.id = history.candidate_id
-            WHERE history.stage IN (
-              'new_candidate', 'responded', 'job_interview',
-              'test_and_demo', 'under_review'
-            )
-            GROUP BY history.stage""",
+            SELECT stages.stage,
+                   COUNT(*) FILTER (
+                     WHERE reached.furthest_rank >= stages.stage_rank
+                   ) AS candidates
+            FROM stages
+            CROSS JOIN reached
+            GROUP BY stages.stage, stages.stage_rank
+            ORDER BY stages.stage_rank""",
         tuple(params),
     ).fetchall()
 

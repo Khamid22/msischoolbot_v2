@@ -624,11 +624,13 @@ function ActionFields({
   candidate,
   options,
   conflicts,
+  allowHistoricalRestoration = false,
 }: {
   action: ProfileAction;
   candidate: RecruitmentCandidate;
   options?: RecruitmentOptions;
   conflicts: RecruitmentAppointment[];
+  allowHistoricalRestoration?: boolean;
 }) {
   switch (action.kind) {
     case "edit_profile":
@@ -895,6 +897,7 @@ function ActionFields({
           appointmentType={action.appointmentType}
           options={options}
           conflicts={conflicts}
+          allowHistoricalRestoration={allowHistoricalRestoration}
         />
       );
     case "reschedule_appointment":
@@ -904,6 +907,7 @@ function ActionFields({
           appointment={action.appointment}
           options={options}
           conflicts={conflicts}
+          allowHistoricalRestoration={allowHistoricalRestoration}
         />
       );
     case "appointment_status":
@@ -2119,7 +2123,10 @@ export function CandidateProfile({
               title="Recruitment progress"
               icon={<BriefcaseBusiness className="h-4 w-4" />}
             >
-              <ol className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">{(candidate.progress || []).map((item) => <li key={item.key} className={`flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-xs font-semibold ${item.status === "completed" ? "bg-emerald-50 text-emerald-800" : item.status === "current" ? "bg-amber-50 text-amber-800" : "bg-muted/50 text-muted-foreground"}`}><span aria-hidden="true" className={`h-2 w-2 rounded-full ${item.status === "completed" ? "bg-emerald-500" : item.status === "current" ? "bg-amber-500" : "bg-slate-300"}`} />{item.label}</li>)}</ol>
+              <ol className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">{(candidate.progress || []).map((item) => {
+                const subjectWarning = candidate.status === "under_review" && item.key === "subject_test" && candidate.evaluation_states?.subject_test !== "passed";
+                return <li key={item.key} className={`flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-xs font-semibold ${subjectWarning ? "bg-red-50 text-red-700" : item.status === "completed" ? "bg-emerald-50 text-emerald-800" : item.status === "current" ? "bg-amber-50 text-amber-800" : "bg-muted/50 text-muted-foreground"}`}><span aria-hidden="true" className={`h-2 w-2 rounded-full ${subjectWarning ? "bg-red-500" : item.status === "completed" ? "bg-emerald-500" : item.status === "current" ? "bg-amber-500" : "bg-slate-300"}`} />{subjectWarning ? "Subject test missing/not passed" : item.label}</li>;
+              })}</ol>
               {candidate.document_progress ? <p className="mt-3 text-xs text-muted-foreground">Required documents: <strong className="text-foreground">{candidate.document_progress.required_uploaded}/{candidate.document_progress.required_total}</strong> · Optional: {candidate.document_progress.optional_uploaded}/{candidate.document_progress.optional_total}</p> : null}
             </Panel>
           </div>
@@ -2280,6 +2287,7 @@ export function CandidateProfile({
             title="Under-review summary"
             icon={<ShieldCheck className="h-4 w-4" />}
           >
+            {candidate.status === "under_review" && candidate.evaluation_states?.subject_test !== "passed" ? <div role="status" className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Subject test missing/not passed. This warning is informational and does not block the final decision.</div> : null}
             <DefinitionGrid
               values={Object.entries(candidate.under_review || {}).map(
                 ([key, value]) => [humanize(key), value],
@@ -2588,6 +2596,7 @@ export function CandidateProfile({
               candidate={candidate}
               options={options.data}
               conflicts={appointmentConflicts}
+              allowHistoricalRestoration={role === "hr_manager"}
             />
           </form>
         ) : null}
@@ -2616,7 +2625,7 @@ export function CandidateProfile({
               </div>
             ) : null}
             {action?.kind === "record_test" ? (
-              <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} />
+              <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} allowHistoricalRestoration={role === "hr_manager"} />
             ) : null}
           </ModalBody>
           <ModalFooter>
@@ -2651,7 +2660,7 @@ export function CandidateProfile({
         <form id={`${formId}-demo`} onSubmit={submitAction}>
           <ModalBody>
             {mutation.error ? <div role="alert" className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">{queryError(mutation.error)}</div> : null}
-            {action?.kind === "record_demo" ? <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} /> : null}
+            {action?.kind === "record_demo" ? <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} allowHistoricalRestoration={role === "hr_manager"} /> : null}
           </ModalBody>
           <ModalFooter>
             <div className="flex flex-wrap justify-end gap-2">

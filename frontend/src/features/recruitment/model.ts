@@ -165,6 +165,15 @@ export type RecruitmentCandidate = {
   final_decision_at?: string;
   latest_interview_result?: string;
   latest_interview_at?: string;
+  latest_subject_test_result?: string;
+  latest_subject_test_at?: string;
+  latest_demo_result?: string;
+  latest_demo_at?: string;
+  evaluation_states?: {
+    interview: string;
+    demo: string;
+    subject_test: "passed" | "not_passed" | "missing";
+  };
   next_task?: RecruitmentTask | null;
   next_appointment?: RecruitmentAppointment | null;
   academy_teacher_id?: number | null;

@@ -70,6 +70,10 @@ _CANDIDATE_COLUMNS = """
     decision.created_at::text AS final_decision_at,
     COALESCE(latest_interview.result, '') AS latest_interview_result,
     latest_interview.interview_at::text AS latest_interview_at,
+    COALESCE(latest_subject_test.result, '') AS latest_subject_test_result,
+    latest_subject_test.test_at::text AS latest_subject_test_at,
+    COALESCE(latest_demo.result, '') AS latest_demo_result,
+    latest_demo.demo_at::text AS latest_demo_at,
     task.id AS next_task_id,
     COALESCE(task.title, '') AS next_action,
     task.due_at::text AS next_action_at,
@@ -151,6 +155,22 @@ def _candidate_joins() -> str:
             ORDER BY interview.interview_at DESC NULLS LAST, interview.id DESC
             LIMIT 1
         ) latest_interview ON true
+        LEFT JOIN LATERAL (
+            SELECT subject_test.result, subject_test.test_at
+            FROM msi_v2.teacher_candidate_subject_tests subject_test
+            WHERE subject_test.candidate_id = candidate.id
+              AND subject_test.voided_at IS NULL
+            ORDER BY subject_test.test_at DESC NULLS LAST, subject_test.id DESC
+            LIMIT 1
+        ) latest_subject_test ON true
+        LEFT JOIN LATERAL (
+            SELECT demo.result, demo.demo_at
+            FROM msi_v2.teacher_candidate_demo_lessons demo
+            WHERE demo.candidate_id = candidate.id
+              AND demo.voided_at IS NULL
+            ORDER BY demo.demo_at DESC NULLS LAST, demo.id DESC
+            LIMIT 1
+        ) latest_demo ON true
         LEFT JOIN LATERAL (
             SELECT t.id, t.title, t.due_at
             FROM msi_v2.teacher_candidate_tasks t
@@ -1280,6 +1300,37 @@ def complete_appointment(
         RETURNING id, version
         """,
         (now, actor_account_id, now, int(appointment_id), int(candidate_id)),
+    ).fetchone()
+
+
+def complete_historical_appointment(
+    conn: Any,
+    *,
+    appointment_id: int,
+    candidate_id: int,
+    completed_at: str,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    """Complete a restored appointment at its real historical end time."""
+
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_appointments
+        SET status = 'completed', completed_at = %s::timestamptz,
+            updated_by_account_id = %s, updated_at = %s::timestamptz,
+            version = version + 1
+        WHERE id = %s AND candidate_id = %s
+          AND status IN ('scheduled', 'in_progress')
+        RETURNING id, version
+        """,
+        (
+            completed_at,
+            actor_account_id,
+            now,
+            int(appointment_id),
+            int(candidate_id),
+        ),
     ).fetchone()
 
 
