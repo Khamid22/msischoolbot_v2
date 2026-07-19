@@ -69,7 +69,6 @@
 /api/v1/academic-director/teacher-academy/assignments/{assignment_id} | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete | POST
-/api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/lessons | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote | POST
 /api/v1/academic-director/teacher-academy/{academy_teacher_id}/status | POST
@@ -192,6 +191,7 @@
 /api/v1/recruitment/settings/{setting_id} | DELETE
 /api/v1/recruitment/tasks | GET
 /api/v1/recruitment/teachers | GET
+/api/v1/recruitment/teachers/{academy_teacher_id}/remove | POST
 /api/v1/student/activity/ping | GET
 /api/v1/student/chat/messages | GET
 /api/v1/student/chat/messages | POST

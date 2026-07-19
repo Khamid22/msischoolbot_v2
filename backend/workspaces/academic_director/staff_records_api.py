@@ -8,7 +8,6 @@ from backend.core.api import ApiSuccess, api_success
 from backend.modules.teacher_academy.responses import (
     add_assessment_response,
     create_academy_teacher_response,
-    delete_academy_teacher_response,
     delete_assessment_response,
     promote_response,
     sync_lessons_response,
@@ -136,14 +135,6 @@ def register_teacher_academy_routes(router: APIRouter) -> None:
         payload: Annotated[UpdateAcademyStatusForm, Form()],
     ):
         return update_status_response(academy_teacher_id, payload)
-
-    @router.post(
-        "/teacher-academy/{academy_teacher_id}/delete",
-        operation_id="api_v1_academic_director_delete_academy_teacher",
-        response_model=ApiSuccess[TeacherAcademyMutationResult],
-    )
-    def delete_academy_teacher(academy_teacher_id: int):
-        return delete_academy_teacher_response(academy_teacher_id)
 
     @router.post(
         "/teacher-academy/{academy_teacher_id}/promote",

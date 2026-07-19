@@ -60,7 +60,6 @@ export const routes = {
   academicDirectorTeacherAcademyStatusUpdate: apiRoutes.academicDirectorTeacherAcademyStatusUpdate,
   academicDirectorTeacherAcademyLessonsSync: apiRoutes.academicDirectorTeacherAcademyLessonsSync,
   academicDirectorTeacherAcademyPromote: apiRoutes.academicDirectorTeacherAcademyPromote,
-  academicDirectorTeacherAcademyDelete: apiRoutes.academicDirectorTeacherAcademyDelete,
   headOfDepartmentOverview: "/head-of-departments",
   headOfDepartmentTeacherAcademy: "/head-of-departments/teacher-academy",
   headOfDepartmentTimetable: "/head-of-departments/timetable",

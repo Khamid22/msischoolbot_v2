@@ -279,7 +279,6 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       statusUpdate: routes.academicDirectorTeacherAcademyStatusUpdate,
       lessonsSync: routes.academicDirectorTeacherAcademyLessonsSync,
       promote: routes.academicDirectorTeacherAcademyPromote,
-      delete: routes.academicDirectorTeacherAcademyDelete,
     };
   }
   if (roleMode === "head_of_department" || adminMode === "head_of_department") {

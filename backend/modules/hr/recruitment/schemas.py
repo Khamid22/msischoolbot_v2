@@ -207,6 +207,11 @@ class FinalDecisionCreate(StrictModel):
     approval_id: OptionalInt = Field(default=None, ge=1)
 
 
+class AcademyTeacherRemoval(StrictModel):
+    rejection_reason: str = Field(min_length=1, max_length=120)
+    reason_detail: str = Field(default="", max_length=5000)
+
+
 class EvaluationVoid(StrictModel):
     reason: str = Field(min_length=1, max_length=2000)
 
@@ -234,6 +239,7 @@ class AcademyIntakeOnboarding(StrictModel):
 
 
 __all__ = [
+    "AcademyTeacherRemoval",
     "ApprovalRequestCreate",
     "AcademyIntakeOnboarding",
     "ApprovalReview",

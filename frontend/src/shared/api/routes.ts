@@ -38,8 +38,6 @@ export const apiRoutes = {
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/lessons`,
   academicDirectorTeacherAcademyPromote: (academyTeacherId: number | string) =>
     `/api/v1/academic-director/teacher-academy/${academyTeacherId}/promote`,
-  academicDirectorTeacherAcademyDelete: (academyTeacherId: number | string) =>
-    `/api/v1/academic-director/teacher-academy/${academyTeacherId}/delete`,
   academicDirectorAcademicContextApi: "/api/v1/academic-director/academic/context",
   academicDirectorAcademicGroupsApi: (query = "") => `/api/v1/academic-director/academic/groups${query ? `?${query}` : ""}`,
   academicDirectorAcademicProgramsApi: (query = "") => `/api/v1/academic-director/academic/programs${query ? `?${query}` : ""}`,

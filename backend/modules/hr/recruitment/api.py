@@ -24,6 +24,7 @@ from backend.modules.hr.recruitment.policies import (
     ensure_subject_test_write,
 )
 from backend.modules.hr.recruitment.schemas import (
+    AcademyTeacherRemoval,
     ApprovalRequestCreate,
     ApprovalReview,
     AppointmentCreate,
@@ -149,6 +150,30 @@ def teachers(
             search=search,
         )
     )
+
+
+@router.post(
+    "/teachers/{academy_teacher_id}/remove",
+    operation_id="api_v1_recruitment_remove_academy_teacher",
+)
+def remove_academy_teacher(
+    academy_teacher_id: int,
+    payload: AcademyTeacherRemoval,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    result = _call(
+        service.remove_academy_teacher,
+        user,
+        academy_teacher_id,
+        payload.model_dump(),
+    )
+    message = (
+        "Teacher was already removed from Teacher Academy."
+        if result.get("already_removed")
+        else "Teacher removed from Teacher Academy and added to Rejected."
+    )
+    return api_success({"message": message, **result})
 
 
 @router.get("/decision-queue", operation_id="api_v1_recruitment_decision_queue")

@@ -97,7 +97,6 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/status",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/lessons",
         "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/promote",
-        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete",
         "/api/v1/head-of-department/teacher-academy/assignments/{assignment_id}",
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments",
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/assessments/{assessment_id}/delete",
@@ -105,6 +104,13 @@ def test_clean_teacher_academy_api_routes_are_registered(app):
         "/api/v1/head-of-department/teacher-academy/{academy_teacher_id}/lessons",
     ]:
         assert "POST" in routes[path]
+    assert "POST" not in routes.get(
+        "/api/v1/academic-director/teacher-academy/{academy_teacher_id}/delete",
+        set(),
+    )
+    assert "POST" in routes[
+        "/api/v1/recruitment/teachers/{academy_teacher_id}/remove"
+    ]
 
 
 def test_old_role_teacher_academy_api_routes_are_absent(app):
@@ -226,6 +232,59 @@ def test_head_of_department_cannot_reset_teacher_password(client, monkeypatch):
     assert response.status_code == 403
 
 
+def test_only_hr_manager_can_remove_a_teacher_from_academy(client, monkeypatch):
+    import backend.modules.hr.recruitment.api as recruitment_api
+
+    calls = []
+
+    def fake_remove(user, academy_teacher_id, values):
+        calls.append((user.role, academy_teacher_id, values))
+        return {
+            "identity_deleted": False,
+            "already_removed": False,
+            "candidate": {"id": 164},
+        }
+
+    monkeypatch.setattr(recruitment_api.service, "remove_academy_teacher", fake_remove)
+    payload = {"rejection_reason": "failed_academy", "reason_detail": "Did not pass Academy."}
+
+    _set_session(
+        client,
+        {
+            "auth_role": "hr_manager",
+            "auth_login": "HR0001",
+            "account_id": 41,
+            "staff_id": 21,
+        },
+    )
+    allowed = client.post(
+        "/api/v1/recruitment/teachers/8/remove",
+        json=payload,
+        headers=XHR,
+    )
+    assert allowed.status_code == 200
+    assert calls == [("hr_manager", 8, payload)]
+
+    for role in ("ceo", "academic_director", "head_of_department"):
+        _set_session(
+            client,
+            {
+                "auth_role": role,
+                "auth_login": role.upper(),
+                "account_id": 42,
+                "staff_id": 22,
+            },
+        )
+        denied = client.post(
+            "/api/v1/recruitment/teachers/8/remove",
+            json=payload,
+            headers=XHR,
+        )
+        assert denied.status_code == 403
+
+    assert calls == [("hr_manager", 8, payload)]
+
+
 def test_academic_director_schedule_assess_status_and_promote_routes_call_domain_service(client, monkeypatch):
     academy_api = _patch_api_payload(monkeypatch)
     calls = {}
@@ -246,10 +305,6 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
         calls["promote"] = kwargs
         return True, ""
 
-    def fake_delete(**kwargs):
-        calls["delete"] = kwargs
-        return True, ""
-
     def fake_delete_assessment(**kwargs):
         calls["delete_assessment"] = kwargs
         return True, ""
@@ -258,7 +313,6 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
     monkeypatch.setattr(academy_api, "add_assessment", fake_add_assessment)
     monkeypatch.setattr(academy_api, "update_academy_status", fake_update_status)
     monkeypatch.setattr(academy_api, "promote_academy_teacher", fake_promote)
-    monkeypatch.setattr(academy_api, "delete_academy_teacher", fake_delete)
     monkeypatch.setattr(academy_api, "delete_assessment", fake_delete_assessment)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "AD0001"})
 
@@ -286,17 +340,11 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
         data={"teacher_assigned_group": "Grade 8A", "teacher_pay_rate": "100000"},
         headers=XHR,
     )
-    delete_response = client.post(
-        "/api/v1/academic-director/teacher-academy/91/delete",
-        headers=XHR,
-    )
-
     assert schedule_response.status_code == 200
     assert assessment_response.status_code == 200
     assert status_response.status_code == 200
     assert assessment_delete_response.status_code == 200
     assert promote_response.status_code == 200
-    assert delete_response.status_code == 200
     assert calls["assignment"]["assignment_id"] == 8
     assert calls["assignment"]["status"] == "ready"
     assert calls["assessment"]["academy_teacher_id"] == 91
@@ -306,7 +354,11 @@ def test_academic_director_schedule_assess_status_and_promote_routes_call_domain
     assert calls["delete_assessment"] == {"academy_teacher_id": 91, "assessment_id": 17}
     assert calls["promote"]["academy_teacher_id"] == 91
     assert calls["promote"]["assigned_group"] == "Grade 8A"
-    assert calls["delete"]["academy_teacher_id"] == 91
+    removed_route = client.post(
+        "/api/v1/academic-director/teacher-academy/91/delete",
+        headers=XHR,
+    )
+    assert removed_route.status_code == 404
 
 
 def test_academic_director_lessons_sync_route_calls_domain_service(client, monkeypatch):
@@ -422,7 +474,7 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "routes.academicDirectorTeacherAcademyAssignmentUpdate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssessmentCreate" in panel_source
     assert "routes.academicDirectorTeacherAcademyAssessmentDelete" in panel_source
-    assert "routes.academicDirectorTeacherAcademyDelete" in panel_source
+    assert "routes.academicDirectorTeacherAcademyDelete" not in panel_source
     assert "routes.academicDirectorTeacherPasswordReset" in panel_source
     assert "Password reset — same as the login" in panel_source
     assert "Delete assessment report" in panel_source
@@ -434,7 +486,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "routes.adminTeacherAcademy" not in panel_source
     assert "apiRoutes.academicDirectorTeacherAcademyCreate" in routes_source
     assert 'academicDirectorTeacherAcademyCreate: "/api/v1/academic-director/teacher-academy"' in api_routes_source
-    assert "academicDirectorTeacherAcademyDelete" in routes_source
+    assert "academicDirectorTeacherAcademyDelete" not in routes_source
+    assert "academicDirectorTeacherAcademyDelete" not in api_routes_source
     assert "academicDirectorTeacherPasswordReset" in routes_source
     assert "/api/v1/academic-director/teachers/${teacherId}/reset-password" in api_routes_source
     assert "academicDirectorTeacherAcademyAssessmentDelete" in routes_source

@@ -330,7 +330,13 @@ def list_candidate_rows(
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
-    clauses: list[str] = ["candidate.is_application_received = true"]
+    clauses: list[str] = []
+    if stage in {"rejected", "candidate_withdrew"}:
+        clauses.append(
+            "(candidate.is_application_received = true OR candidate.profile_origin = 'academy_direct')"
+        )
+    else:
+        clauses.append("candidate.is_application_received = true")
     params: list[Any] = []
     visibility, visibility_params = _visibility_clause(
         visible_account_id,
@@ -438,15 +444,23 @@ def list_teacher_handoff_rows(
                 COALESCE(subject.subject_name, '') AS subject,
                 COALESCE(academy.academy_status, 'in_training') AS status,
                 COALESCE(academy.account_onboarding_status, 'complete') AS onboarding_status,
-                COALESCE(
-                    academy.academy_start_date::timestamptz,
-                    academy.created_at
-                ) AS joined_at
+                academy.academy_start_date::timestamptz AS joined_at,
+                (
+                    academy.user_id IS NOT NULL
+                    AND academy.promoted_teacher_id IS NULL
+                    AND COALESCE(identity_staff.role, '') = 'teacher'
+                    AND COALESCE(identity_teacher.status, '') = 'academy'
+                ) AS generated_login_will_be_deleted
             FROM msi_v2.academy_teachers academy
             LEFT JOIN msi_v2.subjects subject ON subject.id = academy.subject_id
             LEFT JOIN msi_v2.subject_programs program
               ON program.id = academy.subject_program_id
+            LEFT JOIN msi_v2.msi_staff identity_staff
+              ON identity_staff.id = academy.user_id
+            LEFT JOIN msi_v2.teachers identity_teacher
+              ON identity_teacher.id = identity_staff.teacher_id
             WHERE academy.promoted_teacher_id IS NULL
+              AND COALESCE(academy.academy_status, '') <> 'rejected'
 
             UNION ALL
 
@@ -463,7 +477,8 @@ def list_teacher_handoff_rows(
                 COALESCE(subject.subject_name, '') AS subject,
                 candidate.status,
                 'missing_handoff'::text AS onboarding_status,
-                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at
+                NULL::timestamptz AS joined_at,
+                false AS generated_login_will_be_deleted
             FROM msi_v2.teacher_candidates candidate
             LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
             WHERE candidate.status = 'teacher_academy'
@@ -488,7 +503,8 @@ def list_teacher_handoff_rows(
                 COALESCE(teacher_subject.subject_name, '') AS subject,
                 teacher.status,
                 COALESCE(teacher.account_onboarding_status, 'complete') AS onboarding_status,
-                teacher.created_at AS joined_at
+                teacher.created_at AS joined_at,
+                false AS generated_login_will_be_deleted
             FROM msi_v2.teachers teacher
             LEFT JOIN msi_v2.teacher_candidates candidate
               ON candidate.id = teacher.recruitment_candidate_id
@@ -535,7 +551,8 @@ def list_teacher_handoff_rows(
                 COALESCE(subject.subject_name, '') AS subject,
                 candidate.status,
                 'missing_handoff'::text AS onboarding_status,
-                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at
+                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at,
+                false AS generated_login_will_be_deleted
             FROM msi_v2.teacher_candidates candidate
             LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
             WHERE candidate.status = 'active_teacher'
@@ -572,7 +589,8 @@ def list_teacher_handoff_rows(
         WITH record AS ({records_sql})
         SELECT record.kind, record.record_id, record.recruitment_candidate_id,
                record.full_name, record.position, record.subject, record.status,
-               record.onboarding_status, record.joined_at::text AS joined_at
+               record.onboarding_status, record.joined_at::text AS joined_at,
+               record.generated_login_will_be_deleted
         FROM record
         {where_sql}
         ORDER BY record.joined_at DESC NULLS LAST, lower(record.full_name), record.record_id
@@ -1777,7 +1795,7 @@ def insert_academy_direct_profile(
             )
             SELECT id, 'teacher_academy', %s::timestamptz, %s,
                    'Lifecycle profile created from an existing Teacher Academy record.',
-                   'academy_reconciliation', NULL, NULL
+                   'migration', NULL, NULL
             FROM inserted_profile
             RETURNING candidate_id
         )
@@ -2505,12 +2523,183 @@ def insert_final_decision(conn: Any, *, candidate_id: int, values: dict[str, Any
     return int(row["id"]) if row else 0
 
 
+def lock_academy_removal_row(conn: Any, academy_teacher_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT academy.id, academy.recruitment_candidate_id,
+               academy.academy_status, academy.account_onboarding_status,
+               academy.user_id AS staff_id, academy.promoted_teacher_id,
+               COALESCE(staff.teacher_id, 0) AS teacher_id,
+               COALESCE(staff.login, '') AS login,
+               COALESCE(staff.role, '') AS staff_role,
+               COALESCE(identity_teacher.status, '') AS teacher_status
+        FROM msi_v2.academy_teachers academy
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = academy.user_id
+        LEFT JOIN msi_v2.teachers identity_teacher ON identity_teacher.id = staff.teacher_id
+        WHERE academy.id = %s
+        FOR UPDATE OF academy
+        """,
+        (int(academy_teacher_id),),
+    ).fetchone()
+
+
+def lock_academy_identity_rows(
+    conn: Any,
+    *,
+    staff_id: int,
+    teacher_id: int,
+) -> tuple[Any, Any]:
+    staff = conn.execute(
+        """
+        SELECT id, teacher_id, role, status
+        FROM msi_v2.msi_staff
+        WHERE id = %s
+        FOR UPDATE
+        """,
+        (int(staff_id),),
+    ).fetchone()
+    teacher = conn.execute(
+        """
+        SELECT id, status, recruitment_candidate_id
+        FROM msi_v2.teachers
+        WHERE id = %s
+        FOR UPDATE
+        """,
+        (int(teacher_id),),
+    ).fetchone()
+    return staff, teacher
+
+
+def mark_academy_removed(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
+    now: str,
+) -> bool:
+    row = conn.execute(
+        """
+        UPDATE msi_v2.academy_teachers
+        SET academy_status = 'rejected',
+            account_onboarding_status = 'removed',
+            updated_at = %s::timestamptz
+        WHERE id = %s
+          AND promoted_teacher_id IS NULL
+        RETURNING id
+        """,
+        (now, int(academy_teacher_id)),
+    ).fetchone()
+    return bool(row)
+
+
+def list_teacher_account_ids_for_staff(conn: Any, staff_id: int) -> list[int]:
+    if not int(staff_id or 0):
+        return []
+    rows = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.accounts
+        WHERE legacy_source_table = 'msi_staff'
+          AND legacy_source_id = %s
+          AND role = 'teacher'
+        ORDER BY id
+        FOR UPDATE
+        """,
+        (int(staff_id),),
+    ).fetchall()
+    return [int(row["id"]) for row in rows if int(row["id"] or 0) > 0]
+
+
+def cancel_pending_candidate_tasks(
+    conn: Any,
+    *,
+    candidate_id: int,
+    actor_account_id: int | None,
+    now: str,
+) -> list[int]:
+    rows = conn.execute(
+        """
+        UPDATE msi_v2.teacher_candidate_tasks
+        SET status = 'cancelled', cancelled_at = %s::timestamptz,
+            completed_at = NULL, updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE candidate_id = %s AND status = 'pending'
+        RETURNING id
+        """,
+        (now, actor_account_id, now, int(candidate_id)),
+    ).fetchall()
+    return [int(row["id"]) for row in rows]
+
+
+def delete_generated_academy_identity(
+    conn: Any,
+    *,
+    staff_id: int,
+    teacher_id: int,
+    account_ids: list[int],
+) -> None:
+    safe_account_ids = [int(item) for item in account_ids if int(item or 0) > 0]
+    if safe_account_ids:
+        conn.execute(
+            "DELETE FROM msi_v2.teacher_profiles WHERE account_id = ANY(%s::bigint[])",
+            (safe_account_ids,),
+        )
+        conn.execute(
+            "DELETE FROM msi_v2.staff_profiles WHERE account_id = ANY(%s::bigint[])",
+            (safe_account_ids,),
+        )
+    if int(teacher_id or 0):
+        conn.execute(
+            "DELETE FROM msi_v2.teacher_profiles WHERE teacher_id = %s",
+            (int(teacher_id),),
+        )
+    if int(staff_id or 0):
+        conn.execute(
+            "DELETE FROM msi_v2.staff_profiles WHERE staff_id = %s",
+            (int(staff_id),),
+        )
+    if safe_account_ids:
+        conn.execute(
+            "DELETE FROM msi_v2.accounts WHERE id = ANY(%s::bigint[])",
+            (safe_account_ids,),
+        )
+    if int(staff_id or 0):
+        conn.execute(
+            "DELETE FROM msi_v2.msi_staff WHERE id = %s",
+            (int(staff_id),),
+        )
+    if int(teacher_id or 0):
+        conn.execute(
+            "DELETE FROM msi_v2.teachers WHERE id = %s AND status = 'academy'",
+            (int(teacher_id),),
+        )
+
+
 def ensure_academy_intake(conn: Any, *, candidate: Any, actor_login: str, now: str) -> int:
     existing = conn.execute(
-        "SELECT id FROM msi_v2.academy_teachers WHERE recruitment_candidate_id = %s LIMIT 1",
+        """
+        SELECT id, academy_status, user_id
+        FROM msi_v2.academy_teachers
+        WHERE recruitment_candidate_id = %s
+        LIMIT 1
+        FOR UPDATE
+        """,
         (candidate["id"],),
     ).fetchone()
     if existing:
+        if str(existing["academy_status"] or "") == "rejected":
+            conn.execute(
+                """
+                UPDATE msi_v2.academy_teachers
+                SET academy_status = 'new_academy_teacher',
+                    account_onboarding_status = CASE
+                        WHEN user_id IS NULL THEN 'pending'
+                        ELSE 'complete'
+                    END,
+                    updated_at = %s::timestamptz
+                WHERE id = %s
+                """,
+                (now, int(existing["id"])),
+            )
         return int(existing["id"])
     row = conn.execute(
         """

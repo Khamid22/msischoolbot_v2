@@ -1,7 +1,11 @@
 """Contracts for one lifecycle profile across Recruitment and Teacher Academy."""
 
+from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
+
+from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository, service
 
 
@@ -37,6 +41,11 @@ def test_pipeline_and_candidate_lists_exclude_academy_direct_profiles():
     repository.list_candidate_rows(conn)
     combined_sql = "\n".join(call[0] for call in conn.calls)
     assert "candidate.is_application_received = true" in combined_sql
+
+    conn = _CaptureConnection()
+    repository.list_candidate_rows(conn, stage="rejected")
+    rejected_sql = "\n".join(call[0] for call in conn.calls)
+    assert "candidate.profile_origin = 'academy_direct'" in rejected_sql
 
 
 def test_candidate_summary_exposes_one_academy_block_and_exact_identity_state():
@@ -129,3 +138,118 @@ def test_frontend_uses_the_shared_profile_and_academy_block():
     assert "candidate.academy" in profile
     assert "No application history has been generated." in profile
     assert "origin=teachers" in teachers
+    assert "Remove from Teacher Academy" in teachers
+    assert "generated_login_will_be_deleted" in teachers
+
+
+def test_academy_removal_is_audited_and_history_preserving():
+    service_source = Path("backend/modules/hr/recruitment/service.py").read_text()
+    repository_source = Path("backend/modules/hr/recruitment/repository.py").read_text()
+    ad_routes = Path(
+        "backend/workspaces/academic_director/staff_records_api.py"
+    ).read_text()
+
+    assert "def remove_academy_teacher(" in service_source
+    assert 'event_type="candidate.academy_removed"' in service_source
+    assert '"origin_stage": "teacher_academy"' in service_source
+    assert "lessons_and_assessments_preserved" in service_source
+    assert "DELETE FROM msi_v2.academy_teachers" not in repository_source
+    assert "COALESCE(academy.academy_status, '') <> 'rejected'" in repository_source
+    assert "def ensure_academy_intake" in repository_source
+    assert "academy_status = 'new_academy_teacher'" in repository_source
+    assert (
+        '@router.post("/teacher-academy/{academy_teacher_id}/delete")'
+        not in ad_routes
+    )
+
+
+def test_academy_removal_rejects_transactionally_without_deleting_history(monkeypatch):
+    class Connection:
+        committed = False
+
+        def commit(self):
+            self.committed = True
+
+    conn = Connection()
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    audits = []
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(repository, "recruitment_setting_value_exists", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        repository,
+        "lock_academy_removal_row",
+        lambda *_args, **_kwargs: {
+            "id": 14,
+            "recruitment_candidate_id": 330,
+            "academy_status": "in_training",
+            "staff_id": 0,
+            "teacher_id": 0,
+            "staff_role": "",
+            "teacher_status": "",
+            "promoted_teacher_id": 0,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 330,
+            "status": "teacher_academy",
+            "version": 4,
+            "active_teacher_id": 0,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "latest_active_final_decision",
+        lambda *_args, **_kwargs: {"decision": "teacher_academy"},
+    )
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [7])
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [8])
+    monkeypatch.setattr(repository, "cancel_pending_candidate_tasks", lambda *_args, **_kwargs: [9])
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_args, **_kwargs: {"id": 330})
+    monkeypatch.setattr(repository, "mark_academy_removed", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(repository, "insert_final_decision", lambda *_args, **_kwargs: 91)
+    monkeypatch.setattr(
+        repository,
+        "insert_audit",
+        lambda *_args, **kwargs: audits.append((kwargs["event_type"], kwargs["detail"])),
+    )
+    monkeypatch.setattr(service, "_notify_cancelled_appointments", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "_sync_system_next_actions", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 330, "status": "rejected"})
+
+    result = service.remove_academy_teacher(
+        CurrentUser(login="HR0001", role="hr_manager", account_id=41, staff_id=21),
+        14,
+        {"rejection_reason": "failed_academy", "reason_detail": "Did not pass."},
+    )
+
+    assert result == {
+        "candidate": {"id": 330, "status": "rejected"},
+        "identity_deleted": False,
+        "already_removed": False,
+    }
+    assert conn.committed is True
+    assert {event for event, _detail in audits} >= {
+        "candidate.stage_changed",
+        "candidate.academy_removed",
+        "candidate.final_decision_made",
+        "candidate.tasks_cancelled",
+    }
+    academy_audit = next(detail for event, detail in audits if event == "candidate.academy_removed")
+    assert academy_audit["lessons_and_assessments_preserved"] is True
+
+
+def test_academy_removal_fails_closed_for_non_hr_roles():
+    with pytest.raises(service.RecruitmentError) as exc:
+        service.remove_academy_teacher(
+            CurrentUser(login="CEO0001", role="ceo"),
+            14,
+            {"rejection_reason": "failed_academy"},
+        )
+    assert exc.value.status_code == 403

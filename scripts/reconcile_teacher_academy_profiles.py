@@ -24,9 +24,9 @@ from backend.modules.hr.recruitment import repository  # noqa: E402
 APPLICATION_LINKS = (
     (164, 8, "Qodirov Ibrohim"),
     (111, 9, "Niaz Ahmed"),
-    (301, 11, "Ziyodullayeva Nigora"),
 )
 APPLICATION_INTAKES = (
+    (301, "Ziyodullayeva Nigora"),
     (146, "Zikriyoev Javokhir"),
     (190, "Mamadiyev Asilbek"),
     (288, "Murotboyeva Sabrina"),
@@ -149,7 +149,7 @@ def _move_application_to_academy(
         actor_account_id=actor_account_id,
         now=now,
         comment="Reconciled with the existing Teacher Academy lifecycle block.",
-        transition_source="academy_reconciliation",
+        transition_source="migration",
     )
     if not moved:
         raise RuntimeError(f"Profile #{candidate_id} changed during reconciliation.")
@@ -320,6 +320,16 @@ def _create_new_academy_record(
     if not academy_id:
         raise RuntimeError(f"Could not create the Academy block for profile #{candidate_id}.")
     if not candidate["academy_teacher_id"]:
+        conn.execute(
+            """
+            UPDATE msi_v2.academy_teachers
+            SET academy_status = 'in_training',
+                account_onboarding_status = 'pending',
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (now, academy_id),
+        )
         _audit(
             conn,
             candidate_id=candidate_id,

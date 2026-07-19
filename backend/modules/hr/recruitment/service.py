@@ -518,6 +518,7 @@ def list_teacher_handoffs(
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
         )
+    normalized_rows = [_row_dict(row) for row in rows]
     return {
         "items": [
             {
@@ -530,8 +531,12 @@ def list_teacher_handoffs(
                 "status": _text(row["status"]),
                 "onboarding_status": _text(row["onboarding_status"]),
                 "joined_at": _iso(row["joined_at"]),
+                "can_remove": user.role == "hr_manager" and normalized_kind == "teacher_academy",
+                "generated_login_will_be_deleted": bool(
+                    row.get("generated_login_will_be_deleted")
+                ),
             }
-            for row in rows
+            for row in normalized_rows
         ],
         "page": safe_page,
         "per_page": safe_per_page,
@@ -2924,6 +2929,298 @@ def review_approval(user: CurrentUser, candidate_id: int, approval_id: int, *, s
         )
         conn.commit()
     return get_candidate(user, int(candidate_id))
+
+
+def remove_academy_teacher(
+    user: CurrentUser,
+    academy_teacher_id: int,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only the HR Manager can remove a Teacher Academy teacher.",
+            status_code=403,
+        )
+    rejection_reason = _text(values.get("rejection_reason"))
+    reason_detail = _text(values.get("reason_detail"))
+    if not rejection_reason:
+        raise RecruitmentError("Select a rejection reason.")
+    if rejection_reason == "other" and not reason_detail:
+        raise RecruitmentError("Explain the other rejection reason.")
+
+    now = _now()
+    identity_deleted = False
+    candidate_id = 0
+    with connect_auth_db() as conn:
+        if not repository.recruitment_setting_value_exists(
+            conn,
+            category="rejection_reason",
+            value=rejection_reason,
+        ):
+            raise RecruitmentError("Select an active rejection reason.")
+
+        academy = repository.lock_academy_removal_row(conn, int(academy_teacher_id))
+        if not academy:
+            raise RecruitmentError("Teacher Academy record was not found.", status_code=404)
+        candidate_id = int(academy["recruitment_candidate_id"] or 0)
+        if not candidate_id:
+            raise RecruitmentError(
+                "Link this Academy record to a lifecycle profile before removing it.",
+                status_code=409,
+            )
+        candidate = _lock_candidate(conn, candidate_id)
+        if not candidate:
+            raise RecruitmentError("Linked lifecycle profile was not found.", status_code=409)
+
+        latest_decision = repository.latest_active_final_decision(
+            conn,
+            candidate_id,
+            for_update=True,
+        )
+        if (
+            _text(candidate["status"]) == "rejected"
+            and _text(academy["academy_status"]) == "rejected"
+            and latest_decision
+            and _text(latest_decision["decision"]) == "rejected"
+        ):
+            conn.rollback()
+            return {
+                "candidate": get_candidate(user, candidate_id),
+                "identity_deleted": False,
+                "already_removed": True,
+            }
+
+        if int(academy["promoted_teacher_id"] or 0) or int(candidate["active_teacher_id"] or 0):
+            raise RecruitmentError(
+                "Active or promoted teachers cannot be removed through Teacher Academy.",
+                status_code=409,
+            )
+        if _text(candidate["status"]) != "teacher_academy":
+            raise RecruitmentError(
+                "Only a current Teacher Academy profile can be removed.",
+                status_code=409,
+            )
+        if _text(academy["academy_status"]) == "rejected":
+            raise RecruitmentError(
+                "The Academy record is already removed but its profile is inconsistent.",
+                status_code=409,
+            )
+
+        staff_id = int(academy["staff_id"] or 0)
+        teacher_id = int(academy["teacher_id"] or 0)
+        generated_identity = bool(
+            staff_id
+            and teacher_id
+            and _text(academy["staff_role"]) == "teacher"
+            and _text(academy["teacher_status"]) == "academy"
+            and not int(academy["promoted_teacher_id"] or 0)
+        )
+        if staff_id and not generated_identity:
+            raise RecruitmentError(
+                "This Academy record uses a shared identity and requires manual review.",
+                status_code=409,
+            )
+        if generated_identity:
+            locked_staff, locked_teacher = repository.lock_academy_identity_rows(
+                conn,
+                staff_id=staff_id,
+                teacher_id=teacher_id,
+            )
+            if (
+                not locked_staff
+                or int(locked_staff["teacher_id"] or 0) != teacher_id
+                or _text(locked_staff["role"]) != "teacher"
+                or not locked_teacher
+                or _text(locked_teacher["status"]) != "academy"
+                or (
+                    int(locked_teacher["recruitment_candidate_id"] or 0)
+                    and int(locked_teacher["recruitment_candidate_id"]) != candidate_id
+                )
+            ):
+                raise RecruitmentError(
+                    "The Academy identity changed or is shared. Refresh and request manual review.",
+                    status_code=409,
+                )
+        account_ids = (
+            repository.list_teacher_account_ids_for_staff(conn, staff_id)
+            if generated_identity
+            else []
+        )
+
+        revoked_approval_ids = repository.revoke_open_approvals(
+            conn,
+            candidate_id=candidate_id,
+            comment=reason_detail or rejection_reason,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        cancelled_appointment_ids = repository.cancel_scheduled_appointments(
+            conn,
+            candidate_id=candidate_id,
+            reason="Teacher removed from Teacher Academy.",
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        _notify_cancelled_appointments(
+            conn,
+            candidate_id=candidate_id,
+            appointment_ids=cancelled_appointment_ids,
+        )
+        cancelled_task_ids = repository.cancel_pending_candidate_tasks(
+            conn,
+            candidate_id=candidate_id,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+
+        updated = repository.update_candidate_stage(
+            conn,
+            candidate_id=candidate_id,
+            stage="rejected",
+            expected_version=int(candidate["version"]),
+            actor_account_id=_actor_account(user),
+            now=now,
+            comment=reason_detail or rejection_reason,
+            transition_source="manual",
+        )
+        if not updated:
+            raise RecruitmentError(
+                "This teacher changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        if not repository.mark_academy_removed(
+            conn,
+            academy_teacher_id=int(academy_teacher_id),
+            now=now,
+        ):
+            raise RecruitmentError(
+                "The Academy record changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+
+        decision_id = repository.insert_final_decision(
+            conn,
+            candidate_id=candidate_id,
+            values={
+                "decision": "rejected",
+                "rejection_reason": rejection_reason,
+                "reason_detail": reason_detail,
+                "origin_stage": "teacher_academy",
+                "follow_up_at": "",
+                "approval_id": None,
+            },
+            actor_account_id=_actor_account(user),
+            actor_login=user.login,
+            now=now,
+        )
+
+        if generated_identity:
+            repository.delete_generated_academy_identity(
+                conn,
+                staff_id=staff_id,
+                teacher_id=teacher_id,
+                account_ids=account_ids,
+            )
+            identity_deleted = True
+
+        if revoked_approval_ids:
+            repository.insert_audit(
+                conn,
+                candidate_id=candidate_id,
+                event_type="candidate.hire_approvals_revoked",
+                detail={
+                    "approval_ids": revoked_approval_ids,
+                    "reason": reason_detail or rejection_reason,
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        if cancelled_appointment_ids:
+            repository.insert_audit(
+                conn,
+                candidate_id=candidate_id,
+                event_type="candidate.appointments_cancelled",
+                detail={
+                    "appointment_ids": cancelled_appointment_ids,
+                    "reason": "Teacher removed from Teacher Academy.",
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        if cancelled_task_ids:
+            repository.insert_audit(
+                conn,
+                candidate_id=candidate_id,
+                event_type="candidate.tasks_cancelled",
+                detail={
+                    "task_ids": cancelled_task_ids,
+                    "reason": "Teacher removed from Teacher Academy.",
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        repository.insert_audit(
+            conn,
+            candidate_id=candidate_id,
+            event_type="candidate.stage_changed",
+            detail={
+                "from": "teacher_academy",
+                "to": "rejected",
+                "reason": reason_detail or rejection_reason,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        repository.insert_audit(
+            conn,
+            candidate_id=candidate_id,
+            event_type="candidate.academy_removed",
+            detail={
+                "academy_teacher_id": int(academy_teacher_id),
+                "decision_id": decision_id,
+                "rejection_reason": rejection_reason,
+                "reason_detail": reason_detail,
+                "generated_identity_deleted": identity_deleted,
+                "deleted_account_ids": account_ids,
+                "lessons_and_assessments_preserved": True,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        repository.insert_audit(
+            conn,
+            candidate_id=candidate_id,
+            event_type="candidate.final_decision_made",
+            detail={
+                "decision_id": decision_id,
+                "decision": "rejected",
+                "rejection_reason": rejection_reason,
+                "reason_detail": reason_detail,
+                "origin_stage": "teacher_academy",
+                "approval_id": None,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=candidate_id,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        conn.commit()
+
+    return {
+        "candidate": get_candidate(user, candidate_id),
+        "identity_deleted": identity_deleted,
+        "already_removed": False,
+    }
 
 
 def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, Any]) -> dict[str, Any]:
