@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from itsdangerous import TimestampSigner
 
 from backend.core.access import CurrentUser
@@ -89,9 +90,9 @@ def test_analytics_calendar_periods_use_tashkent_boundaries():
         today=today, period="month", date_from="", date_to=""
     ) == (
         datetime(2026, 7, 1).date(),
-        datetime(2026, 7, 31).date(),
+        datetime(2026, 7, 17).date(),
         datetime(2026, 6, 1).date(),
-        datetime(2026, 6, 30).date(),
+        datetime(2026, 6, 17).date(),
         "month",
     )
     assert analytics_service._period_bounds(
@@ -103,6 +104,13 @@ def test_analytics_calendar_periods_use_tashkent_boundaries():
         datetime(2026, 7, 9).date(),
         "custom",
     )
+    with pytest.raises(analytics_service.HrAnalyticsError, match="cannot be in the future"):
+        analytics_service._period_bounds(
+            today=today,
+            period="custom",
+            date_from="2026-07-10",
+            date_to="2026-07-18",
+        )
 
 
 def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch):
@@ -121,13 +129,17 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "active_candidates": 4,
             "average_time_to_hire_days": 12.5,
             "overall_conversion_percentage": 20,
-            "sla_breaches": 2,
+            "cohort_sla_breaches": 2,
         },
         "comparison_summary": {
             "applications": 5,
             "shortlisted": 4,
             "hired": 1,
             "rejected": 1,
+        },
+        "live_summary": {
+            "active_candidates": 304,
+            "sla_overdue_now": 294,
         },
         "journey": [
             {"stage": "new_candidate", "candidates": 10},
@@ -157,18 +169,46 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
         CurrentUser(login="HR0001", role="hr_manager"),
         period="custom",
         date_from="2026-07-01",
-        date_to="2026-07-31",
+        date_to="2026-07-20",
     )
     assert result["summary_cards"]["applications"]["delta_percentage"] == 100.0
     assert result["summary_cards"]["hired"]["value"] == 2
     assert result["secondary_kpis"]["academy_accepted"] == 1
     assert result["secondary_kpis"]["overall_conversion_percentage"] == 20
+    assert result["secondary_kpis"]["active_candidates"] == 304
+    assert result["secondary_kpis"]["sla_overdue_now"] == 294
+    assert result["secondary_kpis"]["cohort_sla_breaches"] == 2
     assert result["outcomes"] == [
         {"outcome": "teacher_academy", "candidates": 1},
         {"outcome": "active_teacher", "candidates": 2},
         {"outcome": "rejected", "candidates": 3},
         {"outcome": "candidate_withdrew", "candidates": 0},
     ]
+
+
+def test_analytics_rejects_invalid_dependent_subsource(monkeypatch):
+    @contextmanager
+    def fake_connection():
+        yield object()
+
+    monkeypatch.setattr(analytics_service, "connect_auth_db", fake_connection)
+    monkeypatch.setattr(
+        analytics_service.repository,
+        "subsource_matches_source",
+        lambda _conn, **_kwargs: False,
+    )
+    with pytest.raises(
+        analytics_service.HrAnalyticsError,
+        match="does not belong to the selected source",
+    ):
+        analytics_service.dashboard(
+            CurrentUser(login="HR0001", role="hr_manager"),
+            period="custom",
+            date_from="2026-07-01",
+            date_to="2026-07-20",
+            source="10",
+            subsource="20",
+        )
 
 
 def test_analytics_trend_fills_empty_buckets_and_zero_comparison_is_safe():
@@ -221,6 +261,11 @@ def test_analytics_repository_queries_bind_every_placeholder():
     trend_query = next(query for query in executed_queries if "WITH filtered_candidates AS" in query)
     assert "GROUP BY 1, 2" in trend_query
     assert "GROUP BY date_trunc" not in trend_query
+    all_queries = "\n".join(executed_queries)
+    assert "msi_v2.academy_teachers" in all_queries
+    assert "msi_v2.teachers" in all_queries
+    assert "academy_status NOT IN ('rejected', 'removed')" in all_queries
+    assert "candidate.status = ANY" in all_queries
 
 
 def test_migration_contains_append_only_history_and_snapshotted_sla():

@@ -312,7 +312,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(analytics, /Applications/);
     assert.match(analytics, /Shortlisted/);
     assert.match(analytics, /Academy accepted/);
-    assert.match(analytics, /Active candidates/);
+    assert.match(analytics, /Current active pipeline/);
+    assert.match(analytics, /SLA overdue now/);
+    assert.match(analytics, /Selected application cohort/);
+    assert.match(analytics, /Live snapshot/);
     assert.match(analytics, /Recruitment journey/);
     assert.match(analytics, /Applicant sources/);
     assert.match(analytics, /Applications by position/);

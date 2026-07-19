@@ -14,6 +14,81 @@ ACTIVE_STAGES = (
 )
 
 
+def _stage_rank_sql(expression: str) -> str:
+    return f"""CASE {expression}
+        WHEN 'new_candidate' THEN 0
+        WHEN 'responded' THEN 1
+        WHEN 'job_interview' THEN 2
+        WHEN 'test_and_demo' THEN 3
+        WHEN 'under_review' THEN 4
+        WHEN 'teacher_academy' THEN 5
+        WHEN 'active_teacher' THEN 6
+        ELSE -1
+    END"""
+
+
+def _candidate_facts_cte(*, where_sql: str, alias: str = "candidate") -> str:
+    """Return one canonical analytics row per application-origin profile."""
+
+    return f"""candidate_facts AS (
+        SELECT
+            {alias}.id,
+            {alias}.application_date,
+            {alias}.created_at AS profile_created_at,
+            {alias}.status,
+            GREATEST(
+                {_stage_rank_sql(f"{alias}.status")},
+                COALESCE(stage_progress.furthest_rank, -1),
+                CASE WHEN academy.id IS NOT NULL THEN 5 ELSE -1 END,
+                CASE WHEN active_teacher.id IS NOT NULL THEN 6 ELSE -1 END
+            ) AS furthest_rank,
+            decision.decision AS latest_decision,
+            decision.created_at AS latest_decision_at,
+            academy.id AS academy_teacher_id,
+            academy.created_at AS academy_created_at,
+            active_teacher.id AS active_teacher_id,
+            active_teacher.created_at AS active_teacher_created_at,
+            COALESCE(stage_sla.breaches, 0) AS cohort_sla_breaches
+        FROM msi_v2.teacher_candidates {alias}
+        LEFT JOIN LATERAL (
+            SELECT MAX({_stage_rank_sql("history.stage")}) AS furthest_rank
+            FROM msi_v2.teacher_candidate_stage_history history
+            WHERE history.candidate_id = {alias}.id
+        ) stage_progress ON true
+        LEFT JOIN LATERAL (
+            SELECT final_decision.decision, final_decision.created_at
+            FROM msi_v2.teacher_candidate_final_decisions final_decision
+            WHERE final_decision.candidate_id = {alias}.id
+              AND final_decision.voided_at IS NULL
+            ORDER BY final_decision.created_at DESC, final_decision.id DESC
+            LIMIT 1
+        ) decision ON true
+        LEFT JOIN LATERAL (
+            SELECT academy_teacher.id, academy_teacher.created_at
+            FROM msi_v2.academy_teachers academy_teacher
+            WHERE academy_teacher.recruitment_candidate_id = {alias}.id
+              AND academy_teacher.academy_status NOT IN ('rejected', 'removed')
+            ORDER BY academy_teacher.id DESC
+            LIMIT 1
+        ) academy ON true
+        LEFT JOIN LATERAL (
+            SELECT teacher.id, teacher.created_at
+            FROM msi_v2.teachers teacher
+            WHERE teacher.recruitment_candidate_id = {alias}.id
+            ORDER BY teacher.id DESC
+            LIMIT 1
+        ) active_teacher ON true
+        LEFT JOIN LATERAL (
+            SELECT COUNT(*)::integer AS breaches
+            FROM msi_v2.teacher_candidate_stage_history history
+            WHERE history.candidate_id = {alias}.id
+              AND history.sla_due_at IS NOT NULL
+              AND COALESCE(history.exited_at, %s::timestamptz) > history.sla_due_at
+        ) stage_sla ON true
+        WHERE {where_sql}
+    )"""
+
+
 def _candidate_filters(
     *,
     date_from: str = "",
@@ -98,6 +173,7 @@ def options_rows(conn: Any) -> dict[str, list[Any]]:
                FROM msi_v2.teacher_candidates candidate
                JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
                WHERE candidate.is_application_received = true
+                 AND candidate.status <> 'trash_bin'
                ORDER BY subject.subject_name"""
         ).fetchall(),
         "responsible_people": conn.execute(
@@ -107,9 +183,34 @@ def options_rows(conn: Any) -> dict[str, list[Any]]:
                JOIN msi_v2.teacher_candidates candidate ON candidate.id = history.candidate_id
                JOIN msi_v2.accounts account ON account.id = history.responsible_account_id
                WHERE candidate.is_application_received = true
+                 AND candidate.status <> 'trash_bin'
                ORDER BY name"""
         ).fetchall(),
     }
+
+
+def subsource_matches_source(
+    conn: Any,
+    *,
+    source_id: int,
+    subsource_id: int,
+) -> bool:
+    row = conn.execute(
+        """SELECT EXISTS (
+             SELECT 1
+             FROM msi_v2.teacher_recruitment_settings subsource
+             JOIN msi_v2.teacher_recruitment_settings source
+               ON source.id = subsource.parent_id
+             WHERE subsource.id = %s
+               AND subsource.category = 'subsource'
+               AND subsource.is_active
+               AND source.id = %s
+               AND source.category = 'source'
+               AND source.is_active
+           ) AS matches""",
+        (subsource_id, source_id),
+    ).fetchone()
+    return bool(row and row["matches"])
 
 
 def _cohort_summary(
@@ -119,57 +220,71 @@ def _cohort_summary(
     params: list[Any],
     now: str,
 ) -> Any:
+    facts_cte = _candidate_facts_cte(where_sql=where_sql)
     return conn.execute(
-        f"""SELECT
+        f"""WITH {facts_cte}
+            SELECT
               COUNT(*) AS applications,
+              COUNT(*) FILTER (WHERE furthest_rank >= 4) AS shortlisted,
+              COUNT(*) FILTER (WHERE active_teacher_id IS NOT NULL) AS hired,
               COUNT(*) FILTER (
-                WHERE EXISTS (
-                  SELECT 1
-                  FROM msi_v2.teacher_candidate_stage_history review_history
-                  WHERE review_history.candidate_id = candidate.id
-                    AND review_history.stage = 'under_review'
-                )
-              ) AS shortlisted,
-              COUNT(*) FILTER (WHERE decision.decision = 'active_teacher') AS hired,
-              COUNT(*) FILTER (WHERE decision.decision = 'rejected') AS rejected,
-              COUNT(*) FILTER (WHERE decision.decision = 'teacher_academy') AS academy_accepted,
-              COUNT(*) FILTER (WHERE decision.decision = 'candidate_withdrew') AS withdrawn,
-              COUNT(*) FILTER (WHERE candidate.status = ANY(%s::text[])) AS active_candidates,
+                WHERE active_teacher_id IS NULL
+                  AND academy_teacher_id IS NULL
+                  AND latest_decision = 'rejected'
+              ) AS rejected,
+              COUNT(*) FILTER (
+                WHERE academy_teacher_id IS NOT NULL
+                  AND active_teacher_id IS NULL
+              ) AS academy_accepted,
+              COUNT(*) FILTER (
+                WHERE active_teacher_id IS NULL
+                  AND academy_teacher_id IS NULL
+                  AND latest_decision = 'candidate_withdrew'
+              ) AS withdrawn,
+              COUNT(*) FILTER (WHERE status = ANY(%s::text[])) AS active_candidates,
               ROUND(AVG(
                 EXTRACT(EPOCH FROM (
-                  decision.created_at - COALESCE(application_history.entered_at, candidate.created_at)
+                  active_teacher_created_at
+                    - (application_date::timestamp AT TIME ZONE 'Asia/Tashkent')
                 )) / 86400.0
-              ) FILTER (WHERE decision.decision = 'active_teacher'), 1) AS average_time_to_hire_days,
+              ) FILTER (
+                WHERE active_teacher_id IS NOT NULL
+                  AND application_date IS NOT NULL
+              ), 1) AS average_time_to_hire_days,
               ROUND(
-                100.0 * COUNT(*) FILTER (WHERE decision.decision = 'active_teacher')
+                100.0 * COUNT(*) FILTER (WHERE active_teacher_id IS NOT NULL)
                 / NULLIF(COUNT(*), 0),
                 1
               ) AS overall_conversion_percentage,
-              COALESCE(SUM(stage_sla.breaches), 0) AS sla_breaches
+              COALESCE(SUM(cohort_sla_breaches), 0) AS cohort_sla_breaches
+            FROM candidate_facts""",
+        tuple([now, *params, list(ACTIVE_STAGES)]),
+    ).fetchone()
+
+
+def _live_summary(
+    conn: Any,
+    *,
+    where_sql: str,
+    params: list[Any],
+    now: str,
+) -> Any:
+    return conn.execute(
+        f"""SELECT
+              COUNT(*) FILTER (
+                WHERE candidate.status = ANY(%s::text[])
+              ) AS active_candidates,
+              COUNT(*) FILTER (
+                WHERE EXISTS (
+                  SELECT 1
+                  FROM msi_v2.teacher_candidate_stage_history open_history
+                  WHERE open_history.candidate_id = candidate.id
+                    AND open_history.exited_at IS NULL
+                    AND open_history.sla_due_at IS NOT NULL
+                    AND open_history.sla_due_at < %s::timestamptz
+                )
+              ) AS sla_overdue_now
             FROM msi_v2.teacher_candidates candidate
-            LEFT JOIN LATERAL (
-              SELECT final_decision.decision, final_decision.created_at
-              FROM msi_v2.teacher_candidate_final_decisions final_decision
-              WHERE final_decision.candidate_id = candidate.id
-                AND final_decision.voided_at IS NULL
-              ORDER BY final_decision.created_at DESC, final_decision.id DESC
-              LIMIT 1
-            ) decision ON true
-            LEFT JOIN LATERAL (
-              SELECT history.entered_at
-              FROM msi_v2.teacher_candidate_stage_history history
-              WHERE history.candidate_id = candidate.id
-                AND history.stage = 'new_candidate'
-              ORDER BY history.entered_at ASC, history.id ASC
-              LIMIT 1
-            ) application_history ON true
-            LEFT JOIN LATERAL (
-              SELECT COUNT(*)::integer AS breaches
-              FROM msi_v2.teacher_candidate_stage_history history
-              WHERE history.candidate_id = candidate.id
-                AND history.sla_due_at IS NOT NULL
-                AND COALESCE(history.exited_at, %s::timestamptz) > history.sla_due_at
-            ) stage_sla ON true
             WHERE {where_sql}""",
         tuple([list(ACTIVE_STAGES), now, *params]),
     ).fetchone()
@@ -216,44 +331,17 @@ def dashboard_rows(
         params=comparison_params,
         now=now,
     )
+    live_summary = _live_summary(
+        conn,
+        where_sql=base_where,
+        params=base_params,
+        now=now,
+    )
 
+    facts_cte = _candidate_facts_cte(where_sql=where_sql)
     journey = conn.execute(
-        f"""WITH cohort AS (
-              SELECT candidate.id,
-                     CASE candidate.status
-                       WHEN 'new_candidate' THEN 0
-                       WHEN 'responded' THEN 1
-                       WHEN 'job_interview' THEN 2
-                       WHEN 'test_and_demo' THEN 3
-                       WHEN 'under_review' THEN 4
-                       WHEN 'teacher_academy' THEN 5
-                       WHEN 'active_teacher' THEN 5
-                       ELSE -1
-                     END AS current_rank
-              FROM msi_v2.teacher_candidates candidate
-              WHERE {where_sql}
-            ), reached AS (
-              SELECT cohort.id,
-                     GREATEST(
-                       cohort.current_rank,
-                       COALESCE(MAX(
-                         CASE history.stage
-                           WHEN 'new_candidate' THEN 0
-                           WHEN 'responded' THEN 1
-                           WHEN 'job_interview' THEN 2
-                           WHEN 'test_and_demo' THEN 3
-                           WHEN 'under_review' THEN 4
-                           WHEN 'teacher_academy' THEN 5
-                           WHEN 'active_teacher' THEN 5
-                           ELSE -1
-                         END
-                       ), -1)
-                     ) AS furthest_rank
-              FROM cohort
-              LEFT JOIN msi_v2.teacher_candidate_stage_history history
-                ON history.candidate_id = cohort.id
-              GROUP BY cohort.id, cohort.current_rank
-            ), stages(stage, stage_rank) AS (
+        f"""WITH {facts_cte},
+            stages(stage, stage_rank) AS (
               VALUES
                 ('new_candidate'::text, 0),
                 ('responded'::text, 1),
@@ -263,32 +351,31 @@ def dashboard_rows(
             )
             SELECT stages.stage,
                    COUNT(*) FILTER (
-                     WHERE reached.furthest_rank >= stages.stage_rank
+                     WHERE candidate_facts.furthest_rank >= stages.stage_rank
                    ) AS candidates
             FROM stages
-            CROSS JOIN reached
+            CROSS JOIN candidate_facts
             GROUP BY stages.stage, stages.stage_rank
             ORDER BY stages.stage_rank""",
-        tuple(params),
+        tuple([now, *params]),
     ).fetchall()
 
     outcomes = conn.execute(
-        f"""SELECT decision.decision AS outcome, COUNT(*) AS candidates
-            FROM msi_v2.teacher_candidates candidate
-            JOIN LATERAL (
-              SELECT final_decision.decision
-              FROM msi_v2.teacher_candidate_final_decisions final_decision
-              WHERE final_decision.candidate_id = candidate.id
-                AND final_decision.voided_at IS NULL
-              ORDER BY final_decision.created_at DESC, final_decision.id DESC
-              LIMIT 1
-            ) decision ON true
-            WHERE {where_sql}
-              AND decision.decision IN (
-                'teacher_academy', 'active_teacher', 'rejected', 'candidate_withdrew'
-              )
-            GROUP BY decision.decision""",
-        tuple(params),
+        f"""WITH {facts_cte},
+            classified AS (
+              SELECT CASE
+                WHEN active_teacher_id IS NOT NULL THEN 'active_teacher'
+                WHEN academy_teacher_id IS NOT NULL THEN 'teacher_academy'
+                WHEN latest_decision = 'rejected' THEN 'rejected'
+                WHEN latest_decision = 'candidate_withdrew' THEN 'candidate_withdrew'
+              END AS outcome
+              FROM candidate_facts
+            )
+            SELECT outcome, COUNT(*) AS candidates
+            FROM classified
+            WHERE outcome IS NOT NULL
+            GROUP BY outcome""",
+        tuple([now, *params]),
     ).fetchall()
 
     trend = conn.execute(
@@ -296,12 +383,29 @@ def dashboard_rows(
               SELECT candidate.id, candidate.application_date
               FROM msi_v2.teacher_candidates candidate
               WHERE {base_where}
-            ), first_review AS (
-              SELECT history.candidate_id, MIN(history.entered_at) AS entered_at
-              FROM msi_v2.teacher_candidate_stage_history history
-              JOIN filtered_candidates candidate ON candidate.id = history.candidate_id
-              WHERE history.stage = 'under_review'
-              GROUP BY history.candidate_id
+            ), first_shortlist AS (
+              SELECT candidate.id AS candidate_id, shortlist.entered_at
+              FROM filtered_candidates candidate
+              JOIN LATERAL (
+                SELECT MIN(event.entered_at) AS entered_at
+                FROM (
+                  SELECT history.entered_at
+                  FROM msi_v2.teacher_candidate_stage_history history
+                  WHERE history.candidate_id = candidate.id
+                    AND history.stage IN (
+                      'under_review', 'teacher_academy', 'active_teacher'
+                    )
+                  UNION ALL
+                  SELECT academy.created_at
+                  FROM msi_v2.academy_teachers academy
+                  WHERE academy.recruitment_candidate_id = candidate.id
+                    AND academy.academy_status NOT IN ('rejected', 'removed')
+                  UNION ALL
+                  SELECT teacher.created_at
+                  FROM msi_v2.teachers teacher
+                  WHERE teacher.recruitment_candidate_id = candidate.id
+                ) event
+              ) shortlist ON shortlist.entered_at IS NOT NULL
             ), latest_decision AS (
               SELECT DISTINCT ON (final_decision.candidate_id)
                      final_decision.candidate_id,
@@ -313,21 +417,37 @@ def dashboard_rows(
               ORDER BY final_decision.candidate_id,
                        final_decision.created_at DESC,
                        final_decision.id DESC
+            ), canonical_hires AS (
+              SELECT teacher.recruitment_candidate_id AS candidate_id,
+                     teacher.created_at
+              FROM msi_v2.teachers teacher
+              JOIN filtered_candidates candidate
+                ON candidate.id = teacher.recruitment_candidate_id
             ), events AS (
               SELECT candidate.application_date AS event_date, 'applications'::text AS event_type
               FROM filtered_candidates candidate
               WHERE candidate.application_date IS NOT NULL
               UNION ALL
-              SELECT (review.entered_at AT TIME ZONE 'Asia/Tashkent')::date, 'shortlisted'
-              FROM first_review review
+              SELECT (shortlist.entered_at AT TIME ZONE 'Asia/Tashkent')::date, 'shortlisted'
+              FROM first_shortlist shortlist
               UNION ALL
-              SELECT (decision.created_at AT TIME ZONE 'Asia/Tashkent')::date,
-                     CASE
-                       WHEN decision.decision = 'active_teacher' THEN 'hired'
-                       WHEN decision.decision = 'rejected' THEN 'rejected'
-                     END
+              SELECT (hire.created_at AT TIME ZONE 'Asia/Tashkent')::date, 'hired'
+              FROM canonical_hires hire
+              UNION ALL
+              SELECT (decision.created_at AT TIME ZONE 'Asia/Tashkent')::date, 'rejected'
               FROM latest_decision decision
-              WHERE decision.decision IN ('active_teacher', 'rejected')
+              WHERE decision.decision = 'rejected'
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM msi_v2.academy_teachers academy
+                  WHERE academy.recruitment_candidate_id = decision.candidate_id
+                    AND academy.academy_status NOT IN ('rejected', 'removed')
+                )
+                AND NOT EXISTS (
+                  SELECT 1
+                  FROM msi_v2.teachers teacher
+                  WHERE teacher.recruitment_candidate_id = decision.candidate_id
+                )
             )
             SELECT date_trunc(%s, event.event_date::timestamp)::date::text AS bucket,
                    event.event_type,
@@ -361,43 +481,29 @@ def dashboard_rows(
     ).fetchall()
 
     sources = conn.execute(
-        f"""SELECT
+        f"""WITH {facts_cte}
+            SELECT
               COALESCE(source_setting.label, NULLIF(candidate.source, ''), 'Not set') AS source,
               COALESCE(subsource_setting.label, 'Not set') AS subsource,
               COUNT(*) AS candidates,
-              COUNT(*) FILTER (
-                WHERE EXISTS (
-                  SELECT 1
-                  FROM msi_v2.teacher_candidate_stage_history review_history
-                  WHERE review_history.candidate_id = candidate.id
-                    AND review_history.stage = 'under_review'
-                )
-              ) AS shortlisted,
-              COUNT(*) FILTER (WHERE decision.decision = 'active_teacher') AS hired,
+              COUNT(*) FILTER (WHERE facts.furthest_rank >= 4) AS shortlisted,
+              COUNT(*) FILTER (WHERE facts.active_teacher_id IS NOT NULL) AS hired,
               ROUND(
-                100.0 * COUNT(*) FILTER (WHERE decision.decision = 'active_teacher')
+                100.0 * COUNT(*) FILTER (WHERE facts.active_teacher_id IS NOT NULL)
                 / NULLIF(COUNT(*), 0),
                 1
               ) AS conversion_percentage
-            FROM msi_v2.teacher_candidates candidate
+            FROM candidate_facts facts
+            JOIN msi_v2.teacher_candidates candidate ON candidate.id = facts.id
             LEFT JOIN msi_v2.teacher_recruitment_settings source_setting
               ON source_setting.id = candidate.source_option_id
             LEFT JOIN msi_v2.teacher_recruitment_settings subsource_setting
               ON subsource_setting.id = candidate.subsource_option_id
-            LEFT JOIN LATERAL (
-              SELECT final_decision.decision
-              FROM msi_v2.teacher_candidate_final_decisions final_decision
-              WHERE final_decision.candidate_id = candidate.id
-                AND final_decision.voided_at IS NULL
-              ORDER BY final_decision.created_at DESC, final_decision.id DESC
-              LIMIT 1
-            ) decision ON true
-            WHERE {where_sql}
             GROUP BY
               COALESCE(source_setting.label, NULLIF(candidate.source, ''), 'Not set'),
               COALESCE(subsource_setting.label, 'Not set')
             ORDER BY candidates DESC, source, subsource""",
-        tuple(params),
+        tuple([now, *params]),
     ).fetchall()
 
     stage_time = conn.execute(
@@ -428,10 +534,10 @@ def dashboard_rows(
             JOIN msi_v2.teacher_candidates candidate ON candidate.id = task.candidate_id
             WHERE task.status = 'pending'
               AND task.due_at < %s::timestamptz
-              AND {where_sql}
+              AND {base_where}
             ORDER BY task.due_at ASC, task.id ASC
             LIMIT 20""",
-        tuple([now, *params]),
+        tuple([now, *base_params]),
     ).fetchall()
 
     appointments = conn.execute(
@@ -445,10 +551,10 @@ def dashboard_rows(
             LEFT JOIN msi_v2.accounts account ON account.id = appointment.responsible_account_id
             WHERE appointment.status IN ('scheduled', 'in_progress')
               AND appointment.starts_at >= %s::timestamptz
-              AND {where_sql}
+              AND {base_where}
             ORDER BY appointment.starts_at ASC, appointment.id ASC
             LIMIT 20""",
-        tuple([now, *params]),
+        tuple([now, *base_params]),
     ).fetchall()
 
     recent_candidates = conn.execute(
@@ -507,6 +613,7 @@ def dashboard_rows(
     return {
         "current_summary": current_summary,
         "comparison_summary": comparison_summary,
+        "live_summary": live_summary,
         "journey": journey,
         "outcomes": outcomes,
         "activity_trend": trend,
@@ -520,4 +627,4 @@ def dashboard_rows(
     }
 
 
-__all__ = ["dashboard_rows", "options_rows"]
+__all__ = ["dashboard_rows", "options_rows", "subsource_matches_source"]

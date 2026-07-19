@@ -342,6 +342,10 @@ function activityLabel(eventType: string) {
 export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: string; role?: RecruitmentRole }) {
   const [filters, setFilters] = useState(() => initialFilters(role));
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const tashkentToday = useMemo(
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date()),
+    [],
+  );
   const options = useQuery({
     queryKey: ["hr-analytics", "options"],
     queryFn: () => recruitmentRequest<Options>(`${api}/options`),
@@ -362,8 +366,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   };
   const selectPeriod = (period: AnalyticsPeriod) => {
     if (period === "custom") {
-      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
-      replaceFilters({ ...filters, period, date_from: filters.date_from || today, date_to: filters.date_to || today });
+      replaceFilters({ ...filters, period, date_from: filters.date_from || tashkentToday, date_to: filters.date_to || tashkentToday });
       return;
     }
     replaceFilters({ ...filters, period, date_from: "", date_to: "" });
@@ -438,10 +441,10 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
             {filters.period === "custom" ? (
               <>
                 <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">From
-                  <input type="date" value={filters.date_from} onChange={(event) => updateCustomDate("date_from", event.target.value)} className={`${fieldClass} mt-1`} />
+                  <input type="date" max={tashkentToday} value={filters.date_from} onChange={(event) => updateCustomDate("date_from", event.target.value)} className={`${fieldClass} mt-1`} />
                 </label>
                 <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">To
-                  <input type="date" value={filters.date_to} onChange={(event) => updateCustomDate("date_to", event.target.value)} className={`${fieldClass} mt-1`} />
+                  <input type="date" max={tashkentToday} value={filters.date_to} onChange={(event) => updateCustomDate("date_to", event.target.value)} className={`${fieldClass} mt-1`} />
                 </label>
               </>
             ) : null}
@@ -462,24 +465,46 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Primary recruitment metrics">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">Selected application cohort</h2>
+          <p className="text-[11px] text-muted-foreground">
+            Applicants received in this period; direct Academy profiles and Trash are excluded.
+          </p>
+        </div>
+        <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+          Cohort metrics
+        </span>
+      </div>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Selected cohort recruitment metrics">
         <KpiCard label="Applications" metric={data.summary_cards.applications} icon={<UsersRound className="h-4 w-4" />} accent />
         <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} icon={<SearchCheck className="h-4 w-4" />} />
         <KpiCard label="Hired" metric={data.summary_cards.hired} icon={<UserCheck className="h-4 w-4" />} />
         <KpiCard label="Rejected" metric={data.summary_cards.rejected} icon={<UserMinus className="h-4 w-4" />} />
       </section>
 
-      <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Additional recruitment metrics">
-        <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
-        <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} icon={<UserMinus className="h-4 w-4" />} />
-        <SecondaryMetric label="Active candidates" value={numberValue(data.secondary_kpis.active_candidates)} icon={<UsersRound className="h-4 w-4" />} />
-        <SecondaryMetric label="Avg time to hire" value={numberValue(data.secondary_kpis.average_time_to_hire_days, "d")} icon={<Clock3 className="h-4 w-4" />} />
-        <SecondaryMetric label="Active conversion" value={numberValue(data.secondary_kpis.overall_conversion_percentage, "%")} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
-        <SecondaryMetric label="SLA breaches" value={numberValue(data.secondary_kpis.sla_breaches)} icon={<AlertTriangle className="h-4 w-4" />} tone={data.secondary_kpis.sla_breaches ? "danger" : "success"} />
-      </section>
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Additional selected cohort metrics">
+          <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
+          <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} icon={<UserMinus className="h-4 w-4" />} />
+          <SecondaryMetric label="Avg time to hire" value={numberValue(data.secondary_kpis.average_time_to_hire_days, "d")} icon={<Clock3 className="h-4 w-4" />} />
+          <SecondaryMetric label="Active conversion" value={numberValue(data.secondary_kpis.overall_conversion_percentage, "%")} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
+        </section>
+        <section className="rounded-xl border border-border bg-card p-2" aria-label="Live recruitment snapshot">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Live snapshot</h2>
+            <span className="text-[10px] text-muted-foreground">As of {dateLabel(data.as_of)}</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <SecondaryMetric label="Current active pipeline" value={numberValue(data.secondary_kpis.active_candidates)} icon={<UsersRound className="h-4 w-4" />} />
+            <SecondaryMetric label="SLA overdue now" value={numberValue(data.secondary_kpis.sla_overdue_now)} icon={<AlertTriangle className="h-4 w-4" />} tone={data.secondary_kpis.sla_overdue_now ? "danger" : "success"} />
+          </div>
+        </section>
+      </div>
 
       <div className="grid gap-3 xl:grid-cols-12">
-        <Panel title="Recruitment activity" description="Applications use application date; other series use the actual event date." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
+        <Panel title="Recruitment activity" description="Event activity in the selected dates: applications use application date; other series use their actual event date." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
           {hasTrend ? (
             <div className="h-[300px] min-w-0 px-1 pb-2 pt-3 sm:px-3">
               <p className="sr-only">Recruitment activity chart. Applications, shortlisted candidates, active hires and rejections over the selected period.</p>
@@ -568,7 +593,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           ) : <EmptyChart>No position data in this cohort.</EmptyChart>}
         </Panel>
 
-        <Panel title="Stage time and SLA" description="Average calendar days across historical stage entries." icon={<Clock3 className="h-4 w-4 text-primary" />} className="xl:col-span-6">
+        <Panel title="Stage time and SLA" description="Historical stage entries for the selected application cohort." icon={<Clock3 className="h-4 w-4 text-primary" />} className="xl:col-span-6">
           <div className="divide-y divide-border/70">
             {data.time_in_stage.length ? data.time_in_stage.map((item) => {
               const target = Number(item.sla_target_days || 0);
@@ -605,7 +630,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           {!data.source_quality.length ? <EmptyChart>No source-quality data in this cohort.</EmptyChart> : null}
         </Panel>
 
-        <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Open the candidate to resolve the next action." : "Read-only overview of recruitment work requiring attention."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="xl:col-span-5">
+        <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Live work across the current pipeline; the cohort date does not limit this panel." : "Read-only live overview across the current pipeline."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="xl:col-span-5">
           <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <div>
               <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
@@ -645,7 +670,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
         </Panel>
 
-        <Panel title="Recent activity" description="Actor-attributed recruitment history." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
+        <Panel title="Recent activity" description="Actor-attributed events that occurred within the selected dates." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
           <ol className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
             {data.recent_activity.map((item) => (
               <li key={item.id} className="flex min-h-[86px] gap-3 bg-card px-3 py-3 sm:px-4">

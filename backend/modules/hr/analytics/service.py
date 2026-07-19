@@ -84,22 +84,23 @@ def _period_bounds(
             raise HrAnalyticsError("Custom analytics ranges require both start and end dates.")
         start = _parse_date(date_from, field="Analytics start date")
         end = _parse_date(date_to, field="Analytics end date")
+        if end > today:
+            raise HrAnalyticsError("Analytics end date cannot be in the future.")
     elif normalized == "today":
         start = end = today
     elif normalized == "week":
         start = today - timedelta(days=today.weekday())
-        end = start + timedelta(days=6)
+        end = today
     elif normalized == "month":
         start = _month_start(today)
-        end = _month_end(today)
+        end = today
     elif normalized == "quarter":
         quarter_month = ((today.month - 1) // 3) * 3 + 1
         start = date(today.year, quarter_month, 1)
-        end_month = quarter_month + 2
-        end = date(today.year, end_month, monthrange(today.year, end_month)[1])
+        end = today
     else:
         start = date(today.year, 1, 1)
-        end = date(today.year, 12, 31)
+        end = today
 
     if start > end:
         raise HrAnalyticsError("The start date cannot be after the end date.")
@@ -110,20 +111,30 @@ def _period_bounds(
         comparison_start = comparison_end = start - timedelta(days=1)
     elif normalized == "week":
         comparison_start = start - timedelta(days=7)
-        comparison_end = start - timedelta(days=1)
+        comparison_end = end - timedelta(days=7)
     elif normalized == "month":
         comparison_start = _previous_month(start)
-        comparison_end = _month_end(comparison_start)
+        comparison_end = comparison_start.replace(
+            day=min(end.day, monthrange(comparison_start.year, comparison_start.month)[1])
+        )
     elif normalized == "quarter":
-        comparison_end = start - timedelta(days=1)
+        prior_quarter_end = start - timedelta(days=1)
         comparison_start = date(
-            comparison_end.year,
-            ((comparison_end.month - 1) // 3) * 3 + 1,
+            prior_quarter_end.year,
+            ((prior_quarter_end.month - 1) // 3) * 3 + 1,
             1,
+        )
+        comparison_end = min(
+            comparison_start + (end - start),
+            prior_quarter_end,
         )
     elif normalized == "year":
         comparison_start = date(start.year - 1, 1, 1)
-        comparison_end = date(start.year - 1, 12, 31)
+        comparison_end = date(
+            start.year - 1,
+            end.month,
+            min(end.day, monthrange(start.year - 1, end.month)[1]),
+        )
     else:
         span = end - start
         comparison_end = start - timedelta(days=1)
@@ -235,6 +246,24 @@ def dashboard(
     bucket = _bucket_for(start, end)
     now = datetime.now(UTC).isoformat()
     with connect_auth_db() as conn:
+        if subsource and not source:
+            raise HrAnalyticsError("Select a source before selecting a subsource.")
+        if subsource:
+            try:
+                source_id = int(source)
+                subsource_id = int(subsource)
+            except (TypeError, ValueError) as exc:
+                raise HrAnalyticsError(
+                    "Source and subsource filters must use configured option IDs."
+                ) from exc
+            if not repository.subsource_matches_source(
+                conn,
+                source_id=source_id,
+                subsource_id=subsource_id,
+            ):
+                raise HrAnalyticsError(
+                    "The selected subsource does not belong to the selected source."
+                )
         rows = repository.dashboard_rows(
             conn,
             date_from=start.isoformat(),
@@ -252,6 +281,7 @@ def dashboard(
 
     current = _dict(rows["current_summary"])
     comparison = _dict(rows["comparison_summary"])
+    live = _dict(rows["live_summary"])
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
     journey_counts = {
         str(row["stage"]): int(row["candidates"] or 0)
@@ -324,6 +354,7 @@ def dashboard(
 
     return {
         "role": user.role,
+        "as_of": now,
         "range": {
             "from": start.isoformat(),
             "to": end.isoformat(),
@@ -347,14 +378,17 @@ def dashboard(
         "secondary_kpis": {
             "academy_accepted": int(current.get("academy_accepted") or 0),
             "withdrawn": int(current.get("withdrawn") or 0),
-            "active_candidates": int(current.get("active_candidates") or 0),
+            "active_candidates": int(live.get("active_candidates") or 0),
             "average_time_to_hire_days": current.get("average_time_to_hire_days"),
             "overall_conversion_percentage": current.get("overall_conversion_percentage"),
-            "sla_breaches": int(current.get("sla_breaches") or 0),
+            # Keep the legacy field while exposing explicit live/cohort scopes.
+            "sla_breaches": int(live.get("sla_overdue_now") or 0),
+            "sla_overdue_now": int(live.get("sla_overdue_now") or 0),
+            "cohort_sla_breaches": int(current.get("cohort_sla_breaches") or 0),
         },
         # Compatibility for clients using the first analytics contract.
         "kpis": {
-            "active_candidates": int(current.get("active_candidates") or 0),
+            "active_candidates": int(live.get("active_candidates") or 0),
             "new_this_month": int(current.get("applications") or 0),
             "hired_this_month": int(current.get("hired") or 0),
             "average_time_to_hire_days": current.get("average_time_to_hire_days"),
@@ -375,7 +409,8 @@ def dashboard(
         "source_conversion": source_conversion,
         "time_in_stage": stage_time,
         "sla": {
-            "breaches": int(current.get("sla_breaches") or 0),
+            "breaches": int(current.get("cohort_sla_breaches") or 0),
+            "overdue_now": int(live.get("sla_overdue_now") or 0),
             "bottlenecks": stage_time[:3],
         },
         "overdue_actions": [_dict(row) for row in rows["overdue_actions"]],

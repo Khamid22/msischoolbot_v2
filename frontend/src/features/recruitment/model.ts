@@ -273,6 +273,7 @@ export type RecruitmentSettingsData = {
 
 export type HrAnalyticsDashboard = {
   role: "hr_manager" | "ceo";
+  as_of: string;
   range: {
     from: string;
     to: string;
@@ -301,6 +302,8 @@ export type HrAnalyticsDashboard = {
     average_time_to_hire_days?: number | null;
     overall_conversion_percentage?: number | null;
     sla_breaches: number;
+    sla_overdue_now: number;
+    cohort_sla_breaches: number;
   };
   kpis: { active_candidates: number; new_this_month: number; hired_this_month: number; average_time_to_hire_days?: number | null; overall_conversion_percentage?: number | null };
   funnel: Array<{ stage: string; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
@@ -312,7 +315,7 @@ export type HrAnalyticsDashboard = {
   source_quality: Array<{ source: string; subsource: string; candidates: number; shortlisted: number; hired: number; conversion_percentage: number }>;
   source_conversion: Array<{ source: string; candidates: number; hired: number; conversion_percentage: number }>;
   time_in_stage: Array<{ stage: string; average_days: number; sla_target_days?: number | null; sla_breaches: number; entries: number }>;
-  sla: { breaches: number; bottlenecks: Array<{ stage: string; average_days: number; sla_breaches: number }> };
+  sla: { breaches: number; overdue_now: number; bottlenecks: Array<{ stage: string; average_days: number; sla_breaches: number }> };
   overdue_actions: Array<{ id: number; candidate_id: number; candidate_name: string; title: string; due_at: string }>;
   upcoming_appointments: Array<{ id: number; candidate_id: number; candidate_name: string; appointment_type: string; starts_at: string; responsible_name?: string }>;
   recent_candidates: Array<{
