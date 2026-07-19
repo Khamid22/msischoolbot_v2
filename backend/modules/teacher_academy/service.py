@@ -5,6 +5,7 @@ from backend.core.database import connect_auth_db
 
 from backend.modules.teacher_academy import repository as repository
 from backend.modules.teacher_academy import mutations_repository
+from backend.modules.hr.recruitment import repository as recruitment_repository
 from backend.modules.people.teachers.service import list_teachers, upsert_teacher
 
 VALID_ACADEMY_STATUSES = {
@@ -96,6 +97,7 @@ def create_academy_teacher(
             updated_at=now,
         )
         if not profile_teacher_id:
+            conn.rollback()
             return _create_result(False, "Unable to create the teacher profile.", return_credentials=return_credentials)
         login = repository.get_next_teacher_code(conn)
         password_hash = generate_password_hash(login)
@@ -107,7 +109,14 @@ def create_academy_teacher(
             password_hash,
             now,
         )
-        _provision_teacher_account_v2(
+        if not staff_id:
+            conn.rollback()
+            return _create_result(
+                False,
+                "Unable to provision the Academy teacher login.",
+                return_credentials=return_credentials,
+            )
+        account_id = _provision_teacher_account_v2(
             conn,
             teacher_id=profile_teacher_id,
             staff_id=staff_id,
@@ -133,6 +142,66 @@ def create_academy_teacher(
             notes=str(notes or "").strip(),
             created_by=str(created_by or "").strip(),
             created_at=now,
+        )
+        if not academy_teacher_id:
+            conn.rollback()
+            return _create_result(
+                False,
+                "Unable to create the Teacher Academy record.",
+                return_credentials=return_credentials,
+            )
+        lifecycle_profile_id = recruitment_repository.insert_academy_direct_profile(
+            conn,
+            full_name=normalized_name,
+            subject_id=int(program["subject_id"]),
+            applied_position=str(position or "Trainee Teacher").strip() or "Trainee Teacher",
+            phone=str(phone or "").strip(),
+            email=str(email or "").strip(),
+            telegram_username=str(telegram_username or "").strip(),
+            linked_account_id=account_id or None,
+            now=now,
+            actor_account_id=None,
+            transition_source="manual",
+            history_comment="Lifecycle profile created with a Teacher Academy teacher.",
+        )
+        if not lifecycle_profile_id or not recruitment_repository.link_academy_profile(
+            conn,
+            academy_teacher_id=academy_teacher_id,
+            candidate_id=lifecycle_profile_id,
+            full_name=normalized_name,
+            linked_account_id=account_id or None,
+            now=now,
+        ):
+            conn.rollback()
+            return _create_result(
+                False,
+                "Unable to link the Teacher Academy lifecycle profile.",
+                return_credentials=return_credentials,
+            )
+        if not mutations_repository.link_teacher_identity_to_candidate(
+            conn,
+            teacher_id=profile_teacher_id,
+            candidate_id=lifecycle_profile_id,
+            updated_at=now,
+        ):
+            conn.rollback()
+            return _create_result(
+                False,
+                "Unable to link the Teacher Academy account profile.",
+                return_credentials=return_credentials,
+            )
+        recruitment_repository.insert_audit(
+            conn,
+            candidate_id=lifecycle_profile_id,
+            event_type="candidate.academy_profile_created",
+            detail={
+                "academy_teacher_id": academy_teacher_id,
+                "profile_origin": "academy_direct",
+                "created_by": str(created_by or "").strip(),
+            },
+            actor_account_id=None,
+            actor_staff_id=None,
+            now=now,
         )
         for sequence_no, lesson in enumerate(lessons, start=1):
             mutations_repository.insert_academy_lesson_assignment(

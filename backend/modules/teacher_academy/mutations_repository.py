@@ -71,6 +71,30 @@ def insert_academy_teacher(
     return int(row["id"] or 0) if row else 0
 
 
+def link_teacher_identity_to_candidate(
+    conn: Any,
+    *,
+    teacher_id: int,
+    candidate_id: int,
+    updated_at: str,
+) -> bool:
+    row = conn.execute(
+        """
+        UPDATE msi_v2.teachers
+        SET recruitment_candidate_id = %s,
+            updated_at = %s::timestamptz
+        WHERE id = %s
+          AND (
+              recruitment_candidate_id IS NULL
+              OR recruitment_candidate_id = %s
+          )
+        RETURNING id
+        """,
+        (candidate_id, updated_at, teacher_id, candidate_id),
+    ).fetchone()
+    return bool(row)
+
+
 def get_pending_recruitment_academy_intake(conn: Any, academy_teacher_id: int) -> Any:
     return conn.execute(
         """

@@ -134,12 +134,20 @@ def test_frontend_uses_the_shared_profile_and_academy_block():
     model = Path("frontend/src/features/recruitment/model.ts").read_text()
     profile = Path("frontend/src/features/recruitment/CandidateProfile.tsx").read_text()
     teachers = Path("frontend/src/features/recruitment/TeachersView.tsx").read_text()
+    roster = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyRoster.tsx"
+    ).read_text()
+    academic_panel = Path(
+        "frontend/src/features/teacher-academy/TeacherAcademyPanel.tsx"
+    ).read_text()
     assert 'profile_origin?: "application" | "academy_direct"' in model
     assert "candidate.academy" in profile
     assert "No application history has been generated." in profile
-    assert "origin=teachers" in teachers
-    assert "Remove from Teacher Academy" in teachers
-    assert "generated_login_will_be_deleted" in teachers
+    assert "TeacherAcademyRoster" in teachers
+    assert "TeacherAcademyRoster" in academic_panel
+    assert "origin=teachers" in roster
+    assert "Remove from Teacher Academy" in roster
+    assert "generated_login_will_be_deleted" in roster
 
 
 def test_academy_removal_is_audited_and_history_preserving():
@@ -245,10 +253,11 @@ def test_academy_removal_rejects_transactionally_without_deleting_history(monkey
     assert academy_audit["lessons_and_assessments_preserved"] is True
 
 
-def test_academy_removal_fails_closed_for_non_hr_roles():
+@pytest.mark.parametrize("role", ["ceo", "head_of_department"])
+def test_academy_removal_fails_closed_for_unauthorized_roles(role):
     with pytest.raises(service.RecruitmentError) as exc:
         service.remove_academy_teacher(
-            CurrentUser(login="CEO0001", role="ceo"),
+            CurrentUser(login=role.upper(), role=role),
             14,
             {"rejection_reason": "failed_academy"},
         )

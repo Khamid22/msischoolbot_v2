@@ -21,7 +21,11 @@ class _AcademyCreateConnection:
         self.curriculum_rows = curriculum_rows
         self.assignments = []
         self.notifications = []
+        self.lifecycle_profiles = []
+        self.academy_links = []
+        self.teacher_links = []
         self.commits = 0
+        self.rollbacks = 0
 
     def __enter__(self):
         return self
@@ -60,6 +64,9 @@ class _AcademyCreateConnection:
 
     def commit(self):
         self.commits += 1
+
+    def rollback(self):
+        self.rollbacks += 1
 
 
 def _curriculum_rows():
@@ -115,6 +122,26 @@ def _patch_create_dependencies(monkeypatch, curriculum_rows=None):
     monkeypatch.setattr(academy_service.repository, "insert_teacher_auth", lambda *args, **kwargs: 55)
     monkeypatch.setattr(academy_service, "_provision_teacher_account_v2", lambda *args, **kwargs: 0)
     monkeypatch.setattr(
+        academy_service.recruitment_repository,
+        "insert_academy_direct_profile",
+        lambda *args, **kwargs: conn.lifecycle_profiles.append(kwargs) or 330,
+    )
+    monkeypatch.setattr(
+        academy_service.recruitment_repository,
+        "link_academy_profile",
+        lambda *args, **kwargs: conn.academy_links.append(kwargs) or True,
+    )
+    monkeypatch.setattr(
+        academy_service.recruitment_repository,
+        "insert_audit",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        academy_service.mutations_repository,
+        "link_teacher_identity_to_candidate",
+        lambda *args, **kwargs: conn.teacher_links.append(kwargs) or True,
+    )
+    monkeypatch.setattr(
         academy_service,
         "_notify_academy_event_safe",
         lambda **kwargs: conn.notifications.append(kwargs)
@@ -146,6 +173,10 @@ def test_create_academy_teacher_uses_selected_lesson_ids_in_order(monkeypatch):
     assert conn.notifications[0]["academy_teacher"]["full_name"] == "Example Teacher"
     assert conn.notifications[0]["academy_teacher"]["subject"] == "Mathematics"
     assert "lessons" not in conn.notifications[0]["body"]
+    assert conn.lifecycle_profiles[0]["transition_source"] == "manual"
+    assert conn.lifecycle_profiles[0]["full_name"] == "Example Teacher"
+    assert conn.academy_links[0]["candidate_id"] == 330
+    assert conn.teacher_links[0]["candidate_id"] == 330
     assert conn.commits == 1
 
 
@@ -177,6 +208,28 @@ def test_create_academy_teacher_rejects_invalid_lesson_id(monkeypatch):
 
     assert created is False
     assert message == "Select valid Teacher Academy lessons."
+    assert conn.assignments == []
+
+
+def test_create_academy_teacher_rolls_back_when_lifecycle_link_fails(monkeypatch):
+    conn = _patch_create_dependencies(monkeypatch)
+    monkeypatch.setattr(
+        academy_service.recruitment_repository,
+        "link_academy_profile",
+        lambda *args, **kwargs: False,
+    )
+
+    created, message, _credentials = academy_service.create_academy_teacher(
+        full_name="Example Teacher",
+        subject_program_id=7,
+        selected_curriculum_item_ids=[101],
+        return_credentials=True,
+    )
+
+    assert created is False
+    assert message == "Unable to link the Teacher Academy lifecycle profile."
+    assert conn.rollbacks == 1
+    assert conn.commits == 0
     assert conn.assignments == []
 
 

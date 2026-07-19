@@ -419,15 +419,11 @@ def list_teacher_handoff_rows(
     kind: str,
     search: str = "",
     subject_id: int | None = None,
+    sort: str = "average_score",
     limit: int = 100,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
-    """List canonical Academy/active teachers, retaining unlinked legacy outcomes.
-
-    The canonical business tables are the source of truth. Recruitment candidates
-    are included only as a compatibility fallback when an older final outcome has
-    no linked handoff record.
-    """
+    """List canonical Academy/active teacher business records."""
 
     if kind == "teacher_academy":
         records_sql = """
@@ -500,42 +496,6 @@ def list_teacher_handoff_rows(
             ) academy_progress ON true
             WHERE academy.promoted_teacher_id IS NULL
               AND COALESCE(academy.academy_status, '') <> 'rejected'
-
-            UNION ALL
-
-            SELECT
-                'teacher_academy'::text AS kind,
-                candidate.id AS record_id,
-                candidate.id AS recruitment_candidate_id,
-                candidate.full_name,
-                COALESCE(
-                    NULLIF(candidate.applied_position, ''),
-                    NULLIF(subject.subject_name, ''),
-                    'Position not set'
-                ) AS position,
-                COALESCE(subject.subject_name, '') AS subject,
-                CASE
-                    WHEN candidate.subject_id IS NULL THEN ARRAY[]::bigint[]
-                    ELSE ARRAY[candidate.subject_id]::bigint[]
-                END AS subject_ids,
-                candidate.status,
-                'missing_handoff'::text AS onboarding_status,
-                NULL::timestamptz AS joined_at,
-                (candidate.stage_changed_at AT TIME ZONE 'Asia/Tashkent')::date::text
-                    AS added_on,
-                candidate.stage_changed_at AS sort_at,
-                0::integer AS assigned_count,
-                0::integer AS passed_count,
-                NULL::numeric AS average_score,
-                false AS generated_login_will_be_deleted
-            FROM msi_v2.teacher_candidates candidate
-            LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
-            WHERE candidate.status = 'teacher_academy'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM msi_v2.academy_teachers linked
-                  WHERE linked.recruitment_candidate_id = candidate.id
-              )
         """
     elif kind == "active_teacher":
         records_sql = """
@@ -594,51 +554,6 @@ def list_teacher_handoff_rows(
                 ) available_subject
             ) teacher_subject ON true
             WHERE teacher.status = 'active'
-
-            UNION ALL
-
-            SELECT
-                'active_teacher'::text AS kind,
-                candidate.id AS record_id,
-                candidate.id AS recruitment_candidate_id,
-                candidate.full_name,
-                COALESCE(
-                    NULLIF(candidate.applied_position, ''),
-                    NULLIF(subject.subject_name, ''),
-                    'Position not set'
-                ) AS position,
-                COALESCE(subject.subject_name, '') AS subject,
-                CASE
-                    WHEN candidate.subject_id IS NULL THEN ARRAY[]::bigint[]
-                    ELSE ARRAY[candidate.subject_id]::bigint[]
-                END AS subject_ids,
-                candidate.status,
-                'missing_handoff'::text AS onboarding_status,
-                COALESCE(candidate.updated_at, candidate.created_at) AS joined_at,
-                (
-                    COALESCE(
-                        candidate.stage_changed_at,
-                        candidate.updated_at,
-                        candidate.created_at
-                    ) AT TIME ZONE 'Asia/Tashkent'
-                )::date::text AS added_on,
-                COALESCE(
-                    candidate.stage_changed_at,
-                    candidate.updated_at,
-                    candidate.created_at
-                ) AS sort_at,
-                0::integer AS assigned_count,
-                0::integer AS passed_count,
-                NULL::numeric AS average_score,
-                false AS generated_login_will_be_deleted
-            FROM msi_v2.teacher_candidates candidate
-            LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
-            WHERE candidate.status = 'active_teacher'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM msi_v2.teachers linked
-                  WHERE linked.recruitment_candidate_id = candidate.id
-              )
         """
     else:
         raise ValueError("Unknown teacher handoff kind.")
@@ -656,6 +571,24 @@ def list_teacher_handoff_rows(
         filters.append("%s = ANY(record.subject_ids)")
         params.append(int(subject_id))
     where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
+    normalized_sort = str(sort or "").strip().lower()
+    if kind == "active_teacher":
+        normalized_sort = "date"
+    order_sql = {
+        "average_score": (
+            "record.average_score DESC NULLS LAST, record.passed_count DESC, "
+            "record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id"
+        ),
+        "lessons": (
+            "record.passed_count DESC, record.average_score DESC NULLS LAST, "
+            "record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id"
+        ),
+        "date": (
+            "record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id"
+        ),
+    }.get(normalized_sort)
+    if order_sql is None:
+        raise ValueError("Unknown teacher handoff sort.")
     total_row = conn.execute(
         f"""
         WITH record AS ({records_sql})
@@ -676,7 +609,7 @@ def list_teacher_handoff_rows(
                record.generated_login_will_be_deleted
         FROM record
         {where_sql}
-        ORDER BY record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id
+        ORDER BY {order_sql}
         LIMIT %s OFFSET %s
         """,
         tuple([*params, int(limit), int(offset)]),
@@ -1853,6 +1786,8 @@ def insert_academy_direct_profile(
     linked_account_id: int | None,
     now: str,
     actor_account_id: int | None,
+    transition_source: str = "migration",
+    history_comment: str = "Lifecycle profile created from an existing Teacher Academy record.",
 ) -> int:
     """Create a lifecycle profile without fabricating a recruitment application."""
 
@@ -1877,8 +1812,7 @@ def insert_academy_direct_profile(
                 comment, transition_source, sla_target_days, sla_due_at
             )
             SELECT id, 'teacher_academy', %s::timestamptz, %s,
-                   'Lifecycle profile created from an existing Teacher Academy record.',
-                   'migration', NULL, NULL
+                   %s, %s, NULL, NULL
             FROM inserted_profile
             RETURNING candidate_id
         )
@@ -1887,7 +1821,7 @@ def insert_academy_direct_profile(
         (
             full_name, phone, email, telegram_username, int(subject_id or 0),
             applied_position, now, linked_account_id, actor_account_id, now, now,
-            now, actor_account_id,
+            now, actor_account_id, history_comment, transition_source,
         ),
     ).fetchone()
     return int(row["id"]) if row else 0

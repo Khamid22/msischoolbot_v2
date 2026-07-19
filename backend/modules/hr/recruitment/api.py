@@ -13,6 +13,7 @@ from backend.modules.hr.recruitment import service
 from backend.modules.hr.recruitment import notifications as recruitment_notifications
 from backend.modules.hr.recruitment.constants import RECRUITMENT_ROLES
 from backend.modules.hr.recruitment.policies import (
+    ensure_academy_removal_management,
     ensure_academic_write,
     ensure_approval_request,
     ensure_approval_review,
@@ -139,6 +140,10 @@ def teachers(
     per_page: Annotated[int, Query(ge=1, le=100)] = 100,
     search: str = "",
     subject_id: Annotated[int | None, Query(ge=1)] = None,
+    sort: Annotated[
+        str,
+        Query(pattern="^(average_score|lessons|date)$"),
+    ] = "average_score",
     user: CurrentUser = Depends(get_current_user),
 ):
     return api_success(
@@ -150,6 +155,7 @@ def teachers(
             per_page=per_page,
             search=search,
             subject_id=subject_id,
+            sort=sort,
         )
     )
 
@@ -163,7 +169,7 @@ def remove_academy_teacher(
     payload: AcademyTeacherRemoval,
     user: CurrentUser = Depends(get_current_user),
 ):
-    ensure_hr_management(user)
+    ensure_academy_removal_management(user)
     result = _call(
         service.remove_academy_teacher,
         user,

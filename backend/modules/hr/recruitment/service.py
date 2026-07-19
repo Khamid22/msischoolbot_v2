@@ -500,10 +500,11 @@ def list_teacher_handoffs(
     per_page: int = 100,
     search: str = "",
     subject_id: int | None = None,
+    sort: str = "average_score",
 ) -> dict[str, Any]:
-    if user.role not in {"hr_manager", "ceo"}:
+    if user.role not in {"hr_manager", "academic_director", "ceo"}:
         raise RecruitmentError(
-            "Teacher handoff records require HR Manager or CEO access.",
+            "Teacher handoff records require HR Manager, Academic Director, or CEO access.",
             status_code=403,
         )
     normalized_kind = _text(kind)
@@ -511,12 +512,18 @@ def list_teacher_handoffs(
         raise RecruitmentError("Unknown teacher handoff type.")
     safe_page = max(1, int(page or 1))
     safe_per_page = max(1, min(int(per_page or 100), 100))
+    normalized_sort = _text(sort).lower() or "average_score"
+    if normalized_sort not in {"average_score", "lessons", "date"}:
+        raise RecruitmentError("Unknown teacher roster sort.")
+    if normalized_kind == "active_teacher":
+        normalized_sort = "date"
     with connect_auth_db() as conn:
         rows, total = repository.list_teacher_handoff_rows(
             conn,
             kind=normalized_kind,
             search=_text(search),
             subject_id=subject_id,
+            sort=normalized_sort,
             limit=safe_per_page,
             offset=(safe_page - 1) * safe_per_page,
         )
@@ -541,7 +548,10 @@ def list_teacher_handoffs(
                     if row.get("average_score") is not None
                     else None
                 ),
-                "can_remove": user.role == "hr_manager" and normalized_kind == "teacher_academy",
+                "can_remove": (
+                    user.role in {"hr_manager", "academic_director"}
+                    and normalized_kind == "teacher_academy"
+                ),
                 "generated_login_will_be_deleted": bool(
                     row.get("generated_login_will_be_deleted")
                 ),
@@ -2946,9 +2956,9 @@ def remove_academy_teacher(
     academy_teacher_id: int,
     values: dict[str, Any],
 ) -> dict[str, Any]:
-    if user.role != "hr_manager":
+    if user.role not in {"hr_manager", "academic_director"}:
         raise RecruitmentError(
-            "Only the HR Manager can remove a Teacher Academy teacher.",
+            "Only the HR Manager or Academic Director can remove a Teacher Academy teacher.",
             status_code=403,
         )
     rejection_reason = _text(values.get("rejection_reason"))
@@ -2995,7 +3005,7 @@ def remove_academy_teacher(
         ):
             conn.rollback()
             return {
-                "candidate": get_candidate(user, candidate_id),
+                "candidate": {"id": candidate_id, "status": "rejected"},
                 "identity_deleted": False,
                 "already_removed": True,
             }
@@ -3227,7 +3237,7 @@ def remove_academy_teacher(
         conn.commit()
 
     return {
-        "candidate": get_candidate(user, candidate_id),
+        "candidate": {"id": candidate_id, "status": "rejected"},
         "identity_deleted": identity_deleted,
         "already_removed": False,
     }

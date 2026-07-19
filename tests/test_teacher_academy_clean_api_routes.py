@@ -232,7 +232,7 @@ def test_head_of_department_cannot_reset_teacher_password(client, monkeypatch):
     assert response.status_code == 403
 
 
-def test_only_hr_manager_can_remove_a_teacher_from_academy(client, monkeypatch):
+def test_hr_and_academic_director_can_safely_remove_a_teacher_from_academy(client, monkeypatch):
     import backend.modules.hr.recruitment.api as recruitment_api
 
     calls = []
@@ -265,7 +265,24 @@ def test_only_hr_manager_can_remove_a_teacher_from_academy(client, monkeypatch):
     assert allowed.status_code == 200
     assert calls == [("hr_manager", 8, payload)]
 
-    for role in ("ceo", "academic_director", "head_of_department"):
+    _set_session(
+        client,
+        {
+            "auth_role": "academic_director",
+            "auth_login": "AD0001",
+            "account_id": 43,
+            "staff_id": 23,
+        },
+    )
+    academic_allowed = client.post(
+        "/api/v1/recruitment/teachers/8/remove",
+        json=payload,
+        headers=XHR,
+    )
+    assert academic_allowed.status_code == 200
+    assert calls[-1] == ("academic_director", 8, payload)
+
+    for role in ("ceo", "head_of_department"):
         _set_session(
             client,
             {
@@ -282,7 +299,10 @@ def test_only_hr_manager_can_remove_a_teacher_from_academy(client, monkeypatch):
         )
         assert denied.status_code == 403
 
-    assert calls == [("hr_manager", 8, payload)]
+    assert calls == [
+        ("hr_manager", 8, payload),
+        ("academic_director", 8, payload),
+    ]
 
 
 def test_academic_director_schedule_assess_status_and_promote_routes_call_domain_service(client, monkeypatch):

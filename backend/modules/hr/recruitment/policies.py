@@ -57,6 +57,14 @@ def ensure_hr_management(user: CurrentUser) -> None:
         raise HTTPException(status_code=403, detail="This action requires HR Manager access.")
 
 
+def ensure_academy_removal_management(user: CurrentUser) -> None:
+    if user.role not in {"hr_manager", "academic_director"}:
+        raise HTTPException(
+            status_code=403,
+            detail="This action requires HR Manager or Academic Director access.",
+        )
+
+
 def ensure_pipeline_management(user: CurrentUser) -> None:
     if user.role not in {"hr_manager", "ceo"}:
         raise HTTPException(status_code=403, detail="You cannot move recruitment candidates.")

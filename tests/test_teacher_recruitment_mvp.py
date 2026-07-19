@@ -57,7 +57,7 @@ def test_stage_and_rejection_taxonomies_are_stable():
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
 
-def test_teacher_handoff_repository_reads_canonical_tables_and_keeps_legacy_fallbacks():
+def test_teacher_handoff_repository_reads_only_canonical_tables_and_sorts_server_side():
     class Result:
         def __init__(self, rows):
             self.rows = rows
@@ -86,12 +86,14 @@ def test_teacher_handoff_repository_reads_canonical_tables_and_keeps_legacy_fall
     academy_sql = "\n".join(sql for sql, _params in academy_conn.calls)
     assert "FROM msi_v2.academy_teachers academy" in academy_sql
     assert "academy.promoted_teacher_id IS NULL" in academy_sql
-    assert "candidate.status = 'teacher_academy'" in academy_sql
-    assert "linked.recruitment_candidate_id = candidate.id" in academy_sql
+    assert "candidate.status = 'teacher_academy'" not in academy_sql
+    assert "UNION ALL" not in academy_sql
     assert "academy.created_at AT TIME ZONE 'Asia/Tashkent'" in academy_sql
     assert "FROM msi_v2.academy_lesson_assignments assignment" in academy_sql
     assert "FROM msi_v2.academy_assessments assessment" in academy_sql
     assert "%s = ANY(record.subject_ids)" in academy_sql
+    assert "record.average_score DESC NULLS LAST" in academy_sql
+    assert "lower(record.full_name)" in academy_sql
     assert academy_conn.calls[0][1] == ("%Math%", "%Math%", "%Math%", 4)
 
     active_conn = Connection()
@@ -103,7 +105,9 @@ def test_teacher_handoff_repository_reads_canonical_tables_and_keeps_legacy_fall
     assert "FROM msi_v2.teachers teacher" in active_sql
     assert "teacher.status = 'active'" in active_sql
     assert "FROM msi_v2.teacher_subjects teacher_subject_link" in active_sql
-    assert "candidate.status = 'active_teacher'" in active_sql
+    assert "candidate.status = 'active_teacher'" not in active_sql
+    assert "FROM msi_v2.teacher_candidates candidate" not in active_sql
+    assert "record.sort_at DESC NULLS LAST" in active_sql
 
 
 def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(monkeypatch):
@@ -151,9 +155,16 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
     assert result["items"][0]["passed_count"] == 8
     assert result["items"][0]["average_score"] == 7.2
 
-    with pytest.raises(service.RecruitmentError, match="HR Manager or CEO"):
+    academic_result = service.list_teacher_handoffs(
+        _user("academic_director"),
+        kind="teacher_academy",
+        sort="lessons",
+    )
+    assert academic_result["total"] == 1
+
+    with pytest.raises(service.RecruitmentError, match="Academic Director"):
         service.list_teacher_handoffs(
-            _user("academic_director"),
+            _user("head_of_department"),
             kind="teacher_academy",
         )
 

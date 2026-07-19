@@ -15,6 +15,11 @@ import { routes } from "@/shared/lib/routes";
 import { asNumber, asString } from "@/shared/lib/workspace";
 import { formatUzs, postForm, semesterStages, suggestedLessonRate, teacherCategories, ToastTone } from "@/features/people/teachers/model";
 import { apiData, apiErrorMessage, apiSucceeded, jsonCsrfHeaders } from "@/shared/lib/api";
+import {
+  TeacherAcademyRoster,
+  type TeacherRosterItem,
+  useCanonicalTeacherRosterTotals,
+} from "@/features/teacher-academy/TeacherAcademyRoster";
 
 type AcademyTeacher = Record<string, unknown>;
 type AcademyAssignment = Record<string, unknown>;
@@ -2195,6 +2200,43 @@ export function TeacherAcademyPanel({
       return employmentType !== "academy" && !["inactive", "deleted", "archived"].includes(status);
     });
   }, [state.props?.adminTeachers, state.teachers]);
+  const academyRosterRefreshToken = useMemo(
+    () => academyTeachers
+      .map((teacher) => [
+        asNumber(teacher.id),
+        asString(teacher.updated_at),
+        academyAssessments(teacher).length,
+      ].join(":"))
+      .join("|"),
+    [academyTeachers],
+  );
+  const activeRosterRefreshToken = useMemo(
+    () => activeTeachers
+      .map((teacher) => `${asNumber(teacher.id)}:${asString(teacher.updated_at)}`)
+      .join("|"),
+    [activeTeachers],
+  );
+  const directorRosterTotals = useCanonicalTeacherRosterTotals(
+    `${academyRosterRefreshToken}::${activeRosterRefreshToken}`,
+    isAcademicDirectorMode,
+  );
+  const openCanonicalRosterTeacher = (teacher: TeacherRosterItem) => {
+    if (teacher.kind === "active_teacher") {
+      const active = activeTeachers.find((row) => asNumber(row.id) === teacher.record_id);
+      if (active) {
+        openActiveTeacherAccount(active);
+        return;
+      }
+      showToast("The active teacher details are not available in this workspace yet.", "danger");
+      return;
+    }
+    const academy = academyTeachers.find((row) => asNumber(row.id) === teacher.record_id);
+    if (academy) {
+      setDetailTeacher(academy);
+      return;
+    }
+    showToast("The Teacher Academy details could not be loaded. Refresh and try again.", "danger");
+  };
   const appointedLessons = useMemo(
     () =>
       academyTeachers
@@ -2654,7 +2696,7 @@ export function TeacherAcademyPanel({
           <div className="mb-3 space-y-2">
             <div role="tablist" aria-label="Teacher Academy workspace" className="grid grid-cols-2 gap-1 rounded-lg border border-foreground/10 bg-muted/40 p-1">
               {[
-                { key: "teachers", label: "Teachers", count: sortedTeachers.length + activeTeachers.length },
+                { key: "teachers", label: "Teachers", count: directorRosterTotals.teacher_academy + directorRosterTotals.active_teacher },
                 { key: "lessons", label: "Appointed Lessons", count: appointedLessons.length },
               ].map((tab) => {
                 const active = directorAcademyTab === tab.key;
@@ -2678,8 +2720,8 @@ export function TeacherAcademyPanel({
             {directorAcademyTab === "teachers" ? (
               <div role="tablist" aria-label="Teacher list type" className="inline-grid grid-cols-2 gap-1 rounded-lg border border-foreground/10 bg-background p-1">
                 {[
-                  { key: "academy", label: "Teacher Academy", count: sortedTeachers.length },
-                  { key: "active", label: "Active Teachers", count: activeTeachers.length },
+                  { key: "academy", label: "Teacher Academy", count: directorRosterTotals.teacher_academy },
+                  { key: "active", label: "Active Teachers", count: directorRosterTotals.active_teacher },
                 ].map((tab) => {
                   const active = directorTeachersView === tab.key;
                   return (
@@ -2853,109 +2895,25 @@ export function TeacherAcademyPanel({
               />
             )}
           </div>
-        ) : isAcademicDirectorMode && directorAcademyTab === "teachers" && directorTeachersView === "active" ? (
-          <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
-            {activeTeachers.length ? (
-              <>
-                <MobileCardList className="p-3">
-                  {activeTeachers.map((teacher, index) => (
-                    <article key={asNumber(teacher.id) || asString(teacher.login) || index} className="rounded-lg border border-foreground/10 bg-background p-3 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
-                          {initialsFromName(teacher.full_name)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-black text-foreground">{asString(teacher.full_name) || "Teacher"}</h3>
-                          <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">{asString(teacher.subjects || teacher.subject) || "Subject not set"}</p>
-                          <p className="mt-1 truncate font-mono text-[11px] font-bold text-muted-foreground">{asString(teacher.login) || asString(teacher.teacher_code) || "Login not set"}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => openActiveTeacherAccount(teacher)}
-                        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary/20 bg-background text-sm font-black text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
-                      >
-                        <KeyRound className="h-4 w-4" aria-hidden="true" />
-                        View account
-                      </button>
-                    </article>
-                  ))}
-                </MobileCardList>
-                <ResponsiveTable className="max-h-[calc(100dvh-20rem)] rounded-xl border border-[#DDE4EF] bg-white shadow-sm 2xl:max-h-[48rem]">
-                  <table className="w-full min-w-[780px] table-fixed border-collapse text-left">
-                    <colgroup>
-                      <col className="w-[22%]" />
-                      <col className="w-[19%]" />
-                      <col className="w-[16%]" />
-                      <col className="w-[16%]" />
-                      <col className="w-[11%]" />
-                      <col className="w-[16%]" />
-                    </colgroup>
-                    <thead className="sticky top-0 z-10 border-b border-[#DDE4EF] bg-[#F8FAFD]">
-                      <tr>
-                        {["Teacher", "Subject", "Group", "Contact", "Status", "Actions"].map((heading) => (
-                          <th key={heading} className="px-3 py-2.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#64748B]">
-                            {heading}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#DDE4EF] bg-white">
-                      {activeTeachers.map((teacher, index) => (
-                        <tr
-                          key={asNumber(teacher.id) || asString(teacher.login) || index}
-                          className="group animate-in fade-in slide-in-from-bottom-1 transition-colors duration-150 hover:bg-[#FAFBFE] motion-reduce:animate-none"
-                          style={{ animationDelay: `${index * 20}ms` }}
-                        >
-                          <td className="px-3 py-2.5 align-middle">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#E8EBF3] text-xs font-black text-[#1E2B72]">
-                                {initialsFromName(teacher.full_name)}
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block truncate text-sm font-black text-[#0F172A]">{asString(teacher.full_name) || "Teacher"}</span>
-                                <span className="block truncate font-mono text-[11px] font-bold text-[#64748B]">{asString(teacher.login) || asString(teacher.teacher_code) || "Login not set"}</span>
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <span className="line-clamp-2 text-xs font-black text-[#0F172A]">{asString(teacher.subjects || teacher.subject) || "Subject not set"}</span>
-                          </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(teacher.assigned_group || teacher.group_name || teacher.group) || "Not assigned"}</span>
-                          </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <span className="block truncate text-xs font-bold text-[#64748B]">{asString(teacher.telegram_username || teacher.phone || teacher.email) || "Not set"}</span>
-                          </td>
-                          <td className="px-3 py-2.5 align-middle">
-                            <StatusBadge tone="success" className="text-[10px]">
-                              {asString(teacher.status || teacher.teacher_status) || "Active"}
-                            </StatusBadge>
-                          </td>
-                          <td className="px-3 py-2.5 text-right align-middle">
-                            <button
-                              type="button"
-                              onClick={() => openActiveTeacherAccount(teacher)}
-                              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-primary/20 bg-white px-3 text-[11px] font-black text-primary transition-colors hover:bg-primary/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
-                            >
-                              <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
-                              Account
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </ResponsiveTable>
-              </>
-            ) : (
-              <EmptyState
-                icon={<UsersRound className="h-6 w-6" />}
-                title="No active teachers found."
-                detail="Active teacher records will appear here when they are available in the academic context."
-                className="min-h-[22rem]"
-              />
-            )}
+        ) : isAcademicDirectorMode && directorAcademyTab === "teachers" ? (
+          <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
+            <TeacherAcademyRoster
+              key={directorTeachersView}
+              kind={directorTeachersView === "academy" ? "teacher_academy" : "active_teacher"}
+              refreshToken={directorTeachersView === "academy"
+                ? academyRosterRefreshToken
+                : activeRosterRefreshToken}
+              onOpenTeacher={openCanonicalRosterTeacher}
+              onRemoved={(teacher) => {
+                onAcademyChange(
+                  academyTeachers.filter((row) => asNumber(row.id) !== teacher.record_id),
+                );
+                if (asNumber(detailTeacher?.id) === teacher.record_id) setDetailTeacher(null);
+              }}
+              onAnnouncement={(message, tone) => {
+                showToast(message, tone === "error" ? "danger" : "success");
+              }}
+            />
           </div>
         ) : (
         <div className="overflow-hidden rounded-lg border border-foreground/10 bg-background shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-200 motion-reduce:animate-none">
