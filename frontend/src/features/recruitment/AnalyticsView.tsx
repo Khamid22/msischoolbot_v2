@@ -24,11 +24,13 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Line,
   LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -102,11 +104,12 @@ const chartColors = {
 };
 const sourcePalette = [
   chartColors.primary,
-  chartColors.lime,
+  "#2563EB",
+  "#84CC16",
   chartColors.secondary,
   chartColors.amber,
-  chartColors.success,
-  chartColors.muted,
+  "#0D9488",
+  "#7C3AED",
 ];
 
 function initialFilters(role: RecruitmentRole): Filters {
@@ -161,15 +164,15 @@ function KpiCard({
   accent?: boolean;
 }) {
   return (
-    <article className={`min-h-[116px] rounded-xl border p-3 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
-      <div className="flex items-start justify-between gap-3">
+    <article className={`min-h-[98px] rounded-xl border p-2.5 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <p className={`text-[11px] font-semibold uppercase tracking-[0.08em] ${accent ? "text-slate-700" : "text-muted-foreground"}`}>{label}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">{numberValue(metric.value)}</p>
+          <p className={`text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] ${accent ? "text-slate-700" : "text-muted-foreground"}`}>{label}</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight tabular-nums">{numberValue(metric.value)}</p>
         </div>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${accent ? "bg-white/65 text-slate-900" : "bg-primary/8 text-primary"}`}>{icon}</span>
+        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${accent ? "bg-white/65 text-slate-900" : "bg-primary/8 text-primary"}`}>{icon}</span>
       </div>
-      <div className={`mt-2 flex items-center justify-between gap-2 text-[11px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
+      <div className={`mt-1.5 flex items-center justify-between gap-2 text-[10px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
         <span>{period}</span>
         <span>Total {numberValue(metric.total)}</span>
       </div>
@@ -197,13 +200,13 @@ function SecondaryMetric({
     danger: "bg-destructive/8 text-destructive",
   }[tone];
   return (
-    <article className="flex min-h-[78px] items-center gap-3 rounded-xl border border-border bg-card p-3">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>
+    <article className="flex min-h-[64px] items-center gap-2 rounded-xl border border-border bg-card p-2">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <div className="mt-0.5 flex items-baseline gap-2">
-          <p className="text-xl font-bold tabular-nums">{value}</p>
-          {total !== undefined ? <span className="text-[11px] font-semibold text-muted-foreground">Total {numberValue(total)}</span> : null}
+        <p className="line-clamp-2 text-[10px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">{label}</p>
+        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0">
+          <p className="text-lg font-bold tabular-nums">{value}</p>
+          {total !== undefined ? <span className="text-[10px] font-semibold text-muted-foreground">Total {numberValue(total)}</span> : null}
         </div>
       </div>
     </article>
@@ -225,10 +228,10 @@ function Panel({
 }) {
   return (
     <section className={`min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className}`}>
-      <header className="flex min-h-14 items-start justify-between gap-3 border-b border-border/70 px-3 py-3 sm:px-4">
+      <header className="flex min-h-12 items-start justify-between gap-2 border-b border-border/70 px-3 py-2">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">{icon}{title}</h2>
-          {description ? <p className="mt-0.5 text-[11px] text-muted-foreground">{description}</p> : null}
+          <h2 className="flex items-center gap-2 text-[13px] font-semibold leading-tight">{icon}{title}</h2>
+          {description ? <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-muted-foreground">{description}</p> : null}
         </div>
       </header>
       {children}
@@ -242,14 +245,14 @@ function EmptyChart({ children }: { children: ReactNode }) {
 
 function AnalyticsSkeleton() {
   return (
-    <div className="space-y-3" aria-label="Loading HR analytics">
-      <div className="h-20 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-[116px] animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />)}
+    <div className="space-y-2" aria-label="Loading HR analytics">
+      <div className="h-16 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-[98px] animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none" />)}
       </div>
-      <div className="grid gap-3 xl:grid-cols-12">
-        <div className="h-80 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-8" />
-        <div className="h-80 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-4" />
+      <div className="grid gap-2 xl:grid-cols-12">
+        <div className="h-72 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-8" />
+        <div className="h-72 animate-pulse rounded-xl border border-border bg-muted/45 motion-reduce:animate-none xl:col-span-4" />
       </div>
     </div>
   );
@@ -411,6 +414,10 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   const selectedPeriod = periodLabel(data);
   const topSources = data.source_distribution.slice(0, 6);
   const hasTrend = data.activity_trend.some((item) => item.applications || item.shortlisted || item.hired || item.rejected);
+  const applicationPeak = data.activity_trend.reduce<(typeof data.activity_trend)[number] | null>(
+    (peak, item) => (!peak || item.applications > peak.applications ? item : peak),
+    null,
+  );
   const maxJourney = Math.max(1, ...data.journey.map((item) => item.candidates));
   const roleIsHr = data.role === "hr_manager";
   const filterNames: Array<[keyof Filters, string]> = [
@@ -430,9 +437,9 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   };
 
   return (
-    <div className="space-y-3">
-      <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <div className="space-y-2">
+      <section className="rounded-xl border border-border bg-card p-2 shadow-sm">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
           <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto" role="group" aria-label="Analytics period">
             {periods.map((item) => (
               <button
@@ -440,7 +447,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
                 type="button"
                 aria-pressed={filters.period === item.key}
                 onClick={() => selectPeriod(item.key)}
-                className={`min-h-11 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${filters.period === item.key ? "bg-primary text-primary-foreground" : "bg-muted/55 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                className={`relative min-h-10 shrink-0 rounded-lg px-2.5 text-[11px] font-semibold leading-tight transition-colors before:absolute before:-inset-y-0.5 before:inset-x-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${filters.period === item.key ? "bg-primary text-primary-foreground" : "bg-muted/55 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
               >
                 {item.label}
               </button>
@@ -457,14 +464,14 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
                 </label>
               </>
             ) : null}
-            <button type="button" className={`${secondaryButtonClass} relative`} onClick={() => setFiltersOpen(true)}>
+            <button type="button" className={`${secondaryButtonClass} relative !min-h-10 !px-3 !text-xs before:absolute before:-inset-y-0.5 before:inset-x-0`} onClick={() => setFiltersOpen(true)}>
               <Filter className="h-4 w-4" />Filters
               {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span> : null}
             </button>
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2">
-          <p className="mr-auto text-sm font-semibold text-foreground">{selectedPeriod}</p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-1.5">
+          <p className="mr-auto text-xs font-semibold text-foreground">{selectedPeriod}</p>
           {filterNames.filter(([key]) => filters[key]).map(([key, label]) => (
             <button key={key} type="button" onClick={() => replaceFilters({ ...filters, [key]: "" })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
               {label}: {optionLabel(key, filters[key])}<XCircle className="ml-1.5 h-3.5 w-3.5" />
@@ -474,26 +481,16 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         </div>
       </section>
 
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold">Selected application cohort</h2>
-          <p className="text-[11px] text-muted-foreground">
-            Applicants received in this period; direct Academy profiles and Trash are excluded.
-          </p>
-        </div>
-        <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
-          Cohort metrics
-        </span>
-      </div>
+      <h2 className="text-xs font-semibold">Selected application cohort · {selectedPeriod}</h2>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Selected cohort recruitment metrics">
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Selected cohort recruitment metrics">
         <KpiCard label="Applications" metric={data.summary_cards.applications} period={selectedPeriod} icon={<UsersRound className="h-4 w-4" />} accent />
         <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} period={selectedPeriod} icon={<SearchCheck className="h-4 w-4" />} />
         <KpiCard label="Hired" metric={data.summary_cards.hired} period={selectedPeriod} icon={<UserCheck className="h-4 w-4" />} />
         <KpiCard label="Rejected" metric={data.summary_cards.rejected} period={selectedPeriod} icon={<UserMinus className="h-4 w-4" />} />
       </section>
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Additional selected cohort metrics">
           <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} total={data.secondary_kpis.academy_total} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
           <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} total={data.secondary_kpis.withdrawn_total} icon={<UserMinus className="h-4 w-4" />} />
@@ -512,18 +509,31 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         </section>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-12">
-        <Panel title="Recruitment activity" description="Event activity in the selected dates: applications use application date; other series use their actual event date." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
+      <div className="grid gap-2 xl:grid-cols-12">
+        <Panel title={`Recruitment activity · ${selectedPeriod}`} description="Applications and actual stage events" icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-8">
           {hasTrend ? (
-            <div className="h-[300px] min-w-0 px-1 pb-2 pt-3 sm:px-3">
+            <div className="h-[260px] min-w-0 px-1 pb-1 pt-2 sm:px-2">
               <p className="sr-only">Recruitment activity chart. Applications, shortlisted candidates, active hires and rejections over the selected period.</p>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.activity_trend} margin={{ top: 8, right: 14, left: -18, bottom: 0 }}>
+                <LineChart data={data.activity_trend} margin={{ top: 14, right: 12, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                   <XAxis dataKey="bucket" tickFormatter={(value) => trendBucketLabel(String(value), data.range.bucket)} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} minTickGap={20} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                   <Tooltip labelFormatter={(value) => trendBucketLabel(String(value), data.range.bucket)} contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12, maxWidth: 260 }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
+                  {applicationPeak && applicationPeak.applications > 0 ? (
+                    <ReferenceLine
+                      x={applicationPeak.bucket}
+                      stroke={chartColors.amber}
+                      strokeDasharray="4 4"
+                      label={{
+                        value: `Peak ${applicationPeak.applications} · ${trendBucketLabel(applicationPeak.bucket, data.range.bucket)}`,
+                        position: "insideTopRight",
+                        fill: "#B45309",
+                        fontSize: 10,
+                      }}
+                    />
+                  ) : null}
                   <Line type="monotone" dataKey="applications" name="Applications" stroke={chartColors.primary} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="shortlisted" name="Shortlisted" stroke={chartColors.secondary} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="hired" name="Hired" stroke={chartColors.success} strokeWidth={2} dot={false} />
@@ -534,13 +544,13 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           ) : <EmptyChart>No recruitment events in this period.</EmptyChart>}
         </Panel>
 
-        <Panel title="Applicant sources" description={`${data.summary_cards.applications.value} cohort applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
+        <Panel title={`Applicant sources · ${selectedPeriod}`} description={`${data.summary_cards.applications.value} applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
           {topSources.length ? (
-            <div className="grid min-h-[300px] grid-cols-1 items-center gap-1 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)]">
-              <div className="h-48 min-w-0">
+            <div className="grid min-h-[260px] grid-cols-1 items-center gap-1 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)]">
+              <div className="h-44 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={topSources} dataKey="candidates" nameKey="source" innerRadius="54%" outerRadius="82%" paddingAngle={2} stroke="hsl(var(--card))" strokeWidth={2}>
+                    <Pie data={topSources} dataKey="candidates" nameKey="source" innerRadius="54%" outerRadius="82%" paddingAngle={1} minAngle={3} stroke="none">
                       {topSources.map((item, index) => <Cell key={item.source} fill={sourcePalette[index % sourcePalette.length]} />)}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12 }} formatter={(value, _name, item) => [`${value} · ${item.payload.percentage}%`, item.payload.source]} />
@@ -559,25 +569,25 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           ) : <EmptyChart>No source data in this cohort.</EmptyChart>}
         </Panel>
 
-        <Panel title="Recruitment journey" description="Distinct applicants who reached each stage." icon={<BarChart3 className="h-4 w-4 text-primary" />} className="xl:col-span-7">
-          <div className="space-y-3 p-3 sm:p-4">
+        <Panel title={`Recruitment journey · ${selectedPeriod}`} description="Distinct applicants who reached each stage" icon={<BarChart3 className="h-4 w-4 text-primary" />} className="xl:col-span-7">
+          <div className="space-y-2 p-3">
             {data.journey.map((item) => (
               <div key={item.stage}>
-                <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
                   <span className="font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</span>
                   <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                     {item.conversion_percentage !== null && item.conversion_percentage !== undefined ? `${item.conversion_percentage}% from prior` : "Entry stage"}
                     <strong className="text-foreground">{item.candidates}</strong>
                   </span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${item.candidates / maxJourney * 100}%` }} />
                 </div>
               </div>
             ))}
-            <div className="grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+            <div className="grid gap-1.5 border-t border-border pt-2 sm:grid-cols-2">
               {data.outcomes.map((item) => (
-                <div key={item.outcome} className="flex min-h-11 items-center justify-between rounded-lg bg-muted/45 px-3 text-xs">
+                <div key={item.outcome} className="flex min-h-9 items-center justify-between rounded-lg bg-muted/45 px-2.5 text-[11px]">
                   <span className="font-semibold">{stageLabels[item.outcome] || humanize(item.outcome)}</span>
                   <strong className="tabular-nums">{item.candidates}</strong>
                 </div>
@@ -586,16 +596,18 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </Panel>
 
-        <Panel title="Applications by position" description="Standardized positions in the selected cohort." icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
+        <Panel title={`Applications by position · ${selectedPeriod}`} description="Standardized positions" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
           {data.position_distribution.length ? (
-            <div className="h-[330px] min-w-0 p-3">
+            <div className="h-[280px] min-w-0 p-2">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.position_distribution.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 24, left: 16, bottom: 0 }}>
+                <BarChart data={data.position_distribution.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 32, left: 16, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                   <XAxis type="number" allowDecimals={false} hide />
                   <YAxis type="category" dataKey="position" width={132} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: 10, borderColor: "hsl(var(--border))", fontSize: 12 }} />
-                  <Bar dataKey="candidates" name="Applications" fill={chartColors.primary} radius={[0, 6, 6, 0]} maxBarSize={22} />
+                  <Bar dataKey="candidates" name="Applications" fill={chartColors.primary} radius={[0, 6, 6, 0]} maxBarSize={22}>
+                    <LabelList dataKey="candidates" position="right" fill="hsl(var(--foreground))" fontSize={10} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -608,7 +620,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               const target = Number(item.sla_target_days || 0);
               const ratio = target ? Math.min(100, Number(item.average_days || 0) / target * 100) : 0;
               return (
-                <div key={item.stage} className="grid gap-2 px-3 py-3 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center sm:px-4">
+                <div key={item.stage} className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center">
                   <div>
                     <p className="text-xs font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</p>
                     <p className="text-[11px] text-muted-foreground">{item.entries} stage entries</p>
@@ -634,13 +646,13 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
             </table>
           </div>
           <div className="divide-y divide-border/70 sm:hidden">
-            {data.source_quality.slice(0, 10).map((item) => <div key={`${item.source}:${item.subsource}`} className="px-3 py-3 text-xs"><div className="flex justify-between gap-2"><strong>{item.source} · {item.subsource}</strong><strong>{item.conversion_percentage ?? 0}%</strong></div><p className="mt-1 text-muted-foreground">{item.candidates} applicants · {item.shortlisted} shortlisted · {item.hired} hired</p></div>)}
+            {data.source_quality.slice(0, 10).map((item) => <div key={`${item.source}:${item.subsource}`} className="px-3 py-2 text-xs"><div className="flex justify-between gap-2"><strong>{item.source} · {item.subsource}</strong><strong>{item.conversion_percentage ?? 0}%</strong></div><p className="mt-1 text-muted-foreground">{item.candidates} applicants · {item.shortlisted} shortlisted · {item.hired} hired</p></div>)}
           </div>
           {!data.source_quality.length ? <EmptyChart>No source-quality data in this cohort.</EmptyChart> : null}
         </Panel>
 
         <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Live work across the current pipeline; the cohort date does not limit this panel." : "Read-only live overview across the current pipeline."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="xl:col-span-5">
-          <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <div className="grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <div>
               <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
               <div className="space-y-1">
@@ -664,17 +676,17 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </Panel>
 
-        <Panel title="Recent candidates" description="Latest applications in the selected cohort." icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-7">
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[720px] text-left text-xs">
-              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Candidate</th><th className="px-3 py-2.5">Position</th><th className="px-3 py-2.5">Source</th><th className="px-3 py-2.5">Applied</th><th className="px-3 py-2.5">Stage</th><th className="px-3 py-2.5">Next action</th></tr></thead>
+        <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest cohort applications" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-7">
+          <div className="no-scrollbar hidden max-h-[272px] overflow-auto md:block">
+            <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Candidate</th><th className="px-3 py-2">Position</th><th className="px-3 py-2">Source</th><th className="px-3 py-2">Applied</th><th className="px-3 py-2">Stage</th><th className="px-3 py-2">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.recent_candidates.map((item) => <tr key={item.id} className="hover:bg-muted/25"><td className="px-3 py-2.5"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="px-3 py-2.5">{item.position}</td><td className="px-3 py-2.5"><span className="block">{item.source}</span>{item.subsource ? <span className="text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="px-3 py-2.5">{dateLabel(item.application_date)}</td><td className="px-3 py-2.5">{stageLabels[item.status] || humanize(item.status)}</td><td className="max-w-48 truncate px-3 py-2.5">{item.next_action || "—"}</td></tr>)}
+                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-3 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-3 py-1">{item.position}</td><td className="px-3 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-3 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-3 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-3 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>
-          <div className="divide-y divide-border/70 md:hidden">
-            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-14 px-3 py-3 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="text-sm">{item.full_name}</strong><span className="text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-1 text-xs text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-1 text-[11px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
+          <div className="no-scrollbar max-h-[300px] divide-y divide-border/70 overflow-y-auto md:hidden">
+            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-2 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
           </div>
           {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
         </Panel>
@@ -682,7 +694,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         <Panel title="Recent activity" description="Actor-attributed events that occurred within the selected dates." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
           <ol className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
             {data.recent_activity.map((item) => (
-              <li key={item.id} className="flex min-h-[86px] gap-3 bg-card px-3 py-3 sm:px-4">
+              <li key={item.id} className="flex min-h-[68px] gap-2 bg-card px-3 py-2">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary"><Activity className="h-4 w-4" /></span>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold">{activityLabel(item.event_type)}</p>
