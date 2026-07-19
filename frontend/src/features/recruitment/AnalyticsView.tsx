@@ -676,12 +676,20 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </Panel>
 
-        <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest cohort applications" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-7">
-          <div className="no-scrollbar hidden max-h-[272px] overflow-auto md:block">
-            <table className="w-full min-w-[720px] table-fixed text-left text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2">Candidate</th><th className="px-3 py-2">Position</th><th className="px-3 py-2">Source</th><th className="px-3 py-2">Applied</th><th className="px-3 py-2">Stage</th><th className="px-3 py-2">Next action</th></tr></thead>
+        <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest cohort applications" icon={<UsersRound className="h-4 w-4 text-primary" />} className="self-start xl:col-span-7">
+          <div className="no-scrollbar hidden max-h-[272px] overflow-x-hidden overflow-y-auto md:block">
+            <table className="w-full table-fixed text-left text-xs">
+              <colgroup>
+                <col className="w-[19%]" />
+                <col className="w-[17%]" />
+                <col className="w-[10%]" />
+                <col className="w-[13%]" />
+                <col className="w-[18%]" />
+                <col className="w-[23%]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-2">Candidate</th><th className="px-2 py-2">Position</th><th className="px-2 py-2">Source</th><th className="px-2 py-2">Applied</th><th className="px-2 py-2">Stage</th><th className="px-2 py-2">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-3 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-3 py-1">{item.position}</td><td className="px-3 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-3 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-3 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-3 py-1">{item.next_action || "—"}</td></tr>)}
+                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>
