@@ -452,33 +452,6 @@ export function TeacherAcademyRoster({
     const href = profileHref(teacher, basePath);
     if (href) window.location.assign(href);
   };
-  const teacherActions = (teacher: TeacherRosterItem): ActionMenuItem[] => {
-    const items: ActionMenuItem[] = [
-      {
-        key: "open",
-        label: "Open details",
-        icon: <ExternalLink className="h-4 w-4" />,
-        disabled: !onOpenTeacher && !profileHref(teacher, basePath),
-        tooltip: !onOpenTeacher && !profileHref(teacher, basePath)
-          ? "This teacher has no linked lifecycle profile."
-          : undefined,
-        onClick: () => openTeacher(teacher),
-      },
-    ];
-    if (teacher.can_remove) {
-      items.push(
-        { key: "remove-separator", separator: true },
-        {
-          key: "remove",
-          label: "Remove from Teacher Academy",
-          icon: <UserMinus className="h-4 w-4" />,
-          danger: true,
-          onClick: () => setRemoveTeacher(teacher),
-        },
-      );
-    }
-    return items;
-  };
   const handleRowClick = (
     event: MouseEvent<HTMLTableRowElement>,
     teacher: TeacherRosterItem,
@@ -603,18 +576,17 @@ export function TeacherAcademyRoster({
               <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
                 <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr className="h-10">
-                    <th scope="col" className="w-[18%] px-4 font-semibold">Teacher</th>
+                    <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
                     <th scope="col" className="w-[14%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
                     </th>
-                    <th scope="col" className="w-[16%] px-3 font-semibold">Position</th>
+                    <th scope="col" className="w-[18%] px-3 font-semibold">Position</th>
                     <th scope="col" className="w-[13%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Academy status" : "Status"}
                     </th>
                     <th scope="col" className="w-[11%] px-3 font-semibold">Lessons completed</th>
                     <th scope="col" className="w-[10%] px-3 font-semibold">Average score</th>
-                    <th scope="col" className="w-[12%] px-3 font-semibold">Account</th>
-                    <th scope="col" className="w-[6%] px-2 text-center font-semibold">Actions</th>
+                    <th scope="col" className="w-[14%] px-3 font-semibold">Account</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -656,12 +628,6 @@ export function TeacherAcademyRoster({
                       <td className="px-3 py-1.5"><LessonsCompleted teacher={teacher} /></td>
                       <td className="px-3 py-1.5"><AverageScore teacher={teacher} /></td>
                       <td className="px-3 py-1.5"><AccountStatus teacher={teacher} /></td>
-                      <td className="px-2 py-1.5 text-center">
-                        <ActionMenu
-                          label={`Actions for ${teacher.full_name}`}
-                          items={teacherActions(teacher)}
-                        />
-                      </td>
                     </tr>
                   ))}
                 </tbody>
