@@ -1,8 +1,6 @@
 import {
   Activity,
   AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
   BarChart3,
   CalendarClock,
   Check,
@@ -127,9 +125,20 @@ function numberValue(value: unknown, suffix = "") {
 }
 
 function periodLabel(data: HrAnalyticsDashboard) {
-  const current = `${dateLabel(data.range.from)} – ${dateLabel(data.range.to)}`;
-  const comparison = `${dateLabel(data.range.comparison_from)} – ${dateLabel(data.range.comparison_to)}`;
-  return `${current} compared with ${comparison}`;
+  const to = new Date(`${data.range.to}T00:00:00+05:00`);
+  if (data.range.period === "month") {
+    return new Intl.DateTimeFormat("en", {
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Tashkent",
+    }).format(to);
+  }
+  if (data.range.period === "quarter") {
+    return `Q${Math.floor(to.getMonth() / 3) + 1} ${to.getFullYear()}`;
+  }
+  if (data.range.period === "year") return String(to.getFullYear());
+  if (data.range.period === "today") return dateLabel(data.range.to);
+  return `${dateLabel(data.range.from)} – ${dateLabel(data.range.to)}`;
 }
 
 function trendBucketLabel(value: string, bucket: HrAnalyticsDashboard["range"]["bucket"]) {
@@ -141,16 +150,16 @@ function trendBucketLabel(value: string, bucket: HrAnalyticsDashboard["range"]["
 function KpiCard({
   label,
   metric,
+  period,
   icon,
   accent,
 }: {
   label: string;
-  metric: { value: number; previous: number; delta_percentage?: number | null };
+  metric: { value: number; total: number; previous: number; delta_percentage?: number | null };
+  period: string;
   icon: ReactNode;
   accent?: boolean;
 }) {
-  const delta = metric.delta_percentage;
-  const positive = delta !== null && delta !== undefined && delta >= 0;
   return (
     <article className={`min-h-[116px] rounded-xl border p-3 shadow-sm transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none ${accent ? "border-lime-300 bg-lime-200/80 text-slate-950" : "border-border bg-card"}`}>
       <div className="flex items-start justify-between gap-3">
@@ -160,15 +169,9 @@ function KpiCard({
         </div>
         <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${accent ? "bg-white/65 text-slate-900" : "bg-primary/8 text-primary"}`}>{icon}</span>
       </div>
-      <div className={`mt-2 flex items-center gap-1.5 text-[11px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
-        {delta === null || delta === undefined ? (
-          <span>No prior data</span>
-        ) : (
-          <>
-            {positive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            <span>{Math.abs(delta)}% vs previous period</span>
-          </>
-        )}
+      <div className={`mt-2 flex items-center justify-between gap-2 text-[11px] font-semibold ${accent ? "text-slate-700" : "text-muted-foreground"}`}>
+        <span>{period}</span>
+        <span>Total {numberValue(metric.total)}</span>
       </div>
     </article>
   );
@@ -177,11 +180,13 @@ function KpiCard({
 function SecondaryMetric({
   label,
   value,
+  total,
   icon,
   tone = "primary",
 }: {
   label: string;
   value: string | number;
+  total?: number;
   icon: ReactNode;
   tone?: "primary" | "success" | "warning" | "danger";
 }) {
@@ -196,7 +201,10 @@ function SecondaryMetric({
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>
       <div className="min-w-0">
         <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-xl font-bold tabular-nums">{value}</p>
+        <div className="mt-0.5 flex items-baseline gap-2">
+          <p className="text-xl font-bold tabular-nums">{value}</p>
+          {total !== undefined ? <span className="text-[11px] font-semibold text-muted-foreground">Total {numberValue(total)}</span> : null}
+        </div>
       </div>
     </article>
   );
@@ -400,6 +408,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   }
 
   const data = dashboard.data;
+  const selectedPeriod = periodLabel(data);
   const topSources = data.source_distribution.slice(0, 6);
   const hasTrend = data.activity_trend.some((item) => item.applications || item.shortlisted || item.hired || item.rejected);
   const maxJourney = Math.max(1, ...data.journey.map((item) => item.candidates));
@@ -455,7 +464,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/70 pt-2">
-          <p className="mr-auto text-[11px] text-muted-foreground">{periodLabel(data)} · {data.range.timezone}</p>
+          <p className="mr-auto text-sm font-semibold text-foreground">{selectedPeriod}</p>
           {filterNames.filter(([key]) => filters[key]).map(([key, label]) => (
             <button key={key} type="button" onClick={() => replaceFilters({ ...filters, [key]: "" })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
               {label}: {optionLabel(key, filters[key])}<XCircle className="ml-1.5 h-3.5 w-3.5" />
@@ -478,16 +487,16 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Selected cohort recruitment metrics">
-        <KpiCard label="Applications" metric={data.summary_cards.applications} icon={<UsersRound className="h-4 w-4" />} accent />
-        <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} icon={<SearchCheck className="h-4 w-4" />} />
-        <KpiCard label="Hired" metric={data.summary_cards.hired} icon={<UserCheck className="h-4 w-4" />} />
-        <KpiCard label="Rejected" metric={data.summary_cards.rejected} icon={<UserMinus className="h-4 w-4" />} />
+        <KpiCard label="Applications" metric={data.summary_cards.applications} period={selectedPeriod} icon={<UsersRound className="h-4 w-4" />} accent />
+        <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} period={selectedPeriod} icon={<SearchCheck className="h-4 w-4" />} />
+        <KpiCard label="Hired" metric={data.summary_cards.hired} period={selectedPeriod} icon={<UserCheck className="h-4 w-4" />} />
+        <KpiCard label="Rejected" metric={data.summary_cards.rejected} period={selectedPeriod} icon={<UserMinus className="h-4 w-4" />} />
       </section>
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Additional selected cohort metrics">
-          <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
-          <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} icon={<UserMinus className="h-4 w-4" />} />
+          <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} total={data.secondary_kpis.academy_total} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
+          <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} total={data.secondary_kpis.withdrawn_total} icon={<UserMinus className="h-4 w-4" />} />
           <SecondaryMetric label="Avg time to hire" value={numberValue(data.secondary_kpis.average_time_to_hire_days, "d")} icon={<Clock3 className="h-4 w-4" />} />
           <SecondaryMetric label="Active conversion" value={numberValue(data.secondary_kpis.overall_conversion_percentage, "%")} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
         </section>

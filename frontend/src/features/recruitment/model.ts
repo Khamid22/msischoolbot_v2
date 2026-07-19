@@ -292,12 +292,15 @@ export type HrAnalyticsDashboard = {
   };
   summary_cards: Record<"applications" | "shortlisted" | "hired" | "rejected", {
     value: number;
+    total: number;
     previous: number;
     delta_percentage?: number | null;
   }>;
   secondary_kpis: {
     academy_accepted: number;
+    academy_total: number;
     withdrawn: number;
+    withdrawn_total: number;
     active_candidates: number;
     average_time_to_hire_days?: number | null;
     overall_conversion_percentage?: number | null;

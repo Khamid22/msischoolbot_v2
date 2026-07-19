@@ -281,6 +281,7 @@ def dashboard(
 
     current = _dict(rows["current_summary"])
     comparison = _dict(rows["comparison_summary"])
+    all_time = _dict(rows["total_summary"])
     live = _dict(rows["live_summary"])
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
     journey_counts = {
@@ -318,13 +319,13 @@ def dashboard(
     source_totals: dict[str, dict[str, Any]] = {}
     for item in source_quality:
         source_name = str(item["source"])
-        total = source_totals.setdefault(
+        source_total = source_totals.setdefault(
             source_name,
             {"source": source_name, "candidates": 0, "shortlisted": 0, "hired": 0},
         )
-        total["candidates"] += int(item.get("candidates") or 0)
-        total["shortlisted"] += int(item.get("shortlisted") or 0)
-        total["hired"] += int(item.get("hired") or 0)
+        source_total["candidates"] += int(item.get("candidates") or 0)
+        source_total["shortlisted"] += int(item.get("shortlisted") or 0)
+        source_total["hired"] += int(item.get("hired") or 0)
     application_total = int(current.get("applications") or 0)
     source_distribution = sorted(
         (
@@ -372,12 +373,17 @@ def dashboard(
             "responsible_account_id": responsible_account_id,
         },
         "summary_cards": {
-            key: _comparison_metric(current.get(key), comparison.get(key))
+            key: {
+                **_comparison_metric(current.get(key), comparison.get(key)),
+                "total": int(all_time.get(key) or 0),
+            }
             for key in ("applications", "shortlisted", "hired", "rejected")
         },
         "secondary_kpis": {
             "academy_accepted": int(current.get("academy_accepted") or 0),
+            "academy_total": int(live.get("academy_roster_total") or 0),
             "withdrawn": int(current.get("withdrawn") or 0),
+            "withdrawn_total": int(all_time.get("withdrawn") or 0),
             "active_candidates": int(live.get("active_candidates") or 0),
             "average_time_to_hire_days": current.get("average_time_to_hire_days"),
             "overall_conversion_percentage": current.get("overall_conversion_percentage"),

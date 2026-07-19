@@ -283,7 +283,12 @@ def _live_summary(
                     AND open_history.sla_due_at IS NOT NULL
                     AND open_history.sla_due_at < %s::timestamptz
                 )
-              ) AS sla_overdue_now
+              ) AS sla_overdue_now,
+              (
+                SELECT COUNT(*)
+                FROM msi_v2.academy_teachers academy_teacher
+                WHERE academy_teacher.academy_status NOT IN ('rejected', 'removed')
+              ) AS academy_roster_total
             FROM msi_v2.teacher_candidates candidate
             WHERE {where_sql}""",
         tuple([list(ACTIVE_STAGES), now, *params]),
@@ -329,6 +334,12 @@ def dashboard_rows(
         conn,
         where_sql=comparison_where,
         params=comparison_params,
+        now=now,
+    )
+    total_summary = _cohort_summary(
+        conn,
+        where_sql=base_where,
+        params=base_params,
         now=now,
     )
     live_summary = _live_summary(
@@ -613,6 +624,7 @@ def dashboard_rows(
     return {
         "current_summary": current_summary,
         "comparison_summary": comparison_summary,
+        "total_summary": total_summary,
         "live_summary": live_summary,
         "journey": journey,
         "outcomes": outcomes,

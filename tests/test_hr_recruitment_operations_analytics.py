@@ -137,9 +137,17 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "hired": 1,
             "rejected": 1,
         },
+        "total_summary": {
+            "applications": 20,
+            "shortlisted": 8,
+            "hired": 3,
+            "rejected": 4,
+            "withdrawn": 2,
+        },
         "live_summary": {
             "active_candidates": 304,
             "sla_overdue_now": 294,
+            "academy_roster_total": 9,
         },
         "journey": [
             {"stage": "new_candidate", "candidates": 10},
@@ -152,7 +160,15 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
         ],
         "activity_trend": [],
         "position_distribution": [],
-        "source_quality": [],
+        "source_quality": [
+            {
+                "source": "University",
+                "subsource": "Turin University",
+                "candidates": 4,
+                "shortlisted": 2,
+                "hired": 1,
+            }
+        ],
         "time_in_stage": [],
         "overdue_actions": [],
         "upcoming_appointments": [],
@@ -172,8 +188,11 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
         date_to="2026-07-20",
     )
     assert result["summary_cards"]["applications"]["delta_percentage"] == 100.0
+    assert result["summary_cards"]["applications"]["total"] == 20
     assert result["summary_cards"]["hired"]["value"] == 2
     assert result["secondary_kpis"]["academy_accepted"] == 1
+    assert result["secondary_kpis"]["academy_total"] == 9
+    assert result["secondary_kpis"]["withdrawn_total"] == 2
     assert result["secondary_kpis"]["overall_conversion_percentage"] == 20
     assert result["secondary_kpis"]["active_candidates"] == 304
     assert result["secondary_kpis"]["sla_overdue_now"] == 294
