@@ -110,6 +110,13 @@ type ProfileAction =
 
 type MutationPayload = { message: string; candidate?: RecruitmentCandidate };
 type InlineEditTarget = { id: string; label: string };
+// Appointment actions open in a centered popup (same as the pipeline), not the
+// action drawer.
+const modalActionKinds = new Set<ProfileAction["kind"]>([
+  "schedule_appointment",
+  "reschedule_appointment",
+  "appointment_status",
+]);
 const profileTabs: Array<{ key: ProfileTab; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "evaluations", label: "Evaluations" },
@@ -3319,7 +3326,8 @@ export function CandidateProfile({
         open={Boolean(
           action &&
             action.kind !== "record_demo" &&
-            action.kind !== "record_test",
+            action.kind !== "record_test" &&
+            !modalActionKinds.has(action.kind),
         )}
         onClose={() => {
           if (!mutation.isPending) {
@@ -3334,7 +3342,8 @@ export function CandidateProfile({
         footer={
           action &&
           action.kind !== "record_demo" &&
-          action.kind !== "record_test" ? (
+          action.kind !== "record_test" &&
+          !modalActionKinds.has(action.kind) ? (
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -3379,7 +3388,8 @@ export function CandidateProfile({
         ) : null}
         {action &&
         action.kind !== "record_demo" &&
-        action.kind !== "record_test" ? (
+        action.kind !== "record_test" &&
+        !modalActionKinds.has(action.kind) ? (
           <form id={formId} onSubmit={submitAction}>
             <ActionFields
               action={action}
@@ -3391,6 +3401,62 @@ export function CandidateProfile({
           </form>
         ) : null}
       </Drawer>
+
+      <Modal
+        open={Boolean(action && modalActionKinds.has(action.kind))}
+        onClose={() => {
+          if (!mutation.isPending) {
+            mutation.reset();
+            setAction(null);
+            setAppointmentConflicts([]);
+          }
+        }}
+        title={actionTitle(action)}
+        subtitle={candidate.full_name}
+        size={action?.kind === "appointment_status" ? "sm" : "md"}
+      >
+        {action && modalActionKinds.has(action.kind) ? (
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={submitAction}>
+            <ModalBody>
+              {mutation.error ? (
+                <div
+                  role="alert"
+                  className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  {queryError(mutation.error)}
+                </div>
+              ) : null}
+              <ActionFields
+                action={action}
+                candidate={candidate}
+                options={options.data}
+                conflicts={appointmentConflicts}
+                allowHistoricalRestoration={role === "hr_manager"}
+              />
+            </ModalBody>
+            <ModalFooter>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className={secondaryButtonClass}
+                  disabled={mutation.isPending}
+                  onClick={() => {
+                    mutation.reset();
+                    setAction(null);
+                    setAppointmentConflicts([]);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className={buttonClass} disabled={mutation.isPending}>
+                  {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {appointmentConflicts.length ? "Schedule anyway" : actionSubmitLabel(action)}
+                </button>
+              </div>
+            </ModalFooter>
+          </form>
+        ) : null}
+      </Modal>
 
       <Modal
         open={action?.kind === "record_test"}
