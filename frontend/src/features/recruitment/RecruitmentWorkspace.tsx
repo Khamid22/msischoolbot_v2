@@ -189,9 +189,9 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "tasks" ? <TasksView basePath={basePath} /> : null}
-      {view === "rejected" && effectiveRole === "hr_manager" ? <RejectedCandidatesView basePath={basePath} /> : null}
+      {view === "rejected" && effectiveRole === "hr_manager" ? <RejectedCandidatesView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "settings" && ["hr_manager", "ceo"].includes(effectiveRole) ? <SettingsView onAnnouncement={showToast} /> : null}
-      {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} /> : null}
+      {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
       {view === "profile" ? <div className="space-y-3"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
 

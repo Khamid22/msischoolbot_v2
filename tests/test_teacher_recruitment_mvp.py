@@ -303,6 +303,120 @@ def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
     ]
 
 
+def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "get_candidate_row",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "status": "rejected",
+            "version": 5,
+            "restore_stage": "test_and_demo",
+        },
+    )
+    monkeypatch.setattr(repository, "void_latest_closed_decision", lambda *_args, **_kwargs: 91)
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: {"id": kwargs["candidate_id"], "status": kwargs["stage"]},
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_audit",
+        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+    )
+    monkeypatch.setattr(service, "_sync_system_next_actions", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo"},
+    )
+
+    result = service.restore_closed_candidate(_user(), 7, expected_version=5)
+
+    assert result["status"] == "test_and_demo"
+    assert conn.commits == 1
+    assert events == [
+        (
+            "candidate.recovered",
+            {"from": "rejected", "to": "test_and_demo", "voided_decision_id": 91},
+        )
+    ]
+
+
+def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "full_name": "Closed Candidate",
+            "status": "trash_bin",
+            "version": 4,
+            "academy_teacher_id": None,
+            "active_teacher_id": None,
+        },
+    )
+    monkeypatch.setattr(repository, "list_document_rows", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(repository, "delete_closed_candidate", lambda *_args, **_kwargs: True)
+
+    result = service.permanently_delete_candidate(
+        _user(),
+        7,
+        expected_version=4,
+        confirmation="PERMANENTLY DELETE",
+    )
+    assert result == {"deleted_candidate_id": 7, "deleted_name": "Closed Candidate"}
+    assert conn.commits == 1
+
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 8,
+            "full_name": "Linked Candidate",
+            "status": "rejected",
+            "version": 2,
+            "academy_teacher_id": 12,
+            "active_teacher_id": None,
+        },
+    )
+    with pytest.raises(service.RecruitmentError, match="linked"):
+        service.permanently_delete_candidate(
+            _user(),
+            8,
+            expected_version=2,
+            confirmation="PERMANENTLY DELETE",
+        )
+
+
 def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, monkeypatch):
     monkeypatch.setattr(
         service,

@@ -341,9 +341,11 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /key: "trash", label: "Trash Bin", href: `\$\{basePath\}\/trash`/);
     assert.match(workspace, /view === "trash" && effectiveRole === "hr_manager" \? <TrashBinView/);
     assert.match(trash, /stage: "trash_bin"/);
-    assert.match(trash, /items\.filter\(\(candidate\) => candidate\.status === "trash_bin"\)/);
+    assert.match(trash, /ClosedCandidateActions/);
+    assert.match(trash, /EMPTY TRASH BIN/);
+    assert.match(trash, /useViewportPageSize/);
     assert.match(trash, /origin=trash/);
-    assert.doesNotMatch(trash, /All stages|Candidate filters|filters\.stage/);
+    assert.doesNotMatch(trash, /filters\.stage/);
     assert.match(profile, /origin === "trash" \? `\$\{basePath\}\/trash/);
     assert.ok(workspace.indexOf('key: "schedule"') < workspace.indexOf('key: "rejected"'));
     assert.ok(workspace.indexOf('key: "rejected"') < workspace.indexOf('key: "trash"'));
@@ -358,6 +360,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(rejected, /type OutcomeTab = "rejected" \| "candidate_withdrew"/);
     assert.match(rejected, /origin_stage/);
     assert.match(rejected, /reason_detail/);
+    assert.match(rejected, /ClosedCandidateActions/);
+    assert.match(rejected, /useViewportPageSize/);
   });
 
   test("moves Academy and Active outcomes into a dedicated Teachers switcher", () => {

@@ -507,6 +507,9 @@ def list_candidates(
     subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
+    closed_from: str = "",
+    closed_to: str = "",
+    origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
 ) -> dict[str, Any]:
@@ -515,6 +518,18 @@ def list_candidates(
     normalized_stage = _text(stage)
     if normalized_stage and normalized_stage not in ALL_STAGES:
         raise RecruitmentError("Unknown candidate stage.")
+    normalized_origin_stage = _text(origin_stage)
+    if normalized_origin_stage and normalized_origin_stage not in ALL_STAGES:
+        raise RecruitmentError("Unknown origin stage.")
+    normalized_closed_from = _text(closed_from)
+    normalized_closed_to = _text(closed_to)
+    try:
+        parsed_closed_from = date.fromisoformat(normalized_closed_from) if normalized_closed_from else None
+        parsed_closed_to = date.fromisoformat(normalized_closed_to) if normalized_closed_to else None
+    except ValueError as exc:
+        raise RecruitmentError("Enter a valid closed-date range.") from exc
+    if parsed_closed_from and parsed_closed_to and parsed_closed_from > parsed_closed_to:
+        raise RecruitmentError("Closed from date cannot be after closed to date.")
     with connect_auth_db() as conn:
         rows, total = repository.list_candidate_rows(
             conn,
@@ -528,6 +543,9 @@ def list_candidates(
             subject_id=subject_id,
             application_from=_text(application_from),
             application_to=_text(application_to),
+            closed_from=normalized_closed_from,
+            closed_to=normalized_closed_to,
+            origin_stage=normalized_origin_stage,
             final_decision=_text(final_decision),
             evaluator_account_id=evaluator_account_id,
             limit=safe_per_page,
@@ -540,6 +558,164 @@ def list_candidates(
         "total": total,
         "total_pages": max(1, ceil(total / safe_per_page)) if total else 1,
     }
+
+
+_RESTORABLE_PIPELINE_STAGES = {
+    "new_candidate",
+    "responded",
+    "job_interview",
+    "test_and_demo",
+    "under_review",
+}
+_CLOSED_CANDIDATE_STAGES = {"trash_bin", "rejected", "candidate_withdrew"}
+
+
+def restore_closed_candidate(
+    user: CurrentUser,
+    candidate_id: int,
+    *,
+    expected_version: int,
+) -> dict[str, Any]:
+    now = _now()
+    with connect_auth_db() as conn:
+        candidate = repository.get_candidate_row(conn, int(candidate_id))
+        if not candidate:
+            raise RecruitmentError("Candidate was not found.", status_code=404)
+        from_stage = _text(candidate["status"])
+        if from_stage not in _CLOSED_CANDIDATE_STAGES:
+            raise RecruitmentError("Only closed candidates can be recovered.", status_code=409)
+        restore_stage = _text(candidate["restore_stage"])
+        if restore_stage not in _RESTORABLE_PIPELINE_STAGES:
+            restore_stage = "under_review" if restore_stage in PROTECTED_HIRE_STAGES else "new_candidate"
+        voided_decision_id = None
+        if from_stage in {"rejected", "candidate_withdrew"}:
+            voided_decision_id = repository.void_latest_closed_decision(
+                conn,
+                candidate_id=int(candidate_id),
+                actor_account_id=_actor_account(user),
+                reason="Candidate recovered by HR Manager.",
+                now=now,
+            )
+        updated = repository.update_candidate_stage(
+            conn,
+            candidate_id=int(candidate_id),
+            stage=restore_stage,
+            expected_version=int(expected_version),
+            actor_account_id=_actor_account(user),
+            now=now,
+            comment=f"Recovered from {from_stage.replace('_', ' ')}.",
+            transition_source="restored",
+        )
+        if not updated:
+            raise RecruitmentError(
+                "This candidate changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        repository.insert_audit(
+            conn,
+            candidate_id=int(candidate_id),
+            event_type="candidate.recovered",
+            detail={
+                "from": from_stage,
+                "to": restore_stage,
+                "voided_decision_id": voided_decision_id,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        conn.commit()
+    return get_candidate(user, int(candidate_id))
+
+
+def _validate_permanent_delete_row(candidate: Any) -> None:
+    if not candidate:
+        raise RecruitmentError("Candidate was not found.", status_code=404)
+    if _text(candidate["status"]) not in _CLOSED_CANDIDATE_STAGES:
+        raise RecruitmentError(
+            "Only Trash Bin, Rejected, or Withdrawn candidates can be permanently deleted.",
+            status_code=409,
+        )
+    if int(candidate["academy_teacher_id"] or 0) or int(candidate["active_teacher_id"] or 0):
+        raise RecruitmentError(
+            "This profile is linked to a Teacher Academy or Active Teacher record and cannot be permanently deleted.",
+            status_code=409,
+        )
+
+
+def permanently_delete_candidate(
+    user: CurrentUser,
+    candidate_id: int,
+    *,
+    expected_version: int,
+    confirmation: str,
+) -> dict[str, Any]:
+    if _text(confirmation) != "PERMANENTLY DELETE":
+        raise RecruitmentError("Permanent deletion was not confirmed.")
+    object_keys: list[str] = []
+    deleted_name = ""
+    with connect_auth_db() as conn:
+        candidate = repository.lock_candidate_decision_row(conn, int(candidate_id))
+        _validate_permanent_delete_row(candidate)
+        if int(candidate["version"] or 0) != int(expected_version):
+            raise RecruitmentError(
+                "This candidate changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        deleted_name = _text(candidate["full_name"])
+        object_keys = [
+            _text(document["object_key"])
+            for document in repository.list_document_rows(conn, int(candidate_id))
+            if _text(document["object_key"])
+        ]
+        if not repository.delete_closed_candidate(
+            conn,
+            candidate_id=int(candidate_id),
+            expected_version=int(expected_version),
+        ):
+            raise RecruitmentError(
+                "This candidate changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        conn.commit()
+    for object_key in dict.fromkeys(object_keys):
+        delete_private_candidate_document(object_key)
+    return {"deleted_candidate_id": int(candidate_id), "deleted_name": deleted_name}
+
+
+def empty_trash_bin(user: CurrentUser, *, confirmation: str) -> dict[str, Any]:
+    if _text(confirmation) != "EMPTY TRASH BIN":
+        raise RecruitmentError("Empty Trash Bin was not confirmed.")
+    object_keys: list[str] = []
+    with connect_auth_db() as conn:
+        candidates = repository.list_trash_candidates_for_purge(conn)
+        for candidate in candidates:
+            _validate_permanent_delete_row(candidate)
+            object_keys.extend(
+                _text(document["object_key"])
+                for document in repository.list_document_rows(conn, int(candidate["id"]))
+                if _text(document["object_key"])
+            )
+        for candidate in candidates:
+            if not repository.delete_closed_candidate(
+                conn,
+                candidate_id=int(candidate["id"]),
+                expected_version=int(candidate["version"]),
+            ):
+                raise RecruitmentError(
+                    "Trash Bin changed elsewhere. Refresh and try again.",
+                    status_code=409,
+                )
+        conn.commit()
+    for object_key in dict.fromkeys(key for key in object_keys if key):
+        delete_private_candidate_document(object_key)
+    return {"deleted_count": len(candidates)}
 
 
 def list_teacher_handoffs(

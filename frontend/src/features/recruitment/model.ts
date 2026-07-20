@@ -158,6 +158,7 @@ export type RecruitmentCandidate = {
   final_decision?: string;
   rejection_reason?: string;
   decision_reason_detail?: string;
+  restore_stage?: string;
   decision_origin_stage?: string;
   decision_source_evaluation_type?: string;
   decision_source_evaluation_id?: number | null;

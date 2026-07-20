@@ -33,6 +33,8 @@ from backend.modules.hr.recruitment.schemas import (
     AppointmentUpdate,
     AssignmentReplace,
     CandidateCreate,
+    CandidatePermanentDelete,
+    CandidateRestore,
     CandidateUpdate,
     DemoLessonWrite,
     EvaluationVoid,
@@ -47,6 +49,7 @@ from backend.modules.hr.recruitment.schemas import (
     StageChange,
     SubjectTestWrite,
     TaskWrite,
+    TrashPurge,
 )
 router = APIRouter(
     prefix="/recruitment",
@@ -107,6 +110,9 @@ def candidates(
     subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
+    closed_from: str = "",
+    closed_to: str = "",
+    origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
     user: CurrentUser = Depends(get_current_user),
@@ -124,6 +130,9 @@ def candidates(
             subject_id=subject_id,
             application_from=application_from,
             application_to=application_to,
+            closed_from=closed_from,
+            closed_to=closed_to,
+            origin_stage=origin_stage,
             final_decision=final_decision,
             evaluator_account_id=evaluator_account_id,
         )
@@ -360,6 +369,60 @@ def move_candidate(candidate_id: int, payload: StageChange, user: CurrentUser = 
     )
     message = "Candidate moved to Trash Bin." if payload.stage == "trash_bin" else "Candidate moved."
     return api_success({"message": message, "candidate": candidate})
+
+
+@router.post(
+    "/candidates/{candidate_id}/restore",
+    operation_id="api_v1_recruitment_restore_candidate",
+)
+def restore_candidate(
+    candidate_id: int,
+    payload: CandidateRestore,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    candidate = _call(
+        service.restore_closed_candidate,
+        user,
+        candidate_id,
+        expected_version=payload.expected_version,
+    )
+    return api_success({"message": "Candidate recovered.", "candidate": candidate})
+
+
+@router.post(
+    "/candidates/{candidate_id}/purge",
+    operation_id="api_v1_recruitment_purge_candidate",
+)
+def purge_candidate(
+    candidate_id: int,
+    payload: CandidatePermanentDelete,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    result = _call(
+        service.permanently_delete_candidate,
+        user,
+        candidate_id,
+        expected_version=payload.expected_version,
+        confirmation=payload.confirmation,
+    )
+    return api_success({"message": "Candidate permanently deleted.", **result})
+
+
+@router.post("/trash/purge", operation_id="api_v1_recruitment_empty_trash")
+def empty_trash(
+    payload: TrashPurge,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    result = _call(service.empty_trash_bin, user, confirmation=payload.confirmation)
+    return api_success(
+        {
+            "message": f"{result['deleted_count']} candidate(s) permanently deleted.",
+            **result,
+        }
+    )
 
 
 @router.post(

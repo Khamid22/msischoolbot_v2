@@ -62,6 +62,7 @@ _CANDIDATE_COLUMNS = """
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
     COALESCE(decision.origin_stage, '') AS decision_origin_stage,
+    COALESCE(NULLIF(decision.origin_stage, ''), previous_stage.stage, '') AS restore_stage,
     COALESCE(decision.source_evaluation_type, '') AS decision_source_evaluation_type,
     decision.source_evaluation_id AS decision_source_evaluation_id,
     COALESCE(decision_actor.full_name, decision_actor.login, decision.decided_by_login, '')
@@ -147,6 +148,14 @@ def _candidate_joins() -> str:
             LIMIT 1
         ) decision ON true
         LEFT JOIN msi_v2.accounts decision_actor ON decision_actor.id = decision.decided_by_account_id
+        LEFT JOIN LATERAL (
+            SELECT history.stage
+            FROM msi_v2.teacher_candidate_stage_history history
+            WHERE history.candidate_id = candidate.id
+              AND history.id <> COALESCE(stage_history.id, 0)
+            ORDER BY history.entered_at DESC, history.id DESC
+            LIMIT 1
+        ) previous_stage ON true
         LEFT JOIN LATERAL (
             SELECT interview.result, interview.interview_at
             FROM msi_v2.teacher_candidate_interviews interview
@@ -345,13 +354,16 @@ def list_candidate_rows(
     subject_id: int | None = None,
     application_from: str = "",
     application_to: str = "",
+    closed_from: str = "",
+    closed_to: str = "",
+    origin_stage: str = "",
     final_decision: str = "",
     evaluator_account_id: int | None = None,
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[Any], int]:
     clauses: list[str] = []
-    if stage in {"rejected", "candidate_withdrew"}:
+    if stage in {"rejected", "candidate_withdrew", "trash_bin"}:
         clauses.append(
             "(candidate.is_application_received = true OR candidate.profile_origin = 'academy_direct')"
         )
@@ -397,6 +409,22 @@ def list_candidate_rows(
     if application_to:
         clauses.append("candidate.application_date <= %s::date")
         params.append(application_to)
+    closed_at_sql = (
+        "COALESCE(decision.created_at, candidate.stage_changed_at)"
+        if stage in {"rejected", "candidate_withdrew"}
+        else "candidate.stage_changed_at"
+    )
+    if closed_from:
+        clauses.append(f"{closed_at_sql}::date >= %s::date")
+        params.append(closed_from)
+    if closed_to:
+        clauses.append(f"{closed_at_sql}::date <= %s::date")
+        params.append(closed_to)
+    if origin_stage:
+        clauses.append(
+            "COALESCE(NULLIF(decision.origin_stage, ''), previous_stage.stage, '') = %s"
+        )
+        params.append(origin_stage)
     if final_decision:
         clauses.append("COALESCE(decision.decision, '') = %s")
         params.append(final_decision)
@@ -431,6 +459,88 @@ def list_candidate_rows(
         tuple([*params, limit, offset]),
     ).fetchall()
     return rows, int(total_row["total"] or 0) if total_row else 0
+
+
+def void_latest_closed_decision(
+    conn: Any,
+    *,
+    candidate_id: int,
+    actor_account_id: int | None,
+    reason: str,
+    now: str,
+) -> int | None:
+    row = conn.execute(
+        """
+        WITH latest AS (
+            SELECT id
+            FROM msi_v2.teacher_candidate_final_decisions
+            WHERE candidate_id = %s
+              AND decision IN ('rejected', 'candidate_withdrew')
+              AND voided_at IS NULL
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+            FOR UPDATE
+        )
+        UPDATE msi_v2.teacher_candidate_final_decisions decision
+        SET voided_at = %s::timestamptz,
+            voided_by_account_id = %s,
+            void_reason = %s
+        FROM latest
+        WHERE decision.id = latest.id
+        RETURNING decision.id
+        """,
+        (int(candidate_id), now, actor_account_id, reason),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def delete_closed_candidate(
+    conn: Any,
+    *,
+    candidate_id: int,
+    expected_version: int,
+) -> bool:
+    row = conn.execute(
+        """
+        WITH locked AS (
+            SELECT id
+            FROM msi_v2.teacher_candidates
+            WHERE id = %s
+              AND version = %s
+              AND status IN ('trash_bin', 'rejected', 'candidate_withdrew')
+            FOR UPDATE
+        ), deleted_audit AS (
+            DELETE FROM msi_v2.audit_events audit
+            USING locked
+            WHERE audit.entity_type = 'teacher_candidate'
+              AND audit.entity_id = locked.id
+        )
+        DELETE FROM msi_v2.teacher_candidates candidate
+        USING locked
+        WHERE candidate.id = locked.id
+        RETURNING candidate.id
+        """,
+        (int(candidate_id), int(expected_version)),
+    ).fetchone()
+    return bool(row)
+
+
+def list_trash_candidates_for_purge(conn: Any) -> list[Any]:
+    return conn.execute(
+        """
+        SELECT candidate.id, candidate.full_name, candidate.status, candidate.version,
+               academy.id AS academy_teacher_id,
+               teacher.id AS active_teacher_id
+        FROM msi_v2.teacher_candidates candidate
+        LEFT JOIN msi_v2.academy_teachers academy
+          ON academy.recruitment_candidate_id = candidate.id
+        LEFT JOIN msi_v2.teachers teacher
+          ON teacher.recruitment_candidate_id = candidate.id
+        WHERE candidate.status = 'trash_bin'
+        ORDER BY candidate.id
+        FOR UPDATE OF candidate
+        """
+    ).fetchall()
 
 
 def list_teacher_handoff_rows(
