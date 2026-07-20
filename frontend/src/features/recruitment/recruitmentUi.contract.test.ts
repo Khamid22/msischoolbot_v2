@@ -208,21 +208,30 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /Record subject test/);
   });
 
-  test("renders Academy training as a read-only responsive table and cards", () => {
+  test("renders canonical Academy training details in a responsive expandable table", () => {
     assert.match(profile, /title="Academy training"/);
-    assert.match(profile, /Evaluated/);
+    assert.match(profile, /Start date/);
+    assert.match(profile, /Assigned/);
     assert.match(profile, /Passed/);
-    assert.match(profile, /Average score/);
-    assert.match(profile, />Delivered</);
-    assert.match(profile, /Not delivered yet/);
-    assert.match(profile, /HOD of \$\{academyDepartmentName\(subject, position\)\} Department/);
+    assert.match(profile, /Failed/);
+    assert.match(profile, /Avg score/);
+    assert.match(profile, /Assigned Topics/);
+    assert.match(profile, /Evaluated Date/);
+    assert.match(profile, /Evaluated By/);
+    assert.match(profile, /Average Score/);
+    assert.match(profile, /Head Of \$\{academyDepartmentName\(subject, position\)\} Department/);
     assert.doesNotMatch(profile, /Assignment \/ schedule/);
-    assert.match(profile, /hidden overflow-hidden rounded-lg border border-border lg:block/);
+    assert.match(profile, /overflow-x-auto overscroll-x-contain/);
     assert.match(profile, /space-y-2 lg:hidden/);
     assert.match(profile, /Awaiting evaluation/);
+    assert.match(profile, /section_feedback/);
+    assert.match(profile, /Assessment criteria/);
+    assert.match(profile, /Lesson areas/);
+    assert.match(profile, /areas_for_improvement/);
     assert.match(profile, /final_recommendation/);
-    assert.match(profile, /aria-expanded=\{expanded\}/);
-    assert.match(profile, />Read-only</);
+    assert.match(profile, /role="progressbar"/);
+    assert.match(profile, /role=\{assessment \? "button" : undefined\}/);
+    assert.doesNotMatch(profile, />Read-only</);
     const trainingPanel =
       profile.split("function TrainingPanel")[1]?.split("function OutcomeFields")[0] || "";
     assert.doesNotMatch(
@@ -513,6 +522,7 @@ describe("Academy training data matching", () => {
       assigned: 2,
       evaluated: 1,
       passed: 1,
+      failed: 0,
       averageScore: 8,
     });
   });
@@ -533,6 +543,7 @@ describe("Academy training data matching", () => {
       assigned: 2,
       evaluated: 1,
       passed: 0,
+      failed: 1,
       averageScore: null,
     });
   });

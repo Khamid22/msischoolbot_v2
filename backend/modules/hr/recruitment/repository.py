@@ -97,7 +97,10 @@ _CANDIDATE_COLUMNS = """
     appointment.started_at::text AS next_appointment_started_at,
     academy.id AS academy_teacher_id,
     academy.academy_status AS academy_status,
-    academy.academy_start_date::text AS academy_start_date,
+    COALESCE(
+        academy.academy_start_date::text,
+        (academy.created_at AT TIME ZONE 'Asia/Tashkent')::date::text
+    ) AS academy_start_date,
     academy.account_onboarding_status AS academy_onboarding_status,
     academy.subject_id AS academy_subject_id,
     COALESCE(academy_subject.subject_name, '') AS academy_subject,
@@ -864,8 +867,18 @@ def list_academy_lifecycle_assessment_rows(conn: Any, academy_teacher_id: int) -
                assessment.assessment_type, assessment.lesson_number,
                assessment.lesson_topic,
                assessment.assessment_datetime::text AS assessment_datetime,
+               assessment.session_type, assessment.class_label,
+               assessment.section_feedback,
+               assessment.teacher_guidance_compliance_score,
+               assessment.timing_adherence_score,
+               assessment.resource_familiarity_score,
+               assessment.english_fluency_score,
+               assessment.confidence_delivery_score,
+               assessment.engagement_technique_score,
                assessment.weighted_overall_score,
+               assessment.strengths, assessment.areas_for_improvement,
                assessment.final_recommendation, assessment.decision,
+               assessment.created_by,
                COALESCE(evaluator.full_name, '') AS evaluator_name
         FROM msi_v2.academy_assessments assessment
         LEFT JOIN msi_v2.teachers evaluator ON evaluator.id = assessment.evaluator_id

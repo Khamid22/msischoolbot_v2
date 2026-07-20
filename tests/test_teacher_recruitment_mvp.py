@@ -110,6 +110,33 @@ def test_teacher_handoff_repository_reads_only_canonical_tables_and_sorts_server
     assert "record.sort_at DESC NULLS LAST" in active_sql
 
 
+def test_candidate_training_repository_returns_the_canonical_hod_assessment_details():
+    class Result:
+        def fetchall(self):
+            return []
+
+    class Connection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return Result()
+
+    conn = Connection()
+    assert repository.list_academy_lifecycle_assessment_rows(conn, 9) == []
+    sql, params = conn.calls[0]
+    assert params == (9,)
+    assert "assessment.assessment_datetime::text" in sql
+    assert "assessment.section_feedback" in sql
+    assert "assessment.teacher_guidance_compliance_score" in sql
+    assert "assessment.engagement_technique_score" in sql
+    assert "assessment.strengths" in sql
+    assert "assessment.areas_for_improvement" in sql
+    assert "assessment.final_recommendation" in sql
+    assert "(academy.created_at AT TIME ZONE 'Asia/Tashkent')::date::text" in repository._CANDIDATE_COLUMNS
+
+
 def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(monkeypatch):
     @contextmanager
     def connect():

@@ -128,10 +128,22 @@ export type AcademyTrainingAssessment = {
   lesson_number?: string | null;
   lesson_topic?: string | null;
   assessment_datetime?: string | null;
+  session_type?: string | null;
+  class_label?: string | null;
+  section_feedback?: Record<string, unknown> | string | null;
+  teacher_guidance_compliance_score?: number | null;
+  timing_adherence_score?: number | null;
+  resource_familiarity_score?: number | null;
+  english_fluency_score?: number | null;
+  confidence_delivery_score?: number | null;
+  engagement_technique_score?: number | null;
   weighted_overall_score?: number | null;
+  strengths?: string | null;
+  areas_for_improvement?: string | null;
   final_recommendation?: string | null;
   decision?: string | null;
   evaluator_name?: string | null;
+  created_by?: string | null;
 };
 
 export type AcademyTrainingRow = {
@@ -143,6 +155,7 @@ export type AcademyTrainingSummary = {
   assigned: number;
   evaluated: number;
   passed: number;
+  failed: number;
   averageScore: number | null;
 };
 
@@ -207,6 +220,12 @@ export function academyTrainingSummary(
     evaluated: evaluatedRows.length,
     passed: evaluatedRows.filter((row) =>
       academyPassingDecisions.has(String(row.assessment?.decision || "").toLowerCase()),
+    ).length,
+    failed: evaluatedRows.filter(
+      (row) =>
+        !academyPassingDecisions.has(
+          String(row.assessment?.decision || "").toLowerCase(),
+        ),
     ).length,
     averageScore: numericScores.length
       ? Math.round(
