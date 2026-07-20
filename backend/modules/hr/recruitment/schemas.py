@@ -82,14 +82,11 @@ class TrashPurge(StrictModel):
 
 class AppointmentFields(StrictModel):
     starts_at: datetime
-    duration_minutes: OptionalInt = Field(default=None, ge=15, le=240)
     responsible_account_id: OptionalInt = Field(default=None, ge=1)
     appointment_format: str = Field(default="", max_length=120)
     location_or_link: str = Field(default="", max_length=1000)
     topic: str = Field(default="", max_length=500)
     note: str | None = Field(default=None, max_length=5000)
-    allow_conflict: bool = False
-    historical_result: str = Field(default="", pattern="^(|passed|failed)$")
 
 
 class ScheduledStageMove(AppointmentFields):
@@ -116,10 +113,13 @@ class InterviewSessionStart(StrictModel):
 
 class InterviewSessionComplete(StrictModel):
     expected_version: int = Field(ge=1)
-    notes: str = Field(default="", max_length=10000)
     result: str = Field(pattern="^(passed|failed)$")
-    # HR-supplied explanation used when a failed interview auto-rejects.
     reason_detail: str = Field(default="", max_length=10000)
+    english_level_option_id: OptionalInt = Field(default=None, ge=1)
+    education_background: str = Field(default="", max_length=5000)
+    teaching_experience_option_id: OptionalInt = Field(default=None, ge=1)
+    interests_hobbies: str = Field(default="", max_length=3000)
+    motivation_expectations: str = Field(default="", max_length=5000)
 
 
 class AssignmentReplace(StrictModel):
@@ -179,6 +179,7 @@ class SubjectTestWrite(StrictModel):
 
 class DemoLessonWrite(StrictModel):
     appointment_id: OptionalInt = Field(default=None, ge=1)
+    expected_version: OptionalInt = Field(default=None, ge=1)
     demo_at: OptionalDateTime = None
     subject_id: OptionalInt = Field(default=None, ge=1)
     subject_label: str = Field(default="", max_length=200)
@@ -234,10 +235,6 @@ class TeacherHandoffClose(StrictModel):
     reason_detail: str = Field(default="", max_length=5000)
 
 
-class EvaluationVoid(StrictModel):
-    reason: str = Field(min_length=1, max_length=2000)
-
-
 class RecruitmentSettingCreate(StrictModel):
     category: str = Field(
         pattern="^(source|subsource|rejection_reason|position|english_level|schedule|availability|expected_salary|teaching_experience)$"
@@ -274,7 +271,6 @@ __all__ = [
     "CandidateRestore",
     "CandidateUpdate",
     "DemoLessonWrite",
-    "EvaluationVoid",
     "FinalDecisionCreate",
     "InterviewWrite",
     "InterviewSessionComplete",

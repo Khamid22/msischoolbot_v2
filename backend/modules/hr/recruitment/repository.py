@@ -7,14 +7,14 @@ from backend.modules.hr.recruitment.appointments.repository import (
     cancel_active_appointments,
     cancel_scheduled_appointments,
     complete_appointment,
-    complete_historical_appointment,
     complete_interview_session,
+    delete_appointment,
     get_appointment_row,
     insert_appointment,
     list_appointment_conflicts,
     list_appointment_rows,
     set_appointment_status,
-    start_interview_session,
+    start_appointment_session,
     update_appointment,
 )
 from backend.modules.hr.recruitment.candidates.read_repository import (
@@ -66,6 +66,9 @@ from backend.modules.hr.recruitment.documents.repository import (
     remove_document,
 )
 from backend.modules.hr.recruitment.evaluations.repository import (
+    candidate_evaluation_state,
+    delete_evaluation,
+    delete_system_final_decision,
     ensure_candidate_assignment,
     get_evaluation_row,
     get_system_decision_for_evaluation,
@@ -79,8 +82,6 @@ from backend.modules.hr.recruitment.evaluations.repository import (
     list_subject_test_rows,
     list_valid_evaluator_accounts,
     responsible_account_row,
-    void_evaluation,
-    void_system_final_decision,
 )
 from backend.modules.hr.recruitment.handoffs.repository import (
     cancel_pending_candidate_tasks,

@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarClock,
   Check,
+  ChevronLeft,
   ChevronRight,
   CircleDot,
   Clock3,
@@ -54,9 +55,8 @@ import {
 } from "@/features/recruitment/ui";
 import { Drawer } from "@/shared/ui/Drawer";
 
-type AnalyticsPeriod = "today" | "week" | "month" | "quarter" | "year" | "custom";
 type Filters = {
-  period: AnalyticsPeriod;
+  period: "custom";
   date_from: string;
   date_to: string;
   source: string;
@@ -75,14 +75,6 @@ type Options = {
 };
 
 const api = "/api/v1/hr/analytics";
-const periods: Array<{ key: AnalyticsPeriod; label: string }> = [
-  { key: "today", label: "Today" },
-  { key: "week", label: "Week" },
-  { key: "month", label: "Month" },
-  { key: "quarter", label: "Quarter" },
-  { key: "year", label: "Year" },
-  { key: "custom", label: "Custom" },
-];
 const filterKeys = [
   "period",
   "date_from",
@@ -112,36 +104,65 @@ const sourcePalette = [
   "#7C3AED",
 ];
 
-function initialFilters(role: RecruitmentRole): Filters {
+function tashkentDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tashkent",
+  }).format(new Date());
+}
+
+function monthBounds(month: string, today = tashkentDateKey()) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0))
+    .toISOString()
+    .slice(0, 10);
+  return {
+    from: `${month}-01`,
+    to: month === today.slice(0, 7) ? today : lastDay,
+  };
+}
+
+function shiftMonth(month: string, direction: -1 | 1) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1 + direction, 1))
+    .toISOString()
+    .slice(0, 7);
+}
+
+function monthLabel(month: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Tashkent",
+  }).format(new Date(`${month}-01T12:00:00+05:00`));
+}
+
+function initialFilters(_role: RecruitmentRole): Filters {
   const params = new URLSearchParams(window.location.search);
-  const defaultPeriod = role === "ceo" ? "year" : "month";
-  const requestedPeriod = params.get("period") as AnalyticsPeriod | null;
-  const period = periods.some((item) => item.key === requestedPeriod) ? requestedPeriod! : defaultPeriod;
+  const requestedMonth = (params.get("date_from") || "").slice(0, 7);
+  const currentMonth = tashkentDateKey().slice(0, 7);
+  const month =
+    /^\d{4}-\d{2}$/.test(requestedMonth) &&
+    requestedMonth <= currentMonth
+      ? requestedMonth
+      : currentMonth;
+  const bounds = monthBounds(month);
   return Object.fromEntries(
-    filterKeys.map((key) => [key, key === "period" ? period : params.get(key) || ""]),
+    filterKeys.map((key) => [
+      key,
+      key === "period"
+        ? "custom"
+        : key === "date_from"
+          ? bounds.from
+          : key === "date_to"
+            ? bounds.to
+            : params.get(key) || "",
+    ]),
   ) as Filters;
 }
 
 function numberValue(value: unknown, suffix = "") {
   if (value === null || value === undefined || value === "") return "—";
   return `${new Intl.NumberFormat("en").format(Number(value))}${suffix}`;
-}
-
-function periodLabel(data: HrAnalyticsDashboard) {
-  const to = new Date(`${data.range.to}T00:00:00+05:00`);
-  if (data.range.period === "month") {
-    return new Intl.DateTimeFormat("en", {
-      month: "long",
-      year: "numeric",
-      timeZone: "Asia/Tashkent",
-    }).format(to);
-  }
-  if (data.range.period === "quarter") {
-    return `Q${Math.floor(to.getMonth() / 3) + 1} ${to.getFullYear()}`;
-  }
-  if (data.range.period === "year") return String(to.getFullYear());
-  if (data.range.period === "today") return dateLabel(data.range.to);
-  return `${dateLabel(data.range.from)} – ${dateLabel(data.range.to)}`;
 }
 
 function trendBucketLabel(value: string, bucket: HrAnalyticsDashboard["range"]["bucket"]) {
@@ -176,6 +197,52 @@ function KpiCard({
         <span>{period}</span>
         <span>Total {numberValue(metric.total)}</span>
       </div>
+    </article>
+  );
+}
+
+function EvaluationKpi({
+  label,
+  metric,
+}: {
+  label: string;
+  metric: {
+    total: number;
+    unique_candidates: number;
+    passed: number;
+    failed: number;
+    pass_rate: number;
+  };
+}) {
+  return (
+    <article className="rounded-xl border border-border bg-card p-3 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {numberValue(metric.unique_candidates)}
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            Unique candidates · best valid attempt
+          </p>
+        </div>
+        <span className="rounded-full bg-primary/8 px-2 py-1 text-xs font-semibold text-primary">
+          {numberValue(metric.pass_rate, "%")}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <span className="rounded-lg bg-emerald-50 px-2 py-1.5 font-semibold text-emerald-800">
+          Passed {numberValue(metric.passed)}
+        </span>
+        <span className="rounded-lg bg-red-50 px-2 py-1.5 font-semibold text-red-700">
+          Failed {numberValue(metric.failed)}
+        </span>
+      </div>
+      <p className="mt-2 text-[10px] font-semibold text-muted-foreground">
+        Total attempts {numberValue(metric.total)}
+      </p>
     </article>
   );
 }
@@ -353,10 +420,9 @@ function activityLabel(eventType: string) {
 export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: string; role?: RecruitmentRole }) {
   const [filters, setFilters] = useState(() => initialFilters(role));
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const tashkentToday = useMemo(
-    () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date()),
-    [],
-  );
+  const tashkentToday = useMemo(() => tashkentDateKey(), []);
+  const selectedMonth = filters.date_from.slice(0, 7);
+  const currentMonth = tashkentToday.slice(0, 7);
   const options = useQuery({
     queryKey: ["hr-analytics", "options"],
     queryFn: () => recruitmentRequest<Options>(`${api}/options`),
@@ -375,15 +441,15 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
     setFilters(next);
     replaceUrlParams(next);
   };
-  const selectPeriod = (period: AnalyticsPeriod) => {
-    if (period === "custom") {
-      replaceFilters({ ...filters, period, date_from: filters.date_from || tashkentToday, date_to: filters.date_to || tashkentToday });
-      return;
-    }
-    replaceFilters({ ...filters, period, date_from: "", date_to: "" });
-  };
-  const updateCustomDate = (key: "date_from" | "date_to", value: string) => {
-    replaceFilters({ ...filters, period: "custom", [key]: value });
+  const selectMonth = (month: string) => {
+    if (!/^\d{4}-\d{2}$/.test(month) || month > currentMonth) return;
+    const bounds = monthBounds(month, tashkentToday);
+    replaceFilters({
+      ...filters,
+      period: "custom",
+      date_from: bounds.from,
+      date_to: bounds.to,
+    });
   };
   const clearFilters = () => {
     replaceFilters({
@@ -411,7 +477,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   }
 
   const data = dashboard.data;
-  const selectedPeriod = periodLabel(data);
+  const selectedPeriod = monthLabel(selectedMonth);
   const topSources = data.source_distribution.slice(0, 6);
   const hasTrend = data.activity_trend.some((item) => item.applications || item.shortlisted || item.hired || item.rejected);
   const applicationPeak = data.activity_trend.reduce<(typeof data.activity_trend)[number] | null>(
@@ -439,41 +505,55 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   return (
     <div className="space-y-2">
       <section className="rounded-xl border border-border bg-card p-2 shadow-sm">
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-          <div className="no-scrollbar flex min-w-0 gap-1 overflow-x-auto" role="group" aria-label="Analytics period">
-            {periods.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                aria-pressed={filters.period === item.key}
-                onClick={() => selectPeriod(item.key)}
-                className={`relative min-h-10 shrink-0 rounded-lg px-2.5 text-[11px] font-semibold leading-tight transition-colors before:absolute before:-inset-y-0.5 before:inset-x-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${filters.period === item.key ? "bg-primary text-primary-foreground" : "bg-muted/55 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {filters.period === "custom" ? (
-              <>
-                <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">From
-                  <input type="date" max={tashkentToday} value={filters.date_from} onChange={(event) => updateCustomDate("date_from", event.target.value)} className={`${fieldClass} mt-1`} />
-                </label>
-                <label className="w-[154px] text-[11px] font-semibold text-muted-foreground">To
-                  <input type="date" max={tashkentToday} value={filters.date_to} onChange={(event) => updateCustomDate("date_to", event.target.value)} className={`${fieldClass} mt-1`} />
-                </label>
-              </>
-            ) : null}
-            <button type="button" className={`${secondaryButtonClass} relative !min-h-10 !px-3 !text-xs before:absolute before:-inset-y-0.5 before:inset-x-0`} onClick={() => setFiltersOpen(true)}>
-              <Filter className="h-4 w-4" />Filters
-              {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span> : null}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div
+            className="inline-flex min-h-10 items-center overflow-hidden rounded-lg border border-border"
+            role="group"
+            aria-label="Analytics month"
+          >
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35"
+              onClick={() => selectMonth(shiftMonth(selectedMonth, -1))}
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <label className="relative flex h-10 min-w-36 cursor-pointer items-center justify-center border-x border-border px-4 text-xs font-semibold">
+              <span>{selectedPeriod}</span>
+              <span className="sr-only">Select month and year</span>
+              <input
+                type="month"
+                value={selectedMonth}
+                max={currentMonth}
+                onChange={(event) => selectMonth(event.target.value)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Select analytics month and year"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={selectedMonth >= currentMonth}
+              className="flex h-10 w-10 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-35"
+              onClick={() => selectMonth(shiftMonth(selectedMonth, 1))}
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+          <button type="button" className={`${secondaryButtonClass} relative !min-h-10 !px-3 !text-xs before:absolute before:-inset-y-0.5 before:inset-x-0`} onClick={() => setFiltersOpen(true)}>
+            <Filter className="h-4 w-4" />Filters
+            {activeFilterCount ? <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">{activeFilterCount}</span> : null}
+          </button>
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-1.5">
           <p className="mr-auto text-xs font-semibold text-foreground">{selectedPeriod}</p>
           {filterNames.filter(([key]) => filters[key]).map(([key, label]) => (
-            <button key={key} type="button" onClick={() => replaceFilters({ ...filters, [key]: "" })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+            <button key={key} type="button" onClick={() => replaceFilters({
+              ...filters,
+              [key]: "",
+              ...(key === "source" ? { subsource: "" } : {}),
+            })} className="inline-flex min-h-9 items-center rounded-full border border-border bg-muted/50 px-2.5 text-[11px] font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
               {label}: {optionLabel(key, filters[key])}<XCircle className="ml-1.5 h-3.5 w-3.5" />
             </button>
           ))}
@@ -481,18 +561,27 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         </div>
       </section>
 
-      <h2 className="text-xs font-semibold">Selected application cohort · {selectedPeriod}</h2>
+      <h2 className="text-xs font-semibold">
+        Recruitment activity · {selectedPeriod}
+      </h2>
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Selected cohort recruitment metrics">
+      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5" aria-label="Canonical recruitment event metrics">
         <KpiCard label="Applications" metric={data.summary_cards.applications} period={selectedPeriod} icon={<UsersRound className="h-4 w-4" />} accent />
-        <KpiCard label="Shortlisted" metric={data.summary_cards.shortlisted} period={selectedPeriod} icon={<SearchCheck className="h-4 w-4" />} />
-        <KpiCard label="Hired" metric={data.summary_cards.hired} period={selectedPeriod} icon={<UserCheck className="h-4 w-4" />} />
+        <KpiCard label="Final Decision" metric={data.summary_cards.final_decision} period={selectedPeriod} icon={<SearchCheck className="h-4 w-4" />} />
+        <KpiCard label="Teacher Academy" metric={data.summary_cards.teacher_academy} period={selectedPeriod} icon={<ShieldCheck className="h-4 w-4" />} />
+        <KpiCard label="Active Teachers" metric={data.summary_cards.active_teachers} period={selectedPeriod} icon={<UserCheck className="h-4 w-4" />} />
         <KpiCard label="Rejected" metric={data.summary_cards.rejected} period={selectedPeriod} icon={<UserMinus className="h-4 w-4" />} />
+      </section>
+
+      <section className="grid gap-2 md:grid-cols-3" aria-label="Evaluation outcome metrics">
+        <EvaluationKpi label="Job Interviews" metric={data.evaluation_kpis.interview} />
+        <EvaluationKpi label="Demo Lessons" metric={data.evaluation_kpis.demo} />
+        <EvaluationKpi label="Subject Tests" metric={data.evaluation_kpis.subject_test} />
       </section>
 
       <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Additional selected cohort metrics">
-          <SecondaryMetric label="Academy accepted" value={numberValue(data.secondary_kpis.academy_accepted)} total={data.secondary_kpis.academy_total} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
+          <SecondaryMetric label="Teacher Academy added" value={numberValue(data.secondary_kpis.academy_accepted)} total={data.secondary_kpis.academy_total} icon={<ShieldCheck className="h-4 w-4" />} tone="warning" />
           <SecondaryMetric label="Withdrawn" value={numberValue(data.secondary_kpis.withdrawn)} total={data.secondary_kpis.withdrawn_total} icon={<UserMinus className="h-4 w-4" />} />
           <SecondaryMetric label="Avg time to hire" value={numberValue(data.secondary_kpis.average_time_to_hire_days, "d")} icon={<Clock3 className="h-4 w-4" />} />
           <SecondaryMetric label="Active conversion" value={numberValue(data.secondary_kpis.overall_conversion_percentage, "%")} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
@@ -536,7 +625,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
                   ) : null}
                   <Line type="monotone" dataKey="applications" name="Applications" stroke={chartColors.primary} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="shortlisted" name="Shortlisted" stroke={chartColors.secondary} strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="hired" name="Hired" stroke={chartColors.success} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="hired" name="Active Teachers" stroke={chartColors.success} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="rejected" name="Rejected" stroke={chartColors.destructive} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
@@ -544,7 +633,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           ) : <EmptyChart>No recruitment events in this period.</EmptyChart>}
         </Panel>
 
-        <Panel title={`Applicant sources · ${selectedPeriod}`} description={`${data.summary_cards.applications.value} applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
+        <Panel title={`Applicant sources · ${selectedPeriod}`} description={`Application cohort · ${data.summary_cards.applications.value} applications`} icon={<CircleDot className="h-4 w-4 text-primary" />} className="xl:col-span-4">
           {topSources.length ? (
             <div className="grid min-h-[260px] grid-cols-1 items-center gap-1 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(150px,0.8fr)]">
               <div className="h-44 min-w-0">
@@ -569,7 +658,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           ) : <EmptyChart>No source data in this cohort.</EmptyChart>}
         </Panel>
 
-        <Panel title={`Recruitment journey · ${selectedPeriod}`} description="Distinct applicants who reached each stage" icon={<BarChart3 className="h-4 w-4 text-primary" />} className="xl:col-span-7">
+        <Panel title={`Recruitment journey · ${selectedPeriod}`} description="Application cohort · distinct applicants who reached each stage" icon={<BarChart3 className="h-4 w-4 text-primary" />} className="xl:col-span-7">
           <div className="space-y-2 p-3">
             {data.journey.map((item) => (
               <div key={item.stage}>
@@ -596,7 +685,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </Panel>
 
-        <Panel title={`Applications by position · ${selectedPeriod}`} description="Standardized positions" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
+        <Panel title={`Applications by position · ${selectedPeriod}`} description="Application cohort · standardized positions" icon={<UsersRound className="h-4 w-4 text-primary" />} className="xl:col-span-5">
           {data.position_distribution.length ? (
             <div className="h-[280px] min-w-0 p-2">
               <ResponsiveContainer width="100%" height="100%">
@@ -639,7 +728,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         <Panel title="Source quality" description="Subsource-level shortlisting and Active Teacher conversion." icon={<TrendingUp className="h-4 w-4 text-primary" />} className="xl:col-span-6">
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[540px] text-left text-xs">
-              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Source</th><th className="px-3 py-1.5">Applicants</th><th className="px-3 py-1.5">Shortlisted</th><th className="px-3 py-1.5">Hired</th><th className="px-3 py-1.5">Conversion</th></tr></thead>
+              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Source</th><th className="px-3 py-1.5">Applicants</th><th className="px-3 py-1.5">Shortlisted</th><th className="px-3 py-1.5">Active Teachers</th><th className="px-3 py-1.5">Conversion</th></tr></thead>
               <tbody className="divide-y divide-border/70">
                 {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-1.5"><strong className="block">{item.source}</strong><span className="text-[10px] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-1.5 tabular-nums">{item.candidates}</td><td className="px-3 py-1.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-1.5 tabular-nums">{item.hired}</td><td className="px-3 py-1.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
               </tbody>
@@ -651,10 +740,10 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           {!data.source_quality.length ? <EmptyChart>No source-quality data in this cohort.</EmptyChart> : null}
         </Panel>
 
-        <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Live work across the current pipeline; the cohort date does not limit this panel." : "Read-only live overview across the current pipeline."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="xl:col-span-5">
-          <div className="grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        <Panel title={roleIsHr ? "Operational attention" : "Executive attention"} description={roleIsHr ? "Live work across the current pipeline; the cohort date does not limit this panel." : "Read-only live overview across the current pipeline."} icon={<CalendarClock className="h-4 w-4 text-primary" />} className="h-full xl:col-span-5">
+          <div className="grid gap-2 p-2 sm:grid-cols-2 xl:h-[272px] xl:grid-cols-1 xl:overflow-y-auto 2xl:grid-cols-2">
             <div>
-              <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
+              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Overdue actions</span><span className="rounded-full bg-destructive/8 px-2 py-1 text-destructive">{data.overdue_actions.length}</span></p>
               <div className="space-y-1">
                 {data.overdue_actions.slice(0, 5).map((item) => {
                   const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{item.title} · {dateLabel(item.due_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
@@ -664,7 +753,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               </div>
             </div>
             <div>
-              <p className="mb-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Upcoming</span><span className="rounded-full bg-primary/8 px-2 py-1 text-primary">{data.upcoming_appointments.length}</span></p>
+              <p className="sticky top-0 z-10 mb-2 flex items-center justify-between bg-card py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Upcoming</span><span className="rounded-full bg-primary/8 px-2 py-1 text-primary">{data.upcoming_appointments.length}</span></p>
               <div className="space-y-1">
                 {data.upcoming_appointments.slice(0, 5).map((item) => {
                   const content = <><span className="min-w-0"><strong className="block truncate">{item.candidate_name}</strong><span className="block truncate text-[11px] text-muted-foreground">{humanize(item.appointment_type)} · {dateLabel(item.starts_at)}</span></span>{roleIsHr ? <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" /> : null}</>;
@@ -676,8 +765,8 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           </div>
         </Panel>
 
-        <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest cohort applications" icon={<UsersRound className="h-4 w-4 text-primary" />} className="self-start xl:col-span-7">
-          <div className="no-scrollbar hidden max-h-[272px] overflow-x-hidden overflow-y-auto md:block">
+        <Panel title={`Recent candidates · ${selectedPeriod}`} description="Latest application-cohort candidates" icon={<UsersRound className="h-4 w-4 text-primary" />} className="h-full xl:col-span-7">
+          <div className="no-scrollbar hidden h-[272px] overflow-x-hidden overflow-y-auto md:block">
             <table className="w-full table-fixed text-left text-xs">
               <colgroup>
                 <col className="w-[19%]" />
@@ -689,7 +778,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               </colgroup>
               <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-1.5">Candidate</th><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5">Source</th><th className="px-2 py-1.5">Applied</th><th className="px-2 py-1.5">Stage</th><th className="px-2 py-1.5">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
+                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center break-words font-semibold leading-tight hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>

@@ -56,7 +56,7 @@ export type RecruitmentPermissions = {
   can_review_approval: boolean;
   can_finalize: boolean;
   can_reject: boolean;
-  can_void_evaluations: boolean;
+  can_delete_evaluations: boolean;
   can_add_note: boolean;
 };
 
@@ -80,7 +80,7 @@ export type RecruitmentAppointment = {
   candidate_status?: string;
   appointment_type: "job_interview" | "demo_lesson";
   starts_at: string;
-  ends_at: string;
+  ends_at?: string | null;
   responsible_account_id?: number | null;
   responsible_name?: string;
   responsible_role?: string;
@@ -106,6 +106,14 @@ export type RecruitmentAppointment = {
   subject_id?: number | null;
   subject?: string;
   is_overdue?: boolean;
+  evaluation_outcome?: "passed" | "failed" | "";
+  display_status?:
+    | "passed"
+    | "failed"
+    | "scheduled"
+    | "in_progress"
+    | "overdue"
+    | "not_conducted";
 };
 
 export type AcademyTrainingLesson = {
@@ -440,15 +448,23 @@ export type HrAnalyticsDashboard = {
     subject_id?: number | null;
     responsible_account_id?: number | null;
   };
-  summary_cards: Record<"applications" | "shortlisted" | "hired" | "rejected", {
+  summary_cards: Record<"applications" | "final_decision" | "teacher_academy" | "active_teachers" | "rejected", {
     value: number;
     total: number;
     previous: number;
     delta_percentage?: number | null;
   }>;
+  evaluation_kpis: Record<"interview" | "demo" | "subject_test", {
+    total: number;
+    unique_candidates: number;
+    passed: number;
+    failed: number;
+    pass_rate: number;
+  }>;
   secondary_kpis: {
     academy_accepted: number;
     academy_total: number;
+    active_teacher_total: number;
     withdrawn: number;
     withdrawn_total: number;
     active_candidates: number;

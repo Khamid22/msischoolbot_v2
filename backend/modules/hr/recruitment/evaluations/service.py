@@ -13,7 +13,6 @@ from backend.modules.hr.recruitment import notifications as recruitment_notifica
 from backend.modules.hr.recruitment.constants import (
     DEMO_RESULTS,
     INTERVIEW_RESULTS,
-    PROTECTED_HIRE_STAGES,
 )
 from backend.modules.hr.recruitment.errors import RecruitmentError
 from backend.modules.hr.recruitment.projections import text as _text
@@ -195,14 +194,12 @@ def _add_record(
                 raise RecruitmentError(
                     "Appointment type does not match this evaluation.", status_code=409
                 )
-            required_status = (
-                "in_progress" if appointment_type == "job_interview" else "scheduled"
-            )
+            required_status = "in_progress"
             if _text(appointment["status"]) != required_status:
                 message = (
                     "Start this interview before recording its result."
                     if appointment_type == "job_interview"
-                    else "This appointment is no longer scheduled."
+                    else "Start this demo lesson before recording its result."
                 )
                 raise RecruitmentError(message, status_code=409)
             if timestamp_key and (not _text(values.get(timestamp_key))):
@@ -277,6 +274,8 @@ def _add_record(
                 now=now,
             )
         result = _text(values.get("result"))
+        candidate_stage = _text(candidate.get("status"))
+        supplemental_academy_evaluation = candidate_stage == "teacher_academy"
         if database_backed:
             repository.insert_audit(
                 conn,
@@ -290,11 +289,12 @@ def _add_record(
         stage_changed = False
         if (
             result == "failed"
+            and not supplemental_academy_evaluation
             and candidate.get("status") is not None
             and (candidate.get("version") is not None)
         ):
             if _text(candidate["status"]) in {
-                *PROTECTED_HIRE_STAGES,
+                "active_teacher",
                 "rejected",
                 "candidate_withdrew",
                 "trash_bin",
@@ -426,7 +426,7 @@ def _add_record(
                 ),
                 now=now,
             )
-        elif result == "failed":
+        elif result == "failed" and not supplemental_academy_evaluation:
             cancelled_after_failure = repository.cancel_scheduled_appointments(
                 conn,
                 candidate_id=int(candidate_id),
@@ -491,39 +491,85 @@ def _add_record(
                 now=now,
             )
         elif (
-            evaluation_type == "demo"
+            evaluation_type == "subject_test"
             and result == "passed"
-            and appointment_id
             and (_text(candidate.get("status")) == "test_and_demo")
         ):
-            if not repository.update_candidate_stage(
+            evaluation_state = repository.candidate_evaluation_state(
+                conn, candidate_id=int(candidate_id)
+            )
+            if not evaluation_state or not bool(evaluation_state["demo_passed"]):
+                evaluation_state = None
+            if evaluation_state is None:
+                stage_changed = False
+            else:
+                if not repository.update_candidate_stage(
+                    conn,
+                    candidate_id=int(candidate_id),
+                    stage="under_review",
+                    expected_version=int(candidate["version"]),
+                    actor_account_id=_actor_account(user),
+                    now=now,
+                    comment="Passed subject test after demo lesson",
+                    transition_source="automatic",
+                ):
+                    raise RecruitmentError(
+                        "This candidate changed elsewhere. Refresh and try again.",
+                        status_code=409,
+                    )
+                stage_changed = True
+                repository.insert_audit(
+                    conn,
+                    candidate_id=int(candidate_id),
+                    event_type="candidate.stage_changed",
+                    detail={
+                        "from": "test_and_demo",
+                        "to": "under_review",
+                        "reason": "Passed subject test after demo lesson",
+                    },
+                    actor_account_id=_actor_account(user),
+                    actor_staff_id=_actor_staff(user),
+                    now=now,
+                )
+        if evaluation_type == "interview":
+            profile_values = {
+                key: values.get(key)
+                for key in (
+                    "english_level_option_id",
+                    "education_background",
+                    "teaching_experience_option_id",
+                    "interests_hobbies",
+                    "motivation_expectations",
+                )
+                if key in values
+            }
+            for key, category in (
+                ("english_level_option_id", "english_level"),
+                ("teaching_experience_option_id", "teaching_experience"),
+            ):
+                option_id = profile_values.get(key)
+                if not option_id:
+                    continue
+                option = repository.recruitment_setting_by_id(conn, int(option_id))
+                if (
+                    not option
+                    or _text(option["category"]) != category
+                    or not bool(option["is_active"])
+                ):
+                    raise RecruitmentError(
+                        f"Select a valid {category.replace('_', ' ')} option."
+                    )
+            if profile_values and not repository.update_candidate(
                 conn,
                 candidate_id=int(candidate_id),
-                stage="under_review",
-                expected_version=int(candidate["version"]),
+                values=profile_values,
                 actor_account_id=_actor_account(user),
                 now=now,
-                comment="Passed assigned demo lesson",
-                transition_source="automatic",
             ):
                 raise RecruitmentError(
-                    "This candidate changed elsewhere. Refresh and try again.",
+                    "The candidate profile changed elsewhere. Refresh and try again.",
                     status_code=409,
                 )
-            stage_changed = True
-            repository.insert_audit(
-                conn,
-                candidate_id=int(candidate_id),
-                event_type="candidate.stage_changed",
-                detail={
-                    "from": "test_and_demo",
-                    "to": "under_review",
-                    "reason": "Passed assigned demo lesson",
-                },
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
         if not database_backed and result != "failed":
             repository.insert_audit(
                 conn,
@@ -562,18 +608,14 @@ def _add_record(
     return dependencies.get_candidate(user, int(candidate_id))
 
 
-def void_evaluation(
+def delete_evaluation(
     user: CurrentUser,
     candidate_id: int,
     *,
     evaluation_type: str,
     attempt_id: int,
-    reason: str,
     dependencies: EvaluationDependencies,
 ) -> dict[str, Any]:
-    normalized_reason = _text(reason)
-    if not normalized_reason:
-        raise RecruitmentError("Explain why this evaluation is being voided.")
     table_by_type = {
         "interview": "teacher_candidate_interviews",
         "subject_test": "teacher_candidate_subject_tests",
@@ -587,7 +629,7 @@ def void_evaluation(
         and evaluation_type == "interview"
     ):
         raise RecruitmentError(
-            "Academic evaluators cannot void HR interview results.", status_code=403
+            "Academic evaluators cannot delete HR interview results.", status_code=403
         )
     if user.role not in {
         "hr_manager",
@@ -596,7 +638,7 @@ def void_evaluation(
         "head_of_department",
     }:
         raise RecruitmentError(
-            "You cannot void recruitment evaluations.", status_code=403
+            "You cannot delete recruitment evaluations.", status_code=403
         )
     now = _now()
     with dependencies.connect() as conn:
@@ -619,10 +661,8 @@ def void_evaluation(
             if database_backed
             else {"id": attempt_id, "result": "", "voided_at": None}
         )
-        if not evaluation or evaluation["voided_at"]:
-            raise RecruitmentError(
-                "Evaluation was not found or was already voided.", status_code=409
-            )
+        if not evaluation:
+            raise RecruitmentError("Evaluation was not found.", status_code=404)
         system_decision = (
             repository.get_system_decision_for_evaluation(
                 conn,
@@ -644,77 +684,95 @@ def void_evaluation(
                 or int(latest_decision["id"]) != int(system_decision["id"])
             ):
                 raise RecruitmentError(
-                    "This rejection has later workflow changes and requires manual review.",
+                    "This automatic rejection has later workflow changes and cannot be deleted.",
                     status_code=409,
                 )
-        voided = repository.void_evaluation(
+        deleted = repository.delete_evaluation(
             conn,
             table=table,
             candidate_id=int(candidate_id),
             attempt_id=int(attempt_id),
-            actor_account_id=_actor_account(user),
-            reason=normalized_reason,
-            now=now,
         )
-        if not voided:
-            raise RecruitmentError(
-                "Evaluation was not found or was already voided.", status_code=409
+        if not deleted:
+            raise RecruitmentError("Evaluation was not found.", status_code=404)
+        appointment_id = int(deleted.get("appointment_id") or 0)
+        if appointment_id:
+            recruitment_notifications.cancel_demo_reminders(conn, appointment_id)
+            repository.delete_appointment(
+                conn,
+                appointment_id=appointment_id,
+                candidate_id=int(candidate_id),
             )
-        restored_stage = ""
+        restored_stage = _text(candidate["status"])
         if system_decision:
             restored_stage = _text(system_decision["origin_stage"]) or "new_candidate"
-            if not repository.void_system_final_decision(
+            if not repository.delete_system_final_decision(
                 conn,
                 decision_id=int(system_decision["id"]),
-                actor_account_id=_actor_account(user),
-                reason=normalized_reason,
-                now=now,
             ):
                 raise RecruitmentError(
                     "The automatic rejection changed elsewhere.", status_code=409
                 )
+
+        current_stage = _text(candidate["status"])
+        target_stage = current_stage
+        if current_stage not in {
+            "teacher_academy",
+            "active_teacher",
+            *({"rejected"} if not system_decision else set()),
+            "candidate_withdrew",
+            "trash_bin",
+        }:
+            state = repository.candidate_evaluation_state(
+                conn, candidate_id=int(candidate_id)
+            )
+            any_failed = state and any(
+                bool(state[key])
+                for key in (
+                    "interview_failed",
+                    "demo_failed",
+                    "subject_test_failed",
+                )
+            )
+            if any_failed:
+                target_stage = "rejected"
+            elif (
+                state
+                and bool(state["interview_passed"])
+                and bool(state["demo_passed"])
+                and bool(state["subject_test_passed"])
+            ):
+                target_stage = "under_review"
+            elif state and bool(state["interview_passed"]):
+                target_stage = "test_and_demo"
+            elif current_stage in {
+                "job_interview",
+                "test_and_demo",
+                "under_review",
+                "rejected",
+            }:
+                target_stage = (
+                    restored_stage
+                    if restored_stage
+                    not in {"rejected", "test_and_demo", "under_review"}
+                    else "job_interview"
+                )
+
+        if target_stage != current_stage:
             if not repository.update_candidate_stage(
                 conn,
                 candidate_id=int(candidate_id),
-                stage=restored_stage,
+                stage=target_stage,
                 expected_version=int(candidate["version"]),
                 actor_account_id=_actor_account(user),
                 now=now,
-                comment="Failed evaluation voided",
+                comment="Evaluation permanently deleted; workflow recalculated",
                 transition_source="restored",
             ):
                 raise RecruitmentError(
                     "This candidate changed elsewhere. Refresh and try again.",
                     status_code=409,
                 )
-            repository.insert_audit(
-                conn,
-                candidate_id=int(candidate_id),
-                event_type="candidate.system_rejection_voided",
-                detail={
-                    "decision_id": int(system_decision["id"]),
-                    "evaluation_type": evaluation_type,
-                    "attempt_id": int(attempt_id),
-                    "restored_stage": restored_stage,
-                    "reason": normalized_reason,
-                },
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
-            repository.insert_audit(
-                conn,
-                candidate_id=int(candidate_id),
-                event_type="candidate.stage_changed",
-                detail={
-                    "from": "rejected",
-                    "to": restored_stage,
-                    "reason": "Failed evaluation voided",
-                },
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
         else:
             repository.touch_candidate(
                 conn,
@@ -722,18 +780,17 @@ def void_evaluation(
                 actor_account_id=_actor_account(user),
                 now=now,
             )
-        void_detail = {
+        delete_detail = {
             "evaluation_type": evaluation_type,
             "attempt_id": int(attempt_id),
-            "reason": normalized_reason,
+            "result": _text(deleted.get("result")),
+            "appointment_id": appointment_id or None,
         }
-        if restored_stage:
-            void_detail["restored_stage"] = restored_stage
         repository.insert_audit(
             conn,
             candidate_id=int(candidate_id),
-            event_type="candidate.evaluation_voided",
-            detail=void_detail,
+            event_type="candidate.evaluation_deleted",
+            detail=delete_detail,
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
             now=now,
@@ -754,5 +811,5 @@ __all__ = [
     "add_demo",
     "add_interview",
     "add_subject_test",
-    "void_evaluation",
+    "delete_evaluation",
 ]

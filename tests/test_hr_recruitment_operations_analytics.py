@@ -144,10 +144,47 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
             "rejected": 4,
             "withdrawn": 2,
         },
+        "event_summary": {
+            "applications": 10,
+            "final_decision": 6,
+            "teacher_academy": 1,
+            "active_teachers": 2,
+            "rejected": 3,
+            "withdrawn": 1,
+            "interview_total": 2,
+            "interview_unique_candidates": 2,
+            "interview_passed": 1,
+            "interview_failed": 1,
+            "demo_total": 4,
+            "demo_unique_candidates": 3,
+            "demo_passed": 2,
+            "demo_failed": 1,
+            "subject_test_total": 6,
+            "subject_test_unique_candidates": 5,
+            "subject_test_passed": 4,
+            "subject_test_failed": 1,
+        },
+        "comparison_event_summary": {
+            "applications": 5,
+            "final_decision": 4,
+            "teacher_academy": 0,
+            "active_teachers": 1,
+            "rejected": 1,
+            "withdrawn": 0,
+        },
+        "total_event_summary": {
+            "applications": 20,
+            "final_decision": 8,
+            "teacher_academy": 9,
+            "active_teachers": 3,
+            "rejected": 4,
+            "withdrawn": 2,
+        },
         "live_summary": {
             "active_candidates": 304,
             "sla_overdue_now": 294,
             "academy_roster_total": 9,
+            "active_teacher_roster_total": 3,
         },
         "journey": [
             {"stage": "new_candidate", "candidates": 10},
@@ -189,9 +226,26 @@ def test_analytics_contract_keeps_academy_separate_and_deduplicated(monkeypatch)
     )
     assert result["summary_cards"]["applications"]["delta_percentage"] == 100.0
     assert result["summary_cards"]["applications"]["total"] == 20
-    assert result["summary_cards"]["hired"]["value"] == 2
+    assert result["summary_cards"]["final_decision"]["value"] == 6
+    assert result["summary_cards"]["teacher_academy"]["value"] == 1
+    assert result["summary_cards"]["active_teachers"]["value"] == 2
+    assert result["evaluation_kpis"]["interview"] == {
+        "total": 2,
+        "unique_candidates": 2,
+        "passed": 1,
+        "failed": 1,
+        "pass_rate": 50.0,
+    }
+    assert result["evaluation_kpis"]["demo"] == {
+        "total": 4,
+        "unique_candidates": 3,
+        "passed": 2,
+        "failed": 1,
+        "pass_rate": 66.7,
+    }
     assert result["secondary_kpis"]["academy_accepted"] == 1
     assert result["secondary_kpis"]["academy_total"] == 9
+    assert result["secondary_kpis"]["active_teacher_total"] == 3
     assert result["secondary_kpis"]["withdrawn_total"] == 2
     assert result["secondary_kpis"]["overall_conversion_percentage"] == 20
     assert result["secondary_kpis"]["active_candidates"] == 304
@@ -280,10 +334,28 @@ def test_analytics_repository_queries_bind_every_placeholder():
     trend_query = next(query for query in executed_queries if "WITH filtered_candidates AS" in query)
     assert "GROUP BY 1, 2" in trend_query
     assert "GROUP BY date_trunc" not in trend_query
+    trend_candidates = trend_query.split("), first_shortlist", 1)[0]
+    assert "candidate.application_date BETWEEN" not in trend_candidates
+    assert "candidate.status <> 'trash_bin'" not in trend_candidates
+    activity_query = next(
+        query for query in executed_queries
+        if "FROM msi_v2.audit_events audit" in query
+    )
+    assert "candidate.application_date BETWEEN" not in activity_query
+    assert "candidate.status <> 'trash_bin'" not in activity_query
+    event_queries = [
+        query for query in executed_queries if "WITH bounds AS" in query
+    ]
+    assert len(event_queries) == 3
+    for query in event_queries:
+        base_candidates = query.split("), latest_closure", 1)[0]
+        assert "candidate.application_date BETWEEN" not in base_candidates
+        assert "candidate.status <> 'trash_bin'" not in base_candidates
     all_queries = "\n".join(executed_queries)
     assert "msi_v2.academy_teachers" in all_queries
     assert "msi_v2.teachers" in all_queries
-    assert "academy_status NOT IN ('rejected', 'removed')" in all_queries
+    assert "academy_status NOT IN (" in all_queries
+    assert "'rejected', 'removed', 'trash_bin'" in all_queries
     assert "candidate.status = ANY" in all_queries
 
 

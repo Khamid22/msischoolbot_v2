@@ -47,7 +47,7 @@ def _candidate_facts_cte(*, where_sql: str, alias: str = "candidate") -> str:
             academy.id AS academy_teacher_id,
             academy.created_at AS academy_created_at,
             active_teacher.id AS active_teacher_id,
-            active_teacher.created_at AS active_teacher_created_at,
+            active_teacher.activated_at AS active_teacher_created_at,
             COALESCE(stage_sla.breaches, 0) AS cohort_sla_breaches
         FROM msi_v2.teacher_candidates {alias}
         LEFT JOIN LATERAL (
@@ -67,14 +67,19 @@ def _candidate_facts_cte(*, where_sql: str, alias: str = "candidate") -> str:
             SELECT academy_teacher.id, academy_teacher.created_at
             FROM msi_v2.academy_teachers academy_teacher
             WHERE academy_teacher.recruitment_candidate_id = {alias}.id
-              AND academy_teacher.academy_status NOT IN ('rejected', 'removed')
+              AND academy_teacher.promoted_teacher_id IS NULL
+              AND academy_teacher.academy_status NOT IN (
+                'rejected', 'removed', 'trash_bin'
+              )
             ORDER BY academy_teacher.id DESC
             LIMIT 1
         ) academy ON true
         LEFT JOIN LATERAL (
-            SELECT teacher.id, teacher.created_at
+            SELECT teacher.id, COALESCE(teacher.activated_at, teacher.created_at)
+                   AS activated_at
             FROM msi_v2.teachers teacher
             WHERE teacher.recruitment_candidate_id = {alias}.id
+              AND teacher.status = 'active'
             ORDER BY teacher.id DESC
             LIMIT 1
         ) active_teacher ON true
@@ -99,11 +104,12 @@ def _candidate_filters(
     subject_id: int | None = None,
     responsible_account_id: int | None = None,
     alias: str = "candidate",
+    application_profiles_only: bool = True,
+    include_trash: bool = False,
 ) -> tuple[str, list[Any]]:
-    clauses = [
-        f"{alias}.status <> 'trash_bin'",
-        f"{alias}.is_application_received = true",
-    ]
+    clauses = [] if include_trash else [f"{alias}.status <> 'trash_bin'"]
+    if application_profiles_only:
+        clauses.append(f"{alias}.is_application_received = true")
     params: list[Any] = []
     if date_from and date_to:
         clauses.append(f"{alias}.application_date BETWEEN %s::date AND %s::date")
@@ -145,7 +151,7 @@ def _candidate_filters(
             )"""
         )
         params.append(int(responsible_account_id))
-    return " AND ".join(clauses), params
+    return " AND ".join(clauses) or "TRUE", params
 
 
 def options_rows(conn: Any) -> dict[str, list[Any]]:
@@ -287,11 +293,211 @@ def _live_summary(
               (
                 SELECT COUNT(*)
                 FROM msi_v2.academy_teachers academy_teacher
-                WHERE academy_teacher.academy_status NOT IN ('rejected', 'removed')
-              ) AS academy_roster_total
+                LEFT JOIN msi_v2.teacher_candidates academy_candidate
+                  ON academy_candidate.id = academy_teacher.recruitment_candidate_id
+                WHERE academy_teacher.promoted_teacher_id IS NULL
+                  AND academy_teacher.academy_status NOT IN (
+                    'rejected', 'removed', 'trash_bin'
+                  )
+                  AND COALESCE(academy_candidate.status, 'teacher_academy') NOT IN (
+                    'rejected', 'candidate_withdrew', 'trash_bin'
+                  )
+              ) AS academy_roster_total,
+              (
+                SELECT COUNT(*)
+                FROM msi_v2.teachers teacher
+                LEFT JOIN msi_v2.teacher_candidates active_candidate
+                  ON active_candidate.id = teacher.recruitment_candidate_id
+                WHERE teacher.status = 'active'
+                  AND COALESCE(active_candidate.status, 'active_teacher') NOT IN (
+                    'rejected', 'candidate_withdrew', 'trash_bin'
+                  )
+              ) AS active_teacher_roster_total
             FROM msi_v2.teacher_candidates candidate
             WHERE {where_sql}""",
         tuple([list(ACTIVE_STAGES), now, *params]),
+    ).fetchone()
+
+
+def _event_summary(
+    conn: Any,
+    *,
+    base_where: str,
+    base_params: list[Any],
+    date_from: str,
+    date_to: str,
+) -> Any:
+    """Count canonical business events rather than application-cohort outcomes."""
+
+    return conn.execute(
+        f"""
+        WITH bounds AS (
+          SELECT %s::date AS date_from, %s::date AS date_to
+        ), base_candidates AS (
+          SELECT candidate.id, candidate.application_date, candidate.status,
+                 candidate.is_application_received
+          FROM msi_v2.teacher_candidates candidate
+          WHERE {base_where}
+        ), latest_closure AS (
+          SELECT DISTINCT ON (decision.candidate_id)
+                 decision.candidate_id, decision.decision, decision.created_at
+          FROM msi_v2.teacher_candidate_final_decisions decision
+          JOIN base_candidates candidate ON candidate.id = decision.candidate_id
+          WHERE decision.voided_at IS NULL
+            AND decision.decision IN ('rejected', 'candidate_withdrew')
+          ORDER BY decision.candidate_id, decision.created_at DESC, decision.id DESC
+        ), evaluation_attempts AS (
+          SELECT interview.id, interview.candidate_id, 'interview'::text AS kind,
+                 interview.result,
+                 interview.overall_score::numeric AS score,
+                 COALESCE(interview.interview_at, interview.created_at) AS occurred_at
+          FROM msi_v2.teacher_candidate_interviews interview
+          JOIN base_candidates candidate ON candidate.id = interview.candidate_id
+          WHERE interview.voided_at IS NULL
+            AND interview.result IN ('passed', 'failed')
+          UNION ALL
+          SELECT demo.id, demo.candidate_id, 'demo'::text,
+                 demo.result, demo.score::numeric,
+                 COALESCE(demo.demo_at, demo.created_at)
+          FROM msi_v2.teacher_candidate_demo_lessons demo
+          JOIN base_candidates candidate ON candidate.id = demo.candidate_id
+          WHERE demo.voided_at IS NULL
+            AND demo.result IN ('passed', 'failed')
+          UNION ALL
+          SELECT test.id, test.candidate_id, 'subject_test'::text,
+                 test.result,
+                 CASE
+                   WHEN test.maximum_score > 0
+                   THEN (test.score / test.maximum_score) * 100
+                   ELSE test.score
+                 END,
+                 COALESCE(test.test_at, test.created_at)
+          FROM msi_v2.teacher_candidate_subject_tests test
+          JOIN base_candidates candidate ON candidate.id = test.candidate_id
+          WHERE test.voided_at IS NULL
+            AND test.result IN ('passed', 'failed')
+        ), ranked_attempts AS (
+          SELECT attempt.*,
+                 row_number() OVER (
+                   PARTITION BY attempt.kind, attempt.candidate_id
+                   ORDER BY
+                     CASE attempt.result WHEN 'passed' THEN 2 ELSE 1 END DESC,
+                     attempt.score DESC NULLS LAST,
+                     attempt.occurred_at DESC,
+                     attempt.id DESC
+                 ) AS attempt_rank
+          FROM evaluation_attempts attempt
+          CROSS JOIN bounds
+          WHERE (attempt.occurred_at AT TIME ZONE 'Asia/Tashkent')::date
+                BETWEEN bounds.date_from AND bounds.date_to
+        ), selected_attempts AS (
+          SELECT * FROM ranked_attempts WHERE attempt_rank = 1
+        )
+        SELECT
+          (
+            SELECT COUNT(*) FROM base_candidates candidate
+            CROSS JOIN bounds
+            WHERE candidate.is_application_received = true
+              AND candidate.application_date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS applications,
+          (
+            SELECT COUNT(DISTINCT history.candidate_id)
+            FROM msi_v2.teacher_candidate_stage_history history
+            JOIN base_candidates candidate ON candidate.id = history.candidate_id
+            CROSS JOIN bounds
+            WHERE history.stage = 'under_review'
+              AND (history.entered_at AT TIME ZONE 'Asia/Tashkent')::date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS final_decision,
+          (
+            SELECT COUNT(DISTINCT academy.recruitment_candidate_id)
+            FROM msi_v2.academy_teachers academy
+            JOIN base_candidates candidate
+              ON candidate.id = academy.recruitment_candidate_id
+            CROSS JOIN bounds
+            WHERE academy.promoted_teacher_id IS NULL
+              AND academy.academy_status NOT IN ('rejected', 'removed', 'trash_bin')
+              AND candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
+              AND (
+                COALESCE(
+                  academy.academy_start_date::timestamp AT TIME ZONE 'Asia/Tashkent',
+                  academy.created_at
+                ) AT TIME ZONE 'Asia/Tashkent'
+              )::date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS teacher_academy,
+          (
+            SELECT COUNT(DISTINCT teacher.recruitment_candidate_id)
+            FROM msi_v2.teachers teacher
+            JOIN base_candidates candidate
+              ON candidate.id = teacher.recruitment_candidate_id
+            CROSS JOIN bounds
+            WHERE teacher.status = 'active'
+              AND candidate.status NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
+              AND (
+                COALESCE(teacher.activated_at, teacher.created_at)
+                AT TIME ZONE 'Asia/Tashkent'
+              )::date BETWEEN bounds.date_from AND bounds.date_to
+          ) AS active_teachers,
+          (
+            SELECT COUNT(*) FROM latest_closure closure
+            JOIN base_candidates candidate ON candidate.id = closure.candidate_id
+            CROSS JOIN bounds
+            WHERE candidate.status = 'rejected'
+              AND closure.decision = 'rejected'
+              AND (closure.created_at AT TIME ZONE 'Asia/Tashkent')::date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS rejected,
+          (
+            SELECT COUNT(*) FROM latest_closure closure
+            JOIN base_candidates candidate ON candidate.id = closure.candidate_id
+            CROSS JOIN bounds
+            WHERE candidate.status = 'candidate_withdrew'
+              AND closure.decision = 'candidate_withdrew'
+              AND (closure.created_at AT TIME ZONE 'Asia/Tashkent')::date
+                  BETWEEN bounds.date_from AND bounds.date_to
+          ) AS withdrawn,
+          (
+            SELECT COUNT(*) FROM ranked_attempts attempt
+            WHERE attempt.kind = 'interview'
+          ) AS interview_total,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'interview'
+          ) AS interview_unique_candidates,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'interview' AND selected.result = 'passed'
+          ) AS interview_passed,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'interview' AND selected.result = 'failed'
+          ) AS interview_failed,
+          (
+            SELECT COUNT(*) FROM ranked_attempts attempt
+            WHERE attempt.kind = 'demo'
+          ) AS demo_total,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'demo'
+          ) AS demo_unique_candidates,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'demo' AND selected.result = 'passed'
+          ) AS demo_passed,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'demo' AND selected.result = 'failed'
+          ) AS demo_failed,
+          (
+            SELECT COUNT(*) FROM ranked_attempts attempt
+            WHERE attempt.kind = 'subject_test'
+          ) AS subject_test_total,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'subject_test'
+          ) AS subject_test_unique_candidates,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'subject_test' AND selected.result = 'passed'
+          ) AS subject_test_passed,
+          COUNT(*) FILTER (
+            WHERE selected.kind = 'subject_test' AND selected.result = 'failed'
+          ) AS subject_test_failed
+        FROM selected_attempts selected
+        """,
+        tuple([date_from, date_to, *base_params]),
     ).fetchone()
 
 
@@ -328,6 +534,16 @@ def dashboard_rows(
         **filter_values,
     )
     base_where, base_params = _candidate_filters(**filter_values)
+    event_filter_values = {
+        **filter_values,
+        "date_from": "",
+        "date_to": "",
+    }
+    event_base_where, event_base_params = _candidate_filters(
+        **event_filter_values,
+        application_profiles_only=False,
+        include_trash=True,
+    )
 
     current_summary = _cohort_summary(conn, where_sql=where_sql, params=params, now=now)
     comparison_summary = _cohort_summary(
@@ -347,6 +563,27 @@ def dashboard_rows(
         where_sql=base_where,
         params=base_params,
         now=now,
+    )
+    event_summary = _event_summary(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    comparison_event_summary = _event_summary(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from=comparison_from,
+        date_to=comparison_to,
+    )
+    total_event_summary = _event_summary(
+        conn,
+        base_where=event_base_where,
+        base_params=event_base_params,
+        date_from="1900-01-01",
+        date_to="2999-12-31",
     )
 
     facts_cte = _candidate_facts_cte(where_sql=where_sql)
@@ -393,7 +630,7 @@ def dashboard_rows(
         f"""WITH filtered_candidates AS (
               SELECT candidate.id, candidate.application_date
               FROM msi_v2.teacher_candidates candidate
-              WHERE {base_where}
+              WHERE {event_base_where}
             ), first_shortlist AS (
               SELECT candidate.id AS candidate_id, shortlist.entered_at
               FROM filtered_candidates candidate
@@ -407,14 +644,22 @@ def dashboard_rows(
                       'under_review', 'teacher_academy', 'active_teacher'
                     )
                   UNION ALL
-                  SELECT academy.created_at
-                  FROM msi_v2.academy_teachers academy
-                  WHERE academy.recruitment_candidate_id = candidate.id
-                    AND academy.academy_status NOT IN ('rejected', 'removed')
-                  UNION ALL
-                  SELECT teacher.created_at
-                  FROM msi_v2.teachers teacher
-                  WHERE teacher.recruitment_candidate_id = candidate.id
+	                  SELECT COALESCE(
+	                           academy.academy_start_date::timestamp
+	                             AT TIME ZONE 'Asia/Tashkent',
+	                           academy.created_at
+	                         )
+	                  FROM msi_v2.academy_teachers academy
+	                  WHERE academy.recruitment_candidate_id = candidate.id
+	                    AND academy.promoted_teacher_id IS NULL
+	                    AND academy.academy_status NOT IN (
+	                      'rejected', 'removed', 'trash_bin'
+	                    )
+	                  UNION ALL
+	                  SELECT COALESCE(teacher.activated_at, teacher.created_at)
+	                  FROM msi_v2.teachers teacher
+	                  WHERE teacher.recruitment_candidate_id = candidate.id
+	                    AND teacher.status = 'active'
                 ) event
               ) shortlist ON shortlist.entered_at IS NOT NULL
             ), latest_decision AS (
@@ -430,10 +675,11 @@ def dashboard_rows(
                        final_decision.id DESC
             ), canonical_hires AS (
               SELECT teacher.recruitment_candidate_id AS candidate_id,
-                     teacher.created_at
+	                     COALESCE(teacher.activated_at, teacher.created_at) AS created_at
               FROM msi_v2.teachers teacher
-              JOIN filtered_candidates candidate
-                ON candidate.id = teacher.recruitment_candidate_id
+	              JOIN filtered_candidates candidate
+	                ON candidate.id = teacher.recruitment_candidate_id
+	              WHERE teacher.status = 'active'
             ), events AS (
               SELECT candidate.application_date AS event_date, 'applications'::text AS event_type
               FROM filtered_candidates candidate
@@ -452,12 +698,16 @@ def dashboard_rows(
                   SELECT 1
                   FROM msi_v2.academy_teachers academy
                   WHERE academy.recruitment_candidate_id = decision.candidate_id
-                    AND academy.academy_status NOT IN ('rejected', 'removed')
+	                    AND academy.promoted_teacher_id IS NULL
+	                    AND academy.academy_status NOT IN (
+	                      'rejected', 'removed', 'trash_bin'
+	                    )
                 )
                 AND NOT EXISTS (
                   SELECT 1
-                  FROM msi_v2.teachers teacher
-                  WHERE teacher.recruitment_candidate_id = decision.candidate_id
+	                  FROM msi_v2.teachers teacher
+	                  WHERE teacher.recruitment_candidate_id = decision.candidate_id
+	                    AND teacher.status = 'active'
                 )
             )
             SELECT date_trunc(%s, event.event_date::timestamp)::date::text AS bucket,
@@ -467,7 +717,7 @@ def dashboard_rows(
             WHERE event.event_date BETWEEN %s::date AND %s::date
             GROUP BY 1, 2
             ORDER BY 1, 2""",
-        tuple([*base_params, bucket, date_from, date_to]),
+        tuple([*event_base_params, bucket, date_from, date_to]),
     ).fetchall()
 
     positions = conn.execute(
@@ -613,12 +863,12 @@ def dashboard_rows(
              AND audit.entity_type = 'teacher_candidate'
             LEFT JOIN msi_v2.accounts account ON account.id = audit.actor_account_id
             LEFT JOIN msi_v2.msi_staff staff ON staff.id = audit.actor_staff_id
-            WHERE {base_where}
+            WHERE {event_base_where}
               AND (audit.created_at AT TIME ZONE 'Asia/Tashkent')::date
                     BETWEEN %s::date AND %s::date
             ORDER BY audit.created_at DESC, audit.id DESC
             LIMIT 12""",
-        tuple([*base_params, date_from, date_to]),
+        tuple([*event_base_params, date_from, date_to]),
     ).fetchall()
 
     return {
@@ -626,6 +876,9 @@ def dashboard_rows(
         "comparison_summary": comparison_summary,
         "total_summary": total_summary,
         "live_summary": live_summary,
+        "event_summary": event_summary,
+        "comparison_event_summary": comparison_event_summary,
+        "total_event_summary": total_event_summary,
         "journey": journey,
         "outcomes": outcomes,
         "activity_trend": trend,

@@ -85,14 +85,14 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /delete.*candidate/i);
   });
 
-  test("moves first and schedules Interview or Demo from the yellow warning", () => {
+  test("schedules Interview or Demo from the yellow warning without date restrictions", () => {
     assert.match(pipeline, /<AppointmentForm/);
     assert.match(pipeline, /Interview not scheduled/);
     assert.match(pipeline, /Demo lesson not scheduled/);
     assert.match(pipeline, /\/appointments/);
     assert.doesNotMatch(pipeline, /\/scheduled-stage-moves/);
     assert.doesNotMatch(pipeline, /Schedule & move/);
-    assert.match(pipeline, /appointmentConflictDetails/);
+    assert.doesNotMatch(pipeline, /appointmentConflictDetails/);
     assert.match(pipeline, /setScheduleSelection/);
   });
 
@@ -135,17 +135,15 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
   test("uses compact date/time controls, auto-assigns HR interviews, and omits scheduling notes", () => {
     assert.match(appointmentForm, /type="date"/);
     assert.match(appointmentForm, /type="time"/);
-    assert.match(appointmentForm, /step=\{900\}/);
-    assert.match(appointmentForm, /step=\{15\}/);
+    assert.match(appointmentForm, /step=\{60\}/);
     assert.doesNotMatch(appointmentForm, /Appointment time|Asia\/Tashkent \(UTC\+5\)/);
     assert.doesNotMatch(appointmentForm, /Responsible interviewer/);
-    assert.match(appointmentForm, /demo && !historical \? <label[\s\S]*Demo evaluator/);
+    assert.match(appointmentForm, /demo \? \([\s\S]*Demo evaluator/);
     assert.match(appointmentForm, /Conference link \(optional\)/);
     assert.match(appointmentForm, /Location \(optional\)/);
     assert.doesNotMatch(appointmentForm, /name="note"|>Notes</);
-    assert.match(appointmentForm, /Historical result/);
-    assert.match(appointmentForm, /name="historical_result"/);
-    assert.match(appointmentForm, /isPastTashkentAppointment/);
+    assert.doesNotMatch(appointmentForm, /Historical result|historical_result|duration_minutes/);
+    assert.doesNotMatch(appointmentForm, /min=/);
   });
 
   test("keeps pipeline-only cards compact and warns about missing subject knowledge", () => {
@@ -182,7 +180,7 @@ describe("candidate navigation and progressive disclosure", () => {
   const list = source("CandidateListView.tsx");
   const workspace = source("RecruitmentWorkspace.tsx");
 
-  test("gives HR URL-backed profile tabs, inline editing, voidable evaluations, and a history drawer", () => {
+  test("gives HR URL-backed profile tabs, inline editing, deletable evaluations, and a history drawer", () => {
     for (const tab of ["overview", "evaluations", "documents", "hiring"]) {
       assert.match(profile, new RegExp(`key: "${tab}"`));
     }
@@ -196,10 +194,15 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /education_background/);
     assert.match(profile, /Education background/);
     assert.match(profile, /expected_version: candidate\.version/);
-    assert.match(profile, /Void mistaken result/);
+    assert.match(profile, /Delete evaluation/);
+    assert.match(profile, /permanently/);
+    assert.match(profile, /method: "DELETE"/);
     assert.match(profile, /Read-only audit trail/);
-    assert.match(profile, /value="trash_bin"/);
-    assert.match(profile, /appointments are scheduled separately after the move/);
+    assert.doesNotMatch(profile, /kind: "move_candidate"/);
+    assert.doesNotMatch(profile, /kind: "record_interview"/);
+    assert.doesNotMatch(profile, /kind: "record_demo"/);
+    assert.match(profile, /Candidate Withdraw/);
+    assert.match(profile, /View History/);
     assert.doesNotMatch(profile, /\/scheduled-stage-moves/);
     assert.match(profile, /candidate\.next_appointment/);
     assert.doesNotMatch(profile, /title="Upcoming appointments"/);
@@ -241,19 +244,21 @@ describe("candidate navigation and progressive disclosure", () => {
     );
   });
 
-  test("records scheduled demo lessons in a compact Pass or Reject modal", () => {
-    const demoFields = profile.split('case "record_demo":')[1]?.split('case "schedule_appointment":')[0] || "";
-    assert.match(profile, /open=\{action\?\.kind === "record_demo"\}/);
-    assert.match(profile, /title="Record demo lesson"/);
-    assert.match(profile, /size="sm"/);
-    assert.match(demoFields, /Date/);
-    assert.match(demoFields, /Time/);
-    assert.match(demoFields, /Full name/);
-    assert.match(demoFields, /Evaluator's notes/);
-    assert.doesNotMatch(demoFields, /Score \(0–10\)|Criterion result|Academic recommendation|name="score"/);
-    assert.match(profile, /name="result" value="passed"[\s\S]*Pass/);
-    assert.match(profile, /name="result" value="failed"[\s\S]*Reject/);
-    assert.match(profile, /scheduledAppointments\.find\(\(item\) => item\.appointment_type === "demo_lesson"/);
+  test("starts assigned demos with overwrite confirmation and records Pass or Fail", () => {
+    const demoSession = source("DemoSessionModal.tsx");
+    assert.match(profile, /<DemoSessionModal/);
+    assert.match(demoSession, /Start demo lesson now\?/);
+    assert.match(demoSession, /scheduled date and time will be overwritten/);
+    assert.match(demoSession, />\s*Cancel\s*</);
+    assert.match(demoSession, />[\s\S]*Proceed\s*</);
+    assert.match(demoSession, /complete\.mutate\("passed"\)/);
+    assert.match(demoSession, /complete\.mutate\("failed"\)/);
+    assert.match(demoSession, /Evaluator notes/);
+    assert.doesNotMatch(demoSession, /Score \(0–10\)|Criterion result|Academic recommendation/);
+    assert.match(
+      profile,
+      /scheduledAppointments\.find\([\s\S]*appointment_type === "demo_lesson"/,
+    );
   });
 
   test("records a compact subject percentage and Passed or Failed status", () => {
@@ -357,13 +362,18 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /<AnalyticsView/);
     assert.match(analytics, /\/api\/v1\/hr\/analytics/);
     assert.match(analytics, /Applications/);
-    assert.match(analytics, /Shortlisted/);
-    assert.match(analytics, /Academy accepted/);
+    assert.match(analytics, /Final Decision/);
+    assert.match(analytics, /Teacher Academy/);
+    assert.match(analytics, /Active Teachers/);
+    assert.match(analytics, /Job Interviews/);
+    assert.match(analytics, /Demo Lessons/);
+    assert.match(analytics, /Subject Tests/);
     assert.match(analytics, /academy_total/);
     assert.match(analytics, /Total \{numberValue/);
     assert.match(analytics, /Current active pipeline/);
     assert.match(analytics, /SLA overdue now/);
-    assert.match(analytics, /Selected application cohort/);
+    assert.match(analytics, /type="month"/);
+    assert.match(analytics, /disabled=\{selectedMonth >= currentMonth\}/);
     assert.match(analytics, /Live snapshot/);
     assert.match(analytics, /Recruitment journey/);
     assert.match(analytics, /Applicant sources/);
@@ -468,18 +478,22 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(workspace, /key: "schedule", label: "Schedule"/);
     assert.match(workspace, /view === "schedule" \? <ScheduleView/);
     assert.match(schedule, /mode === "week"/);
-    assert.match(schedule, /md:hidden/);
+    assert.match(schedule, /overflow-x-auto/);
     assert.match(schedule, /replaceUrlParams/);
     assert.match(schedule, /appointment_type/);
     assert.match(schedule, /responsible_account_id/);
     assert.match(schedule, /Asia\/Tashkent/);
     assert.match(schedule, /scheduleDayLabel\(day\)/);
     assert.match(schedule, /appointmentTimeLabel\(item\)/);
-    assert.match(schedule, /scheduled,in_progress,completed/);
-    assert.match(schedule, /Current & completed/);
-    assert.match(schedule, /Evaluated by/);
+    assert.match(schedule, /not_conducted/);
+    assert.match(schedule, /Passed/);
+    assert.match(schedule, /Failed/);
+    assert.match(schedule, /Overdue/);
     assert.match(schedule, /evaluated_by_name/);
-    assert.match(schedule, /min-w-\[70rem\]/);
+    assert.match(schedule, /min-w-\[84rem\]/);
+    assert.match(schedule, /overflow-y-auto/);
+    assert.match(schedule, /placeholderData: keepPreviousData/);
+    assert.doesNotMatch(schedule, /Completed/);
     assert.doesNotMatch(schedule, /dateLabel\(schoolDayStartIso\(day\)\)/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
   });

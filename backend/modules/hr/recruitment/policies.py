@@ -111,11 +111,14 @@ def ensure_approval_review(user: CurrentUser, candidate_id: int) -> None:
 
 def ensure_final_decision(user: CurrentUser, decision: str) -> None:
     normalized = str(decision or "").strip()
-    if user.role == "ceo":
+    if user.role == "ceo" and normalized != "teacher_academy":
         return
     if user.role in {"hr_manager", "academic_director"} and normalized == "rejected":
         return
-    if user.role == "hr_manager" and normalized == "candidate_withdrew":
+    if user.role == "hr_manager" and normalized in {
+        "candidate_withdrew",
+        "teacher_academy",
+    }:
         return
     raise HTTPException(status_code=403, detail="You cannot finalize this recruitment decision.")
 

@@ -313,6 +313,11 @@ def _patch_approval_transaction(monkeypatch, *, approval_status: str = "requeste
     )
     monkeypatch.setattr(
         repository,
+        "touch_candidate",
+        lambda *_args, **_kwargs: events.append(("touched", _kwargs["candidate_id"])),
+    )
+    monkeypatch.setattr(
+        repository,
         "ensure_active_teacher_intake",
         lambda *_args, **_kwargs: events.append(("intake", 77)) or 77,
     )
@@ -336,19 +341,12 @@ def _patch_approval_transaction(monkeypatch, *, approval_status: str = "requeste
         "consume_approval",
         lambda *_args, **_kwargs: events.append(("consumed", _kwargs["approval_id"])),
     )
-    monkeypatch.setattr(service, "get_candidate", lambda *_args: {"id": 8, "status": "active_teacher"})
+    monkeypatch.setattr(service, "get_candidate", lambda *_args: {"id": 8, "status": "under_review"})
     return conn, events, candidate, approval
 
 
-@pytest.mark.parametrize("approval_status", ["requested", "approved"])
-def test_academic_director_approval_atomically_finalizes_and_consumes(
-    monkeypatch,
-    approval_status,
-):
-    conn, events, _candidate, _approval = _patch_approval_transaction(
-        monkeypatch,
-        approval_status=approval_status,
-    )
+def test_academic_director_approval_records_review_without_finalizing(monkeypatch):
+    conn, events, _candidate, _approval = _patch_approval_transaction(monkeypatch)
 
     result = service.review_approval(
         _user(),
@@ -358,79 +356,37 @@ def test_academic_director_approval_atomically_finalizes_and_consumes(
         review_comment="Academic review complete.",
     )
 
-    assert result["status"] == "active_teacher"
-    assert ("intake", 77) in events
-    assert ("stage", "active_teacher") in events
-    assert ("consumed", 9) in events
-    assert any(event == "candidate.final_decision_made" for event, _detail in events)
-    if approval_status == "requested":
-        assert ("approved", "approved") in events
-        assert any(event == "candidate.hire_approval_approved" for event, _detail in events)
-    else:
-        assert ("approved", "approved") not in events
+    assert result["status"] == "under_review"
+    assert ("approved", "approved") in events
+    assert ("touched", 8) in events
+    assert any(event == "candidate.hire_approval_approved" for event, _detail in events)
+    assert not any(
+        event in {"intake", "academy", "stage", "decision", "consumed"}
+        for event, _detail in events
+    )
     assert conn.commits == 1
 
 
-def test_academic_director_academy_approval_provisions_account_before_stage_commit(
-    monkeypatch,
-):
-    conn, events, candidate, approval = _patch_approval_transaction(monkeypatch)
+def test_academic_director_cannot_review_legacy_academy_approval(monkeypatch):
+    conn, events, _candidate, approval = _patch_approval_transaction(monkeypatch)
     approval["requested_outcome"] = "teacher_academy"
-    monkeypatch.setattr(
-        service,
-        "provision_recruitment_academy_account",
-        lambda *_args, **_kwargs: events.append(
-            ("account", _kwargs["academy_teacher_id"])
-        ),
-    )
-    monkeypatch.setattr(
-        service,
-        "get_candidate",
-        lambda *_args: {"id": 8, "status": "teacher_academy"},
-    )
 
-    result = service.review_approval(
-        _user(),
-        8,
-        9,
-        status="approved",
-        review_comment="Approved for Academy.",
-    )
+    with pytest.raises(service.RecruitmentError) as exc:
+        service.review_approval(
+            _user(),
+            8,
+            9,
+            status="approved",
+            review_comment="Approved for Academy.",
+        )
 
-    assert result["status"] == "teacher_academy"
-    assert events.index(("academy", 88)) < events.index(("account", 88))
-    assert events.index(("account", 88)) < events.index(("stage", "teacher_academy"))
-    assert conn.commits == 1
-
-
-def test_approval_retry_reuses_consumed_outcome_without_duplicate_mutations(monkeypatch):
-    conn, events, candidate, approval = _patch_approval_transaction(
-        monkeypatch,
-        approval_status="consumed",
-    )
-    candidate.update({"status": "active_teacher", "active_teacher_id": 77})
-    monkeypatch.setattr(
-        repository,
-        "final_decision_for_approval",
-        lambda *_args, **_kwargs: {"id": 15, "decision": "active_teacher"},
-    )
-
-    result = service.review_approval(
-        _user(),
-        8,
-        9,
-        status="approved",
-        review_comment="Retry.",
-    )
-
-    assert result["status"] == "active_teacher"
+    assert exc.value.status_code == 409
     assert events == []
-    assert conn.rollbacks == 1
     assert conn.commits == 0
 
 
-@pytest.mark.parametrize("approval_status", ["returned", "revoked"])
-def test_returned_and_revoked_approvals_conflict(monkeypatch, approval_status):
+@pytest.mark.parametrize("approval_status", ["approved", "consumed", "returned", "revoked"])
+def test_non_pending_approvals_conflict(monkeypatch, approval_status):
     _patch_approval_transaction(monkeypatch, approval_status=approval_status)
 
     with pytest.raises(service.RecruitmentError) as exc:
@@ -460,11 +416,6 @@ def test_mismatched_approval_conflicts(monkeypatch):
         },
     )
     monkeypatch.setattr(repository, "get_approval_row", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        repository,
-        "get_approval_by_id",
-        lambda *_args, **_kwargs: {"id": 9, "candidate_id": 99},
-    )
 
     with pytest.raises(service.RecruitmentError) as exc:
         service.review_approval(

@@ -27,6 +27,7 @@ def _appointment_columns() -> str:
         COALESCE(subject.subject_name, '') AS subject,
         COALESCE(responsible.full_name, responsible.login, '') AS responsible_name,
         responsible.role AS responsible_role,
+        COALESCE(interview_evaluation.result, demo_evaluation.result, '') AS evaluation_outcome,
         COALESCE(demo_evaluator.full_name, demo_evaluator.login, '') AS evaluated_by_name
     """
 
@@ -41,6 +42,7 @@ def list_appointment_rows(
     starts_to: str = "",
     appointment_type: str = "",
     status: str = "",
+    display_status: str = "",
     responsible_account_id: int | None = None,
     limit: int = 100,
     offset: int = 0,
@@ -80,16 +82,47 @@ def list_appointment_rows(
     if appointment_type:
         clauses.append("appointment.appointment_type = %s")
         params.append(appointment_type)
-    if status:
-        status_values = [
-            item.strip() for item in str(status).split(",") if item.strip()
-        ]
-        if len(status_values) == 1:
-            clauses.append("appointment.status = %s")
-            params.append(status_values[0])
-        elif status_values:
-            clauses.append("appointment.status = ANY(%s::text[])")
-            params.append(status_values)
+    status_values = [
+        item.strip() for item in str(status).split(",") if item.strip()
+    ]
+    display_values = [
+        item.strip()
+        for item in str(display_status).split(",")
+        if item.strip()
+    ]
+    status_predicates: list[str] = []
+    if status_values:
+        status_predicates.append(
+            "appointment.status = %s"
+            if len(status_values) == 1
+            else "appointment.status = ANY(%s::text[])"
+        )
+        params.append(status_values[0] if len(status_values) == 1 else status_values)
+    if display_values:
+        display_expression = """CASE
+            WHEN COALESCE(
+                interview_evaluation.result,
+                demo_evaluation.result,
+                ''
+            ) IN ('passed', 'failed')
+            THEN COALESCE(
+                interview_evaluation.result,
+                demo_evaluation.result
+            )
+            WHEN appointment.status = 'in_progress' THEN 'in_progress'
+            WHEN appointment.status = 'scheduled'
+                 AND appointment.starts_at < now() THEN 'overdue'
+            WHEN appointment.status = 'scheduled' THEN 'scheduled'
+            ELSE 'not_conducted'
+        END"""
+        status_predicates.append(
+            f"({display_expression}) = %s"
+            if len(display_values) == 1
+            else f"({display_expression}) = ANY(%s::text[])"
+        )
+        params.append(display_values[0] if len(display_values) == 1 else display_values)
+    if status_predicates:
+        clauses.append(f"({' OR '.join(status_predicates)})")
     if responsible_account_id:
         clauses.append("appointment.responsible_account_id = %s")
         params.append(int(responsible_account_id))
@@ -100,6 +133,9 @@ def list_appointment_rows(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.teacher_candidate_interviews interview_evaluation
+          ON interview_evaluation.appointment_id = appointment.id
+         AND interview_evaluation.voided_at IS NULL
         LEFT JOIN msi_v2.teacher_candidate_demo_lessons demo_evaluation
           ON demo_evaluation.appointment_id = appointment.id
          AND demo_evaluation.voided_at IS NULL
@@ -139,6 +175,9 @@ def get_appointment_row(
         LEFT JOIN msi_v2.subjects subject ON subject.id = candidate.subject_id
         LEFT JOIN msi_v2.accounts responsible ON responsible.id = appointment.responsible_account_id
         LEFT JOIN msi_v2.accounts started_by ON started_by.id = appointment.started_by_account_id
+        LEFT JOIN msi_v2.teacher_candidate_interviews interview_evaluation
+          ON interview_evaluation.appointment_id = appointment.id
+         AND interview_evaluation.voided_at IS NULL
         LEFT JOIN msi_v2.teacher_candidate_demo_lessons demo_evaluation
           ON demo_evaluation.appointment_id = appointment.id
          AND demo_evaluation.voided_at IS NULL
@@ -346,37 +385,6 @@ def complete_appointment(
     ).fetchone()
 
 
-def complete_historical_appointment(
-    conn: Any,
-    *,
-    appointment_id: int,
-    candidate_id: int,
-    completed_at: str,
-    actor_account_id: int | None,
-    now: str,
-) -> Any:
-    """Complete a restored appointment at its real historical end time."""
-
-    return conn.execute(
-        """
-        UPDATE msi_v2.teacher_candidate_appointments
-        SET status = 'completed', completed_at = %s::timestamptz,
-            updated_by_account_id = %s, updated_at = %s::timestamptz,
-            version = version + 1
-        WHERE id = %s AND candidate_id = %s
-          AND status IN ('scheduled', 'in_progress')
-        RETURNING id, version
-        """,
-        (
-            completed_at,
-            actor_account_id,
-            now,
-            int(appointment_id),
-            int(candidate_id),
-        ),
-    ).fetchone()
-
-
 def cancel_active_appointments(
     conn: Any,
     *,
@@ -417,7 +425,7 @@ def cancel_scheduled_appointments(
     )
 
 
-def start_interview_session(
+def start_appointment_session(
     conn: Any,
     *,
     appointment_id: int,
@@ -429,16 +437,16 @@ def start_interview_session(
     return conn.execute(
         """
         UPDATE msi_v2.teacher_candidate_appointments
-        SET status = 'in_progress', started_at = %s::timestamptz,
+        SET status = 'in_progress', starts_at = %s::timestamptz,
+            ends_at = NULL, started_at = %s::timestamptz,
             started_by_account_id = %s, updated_by_account_id = %s,
             updated_at = %s::timestamptz, version = version + 1
         WHERE id = %s AND candidate_id = %s
-          AND appointment_type = 'job_interview'
           AND status = 'scheduled' AND version = %s
-          AND %s::timestamptz >= starts_at - interval '30 minutes'
         RETURNING id, version, status, started_at::text AS started_at
         """,
         (
+            now,
             now,
             actor_account_id,
             actor_account_id,
@@ -446,9 +454,24 @@ def start_interview_session(
             int(appointment_id),
             int(candidate_id),
             int(expected_version),
-            now,
         ),
     ).fetchone()
+
+
+def delete_appointment(
+    conn: Any,
+    *,
+    appointment_id: int,
+    candidate_id: int,
+) -> bool:
+    cursor = conn.execute(
+        """
+        DELETE FROM msi_v2.teacher_candidate_appointments
+        WHERE id = %s AND candidate_id = %s
+        """,
+        (int(appointment_id), int(candidate_id)),
+    )
+    return int(getattr(cursor, "rowcount", 0) or 0) > 0
 
 
 def complete_interview_session(
@@ -488,13 +511,13 @@ __all__ = [
     "cancel_active_appointments",
     "cancel_scheduled_appointments",
     "complete_appointment",
-    "complete_historical_appointment",
     "complete_interview_session",
+    "delete_appointment",
     "get_appointment_row",
     "insert_appointment",
     "list_appointment_conflicts",
     "list_appointment_rows",
     "set_appointment_status",
-    "start_interview_session",
+    "start_appointment_session",
     "update_appointment",
 ]

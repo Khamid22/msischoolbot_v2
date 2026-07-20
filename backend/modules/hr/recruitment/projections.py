@@ -55,9 +55,18 @@ def task_payload(row: Any) -> dict[str, Any]:
 def appointment_payload(row: Any) -> dict[str, Any]:
     payload = row_dict(row)
     payload["is_overdue"] = False
-    payload["can_start"] = False
-    payload["start_available_at"] = None
+    payload["can_start"] = text(payload.get("status")) == "scheduled"
+    payload["start_available_at"] = payload.get("starts_at")
     payload["overdue_at"] = None
+    status = text(payload.get("status"))
+    outcome = text(payload.get("evaluation_outcome")).lower()
+    display_status = {
+        "cancelled": "not_conducted",
+        "no_show": "not_conducted",
+        "in_progress": "in_progress",
+    }.get(status, "")
+    if outcome in {"passed", "failed"}:
+        display_status = outcome
     if payload.get("starts_at"):
         try:
             starts_at = datetime.fromisoformat(
@@ -65,19 +74,18 @@ def appointment_payload(row: Any) -> dict[str, Any]:
             )
             if starts_at.tzinfo is None:
                 starts_at = starts_at.replace(tzinfo=UTC)
-            start_available_at = starts_at - timedelta(minutes=30)
-            overdue_at = starts_at + timedelta(minutes=30)
             now = datetime.now(UTC)
-            payload["start_available_at"] = start_available_at.isoformat()
-            payload["overdue_at"] = overdue_at.isoformat()
-            payload["can_start"] = (
-                text(payload.get("status")) == "scheduled" and now >= start_available_at
-            )
+            payload["overdue_at"] = starts_at.isoformat()
             payload["is_overdue"] = (
-                text(payload.get("status")) == "scheduled" and now >= overdue_at
+                status == "scheduled" and now > starts_at
             )
+            if payload["is_overdue"]:
+                display_status = "overdue"
         except ValueError:
             pass
+    if not display_status:
+        display_status = "scheduled" if status == "scheduled" else "not_conducted"
+    payload["display_status"] = display_status
     return payload
 
 
@@ -391,7 +399,7 @@ def permissions(
         "can_review_approval": role == "academic_director",
         "can_finalize": role == "ceo",
         "can_reject": role in {"hr_manager", "academic_director", "ceo"},
-        "can_void_evaluations": (role in {"hr_manager", "ceo"} or academic_evaluation),
+        "can_delete_evaluations": (role in {"hr_manager", "ceo"} or academic_evaluation),
         "can_add_note": role
         in {"hr_manager", "academic_director", "head_of_department", "ceo"},
     }

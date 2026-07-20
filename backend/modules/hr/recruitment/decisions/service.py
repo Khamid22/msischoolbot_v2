@@ -56,15 +56,40 @@ def request_approval(
     request_note: str,
     dependencies: DecisionDependencies,
 ) -> dict[str, Any]:
-    outcome = _text(requested_outcome)
-    if outcome not in PROTECTED_HIRE_STAGES:
+    if user.role not in {"hr_manager", "ceo"}:
         raise RecruitmentError(
-            "Hiring approval is only available for Academy or Active Teacher outcomes."
+            "Only HR can request Active Teacher approval.", status_code=403
+        )
+    outcome = _text(requested_outcome)
+    if outcome != "active_teacher":
+        raise RecruitmentError(
+            "Academic Director approval is only used for Active Teachers."
         )
     now = _now()
     with dependencies.connect() as conn:
-        if not repository.get_candidate_row(conn, int(candidate_id)):
+        candidate = dependencies.lock_candidate(conn, int(candidate_id))
+        if not candidate:
             raise RecruitmentError("Candidate was not found.", status_code=404)
+        academy_promotion = (
+            _text(candidate["status"]) == "teacher_academy"
+            and int(candidate.get("academy_teacher_id") or 0) > 0
+        )
+        if not academy_promotion:
+            evaluation_state = repository.candidate_evaluation_state(
+                conn, candidate_id=int(candidate_id)
+            )
+            if _text(candidate["status"]) != "under_review" or not all(
+                bool(evaluation_state[key])
+                for key in (
+                    "interview_passed",
+                    "demo_passed",
+                    "subject_test_passed",
+                )
+            ):
+                raise RecruitmentError(
+                    "All recruitment evaluations must pass before requesting Active Teacher approval.",
+                    status_code=409,
+                )
         approval_id = repository.insert_approval_request(
             conn,
             candidate_id=int(candidate_id),
@@ -98,170 +123,6 @@ def request_approval(
     return dependencies.get_candidate(user, int(candidate_id))
 
 
-def _approve_and_finalize_request(
-    user: CurrentUser,
-    candidate_id: int,
-    approval_id: int,
-    *,
-    review_comment: str,
-    dependencies: DecisionDependencies,
-) -> dict[str, Any]:
-    now = _now()
-    with dependencies.connect() as conn:
-        candidate = dependencies.lock_candidate(conn, int(candidate_id))
-        if not candidate:
-            raise RecruitmentError("Candidate was not found.", status_code=404)
-        approval = repository.get_approval_row(
-            conn,
-            candidate_id=int(candidate_id),
-            approval_id=int(approval_id),
-            for_update=True,
-        )
-        if not approval:
-            mismatched = repository.get_approval_by_id(
-                conn, approval_id=int(approval_id), for_update=True
-            )
-            if mismatched:
-                raise RecruitmentError(
-                    "Approval request does not belong to this candidate.",
-                    status_code=409,
-                )
-            raise RecruitmentError("Approval request was not found.", status_code=404)
-        outcome = _text(approval["requested_outcome"])
-        approval_status = _text(approval["status"])
-        linked_id = (
-            int(candidate["academy_teacher_id"] or 0)
-            if outcome == "teacher_academy"
-            else int(candidate["active_teacher_id"] or 0)
-        )
-        if approval_status == "consumed":
-            final_decision = repository.final_decision_for_approval(
-                conn, candidate_id=int(candidate_id), approval_id=int(approval_id)
-            )
-            if (
-                outcome in PROTECTED_HIRE_STAGES
-                and _text(candidate["status"]) == outcome
-                and linked_id
-                and final_decision
-                and (_text(final_decision["decision"]) == outcome)
-            ):
-                conn.rollback()
-                return dependencies.get_candidate(user, int(candidate_id))
-            raise RecruitmentError(
-                "This approval was already consumed by another decision.",
-                status_code=409,
-            )
-        if approval_status not in {"requested", "approved"}:
-            raise RecruitmentError(
-                "Approval request is no longer actionable.", status_code=409
-            )
-        if outcome not in PROTECTED_HIRE_STAGES:
-            raise RecruitmentError(
-                "Approval request has an invalid hiring outcome.", status_code=409
-            )
-        if _text(candidate["status"]) in PROTECTED_HIRE_STAGES or linked_id:
-            raise RecruitmentError(
-                "The candidate already has a finalized hiring outcome.", status_code=409
-            )
-        if approval_status == "requested":
-            if not repository.review_approval(
-                conn,
-                candidate_id=int(candidate_id),
-                approval_id=int(approval_id),
-                status="approved",
-                comment=review_comment,
-                actor_account_id=_actor_account(user),
-                now=now,
-            ):
-                raise RecruitmentError(
-                    "Approval request changed elsewhere. Refresh and try again.",
-                    status_code=409,
-                )
-            repository.insert_audit(
-                conn,
-                candidate_id=int(candidate_id),
-                event_type="candidate.hire_approval_approved",
-                detail={"approval_id": int(approval_id), "comment": review_comment},
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
-        if outcome == "teacher_academy":
-            academy_teacher_id = repository.ensure_academy_intake(
-                conn, candidate=candidate, actor_login=user.login, now=now
-            )
-            try:
-                dependencies.provision_academy_account(
-                    conn,
-                    academy_teacher_id=academy_teacher_id,
-                    actor_account_id=_actor_account(user),
-                    actor_login=user.login,
-                    now=now,
-                )
-            except AcademyAccountProvisioningError as exc:
-                raise RecruitmentError(
-                    str(exc),
-                    status_code=409,
-                    code="academy_account_provisioning_failed",
-                ) from exc
-        else:
-            repository.ensure_active_teacher_intake(conn, candidate=candidate, now=now)
-        updated = repository.update_candidate_stage(
-            conn,
-            candidate_id=int(candidate_id),
-            stage=outcome,
-            expected_version=int(candidate["version"]),
-            actor_account_id=_actor_account(user),
-            now=now,
-            comment=review_comment or "Academic Director approved hiring outcome.",
-            transition_source="automatic",
-        )
-        if not updated:
-            raise RecruitmentError(
-                "This candidate changed elsewhere. Refresh and try again.",
-                status_code=409,
-            )
-        decision_id = repository.insert_final_decision(
-            conn,
-            candidate_id=int(candidate_id),
-            values={
-                "decision": outcome,
-                "rejection_reason": "",
-                "reason_detail": review_comment,
-                "origin_stage": _text(candidate["status"]),
-                "follow_up_at": "",
-                "approval_id": int(approval_id),
-            },
-            actor_account_id=_actor_account(user),
-            actor_login=user.login,
-            now=now,
-        )
-        repository.consume_approval(conn, approval_id=int(approval_id), now=now)
-        repository.insert_audit(
-            conn,
-            candidate_id=int(candidate_id),
-            event_type="candidate.final_decision_made",
-            detail={
-                "decision_id": decision_id,
-                "decision": outcome,
-                "rejection_reason": "",
-                "reason_detail": review_comment,
-                "approval_id": int(approval_id),
-            },
-            actor_account_id=_actor_account(user),
-            actor_staff_id=_actor_staff(user),
-            now=now,
-        )
-        dependencies.sync_next_actions(
-            conn,
-            candidate_id=int(candidate_id),
-            actor_account_id=_actor_account(user),
-            now=now,
-        )
-        conn.commit()
-    return dependencies.get_candidate(user, int(candidate_id))
-
-
 def review_approval(
     user: CurrentUser,
     candidate_id: int,
@@ -271,6 +132,11 @@ def review_approval(
     review_comment: str,
     dependencies: DecisionDependencies,
 ) -> dict[str, Any]:
+    if user.role != "academic_director":
+        raise RecruitmentError(
+            "Only the Academic Director can review hiring approval requests.",
+            status_code=403,
+        )
     normalized_status = _text(status)
     normalized_comment = _text(review_comment)
     if normalized_status not in {"approved", "returned"}:
@@ -279,17 +145,29 @@ def review_approval(
         raise RecruitmentError(
             "A comment is required when returning an approval request."
         )
-    if normalized_status == "approved":
-        return _approve_and_finalize_request(
-            user,
-            candidate_id,
-            approval_id,
-            review_comment=normalized_comment
-            or "Approved and finalized by Academic Director.",
-            dependencies=dependencies,
-        )
     now = _now()
     with dependencies.connect() as conn:
+        approval = repository.get_approval_row(
+            conn,
+            candidate_id=int(candidate_id),
+            approval_id=int(approval_id),
+            for_update=True,
+        )
+        if not approval:
+            raise RecruitmentError(
+                "Approval request was not found or does not belong to this candidate.",
+                status_code=409,
+            )
+        if _text(approval["requested_outcome"]) != "active_teacher":
+            raise RecruitmentError(
+                "Teacher Academy placement is finalized directly by HR.",
+                status_code=409,
+            )
+        if _text(approval["status"]) != "requested":
+            raise RecruitmentError(
+                "Approval request is no longer pending.",
+                status_code=409,
+            )
         if not repository.review_approval(
             conn,
             candidate_id=int(candidate_id),
@@ -318,6 +196,12 @@ def review_approval(
             actor_staff_id=_actor_staff(user),
             now=now,
         )
+        dependencies.sync_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     return dependencies.get_candidate(user, int(candidate_id))
 
@@ -333,9 +217,13 @@ def make_final_decision(
     allowed = {*PROTECTED_HIRE_STAGES, "rejected", "candidate_withdrew"}
     if decision not in allowed:
         raise RecruitmentError("Unknown final decision.")
-    if decision in PROTECTED_HIRE_STAGES and user.role != "ceo":
+    if decision == "active_teacher" and user.role != "ceo":
         raise RecruitmentError(
             "Only CEO can directly finalize this hiring outcome.", status_code=403
+        )
+    if decision == "teacher_academy" and user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR can add a candidate to Teacher Academy.", status_code=403
         )
     if decision == "rejected" and user.role not in {
         "hr_manager",
@@ -379,6 +267,27 @@ def make_final_decision(
             conn.rollback()
             return dependencies.get_candidate(user, int(candidate_id))
         if decision in PROTECTED_HIRE_STAGES:
+            academy_promotion = (
+                decision == "active_teacher"
+                and _text(candidate["status"]) == "teacher_academy"
+                and int(candidate.get("academy_teacher_id") or 0) > 0
+            )
+            if not academy_promotion:
+                evaluation_state = repository.candidate_evaluation_state(
+                    conn, candidate_id=int(candidate_id)
+                )
+                if _text(candidate["status"]) != "under_review" or not all(
+                    bool(evaluation_state[key])
+                    for key in (
+                        "interview_passed",
+                        "demo_passed",
+                        "subject_test_passed",
+                    )
+                ):
+                    raise RecruitmentError(
+                        "All recruitment evaluations must pass before final placement.",
+                        status_code=409,
+                    )
             linked_id = (
                 int(candidate["academy_teacher_id"] or 0)
                 if decision == "teacher_academy"
@@ -387,23 +296,24 @@ def make_final_decision(
             if _text(candidate["status"]) == decision and linked_id:
                 conn.rollback()
                 return dependencies.get_candidate(user, int(candidate_id))
-            if not approval_id:
+            if decision == "active_teacher" and not approval_id:
                 raise RecruitmentError("Academic Director approval is required.")
-            approval = repository.get_approval_row(
-                conn,
-                candidate_id=int(candidate_id),
-                approval_id=approval_id,
-                for_update=True,
-            )
-            if (
-                not approval
-                or approval["status"] != "approved"
-                or approval["requested_outcome"] != decision
-            ):
-                raise RecruitmentError(
-                    "Use an approved Academic Director request for this outcome.",
-                    status_code=409,
+            if decision == "active_teacher":
+                approval = repository.get_approval_row(
+                    conn,
+                    candidate_id=int(candidate_id),
+                    approval_id=approval_id,
+                    for_update=True,
                 )
+                if (
+                    not approval
+                    or approval["status"] != "approved"
+                    or approval["requested_outcome"] != decision
+                ):
+                    raise RecruitmentError(
+                        "Use an approved Academic Director request for this outcome.",
+                        status_code=409,
+                    )
         if decision == "teacher_academy":
             academy_teacher_id = repository.ensure_academy_intake(
                 conn, candidate=candidate, actor_login=user.login, now=now
@@ -481,7 +391,7 @@ def make_final_decision(
             actor_login=user.login,
             now=now,
         )
-        if decision in PROTECTED_HIRE_STAGES:
+        if approval_id:
             repository.consume_approval(conn, approval_id=approval_id, now=now)
         if revoked_approval_ids:
             repository.insert_audit(
@@ -537,7 +447,6 @@ def make_final_decision(
 
 __all__ = [
     "DecisionDependencies",
-    "_approve_and_finalize_request",
     "make_final_decision",
     "request_approval",
     "review_approval",

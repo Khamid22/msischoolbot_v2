@@ -282,6 +282,9 @@ def dashboard(
     current = _dict(rows["current_summary"])
     comparison = _dict(rows["comparison_summary"])
     all_time = _dict(rows["total_summary"])
+    events = _dict(rows["event_summary"])
+    comparison_events = _dict(rows["comparison_event_summary"])
+    all_time_events = _dict(rows["total_event_summary"])
     live = _dict(rows["live_summary"])
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
     journey_counts = {
@@ -374,16 +377,46 @@ def dashboard(
         },
         "summary_cards": {
             key: {
-                **_comparison_metric(current.get(key), comparison.get(key)),
-                "total": int(all_time.get(key) or 0),
+                **_comparison_metric(events.get(key), comparison_events.get(key)),
+                "total": int(all_time_events.get(key) or 0),
             }
-            for key in ("applications", "shortlisted", "hired", "rejected")
+            for key in (
+                "applications",
+                "final_decision",
+                "teacher_academy",
+                "active_teachers",
+                "rejected",
+            )
+        },
+        "evaluation_kpis": {
+            kind: {
+                "total": int(events.get(f"{kind}_total") or 0),
+                "unique_candidates": int(
+                    events.get(f"{kind}_unique_candidates") or 0
+                ),
+                "passed": int(events.get(f"{kind}_passed") or 0),
+                "failed": int(events.get(f"{kind}_failed") or 0),
+                "pass_rate": (
+                    round(
+                        int(events.get(f"{kind}_passed") or 0)
+                        / int(events.get(f"{kind}_unique_candidates") or 0)
+                        * 100,
+                        1,
+                    )
+                    if int(events.get(f"{kind}_unique_candidates") or 0)
+                    else 0
+                ),
+            }
+            for kind in ("interview", "demo", "subject_test")
         },
         "secondary_kpis": {
-            "academy_accepted": int(current.get("academy_accepted") or 0),
+            "academy_accepted": int(events.get("teacher_academy") or 0),
             "academy_total": int(live.get("academy_roster_total") or 0),
-            "withdrawn": int(current.get("withdrawn") or 0),
-            "withdrawn_total": int(all_time.get("withdrawn") or 0),
+            "active_teacher_total": int(
+                live.get("active_teacher_roster_total") or 0
+            ),
+            "withdrawn": int(events.get("withdrawn") or 0),
+            "withdrawn_total": int(all_time_events.get("withdrawn") or 0),
             "active_candidates": int(live.get("active_candidates") or 0),
             "average_time_to_hire_days": current.get("average_time_to_hire_days"),
             "overall_conversion_percentage": current.get("overall_conversion_percentage"),

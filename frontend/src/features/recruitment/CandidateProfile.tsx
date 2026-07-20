@@ -32,9 +32,9 @@ import {
 } from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
+import { DemoSessionModal } from "@/features/recruitment/DemoSessionModal";
 import { InterviewSessionModal } from "@/features/recruitment/InterviewSessionModal";
 import {
-  appointmentConflictDetails,
   formValues,
   jsonBody,
   recruitmentRequest,
@@ -45,7 +45,6 @@ import {
   dateLabel,
   dateTimeLabel,
   humanize,
-  manualStages,
   stageLabels,
   type RecruitmentAppointment,
   type RecruitmentCandidate,
@@ -75,11 +74,8 @@ type ProfileTab =
   "overview" | "evaluations" | "documents" | "hiring" | "training" | "activity";
 type ProfileAction =
   | { kind: "edit_profile" }
-  | { kind: "move_candidate" }
   | { kind: "upload_document"; document?: Record<string, unknown> }
-  | { kind: "record_interview"; appointment?: RecruitmentAppointment }
   | { kind: "record_test" }
-  | { kind: "record_demo"; appointment?: RecruitmentAppointment }
   | {
       kind: "schedule_appointment";
       appointmentType: "job_interview" | "demo_lesson";
@@ -92,6 +88,7 @@ type ProfileAction =
     }
   | { kind: "assign_evaluators" }
   | { kind: "request_approval"; previous?: Record<string, unknown> }
+  | { kind: "place_teacher_academy" }
   | { kind: "reject_candidate" }
   | { kind: "record_outcome" }
   | {
@@ -101,7 +98,7 @@ type ProfileAction =
     }
   | { kind: "withdraw_candidate" }
   | {
-      kind: "void_evaluation";
+      kind: "delete_evaluation";
       evaluationType: "interview" | "subject_test" | "demo";
       attempt: Record<string, unknown>;
     }
@@ -124,9 +121,8 @@ const profileTabs: Array<{ key: ProfileTab; label: string }> = [
   { key: "hiring", label: "Hiring" },
   { key: "activity", label: "Activity" },
 ];
-// HR does not use the Hiring tab: acceptance is a direct Accept/Reject action
-// (Accept routes the Academic Director sign-off). The Hiring tab stays for the
-// Academic Director / HOD deciders via the full profileTabs set.
+// HR completes final placement from the Next action card. The Hiring tab stays
+// available to approval reviewers through the full profileTabs set.
 const hrProfileTabs = profileTabs.filter((item) => item.key !== "activity" && item.key !== "hiring");
 const trainingProfileTab: { key: ProfileTab; label: string } = {
   key: "training",
@@ -139,20 +135,6 @@ const profileTabKeys = new Set<ProfileTab>([
 
 function text(value: unknown) {
   return String(value ?? "");
-}
-
-function scheduledDatePart(value: unknown) {
-  const parsed = new Date(text(value));
-  return Number.isNaN(parsed.getTime())
-    ? "Not scheduled"
-    : new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "Asia/Tashkent" }).format(parsed);
-}
-
-function scheduledTimePart(value: unknown) {
-  const parsed = new Date(text(value));
-  return Number.isNaN(parsed.getTime())
-    ? "Not scheduled"
-    : new Intl.DateTimeFormat("en", { timeStyle: "short", timeZone: "Asia/Tashkent" }).format(parsed);
 }
 
 function subjectTestPaperTitle(candidate: RecruitmentCandidate) {
@@ -343,29 +325,28 @@ function InlineField({
 function AttemptList({
   items,
   empty,
-  onVoid,
+  onDelete,
 }: {
   items: Array<Record<string, unknown>>;
   empty: string;
-  onVoid?: (item: Record<string, unknown>) => void;
+  onDelete?: (item: Record<string, unknown>) => void;
 }) {
   if (!items.length) return <EmptyLine>{empty}</EmptyLine>;
   return (
     <div className="space-y-2">
       {items.map((item) => {
-        const isVoided = Boolean(item.voided_at);
         const isFailed = text(item.result).toLowerCase() === "failed";
         return (
           <article
             key={text(item.id)}
-            className={`rounded-lg border p-3 ${isFailed && !isVoided ? "border-destructive/30 bg-destructive/5" : "border-border"} ${isVoided ? "opacity-60" : ""}`}
+            className={`rounded-lg border p-3 ${isFailed ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <StatusBadge
-                  status={isVoided ? "voided" : text(item.result || "recorded")}
+                  status={text(item.result || "recorded")}
                 />
-                {isFailed && !isVoided ? (
+                {isFailed ? (
                   <span className="text-xs font-semibold text-destructive">
                     Failed
                   </span>
@@ -380,14 +361,14 @@ function AttemptList({
                       item.created_at,
                   )}
                 </span>
-                {onVoid && !isVoided ? (
+                {onDelete ? (
                   <ActionMenu
                     items={[
                       {
-                        key: "void",
-                        label: "Void mistaken result",
+                        key: "delete",
+                        label: "Delete",
                         danger: true,
-                        onClick: () => onVoid(item),
+                        onClick: () => onDelete(item),
                       },
                     ]}
                     label="Evaluation actions"
@@ -415,11 +396,6 @@ function AttemptList({
                   "No notes",
               )}
             </p>
-            {isVoided ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Voided: {text(item.void_reason)} · {dateLabel(item.voided_at)}
-              </p>
-            ) : null}
           </article>
         );
       })}
@@ -429,16 +405,15 @@ function AttemptList({
 
 function SubjectTestList({
   items,
-  onVoid,
+  onDelete,
 }: {
   items: Array<Record<string, unknown>>;
-  onVoid?: (item: Record<string, unknown>) => void;
+  onDelete?: (item: Record<string, unknown>) => void;
 }) {
   if (!items.length) return <EmptyLine>No subject knowledge tests recorded.</EmptyLine>;
   return (
     <div className="space-y-2">
       {items.map((item) => {
-        const isVoided = Boolean(item.voided_at);
         const maximum = item.maximum_score == null ? Number.NaN : Number(item.maximum_score);
         const score = item.score == null ? Number.NaN : Number(item.score);
         const percentage = item.percentage == null ? Number.NaN : Number(item.percentage);
@@ -451,14 +426,14 @@ function SubjectTestList({
         return (
           <article
             key={text(item.id)}
-            className={`rounded-lg border p-3 ${text(item.result).toLowerCase() === "failed" && !isVoided ? "border-destructive/30 bg-destructive/5" : "border-border"} ${isVoided ? "opacity-60" : ""}`}
+            className={`rounded-lg border p-3 ${text(item.result).toLowerCase() === "failed" ? "border-destructive/30 bg-destructive/5" : "border-border"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-semibold">{paper}</p>
                 <p className="mt-1 flex items-center gap-2 text-xs font-semibold">
                   <span className="text-muted-foreground">Status:</span>
-                  <StatusBadge status={isVoided ? "voided" : text(item.result)} />
+                  <StatusBadge status={text(item.result)} />
                 </p>
               </div>
               <div className="flex shrink-0 items-start gap-1">
@@ -470,19 +445,14 @@ function SubjectTestList({
                   {dateLabel(item.test_at || item.created_at)}
                 </span>
                 </div>
-                {onVoid && !isVoided ? (
+                {onDelete ? (
                   <ActionMenu
-                    items={[{ key: "void", label: "Void mistaken result", danger: true, onClick: () => onVoid(item) }]}
+                    items={[{ key: "delete", label: "Delete", danger: true, onClick: () => onDelete(item) }]}
                     label="Subject test actions"
                   />
                 ) : null}
               </div>
             </div>
-            {isVoided ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Voided: {text(item.void_reason)} · {dateLabel(item.voided_at)}
-              </p>
-            ) : null}
           </article>
         );
       })}
@@ -1088,12 +1058,7 @@ function OutcomeFields({
   const canFinalize = Boolean(candidate.permissions?.can_finalize);
   const canReject = Boolean(candidate.permissions?.can_reject);
   const availableDecisions = canFinalize
-    ? [
-        "candidate_withdrew",
-        "rejected",
-        "teacher_academy",
-        "active_teacher",
-      ]
+    ? ["active_teacher"]
     : canReject
       ? ["rejected"]
       : ["candidate_withdrew"];
@@ -1175,52 +1140,6 @@ function OutcomeFields({
   );
 }
 
-function MoveCandidateFields({
-  candidate,
-}: {
-  candidate: RecruitmentCandidate;
-}) {
-  const [stage, setStage] = useState("");
-  return (
-    <div className="grid gap-2">
-      <label className="text-xs font-semibold">
-        New stage
-        <select
-          required
-          name="stage"
-          value={stage}
-          onChange={(event) => setStage(event.target.value)}
-          className={`${fieldClass} mt-1`}
-        >
-          <option value="">Choose a stage</option>
-          {manualStages
-            .filter((value) => value !== candidate.status)
-            .map((value) => (
-              <option key={value} value={value}>
-                {stageLabels[value]}
-              </option>
-            ))}
-          {candidate.status !== "trash_bin" ? (
-            <option value="trash_bin">{stageLabels.trash_bin}</option>
-          ) : null}
-        </select>
-      </label>
-      <label className="text-xs font-semibold">
-        Reason
-        <textarea
-          name="reason"
-          defaultValue="Candidate profile move"
-          className={`${fieldClass} mt-1 min-h-20`}
-        />
-      </label>
-      <p className="text-xs leading-5 text-muted-foreground">
-        Interview and demo appointments are scheduled separately after the move.
-        Protected Academy/Active outcomes continue through Hiring.
-      </p>
-    </div>
-  );
-}
-
 function CandidateOptionFields({ candidate, options }: { candidate: RecruitmentCandidate; options?: RecruitmentOptions }) {
   const [sourceId, setSourceId] = useState(String(candidate.source_option_id || ""));
   const [subsourceId, setSubsourceId] = useState(String(candidate.subsource_option_id || ""));
@@ -1242,14 +1161,10 @@ function ActionFields({
   action,
   candidate,
   options,
-  conflicts,
-  allowHistoricalRestoration = false,
 }: {
   action: ProfileAction;
   candidate: RecruitmentCandidate;
   options?: RecruitmentOptions;
-  conflicts: RecruitmentAppointment[];
-  allowHistoricalRestoration?: boolean;
 }) {
   switch (action.kind) {
     case "edit_profile":
@@ -1361,8 +1276,6 @@ function ActionFields({
           </label>
         </div>
       );
-    case "move_candidate":
-      return <MoveCandidateFields candidate={candidate} />;
     case "upload_document":
       return (
         <div className="grid gap-2">
@@ -1406,52 +1319,6 @@ function ActionFields({
           ) : null}
         </div>
       );
-    case "record_interview":
-      return (
-        <div className="grid gap-2">
-          {action.appointment ? (
-            <input
-              type="hidden"
-              name="appointment_id"
-              value={action.appointment.id}
-            />
-          ) : null}
-          <label className="text-xs font-semibold">
-            Result
-            <select required name="result" className={`${fieldClass} mt-1`}>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-              <option value="additional_interview">Additional interview</option>
-              <option value="candidate_withdrew">Candidate withdrew</option>
-            </select>
-          </label>
-          <label className="text-xs font-semibold">
-            Format
-            <input
-              name="interview_format"
-              defaultValue={action.appointment?.appointment_format}
-              className={`${fieldClass} mt-1`}
-            />
-          </label>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <label className="text-xs font-semibold">CEFR<select name="cefr_level" className={`${fieldClass} mt-1`}><option value="">Not set</option>{["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label className="text-xs font-semibold">Overall (0–10)<input name="overall_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
-            <label className="text-xs font-semibold">Communication (0–10)<input name="communication_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
-          </div>
-          <label className="text-xs font-semibold">Recommendation<select name="recommendation_code" className={`${fieldClass} mt-1`}><option value="">Not set</option><option value="proceed">Proceed</option><option value="hold">Hold</option><option value="reject">Reject</option></select></label>
-          <label className="text-xs font-semibold">
-            Notes
-            <textarea name="notes" className={`${fieldClass} mt-1 min-h-24`} />
-          </label>
-          <label className="text-xs font-semibold">
-            HR recommendation
-            <textarea
-              name="hr_recommendation"
-              className={`${fieldClass} mt-1 min-h-24`}
-            />
-          </label>
-        </div>
-      );
     case "record_test":
       return (
         <div className="grid gap-2">
@@ -1489,34 +1356,11 @@ function ActionFields({
           </label>
         </div>
       );
-    case "record_demo":
-      return (
-        <div className="grid gap-2">
-          <input type="hidden" name="appointment_id" value={action.appointment?.id || ""} />
-          <input type="hidden" name="topic" value={action.appointment?.topic || ""} />
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</span><strong className="mt-0.5 block text-sm">{scheduledDatePart(action.appointment?.starts_at)}</strong></div>
-            <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Time</span><strong className="mt-0.5 block text-sm">{scheduledTimePart(action.appointment?.starts_at)}</strong></div>
-          </div>
-          <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Full name</span><strong className="mt-0.5 block text-sm">{candidate.full_name}</strong></div>
-          <label className="text-xs font-semibold">
-            Evaluator's notes
-            <textarea
-              autoFocus
-              required
-              name="overview"
-              className={`${fieldClass} mt-1 min-h-28 resize-y`}
-            />
-          </label>
-        </div>
-      );
     case "schedule_appointment":
       return (
         <AppointmentForm
           appointmentType={action.appointmentType}
           options={options}
-          conflicts={conflicts}
-          allowHistoricalRestoration={allowHistoricalRestoration}
         />
       );
     case "reschedule_appointment":
@@ -1525,8 +1369,6 @@ function ActionFields({
           appointmentType={action.appointment.appointment_type}
           appointment={action.appointment}
           options={options}
-          conflicts={conflicts}
-          allowHistoricalRestoration={allowHistoricalRestoration}
         />
       );
     case "appointment_status":
@@ -1585,19 +1427,12 @@ function ActionFields({
     case "request_approval":
       return (
         <div className="grid gap-2">
-          <label className="text-xs font-semibold">
-            Requested outcome
-            <select
-              name="requested_outcome"
-              defaultValue={
-                text(action.previous?.requested_outcome) || "teacher_academy"
-              }
-              className={`${fieldClass} mt-1`}
-            >
-              <option value="teacher_academy">Teacher Academy</option>
-              <option value="active_teacher">Active Teacher</option>
-            </select>
-          </label>
+          <input type="hidden" name="requested_outcome" value="active_teacher" />
+          <p className="rounded-lg bg-muted/50 p-3 text-sm">
+            Request Academic Director permission to place this candidate in
+            Active Teachers. Academic approval records permission; CEO
+            finalization remains a future step.
+          </p>
           <label className="text-xs font-semibold">
             Request note
             <textarea
@@ -1607,6 +1442,13 @@ function ActionFields({
             />
           </label>
         </div>
+      );
+    case "place_teacher_academy":
+      return (
+        <p className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
+          Add <strong>{candidate.full_name}</strong> directly to Teacher
+          Academy? Academic Director approval is not required.
+        </p>
       );
     case "reject_candidate":
       return (
@@ -1637,7 +1479,7 @@ function ActionFields({
         <div className="grid gap-2">
           <p className="rounded-lg bg-muted/50 p-3 text-sm">
             {action.status === "approved"
-              ? `${stageLabels[text(action.approval.requested_outcome)]} will be approved and finalized. The onboarding record will remain pending.`
+              ? `${stageLabels[text(action.approval.requested_outcome)]} will be approved for future CEO finalization. The candidate will not be activated yet.`
               : `${stageLabels[text(action.approval.requested_outcome)]} approval will be returned to HR.`}
           </p>
           <label className="text-xs font-semibold">
@@ -1647,7 +1489,7 @@ function ActionFields({
               required={action.status === "returned"}
               defaultValue={
                 action.status === "approved"
-                  ? "Approved and finalized by Academic Director."
+                  ? "Approved by Academic Director for CEO review."
                   : ""
               }
               className={`${fieldClass} mt-1 min-h-24`}
@@ -1667,23 +1509,12 @@ function ActionFields({
           />
         </label>
       );
-    case "void_evaluation":
+    case "delete_evaluation":
       return (
-        <div className="grid gap-2">
-          <p className="rounded-lg bg-muted/50 p-3 text-sm">
-            This keeps the result in history but excludes it from the
-            candidate's latest evaluation summary.
-          </p>
-          <label className="text-xs font-semibold">
-            Why is this result being voided?
-            <textarea
-              autoFocus
-              required
-              name="reason"
-              className={`${fieldClass} mt-1 min-h-24`}
-            />
-          </label>
-        </div>
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          This evaluation and its linked schedule entry will be permanently
+          deleted. The candidate workflow will be recalculated.
+        </p>
       );
     case "add_task":
       return (
@@ -1727,16 +1558,10 @@ function actionTitle(action: ProfileAction | null) {
   switch (action.kind) {
     case "edit_profile":
       return "Edit candidate profile";
-    case "move_candidate":
-      return "Move candidate";
     case "upload_document":
       return action.document ? "Replace document" : "Upload document";
-    case "record_interview":
-      return "Record interview";
     case "record_test":
       return "Record subject test";
-    case "record_demo":
-      return "Record demo lesson";
     case "schedule_appointment":
       return action.appointmentType === "job_interview"
         ? "Schedule job interview"
@@ -1751,18 +1576,20 @@ function actionTitle(action: ProfileAction | null) {
       return "Assign evaluators";
     case "request_approval":
       return "Request hiring approval";
+    case "place_teacher_academy":
+      return "Add to Teacher Academy";
     case "reject_candidate":
       return "Reject candidate";
     case "record_outcome":
       return "Record outcome";
     case "review_approval":
       return action.status === "approved"
-        ? "Approve and finalize"
+        ? "Approve Active Teacher request"
         : "Return request";
     case "withdraw_candidate":
       return "Candidate withdrew";
-    case "void_evaluation":
-      return "Void evaluation result";
+    case "delete_evaluation":
+      return "Delete evaluation";
     case "add_task":
       return "Add task";
     case "add_note":
@@ -1772,7 +1599,6 @@ function actionTitle(action: ProfileAction | null) {
 
 function actionSubmitLabel(action: ProfileAction | null) {
   if (!action) return "Save";
-  if (action.kind === "move_candidate") return "Move candidate";
   if (action.kind === "schedule_appointment") return "Schedule appointment";
   if (action.kind === "reschedule_appointment") return "Save appointment";
   if (action.kind === "appointment_status")
@@ -1781,11 +1607,13 @@ function actionSubmitLabel(action: ProfileAction | null) {
       : "Mark no-show";
   if (action.kind === "review_approval")
     return action.status === "approved"
-      ? "Approve & finalize"
+      ? "Approve request"
       : "Return request";
   if (action.kind === "upload_document")
     return action.document ? "Replace" : "Upload";
   if (action.kind === "reject_candidate") return "Reject candidate";
+  if (action.kind === "place_teacher_academy") return "Proceed";
+  if (action.kind === "delete_evaluation") return "Delete";
   return "Save";
 }
 
@@ -1810,9 +1638,7 @@ export function CandidateProfile({
   );
   const [action, setAction] = useState<ProfileAction | null>(null);
   const [interviewSession, setInterviewSession] = useState<RecruitmentAppointment | null>(null);
-  const [appointmentConflicts, setAppointmentConflicts] = useState<
-    RecruitmentAppointment[]
-  >([]);
+  const [demoSession, setDemoSession] = useState<RecruitmentAppointment | null>(null);
   const [removeDocument, setRemoveDocument] = useState<Record<
     string,
     unknown
@@ -1876,16 +1702,10 @@ export function CandidateProfile({
         return;
       }
       setAction(null);
-      setAppointmentConflicts([]);
       setRemoveDocument(null);
       void queryClient.invalidateQueries({ queryKey: ["recruitment"] });
     },
-    onError: (error) => {
-      const conflicts =
-        appointmentConflictDetails<RecruitmentAppointment>(error);
-      if (conflicts.length) setAppointmentConflicts(conflicts);
-      onAnnouncement(queryError(error), "error");
-    },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
   });
 
   useEffect(() => {
@@ -1941,20 +1761,27 @@ export function CandidateProfile({
   // Evaluations unlock one by one: interview -> demo lesson -> subject test.
   const interviewPassed = candidate.evaluation_states?.interview === "passed";
   const demoPassed = candidate.evaluation_states?.demo === "passed";
+  const subjectTestPassed =
+    candidate.evaluation_states?.subject_test === "passed";
+  const allRequiredPassed =
+    interviewPassed && demoPassed && subjectTestPassed;
+  const academySupplement = candidate.status === "teacher_academy";
   const canScheduleInterview =
     canManageAppointments &&
-    ["responded", "job_interview", "test_and_demo"].includes(candidate.status) &&
-    !interviewPassed &&
+    ["responded", "job_interview", "test_and_demo", "teacher_academy"].includes(candidate.status) &&
+    (academySupplement || !interviewPassed) &&
     !hasScheduledInterview;
   const canScheduleDemo =
     canManageAppointments &&
-    ["job_interview", "test_and_demo"].includes(candidate.status) &&
-    interviewPassed &&
-    !demoPassed &&
+    ["job_interview", "test_and_demo", "teacher_academy"].includes(candidate.status) &&
+    (academySupplement || interviewPassed) &&
+    (academySupplement || !demoPassed) &&
     !hasScheduledDemo;
-  const canRecordSubjectTest = Boolean(permissions?.can_add_subject_test) && demoPassed;
+  const canRecordSubjectTest =
+    Boolean(permissions?.can_add_subject_test) &&
+    demoPassed &&
+    !subjectTestPassed;
   const openReschedule = (appointment: RecruitmentAppointment) => {
-    setAppointmentConflicts([]);
     setAction({ kind: "reschedule_appointment", appointment });
   };
   const appointmentActionMenu = (appointment: RecruitmentAppointment) =>
@@ -1971,7 +1798,7 @@ export function CandidateProfile({
     <button
       type="button"
       className={secondaryButtonClass}
-      onClick={() => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType }); }}
+      onClick={() => setAction({ kind: "schedule_appointment", appointmentType })}
     >
       <CalendarPlus className="h-4 w-4" />
       <span className="hidden sm:inline">Schedule</span>
@@ -2150,7 +1977,6 @@ export function CandidateProfile({
   const submitAction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!action) return;
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const form = event.currentTarget;
     if (action.kind === "upload_document") {
       mutation.mutate({
@@ -2160,11 +1986,6 @@ export function CandidateProfile({
       });
     } else if (action.kind === "edit_profile") {
       submit("", formValues(form), "PATCH");
-    } else if (action.kind === "move_candidate") {
-      const values = formValues(form);
-      submit("/stage", { ...values, expected_version: candidate.version });
-    } else if (action.kind === "record_interview") {
-      submit("/interviews", formValues(form));
     } else if (action.kind === "record_test") {
       const values = formValues(form);
       const percentage = Number(values.percentage);
@@ -2180,21 +2001,10 @@ export function CandidateProfile({
         topic_scores: [],
         notes: "",
       });
-    } else if (action.kind === "record_demo") {
-      const values = formValues(form);
-      const result = submitter?.name === "result" ? submitter.value : "";
-      if (!['passed', 'failed'].includes(result)) return;
-      submit("/demo-lessons", {
-        ...values,
-        result,
-        subject_id: candidate.subject_id || null,
-        criteria_scores: [],
-      });
     } else if (action.kind === "schedule_appointment") {
       submit("/appointments", {
         ...formValues(form),
         appointment_type: action.appointmentType,
-        allow_conflict: Boolean(appointmentConflicts.length),
       });
     } else if (action.kind === "reschedule_appointment") {
       submit(
@@ -2202,7 +2012,6 @@ export function CandidateProfile({
         {
           ...formValues(form),
           expected_version: action.appointment.version,
-          allow_conflict: Boolean(appointmentConflicts.length),
         },
         "PATCH",
       );
@@ -2223,6 +2032,11 @@ export function CandidateProfile({
       );
     } else if (action.kind === "request_approval") {
       submit("/approval-requests", formValues(form));
+    } else if (action.kind === "place_teacher_academy") {
+      submit("/final-decisions", {
+        decision: "teacher_academy",
+        reason_detail: "Placed in Teacher Academy by HR.",
+      });
     } else if (action.kind === "reject_candidate") {
       submit("/final-decisions", {
         decision: "rejected",
@@ -2244,14 +2058,14 @@ export function CandidateProfile({
         decision: "candidate_withdrew",
         ...formValues(form),
       });
-    } else if (action.kind === "void_evaluation") {
+    } else if (action.kind === "delete_evaluation") {
       const segment =
         action.evaluationType === "interview"
           ? "interviews"
           : action.evaluationType === "subject_test"
             ? "subject-tests"
             : "demo-lessons";
-      submit(`/${segment}/${Number(action.attempt.id)}/void`, formValues(form));
+      submit(`/${segment}/${Number(action.attempt.id)}`, {}, "DELETE");
     } else if (action.kind === "add_task") {
       submit("/tasks", formValues(form));
     } else if (action.kind === "add_note") {
@@ -2265,7 +2079,6 @@ export function CandidateProfile({
       key: "schedule_interview",
       label: "Schedule interview",
       onClick: () => {
-        setAppointmentConflicts([]);
         setAction({
           kind: "schedule_appointment",
           appointmentType: "job_interview",
@@ -2277,7 +2090,6 @@ export function CandidateProfile({
       key: "schedule_demo",
       label: "Schedule demo lesson",
       onClick: () => {
-        setAppointmentConflicts([]);
         setAction({
           kind: "schedule_appointment",
           appointmentType: "demo_lesson",
@@ -2285,11 +2097,13 @@ export function CandidateProfile({
       },
     });
   if (permissions?.can_add_academic_evaluation) {
-    const scheduledDemo = scheduledAppointments.find((item) => item.appointment_type === "demo_lesson" && item.status === "scheduled");
+    const scheduledDemo = scheduledAppointments.find(
+      (item) => item.appointment_type === "demo_lesson",
+    );
     if (scheduledDemo) evaluationItems.push({
       key: "demo",
-      label: "Record demo lesson",
-      onClick: () => setAction({ kind: "record_demo", appointment: scheduledDemo }),
+      label: scheduledDemo.status === "in_progress" ? "Resume demo lesson" : "Start demo lesson",
+      onClick: () => setDemoSession(scheduledDemo),
     });
   }
   const hiringItems: ActionMenuItem[] = [];
@@ -2306,15 +2120,14 @@ export function CandidateProfile({
       onClick: () => setAction({ kind: "request_approval" }),
     });
   if (
-    role !== "hr_manager" &&
-    (permissions?.can_finalize || permissions?.can_reject)
+    role === "ceo" &&
+    candidate.status === "under_review" &&
+    allRequiredPassed &&
+    permissions?.can_finalize
   )
     hiringItems.push({
       key: "outcome",
-      label:
-        permissions?.can_reject && !permissions?.can_finalize
-          ? "Reject candidate"
-          : "Record outcome",
+      label: "Record outcome",
       onClick: () => setAction({ kind: "record_outcome" }),
     });
   const activityItems: ActionMenuItem[] = [];
@@ -2333,13 +2146,21 @@ export function CandidateProfile({
 
   const overviewItems: ActionMenuItem[] = [];
   if (
-    permissions?.can_move_stage &&
-    !["teacher_academy", "active_teacher"].includes(candidate.status)
+    role === "hr_manager" &&
+    permissions?.can_reject &&
+    ![
+      "candidate_withdrew",
+      "rejected",
+      "trash_bin",
+      "teacher_academy",
+      "active_teacher",
+    ].includes(candidate.status)
   ) {
     overviewItems.push({
-      key: "move",
-      label: "Move candidate",
-      onClick: () => setAction({ kind: "move_candidate" }),
+      key: "reject",
+      label: "Reject",
+      danger: true,
+      onClick: () => setAction({ kind: "reject_candidate" }),
     });
   }
   if (
@@ -2354,87 +2175,24 @@ export function CandidateProfile({
   ) {
     overviewItems.push({
       key: "withdraw",
-      label: "Candidate withdrew",
+      label: "Candidate Withdraw",
       onClick: () => setAction({ kind: "withdraw_candidate" }),
     });
   }
   if (role === "hr_manager")
     overviewItems.push({
       key: "history",
-      label: "View history",
+      label: "View History",
       onClick: () => setHistoryOpen(true),
     });
 
   const returnedApproval = (candidate.approvals || []).find(
     (item) => item.status === "returned",
   );
-  const hrHiringAction =
-    role === "hr_manager" && permissions?.can_request_approval ? (
-      <button
-        type="button"
-        className={buttonClass}
-        onClick={() =>
-          setAction({ kind: "request_approval", previous: returnedApproval })
-        }
-      >
-        <ShieldCheck className="h-4 w-4" />
-        {returnedApproval ? "Resubmit" : "Send to Academic Director"}
-      </button>
-    ) : null;
-
-  // HR accepts/rejects directly at the Final Decision stage. Accept routes the
-  // Academic Director sign-off (request_approval); Reject finalizes a rejection.
-  const hrDecisionActions =
-    role === "hr_manager" &&
-    candidate.status === "under_review" &&
-    (permissions?.can_request_approval || permissions?.can_reject) ? (
-      <div className="flex items-center gap-1">
-        {permissions?.can_request_approval ? (
-          <button
-            type="button"
-            className={buttonClass}
-            title={returnedApproval ? "Resubmit to Academic Director" : "Accept and send to Academic Director"}
-            onClick={() => setAction({ kind: "request_approval", previous: returnedApproval })}
-          >
-            <GraduationCap className="h-4 w-4" />
-            <span className="hidden sm:inline">{returnedApproval ? "Resubmit" : "Accept"}</span>
-          </button>
-        ) : null}
-        {permissions?.can_reject ? (
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            title="Reject candidate"
-            onClick={() => setAction({ kind: "reject_candidate" })}
-          >
-            <Ban className="h-4 w-4" />
-            <span className="hidden sm:inline">Reject</span>
-          </button>
-        ) : null}
-      </div>
-    ) : null;
+  const hrHiringAction = null;
 
   const tabAction =
-    tab === "overview" &&
-    (permissions?.can_edit_profile || overviewItems.length) ? (
-      <div className="flex items-center gap-1">
-        {role !== "hr_manager" && permissions?.can_edit_profile ? (
-          <button
-            type="button"
-            className={buttonClass}
-            aria-label="Edit profile"
-            title="Edit profile"
-            onClick={() => setAction({ kind: "edit_profile" })}
-          >
-            <Pencil className="h-4 w-4" />
-            <span className="hidden sm:inline">Edit profile</span>
-          </button>
-        ) : null}
-        {overviewItems.length ? (
-          <ActionMenu items={overviewItems} label="Candidate actions" />
-        ) : null}
-      </div>
-    ) : tab === "evaluations" && evaluationItems.length ? (
+    tab === "evaluations" && evaluationItems.length ? (
       <ActionMenu items={evaluationItems} label="Add evaluation" />
     ) : tab === "documents" && permissions?.can_manage_documents ? (
       <button
@@ -2458,36 +2216,84 @@ export function CandidateProfile({
     ) : tab === "activity" && activityItems.length ? (
       <ActionMenu items={activityItems} label="Activity actions" />
     ) : null;
+  const candidateMenu = overviewItems.length ? (
+    <ActionMenu items={overviewItems} label="Candidate actions" />
+  ) : null;
 
   // A single, unambiguous "do this next" CTA derived from the candidate's real
   // state so HR always knows the exact step to complete.
   const nextStep: { label: string; sublabel: string; onClick: () => void } | null = (() => {
     const appt = candidate.next_appointment;
     if (appt) {
+      const canConduct =
+        appt.appointment_type === "job_interview"
+          ? role === "hr_manager"
+          : Boolean(permissions?.can_add_academic_evaluation);
       return {
-        label: appt.appointment_type === "job_interview" ? "Start interview" : "Open demo lesson",
+        label: canConduct
+          ? appt.appointment_type === "job_interview"
+            ? "Start interview"
+            : "Open demo lesson"
+          : appt.appointment_type === "job_interview"
+            ? "Interview scheduled"
+            : "Demo lesson scheduled",
         sublabel: `${dateTimeLabel(appt.starts_at)}${appt.responsible_name ? ` · ${appt.responsible_name}` : ""}`,
-        onClick: () => { if (appt.appointment_type === "job_interview") setInterviewSession(appt); else setProfileTab("evaluations"); },
+        onClick: () => {
+          if (!canConduct) {
+            setProfileTab("evaluations");
+          } else if (appt.appointment_type === "job_interview") {
+            setInterviewSession(appt);
+          } else {
+            setDemoSession(appt);
+          }
+        },
       };
     }
     // Sequential flow: interview -> demo lesson -> subject test.
     if (canScheduleInterview) {
-      return { label: "Schedule job interview", sublabel: candidate.evaluation_states?.interview === "missing" ? "No interview recorded" : "No interview scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }); } };
+      return { label: "Schedule job interview", sublabel: candidate.evaluation_states?.interview === "missing" ? "No interview recorded" : "No interview scheduled yet", onClick: () => setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }) };
     }
     if (canScheduleDemo) {
-      return { label: "Schedule demo lesson", sublabel: "No demo scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }); } };
+      return { label: "Schedule demo lesson", sublabel: "No demo scheduled yet", onClick: () => setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }) };
     }
-    if (candidate.status === "test_and_demo" && canRecordSubjectTest && candidate.evaluation_states?.subject_test !== "passed") {
+    if (candidate.status === "test_and_demo" && canRecordSubjectTest) {
       return { label: "Record subject test", sublabel: "Subject test pending", onClick: () => { setProfileTab("evaluations"); setAction({ kind: "record_test" }); } };
-    }
-    if (candidate.status === "under_review" && permissions?.can_request_approval) {
-      return { label: returnedApproval ? "Resubmit to Academic Director" : "Accept → Academic Director", sublabel: "Ready for final sign-off", onClick: () => setAction({ kind: "request_approval", previous: returnedApproval }) };
     }
     if (candidate.next_task) {
       return { label: candidate.next_task.title, sublabel: `Due ${dateLabel(candidate.next_task.due_at)}`, onClick: () => setProfileTab("evaluations") };
     }
     return null;
   })();
+  const finalPlacementButtons =
+    role === "hr_manager" &&
+    candidate.status === "under_review" &&
+    allRequiredPassed ? (
+      <div className="grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          className={`${buttonClass} w-full justify-center`}
+          onClick={() => setAction({ kind: "place_teacher_academy" })}
+        >
+          <GraduationCap className="h-4 w-4" />
+          Teacher Academy
+        </button>
+        {permissions?.can_request_approval ? (
+          <button
+            type="button"
+            className={`${secondaryButtonClass} w-full justify-center`}
+            onClick={() =>
+              setAction({
+                kind: "request_approval",
+                previous: returnedApproval,
+              })
+            }
+          >
+            <UserRound className="h-4 w-4" />
+            Active Teachers
+          </button>
+        ) : null}
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-2">
@@ -2518,14 +2324,14 @@ export function CandidateProfile({
           </a>
           <div className="min-w-0 flex-1 py-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-lg font-bold tracking-tight sm:text-xl">
+              <h1 className="min-w-0 break-words text-lg font-bold tracking-tight sm:text-xl">
                 {candidate.full_name}
               </h1>
               <StatusBadge status={candidate.status}>
                 {stageLabels[candidate.status] || humanize(candidate.status)}
               </StatusBadge>
             </div>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            <p className="mt-0.5 break-words text-xs text-muted-foreground">
               {candidate.applied_position ||
                 candidate.subject ||
                 "Position not set"}
@@ -2536,7 +2342,10 @@ export function CandidateProfile({
                   : ""}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">{hrDecisionActions}{tabAction}</div>
+          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1">
+            {tabAction}
+            {candidateMenu}
+          </div>
         </div>
         <label className="mt-2 block text-xs font-semibold text-muted-foreground sm:hidden">
           Profile section
@@ -2850,8 +2659,25 @@ export function CandidateProfile({
             <Panel
               title="Next action"
               icon={<CalendarClock className="h-4 w-4" />}
+              action={
+                candidate.current_sla ? (
+                  <span
+                    className={`max-w-[12rem] rounded-md px-2 py-1 text-right text-[11px] font-semibold leading-tight ${
+                      candidate.current_sla.status === "red"
+                        ? "bg-red-50 text-red-700"
+                        : candidate.current_sla.status === "yellow"
+                          ? "bg-amber-50 text-amber-800"
+                          : "bg-emerald-50 text-emerald-800"
+                    }`}
+                  >
+                    {candidate.current_sla.status === "red"
+                      ? "SLA overdue"
+                      : `SLA due ${dateLabel(candidate.current_sla.due_at)}`}
+                  </span>
+                ) : undefined
+              }
             >
-              {nextStep ? (
+              {finalPlacementButtons || (nextStep ? (
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
@@ -2865,8 +2691,7 @@ export function CandidateProfile({
                 </button>
               ) : (
                 <EmptyLine>No next action.</EmptyLine>
-              )}
-              {candidate.current_sla ? <div className={`mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold ${candidate.current_sla.status === "red" ? "bg-red-50 text-red-700" : candidate.current_sla.status === "yellow" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>{candidate.current_sla.status === "red" ? "SLA overdue" : `Stage SLA due ${dateLabel(candidate.current_sla.due_at)}`}</div> : null}
+              ))}
             </Panel>
             <Panel
               title="Recruitment progress"
@@ -2898,7 +2723,7 @@ export function CandidateProfile({
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => (
                   <div key={appointment.id} className="flex items-center gap-1.5">
-                    <button type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>
+                    <button type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : appointment.status === "in_progress" ? "border-violet-300 bg-violet-50 text-violet-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="shrink-0 text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>
                     {appointmentActionMenu(appointment)}
                   </div>
                 ))}
@@ -2911,12 +2736,12 @@ export function CandidateProfile({
               <AttemptList
                 items={candidate.interviews || []}
                 empty="No interviews recorded."
-                onVoid={
-                  permissions?.can_void_evaluations &&
+                onDelete={
+                  permissions?.can_delete_evaluations &&
                   !["academic_director", "head_of_department"].includes(role)
                     ? (attempt) =>
                         setAction({
-                          kind: "void_evaluation",
+                          kind: "delete_evaluation",
                           evaluationType: "interview",
                           attempt,
                         })
@@ -2932,7 +2757,7 @@ export function CandidateProfile({
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
                   <div key={appointment.id} className="flex items-center gap-1.5">
-                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>
+                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setDemoSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-amber-300 bg-amber-50 text-amber-900" : "border-blue-300 bg-blue-50 text-blue-900"}`}><span className="min-w-0"><strong className="block break-words text-[13px]">{appointment.status === "in_progress" ? "Demo lesson in progress" : appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block break-words text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block break-words text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span> : null}</button>
                     {appointmentActionMenu(appointment)}
                   </div>
                 ))}
@@ -2945,11 +2770,11 @@ export function CandidateProfile({
               <AttemptList
                 items={candidate.demo_lessons || []}
                 empty="No demo lessons recorded."
-                onVoid={
-                  permissions?.can_void_evaluations
+                onDelete={
+                  permissions?.can_delete_evaluations
                     ? (attempt) =>
                         setAction({
-                          kind: "void_evaluation",
+                          kind: "delete_evaluation",
                           evaluationType: "demo",
                           attempt,
                         })
@@ -2976,11 +2801,11 @@ export function CandidateProfile({
               ) : null}
               <SubjectTestList
                 items={candidate.subject_tests || []}
-                onVoid={
-                  permissions?.can_void_evaluations
+                onDelete={
+                  permissions?.can_delete_evaluations
                     ? (attempt) =>
                         setAction({
-                          kind: "void_evaluation",
+                          kind: "delete_evaluation",
                           evaluationType: "subject_test",
                           attempt,
                         })
@@ -3062,7 +2887,7 @@ export function CandidateProfile({
             title="Under-review summary"
             icon={<ShieldCheck className="h-4 w-4" />}
           >
-            {candidate.status === "under_review" && candidate.evaluation_states?.subject_test !== "passed" ? <div role="status" className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">Subject test missing/not passed. This warning is informational and does not block the final decision.</div> : null}
+            {candidate.status === "under_review" && candidate.evaluation_states?.subject_test !== "passed" ? <div role="status" className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">Subject test missing/not passed. Final outcome actions remain locked.</div> : null}
             <DefinitionGrid
               values={Object.entries(candidate.under_review || {}).map(
                 ([key, value]) => [humanize(key), value],
@@ -3104,7 +2929,7 @@ export function CandidateProfile({
                         ? [
                             {
                               key: "approve",
-                              label: "Approve & finalize",
+                              label: "Approve for CEO review",
                               onClick: () =>
                                 setAction({
                                   kind: "review_approval",
@@ -3213,8 +3038,8 @@ export function CandidateProfile({
           </div>
           {pendingApprovals.length ? (
             <p className="text-xs text-muted-foreground">
-              The Academic Director can approve and finalize the requested
-              outcome or return it to HR.
+              The Academic Director can approve the request for future CEO
+              finalization or return it to HR.
             </p>
           ) : null}
           {approved.length ? (
@@ -3335,7 +3160,6 @@ export function CandidateProfile({
       <Drawer
         open={Boolean(
           action &&
-            action.kind !== "record_demo" &&
             action.kind !== "record_test" &&
             !modalActionKinds.has(action.kind),
         )}
@@ -3343,7 +3167,6 @@ export function CandidateProfile({
           if (!mutation.isPending) {
             mutation.reset();
             setAction(null);
-            setAppointmentConflicts([]);
           }
         }}
         title={actionTitle(action)}
@@ -3351,7 +3174,6 @@ export function CandidateProfile({
         widthClass="sm:max-w-xl"
         footer={
           action &&
-          action.kind !== "record_demo" &&
           action.kind !== "record_test" &&
           !modalActionKinds.has(action.kind) ? (
             <div className="flex justify-end gap-2">
@@ -3362,7 +3184,6 @@ export function CandidateProfile({
                 onClick={() => {
                   mutation.reset();
                   setAction(null);
-                  setAppointmentConflicts([]);
                 }}
               >
                 Cancel
@@ -3380,9 +3201,7 @@ export function CandidateProfile({
                 {mutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                {appointmentConflicts.length
-                  ? "Schedule anyway"
-                  : actionSubmitLabel(action)}
+                {actionSubmitLabel(action)}
               </button>
             </div>
           ) : undefined
@@ -3397,7 +3216,6 @@ export function CandidateProfile({
           </div>
         ) : null}
         {action &&
-        action.kind !== "record_demo" &&
         action.kind !== "record_test" &&
         !modalActionKinds.has(action.kind) ? (
           <form id={formId} onSubmit={submitAction}>
@@ -3405,8 +3223,6 @@ export function CandidateProfile({
               action={action}
               candidate={candidate}
               options={options.data}
-              conflicts={appointmentConflicts}
-              allowHistoricalRestoration={role === "hr_manager"}
             />
           </form>
         ) : null}
@@ -3418,7 +3234,6 @@ export function CandidateProfile({
           if (!mutation.isPending) {
             mutation.reset();
             setAction(null);
-            setAppointmentConflicts([]);
           }
         }}
         title={actionTitle(action)}
@@ -3440,8 +3255,6 @@ export function CandidateProfile({
                 action={action}
                 candidate={candidate}
                 options={options.data}
-                conflicts={appointmentConflicts}
-                allowHistoricalRestoration={role === "hr_manager"}
               />
             </ModalBody>
             <ModalFooter>
@@ -3453,14 +3266,13 @@ export function CandidateProfile({
                   onClick={() => {
                     mutation.reset();
                     setAction(null);
-                    setAppointmentConflicts([]);
                   }}
                 >
                   Cancel
                 </button>
                 <button type="submit" className={buttonClass} disabled={mutation.isPending}>
                   {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  {appointmentConflicts.length ? "Schedule anyway" : actionSubmitLabel(action)}
+                  {actionSubmitLabel(action)}
                 </button>
               </div>
             </ModalFooter>
@@ -3491,7 +3303,7 @@ export function CandidateProfile({
               </div>
             ) : null}
             {action?.kind === "record_test" ? (
-              <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} allowHistoricalRestoration={role === "hr_manager"} />
+              <ActionFields action={action} candidate={candidate} options={options.data} />
             ) : null}
           </ModalBody>
           <ModalFooter>
@@ -3503,36 +3315,6 @@ export function CandidateProfile({
                 {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 Save
               </button>
-            </div>
-          </ModalFooter>
-        </form>
-      </Modal>
-
-      <Modal
-        open={action?.kind === "record_demo"}
-        onClose={() => {
-          if (!mutation.isPending) {
-            mutation.reset();
-            setAction(null);
-          }
-        }}
-        title="Record demo lesson"
-        subtitle={candidate.full_name}
-        size="sm"
-        mobileMode="sheet"
-        closeOnEscape={!mutation.isPending}
-        closeOnOutsideClick={!mutation.isPending}
-      >
-        <form id={`${formId}-demo`} onSubmit={submitAction}>
-          <ModalBody>
-            {mutation.error ? <div role="alert" className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">{queryError(mutation.error)}</div> : null}
-            {action?.kind === "record_demo" ? <ActionFields action={action} candidate={candidate} options={options.data} conflicts={[]} allowHistoricalRestoration={role === "hr_manager"} /> : null}
-          </ModalBody>
-          <ModalFooter>
-            <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); }}>Cancel</button>
-              <button type="submit" name="result" value="passed" className="flex min-h-9 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-60" disabled={mutation.isPending}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Pass</button>
-              <button type="submit" name="result" value="failed" className="flex min-h-9 items-center justify-center rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:opacity-60" disabled={mutation.isPending}><X className="h-4 w-4" />Reject</button>
             </div>
           </ModalFooter>
         </form>
@@ -3573,7 +3355,17 @@ export function CandidateProfile({
           open
           candidate={candidate}
           appointment={interviewSession}
+          options={options.data}
           onClose={() => setInterviewSession(null)}
+          onAnnouncement={onAnnouncement}
+        />
+      ) : null}
+      {demoSession ? (
+        <DemoSessionModal
+          open
+          candidate={candidate}
+          appointment={demoSession}
+          onClose={() => setDemoSession(null)}
           onAnnouncement={onAnnouncement}
         />
       ) : null}

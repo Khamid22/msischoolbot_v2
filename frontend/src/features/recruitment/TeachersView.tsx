@@ -61,7 +61,9 @@ export function TeachersView({ basePath, onAnnouncement }: TeachersViewProps) {
               onClick={() => selectTab(tab.key)}
               className={`relative inline-flex min-h-9 items-center gap-2 px-3 py-1.5 text-sm font-semibold transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none sm:min-w-44 ${
                 active
-                  ? "z-10 bg-amber-500 text-amber-950"
+                  ? tab.key === "active_teacher"
+                    ? "z-10 bg-primary text-primary-foreground"
+                    : "z-10 bg-amber-500 text-amber-950"
                   : "bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground"
               } ${index === 0 ? "rounded-tl-lg" : ""}`}
               style={{

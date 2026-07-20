@@ -165,8 +165,6 @@ def _sync_system_next_actions(
         elif _text(state.get("interview_result")) != "passed":
             add("schedule_interview", "Schedule job interview")
     elif stage == "test_and_demo":
-        if _text(state.get("subject_test_result")) != "passed":
-            add("record_subject_test", "Record subject test")
         if state.get("demo_appointment_id"):
             add(
                 "record_demo_result",
@@ -175,13 +173,18 @@ def _sync_system_next_actions(
             )
         elif _text(state.get("demo_result")) != "passed":
             add("schedule_demo", "Schedule demo lesson")
+        elif _text(state.get("subject_test_result")) != "passed":
+            add("record_subject_test", "Record subject test")
     elif stage == "under_review":
         if int(state.get("required_document_count") or 0) < len(
             REQUIRED_DOCUMENT_TYPES
         ):
             add("collect_required_documents", "Collect required documents")
         if not state.get("actionable_approval_id"):
-            add("send_academic_approval", "Send hiring request to Academic Director")
+            add(
+                "choose_teacher_destination",
+                "Choose Teacher Academy or Active Teachers",
+            )
 
     repository.replace_system_tasks(
         conn,
@@ -708,7 +711,6 @@ def _appointment_dependencies() -> appointment_service.AppointmentDependencies:
         add_record=_add_record,
         prepare_appointment=_prepare_appointment,
         ensure_demo_assignment=_ensure_demo_assignment,
-        record_historical_result=_record_historical_appointment_result,
         audit_appointment=_audit_appointment,
         academic_visible_id=_academic_visible_id,
         visible_subject_ids=_visible_subject_ids,
@@ -724,6 +726,22 @@ def start_interview_session(
     expected_version: int,
 ) -> dict[str, Any]:
     return appointment_service.start_interview_session(
+        user,
+        candidate_id,
+        appointment_id,
+        expected_version=expected_version,
+        dependencies=_appointment_dependencies(),
+    )
+
+
+def start_appointment_session(
+    user: CurrentUser,
+    candidate_id: int,
+    appointment_id: int,
+    *,
+    expected_version: int,
+) -> dict[str, Any]:
+    return appointment_service.start_appointment_session(
         user,
         candidate_id,
         appointment_id,
@@ -768,7 +786,7 @@ def list_appointments(
     starts_from: str = "",
     starts_to: str = "",
     appointment_type: str = "",
-    status: str = "scheduled,in_progress,completed",
+    status: str = "",
     responsible_account_id: int | None = None,
 ) -> dict[str, Any]:
     return appointment_service.list_appointments(
@@ -833,36 +851,10 @@ def _prepare_appointment(
     if appointment_type not in APPOINTMENT_TYPES:
         raise RecruitmentError("Unknown appointment type.")
     starts_at = _school_datetime(values.get("starts_at"))
-    historical_result = _text(values.get("historical_result"))
-    is_historical = starts_at <= datetime.now(UTC)
-    if is_historical and user.role != "hr_manager":
-        raise RecruitmentError(
-            "Only HR Manager can restore a historical appointment.",
-            status_code=403,
-        )
-    if is_historical and historical_result not in {"passed", "failed"}:
-        raise RecruitmentError("Choose Passed or Failed for a past appointment.")
-    if not is_historical and historical_result:
-        raise RecruitmentError(
-            "Historical results are accepted only for past appointments."
-        )
-    duration = int(
-        values.get("duration_minutes")
-        or (30 if appointment_type == "job_interview" else 45)
-    )
-    if duration < 15 or duration > 240:
-        raise RecruitmentError(
-            "Appointment duration must be between 15 and 240 minutes."
-        )
-    ends_at = starts_at + timedelta(minutes=duration)
     responsible_account_id = (
-        int(_actor_account(user) or 0)
-        if is_historical
-        else (
-            int(job_interviewer_account_id or 0)
-            if appointment_type == "job_interview"
-            else int(values.get("responsible_account_id") or 0)
-        )
+        int(job_interviewer_account_id or _actor_account(user) or 0)
+        if appointment_type == "job_interview"
+        else int(values.get("responsible_account_id") or 0)
     )
     if appointment_type == "job_interview" and not responsible_account_id:
         raise RecruitmentError("The HR account is not available for this interview.")
@@ -870,12 +862,10 @@ def _prepare_appointment(
         repository.responsible_account_row(conn, responsible_account_id)
         if responsible_account_id
         and appointment_type == "demo_lesson"
-        and not is_historical
         else None
     )
     if (
         appointment_type == "demo_lesson"
-        and not is_historical
         and responsible_account_id
         and not responsible
     ):
@@ -886,7 +876,7 @@ def _prepare_appointment(
         raise RecruitmentError(
             "Selected staff member cannot manage recruitment appointments."
         )
-    if appointment_type == "demo_lesson" and not is_historical:
+    if appointment_type == "demo_lesson":
         if not responsible:
             raise RecruitmentError(
                 "Select an Academic Director or HOD for the demo lesson."
@@ -902,8 +892,7 @@ def _prepare_appointment(
         **values,
         "appointment_type": appointment_type,
         "starts_at": starts_at.isoformat(),
-        "ends_at": ends_at.isoformat(),
-        "duration_minutes": duration,
+        "ends_at": None,
         "responsible_account_id": responsible_account_id or None,
         "appointment_format": _text(values.get("appointment_format")),
         "location_or_link": _text(values.get("location_or_link")),
@@ -911,29 +900,9 @@ def _prepare_appointment(
         "note": (
             existing_note if values.get("note") is None else _text(values.get("note"))
         ),
-        "is_historical": is_historical,
-        "historical_result": historical_result,
     }
-    if not is_historical and not prepared["appointment_format"]:
+    if not prepared["appointment_format"]:
         raise RecruitmentError("Select an appointment format.")
-    conflicts = (
-        repository.list_appointment_conflicts(
-            conn,
-            responsible_account_id=responsible_account_id,
-            starts_at=prepared["starts_at"],
-            ends_at=prepared["ends_at"],
-            exclude_appointment_id=exclude_appointment_id,
-        )
-        if responsible_account_id and not is_historical
-        else []
-    )
-    if conflicts and not bool(values.get("allow_conflict")):
-        raise RecruitmentError(
-            "This staff member already has an overlapping recruitment appointment.",
-            status_code=409,
-            code="appointment_conflict",
-            details=[_appointment_payload(item) for item in conflicts],
-        )
     return prepared
 
 
@@ -1020,245 +989,6 @@ def _notify_cancelled_appointments(
             )
 
 
-def _record_historical_appointment_result(
-    conn: Any,
-    *,
-    user: CurrentUser,
-    candidate: Any,
-    appointment_id: int,
-    prepared: dict[str, Any],
-    now: str,
-) -> None:
-    """Complete a restored appointment and its minimal evaluation atomically."""
-
-    appointment_type = _text(prepared["appointment_type"])
-    result = _text(prepared["historical_result"])
-    actor_account_id = _actor_account(user)
-    actor_staff_id = _actor_staff(user)
-    candidate_id = int(candidate["id"])
-    completed = repository.complete_historical_appointment(
-        conn,
-        appointment_id=int(appointment_id),
-        candidate_id=candidate_id,
-        completed_at=_text(prepared["ends_at"]),
-        actor_account_id=actor_account_id,
-        now=now,
-    )
-    if not completed:
-        raise RecruitmentError(
-            "This appointment changed elsewhere. Refresh and try again.",
-            status_code=409,
-        )
-
-    if appointment_type == "job_interview":
-        evaluation_type = "interview"
-        event_type = "candidate.interview_recorded"
-        record_id = repository.insert_interview(
-            conn,
-            candidate_id=candidate_id,
-            values={
-                "appointment_id": int(appointment_id),
-                "interview_at": prepared["starts_at"],
-                "interviewer_account_id": actor_account_id,
-                "interview_format": "",
-                "notes": "",
-                "result": result,
-            },
-            actor_account_id=actor_account_id,
-            now=now,
-        )
-    else:
-        evaluation_type = "demo"
-        event_type = "candidate.demo_lesson_recorded"
-        record_id = repository.insert_demo(
-            conn,
-            candidate_id=candidate_id,
-            values={
-                "appointment_id": int(appointment_id),
-                "demo_at": prepared["starts_at"],
-                "subject_id": candidate.get("subject_id"),
-                "subject_label": _text(candidate.get("subject")),
-                "topic": "",
-                "evaluator_account_id": actor_account_id,
-                "overview": "",
-                "result": result,
-            },
-            actor_account_id=actor_account_id,
-            now=now,
-        )
-
-    repository.insert_audit(
-        conn,
-        candidate_id=candidate_id,
-        event_type=event_type,
-        detail={
-            "record_id": record_id,
-            "result": result,
-            "historical_restoration": True,
-            "occurred_at": prepared["starts_at"],
-        },
-        actor_account_id=actor_account_id,
-        actor_staff_id=actor_staff_id,
-        now=now,
-    )
-    _audit_appointment(
-        conn,
-        user=user,
-        candidate_id=candidate_id,
-        event_type="candidate.historical_appointment_restored",
-        appointment_id=int(appointment_id),
-        detail={
-            "appointment_type": appointment_type,
-            "result": result,
-            "starts_at": prepared["starts_at"],
-            "record_id": record_id,
-        },
-        now=now,
-    )
-
-    original_stage = _text(candidate["status"])
-    if result == "failed":
-        rejection_reason, rejection_label = (
-            ("failed_job_interview", "Failed job interview")
-            if evaluation_type == "interview"
-            else ("failed_demo_lesson", "Failed demo lesson")
-        )
-        cancelled_ids = repository.cancel_scheduled_appointments(
-            conn,
-            candidate_id=candidate_id,
-            reason=rejection_label,
-            actor_account_id=actor_account_id,
-            now=now,
-        )
-        # Historical restoration must never enqueue new delivery events.
-        for cancelled_id in cancelled_ids:
-            recruitment_notifications.cancel_demo_reminders(conn, int(cancelled_id))
-        revoked_approval_ids = repository.revoke_open_approvals(
-            conn,
-            candidate_id=candidate_id,
-            comment=rejection_label,
-            actor_account_id=actor_account_id,
-            now=now,
-        )
-        if not repository.update_candidate_stage(
-            conn,
-            candidate_id=candidate_id,
-            stage="rejected",
-            expected_version=int(candidate["version"]),
-            actor_account_id=actor_account_id,
-            now=now,
-            comment=rejection_label,
-            transition_source="restored",
-        ):
-            raise RecruitmentError(
-                "This candidate changed elsewhere. Refresh and try again.",
-                status_code=409,
-            )
-        decision_id = repository.insert_final_decision(
-            conn,
-            candidate_id=candidate_id,
-            values={
-                "decision": "rejected",
-                "rejection_reason": rejection_reason,
-                "reason_detail": f"{rejection_label}; historical evaluation #{record_id}.",
-                "origin_stage": original_stage,
-                "follow_up_at": "",
-                "approval_id": None,
-                "is_system_generated": True,
-                "source_evaluation_type": evaluation_type,
-                "source_evaluation_id": record_id,
-            },
-            actor_account_id=actor_account_id,
-            actor_login=user.login,
-            now=now,
-        )
-        repository.insert_audit(
-            conn,
-            candidate_id=candidate_id,
-            event_type="candidate.final_decision_made",
-            detail={
-                "decision_id": decision_id,
-                "decision": "rejected",
-                "rejection_reason": rejection_reason,
-                "origin_stage": original_stage,
-                "evaluation_type": evaluation_type,
-                "record_id": record_id,
-                "revoked_approval_ids": revoked_approval_ids,
-                "historical_restoration": True,
-            },
-            actor_account_id=actor_account_id,
-            actor_staff_id=actor_staff_id,
-            now=now,
-        )
-        repository.insert_audit(
-            conn,
-            candidate_id=candidate_id,
-            event_type="candidate.stage_changed",
-            detail={
-                "from": original_stage,
-                "to": "rejected",
-                "reason": rejection_label,
-            },
-            actor_account_id=actor_account_id,
-            actor_staff_id=actor_staff_id,
-            now=now,
-        )
-    else:
-        next_stage = (
-            "test_and_demo"
-            if appointment_type == "job_interview" and original_stage == "job_interview"
-            else (
-                "under_review"
-                if appointment_type == "demo_lesson"
-                and original_stage == "test_and_demo"
-                else ""
-            )
-        )
-        if next_stage:
-            reason = (
-                "Passed historical job interview"
-                if appointment_type == "job_interview"
-                else "Passed historical demo lesson"
-            )
-            if not repository.update_candidate_stage(
-                conn,
-                candidate_id=candidate_id,
-                stage=next_stage,
-                expected_version=int(candidate["version"]),
-                actor_account_id=actor_account_id,
-                now=now,
-                comment=reason,
-                transition_source="restored",
-            ):
-                raise RecruitmentError(
-                    "This candidate changed elsewhere. Refresh and try again.",
-                    status_code=409,
-                )
-            repository.insert_audit(
-                conn,
-                candidate_id=candidate_id,
-                event_type="candidate.stage_changed",
-                detail={"from": original_stage, "to": next_stage, "reason": reason},
-                actor_account_id=actor_account_id,
-                actor_staff_id=actor_staff_id,
-                now=now,
-            )
-        else:
-            repository.touch_candidate(
-                conn,
-                candidate_id=candidate_id,
-                actor_account_id=actor_account_id,
-                now=now,
-            )
-
-    _sync_system_next_actions(
-        conn,
-        candidate_id=candidate_id,
-        actor_account_id=actor_account_id,
-        now=now,
-    )
-
-
 def schedule_stage_move(
     user: CurrentUser,
     candidate_id: int,
@@ -1306,15 +1036,14 @@ def schedule_stage_move(
                 "This candidate changed elsewhere. Refresh and try again.",
                 status_code=409,
             )
-        if not prepared["is_historical"]:
-            _ensure_demo_assignment(
-                conn,
-                candidate=candidate,
-                values=prepared,
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
+        _ensure_demo_assignment(
+            conn,
+            candidate=candidate,
+            values=prepared,
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
         appointment_id = repository.insert_appointment(
             conn,
             candidate_id=int(candidate_id),
@@ -1322,82 +1051,56 @@ def schedule_stage_move(
             actor_account_id=_actor_account(user),
             now=now,
         )
-        if prepared["is_historical"]:
-            repository.insert_audit(
+        _audit_appointment(
+            conn,
+            user=user,
+            candidate_id=int(candidate_id),
+            event_type="candidate.appointment_scheduled",
+            appointment_id=appointment_id,
+            detail={
+                "appointment_type": appointment_type,
+                "starts_at": prepared["starts_at"],
+                "ends_at": prepared["ends_at"],
+                "responsible_account_id": prepared.get("responsible_account_id"),
+            },
+            now=now,
+        )
+        repository.insert_audit(
+            conn,
+            candidate_id=int(candidate_id),
+            event_type="candidate.stage_changed",
+            detail={
+                "from": candidate["status"],
+                "to": stage,
+                "reason": "Appointment scheduled",
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        saved_appointment = (
+            repository.get_appointment_row(
                 conn,
                 candidate_id=int(candidate_id),
-                event_type="candidate.stage_changed",
-                detail={
-                    "from": candidate["status"],
-                    "to": stage,
-                    "reason": "Historical appointment restored",
-                },
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
-            moved_candidate = _lock_candidate(conn, int(candidate_id))
-            if not moved_candidate:
-                raise RecruitmentError("Candidate was not found.", status_code=404)
-            _record_historical_appointment_result(
-                conn,
-                user=user,
-                candidate=moved_candidate,
                 appointment_id=appointment_id,
-                prepared=prepared,
-                now=now,
             )
-        else:
-            _audit_appointment(
+            if hasattr(conn, "execute")
+            else None
+        )
+        if saved_appointment:
+            recruitment_notifications.enqueue_demo_event(
                 conn,
-                user=user,
-                candidate_id=int(candidate_id),
-                event_type="candidate.appointment_scheduled",
-                appointment_id=appointment_id,
-                detail={
-                    "appointment_type": appointment_type,
-                    "starts_at": prepared["starts_at"],
-                    "ends_at": prepared["ends_at"],
-                    "responsible_account_id": prepared.get("responsible_account_id"),
-                },
-                now=now,
+                appointment=saved_appointment,
+                event_type="demo_assigned",
+                version_token=int(saved_appointment["version"] or 1),
+                include_reminders=True,
             )
-            repository.insert_audit(
-                conn,
-                candidate_id=int(candidate_id),
-                event_type="candidate.stage_changed",
-                detail={
-                    "from": candidate["status"],
-                    "to": stage,
-                    "reason": "Appointment scheduled",
-                },
-                actor_account_id=_actor_account(user),
-                actor_staff_id=_actor_staff(user),
-                now=now,
-            )
-            saved_appointment = (
-                repository.get_appointment_row(
-                    conn,
-                    candidate_id=int(candidate_id),
-                    appointment_id=appointment_id,
-                )
-                if hasattr(conn, "execute")
-                else None
-            )
-            if saved_appointment:
-                recruitment_notifications.enqueue_demo_event(
-                    conn,
-                    appointment=saved_appointment,
-                    event_type="demo_assigned",
-                    version_token=int(saved_appointment["version"] or 1),
-                    include_reminders=True,
-                )
-            _sync_system_next_actions(
-                conn,
-                candidate_id=int(candidate_id),
-                actor_account_id=_actor_account(user),
-                now=now,
-            )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=int(candidate_id),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
         conn.commit()
     result = get_candidate(user, int(candidate_id))
     appointment = next(
@@ -1484,20 +1187,18 @@ def _add_record(
     )
 
 
-def void_evaluation(
+def delete_evaluation(
     user: CurrentUser,
     candidate_id: int,
     *,
     evaluation_type: str,
     attempt_id: int,
-    reason: str,
 ) -> dict[str, Any]:
-    return evaluation_service.void_evaluation(
+    return evaluation_service.delete_evaluation(
         user,
         candidate_id,
         evaluation_type=evaluation_type,
         attempt_id=attempt_id,
-        reason=reason,
         dependencies=_evaluation_dependencies(),
     )
 
@@ -1660,22 +1361,6 @@ def request_approval(
         candidate_id,
         requested_outcome=requested_outcome,
         request_note=request_note,
-        dependencies=_decision_dependencies(),
-    )
-
-
-def _approve_and_finalize_request(
-    user: CurrentUser,
-    candidate_id: int,
-    approval_id: int,
-    *,
-    review_comment: str,
-) -> dict[str, Any]:
-    return decision_service._approve_and_finalize_request(
-        user,
-        candidate_id,
-        approval_id,
-        review_comment=review_comment,
         dependencies=_decision_dependencies(),
     )
 

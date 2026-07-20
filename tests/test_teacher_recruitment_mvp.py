@@ -281,6 +281,10 @@ def test_protected_stage_and_decision_rules_fail_before_persistence():
         service.make_final_decision(
             _user(), 1, {"decision": "active_teacher", "approval_id": 1}
         )
+    with pytest.raises(service.RecruitmentError, match="Only HR"):
+        service.make_final_decision(
+            _user("ceo"), 1, {"decision": "teacher_academy"}
+        )
     with pytest.raises(service.RecruitmentError, match="Explain"):
         service.make_final_decision(
             _user("academic_director"),
@@ -689,7 +693,6 @@ def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(
             "stage": "job_interview",
             "expected_version": 4,
             "starts_at": "2099-07-16T10:00:00",
-            "duration_minutes": 30,
         },
     )
     assert denied.status_code == 403
@@ -702,7 +705,6 @@ def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(
             "stage": "job_interview",
             "expected_version": 4,
             "starts_at": "2099-07-16T10:00:00",
-            "duration_minutes": 30,
         },
     )
     assert allowed.status_code == 201
@@ -724,7 +726,6 @@ def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(
             "stage": "job_interview",
             "expected_version": 4,
             "starts_at": "2099-07-16T10:00:00",
-            "duration_minutes": 30,
             "responsible_account_id": 41,
         },
     )

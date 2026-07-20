@@ -133,9 +133,12 @@ def list_teacher_handoff_rows(
                 COALESCE(teacher_subject.subject_ids, ARRAY[]::bigint[]) AS subject_ids,
                 teacher.status,
                 COALESCE(teacher.account_onboarding_status, 'complete') AS onboarding_status,
-                teacher.created_at AS joined_at,
-                (teacher.created_at AT TIME ZONE 'Asia/Tashkent')::date::text AS added_on,
-                teacher.created_at AS sort_at,
+                COALESCE(teacher.activated_at, teacher.created_at) AS joined_at,
+                (
+                    COALESCE(teacher.activated_at, teacher.created_at)
+                    AT TIME ZONE 'Asia/Tashkent'
+                )::date::text AS added_on,
+                COALESCE(teacher.activated_at, teacher.created_at) AS sort_at,
                 0::integer AS assigned_count,
                 0::integer AS evaluated_count,
                 0::integer AS passed_count,
@@ -513,7 +516,7 @@ def ensure_academy_intake(
 def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
     existing = conn.execute(
         """
-        SELECT id, status
+        SELECT id, status, activated_at
         FROM msi_v2.teachers
         WHERE recruitment_candidate_id = %s
         LIMIT 1
@@ -522,14 +525,18 @@ def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
     ).fetchone()
     if existing:
         teacher_id = int(existing["id"])
-        if str(existing["status"] or "").strip().lower() == "rejected":
+        if (
+            str(existing["status"] or "").strip().lower() != "active"
+            or existing["activated_at"] is None
+        ):
             conn.execute(
                 """
                 UPDATE msi_v2.teachers
-                SET status = 'active', updated_at = %s::timestamptz
-                WHERE id = %s AND status = 'rejected'
+                SET status = 'active', activated_at = %s::timestamptz,
+                    updated_at = %s::timestamptz
+                WHERE id = %s
                 """,
-                (now, teacher_id),
+                (now, now, teacher_id),
             )
             staff = conn.execute(
                 """
@@ -554,8 +561,11 @@ def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
         INSERT INTO msi_v2.teachers (
             full_name, phone, telegram_username, status, notes,
             recruitment_candidate_id, account_onboarding_status,
-            created_at, updated_at
-        ) VALUES (%s, %s, %s, 'active', %s, %s, 'pending', %s::timestamptz, %s::timestamptz)
+            activated_at, created_at, updated_at
+        ) VALUES (
+            %s, %s, %s, 'active', %s, %s, 'pending',
+            %s::timestamptz, %s::timestamptz, %s::timestamptz
+        )
         RETURNING id
         """,
         (
@@ -564,6 +574,7 @@ def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
             candidate["telegram_username"],
             f"Accepted directly from recruitment candidate #{candidate['id']}.",
             candidate["id"],
+            now,
             now,
             now,
         ),

@@ -37,7 +37,6 @@ from backend.modules.hr.recruitment.schemas import (
     CandidateRestore,
     CandidateUpdate,
     DemoLessonWrite,
-    EvaluationVoid,
     FinalDecisionCreate,
     InterviewSessionComplete,
     InterviewSessionStart,
@@ -250,11 +249,11 @@ def tasks(user: CurrentUser = Depends(get_current_user)):
 @router.get("/appointments", operation_id="api_v1_recruitment_appointments")
 def appointments(
     page: Annotated[int, Query(ge=1)] = 1,
-    per_page: Annotated[int, Query(ge=1, le=100)] = 50,
+    per_page: Annotated[int, Query(ge=1, le=500)] = 50,
     starts_from: Annotated[str, Query(alias="from")] = "",
     starts_to: Annotated[str, Query(alias="to")] = "",
     appointment_type: str = "",
-    status: str = "scheduled,in_progress,completed",
+    status: str = "",
     responsible_account_id: int | None = None,
     user: CurrentUser = Depends(get_current_user),
 ):
@@ -569,6 +568,27 @@ def add_interview(candidate_id: int, payload: InterviewWrite, user: CurrentUser 
 
 
 @router.post(
+    "/candidates/{candidate_id}/appointments/{appointment_id}/start",
+    operation_id="api_v1_recruitment_start_appointment",
+)
+def start_appointment(
+    candidate_id: int,
+    appointment_id: int,
+    payload: InterviewSessionStart,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_candidate_view(user, candidate_id)
+    result = _call(
+        service.start_appointment_session,
+        user,
+        candidate_id,
+        appointment_id,
+        expected_version=payload.expected_version,
+    )
+    return api_success({"message": "Appointment started at the current time.", **result})
+
+
+@router.post(
     "/candidates/{candidate_id}/appointments/{appointment_id}/start-interview",
     operation_id="api_v1_recruitment_start_interview",
 )
@@ -624,14 +644,13 @@ def add_demo(candidate_id: int, payload: DemoLessonWrite, user: CurrentUser = De
     return api_success({"message": "Demo lesson recorded.", "candidate": candidate}, status_code=201)
 
 
-@router.post(
-    "/candidates/{candidate_id}/interviews/{attempt_id}/void",
-    operation_id="api_v1_recruitment_void_interview",
+@router.delete(
+    "/candidates/{candidate_id}/interviews/{attempt_id}",
+    operation_id="api_v1_recruitment_delete_interview",
 )
-def void_interview(
+def delete_interview(
     candidate_id: int,
     attempt_id: int,
-    payload: EvaluationVoid,
     user: CurrentUser = Depends(get_current_user),
 ):
     if user.role in {"academic_director", "head_of_department"}:
@@ -639,24 +658,22 @@ def void_interview(
     else:
         ensure_candidate_view(user, candidate_id)
     candidate = _call(
-        service.void_evaluation,
+        service.delete_evaluation,
         user,
         candidate_id,
         evaluation_type="interview",
         attempt_id=attempt_id,
-        reason=payload.reason,
     )
-    return api_success({"message": "Interview result voided.", "candidate": candidate})
+    return api_success({"message": "Interview deleted.", "candidate": candidate})
 
 
-@router.post(
-    "/candidates/{candidate_id}/subject-tests/{attempt_id}/void",
-    operation_id="api_v1_recruitment_void_subject_test",
+@router.delete(
+    "/candidates/{candidate_id}/subject-tests/{attempt_id}",
+    operation_id="api_v1_recruitment_delete_subject_test",
 )
-def void_subject_test(
+def delete_subject_test(
     candidate_id: int,
     attempt_id: int,
-    payload: EvaluationVoid,
     user: CurrentUser = Depends(get_current_user),
 ):
     if user.role in {"academic_director", "head_of_department"}:
@@ -664,24 +681,22 @@ def void_subject_test(
     else:
         ensure_candidate_view(user, candidate_id)
     candidate = _call(
-        service.void_evaluation,
+        service.delete_evaluation,
         user,
         candidate_id,
         evaluation_type="subject_test",
         attempt_id=attempt_id,
-        reason=payload.reason,
     )
-    return api_success({"message": "Subject-test result voided.", "candidate": candidate})
+    return api_success({"message": "Subject test deleted.", "candidate": candidate})
 
 
-@router.post(
-    "/candidates/{candidate_id}/demo-lessons/{attempt_id}/void",
-    operation_id="api_v1_recruitment_void_demo",
+@router.delete(
+    "/candidates/{candidate_id}/demo-lessons/{attempt_id}",
+    operation_id="api_v1_recruitment_delete_demo",
 )
-def void_demo(
+def delete_demo(
     candidate_id: int,
     attempt_id: int,
-    payload: EvaluationVoid,
     user: CurrentUser = Depends(get_current_user),
 ):
     if user.role in {"academic_director", "head_of_department"}:
@@ -689,14 +704,13 @@ def void_demo(
     else:
         ensure_candidate_view(user, candidate_id)
     candidate = _call(
-        service.void_evaluation,
+        service.delete_evaluation,
         user,
         candidate_id,
         evaluation_type="demo",
         attempt_id=attempt_id,
-        reason=payload.reason,
     )
-    return api_success({"message": "Demo result voided.", "candidate": candidate})
+    return api_success({"message": "Demo lesson deleted.", "candidate": candidate})
 
 
 @router.post("/candidates/{candidate_id}/tasks", status_code=201, operation_id="api_v1_recruitment_create_task")
@@ -798,7 +812,7 @@ def review_approval(
         review_comment=payload.review_comment,
     )
     message = (
-        "Candidate approved and finalized."
+        "Academic approval recorded. CEO approval remains pending."
         if payload.status == "approved"
         else "Approval request returned."
     )

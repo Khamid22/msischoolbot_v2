@@ -15,6 +15,7 @@ def list_interview_rows(conn: Any, candidate_id: int) -> list[Any]:
         FROM msi_v2.teacher_candidate_interviews interview
         LEFT JOIN msi_v2.accounts interviewer ON interviewer.id = interview.interviewer_account_id
         WHERE interview.candidate_id = %s
+          AND interview.voided_at IS NULL
         ORDER BY interview.created_at DESC, interview.id DESC
         """,
         (candidate_id,),
@@ -52,6 +53,7 @@ def list_subject_test_rows(conn: Any, candidate_id: int) -> list[Any]:
             WHERE topic.subject_test_id = test.id
         ) topics ON true
         WHERE test.candidate_id = %s
+          AND test.voided_at IS NULL
         ORDER BY test.created_at DESC, test.id DESC
         """,
         (candidate_id,),
@@ -83,21 +85,19 @@ def list_demo_rows(conn: Any, candidate_id: int) -> list[Any]:
             WHERE criterion.demo_lesson_id = demo.id
         ) criteria ON true
         WHERE demo.candidate_id = %s
+          AND demo.voided_at IS NULL
         ORDER BY demo.created_at DESC, demo.id DESC
         """,
         (candidate_id,),
     ).fetchall()
 
 
-def void_evaluation(
+def delete_evaluation(
     conn: Any,
     *,
     table: str,
     candidate_id: int,
     attempt_id: int,
-    actor_account_id: int | None,
-    reason: str,
-    now: str,
 ) -> Any:
     allowed_tables = {
         "teacher_candidate_interviews",
@@ -106,26 +106,16 @@ def void_evaluation(
     }
     if table not in allowed_tables:
         return None
+    appointment_expression = (
+        "NULL::bigint" if table == "teacher_candidate_subject_tests" else "appointment_id"
+    )
     return conn.execute(
         f"""
-        UPDATE msi_v2.{table}
-        SET voided_at = %s::timestamptz,
-            voided_by_account_id = %s,
-            void_reason = %s,
-            updated_by_account_id = %s,
-            updated_at = %s::timestamptz
-        WHERE id = %s AND candidate_id = %s AND voided_at IS NULL
-        RETURNING id
+        DELETE FROM msi_v2.{table}
+        WHERE id = %s AND candidate_id = %s
+        RETURNING id, result, {appointment_expression} AS appointment_id
         """,
-        (
-            now,
-            actor_account_id,
-            reason,
-            actor_account_id,
-            now,
-            attempt_id,
-            candidate_id,
-        ),
+        (attempt_id, candidate_id),
     ).fetchone()
 
 
@@ -144,10 +134,15 @@ def get_evaluation_row(
     }
     if table not in allowed_tables:
         return None
+    appointment_expression = (
+        "NULL::bigint AS appointment_id"
+        if table == "teacher_candidate_subject_tests"
+        else "appointment_id"
+    )
     lock = "FOR UPDATE" if for_update else ""
     return conn.execute(
         f"""
-        SELECT id, candidate_id, result, voided_at
+        SELECT id, candidate_id, result, {appointment_expression}, voided_at
         FROM msi_v2.{table}
         WHERE id = %s AND candidate_id = %s
         LIMIT 1 {lock}
@@ -196,24 +191,58 @@ def latest_active_final_decision(
     ).fetchone()
 
 
-def void_system_final_decision(
+def delete_system_final_decision(
     conn: Any,
     *,
     decision_id: int,
-    actor_account_id: int | None,
-    reason: str,
-    now: str,
 ) -> bool:
     cursor = conn.execute(
         """
-        UPDATE msi_v2.teacher_candidate_final_decisions
-        SET voided_at = %s::timestamptz, voided_by_account_id = %s,
-            void_reason = %s
+        DELETE FROM msi_v2.teacher_candidate_final_decisions
         WHERE id = %s AND is_system_generated = true AND voided_at IS NULL
         """,
-        (now, actor_account_id, reason, int(decision_id)),
+        (int(decision_id),),
     )
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
+
+
+def candidate_evaluation_state(conn: Any, *, candidate_id: int) -> Any:
+    return conn.execute(
+        """
+        SELECT
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_interviews item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'passed'
+          ) AS interview_passed,
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_interviews item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'failed'
+          ) AS interview_failed,
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_demo_lessons item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'passed'
+          ) AS demo_passed,
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_demo_lessons item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'failed'
+          ) AS demo_failed,
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_subject_tests item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'passed'
+          ) AS subject_test_passed,
+          EXISTS (
+            SELECT 1 FROM msi_v2.teacher_candidate_subject_tests item
+            WHERE item.candidate_id = %s AND item.voided_at IS NULL
+              AND item.result = 'failed'
+          ) AS subject_test_failed
+        """,
+        (candidate_id, candidate_id, candidate_id, candidate_id, candidate_id, candidate_id),
+    ).fetchone()
 
 
 def responsible_account_row(conn: Any, account_id: int) -> Any:
@@ -456,6 +485,9 @@ def list_valid_evaluator_accounts(conn: Any, account_ids: Iterable[int]) -> set[
 
 __all__ = [
     "ensure_candidate_assignment",
+    "candidate_evaluation_state",
+    "delete_evaluation",
+    "delete_system_final_decision",
     "get_evaluation_row",
     "get_system_decision_for_evaluation",
     "hod_account_has_subject_scope",
@@ -468,6 +500,4 @@ __all__ = [
     "list_subject_test_rows",
     "list_valid_evaluator_accounts",
     "responsible_account_row",
-    "void_evaluation",
-    "void_system_final_decision",
 ]

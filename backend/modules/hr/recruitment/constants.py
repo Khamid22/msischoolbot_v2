@@ -72,6 +72,9 @@ APPOINTMENT_TYPES = frozenset({"job_interview", "demo_lesson"})
 APPOINTMENT_STATUSES = frozenset(
     {"scheduled", "in_progress", "completed", "cancelled", "no_show"}
 )
+APPOINTMENT_DISPLAY_STATUSES = frozenset(
+    {"passed", "failed", "scheduled", "in_progress", "overdue", "not_conducted"}
+)
 SCHEDULED_STAGE_TYPES = {"job_interview": "job_interview", "test_and_demo": "demo_lesson"}
 
 RECRUITMENT_ROLES = frozenset(
@@ -84,6 +87,7 @@ ACADEMIC_ROLES = frozenset({"academic_director", "head_of_department"})
 __all__ = [
     "ACADEMIC_ROLES",
     "APPOINTMENT_STATUSES",
+    "APPOINTMENT_DISPLAY_STATUSES",
     "APPOINTMENT_TYPES",
     "ALL_STAGES",
     "ALTERNATIVE_STAGES",
