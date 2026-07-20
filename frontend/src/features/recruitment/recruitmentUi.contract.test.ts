@@ -210,10 +210,13 @@ describe("candidate navigation and progressive disclosure", () => {
 
   test("renders Academy training as a read-only responsive table and cards", () => {
     assert.match(profile, /title="Academy training"/);
-    assert.match(profile, /Assigned/);
     assert.match(profile, /Evaluated/);
     assert.match(profile, /Passed/);
     assert.match(profile, /Average score/);
+    assert.match(profile, />Delivered</);
+    assert.match(profile, /Not delivered yet/);
+    assert.match(profile, /HOD of \$\{academyDepartmentName\(subject, position\)\} Department/);
+    assert.doesNotMatch(profile, /Assignment \/ schedule/);
     assert.match(profile, /hidden overflow-hidden rounded-lg border border-border lg:block/);
     assert.match(profile, /space-y-2 lg:hidden/);
     assert.match(profile, /Awaiting evaluation/);

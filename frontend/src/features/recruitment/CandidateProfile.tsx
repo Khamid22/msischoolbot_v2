@@ -486,20 +486,44 @@ function trainingLessonTitle(row: AcademyTrainingRow) {
   };
 }
 
-function trainingLessonDate(row: AcademyTrainingRow) {
+function trainingLessonDelivery(row: AcademyTrainingRow) {
   if (row.lesson.session_datetime) {
     return {
-      label: "Scheduled",
+      label: "Delivered",
       value: dateTimeLabel(row.lesson.session_datetime),
     };
   }
-  if (row.lesson.deadline_date) {
-    return { label: "Due", value: dateLabel(row.lesson.deadline_date) };
-  }
   return {
-    label: "Assigned",
-    value: dateLabel(row.lesson.assigned_at),
+    label: "Delivered",
+    value: row.assessment ? "Date not recorded" : "Not delivered yet",
   };
+}
+
+function academyDepartmentName(subject?: string, position?: string) {
+  const value = `${text(subject)} ${text(position)}`.toLocaleLowerCase();
+  if (value.includes("math")) return "Math";
+  if (value.includes("chem")) return "Chemistry";
+  if (value.includes("physics")) return "Physics";
+  if (value.includes("biology")) return "Biology";
+  if (value.includes("english") || value.includes("esl")) return "ESL";
+
+  const cleaned = text(subject || position)
+    .replace(/\bIGCSE\b/gi, "")
+    .replace(/\bTeacher\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Subject";
+}
+
+function trainingEvaluator(
+  row: AcademyTrainingRow,
+  subject?: string,
+  position?: string,
+) {
+  const recordedEvaluator =
+    text(row.assessment?.evaluator_name).trim() ||
+    text(row.lesson.evaluator_name).trim();
+  return recordedEvaluator || `HOD of ${academyDepartmentName(subject, position)} Department`;
 }
 
 function trainingScore(value: number | null | undefined) {
@@ -511,13 +535,16 @@ function trainingScore(value: number | null | undefined) {
 
 function TrainingPanel({
   rows,
+  subject,
+  position,
 }: {
   rows: AcademyTrainingRow[];
+  subject?: string;
+  position?: string;
 }) {
   const [expandedLessonId, setExpandedLessonId] = useState<number | null>(null);
   const summary = academyTrainingSummary(rows);
   const metrics = [
-    ["Assigned", summary.assigned],
     ["Evaluated", summary.evaluated],
     ["Passed", summary.passed],
     ["Average score", summary.averageScore === null ? "—" : summary.averageScore],
@@ -530,7 +557,7 @@ function TrainingPanel({
       aria-labelledby="candidate-tab-training"
       className="space-y-3"
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {metrics.map(([label, value]) => (
           <section
             key={label}
@@ -561,12 +588,12 @@ function TrainingPanel({
             <div className="hidden overflow-hidden rounded-lg border border-border lg:block">
               <table className="w-full table-fixed text-left">
                 <caption className="sr-only">
-                  Assigned Teacher Academy lessons and their latest evaluations
+                  Teacher Academy lesson delivery and latest evaluation details
                 </caption>
                 <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th scope="col" className="w-[27%] px-3 py-2">Lesson</th>
-                    <th scope="col" className="w-[19%] px-3 py-2">Assignment / schedule</th>
+                    <th scope="col" className="w-[19%] px-3 py-2">Delivered</th>
                     <th scope="col" className="w-[18%] px-3 py-2">Evaluator</th>
                     <th scope="col" className="w-[16%] px-3 py-2">Training status</th>
                     <th scope="col" className="w-[20%] px-3 py-2">Score / result</th>
@@ -575,13 +602,10 @@ function TrainingPanel({
                 <tbody className="divide-y divide-border">
                   {rows.map((row) => {
                     const title = trainingLessonTitle(row);
-                    const assignmentDate = trainingLessonDate(row);
+                    const delivery = trainingLessonDelivery(row);
                     const assessment = row.assessment;
                     const expanded = expandedLessonId === row.lesson.id;
-                    const evaluator =
-                      text(assessment?.evaluator_name).trim() ||
-                      text(row.lesson.evaluator_name).trim() ||
-                      "Not assigned";
+                    const evaluator = trainingEvaluator(row, subject, position);
                     return (
                       <Fragment key={row.lesson.id}>
                         <tr className="align-middle">
@@ -594,8 +618,7 @@ function TrainingPanel({
                             </span>
                           </th>
                           <td className="px-3 py-2.5 text-xs">
-                            <span className="block font-semibold text-foreground">{assignmentDate.label}</span>
-                            <span className="mt-0.5 block text-muted-foreground">{assignmentDate.value}</span>
+                            <span className="block text-foreground">{delivery.value}</span>
                           </td>
                           <td className="truncate px-3 py-2.5 text-xs text-foreground" title={evaluator}>
                             {evaluator}
@@ -658,13 +681,10 @@ function TrainingPanel({
             <div className="space-y-2 lg:hidden">
               {rows.map((row) => {
                 const title = trainingLessonTitle(row);
-                const assignmentDate = trainingLessonDate(row);
+                const delivery = trainingLessonDelivery(row);
                 const assessment = row.assessment;
                 const expanded = expandedLessonId === row.lesson.id;
-                const evaluator =
-                  text(assessment?.evaluator_name).trim() ||
-                  text(row.lesson.evaluator_name).trim() ||
-                  "Not assigned";
+                const evaluator = trainingEvaluator(row, subject, position);
                 return (
                   <article
                     key={row.lesson.id}
@@ -685,8 +705,8 @@ function TrainingPanel({
                     </div>
                     <dl className="mt-3 grid min-w-0 grid-cols-2 gap-2 text-xs">
                       <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
-                        <dt className="font-semibold text-muted-foreground">{assignmentDate.label}</dt>
-                        <dd className="mt-0.5 text-foreground">{assignmentDate.value}</dd>
+                        <dt className="font-semibold text-muted-foreground">{delivery.label}</dt>
+                        <dd className="mt-0.5 text-foreground">{delivery.value}</dd>
                       </div>
                       <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
                         <dt className="font-semibold text-muted-foreground">Evaluator</dt>
@@ -2763,7 +2783,11 @@ export function CandidateProfile({
       ) : null}
 
       {tab === "training" && role === "hr_manager" && candidate.academy ? (
-        <TrainingPanel rows={trainingRows} />
+        <TrainingPanel
+          rows={trainingRows}
+          subject={candidate.academy.subject}
+          position={candidate.applied_position}
+        />
       ) : null}
 
       {tab === "activity" ? (
