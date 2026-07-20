@@ -62,7 +62,11 @@ _CANDIDATE_COLUMNS = """
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
     COALESCE(decision.origin_stage, '') AS decision_origin_stage,
-    COALESCE(NULLIF(decision.origin_stage, ''), previous_stage.stage, '') AS restore_stage,
+    CASE
+        WHEN candidate.status = 'trash_bin'
+            THEN COALESCE(previous_stage.stage, NULLIF(decision.origin_stage, ''), '')
+        ELSE COALESCE(NULLIF(decision.origin_stage, ''), previous_stage.stage, '')
+    END AS restore_stage,
     COALESCE(decision.source_evaluation_type, '') AS decision_source_evaluation_type,
     decision.source_evaluation_id AS decision_source_evaluation_id,
     COALESCE(decision_actor.full_name, decision_actor.login, decision.decided_by_login, '')
@@ -624,8 +628,15 @@ def list_teacher_handoff_rows(
                           AND assessment.weighted_overall_score > 0
                     ) AS average_score
             ) academy_progress ON true
+            LEFT JOIN msi_v2.teacher_candidates candidate
+              ON candidate.id = academy.recruitment_candidate_id
             WHERE academy.promoted_teacher_id IS NULL
-              AND COALESCE(academy.academy_status, '') <> 'rejected'
+              AND COALESCE(academy.academy_status, '') NOT IN (
+                  'rejected', 'removed', 'trash_bin'
+              )
+              AND COALESCE(candidate.status, 'teacher_academy') NOT IN (
+                  'rejected', 'candidate_withdrew', 'trash_bin'
+              )
         """
     elif kind == "active_teacher":
         records_sql = """
@@ -684,6 +695,9 @@ def list_teacher_handoff_rows(
                 ) available_subject
             ) teacher_subject ON true
             WHERE teacher.status = 'active'
+              AND COALESCE(candidate.status, 'active_teacher') NOT IN (
+                  'rejected', 'candidate_withdrew', 'trash_bin'
+              )
         """
     else:
         raise ValueError("Unknown teacher handoff kind.")
@@ -2769,6 +2783,209 @@ def mark_academy_removed(
     return bool(row)
 
 
+def lock_teacher_handoff_row(conn: Any, *, kind: str, record_id: int) -> Any:
+    if kind == "teacher_academy":
+        return conn.execute(
+            """
+            SELECT academy.id AS record_id, academy.recruitment_candidate_id,
+                   academy.academy_status AS roster_status,
+                   academy.user_id AS staff_id, academy.promoted_teacher_id,
+                   COALESCE(staff.teacher_id, 0) AS teacher_id
+            FROM msi_v2.academy_teachers academy
+            LEFT JOIN msi_v2.msi_staff staff ON staff.id = academy.user_id
+            WHERE academy.id = %s
+            FOR UPDATE OF academy
+            """,
+            (int(record_id),),
+        ).fetchone()
+    if kind == "active_teacher":
+        return conn.execute(
+            """
+            SELECT teacher.id AS record_id, teacher.recruitment_candidate_id,
+                   teacher.status AS roster_status,
+                   COALESCE(staff.id, 0) AS staff_id,
+                   teacher.id AS teacher_id,
+                   NULL::bigint AS promoted_teacher_id
+            FROM msi_v2.teachers teacher
+            LEFT JOIN LATERAL (
+                SELECT candidate.id
+                FROM msi_v2.msi_staff candidate
+                WHERE candidate.teacher_id = teacher.id
+                  AND lower(candidate.role) = 'teacher'
+                ORDER BY
+                    CASE WHEN lower(candidate.status) = 'active' THEN 0 ELSE 1 END,
+                    candidate.id
+                LIMIT 1
+            ) staff ON true
+            WHERE teacher.id = %s
+            FOR UPDATE OF teacher
+            """,
+            (int(record_id),),
+        ).fetchone()
+    raise ValueError("Unknown teacher handoff kind.")
+
+
+def mark_teacher_handoff_closed(
+    conn: Any,
+    *,
+    kind: str,
+    record_id: int,
+    action: str,
+    now: str,
+) -> bool:
+    if action not in {"trash_bin", "rejected"}:
+        raise ValueError("Unknown teacher handoff close action.")
+    if kind == "teacher_academy":
+        cursor = conn.execute(
+            """
+            UPDATE msi_v2.academy_teachers
+            SET academy_status = %s,
+                account_onboarding_status = CASE
+                    WHEN %s = 'rejected' THEN 'removed'
+                    ELSE account_onboarding_status
+                END,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+              AND promoted_teacher_id IS NULL
+              AND COALESCE(academy_status, '') NOT IN ('rejected', 'trash_bin')
+            """,
+            (action, action, now, int(record_id)),
+        )
+        return int(getattr(cursor, "rowcount", 0) or 0) == 1
+    if kind == "active_teacher":
+        cursor = conn.execute(
+            """
+            UPDATE msi_v2.teachers
+            SET status = %s, updated_at = %s::timestamptz
+            WHERE id = %s
+              AND status = 'active'
+            """,
+            (action, now, int(record_id)),
+        )
+        return int(getattr(cursor, "rowcount", 0) or 0) == 1
+    raise ValueError("Unknown teacher handoff kind.")
+
+
+def set_teacher_identity_enabled(
+    conn: Any,
+    *,
+    staff_id: int,
+    teacher_id: int,
+    enabled: bool,
+    now: str,
+) -> None:
+    staff_status = "active" if enabled else "disabled"
+    account_status = "active" if enabled else "disabled"
+    if int(staff_id or 0):
+        conn.execute(
+            """
+            UPDATE msi_v2.msi_staff
+            SET status = %s, updated_at = %s::timestamptz
+            WHERE id = %s AND lower(role) = 'teacher'
+            """,
+            (staff_status, now, int(staff_id)),
+        )
+    conn.execute(
+        """
+        UPDATE msi_v2.accounts account
+        SET status = %s, session_version = account.session_version + 1,
+            updated_at = %s::timestamptz
+        WHERE lower(account.role) = 'teacher'
+          AND (
+              (
+                  %s > 0
+                  AND account.legacy_source_table = 'msi_staff'
+                  AND account.legacy_source_id = %s
+              )
+              OR (
+                  %s > 0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM msi_v2.teacher_profiles profile
+                      WHERE profile.account_id = account.id
+                        AND profile.teacher_id = %s
+                  )
+              )
+          )
+        """,
+        (
+            account_status, now,
+            int(staff_id or 0), int(staff_id or 0),
+            int(teacher_id or 0), int(teacher_id or 0),
+        ),
+    )
+
+
+def restore_teacher_handoff(
+    conn: Any,
+    *,
+    candidate_id: int,
+    kind: str,
+    now: str,
+) -> bool:
+    if kind == "teacher_academy":
+        row = conn.execute(
+            """
+            UPDATE msi_v2.academy_teachers academy
+            SET academy_status = 'in_training',
+                updated_at = %s::timestamptz
+            WHERE academy.recruitment_candidate_id = %s
+              AND academy.academy_status = 'trash_bin'
+              AND academy.promoted_teacher_id IS NULL
+            RETURNING academy.user_id AS staff_id
+            """,
+            (now, int(candidate_id)),
+        ).fetchone()
+        if not row:
+            return False
+        staff_id = int(row["staff_id"] or 0)
+        teacher_row = conn.execute(
+            "SELECT COALESCE(teacher_id, 0) AS teacher_id FROM msi_v2.msi_staff WHERE id = %s",
+            (staff_id,),
+        ).fetchone() if staff_id else None
+        set_teacher_identity_enabled(
+            conn,
+            staff_id=staff_id,
+            teacher_id=int(teacher_row["teacher_id"] or 0) if teacher_row else 0,
+            enabled=True,
+            now=now,
+        )
+        return True
+    if kind == "active_teacher":
+        row = conn.execute(
+            """
+            UPDATE msi_v2.teachers teacher
+            SET status = 'active', updated_at = %s::timestamptz
+            WHERE teacher.recruitment_candidate_id = %s
+              AND teacher.status = 'trash_bin'
+            RETURNING teacher.id
+            """,
+            (now, int(candidate_id)),
+        ).fetchone()
+        if not row:
+            return False
+        teacher_id = int(row["id"])
+        staff = conn.execute(
+            """
+            SELECT id
+            FROM msi_v2.msi_staff
+            WHERE teacher_id = %s AND lower(role) = 'teacher'
+            ORDER BY id
+            LIMIT 1
+            """,
+            (teacher_id,),
+        ).fetchone()
+        set_teacher_identity_enabled(
+            conn,
+            staff_id=int(staff["id"] or 0) if staff else 0,
+            teacher_id=teacher_id,
+            enabled=True,
+            now=now,
+        )
+        return True
+    return False
+
+
 def list_teacher_account_ids_for_staff(conn: Any, staff_id: int) -> list[int]:
     if not int(staff_id or 0):
         return []
@@ -2910,11 +3127,43 @@ def ensure_academy_intake(conn: Any, *, candidate: Any, actor_login: str, now: s
 
 def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
     existing = conn.execute(
-        "SELECT id FROM msi_v2.teachers WHERE recruitment_candidate_id = %s LIMIT 1",
+        """
+        SELECT id, status
+        FROM msi_v2.teachers
+        WHERE recruitment_candidate_id = %s
+        LIMIT 1
+        """,
         (candidate["id"],),
     ).fetchone()
     if existing:
-        return int(existing["id"])
+        teacher_id = int(existing["id"])
+        if str(existing["status"] or "").strip().lower() == "rejected":
+            conn.execute(
+                """
+                UPDATE msi_v2.teachers
+                SET status = 'active', updated_at = %s::timestamptz
+                WHERE id = %s AND status = 'rejected'
+                """,
+                (now, teacher_id),
+            )
+            staff = conn.execute(
+                """
+                SELECT id
+                FROM msi_v2.msi_staff
+                WHERE teacher_id = %s AND lower(role) = 'teacher'
+                ORDER BY id
+                LIMIT 1
+                """,
+                (teacher_id,),
+            ).fetchone()
+            set_teacher_identity_enabled(
+                conn,
+                staff_id=int(staff["id"] or 0) if staff else 0,
+                teacher_id=teacher_id,
+                enabled=True,
+                now=now,
+            )
+        return teacher_id
     row = conn.execute(
         """
         INSERT INTO msi_v2.teachers (

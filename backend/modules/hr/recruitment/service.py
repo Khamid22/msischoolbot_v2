@@ -585,8 +585,21 @@ def restore_closed_candidate(
         if from_stage not in _CLOSED_CANDIDATE_STAGES:
             raise RecruitmentError("Only closed candidates can be recovered.", status_code=409)
         restore_stage = _text(candidate["restore_stage"])
-        if restore_stage not in _RESTORABLE_PIPELINE_STAGES:
+        restoring_teacher_handoff = (
+            from_stage == "trash_bin" and restore_stage in PROTECTED_HIRE_STAGES
+        )
+        if restore_stage not in _RESTORABLE_PIPELINE_STAGES and not restoring_teacher_handoff:
             restore_stage = "under_review" if restore_stage in PROTECTED_HIRE_STAGES else "new_candidate"
+        if restoring_teacher_handoff and not repository.restore_teacher_handoff(
+            conn,
+            candidate_id=int(candidate_id),
+            kind=restore_stage,
+            now=now,
+        ):
+            raise RecruitmentError(
+                "The linked teacher record changed or is no longer recoverable.",
+                status_code=409,
+            )
         voided_decision_id = None
         if from_stage in {"rejected", "candidate_withdrew"}:
             voided_decision_id = repository.void_latest_closed_decision(
@@ -777,6 +790,26 @@ def list_teacher_handoffs(
                 "can_remove": (
                     user.role in {"hr_manager", "academic_director"}
                     and normalized_kind == "teacher_academy"
+                ),
+                "can_delete": bool(
+                    row["recruitment_candidate_id"]
+                    and (
+                        user.role == "hr_manager"
+                        or (
+                            user.role == "academic_director"
+                            and normalized_kind == "teacher_academy"
+                        )
+                    )
+                ),
+                "can_reject": bool(
+                    row["recruitment_candidate_id"]
+                    and (
+                        user.role == "hr_manager"
+                        or (
+                            user.role == "academic_director"
+                            and normalized_kind == "teacher_academy"
+                        )
+                    )
                 ),
                 "generated_login_will_be_deleted": bool(
                     row.get("generated_login_will_be_deleted")
@@ -3783,6 +3816,253 @@ def remove_academy_teacher(
         "candidate": {"id": candidate_id, "status": "rejected"},
         "identity_deleted": identity_deleted,
         "already_removed": False,
+    }
+
+
+def close_teacher_handoff(
+    user: CurrentUser,
+    *,
+    kind: str,
+    record_id: int,
+    values: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_kind = _text(kind)
+    action = _text(values.get("action"))
+    if normalized_kind not in PROTECTED_HIRE_STAGES:
+        raise RecruitmentError("Unknown teacher roster type.")
+    if action not in {"trash_bin", "rejected"}:
+        raise RecruitmentError("Unknown teacher roster action.")
+    allowed = user.role == "hr_manager" or (
+        user.role == "academic_director" and normalized_kind == "teacher_academy"
+    )
+    if not allowed:
+        raise RecruitmentError(
+            "You cannot delete or reject this teacher.",
+            status_code=403,
+        )
+
+    rejection_reason = _text(values.get("rejection_reason"))
+    reason_detail = _text(values.get("reason_detail"))
+    if action == "rejected":
+        if not rejection_reason:
+            raise RecruitmentError("Select a rejection reason.")
+        if rejection_reason == "other" and not reason_detail:
+            raise RecruitmentError("Explain the other rejection reason.")
+        if normalized_kind == "teacher_academy":
+            result = remove_academy_teacher(
+                user,
+                int(record_id),
+                {
+                    "rejection_reason": rejection_reason,
+                    "reason_detail": reason_detail,
+                },
+            )
+            return {
+                **result,
+                "action": action,
+                "kind": normalized_kind,
+                "record_id": int(record_id),
+            }
+
+    now = _now()
+    candidate_id = 0
+    with connect_auth_db() as conn:
+        if action == "rejected" and not repository.recruitment_setting_value_exists(
+            conn,
+            category="rejection_reason",
+            value=rejection_reason,
+        ):
+            raise RecruitmentError("Select an active rejection reason.")
+        handoff = repository.lock_teacher_handoff_row(
+            conn,
+            kind=normalized_kind,
+            record_id=int(record_id),
+        )
+        if not handoff:
+            raise RecruitmentError("Teacher record was not found.", status_code=404)
+        candidate_id = int(handoff["recruitment_candidate_id"] or 0)
+        if not candidate_id:
+            raise RecruitmentError(
+                "Link this teacher record to a lifecycle profile first.",
+                status_code=409,
+            )
+        candidate = _lock_candidate(conn, candidate_id)
+        if not candidate:
+            raise RecruitmentError("Linked lifecycle profile was not found.", status_code=409)
+        candidate_stage = _text(candidate["status"])
+        roster_status = _text(handoff["roster_status"])
+        if candidate_stage == action and roster_status == action:
+            conn.rollback()
+            return {
+                "candidate": {"id": candidate_id, "status": action},
+                "action": action,
+                "kind": normalized_kind,
+                "record_id": int(record_id),
+                "already_closed": True,
+            }
+        if candidate_stage != normalized_kind:
+            raise RecruitmentError(
+                "The linked profile changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        if normalized_kind == "teacher_academy" and int(handoff["promoted_teacher_id"] or 0):
+            raise RecruitmentError(
+                "A promoted Academy teacher cannot be changed here.",
+                status_code=409,
+            )
+
+        reason = (
+            reason_detail or rejection_reason
+            if action == "rejected"
+            else "Moved to Trash Bin from the teacher roster."
+        )
+        revoked_approval_ids = repository.revoke_open_approvals(
+            conn,
+            candidate_id=candidate_id,
+            comment=reason,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        cancelled_appointment_ids = repository.cancel_scheduled_appointments(
+            conn,
+            candidate_id=candidate_id,
+            reason=reason,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        _notify_cancelled_appointments(
+            conn,
+            candidate_id=candidate_id,
+            appointment_ids=cancelled_appointment_ids,
+        )
+        cancelled_task_ids = repository.cancel_pending_candidate_tasks(
+            conn,
+            candidate_id=candidate_id,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not repository.update_candidate_stage(
+            conn,
+            candidate_id=candidate_id,
+            stage=action,
+            expected_version=int(candidate["version"]),
+            actor_account_id=_actor_account(user),
+            now=now,
+            comment=reason,
+            transition_source="manual",
+        ):
+            raise RecruitmentError(
+                "This teacher changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        if not repository.mark_teacher_handoff_closed(
+            conn,
+            kind=normalized_kind,
+            record_id=int(record_id),
+            action=action,
+            now=now,
+        ):
+            raise RecruitmentError(
+                "The teacher roster changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        repository.set_teacher_identity_enabled(
+            conn,
+            staff_id=int(handoff["staff_id"] or 0),
+            teacher_id=int(handoff["teacher_id"] or 0),
+            enabled=False,
+            now=now,
+        )
+
+        decision_id = None
+        if action == "rejected":
+            decision_id = repository.insert_final_decision(
+                conn,
+                candidate_id=candidate_id,
+                values={
+                    "decision": "rejected",
+                    "rejection_reason": rejection_reason,
+                    "reason_detail": reason_detail,
+                    "origin_stage": normalized_kind,
+                    "follow_up_at": "",
+                    "approval_id": None,
+                },
+                actor_account_id=_actor_account(user),
+                actor_login=user.login,
+                now=now,
+            )
+        for event_type, identifiers in (
+            ("candidate.hire_approvals_revoked", revoked_approval_ids),
+            ("candidate.appointments_cancelled", cancelled_appointment_ids),
+            ("candidate.tasks_cancelled", cancelled_task_ids),
+        ):
+            if identifiers:
+                repository.insert_audit(
+                    conn,
+                    candidate_id=candidate_id,
+                    event_type=event_type,
+                    detail={"ids": identifiers, "reason": reason},
+                    actor_account_id=_actor_account(user),
+                    actor_staff_id=_actor_staff(user),
+                    now=now,
+                )
+        repository.insert_audit(
+            conn,
+            candidate_id=candidate_id,
+            event_type="candidate.stage_changed",
+            detail={"from": normalized_kind, "to": action, "reason": reason},
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        repository.insert_audit(
+            conn,
+            candidate_id=candidate_id,
+            event_type="candidate.teacher_roster_closed",
+            detail={
+                "kind": normalized_kind,
+                "record_id": int(record_id),
+                "action": action,
+                "rejection_reason": rejection_reason,
+                "reason_detail": reason_detail,
+                "identity_disabled": bool(
+                    int(handoff["staff_id"] or 0) or int(handoff["teacher_id"] or 0)
+                ),
+                "history_preserved": True,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        if decision_id:
+            repository.insert_audit(
+                conn,
+                candidate_id=candidate_id,
+                event_type="candidate.final_decision_made",
+                detail={
+                    "decision_id": decision_id,
+                    "decision": "rejected",
+                    "rejection_reason": rejection_reason,
+                    "reason_detail": reason_detail,
+                    "origin_stage": normalized_kind,
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+        _sync_system_next_actions(
+            conn,
+            candidate_id=candidate_id,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        conn.commit()
+    return {
+        "candidate": {"id": candidate_id, "status": action},
+        "action": action,
+        "kind": normalized_kind,
+        "record_id": int(record_id),
+        "already_closed": False,
     }
 
 

@@ -173,6 +173,8 @@
 /api/v1/recruitment/candidates/{candidate_id}/interviews | POST
 /api/v1/recruitment/candidates/{candidate_id}/interviews/{attempt_id}/void | POST
 /api/v1/recruitment/candidates/{candidate_id}/notes | POST
+/api/v1/recruitment/candidates/{candidate_id}/purge | POST
+/api/v1/recruitment/candidates/{candidate_id}/restore | POST
 /api/v1/recruitment/candidates/{candidate_id}/scheduled-stage-moves | POST
 /api/v1/recruitment/candidates/{candidate_id}/stage | POST
 /api/v1/recruitment/candidates/{candidate_id}/subject-tests | POST
@@ -192,6 +194,8 @@
 /api/v1/recruitment/tasks | GET
 /api/v1/recruitment/teachers | GET
 /api/v1/recruitment/teachers/{academy_teacher_id}/remove | POST
+/api/v1/recruitment/teachers/{kind}/{record_id}/close | POST
+/api/v1/recruitment/trash/purge | POST
 /api/v1/student/activity/ping | GET
 /api/v1/student/chat/messages | GET
 /api/v1/student/chat/messages | POST

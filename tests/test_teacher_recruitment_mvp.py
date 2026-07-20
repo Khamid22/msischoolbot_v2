@@ -124,7 +124,7 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
                 {
                     "kind": "teacher_academy",
                     "record_id": 17,
-                    "recruitment_candidate_id": None,
+                    "recruitment_candidate_id": 330,
                     "full_name": "Existing Math Teacher",
                     "position": "IGCSE Math Teacher",
                     "subject": "Mathematics",
@@ -148,12 +148,14 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
     )
     assert result["total"] == 1
     assert result["items"][0]["record_id"] == 17
-    assert result["items"][0]["recruitment_candidate_id"] == 0
+    assert result["items"][0]["recruitment_candidate_id"] == 330
     assert result["items"][0]["position"] == "IGCSE Math Teacher"
     assert result["items"][0]["added_on"] == "2026-07-17"
     assert result["items"][0]["assigned_count"] == 12
     assert result["items"][0]["passed_count"] == 8
     assert result["items"][0]["average_score"] == 7.2
+    assert result["items"][0]["can_delete"] is True
+    assert result["items"][0]["can_reject"] is True
 
     academic_result = service.list_teacher_handoffs(
         _user("academic_director"),
@@ -161,6 +163,8 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
         sort="lessons",
     )
     assert academic_result["total"] == 1
+    assert academic_result["items"][0]["can_delete"] is True
+    assert academic_result["items"][0]["can_reject"] is True
 
     with pytest.raises(service.RecruitmentError, match="Academic Director"):
         service.list_teacher_handoffs(

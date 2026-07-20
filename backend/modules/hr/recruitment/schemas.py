@@ -226,6 +226,12 @@ class AcademyTeacherRemoval(StrictModel):
     reason_detail: str = Field(default="", max_length=5000)
 
 
+class TeacherHandoffClose(StrictModel):
+    action: str = Field(pattern="^(trash_bin|rejected)$")
+    rejection_reason: str = Field(default="", max_length=120)
+    reason_detail: str = Field(default="", max_length=5000)
+
+
 class EvaluationVoid(StrictModel):
     reason: str = Field(min_length=1, max_length=2000)
 

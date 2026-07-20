@@ -382,7 +382,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /Academy status/);
     assert.match(roster, /assigned_count/);
     assert.match(roster, /passed_count/);
-    assert.match(roster, /ActionMenu/);
+    assert.match(roster, /Delete to Trash Bin/);
+    assert.match(roster, /Reject teacher/);
+    assert.match(roster, /teachers\/\$\{closeSelection\?\.teacher\.kind\}\/\$\{closeSelection\?\.teacher\.record_id\}\/close/);
     assert.match(roster, /All subjects/);
     assert.match(roster, /teacher_subject/);
     assert.match(roster, /teacher_sort/);
@@ -390,7 +392,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /DESKTOP_MIN_PAGE_SIZE = 10/);
     assert.match(roster, /MOBILE_PAGE_SIZE = 5/);
     assert.match(roster, /className="group h-14/);
-    assert.doesNotMatch(roster, /<th[^>]*>Actions<\/th>/);
+    assert.match(roster, />Actions<\/th>/);
     assert.doesNotMatch(roster, /<th[^>]*>Account<\/th>/);
     assert.doesNotMatch(roster, /<dt[^>]*>Account<\/dt>/);
     assert.match(roster, /toolbarLeading/);

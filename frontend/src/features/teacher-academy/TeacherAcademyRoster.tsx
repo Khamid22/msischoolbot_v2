@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownWideNarrow,
-  ExternalLink,
   Loader2,
   Search,
-  UserMinus,
+  Trash2,
+  UserX,
 } from "lucide-react";
 import {
   useEffect,
@@ -28,7 +28,6 @@ import {
   replaceUrlParams,
   secondaryButtonClass,
 } from "@/features/recruitment/ui";
-import { ActionMenu, type ActionMenuItem } from "@/shared/ui/ActionMenu";
 import { MobileCardList } from "@/shared/ui/MobileCardList";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { Pagination } from "@/shared/ui/Pagination";
@@ -52,6 +51,8 @@ export type TeacherRosterItem = {
   passed_count: number;
   average_score: number | null;
   can_remove: boolean;
+  can_delete: boolean;
+  can_reject: boolean;
   generated_login_will_be_deleted: boolean;
 };
 
@@ -85,10 +86,10 @@ export function useCanonicalTeacherRosterTotals(refreshToken = "", enabled = tru
   };
 }
 
-type RemovalResult = {
+type CloseResult = {
   message: string;
-  identity_deleted: boolean;
-  already_removed: boolean;
+  action: "trash_bin" | "rejected";
+  already_closed?: boolean;
 };
 
 type RosterMessageTone = "success" | "error";
@@ -245,33 +246,15 @@ function useViewportPageSize(
 function TeacherMobileCard({
   teacher,
   onOpen,
-  onRemove,
+  onDelete,
+  onReject,
 }: {
   teacher: TeacherRosterItem;
   onOpen: () => void;
-  onRemove: () => void;
+  onDelete: () => void;
+  onReject: () => void;
 }) {
   const isAcademy = teacher.kind === "teacher_academy";
-  const actions: ActionMenuItem[] = [
-    {
-      key: "open",
-      label: "Open details",
-      icon: <ExternalLink className="h-4 w-4" />,
-      onClick: onOpen,
-    },
-  ];
-  if (teacher.can_remove) {
-    actions.push(
-      { key: "remove-separator", separator: true },
-      {
-        key: "remove",
-        label: "Remove from Teacher Academy",
-        icon: <UserMinus className="h-4 w-4" />,
-        danger: true,
-        onClick: onRemove,
-      },
-    );
-  }
   return (
     <article className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="flex items-start gap-2">
@@ -285,7 +268,6 @@ function TeacherMobileCard({
             {teacher.position || "Position not set"}
           </span>
         </button>
-        <ActionMenu label={`Actions for ${teacher.full_name}`} items={actions} />
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
         <div>
@@ -323,6 +305,30 @@ function TeacherMobileCard({
           </>
         ) : null}
       </dl>
+      {teacher.can_delete || teacher.can_reject ? (
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3">
+          {teacher.can_delete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          ) : null}
+          {teacher.can_reject ? (
+            <button
+              type="button"
+              onClick={onReject}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 text-xs font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
+            >
+              <UserX className="h-4 w-4" />
+              Reject
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -345,7 +351,10 @@ export function TeacherAcademyRoster({
   );
   const [page, setPage] = useState(initial.page);
   const [knownTotal, setKnownTotal] = useState(0);
-  const [removeTeacher, setRemoveTeacher] = useState<TeacherRosterItem | null>(null);
+  const [closeSelection, setCloseSelection] = useState<{
+    teacher: TeacherRosterItem;
+    action: "trash_bin" | "rejected";
+  } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const tableViewportRef = useRef<HTMLDivElement>(null);
   const previousPerPageRef = useRef(0);
@@ -410,19 +419,31 @@ export function TeacherAcademyRoster({
     if (page > totalPages) setPage(totalPages);
   }, [onTotalChange, page, teachers.data?.total, teachers.data?.total_pages]);
 
-  const remove = useMutation({
-    mutationFn: (values: { rejection_reason: string; reason_detail: string }) =>
-      recruitmentRequest<RemovalResult>(
-        `${RECRUITMENT_API}/teachers/${removeTeacher?.record_id}/remove`,
+  const closeTeacher = useMutation({
+    mutationFn: (values: {
+      action: "trash_bin" | "rejected";
+      rejection_reason: string;
+      reason_detail: string;
+    }) =>
+      recruitmentRequest<CloseResult>(
+        `${RECRUITMENT_API}/teachers/${closeSelection?.teacher.kind}/${closeSelection?.teacher.record_id}/close`,
         { method: "POST", body: jsonBody(values) },
       ),
     onSuccess: (result) => {
-      const removedTeacher = removeTeacher;
-      setRemoveTeacher(null);
+      const closedTeacher = closeSelection?.teacher;
+      setCloseSelection(null);
       setRejectionReason("");
-      onAnnouncement(result.message || "Teacher removed from Teacher Academy.", "success");
-      if (removedTeacher) onRemoved?.(removedTeacher);
+      onAnnouncement(
+        result.message || (
+          result.action === "trash_bin"
+            ? "Teacher moved to Trash Bin."
+            : "Teacher rejected."
+        ),
+        "success",
+      );
+      if (closedTeacher) onRemoved?.(closedTeacher);
       void queryClient.invalidateQueries({ queryKey: ["recruitment", "teachers"] });
+      void queryClient.invalidateQueries({ queryKey: ["recruitment", "candidates"] });
     },
     onError: (error) => onAnnouncement(queryError(error), "error"),
   });
@@ -449,17 +470,21 @@ export function TeacherAcademyRoster({
     event.preventDefault();
     openTeacher(teacher);
   };
-  const closeRemoval = () => {
-    if (remove.isPending) return;
-    setRemoveTeacher(null);
+  const closeAction = () => {
+    if (closeTeacher.isPending) return;
+    setCloseSelection(null);
     setRejectionReason("");
-    remove.reset();
+    closeTeacher.reset();
   };
-  const submitRemoval = (event: FormEvent<HTMLFormElement>) => {
+  const submitAction = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    remove.mutate({
-      rejection_reason: String(form.get("rejection_reason") || ""),
+    if (!closeSelection) return;
+    closeTeacher.mutate({
+      action: closeSelection.action,
+      rejection_reason: closeSelection.action === "rejected"
+        ? String(form.get("rejection_reason") || "")
+        : "",
       reason_detail: String(form.get("reason_detail") || "").trim(),
     });
   };
@@ -556,19 +581,20 @@ export function TeacherAcademyRoster({
               ariaLabel={kind === "teacher_academy" ? "Teacher Academy teachers" : "Active teachers"}
               className="overflow-x-auto overflow-y-visible"
             >
-              <table className="w-full min-w-[880px] table-fixed border-collapse text-left">
+              <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
                 <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr className="h-10">
-                    <th scope="col" className="w-[23%] px-4 font-semibold">Teacher</th>
-                    <th scope="col" className="w-[17%] px-3 font-semibold">
+                    <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
+                    <th scope="col" className="w-[15%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
                     </th>
-                    <th scope="col" className="w-[21%] px-3 font-semibold">Position</th>
-                    <th scope="col" className="w-[15%] px-3 font-semibold">
+                    <th scope="col" className="w-[17%] px-3 font-semibold">Position</th>
+                    <th scope="col" className="w-[13%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Academy status" : "Status"}
                     </th>
-                    <th scope="col" className="w-[13%] px-3 font-semibold">Lessons completed</th>
-                    <th scope="col" className="w-[11%] px-3 font-semibold">Average score</th>
+                    <th scope="col" className="w-[11%] px-3 font-semibold">Lessons completed</th>
+                    <th scope="col" className="w-[10%] px-3 font-semibold">Average score</th>
+                    <th scope="col" className="w-[14%] px-3 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -609,6 +635,32 @@ export function TeacherAcademyRoster({
                       </td>
                       <td className="px-3 py-1.5"><LessonsCompleted teacher={teacher} /></td>
                       <td className="px-3 py-1.5"><AverageScore teacher={teacher} /></td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {teacher.can_delete ? (
+                            <button
+                              type="button"
+                              onClick={() => setCloseSelection({ teacher, action: "trash_bin" })}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[11px] font-semibold text-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                              aria-label={`Delete ${teacher.full_name} to Trash Bin`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </button>
+                          ) : null}
+                          {teacher.can_reject ? (
+                            <button
+                              type="button"
+                              onClick={() => setCloseSelection({ teacher, action: "rejected" })}
+                              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 text-[11px] font-semibold text-destructive hover:bg-destructive/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
+                              aria-label={`Reject ${teacher.full_name}`}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                              Reject
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -625,7 +677,8 @@ export function TeacherAcademyRoster({
                   key={`${teacher.kind}:${teacher.record_id}`}
                   teacher={teacher}
                   onOpen={() => openTeacher(teacher)}
-                  onRemove={() => setRemoveTeacher(teacher)}
+                  onDelete={() => setCloseSelection({ teacher, action: "trash_bin" })}
+                  onReject={() => setCloseSelection({ teacher, action: "rejected" })}
                 />
               ))}
               {!items.length ? (
@@ -645,65 +698,76 @@ export function TeacherAcademyRoster({
       </div>
 
       <Modal
-        open={Boolean(removeTeacher)}
-        title="Remove from Teacher Academy"
-        subtitle={removeTeacher?.full_name}
-        onClose={closeRemoval}
-        closeOnOutsideClick={!remove.isPending}
-        closeOnEscape={!remove.isPending}
+        open={Boolean(closeSelection)}
+        title={closeSelection?.action === "trash_bin" ? "Delete to Trash Bin" : "Reject teacher"}
+        subtitle={closeSelection?.teacher.full_name}
+        onClose={closeAction}
+        closeOnOutsideClick={!closeTeacher.isPending}
+        closeOnEscape={!closeTeacher.isPending}
         size="sm"
       >
-        <form onSubmit={submitRemoval}>
+        <form onSubmit={submitAction}>
           <ModalBody className="grid gap-3">
-            {remove.error ? (
+            {closeTeacher.error ? (
               <div role="alert" className="rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-xs text-destructive">
-                {queryError(remove.error)}
+                {queryError(closeTeacher.error)}
               </div>
             ) : null}
-            <label className="text-xs font-semibold">
-              Rejection reason
-              <select
-                autoFocus
-                required
-                name="rejection_reason"
-                value={rejectionReason}
-                onChange={(event) => setRejectionReason(event.target.value)}
-                className={`${fieldClass} mt-1`}
-              >
-                <option value="">Select a reason</option>
-                {(options.data?.rejection_reason_options || []).map((reason) => (
-                  <option key={reason.value} value={reason.value}>{reason.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs font-semibold">
-              Explanation {rejectionReason === "other"
-                ? <span className="text-destructive">(required)</span>
-                : <span className="font-normal text-muted-foreground">(optional)</span>}
-              <textarea
-                name="reason_detail"
-                required={rejectionReason === "other"}
-                className={`${fieldClass} mt-1 min-h-24 resize-y`}
-                placeholder="Add context for the rejection history"
-              />
-            </label>
+            {closeSelection?.action === "rejected" ? (
+              <>
+                <label className="text-xs font-semibold">
+                  Rejection reason
+                  <select
+                    autoFocus
+                    required
+                    name="rejection_reason"
+                    value={rejectionReason}
+                    onChange={(event) => setRejectionReason(event.target.value)}
+                    className={`${fieldClass} mt-1`}
+                  >
+                    <option value="">Select a reason</option>
+                    {(options.data?.rejection_reason_options || []).map((reason) => (
+                      <option key={reason.value} value={reason.value}>{reason.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold">
+                  Explanation {rejectionReason === "other"
+                    ? <span className="text-destructive">(required)</span>
+                    : <span className="font-normal text-muted-foreground">(optional)</span>}
+                  <textarea
+                    name="reason_detail"
+                    required={rejectionReason === "other"}
+                    className={`${fieldClass} mt-1 min-h-24 resize-y`}
+                    placeholder="Add context for the rejection history"
+                  />
+                </label>
+              </>
+            ) : (
+              <input autoFocus className="sr-only" aria-label="Confirm delete to Trash Bin" />
+            )}
             <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950">
-              The lifecycle profile, Academy lessons, assessments, documents, and audit history will be preserved.
-              {removeTeacher?.generated_login_will_be_deleted
-                ? " The Academy-generated login will be permanently deleted and must be provisioned again if the teacher is later accepted."
+              {closeSelection?.action === "trash_bin"
+                ? "This removes the teacher from the active roster and disables their login. The same profile and roster record can be recovered from Trash Bin."
+                : "This moves the profile to Rejected. Lessons, assessments, documents, and audit history remain preserved."}
+              {closeSelection?.action === "rejected"
+                && closeSelection.teacher.generated_login_will_be_deleted
+                ? " The Academy-generated login will be deleted and must be provisioned again if the teacher is accepted later."
                 : ""}
             </p>
           </ModalBody>
           <ModalFooter>
             <div className="flex justify-end gap-2">
-              <button type="button" className={secondaryButtonClass} disabled={remove.isPending} onClick={closeRemoval}>
+              <button type="button" className={secondaryButtonClass} disabled={closeTeacher.isPending} onClick={closeAction}>
                 Cancel
               </button>
-              <button type="submit" className={`${buttonClass} !bg-destructive !text-destructive-foreground`} disabled={remove.isPending || options.isLoading}>
-                {remove.isPending
+              <button type="submit" className={`${buttonClass} !bg-destructive !text-destructive-foreground`} disabled={closeTeacher.isPending || (closeSelection?.action === "rejected" && options.isLoading)}>
+                {closeTeacher.isPending
                   ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <UserMinus className="h-4 w-4" />}
-                Remove teacher
+                  : closeSelection?.action === "trash_bin"
+                    ? <Trash2 className="h-4 w-4" />
+                    : <UserX className="h-4 w-4" />}
+                {closeSelection?.action === "trash_bin" ? "Delete to Trash Bin" : "Reject teacher"}
               </button>
             </div>
           </ModalFooter>

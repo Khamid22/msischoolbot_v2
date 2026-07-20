@@ -146,7 +146,8 @@ def test_frontend_uses_the_shared_profile_and_academy_block():
     assert "TeacherAcademyRoster" in teachers
     assert "TeacherAcademyRoster" in academic_panel
     assert "origin=teachers" in roster
-    assert "Remove from Teacher Academy" in roster
+    assert "Delete to Trash Bin" in roster
+    assert "Reject teacher" in roster
     assert "generated_login_will_be_deleted" in roster
 
 
@@ -162,7 +163,7 @@ def test_academy_removal_is_audited_and_history_preserving():
     assert '"origin_stage": "teacher_academy"' in service_source
     assert "lessons_and_assessments_preserved" in service_source
     assert "DELETE FROM msi_v2.academy_teachers" not in repository_source
-    assert "COALESCE(academy.academy_status, '') <> 'rejected'" in repository_source
+    assert "'rejected', 'removed', 'trash_bin'" in repository_source
     assert "def ensure_academy_intake" in repository_source
     assert "academy_status = 'new_academy_teacher'" in repository_source
     assert (
@@ -260,5 +261,48 @@ def test_academy_removal_fails_closed_for_unauthorized_roles(role):
             CurrentUser(login=role.upper(), role=role),
             14,
             {"rejection_reason": "failed_academy"},
+        )
+    assert exc.value.status_code == 403
+
+
+def test_roster_reject_reuses_safe_academy_removal(monkeypatch):
+    captured = {}
+
+    def remove(user, academy_teacher_id, values):
+        captured.update(
+            user=user,
+            academy_teacher_id=academy_teacher_id,
+            values=values,
+        )
+        return {
+            "candidate": {"id": 330, "status": "rejected"},
+            "identity_deleted": False,
+            "already_removed": False,
+        }
+
+    monkeypatch.setattr(service, "remove_academy_teacher", remove)
+    result = service.close_teacher_handoff(
+        CurrentUser(login="HR0001", role="hr_manager", account_id=41, staff_id=21),
+        kind="teacher_academy",
+        record_id=14,
+        values={
+            "action": "rejected",
+            "rejection_reason": "failed_academy",
+            "reason_detail": "Did not pass.",
+        },
+    )
+    assert result["action"] == "rejected"
+    assert captured["academy_teacher_id"] == 14
+    assert captured["values"]["rejection_reason"] == "failed_academy"
+
+
+@pytest.mark.parametrize("role", ["ceo", "head_of_department"])
+def test_roster_delete_and_reject_fail_closed_for_unauthorized_roles(role):
+    with pytest.raises(service.RecruitmentError) as exc:
+        service.close_teacher_handoff(
+            CurrentUser(login=role.upper(), role=role),
+            kind="active_teacher",
+            record_id=12,
+            values={"action": "trash_bin"},
         )
     assert exc.value.status_code == 403

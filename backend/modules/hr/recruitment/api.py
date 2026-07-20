@@ -49,6 +49,7 @@ from backend.modules.hr.recruitment.schemas import (
     StageChange,
     SubjectTestWrite,
     TaskWrite,
+    TeacherHandoffClose,
     TrashPurge,
 )
 router = APIRouter(
@@ -189,6 +190,32 @@ def remove_academy_teacher(
         "Teacher was already removed from Teacher Academy."
         if result.get("already_removed")
         else "Teacher removed from Teacher Academy and added to Rejected."
+    )
+    return api_success({"message": message, **result})
+
+
+@router.post(
+    "/teachers/{kind}/{record_id}/close",
+    operation_id="api_v1_recruitment_close_teacher_handoff",
+)
+def close_teacher_handoff(
+    kind: str,
+    record_id: int,
+    payload: TeacherHandoffClose,
+    user: CurrentUser = Depends(get_current_user),
+):
+    result = _call(
+        service.close_teacher_handoff,
+        user,
+        kind=kind,
+        record_id=record_id,
+        values=payload.model_dump(),
+    )
+    action = result.get("action")
+    message = (
+        "Teacher moved to Trash Bin."
+        if action == "trash_bin"
+        else "Teacher rejected and removed from the active roster."
     )
     return api_success({"message": message, **result})
 
