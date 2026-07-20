@@ -186,12 +186,12 @@ def create_appointment(
             raise RecruitmentError(
                 "Reopen this candidate before adding an appointment.", status_code=409
             )
-        expected_stage = (
-            "job_interview" if appointment_type == "job_interview" else "test_and_demo"
-        )
-        if _text(candidate["status"]) != expected_stage:
+        # Interviews and demo lessons can both be scheduled anywhere in the
+        # interview/demo phase, so HR can, e.g., record a missed interview for a
+        # candidate already sitting in Test & Demo.
+        if _text(candidate["status"]) not in {"job_interview", "test_and_demo"}:
             raise RecruitmentError(
-                f"Move the candidate to {expected_stage.replace('_', ' ').title()} before scheduling this appointment.",
+                "Move the candidate to the Job Interview or Test & Demo stage before scheduling this appointment.",
                 status_code=409,
             )
         existing_appointment = repository.active_appointment_for_type(

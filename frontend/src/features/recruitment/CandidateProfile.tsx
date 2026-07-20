@@ -1929,6 +1929,9 @@ export function CandidateProfile({
     (item) => ["scheduled", "in_progress"].includes(item.status),
   );
   const canManageAppointments = Boolean(permissions?.can_manage_appointments);
+  // Both interview and demo can be scheduled anywhere in the interview/demo
+  // phase (e.g. record a missed interview while already in Test & Demo).
+  const canScheduleHere = canManageAppointments && ["job_interview", "test_and_demo"].includes(candidate.status);
   const hasScheduledInterview = scheduledAppointments.some((item) => item.appointment_type === "job_interview");
   const hasScheduledDemo = scheduledAppointments.some((item) => item.appointment_type === "demo_lesson");
   const openReschedule = (appointment: RecruitmentAppointment) => {
@@ -2238,8 +2241,8 @@ export function CandidateProfile({
   };
 
   const evaluationItems: ActionMenuItem[] = [];
-  if (permissions?.can_manage_appointments) {
-    if (candidate.status === "job_interview")
+  if (canScheduleHere) {
+    if (!hasScheduledInterview)
       evaluationItems.push({
         key: "schedule_interview",
         label: "Schedule interview",
@@ -2251,7 +2254,7 @@ export function CandidateProfile({
           });
         },
       });
-    if (candidate.status === "test_and_demo")
+    if (!hasScheduledDemo)
       evaluationItems.push({
         key: "schedule_demo",
         label: "Schedule demo lesson",
@@ -2877,7 +2880,7 @@ export function CandidateProfile({
             <Panel
               title="Job Interviews"
               icon={<ClipboardCheck className="h-4 w-4" />}
-              action={canManageAppointments && candidate.status === "job_interview" && !hasScheduledInterview ? scheduleHeaderButton("job_interview") : undefined}
+              action={canScheduleHere && !hasScheduledInterview ? scheduleHeaderButton("job_interview") : undefined}
             >
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => (
@@ -2911,7 +2914,7 @@ export function CandidateProfile({
             <Panel
               title="Demo Lessons"
               icon={<ClipboardCheck className="h-4 w-4" />}
-              action={canManageAppointments && candidate.status === "test_and_demo" && !hasScheduledDemo ? scheduleHeaderButton("demo_lesson") : undefined}
+              action={canScheduleHere && !hasScheduledDemo ? scheduleHeaderButton("demo_lesson") : undefined}
             >
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
