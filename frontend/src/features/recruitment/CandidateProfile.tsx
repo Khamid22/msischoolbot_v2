@@ -523,7 +523,11 @@ function trainingEvaluator(
   const recordedEvaluator =
     text(row.assessment?.evaluator_name).trim() ||
     text(row.lesson.evaluator_name).trim();
-  return recordedEvaluator || `HOD of ${academyDepartmentName(subject, position)} Department`;
+  const role = `HOD of ${academyDepartmentName(subject, position)} Department`;
+  return {
+    label: role,
+    title: recordedEvaluator ? `${role} · ${recordedEvaluator}` : role,
+  };
 }
 
 function trainingScore(value: number | null | undefined) {
@@ -620,8 +624,8 @@ function TrainingPanel({
                           <td className="px-3 py-2.5 text-xs">
                             <span className="block text-foreground">{delivery.value}</span>
                           </td>
-                          <td className="truncate px-3 py-2.5 text-xs text-foreground" title={evaluator}>
-                            {evaluator}
+                          <td className="truncate px-3 py-2.5 text-xs text-foreground" title={evaluator.title}>
+                            {evaluator.label}
                           </td>
                           <td className="px-3 py-2.5">
                             <StatusBadge status={assessment ? "completed" : text(row.lesson.status || "assigned")}>
@@ -710,7 +714,7 @@ function TrainingPanel({
                       </div>
                       <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
                         <dt className="font-semibold text-muted-foreground">Evaluator</dt>
-                        <dd className="mt-0.5 truncate text-foreground" title={evaluator}>{evaluator}</dd>
+                        <dd className="mt-0.5 truncate text-foreground" title={evaluator.title}>{evaluator.label}</dd>
                       </div>
                     </dl>
                     {assessment ? (
