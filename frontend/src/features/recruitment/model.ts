@@ -108,6 +108,116 @@ export type RecruitmentAppointment = {
   is_overdue?: boolean;
 };
 
+export type AcademyTrainingLesson = {
+  id: number;
+  sequence_no?: number | null;
+  lesson_number?: string | null;
+  lesson_topic?: string | null;
+  assignment_type?: string | null;
+  assigned_at?: string | null;
+  deadline_date?: string | null;
+  session_datetime?: string | null;
+  status?: string | null;
+  evaluator_name?: string | null;
+};
+
+export type AcademyTrainingAssessment = {
+  id: number;
+  lesson_assignment_id?: number | null;
+  assessment_type?: string | null;
+  lesson_number?: string | null;
+  lesson_topic?: string | null;
+  assessment_datetime?: string | null;
+  weighted_overall_score?: number | null;
+  final_recommendation?: string | null;
+  decision?: string | null;
+  evaluator_name?: string | null;
+};
+
+export type AcademyTrainingRow = {
+  lesson: AcademyTrainingLesson;
+  assessment: AcademyTrainingAssessment | null;
+};
+
+export type AcademyTrainingSummary = {
+  assigned: number;
+  evaluated: number;
+  passed: number;
+  averageScore: number | null;
+};
+
+const academyPassingDecisions = new Set([
+  "passed",
+  "ready_for_final_evaluation",
+  "approved_for_active_teacher",
+]);
+
+function academyAssessmentOrder(assessment: AcademyTrainingAssessment) {
+  const timestamp = Date.parse(String(assessment.assessment_datetime || ""));
+  return [Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp, assessment.id] as const;
+}
+
+export function academyTrainingRows(
+  lessons: AcademyTrainingLesson[] = [],
+  assessments: AcademyTrainingAssessment[] = [],
+): AcademyTrainingRow[] {
+  const latestAssessmentByLesson = new Map<number, AcademyTrainingAssessment>();
+  assessments.forEach((assessment) => {
+    const assignmentId = Number(assessment.lesson_assignment_id);
+    if (!Number.isInteger(assignmentId) || assignmentId <= 0) return;
+    const current = latestAssessmentByLesson.get(assignmentId);
+    const [nextTime, nextId] = academyAssessmentOrder(assessment);
+    const [currentTime, currentId] = current
+      ? academyAssessmentOrder(current)
+      : [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    if (
+      !current ||
+      nextTime > currentTime ||
+      (nextTime === currentTime && nextId > currentId)
+    ) {
+      latestAssessmentByLesson.set(assignmentId, assessment);
+    }
+  });
+
+  const uniqueLessons = new Map<number, AcademyTrainingLesson>();
+  lessons.forEach((lesson) => {
+    const lessonId = Number(lesson.id);
+    if (Number.isInteger(lessonId) && lessonId > 0 && !uniqueLessons.has(lessonId)) {
+      uniqueLessons.set(lessonId, lesson);
+    }
+  });
+
+  return Array.from(uniqueLessons.values()).map((lesson) => ({
+    lesson,
+    assessment: latestAssessmentByLesson.get(lesson.id) || null,
+  }));
+}
+
+export function academyTrainingSummary(
+  rows: AcademyTrainingRow[],
+): AcademyTrainingSummary {
+  const evaluatedRows = rows.filter((row) => Boolean(row.assessment));
+  const numericScores = evaluatedRows
+    .map((row) => row.assessment?.weighted_overall_score)
+    .filter((score): score is number => score !== null && score !== undefined)
+    .map((score) => Number(score))
+    .filter((score) => Number.isFinite(score));
+  return {
+    assigned: rows.length,
+    evaluated: evaluatedRows.length,
+    passed: evaluatedRows.filter((row) =>
+      academyPassingDecisions.has(String(row.assessment?.decision || "").toLowerCase()),
+    ).length,
+    averageScore: numericScores.length
+      ? Math.round(
+          (numericScores.reduce((total, score) => total + score, 0) /
+            numericScores.length) *
+            10,
+        ) / 10
+      : null,
+  };
+}
+
 export type RecruitmentCandidate = {
   id: number;
   full_name: string;
@@ -191,8 +301,8 @@ export type RecruitmentCandidate = {
     login?: string;
     lesson_count?: number;
     assessment_count?: number;
-    lessons?: Array<Record<string, unknown>>;
-    assessments?: Array<Record<string, unknown>>;
+    lessons?: AcademyTrainingLesson[];
+    assessments?: AcademyTrainingAssessment[];
     account_state?: "connected" | "onboarding_pending";
   } | null;
   active_teacher_id?: number | null;

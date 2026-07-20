@@ -4,6 +4,7 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   Check,
+  ChevronDown,
   ClipboardCheck,
   FileText,
   GraduationCap,
@@ -18,8 +19,10 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Fragment,
   useEffect,
   useId,
+  useMemo,
   useState,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -35,6 +38,8 @@ import {
   recruitmentRequest,
 } from "@/features/recruitment/api";
 import {
+  academyTrainingRows,
+  academyTrainingSummary,
   dateLabel,
   dateTimeLabel,
   humanize,
@@ -43,6 +48,7 @@ import {
   type RecruitmentAppointment,
   type RecruitmentCandidate,
   type RecruitmentOptions,
+  type AcademyTrainingRow,
 } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
@@ -64,7 +70,7 @@ import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type ProfileTab =
-  "overview" | "evaluations" | "documents" | "hiring" | "activity";
+  "overview" | "evaluations" | "documents" | "hiring" | "training" | "activity";
 type ProfileAction =
   | { kind: "edit_profile" }
   | { kind: "move_candidate" }
@@ -109,6 +115,14 @@ const profileTabs: Array<{ key: ProfileTab; label: string }> = [
   { key: "activity", label: "Activity" },
 ];
 const hrProfileTabs = profileTabs.filter((item) => item.key !== "activity");
+const trainingProfileTab: { key: ProfileTab; label: string } = {
+  key: "training",
+  label: "Training",
+};
+const profileTabKeys = new Set<ProfileTab>([
+  ...profileTabs.map((item) => item.key),
+  trainingProfileTab.key,
+]);
 
 function text(value: unknown) {
   return String(value ?? "");
@@ -455,6 +469,280 @@ function SubjectTestList({
           </article>
         );
       })}
+    </div>
+  );
+}
+
+function trainingLessonTitle(row: AcademyTrainingRow) {
+  const number =
+    text(row.lesson.lesson_number).trim() ||
+    (row.lesson.sequence_no ? String(row.lesson.sequence_no) : "");
+  const topic =
+    text(row.lesson.lesson_topic).trim() ||
+    text(row.assessment?.lesson_topic).trim();
+  return {
+    number: number ? `Lesson ${number}` : "Academy lesson",
+    topic: topic || "Topic not recorded",
+  };
+}
+
+function trainingLessonDate(row: AcademyTrainingRow) {
+  if (row.lesson.session_datetime) {
+    return {
+      label: "Scheduled",
+      value: dateTimeLabel(row.lesson.session_datetime),
+    };
+  }
+  if (row.lesson.deadline_date) {
+    return { label: "Due", value: dateLabel(row.lesson.deadline_date) };
+  }
+  return {
+    label: "Assigned",
+    value: dateLabel(row.lesson.assigned_at),
+  };
+}
+
+function trainingScore(value: number | null | undefined) {
+  const score = Number(value);
+  return Number.isFinite(score)
+    ? new Intl.NumberFormat("en", { maximumFractionDigits: 1 }).format(score)
+    : "—";
+}
+
+function TrainingPanel({
+  rows,
+}: {
+  rows: AcademyTrainingRow[];
+}) {
+  const [expandedLessonId, setExpandedLessonId] = useState<number | null>(null);
+  const summary = academyTrainingSummary(rows);
+  const metrics = [
+    ["Assigned", summary.assigned],
+    ["Evaluated", summary.evaluated],
+    ["Passed", summary.passed],
+    ["Average score", summary.averageScore === null ? "—" : summary.averageScore],
+  ];
+
+  return (
+    <div
+      id="candidate-panel-training"
+      role="tabpanel"
+      aria-labelledby="candidate-tab-training"
+      className="space-y-3"
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {metrics.map(([label, value]) => (
+          <section
+            key={label}
+            className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm"
+            aria-label={`${label}: ${value}`}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {label}
+            </p>
+            <p className="mt-0.5 text-xl font-bold tabular-nums text-foreground">
+              {value}
+            </p>
+          </section>
+        ))}
+      </div>
+
+      <Panel
+        title="Academy training"
+        icon={<GraduationCap className="h-4 w-4" />}
+        action={
+          <span className="text-xs text-muted-foreground">Read-only</span>
+        }
+      >
+        {!rows.length ? (
+          <EmptyLine>No Academy lessons assigned.</EmptyLine>
+        ) : (
+          <>
+            <div className="hidden overflow-hidden rounded-lg border border-border lg:block">
+              <table className="w-full table-fixed text-left">
+                <caption className="sr-only">
+                  Assigned Teacher Academy lessons and their latest evaluations
+                </caption>
+                <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="w-[27%] px-3 py-2">Lesson</th>
+                    <th scope="col" className="w-[19%] px-3 py-2">Assignment / schedule</th>
+                    <th scope="col" className="w-[18%] px-3 py-2">Evaluator</th>
+                    <th scope="col" className="w-[16%] px-3 py-2">Training status</th>
+                    <th scope="col" className="w-[20%] px-3 py-2">Score / result</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {rows.map((row) => {
+                    const title = trainingLessonTitle(row);
+                    const assignmentDate = trainingLessonDate(row);
+                    const assessment = row.assessment;
+                    const expanded = expandedLessonId === row.lesson.id;
+                    const evaluator =
+                      text(assessment?.evaluator_name).trim() ||
+                      text(row.lesson.evaluator_name).trim() ||
+                      "Not assigned";
+                    return (
+                      <Fragment key={row.lesson.id}>
+                        <tr className="align-middle">
+                          <th scope="row" className="px-3 py-2.5">
+                            <span className="block truncate text-[13px] font-semibold text-foreground" title={title.number}>
+                              {title.number}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" title={title.topic}>
+                              {title.topic}
+                            </span>
+                          </th>
+                          <td className="px-3 py-2.5 text-xs">
+                            <span className="block font-semibold text-foreground">{assignmentDate.label}</span>
+                            <span className="mt-0.5 block text-muted-foreground">{assignmentDate.value}</span>
+                          </td>
+                          <td className="truncate px-3 py-2.5 text-xs text-foreground" title={evaluator}>
+                            {evaluator}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <StatusBadge status={assessment ? "completed" : text(row.lesson.status || "assigned")}>
+                              {assessment ? "Evaluated" : humanize(row.lesson.status || "assigned")}
+                            </StatusBadge>
+                          </td>
+                          <td className="px-3 py-1">
+                            {assessment ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedLessonId(expanded ? null : row.lesson.id)
+                                }
+                                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                                aria-expanded={expanded}
+                                aria-controls={`training-evaluation-${row.lesson.id}`}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-[13px] font-semibold tabular-nums text-foreground">
+                                    {trainingScore(assessment.weighted_overall_score)}
+                                  </span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {humanize(assessment.decision || "evaluated")}
+                                  </span>
+                                </span>
+                                <ChevronDown
+                                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            ) : (
+                              <StatusBadge status="pending">
+                                Awaiting evaluation
+                              </StatusBadge>
+                            )}
+                          </td>
+                        </tr>
+                        {assessment && expanded ? (
+                          <tr id={`training-evaluation-${row.lesson.id}`}>
+                            <td colSpan={5} className="bg-muted/35 px-4 py-3">
+                              <p className="text-xs font-semibold text-foreground">
+                                Evaluation · {dateTimeLabel(assessment.assessment_datetime)}
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5 text-muted-foreground">
+                                {assessment.final_recommendation || "No recommendation recorded."}
+                              </p>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-2 lg:hidden">
+              {rows.map((row) => {
+                const title = trainingLessonTitle(row);
+                const assignmentDate = trainingLessonDate(row);
+                const assessment = row.assessment;
+                const expanded = expandedLessonId === row.lesson.id;
+                const evaluator =
+                  text(assessment?.evaluator_name).trim() ||
+                  text(row.lesson.evaluator_name).trim() ||
+                  "Not assigned";
+                return (
+                  <article
+                    key={row.lesson.id}
+                    className="min-w-0 rounded-lg border border-border bg-card p-3"
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold" title={title.number}>
+                          {title.number}
+                        </h3>
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                          {title.topic}
+                        </p>
+                      </div>
+                      <StatusBadge status={assessment ? "completed" : text(row.lesson.status || "assigned")}>
+                        {assessment ? "Evaluated" : humanize(row.lesson.status || "assigned")}
+                      </StatusBadge>
+                    </div>
+                    <dl className="mt-3 grid min-w-0 grid-cols-2 gap-2 text-xs">
+                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
+                        <dt className="font-semibold text-muted-foreground">{assignmentDate.label}</dt>
+                        <dd className="mt-0.5 text-foreground">{assignmentDate.value}</dd>
+                      </div>
+                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
+                        <dt className="font-semibold text-muted-foreground">Evaluator</dt>
+                        <dd className="mt-0.5 truncate text-foreground" title={evaluator}>{evaluator}</dd>
+                      </div>
+                    </dl>
+                    {assessment ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedLessonId(expanded ? null : row.lesson.id)
+                        }
+                        className="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border px-3 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                        aria-expanded={expanded}
+                        aria-controls={`training-card-evaluation-${row.lesson.id}`}
+                      >
+                        <span className="text-xs">
+                          <strong className="mr-2 tabular-nums text-foreground">
+                            {trainingScore(assessment.weighted_overall_score)}
+                          </strong>
+                          <span className="text-muted-foreground">
+                            {humanize(assessment.decision || "evaluated")}
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    ) : (
+                      <div className="mt-2 flex min-h-11 items-center">
+                        <StatusBadge status="pending">
+                          Awaiting evaluation
+                        </StatusBadge>
+                      </div>
+                    )}
+                    {assessment && expanded ? (
+                      <div
+                        id={`training-card-evaluation-${row.lesson.id}`}
+                        className="mt-2 rounded-md bg-muted/45 px-3 py-2.5"
+                      >
+                        <p className="text-xs font-semibold text-foreground">
+                          Evaluation · {dateTimeLabel(assessment.assessment_datetime)}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5 text-muted-foreground">
+                          {assessment.final_recommendation || "No recommendation recorded."}
+                        </p>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </Panel>
     </div>
   );
 }
@@ -1161,12 +1449,10 @@ export function CandidateProfile({
   onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
 }) {
   const queryClient = useQueryClient();
-  const visibleProfileTabs =
-    role === "hr_manager" ? hrProfileTabs : profileTabs;
   const requestedTab =
     new URLSearchParams(window.location.search).get("tab") || "overview";
   const [tab, setTab] = useState<ProfileTab>(
-    visibleProfileTabs.some((item) => item.key === requestedTab)
+    profileTabKeys.has(requestedTab as ProfileTab)
       ? (requestedTab as ProfileTab)
       : "overview",
   );
@@ -1192,6 +1478,15 @@ export function CandidateProfile({
         `${RECRUITMENT_API}/candidates/${candidateId}`,
       ),
   });
+  const visibleProfileTabs = useMemo(
+    () =>
+      role === "hr_manager"
+        ? detail.data?.academy
+          ? [...hrProfileTabs, trainingProfileTab]
+          : hrProfileTabs
+        : profileTabs,
+    [detail.data?.academy, role],
+  );
   const options = useQuery({
     queryKey: ["recruitment", "options"],
     queryFn: () =>
@@ -1252,6 +1547,19 @@ export function CandidateProfile({
     return () => window.removeEventListener("popstate", onPopState);
   }, [visibleProfileTabs]);
 
+  useEffect(() => {
+    if (
+      detail.isLoading ||
+      visibleProfileTabs.some((item) => item.key === tab)
+    ) {
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "overview");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    setTab("overview");
+  }, [detail.isLoading, tab, visibleProfileTabs]);
+
   if (detail.isLoading)
     return <PageState>Loading candidate profile…</PageState>;
   if (detail.error || !detail.data)
@@ -1272,6 +1580,10 @@ export function CandidateProfile({
   );
   const pendingTasks = (candidate.tasks || []).filter((task) =>
     ["pending", "overdue"].includes(task.effective_status),
+  );
+  const trainingRows = academyTrainingRows(
+    candidate.academy?.lessons,
+    candidate.academy?.assessments,
   );
 
   const saveInlineField = (
@@ -2448,6 +2760,10 @@ export function CandidateProfile({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {tab === "training" && role === "hr_manager" && candidate.academy ? (
+        <TrainingPanel rows={trainingRows} />
       ) : null}
 
       {tab === "activity" ? (

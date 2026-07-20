@@ -843,6 +843,7 @@ def list_academy_lifecycle_lesson_rows(conn: Any, academy_teacher_id: int) -> li
         """
         SELECT assignment.id, assignment.sequence_no, assignment.lesson_number,
                assignment.lesson_topic, assignment.assignment_type,
+               assignment.created_at::text AS assigned_at,
                assignment.deadline_date::text AS deadline_date,
                assignment.session_datetime::text AS session_datetime,
                assignment.status,

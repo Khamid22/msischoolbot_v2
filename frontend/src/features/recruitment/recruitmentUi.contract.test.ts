@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test, { describe } from "node:test";
 
+import {
+  academyTrainingRows,
+  academyTrainingSummary,
+  type AcademyTrainingAssessment,
+  type AcademyTrainingLesson,
+} from "./model.ts";
+
 function source(name: string) {
   return readFileSync(new URL(`./${name}`, import.meta.url), "utf8");
 }
@@ -174,11 +181,14 @@ describe("candidate navigation and progressive disclosure", () => {
   const list = source("CandidateListView.tsx");
   const workspace = source("RecruitmentWorkspace.tsx");
 
-  test("gives HR four URL-backed tabs, inline editing, voidable evaluations, and a history drawer", () => {
+  test("gives HR URL-backed profile tabs, inline editing, voidable evaluations, and a history drawer", () => {
     for (const tab of ["overview", "evaluations", "documents", "hiring"]) {
       assert.match(profile, new RegExp(`key: "${tab}"`));
     }
     assert.match(profile, /const hrProfileTabs = profileTabs\.filter\(\(item\) => item\.key !== "activity"\)/);
+    assert.match(profile, /key: "training"/);
+    assert.match(profile, /detail\.data\?\.academy[\s\S]*\[\.\.\.hrProfileTabs, trainingProfileTab\]/);
+    assert.match(profile, /tab === "training" && role === "hr_manager" && candidate\.academy/);
     assert.match(profile, /url\.searchParams\.set\("tab", next\)/);
     assert.match(profile, /<Drawer/);
     assert.match(profile, /<InlineField/);
@@ -196,6 +206,26 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(profile, /title="Job Interviews"/);
     assert.match(profile, /can_add_subject_test/);
     assert.match(profile, /Record subject test/);
+  });
+
+  test("renders Academy training as a read-only responsive table and cards", () => {
+    assert.match(profile, /title="Academy training"/);
+    assert.match(profile, /Assigned/);
+    assert.match(profile, /Evaluated/);
+    assert.match(profile, /Passed/);
+    assert.match(profile, /Average score/);
+    assert.match(profile, /hidden overflow-hidden rounded-lg border border-border lg:block/);
+    assert.match(profile, /space-y-2 lg:hidden/);
+    assert.match(profile, /Awaiting evaluation/);
+    assert.match(profile, /final_recommendation/);
+    assert.match(profile, /aria-expanded=\{expanded\}/);
+    assert.match(profile, />Read-only</);
+    const trainingPanel =
+      profile.split("function TrainingPanel")[1]?.split("function OutcomeFields")[0] || "";
+    assert.doesNotMatch(
+      trainingPanel,
+      /onSave|mutation\.mutate|ActionMenu/,
+    );
   });
 
   test("records scheduled demo lessons in a compact Pass or Reject modal", () => {
@@ -439,6 +469,69 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /min-w-\[70rem\]/);
     assert.doesNotMatch(schedule, /dateLabel\(schoolDayStartIso\(day\)\)/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
+  });
+});
+
+describe("Academy training data matching", () => {
+  test("matches only the newest assessment to each assignment without duplicating lessons", () => {
+    const lessons: AcademyTrainingLesson[] = [
+      { id: 11, lesson_number: "1", lesson_topic: "Fractions" },
+      { id: 12, lesson_number: "2", lesson_topic: "Algebra" },
+      { id: 12, lesson_number: "2", lesson_topic: "Duplicate payload row" },
+    ];
+    const assessments: AcademyTrainingAssessment[] = [
+      {
+        id: 21,
+        lesson_assignment_id: 11,
+        assessment_datetime: "2026-07-18T09:00:00Z",
+        weighted_overall_score: 6.5,
+        decision: "needs_improvement",
+      },
+      {
+        id: 22,
+        lesson_assignment_id: 11,
+        assessment_datetime: "2026-07-19T09:00:00Z",
+        weighted_overall_score: 8,
+        decision: "passed",
+      },
+      {
+        id: 23,
+        lesson_assignment_id: null,
+        weighted_overall_score: 10,
+        decision: "passed",
+      },
+    ];
+
+    const rows = academyTrainingRows(lessons, assessments);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].assessment?.id, 22);
+    assert.equal(rows[1].assessment, null);
+    assert.deepEqual(academyTrainingSummary(rows), {
+      assigned: 2,
+      evaluated: 1,
+      passed: 1,
+      averageScore: 8,
+    });
+  });
+
+  test("counts evaluated lessons with missing scores without corrupting the average", () => {
+    const rows = academyTrainingRows(
+      [{ id: 31 }, { id: 32 }],
+      [
+        {
+          id: 41,
+          lesson_assignment_id: 31,
+          weighted_overall_score: null,
+          decision: "needs_improvement",
+        },
+      ],
+    );
+    assert.deepEqual(academyTrainingSummary(rows), {
+      assigned: 2,
+      evaluated: 1,
+      passed: 0,
+      averageScore: null,
+    });
   });
 });
 
