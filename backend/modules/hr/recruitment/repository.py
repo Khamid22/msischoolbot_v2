@@ -2772,7 +2772,6 @@ def mark_academy_removed(
         """
         UPDATE msi_v2.academy_teachers
         SET academy_status = 'rejected',
-            account_onboarding_status = 'removed',
             updated_at = %s::timestamptz
         WHERE id = %s
           AND promoted_teacher_id IS NULL
@@ -2840,16 +2839,12 @@ def mark_teacher_handoff_closed(
             """
             UPDATE msi_v2.academy_teachers
             SET academy_status = %s,
-                account_onboarding_status = CASE
-                    WHEN %s = 'rejected' THEN 'removed'
-                    ELSE account_onboarding_status
-                END,
                 updated_at = %s::timestamptz
             WHERE id = %s
               AND promoted_teacher_id IS NULL
               AND COALESCE(academy_status, '') NOT IN ('rejected', 'trash_bin')
             """,
-            (action, action, now, int(record_id)),
+            (action, now, int(record_id)),
         )
         return int(getattr(cursor, "rowcount", 0) or 0) == 1
     if kind == "active_teacher":

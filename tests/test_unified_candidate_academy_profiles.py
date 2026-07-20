@@ -166,6 +166,7 @@ def test_academy_removal_is_audited_and_history_preserving():
     assert "'rejected', 'removed', 'trash_bin'" in repository_source
     assert "def ensure_academy_intake" in repository_source
     assert "academy_status = 'new_academy_teacher'" in repository_source
+    assert "account_onboarding_status = 'removed'" not in repository_source
     assert (
         '@router.post("/teacher-academy/{academy_teacher_id}/delete")'
         not in ad_routes
