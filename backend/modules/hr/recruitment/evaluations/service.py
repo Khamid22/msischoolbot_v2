@@ -375,7 +375,8 @@ def _add_record(
                 values={
                     "decision": "rejected",
                     "rejection_reason": rejection_reason,
-                    "reason_detail": f"{rejection_label}; evaluation #{record_id}.",
+                    "reason_detail": _text(values.get("reason_detail"))
+                    or f"{rejection_label}; evaluation #{record_id}.",
                     "origin_stage": _text(candidate["status"]),
                     "follow_up_at": "",
                     "approval_id": None,
@@ -458,8 +459,9 @@ def _add_record(
         elif (
             evaluation_type == "interview"
             and result == "passed"
-            and (_text(candidate.get("status")) == "job_interview")
+            and (_text(candidate.get("status")) in {"responded", "job_interview"})
         ):
+            origin_stage = _text(candidate["status"])
             if not repository.update_candidate_stage(
                 conn,
                 candidate_id=int(candidate_id),
@@ -480,7 +482,7 @@ def _add_record(
                 candidate_id=int(candidate_id),
                 event_type="candidate.stage_changed",
                 detail={
-                    "from": "job_interview",
+                    "from": origin_stage,
                     "to": "test_and_demo",
                     "reason": "Passed job interview",
                 },

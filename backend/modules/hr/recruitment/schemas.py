@@ -118,6 +118,8 @@ class InterviewSessionComplete(StrictModel):
     expected_version: int = Field(ge=1)
     notes: str = Field(default="", max_length=10000)
     result: str = Field(pattern="^(passed|failed)$")
+    # HR-supplied explanation used when a failed interview auto-rejects.
+    reason_detail: str = Field(default="", max_length=10000)
 
 
 class AssignmentReplace(StrictModel):

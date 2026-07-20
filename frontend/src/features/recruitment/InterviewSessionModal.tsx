@@ -36,8 +36,9 @@ export function InterviewSessionModal({
   const [session, setSession] = useState(appointment);
   const [now, setNow] = useState(Date.now());
   const [confirmFail, setConfirmFail] = useState(false);
+  const [failReason, setFailReason] = useState("");
   const notesRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { setSession(appointment); setConfirmFail(false); }, [appointment]);
+  useEffect(() => { setSession(appointment); setConfirmFail(false); setFailReason(""); }, [appointment]);
   useEffect(() => {
     if (!open) return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -53,7 +54,7 @@ export function InterviewSessionModal({
     onError: (error) => onAnnouncement(queryError(error), "error"),
   });
   const complete = useMutation({
-    mutationFn: ({ result, notes }: { result: "passed" | "failed"; notes: string }) => recruitmentRequest<SessionResponse>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${session.id}/complete-interview`, { method: "POST", body: jsonBody({ expected_version: session.version, result, notes }) }),
+    mutationFn: ({ result, notes, reasonDetail }: { result: "passed" | "failed"; notes: string; reasonDetail?: string }) => recruitmentRequest<SessionResponse>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${session.id}/complete-interview`, { method: "POST", body: jsonBody({ expected_version: session.version, result, notes, reason_detail: reasonDetail || "" }) }),
     onSuccess: (result) => { onAnnouncement(result.message || "Interview completed."); void queryClient.invalidateQueries({ queryKey: ["recruitment"] }); onClose(); },
     onError: (error) => onAnnouncement(queryError(error), "error"),
   });
@@ -78,10 +79,10 @@ export function InterviewSessionModal({
           ) : (
             <label className="text-xs font-semibold">Interview notes<textarea ref={notesRef} autoFocus name="notes" className={`${fieldClass} mt-1 min-h-32`} placeholder="Record the interview observations…" /></label>
           )}
-          {confirmFail ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Reject {candidate.full_name}?</p><p className="mt-1 text-xs leading-5">Failing this interview automatically rejects the candidate and cancels remaining appointments.</p></div> : null}
+          {confirmFail ? <div role="alert" className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><p className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Reject {candidate.full_name}?</p><p className="text-xs leading-5">Failing this interview rejects the candidate and cancels remaining appointments.</p><label className="block text-xs font-semibold text-foreground">Reason for rejection<textarea autoFocus required value={failReason} onChange={(event) => setFailReason(event.target.value)} className={`${fieldClass} mt-1 min-h-20`} placeholder="Why is this candidate being rejected?" /></label></div> : null}
         </ModalBody>
         <ModalFooter>
-          {!inProgress ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={onClose}>Close</button><button type="button" className={buttonClass} disabled={!startAvailable || pending} onClick={() => start.mutate()}>{start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Start interview</button></div> : confirmFail ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setConfirmFail(false)}>Keep interviewing</button><button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground" disabled={pending} onClick={() => complete.mutate({ result: "failed", notes: notesRef.current?.value || "" })}>{complete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}Confirm fail</button></div> : <div className="flex items-center justify-between gap-2"><button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-destructive/40 px-3 text-sm font-semibold text-destructive" disabled={pending} onClick={() => setConfirmFail(true)}><XCircle className="h-4 w-4" />Fail</button><button type="submit" className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white" disabled={pending}>{complete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Pass</button></div>}
+          {!inProgress ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={onClose}>Close</button><button type="button" className={buttonClass} disabled={!startAvailable || pending} onClick={() => start.mutate()}>{start.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Start interview</button></div> : confirmFail ? <div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setConfirmFail(false)}>Keep interviewing</button><button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground disabled:cursor-not-allowed disabled:opacity-50" disabled={pending || !failReason.trim()} onClick={() => complete.mutate({ result: "failed", notes: notesRef.current?.value || "", reasonDetail: failReason.trim() })}>{complete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}Reject candidate</button></div> : <div className="flex items-center justify-between gap-2"><button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-destructive/40 px-3 text-sm font-semibold text-destructive" disabled={pending} onClick={() => setConfirmFail(true)}><XCircle className="h-4 w-4" />Fail</button><button type="submit" className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3 text-sm font-semibold text-white" disabled={pending}>{complete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Pass</button></div>}
         </ModalFooter>
       </form>
     </Modal>

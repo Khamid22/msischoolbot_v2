@@ -778,6 +778,55 @@ def test_failed_interview_atomically_rejects_with_evaluator_origin_and_system_re
     assert conn.commits == 1
 
 
+def test_passed_interview_from_interview_schedule_advances_to_test_and_demo(monkeypatch):
+    conn = _DatabaseConnection()
+    stage_updates = []
+    events = []
+    candidate = {"id": 7, "status": "responded", "version": 4}
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_a, **_k: candidate)
+    monkeypatch.setattr(repository, "insert_interview", lambda *_a, **_k: 108)
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_a, **kw: stage_updates.append(kw) or {"id": 7})
+    monkeypatch.setattr(repository, "insert_audit", lambda *_a, **kw: events.append((kw["event_type"], kw)))
+    monkeypatch.setattr(service, "get_candidate", lambda *_a, **_k: {"id": 7, "status": "test_and_demo"})
+
+    result = service.add_interview(_user(), 7, {"result": "passed", "notes": "Strong"})
+
+    assert result["status"] == "test_and_demo"
+    assert stage_updates[0]["stage"] == "test_and_demo"
+    assert stage_updates[0]["expected_version"] == 4
+    stage_changed = [kw for event, kw in events if event == "candidate.stage_changed"]
+    assert stage_changed
+    assert stage_changed[0]["detail"]["from"] == "responded"
+    assert stage_changed[0]["detail"]["to"] == "test_and_demo"
+
+
+def test_failed_interview_records_hr_supplied_rejection_reason(monkeypatch):
+    conn = _DatabaseConnection()
+    decisions = []
+    candidate = {"id": 7, "status": "job_interview", "version": 4}
+
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(repository, "lock_candidate_decision_row", lambda *_a, **_k: candidate)
+    monkeypatch.setattr(repository, "insert_interview", lambda *_a, **_k: 108)
+    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_a, **_k: [])
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_a, **_k: [])
+    monkeypatch.setattr(repository, "update_candidate_stage", lambda *_a, **_k: {"id": 7})
+    monkeypatch.setattr(repository, "insert_final_decision", lambda *_a, **kw: decisions.append(kw) or 90)
+    monkeypatch.setattr(repository, "insert_audit", lambda *_a, **_k: None)
+    monkeypatch.setattr(service, "get_candidate", lambda *_a, **_k: {"id": 7, "status": "rejected"})
+
+    service.add_interview(
+        _user(),
+        7,
+        {"result": "failed", "notes": "n", "reason_detail": "Weak subject knowledge"},
+    )
+
+    assert decisions[0]["values"]["reason_detail"] == "Weak subject knowledge"
+    assert decisions[0]["values"]["rejection_reason"] == "failed_job_interview"
+
+
 def test_passed_assigned_demo_moves_test_and_demo_to_under_review(monkeypatch):
     conn = _DatabaseConnection()
     stage_updates = []

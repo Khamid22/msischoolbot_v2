@@ -159,6 +159,7 @@ def complete_interview_session(
             "expected_version": int(values.get("expected_version") or 0),
             "notes": _text(values.get("notes")),
             "result": _text(values.get("result")),
+            "reason_detail": _text(values.get("reason_detail")),
             "interviewer_account_id": _actor_account(user),
         },
         "candidate.interview_recorded",
