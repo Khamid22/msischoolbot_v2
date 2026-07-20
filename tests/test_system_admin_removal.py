@@ -47,6 +47,17 @@ def test_removal_migration_retires_legacy_accounts_and_closes_role_constraint():
     assert "password_hash = NULL" in source
     assert "account_telegram_links" in source
     upgrade_source = source.split("def downgrade", 1)[0]
+    drop_constraint_at = upgrade_source.index(
+        "DROP CONSTRAINT IF EXISTS accounts_role_check"
+    )
+    retire_accounts_at = upgrade_source.index(
+        "UPDATE msi_v2.accounts\n"
+        "        SET login = 'retired_internal_'"
+    )
+    add_constraint_at = upgrade_source.rindex(
+        "ADD CONSTRAINT accounts_role_check"
+    )
+    assert drop_constraint_at < retire_accounts_at < add_constraint_at
     role_constraint = upgrade_source.rsplit(
         "ADD CONSTRAINT accounts_role_check",
         1,

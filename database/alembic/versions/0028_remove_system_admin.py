@@ -17,6 +17,13 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         """
+        ALTER TABLE msi_v2.accounts
+        DROP CONSTRAINT IF EXISTS accounts_role_check;
+        """
+    )
+
+    op.execute(
+        """
         UPDATE msi_v2.account_telegram_links
         SET status = 'revoked'
         WHERE account_id IN (
@@ -76,9 +83,6 @@ def upgrade() -> None:
             session_version = session_version + 1,
             updated_at = now()
         WHERE role = 'system_admin';
-
-        ALTER TABLE msi_v2.accounts
-        DROP CONSTRAINT IF EXISTS accounts_role_check;
 
         ALTER TABLE msi_v2.accounts
         ADD CONSTRAINT accounts_role_check CHECK (
