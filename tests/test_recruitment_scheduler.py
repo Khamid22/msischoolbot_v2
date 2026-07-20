@@ -274,7 +274,7 @@ def test_historical_interview_is_completed_and_advances_atomically(monkeypatch):
         }
     ]
     assert movements[0]["stage"] == "test_and_demo"
-    assert movements[0]["transition_source"] == "historical_restoration"
+    assert movements[0]["transition_source"] == "restored"
     assert notifications_sent == []
 
 
@@ -327,7 +327,7 @@ def test_failed_historical_demo_uses_existing_automatic_rejection_shape(monkeypa
 
     assert conn.commits == 1
     assert movements[0]["stage"] == "rejected"
-    assert movements[0]["transition_source"] == "historical_restoration"
+    assert movements[0]["transition_source"] == "restored"
     assert decisions[0]["rejection_reason"] == "failed_demo_lesson"
     assert decisions[0]["origin_stage"] == "test_and_demo"
     assert decisions[0]["source_evaluation_type"] == "demo"

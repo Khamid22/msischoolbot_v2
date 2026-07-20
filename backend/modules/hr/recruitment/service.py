@@ -1646,7 +1646,7 @@ def _record_historical_appointment_result(
             actor_account_id=actor_account_id,
             now=now,
             comment=rejection_label,
-            transition_source="historical_restoration",
+            transition_source="restored",
         ):
             raise RecruitmentError(
                 "This candidate changed elsewhere. Refresh and try again.",
@@ -1719,7 +1719,7 @@ def _record_historical_appointment_result(
                 actor_account_id=actor_account_id,
                 now=now,
                 comment=reason,
-                transition_source="historical_restoration",
+                transition_source="restored",
             ):
                 raise RecruitmentError(
                     "This candidate changed elsewhere. Refresh and try again.",
