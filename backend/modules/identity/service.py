@@ -19,7 +19,6 @@ LOGGER = logging.getLogger("msi.identity")
 PASSWORD_LOGIN_ALLOWED_STATUS = "active"
 MIN_PASSWORD_LENGTH = 8
 ACCOUNT_AUTH_ROLES = {
-    "system_admin",
     "ceo",
     "customer_support",
     "student",
@@ -30,7 +29,6 @@ ACCOUNT_AUTH_ROLES = {
     "hr_manager",
 }
 STAFF_ACCOUNT_ROLES = {
-    "system_admin",
     "ceo",
     "customer_support",
     "academic_director",
@@ -183,8 +181,6 @@ def _staff_profile(conn: Any, account_id: int, role: str) -> dict[str, Any] | No
         "job_title": _text(row.get("job_title")),
         "department": _text(row.get("department")),
         "staff_login": _text(row.get("staff_login")),
-        "legacy_staff_role": _text(row.get("legacy_staff_role")),
-        "is_owner": bool(row.get("is_owner")),
         "status": _text(row.get("profile_status")).casefold() or "disabled",
     }
 
@@ -332,17 +328,6 @@ def build_session_payload(
                 "staff_role": role,
             }
         )
-        if role == "system_admin":
-            payload.update(
-                {
-                    "auth_role": "admin",
-                    "admin_id": staff_id,
-                    "admin_role": "owner" if profile.get("is_owner") else "system_admin",
-                    "admin_is_owner": bool(profile.get("is_owner")),
-                    "admin_last_panel": "overview",
-                    "admin_last_school": "all",
-                }
-            )
         return payload
     return None
 
@@ -570,7 +555,7 @@ def reset_student_password(
             actor_account_id=parsed_actor_id,
             event_type="account.password_reset",
             entity_account_id=account_id,
-            detail={"role": "student", "method": "administrator"},
+            detail={"role": "student", "method": "authorized_staff_reset"},
         )
         return PasswordChangeOutcome(bool(session_version), session_version=session_version)
 

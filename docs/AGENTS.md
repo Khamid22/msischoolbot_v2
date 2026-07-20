@@ -19,7 +19,6 @@ The system supports:
 - HR Manager
 - Academic Director
 - Head of Department
-- Internal System Admin
 
 ## Current Important Decisions
 
@@ -34,7 +33,6 @@ The system supports:
 - Current schools: School 5 and Sehriyo.
 - More schools will be added later.
 - One user has exactly one role.
-- `system_admin` is internal operator/superuser, not an LMS business role.
 - Real LMS roles are:
   - `ceo`
   - `customer_support`

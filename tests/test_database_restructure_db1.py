@@ -41,11 +41,8 @@ def test_teacher_academy_domain_modules_import_successfully():
 
 
 def test_old_admin_teacher_academy_service_path_is_removed():
-    page_service_source = Path("backend/internal_operations/pages/context.py").read_text()
-
     assert not Path("backend/roles/admin/services/teacher_academy_service.py").exists()
-    assert "from backend.modules.teacher_academy.read_service import list_academy_teachers" in page_service_source
-    assert "teacher_academy_service" not in page_service_source
+    assert not Path("backend/internal_operations").exists()
 
 
 def test_teacher_academy_service_uses_module_repository_not_inline_sql():
@@ -64,7 +61,6 @@ def test_page_and_role_edges_import_teacher_academy_domain_service_where_safe():
         Path("backend/workspaces/academic_director/page.py").read_text(),
         Path("backend/workspaces/head_of_departments/page.py").read_text(),
         Path("backend/modules/academics/head_of_departments_cards.py").read_text(),
-        Path("backend/internal_operations/pages/context.py").read_text(),
     ]
 
     for source in role_sources:

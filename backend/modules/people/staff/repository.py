@@ -323,7 +323,7 @@ def _upsert_staff_account(
         FROM msi_v2.accounts
         WHERE (
                 role IN (
-                    'system_admin', 'ceo', 'customer_support', 'hr_manager',
+                    'ceo', 'customer_support', 'hr_manager',
                     'academic_director', 'head_of_department'
                 )
                 AND lower(btrim(login)) = lower(btrim(%s))
@@ -453,7 +453,7 @@ def _upsert_hod_account(conn: Any, *, staff_id: int, login: str, password_hash: 
         FROM msi_v2.accounts
         WHERE (
                 role IN (
-                    'system_admin', 'ceo', 'customer_support', 'hr_manager',
+                    'ceo', 'customer_support', 'hr_manager',
                     'academic_director', 'head_of_department'
                 )
                 AND lower(btrim(login)) = lower(btrim(%s))

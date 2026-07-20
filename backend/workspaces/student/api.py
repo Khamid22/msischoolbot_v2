@@ -1,8 +1,7 @@
 """Student API v1 router.
 
-Guarded by authentication only (not role): reads are available to any
-signed-in session — matching the legacy behavior admin preview mode relies
-on — while write handlers enforce the student role themselves.
+Guarded by authentication at the router boundary. Individual handlers enforce
+the student role or the relevant student/parent object policy.
 """
 
 from fastapi import APIRouter, Depends, Request

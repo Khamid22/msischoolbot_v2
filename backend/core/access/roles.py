@@ -1,9 +1,6 @@
 """Single role registry: canonical roles, normalization, routing and display helpers."""
 
-ROLE_OWNER = "owner"
-ROLE_SYSTEM_ADMIN = "system_admin"
 ROLE_CEO = "ceo"
-ROLE_ADMIN = "admin"
 ROLE_TEACHER = "teacher"
 ROLE_CUSTOMER_SUPPORT = "customer_support"
 ROLE_PARENT = "parent"
@@ -27,10 +24,7 @@ WORKSPACE_ROLES = {
 NON_PORTAL_STAFF_ROLES: set[str] = set()
 
 ALL_ROLES = {
-    ROLE_OWNER,
-    ROLE_SYSTEM_ADMIN,
     ROLE_CEO,
-    ROLE_ADMIN,
     ROLE_TEACHER,
     ROLE_CUSTOMER_SUPPORT,
     ROLE_PARENT,
@@ -40,23 +34,10 @@ ALL_ROLES = {
     ROLE_HR_MANAGER,
 }
 
-# Roles a session may carry; "owner" normalizes to admin and is never stored.
-VALID_ROLES = {
-    ROLE_ADMIN,
-    ROLE_SYSTEM_ADMIN,
-    ROLE_CEO,
-    ROLE_CUSTOMER_SUPPORT,
-    ROLE_STUDENT,
-    ROLE_PARENT,
-    ROLE_TEACHER,
-    ROLE_ACADEMIC_DIRECTOR,
-    ROLE_HEAD_OF_DEPARTMENT,
-    ROLE_HR_MANAGER,
-}
+# Roles a canonical account or authenticated session may carry.
+VALID_ROLES = set(ALL_ROLES)
 
 ROLE_DASHBOARD_PATHS = {
-    "admin": "/internal/operations",
-    "system_admin": "/internal/operations",
     "ceo": "/ceo",
     "customer_support": "/customer-support",
     "student": "/student",
@@ -68,8 +49,6 @@ ROLE_DASHBOARD_PATHS = {
 }
 
 ROLE_DISPLAY_NAMES = {
-    "admin": "Admin",
-    "system_admin": "System Admin",
     "ceo": "CEO",
     "customer_support": "Customer Support",
     "student": "Student",
@@ -102,12 +81,6 @@ _ROLE_ALIASES = {
     "support": "customer_support",
     "sales": "customer_support",
     "ceo": "ceo",
-    "systemadmin": "system_admin",
-    "system-admin": "system_admin",
-    "system_admin": "system_admin",
-    "system admin": "system_admin",
-    "admin": "admin",
-    "owner": "admin",
     "student": "student",
     "teacher": "teacher",
     "parent": "parent",
@@ -149,10 +122,7 @@ def role_display_name(role) -> str:
 
 
 __all__ = [
-    "ROLE_OWNER",
-    "ROLE_SYSTEM_ADMIN",
     "ROLE_CEO",
-    "ROLE_ADMIN",
     "ROLE_TEACHER",
     "ROLE_CUSTOMER_SUPPORT",
     "ROLE_PARENT",

@@ -14,14 +14,14 @@ type HeadOfDepartmentAcademyProps = {
   authLogin?: string;
   authRole?: string;
   csrfToken?: string;
-  adminMode?: string;
-  adminSchool?: string;
-  adminTeachers?: Array<Record<string, unknown>>;
-  adminTeacherAcademy?: Array<Record<string, unknown>>;
-  adminGroupOptions?: Array<Record<string, unknown>>;
-  adminAcademicSubjects?: Array<Record<string, unknown>>;
-  adminAcademicCurriculumPrograms?: Array<Record<string, unknown>>;
-  adminAcademicCurriculumItems?: Array<Record<string, unknown>>;
+  managementMode?: string;
+  managementSchool?: string;
+  managementTeachers?: Array<Record<string, unknown>>;
+  managementAcademyTeachers?: Array<Record<string, unknown>>;
+  managementGroupOptions?: Array<Record<string, unknown>>;
+  academicManagementSubjects?: Array<Record<string, unknown>>;
+  academicManagementCurriculumPrograms?: Array<Record<string, unknown>>;
+  academicManagementCurriculumItems?: Array<Record<string, unknown>>;
 };
 
 function normalizeGroupOptions(groups: Array<Record<string, unknown>>) {
@@ -34,30 +34,30 @@ function normalizeGroupOptions(groups: Array<Record<string, unknown>>) {
 
 export default function HeadOfDepartmentTeacherAcademyPage(props: HeadOfDepartmentAcademyProps) {
   const [teachers, setTeachers] = useState<Array<Record<string, unknown>>>(
-    Array.isArray(props.adminTeachers) ? props.adminTeachers : [],
+    Array.isArray(props.managementTeachers) ? props.managementTeachers : [],
   );
   const [academyTeachers, setAcademyTeachers] = useState<Array<Record<string, unknown>>>(
-    Array.isArray(props.adminTeacherAcademy) ? props.adminTeacherAcademy : [],
+    Array.isArray(props.managementAcademyTeachers) ? props.managementAcademyTeachers : [],
   );
   const { toast, showToast, clearToast } = useFloatingToast();
 
   const panelState = useMemo(
     () => ({
-      adminMode: "head_of_department",
-      currentSchool: props.adminSchool || "all",
+      managementMode: "head_of_department",
+      currentSchool: props.managementSchool || "all",
       teachers,
       setTeachers,
       academyTeachers,
       setAcademyTeachers,
       filteredGroupOptions: normalizeGroupOptions(
-        Array.isArray(props.adminGroupOptions) ? props.adminGroupOptions : [],
+        Array.isArray(props.managementGroupOptions) ? props.managementGroupOptions : [],
       ),
       props: {
         ...props,
-        adminMode: "head_of_department",
+        managementMode: "head_of_department",
         authRole: props.authRole || "head_of_department",
-        adminTeachers: teachers,
-        adminTeacherAcademy: academyTeachers,
+        managementTeachers: teachers,
+        managementAcademyTeachers: academyTeachers,
       },
     }),
     [academyTeachers, props, teachers],

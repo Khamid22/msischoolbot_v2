@@ -361,7 +361,7 @@ def test_failed_historical_demo_uses_existing_automatic_rejection_shape(monkeypa
     assert decisions[0]["source_evaluation_id"] == 109
 
 
-def test_forward_stage_progress_derives_passes_but_never_subject_knowledge():
+def test_forward_stage_progress_never_fabricates_evaluation_passes():
     states = service._derived_evaluation_states(
         {
             "status": "under_review",
@@ -372,8 +372,8 @@ def test_forward_stage_progress_derives_passes_but_never_subject_knowledge():
     )
 
     assert states == {
-        "interview": "passed",
-        "demo": "passed",
+        "interview": "missing",
+        "demo": "missing",
         "subject_test": "missing",
     }
 

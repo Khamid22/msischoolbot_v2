@@ -90,7 +90,6 @@ def _patch_parent_dependencies(monkeypatch, children):
     else:
         monkeypatch.setattr(parent_routes, "list_parent_client_children", lambda parent_id: children)
 
-    monkeypatch.setattr(parent_routes, "list_parent_children", lambda admin_id: [])
     monkeypatch.setattr(parent_routes, "list_resources", lambda: [])
     monkeypatch.setattr(parent_routes, "list_announcements", lambda: [])
 
@@ -211,7 +210,6 @@ def test_parent_route_db_failure_returns_placeholder_cards(client, monkeypatch):
         ("GET", "/"),
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
-        ("GET", "/admin"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],

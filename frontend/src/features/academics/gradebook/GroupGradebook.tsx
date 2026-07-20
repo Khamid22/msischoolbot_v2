@@ -18,23 +18,23 @@ import { queryClient } from "@/shared/api/queryClient";
 
 type AcademicGradebookRoutes = Pick<
   typeof routes,
-  | "adminAcademicGradebookApi"
-  | "adminAcademicGradebookTrendsApi"
-  | "adminAcademicGroupTimetableApi"
-  | "adminAcademicAttendanceApi"
-  | "adminAcademicHomeworkApi"
-  | "adminAcademicExamApi"
-  | "adminAcademicEnrollmentStatusApi"
-  | "adminAcademicEnrollmentGroupApi"
-  | "adminAcademicLessonApi"
-  | "adminAcademicLessonCancelApi"
-  | "adminAcademicLessonRecoverApi"
-  | "adminAcademicGroupSchedule"
-  | "adminAcademicGroupStudents"
-  | "adminAcademicCalendarClosuresApi"
-  | "adminAcademicCalendarClosurePreview"
-  | "adminAcademicCalendarClosureCreate"
-  | "adminAcademicCalendarClosureUnlock"
+  | "academicManagementGradebookApi"
+  | "academicManagementGradebookTrendsApi"
+  | "academicManagementGroupTimetableApi"
+  | "academicManagementAttendanceApi"
+  | "academicManagementHomeworkApi"
+  | "academicManagementExamApi"
+  | "academicManagementEnrollmentStatusApi"
+  | "academicManagementEnrollmentGroupApi"
+  | "academicManagementLessonApi"
+  | "academicManagementLessonCancelApi"
+  | "academicManagementLessonRecoverApi"
+  | "academicManagementGroupSchedule"
+  | "academicManagementGroupStudents"
+  | "academicManagementCalendarClosuresApi"
+  | "academicManagementCalendarClosurePreview"
+  | "academicManagementCalendarClosureCreate"
+  | "academicManagementCalendarClosureUnlock"
 >;
 
 type CompactTooltipItem = {
@@ -342,7 +342,7 @@ export function GroupGradebook({
 
   async function fetchGradebookData(id: number, view: GradebookView, cursor = "", anchorDate = "", month = "", signal?: AbortSignal) {
     const section = gradebookSection(view);
-    const url = academicRoutes.adminAcademicGradebookApi(id, {
+    const url = academicRoutes.academicManagementGradebookApi(id, {
       cursor: section === "gradebook" ? cursor : undefined,
       anchorDate: section === "gradebook" ? anchorDate : undefined,
       month: section === "gradebook" ? month : undefined,
@@ -566,7 +566,7 @@ export function GroupGradebook({
     setSetupError("");
     setSetupSuccess("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicGroupSchedule(groupId), {
+      const response = await fetch(academicRoutes.academicManagementGroupSchedule(groupId), {
         method: "PUT",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
@@ -615,7 +615,7 @@ export function GroupGradebook({
     setStudentSaving(true);
     setStudentError("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicGroupStudents(groupId), {
+      const response = await fetch(academicRoutes.academicManagementGroupStudents(groupId), {
         method: "POST", headers: jsonCsrfHeaders(csrf), body: JSON.stringify({ full_name: studentName.trim() }),
       });
       const json = await response.json();
@@ -660,7 +660,7 @@ export function GroupGradebook({
     if (!active || saving) return;
     setSaving(true);
     try {
-      const res = await fetch(academicRoutes.adminAcademicAttendanceApi, {
+      const res = await fetch(academicRoutes.academicManagementAttendanceApi, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
@@ -699,7 +699,7 @@ export function GroupGradebook({
     setSaving(true);
     setCellError("");
     try {
-      const res = await fetch(academicRoutes.adminAcademicHomeworkApi, {
+      const res = await fetch(academicRoutes.academicManagementHomeworkApi, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({
@@ -833,7 +833,7 @@ export function GroupGradebook({
     setExamSavingKey(key);
     setError("");
     try {
-      const res = await fetch(academicRoutes.adminAcademicExamApi, {
+      const res = await fetch(academicRoutes.academicManagementExamApi, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({
@@ -867,7 +867,7 @@ export function GroupGradebook({
     }
     setStatusSavingId(enrollmentId);
     try {
-      const res = await fetch(academicRoutes.adminAcademicEnrollmentStatusApi(enrollmentId), {
+      const res = await fetch(academicRoutes.academicManagementEnrollmentStatusApi(enrollmentId), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ status, reason }),
@@ -891,7 +891,7 @@ export function GroupGradebook({
     setMoveSaving(true);
     setError("");
     try {
-      const res = await fetch(academicRoutes.adminAcademicEnrollmentGroupApi(enrollmentId), {
+      const res = await fetch(academicRoutes.academicManagementEnrollmentGroupApi(enrollmentId), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ group_id: Number(moveGroupId) }),
@@ -1063,7 +1063,7 @@ export function GroupGradebook({
     staleTime: 60_000,
     queryFn: async ({ signal }) => {
       const response = await fetch(
-        academicRoutes.adminAcademicGradebookTrendsApi(groupId, { through: selectedLessonMonth, months: 6 }),
+        academicRoutes.academicManagementGradebookTrendsApi(groupId, { through: selectedLessonMonth, months: 6 }),
         { signal },
       );
       const json = await response.json().catch(() => ({}));

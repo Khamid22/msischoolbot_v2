@@ -26,14 +26,14 @@ import { CalendarClosuresModal, type CalendarClosure } from "./CalendarClosuresM
 
 type TimetableRoutes = Pick<
   typeof routes,
-  | "adminAcademicGroupTimetableApi"
-  | "adminAcademicLessonApi"
-  | "adminAcademicLessonCancelApi"
-  | "adminAcademicLessonRecoverApi"
-  | "adminAcademicCalendarClosuresApi"
-  | "adminAcademicCalendarClosurePreview"
-  | "adminAcademicCalendarClosureCreate"
-  | "adminAcademicCalendarClosureUnlock"
+  | "academicManagementGroupTimetableApi"
+  | "academicManagementLessonApi"
+  | "academicManagementLessonCancelApi"
+  | "academicManagementLessonRecoverApi"
+  | "academicManagementCalendarClosuresApi"
+  | "academicManagementCalendarClosurePreview"
+  | "academicManagementCalendarClosureCreate"
+  | "academicManagementCalendarClosureUnlock"
 >;
 
 type TimetableRow = {
@@ -537,10 +537,10 @@ function LessonDetailsSheet({
     setError("");
     try {
       const endpoint = flow === "edit"
-        ? academicRoutes.adminAcademicLessonApi(item.lessonSessionId)
+        ? academicRoutes.academicManagementLessonApi(item.lessonSessionId)
         : flow === "cancel"
-          ? academicRoutes.adminAcademicLessonCancelApi(item.lessonSessionId)
-          : academicRoutes.adminAcademicLessonRecoverApi(item.lessonSessionId);
+          ? academicRoutes.academicManagementLessonCancelApi(item.lessonSessionId)
+          : academicRoutes.academicManagementLessonRecoverApi(item.lessonSessionId);
       const body = flow === "edit"
         ? { date, start_time: startTime, end_time: endTime, room: room.trim(), lesson_name: name.trim(), topic: topic.trim(), allow_recorded_lesson_changes: allowRecorded }
         : flow === "cancel"
@@ -652,7 +652,7 @@ export function ModernGroupTimetable({
     queryKey: ["academic", "timetable", groupId, range.from, range.to],
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({ date_from: range.from, date_to: range.to });
-      const response = await fetch(academicRoutes.adminAcademicGroupTimetableApi(groupId, params.toString()), {
+      const response = await fetch(academicRoutes.academicManagementGroupTimetableApi(groupId, params.toString()), {
         signal,
         cache: "no-store",
         credentials: "same-origin",

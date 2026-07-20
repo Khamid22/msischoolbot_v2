@@ -112,33 +112,6 @@ def test_teacher_login_redirects_to_teacher_workspace(client, monkeypatch):
     assert response.headers["location"] == "/teacher"
 
 
-def test_system_admin_reaches_admin_compatibility(client, monkeypatch):
-    import backend.modules.identity.page as identity_routes
-
-    _set_csrf_session(client)
-    monkeypatch.setattr(
-        identity_routes,
-        "authenticate_account_password",
-        lambda login, password: _auth_result(
-            "admin",
-            account_role="system_admin",
-            auth_login="admin",
-            staff_id=1,
-            staff_role="system_admin",
-            admin_id=1,
-            admin_role="owner",
-            admin_is_owner=True,
-            admin_last_panel="overview",
-            admin_last_school="all",
-        ),
-    )
-
-    response = _post_login(client, "admin")
-
-    assert response.status_code == 302
-    assert response.headers["location"] == "/internal/operations"
-
-
 @pytest.mark.parametrize(
     "database_account",
     [

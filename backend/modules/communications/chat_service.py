@@ -7,7 +7,6 @@ from backend.modules.communications import chat_repository as repository
 
 _DB_LOCK = threading.Lock()
 PAGE_SIZE = 40
-ADMIN_PAGE_SIZE = 60
 MAX_BODY = 800
 
 
@@ -119,56 +118,3 @@ def delete_message(msg_id: int, *, student_login: str) -> None:
             raise PermissionError("You can only delete your own messages.") from exc
         repository.soft_delete_message(conn, msg_id)
         conn.commit()
-
-
-def serialize_admin_message(row) -> dict:
-    result = serialize_message(row)
-    result["isDeleted"] = bool(row["is_deleted"])
-    result.pop("createdAtRaw", None)
-    return result
-
-
-def admin_list_messages(room: str, *, before_id=0) -> list[dict]:
-    with connect_chat_db() as conn:
-        rows = repository.list_message_rows(
-            conn, room, before_id=before_id, limit=ADMIN_PAGE_SIZE, include_deleted=True
-        )
-    return [serialize_admin_message(row) for row in reversed(rows)]
-
-
-def admin_delete_message(msg_id: int) -> None:
-    with _DB_LOCK, connect_chat_db() as conn:
-        if not repository.message_exists(conn, msg_id):
-            raise LookupError("Message not found.")
-        repository.soft_delete_message(conn, msg_id)
-        conn.commit()
-
-
-def block_student(student_id: str, *, blocked_by: str, reason: str) -> None:
-    with _DB_LOCK, connect_chat_db() as conn:
-        repository.upsert_blocked_student(
-            conn, student_id=student_id, blocked_by=blocked_by,
-            blocked_at=utc_now_iso(), reason=reason,
-        )
-        conn.commit()
-
-
-def unblock_student(student_id: str) -> None:
-    with _DB_LOCK, connect_chat_db() as conn:
-        repository.delete_blocked_student(conn, student_id)
-        conn.commit()
-
-
-def list_blocked_students() -> list[dict]:
-    with connect_chat_db() as conn:
-        rows = repository.list_blocked_student_rows(conn)
-    return [{"studentId": str(row["student_id"]), "blockedBy": str(row["blocked_by_admin"]),
-             "blockedAt": fmt_display(str(row["blocked_at"])), "reason": str(row["reason"])}
-            for row in rows]
-
-
-def list_rooms() -> list[dict]:
-    with connect_chat_db() as conn:
-        rows = repository.list_room_rows(conn)
-    return [{"room": str(row["room"]), "total": int(row["total"]), "active": int(row["active"])}
-            for row in rows]

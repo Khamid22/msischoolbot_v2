@@ -192,8 +192,6 @@ def test_unauthenticated_user_cannot_access_role_workspace(
         ("GET", "/"),
         ("POST", "/login"),
         ("POST", "/auth/telegram"),
-        ("GET", "/admin"),
-        ("GET", "/internal/operations"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],

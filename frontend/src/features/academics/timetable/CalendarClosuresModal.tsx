@@ -27,10 +27,10 @@ type ClosurePreview = {
 };
 
 type ClosureRoutes = {
-  adminAcademicCalendarClosuresApi: (query?: string) => string;
-  adminAcademicCalendarClosurePreview: string;
-  adminAcademicCalendarClosureCreate: string;
-  adminAcademicCalendarClosureUnlock: (closureId: number | string) => string;
+  academicManagementCalendarClosuresApi: (query?: string) => string;
+  academicManagementCalendarClosurePreview: string;
+  academicManagementCalendarClosureCreate: string;
+  academicManagementCalendarClosureUnlock: (closureId: number | string) => string;
 };
 
 function formatDate(value: string) {
@@ -111,7 +111,7 @@ export function CalendarClosuresModal({
     });
     if (groupId) query.set("group_id", String(groupId));
     try {
-      const response = await fetch(academicRoutes.adminAcademicCalendarClosuresApi(query.toString()), {
+      const response = await fetch(academicRoutes.academicManagementCalendarClosuresApi(query.toString()), {
         signal,
         cache: "no-store",
         credentials: "same-origin",
@@ -127,7 +127,7 @@ export function CalendarClosuresModal({
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [academicRoutes.adminAcademicCalendarClosuresApi, selectedSchoolId, year, groupId]);
+  }, [academicRoutes.academicManagementCalendarClosuresApi, selectedSchoolId, year, groupId]);
 
   useEffect(() => {
     if (!open) return;
@@ -174,7 +174,7 @@ export function CalendarClosuresModal({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicCalendarClosurePreview, {
+      const response = await fetch(academicRoutes.academicManagementCalendarClosurePreview, {
         method: "POST",
         credentials: "same-origin",
         headers: jsonCsrfHeaders(csrf),
@@ -195,7 +195,7 @@ export function CalendarClosuresModal({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicCalendarClosureCreate, {
+      const response = await fetch(academicRoutes.academicManagementCalendarClosureCreate, {
         method: "POST",
         credentials: "same-origin",
         headers: jsonCsrfHeaders(csrf),
@@ -224,7 +224,7 @@ export function CalendarClosuresModal({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(academicRoutes.adminAcademicCalendarClosureUnlock(unlockTarget.id), {
+      const response = await fetch(academicRoutes.academicManagementCalendarClosureUnlock(unlockTarget.id), {
         method: "POST",
         credentials: "same-origin",
         headers: jsonCsrfHeaders(csrf),

@@ -231,13 +231,15 @@ def _resolve_run_mode():
         "web": "web",
         "server": "web",
         "bot": "bot",
+        "worker": "worker",
+        "recruitment-worker": "worker",
     }
     resolved = aliases.get(raw_mode)
     if resolved:
         return resolved
 
     logging.warning(
-        "Unknown run mode %r. Supported: both, web, bot. Falling back to web.",
+        "Unknown run mode %r. Supported: both, web, bot, worker. Falling back to web.",
         raw_mode,
     )
     return "web"
@@ -252,6 +254,10 @@ if __name__ == "__main__":
         run_web_server()
     elif run_mode == "bot":
         asyncio.run(run_bot())
+    elif run_mode == "worker":
+        from backend.modules.hr.recruitment.worker import run_forever
+
+        run_forever()
     else:
         logging.info(
             "Running bot + web in one process. "

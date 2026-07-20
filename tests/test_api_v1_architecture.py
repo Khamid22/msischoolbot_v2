@@ -44,7 +44,7 @@ def test_legacy_technical_layers_are_removed():
     assert Path("backend/application").is_dir()
     assert Path("backend/workspaces").is_dir()
     assert Path("backend/modules").is_dir()
-    assert Path("backend/internal_operations").is_dir()
+    assert not Path("backend/internal_operations").exists()
 
 
 def test_workspace_inventory_uses_exact_product_names():
@@ -56,8 +56,8 @@ def test_workspace_inventory_uses_exact_product_names():
     assert actual == WORKSPACE_NAMES
 
 
-def test_workspaces_and_internal_operations_do_not_own_sql_or_repositories():
-    for root in ("backend/workspaces", "backend/internal_operations", "backend/application"):
+def test_workspace_and_application_adapters_do_not_own_sql_or_repositories():
+    for root in ("backend/workspaces", "backend/application"):
         for path in _python_sources(root):
             source = path.read_text()
             assert ".execute(" not in source, f"SQL must stay in a module repository: {path}"
@@ -79,7 +79,7 @@ def test_modules_do_not_import_another_modules_repository():
 def test_http_api_adapters_do_not_render_pages():
     api_paths = [
         path
-        for root in ("backend/workspaces", "backend/modules", "backend/internal_operations")
+        for root in ("backend/workspaces", "backend/modules")
         for path in _python_sources(root)
         if path.name.endswith("api.py")
     ]
@@ -117,11 +117,12 @@ def test_server_registers_api_before_page_adapters():
     )
 
 
-def test_frontend_uses_workspace_feature_shared_and_internal_boundaries():
+def test_frontend_uses_workspace_feature_and_shared_boundaries():
     source_root = Path("frontend/src")
     assert not (source_root / "roles").exists()
-    for folder in ("app", "workspaces", "features", "shared", "internal_operations"):
+    for folder in ("app", "workspaces", "features", "shared"):
         assert (source_root / folder).is_dir()
+    assert not (source_root / "internal_operations").exists()
     actual_workspaces = {
         path.name
         for path in (source_root / "workspaces").iterdir()

@@ -98,56 +98,12 @@ def parse_telegram_user_id(raw_value):
     return parsed
 
 
-def current_admin_role():
-    """Returns the admin's specific role: 'owner', 'admin', 'parent', or ''."""
-    if current_auth_role() != "admin":
-        return ""
-    return str(session.get("admin_role", "admin")).strip().lower()
-
-
 def current_staff_id():
     try:
         parsed_value = int(session.get("staff_id"))
     except (TypeError, ValueError):
         return None
     return parsed_value if parsed_value > 0 else None
-
-
-def set_admin_session(admin):
-    if not isinstance(admin, dict) or not admin.get("id"):
-        return False
-
-    raw_admin_role = str(admin.get("role", "admin")).strip() or "admin"
-    portal_role = normalize_role(raw_admin_role)
-    if portal_role not in {
-        "admin",
-        "ceo",
-        "customer_support",
-        "parent",
-        "academic_director",
-        "head_of_department",
-        "hr_manager",
-    }:
-        return False
-    admin_role = "owner" if raw_admin_role.strip().casefold() == "owner" else portal_role
-
-    session.clear()
-    session["auth_role"] = portal_role
-    session["auth_login"] = str(admin.get("login", "")).strip()
-    session["staff_id"] = int(admin["id"])
-    session["staff_role"] = portal_role
-    if portal_role == "admin":
-        session["admin_id"] = int(admin["id"])
-        session["admin_role"] = admin_role
-        session["admin_is_owner"] = admin_role == "owner" or bool(admin.get("is_owner"))
-        session["admin_last_panel"] = "overview"
-        session["admin_last_school"] = "all"
-    elif portal_role == "parent":
-        # Legacy parent-client accounts can live in msi_staff. Keep admin_id so
-        # the existing parent page can resolve linked children during cutover.
-        session["admin_id"] = int(admin["id"])
-    session.permanent = True
-    return True
 
 
 def set_account_session(auth_result):
@@ -312,10 +268,6 @@ def url_for(endpoint: str, **kwargs) -> str:
             url += "?" + "&".join(query_params)
         return url
 
-    if endpoint_clean == "admin_continue":
-        handoff = kwargs.get("handoff", "")
-        return f"/admin/continue?handoff={handoff}"
-
     if endpoint_clean == "login":
         return "/login"
 
@@ -324,18 +276,6 @@ def url_for(endpoint: str, **kwargs) -> str:
 
     if endpoint_clean == "search_student_form":
         return "/search"
-
-    if endpoint_clean == "save_admin_student_profile":
-        s_id = kwargs.get("student_row_id")
-        return f"/admin/students/{s_id}/profile"
-
-    if endpoint_clean == "admin_change_student_password_route":
-        s_id = kwargs.get("student_row_id")
-        return f"/admin/students/{s_id}/password"
-
-    if endpoint_clean == "admin_student_dashboard":
-        s_id = kwargs.get("student_row_id")
-        return f"/admin/students/{s_id}/dashboard"
 
     raise ValueError(f"Unknown endpoint in url_for: {endpoint}")
 
@@ -346,7 +286,6 @@ def logout_portal_session():
 
 __all__ = [
     "current_auth_role",
-    "current_admin_role",
     "current_auth_login",
     "current_staff_id",
     "current_parent_id",
@@ -356,7 +295,6 @@ __all__ = [
     "current_student_school_code",
     "parse_telegram_user_id",
     "set_account_session",
-    "set_admin_session",
     "set_student_session",
     "try_auto_login_student_by_telegram",
     "build_dashboard_url",

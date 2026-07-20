@@ -21,7 +21,7 @@ def onboard_academy_intake(
     academy_teacher_id: int,
     payload: AcademyIntakeOnboarding,
     user: CurrentUser = Depends(
-        require_role("admin", "system_admin", "academic_director", "head_of_department")
+        require_role("academic_director", "head_of_department")
     ),
 ):
     if user.role == "head_of_department" and not can_user_manage_academy_teacher(
@@ -53,7 +53,7 @@ def onboard_academy_intake(
 )
 def provision_active_teacher_intake(
     teacher_id: int,
-    user: CurrentUser = Depends(require_role("admin", "system_admin")),
+    user: CurrentUser = Depends(require_role("academic_director")),
 ):
     created, message, credentials = provision_recruitment_teacher_account(
         teacher_id,

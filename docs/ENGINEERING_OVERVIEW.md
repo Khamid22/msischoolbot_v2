@@ -33,28 +33,27 @@ PostgreSQL is the only LMS data source. Google Sheets and Excel are not integrat
 - Parent invites are hash-only, expiring, single-use, and atomically consumed.
 - `students.id` is the internal student identity; legacy/public IDs are compatibility boundaries only.
 - Runtime SQL is module-owned; the old technical-layer trees are removed.
-- Runtime DDL is removed; Alembic repository head is `0008_remove_teacher_portal`.
+- Runtime DDL is removed; Alembic repository head is `0028_remove_system_admin`.
 - APIs are versioned under `/api/v1`; old role API namespaces are gone.
 - React uses server bootstrap payloads, role-owned pages, shared accessible UI, and explicit `Asia/Tashkent` time helpers.
 
 ## Current Roles
 
-- `system_admin`
 - `ceo`
+- `hr_manager`
 - `academic_director`
 - `head_of_department`
 - `customer_support`
 - `student`
 - `parent`
+- `teacher`
 
-The business roles own separate workspaces. `system_admin` is protected internal operations. Role checks do not replace object checks such as linked child, subject scope, chat membership, or canonical student ownership.
+The business roles own separate workspaces. Role checks do not replace object checks such as linked child, subject scope, chat membership, or canonical student ownership.
 
 ## Important Remaining Compatibility
 
 - physical schema name `msi_v2`;
 - selected legacy correlation and public dashboard ID columns;
-- remaining `/admin/*` HTML form actions and workspace helper services;
-- `admin` presentation/session compatibility for `system_admin`;
 - Telegram-first parent accounts without password credentials;
 - an empty bot router registry until new inbound commands are product-approved and implemented.
 

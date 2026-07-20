@@ -1,5 +1,4 @@
 import { GraduationCap } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { ProgressBar } from "@/shared/ui/ProgressBar";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
@@ -20,14 +19,12 @@ interface AapPageProps {
   studentFullName?: string;
   subjectName?: string;
   lessonRows?: LessonRow[];
-  embedMode?: string;
 }
 
 export default function AAPPage(props: AapPageProps) {
   const lessonRows = Array.isArray(props.lessonRows) ? props.lessonRows : [];
   const isChemistrySubject =
     String(props.subjectName || "").trim().toLowerCase() === "chemistry";
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
 
   const firstColumnLabel = isChemistrySubject ? "Task" : "Date";
   const subtitle = `${props.studentFullName || "Student"} · ${props.subjectName || "Subject"}`;
@@ -134,24 +131,6 @@ export default function AAPPage(props: AapPageProps) {
       No lesson data available for this subject yet.
     </p>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Average Academic Performance"
-        subtitle={subtitle}
-        backUrl={props.backUrl}
-        badge="AAP"
-      >
-        <ChartCard
-          title="Subject Curriculum"
-          icon={<GraduationCap className="h-4 w-4 text-info" />}
-        >
-          {curriculumContent}
-        </ChartCard>
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

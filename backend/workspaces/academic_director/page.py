@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from backend.core.web.rendering import generate_csrf, render_react_page
-from backend.modules.academics.groups.service import list_academic_admin_rows
+from backend.modules.academics.groups.service import list_academic_management_rows
 from backend.modules.communications.announcements_service import list_announcements
 from backend.workspaces.shared import render_role_home
 from backend.modules.reporting.service import academic_director_workspace_cards
@@ -31,13 +31,13 @@ def _safe_academy_timetable_context():
 def _safe_academic_workspace_context(*, include_heavy=True, include_groups=True):
     try:
         try:
-            academic = list_academic_admin_rows(
+            academic = list_academic_management_rows(
                 include_heavy=include_heavy, include_groups=include_groups
             )
         except TypeError as exc:
             if "include_groups" not in str(exc):
                 raise
-            academic = list_academic_admin_rows(include_heavy=include_heavy)
+            academic = list_academic_management_rows(include_heavy=include_heavy)
             if not include_groups:
                 academic = {**academic, "groups": []}
         return {
@@ -109,19 +109,19 @@ def register_academic_director_page_routes(app):
                 "authRole": current_auth_role(),
                 "role": "academic_director",
                 "workspace": workspace,
-                "adminMode": "academic_director",
-                "adminSchool": "all",
-                "adminAcademicSchools": academic_context.get("schools", []),
-                "adminAcademicSubjects": academic_context.get("subjects", []),
-                "adminAcademicGroups": academic_context.get("groups", []),
-                "adminAcademicEnrollments": academic_context.get("enrollments", []),
-                "adminAcademicLessons": academic_context.get("lessons", []),
-                "adminAcademicSchedules": academic_context.get("schedules", []),
-                "adminAcademicSessions": academic_context.get("sessions", []),
-                "adminAcademicCurriculumPrograms": academic_context.get("curriculum_programs", []),
-                "adminAcademicCurriculumItems": academic_context.get("curriculum_items", []),
-                "adminAcademicEnrollmentSummary": academic_context.get("enrollment_summary", {}),
-                "adminAcademicContextMode": "full" if include_heavy else "summary",
+                "managementMode": "academic_director",
+                "managementSchool": "all",
+                "academicManagementSchools": academic_context.get("schools", []),
+                "academicManagementSubjects": academic_context.get("subjects", []),
+                "academicManagementGroups": academic_context.get("groups", []),
+                "academicManagementEnrollments": academic_context.get("enrollments", []),
+                "academicManagementLessons": academic_context.get("lessons", []),
+                "academicManagementSchedules": academic_context.get("schedules", []),
+                "academicManagementSessions": academic_context.get("sessions", []),
+                "academicManagementCurriculumPrograms": academic_context.get("curriculum_programs", []),
+                "academicManagementCurriculumItems": academic_context.get("curriculum_items", []),
+                "academicManagementEnrollmentSummary": academic_context.get("enrollment_summary", {}),
+                "academicManagementContextMode": "full" if include_heavy else "summary",
                 "warning": context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },
@@ -184,7 +184,7 @@ def register_academic_director_page_routes(app):
                 "authRole": current_auth_role(),
                 "role": "academic_director",
                 "workspace": "announcements",
-                "adminAnnouncements": announcement_context.get("announcements", []),
+                "workspaceAnnouncements": announcement_context.get("announcements", []),
                 "warning": announcement_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },
@@ -223,15 +223,15 @@ def register_academic_director_page_routes(app):
             {
                 "authLogin": current_auth_login(),
                 "authRole": current_auth_role(),
-                "adminMode": "academic_director",
-                "adminSchool": "all",
-                "adminTeachers": academy_context["teachers"],
-                "adminTeacherAcademy": academy_context["academy_teachers"],
-                "adminGroupOptions": academy_context["group_options"],
-                "adminAcademicSubjects": academy_context["subjects"],
-                "adminAcademicCurriculumPrograms": academy_context["curriculum_programs"],
-                "adminAcademicCurriculumItems": academy_context["curriculum_items"],
-                "adminAcademyLessonEvents": timetable_context.get("academy_lessons", []),
+                "managementMode": "academic_director",
+                "managementSchool": "all",
+                "managementTeachers": academy_context["teachers"],
+                "managementAcademyTeachers": academy_context["academy_teachers"],
+                "managementGroupOptions": academy_context["group_options"],
+                "academicManagementSubjects": academy_context["subjects"],
+                "academicManagementCurriculumPrograms": academy_context["curriculum_programs"],
+                "academicManagementCurriculumItems": academy_context["curriculum_items"],
+                "academyLessonEvents": timetable_context.get("academy_lessons", []),
                 "warning": timetable_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },

@@ -121,15 +121,15 @@ describe("Academic Director academic workspace", () => {
     for (const token of [
       "AcademicPanel",
       "academicDirectorAcademicRoutes",
-      "adminAcademicGroupCreateApi",
-      "adminAcademicSchoolCreateApi",
-      "adminAcademicScheduleCreate",
-      "adminAcademicGradebookApi",
-      "adminAcademicGradebookTrendsApi",
+      "academicManagementGroupCreateApi",
+      "academicManagementSchoolCreateApi",
+      "academicManagementScheduleCreate",
+      "academicManagementGradebookApi",
+      "academicManagementGradebookTrendsApi",
     ]) {
       assert.match(src, new RegExp(token));
     }
-    assert.doesNotMatch(src, /adminAcademyLessonEvents/);
+    assert.doesNotMatch(src, /academyLessonEvents/);
   });
 });
 
@@ -148,13 +148,13 @@ describe("Timetable and Announcements final workspace", () => {
       "TimetableEventCard",
       "sortTimetableItems",
       "<ResponsiveTable",
-      "adminAcademyLessonEvents",
+      "academyLessonEvents",
     ]) {
       assert.match(src, new RegExp(token));
     }
     // Gradebook sessions and recurring schedule rules no longer feed this view.
-    assert.doesNotMatch(src, /adminAcademicSessions/);
-    assert.doesNotMatch(src, /adminAcademicSchedules/);
+    assert.doesNotMatch(src, /academicManagementSessions/);
+    assert.doesNotMatch(src, /academicManagementSchedules/);
   });
 
   it("announcements render cards with KPI, audience, status, and priority", () => {

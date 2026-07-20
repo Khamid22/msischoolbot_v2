@@ -6,7 +6,7 @@ Audience: engineers changing runtime code.
 
 ```text
 application
-  -> workspace or internal-operations adapter
+  -> role workspace adapter
     -> domain service/public contract
       -> same-domain repository
         -> backend.core.database
@@ -32,11 +32,9 @@ Forbidden:
 
 ## Composition Boundaries
 
-`backend/application` registers pages/APIs and system endpoints. `backend/workspaces` and `backend/internal_operations` translate HTTP into calls to domain services. They do not own business rules or persistence.
+`backend/application` registers pages/APIs and system endpoints. `backend/workspaces` translates HTTP into calls to domain services. Workspaces do not own business rules or persistence.
 
 Core is divided by infrastructure responsibility: `core/access`, `core/api`, `core/runtime`, `core/web`, and `core/database.py`. Password and portal-session behavior is Identity-owned. The remaining `core/web/request_context.py` is an explicit compatibility boundary for older form routes, not the pattern for new FastAPI code.
-
-Internal Operations is divided into `pages`, `academics`, `people`, `staffing`, `resources`, `finance`, and `support`. Its academic API is assembled from focused class, group, curriculum, timetable, and gradebook route modules. Product modules and role workspaces must not import Internal Operations; shared invalidation belongs to Platform.
 
 `backend/modules` is organized by product ownership. Academics is subdivided because scheduling, gradebook, curriculum, and assessment rules change independently, while remaining one transaction-capable module. Schedule changes, cancellation/recovery, and holiday reflow retain their existing explicit transaction boundaries.
 
@@ -57,7 +55,7 @@ PostgreSQL schema `msi_v2` remains unchanged. Each table has one documented owne
 
 ## Frontend Boundaries
 
-Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. Teacher Recruitment is owned by `modules/hr/recruitment` and hands accepted records to the separate Teacher Academy or active-teacher domains without provisioning accounts. Internal System Admin composition lives under `internal_operations`, not a reusable business feature.
+Workspaces compose domain features. `shared` is restricted to cross-domain API, UI, time, motion, and formatting primitives. Teacher Recruitment is owned by `modules/hr/recruitment` and hands accepted records to the separate Teacher Academy or active-teacher domains without provisioning accounts.
 
 Large stateful screens are progressively decomposed through focused model, calculation, modal, and calendar modules. Temporary size exceptions are listed in the module map and guarded from further growth; they are not permission to create new catch-all components.
 

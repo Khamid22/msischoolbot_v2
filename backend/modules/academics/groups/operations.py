@@ -10,11 +10,11 @@ from backend.modules.academics.common import (
 from backend.modules.academics.groups.service import (
     create_group_from_program,
     create_student_with_enrollment,
-    list_academic_admin_rows,
+    list_academic_management_rows,
 )
 
-def list_admin_academic_context(*, include_heavy=True, include_groups=True):
-    return list_academic_admin_rows(
+def list_academic_management_context(*, include_heavy=True, include_groups=True):
+    return list_academic_management_rows(
         include_heavy=include_heavy, include_groups=include_groups
     )
 
@@ -179,7 +179,7 @@ def update_enrollment_status(enrollment_id, status, reason=""):
     active = 1 if normalized_status == "active" else 0
     disqualification_reason = "" if normalized_status == "active" else str(reason or "").strip()
     if normalized_status == "banned" and not disqualification_reason:
-        disqualification_reason = "Banned by admin"
+        disqualification_reason = "Disqualified by Academic Director"
 
     now = _now()
     disqualified_at = "" if normalized_status == "active" else now.strftime("%Y-%m-%dT%H:%M:%SZ")

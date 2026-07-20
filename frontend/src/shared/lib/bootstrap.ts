@@ -8,8 +8,6 @@ export type ReactPageName =
   | "student-aap"
   | "student-ar"
   | "student-office-hours"
-  | "internal-operations-home"
-  | "internal-edit-student"
   | "parent-home"
   | "ceo-home"
   | "customer-support-home"
@@ -45,8 +43,6 @@ const REACT_PAGES = new Set<ReactPageName>([
   "student-aap",
   "student-ar",
   "student-office-hours",
-  "internal-operations-home",
-  "internal-edit-student",
   "parent-home",
   "ceo-home",
   "customer-support-home",
@@ -106,8 +102,6 @@ export function normalizePageName(page: unknown): ReactPageName | null {
   }
 
   const aliases: Record<string, ReactPageName> = {
-    "admin-home": "internal-operations-home",
-    "admin-edit-student": "internal-edit-student",
     "support-home": "customer-support-home",
     "head-of-department-home": "head-of-departments-home",
     "head-of-department-academy": "head-of-departments-academy",

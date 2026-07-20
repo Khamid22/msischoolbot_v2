@@ -1,6 +1,6 @@
 # MSI School LMS
 
-MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. Its product-domain modular monolith serves CEO, HR Manager, Academic Director, Head of Departments, Customer Support, Student, Parent, and the current read-only Teacher workspace. The recruitment domain hands accepted candidates into the retained Teacher Academy and Active Teachers workflows without automatically provisioning accounts. System Admin is a separate protected internal-operations boundary.
+MSI School LMS is a PostgreSQL-first school portal built with FastAPI and React. Its product-domain modular monolith serves CEO, HR Manager, Academic Director, Head of Departments, Customer Support, Student, Parent, and the current read-only Teacher workspace. The recruitment domain hands accepted candidates into the retained Teacher Academy and Active Teachers workflows; Teacher Academy owns provisioning the Teacher account created on academy acceptance.
 
 ## Architecture at a Glance
 
@@ -11,7 +11,6 @@ frontend/src/shared/      shared UI, routing, time, and API primitives
 backend/application/      FastAPI composition and route registration
 backend/workspaces/       role-specific HTTP/page adapters
 backend/modules/          product domains and repository-owned SQL
-backend/internal_operations/ protected System Admin operations
 backend/core/             configuration, PostgreSQL, sessions, and security
 backend/platform/         Redis, Telegram, and storage adapters
 database/alembic/         the only owner of schema DDL
@@ -24,7 +23,6 @@ The runtime dependency direction is:
 
 ```text
 React / Telegram Mini App -> workspace/API adapter -> module service -> module repository -> PostgreSQL
-internal operations ------> shared module contracts --------------------------------------^
 ```
 
 PostgreSQL schema `msi_v2` is the only runtime source of truth. Google Sheets, Excel workbooks, and the old Telegram mini-app workflow are not LMS data integrations.
@@ -53,12 +51,13 @@ pip install -r requirements.txt
 python -m alembic upgrade head
 ```
 
-Run both services, the web service, or the Telegram worker shell:
+Run the default web process or select an independent web, bot, or Recruitment notification process:
 
 ```bash
 python main.py
 python main.py web
 python main.py bot
+python main.py worker
 ```
 
 The bot command registry is intentionally empty at present. Telegram authentication and Mini App parent linking continue to work through the web application.
@@ -95,7 +94,7 @@ Required in deployed environments:
 - `MINI_APP_URL`
 - `APP_SECRET_KEY`
 
-Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool settings, `WEBAPP_INIT_DATA_TTL`, `TELEGRAM_BOT_USERNAME` (without `@`, used by staff account-link buttons), `RECRUITMENT_NOTIFICATION_WORKER_ENABLED`, `REDIS_URL`, storage settings, and owner bootstrap credentials.
+Common optional settings include `RUN_MODE`, `WEB_HOST`, `WEB_PORT`, `PORT`, database pool settings, `WEBAPP_INIT_DATA_TTL`, `TELEGRAM_BOT_USERNAME` (without `@`, used by staff account-link buttons), `RECRUITMENT_NOTIFICATION_POLL_SECONDS`, `RECRUITMENT_NOTIFICATION_BATCH_LIMIT`, `REDIS_URL`, and storage settings.
 
 ## Documentation
 

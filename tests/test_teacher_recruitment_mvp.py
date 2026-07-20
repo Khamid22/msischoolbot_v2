@@ -13,7 +13,11 @@ from pydantic import ValidationError
 
 from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository, service
-from backend.modules.hr.recruitment.constants import ALL_STAGES, PRIMARY_STAGES, REJECTION_REASONS
+from backend.modules.hr.recruitment.constants import (
+    ALL_STAGES,
+    PRIMARY_STAGES,
+    REJECTION_REASONS,
+)
 from backend.modules.hr.recruitment.schemas import (
     CandidateCreate,
     CandidateUpdate,
@@ -26,7 +30,10 @@ XHR = {"X-Requested-With": "XMLHttpRequest"}
 
 
 def _signed_session(data):
-    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip() or "dev-only-insecure-key-do-not-use-in-prod"
+    secret = (
+        os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
+        or "dev-only-insecure-key-do-not-use-in-prod"
+    )
     encoded = b64encode(json.dumps(data).encode("utf-8"))
     return TimestampSigner(secret).sign(encoded).decode("utf-8")
 
@@ -52,7 +59,12 @@ def test_stage_and_rejection_taxonomies_are_stable():
         "teacher_academy",
         "active_teacher",
     )
-    assert ALL_STAGES == {*PRIMARY_STAGES, "rejected", "candidate_withdrew", "trash_bin"}
+    assert ALL_STAGES == {
+        *PRIMARY_STAGES,
+        "rejected",
+        "candidate_withdrew",
+        "trash_bin",
+    }
     assert "other" in REJECTION_REASONS
     assert "missing_or_invalid_documents" in REJECTION_REASONS
 
@@ -134,10 +146,15 @@ def test_candidate_training_repository_returns_the_canonical_hod_assessment_deta
     assert "assessment.strengths" in sql
     assert "assessment.areas_for_improvement" in sql
     assert "assessment.final_recommendation" in sql
-    assert "(academy.created_at AT TIME ZONE 'Asia/Tashkent')::date::text" in repository._CANDIDATE_COLUMNS
+    assert (
+        "(academy.created_at AT TIME ZONE 'Asia/Tashkent')::date::text"
+        in repository._CANDIDATE_COLUMNS
+    )
 
 
-def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(monkeypatch):
+def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(
+    monkeypatch,
+):
     @contextmanager
     def connect():
         yield object()
@@ -206,10 +223,17 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
 
 
 def test_minimal_candidate_and_blank_optional_values_validate():
-    candidate = CandidateCreate.model_validate({"full_name": "  Ada Teacher  ", "application_date": ""})
+    candidate = CandidateCreate.model_validate(
+        {"full_name": "  Ada Teacher  ", "application_date": ""}
+    )
     assert candidate.full_name == "Ada Teacher"
     assert candidate.application_date is None
-    assert CandidateCreate.model_validate({"full_name": "Ada", "position_option_id": 3}).position_option_id == 3
+    assert (
+        CandidateCreate.model_validate(
+            {"full_name": "Ada", "position_option_id": 3}
+        ).position_option_id
+        == 3
+    )
 
     test = SubjectTestWrite.model_validate(
         {"result": "not_completed", "score": "", "maximum_score": ""}
@@ -252,9 +276,7 @@ def test_hod_summary_visibility_fails_closed_without_subject_scope():
 
 def test_protected_stage_and_decision_rules_fail_before_persistence():
     with pytest.raises(service.RecruitmentError, match="protected outcome"):
-        service.move_candidate(
-            _user(), 1, stage="active_teacher", expected_version=1
-        )
+        service.move_candidate(_user(), 1, stage="active_teacher", expected_version=1)
     with pytest.raises(service.RecruitmentError, match="Only CEO"):
         service.make_final_decision(
             _user(), 1, {"decision": "active_teacher", "approval_id": 1}
@@ -304,14 +326,24 @@ def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
             "version": kwargs["expected_version"] + 1,
         },
     )
-    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [21])
-    monkeypatch.setattr(repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [31])
+    monkeypatch.setattr(
+        repository, "revoke_open_approvals", lambda *_args, **_kwargs: [21]
+    )
+    monkeypatch.setattr(
+        repository, "cancel_scheduled_appointments", lambda *_args, **_kwargs: [31]
+    )
     monkeypatch.setattr(
         repository,
         "insert_audit",
-        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
     )
-    monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7, "status": "trash_bin"})
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args, **_kwargs: {"id": 7, "status": "trash_bin"},
+    )
 
     candidate = service.move_candidate(
         _user(),
@@ -334,9 +366,76 @@ def test_hr_trash_move_is_recoverable_versioned_and_audited(monkeypatch):
         ),
         (
             "candidate.moved_to_trash",
-            {"from": "job_interview", "to": "trash_bin", "reason": "Pipeline trash drop"},
+            {
+                "from": "job_interview",
+                "to": "trash_bin",
+                "reason": "Pipeline trash drop",
+            },
         ),
     ]
+
+
+def test_non_terminal_stage_move_keeps_scheduled_appointment(monkeypatch):
+    """Dragging a card between board stages must not destroy a booking."""
+
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+    cancel_calls = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "get_candidate_row",
+        lambda *_args, **_kwargs: {"id": 7, "status": "job_interview", "version": 4},
+    )
+    monkeypatch.setattr(
+        repository,
+        "update_candidate_stage",
+        lambda *_args, **kwargs: {
+            "id": kwargs["candidate_id"],
+            "status": kwargs["stage"],
+            "version": kwargs["expected_version"] + 1,
+        },
+    )
+    monkeypatch.setattr(repository, "revoke_open_approvals", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        repository,
+        "cancel_scheduled_appointments",
+        lambda *_args, **_kwargs: cancel_calls.append(_kwargs) or [],
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_audit",
+        lambda *_args, **kwargs: events.append(kwargs["event_type"]),
+    )
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo"},
+    )
+
+    candidate = service.move_candidate(
+        _user(),
+        7,
+        stage="test_and_demo",
+        expected_version=4,
+        reason="Pipeline move",
+    )
+
+    assert candidate["status"] == "test_and_demo"
+    # The interview booking is untouched: no cancellation call, no audit event.
+    assert cancel_calls == []
+    assert "candidate.appointments_cancelled" not in events
 
 
 def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):
@@ -364,18 +463,27 @@ def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):
             "restore_stage": "test_and_demo",
         },
     )
-    monkeypatch.setattr(repository, "void_latest_closed_decision", lambda *_args, **_kwargs: 91)
+    monkeypatch.setattr(
+        repository, "void_latest_closed_decision", lambda *_args, **_kwargs: 91
+    )
     monkeypatch.setattr(
         repository,
         "update_candidate_stage",
-        lambda *_args, **kwargs: {"id": kwargs["candidate_id"], "status": kwargs["stage"]},
+        lambda *_args, **kwargs: {
+            "id": kwargs["candidate_id"],
+            "status": kwargs["stage"],
+        },
     )
     monkeypatch.setattr(
         repository,
         "insert_audit",
-        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
     )
-    monkeypatch.setattr(service, "_sync_system_next_actions", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        service, "_sync_system_next_actions", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(
         service,
         "get_candidate",
@@ -421,7 +529,9 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
         },
     )
     monkeypatch.setattr(repository, "list_document_rows", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(repository, "delete_closed_candidate", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        repository, "delete_closed_candidate", lambda *_args, **_kwargs: True
+    )
 
     result = service.permanently_delete_candidate(
         _user(),
@@ -453,11 +563,18 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
         )
 
 
-def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, monkeypatch):
+def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(
+    client, monkeypatch
+):
     monkeypatch.setattr(
         service,
         "list_pipeline",
-        lambda user, **_filters: {"stages": {}, "counts": {}, "total": 0, "role": user.role},
+        lambda user, **_filters: {
+            "stages": {},
+            "counts": {},
+            "total": 0,
+            "role": user.role,
+        },
     )
     _set_session(client, "hr_manager", account_id=10, staff_id=20)
     allowed = client.get("/api/v1/recruitment/pipeline", headers=XHR)
@@ -474,7 +591,9 @@ def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(client, mon
         assert denied.status_code == 403
 
 
-def test_hod_recruitment_is_limited_to_assigned_work_without_pipeline(client, monkeypatch):
+def test_hod_recruitment_is_limited_to_assigned_work_without_pipeline(
+    client, monkeypatch
+):
     monkeypatch.setattr(
         service,
         "list_pipeline",
@@ -512,7 +631,9 @@ def test_hr_page_renders_new_shared_workspace_without_legacy_pipeline(client):
     assert client.get("/ceo/recruitment/trash").status_code == 404
 
 
-def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(client, monkeypatch):
+def test_appointment_apis_allow_scoped_reads_but_only_hr_or_ceo_management(
+    client, monkeypatch
+):
     monkeypatch.setattr(
         service,
         "list_appointments",
@@ -587,12 +708,21 @@ def test_recruitment_settings_api_is_hr_managed_and_ceo_read_only(client, monkey
     monkeypatch.setattr(
         service,
         "list_settings",
-        lambda user: {"items": [], "sources": [], "rejection_reasons": [], "role": user.role},
+        lambda user: {
+            "items": [],
+            "sources": [],
+            "rejection_reasons": [],
+            "role": user.role,
+        },
     )
     monkeypatch.setattr(
         service,
         "add_setting",
-        lambda user, **values: {"id": 9, "category": values["category"], "label": values["label"]},
+        lambda user, **values: {
+            "id": 9,
+            "category": values["category"],
+            "label": values["label"],
+        },
     )
     monkeypatch.setattr(
         service,
@@ -609,17 +739,22 @@ def test_recruitment_settings_api_is_hr_managed_and_ceo_read_only(client, monkey
     )
     assert created.status_code == 201
     assert created.json()["data"]["setting"]["label"] == "Job fair"
-    assert client.delete("/api/v1/recruitment/settings/9", headers=XHR).status_code == 200
+    assert (
+        client.delete("/api/v1/recruitment/settings/9", headers=XHR).status_code == 200
+    )
 
     _set_session(client, "ceo", account_id=11, staff_id=21)
     response = client.get("/api/v1/recruitment/settings", headers=XHR)
     assert response.status_code == 200
     assert response.json()["data"]["role"] == "ceo"
-    assert client.post(
-        "/api/v1/recruitment/settings",
-        headers=XHR,
-        json={"category": "source", "label": "Denied"},
-    ).status_code == 403
+    assert (
+        client.post(
+            "/api/v1/recruitment/settings",
+            headers=XHR,
+            json={"category": "source", "label": "Denied"},
+        ).status_code
+        == 403
+    )
 
 
 def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
@@ -637,7 +772,11 @@ def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
         yield conn
 
     monkeypatch.setattr(service, "connect_auth_db", connect)
-    monkeypatch.setattr(repository, "recruitment_setting_by_label_or_value", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_label_or_value",
+        lambda *_args, **_kwargs: None,
+    )
     monkeypatch.setattr(
         repository,
         "save_recruitment_setting",
@@ -653,7 +792,9 @@ def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
     monkeypatch.setattr(
         repository,
         "insert_recruitment_setting_audit",
-        lambda *_args, **kwargs: events.append((kwargs["event_type"], kwargs["detail"])),
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
     )
 
     setting = service.add_setting(
@@ -677,19 +818,20 @@ def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
     ]
 
 
-def test_admin_recruitment_pages_are_not_registered(client):
-    _set_session(client, "admin", account_id=1)
-
+def test_internal_operations_recruitment_pages_are_not_registered(app):
+    paths = {getattr(route, "path", "") for route in app.routes}
     for path in (
         "/internal/operations/recruitment",
         "/internal/operations/recruitment/pipeline",
         "/internal/operations/recruitment/candidates",
     ):
-        assert client.get(path).status_code == 404
+        assert path not in paths
 
 
 def test_migration_preserves_candidates_and_normalizes_history():
-    source = Path("database/alembic/versions/0013_teacher_recruitment_mvp.py").read_text()
+    source = Path(
+        "database/alembic/versions/0013_teacher_recruitment_mvp.py"
+    ).read_text()
     for mapping in (
         "WHEN 'new' THEN 'new_candidate'",
         "WHEN 'interview' THEN 'job_interview'",
@@ -716,7 +858,9 @@ def test_migration_preserves_candidates_and_normalizes_history():
 
 
 def test_decision_queue_migration_is_history_preserving_and_partial():
-    source = Path("database/alembic/versions/0014_hr_access_decision_queue.py").read_text()
+    source = Path(
+        "database/alembic/versions/0014_hr_access_decision_queue.py"
+    ).read_text()
 
     assert "idx_teacher_candidate_hire_approvals_actionable" in source
     assert "WHERE status IN ('requested', 'approved')" in source
@@ -739,7 +883,10 @@ def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candid
     source = Path("database/alembic/versions/0016_recruitment_settings.py").read_text()
     upgrade_source = source.split("def downgrade", 1)[0]
 
-    assert "CREATE TABLE IF NOT EXISTS msi_v2.teacher_recruitment_settings" in upgrade_source
+    assert (
+        "CREATE TABLE IF NOT EXISTS msi_v2.teacher_recruitment_settings"
+        in upgrade_source
+    )
     assert "'source', 'hh.uz', 'hh.uz'" in upgrade_source
     assert "'rejection_reason', 'other', 'Other'" in upgrade_source
     assert "is_active BOOLEAN NOT NULL DEFAULT true" in upgrade_source
@@ -759,10 +906,23 @@ def test_candidate_trash_bin_migration_is_soft_delete_only():
 
 
 def test_trashed_candidates_are_archived_from_operational_queries():
-    source = Path("backend/modules/hr/recruitment/repository.py").read_text()
+    appointment_source = Path(
+        "backend/modules/hr/recruitment/appointments/repository.py"
+    ).read_text()
+    candidate_source = Path(
+        "backend/modules/hr/recruitment/candidates/read_repository.py"
+    ).read_text()
 
-    assert "else:\n        clauses.append(\"candidate.status <> 'trash_bin'\")" in source
-    assert source.count("WHERE candidate.status <> 'trash_bin' AND ({visibility})") == 2
+    assert (
+        "else:\n        clauses.append(\"candidate.status <> 'trash_bin'\")"
+        in appointment_source
+    )
+    assert (
+        candidate_source.count(
+            "WHERE candidate.status <> 'trash_bin' AND ({visibility})"
+        )
+        == 2
+    )
 
 
 def test_recruitment_document_urls_never_use_public_resource_url():
@@ -776,5 +936,7 @@ def test_recruitment_document_urls_never_use_public_resource_url():
 def test_deleted_legacy_candidate_endpoints_and_lesson_practice_stay_absent(app):
     paths = {getattr(route, "path", "") for route in app.routes}
     assert "/admin/teacher-candidates" not in paths
-    assert not Path("frontend/src/features/teacher-academy/TrainingEvaluationModal.tsx").exists()
+    assert not Path(
+        "frontend/src/features/teacher-academy/TrainingEvaluationModal.tsx"
+    ).exists()
     assert not Path("frontend/src/features/hr/recruitment/PromoteModal.tsx").exists()

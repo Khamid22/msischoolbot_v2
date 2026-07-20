@@ -41,7 +41,7 @@ def test_modern_timetable_opens_on_today_and_fetches_only_the_visible_range():
     source = (ROOT / "frontend/src/features/academics/timetable/ModernGroupTimetable.tsx").read_text(encoding="utf-8")
 
     assert "useState(schoolTodayKey)" in source
-    assert "adminAcademicGroupTimetableApi" in source
+    assert "academicManagementGroupTimetableApi" in source
     assert 'queryKey: ["academic", "timetable", groupId, range.from, range.to]' in source
     assert 'type PrimaryMode = "agenda" | "calendar"' in source
     assert 'type CalendarMode = "week" | "month"' in source

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Calendar, Clock, MapPin, User, ChevronDown, Check, X, AlertCircle, Plus } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { JSON_HEADERS, XHR_HEADERS } from "@/shared/lib/api";
@@ -68,14 +67,12 @@ interface StudentOfficeHoursProps {
   subjects?: SubjectOption[];
   teachers?: TeacherOption[];
   csrfToken?: string;
-  embedMode?: string;
 }
 
 export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
   const currentStudent = props.currentStudent;
   const subjects = Array.isArray(props.subjects) ? props.subjects : [];
   const teachers = Array.isArray(props.teachers) ? props.teachers : [];
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const subjectOptions = subjects.filter((subject) => Number(subject.id) > 0);
   const enrolledSubjectIds = new Set(subjectOptions.map((subject) => Number(subject.id)));
   const enrolledSubjectNames = new Set(subjects.map((subject) => subject.name.trim().toLowerCase()).filter(Boolean));
@@ -527,19 +524,6 @@ export default function StudentOfficeHours(props: StudentOfficeHoursProps) {
       )}
     </div>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Book Office Hour"
-        subtitle={currentStudent?.full_name || "Student"}
-        backUrl={props.backUrl}
-        badge="Office Hours"
-      >
-        {content}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

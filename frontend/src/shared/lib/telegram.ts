@@ -6,7 +6,7 @@
 // active — so scrolling the content down closes the app. This wires up the
 // official fixes (expand + disableVerticalSwipes) and keeps the CSS viewport
 // height in sync. It is a no-op outside a real Telegram client, so the
-// browser-based admin console is unaffected.
+// browser-based role workspaces are unaffected.
 
 interface TelegramInsets {
   top?: number;

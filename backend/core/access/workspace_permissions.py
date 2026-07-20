@@ -4,8 +4,6 @@ from backend.core.access import roles
 
 
 ROLE_FEATURE_PERMISSIONS = {
-    "admin": {"*"},
-    "system_admin": {"*"},
     "ceo": {
         "view_global_reports",
         "view_finance_summary",

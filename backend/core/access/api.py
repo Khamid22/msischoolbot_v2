@@ -22,10 +22,8 @@ class CurrentUser:
     student_db_id: int | None = None
     student_enrollment_id: int | None = None
     parent_id: int | None = None
-    admin_id: int | None = None
     staff_id: int | None = None
     account_id: int | None = None
-    is_owner: bool = False
     must_change_password: bool = False
     session_version: int = 1
 
@@ -45,10 +43,6 @@ def _resolve_session_role(session: dict[str, Any]) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required.",
         )
-
-    if auth_role == roles.ROLE_ADMIN:
-        admin_role = roles.normalize_role(session.get("admin_role", ""))
-        return admin_role if admin_role in roles.ALL_ROLES else roles.ROLE_ADMIN
 
     if auth_role in roles.ALL_ROLES:
         return auth_role
@@ -73,10 +67,8 @@ def get_current_user(request: Request) -> CurrentUser:
         student_db_id=_session_int(session, "student_db_id"),
         student_enrollment_id=_session_int(session, "student_enrollment_id"),
         parent_id=_session_int(session, "parent_id"),
-        admin_id=_session_int(session, "admin_id"),
         staff_id=_session_int(session, "staff_id"),
         account_id=_session_int(session, "account_id"),
-        is_owner=bool(session.get("admin_is_owner")),
         must_change_password=bool(session.get("must_change_password")),
         session_version=_session_int(session, "session_version") or 1,
     )

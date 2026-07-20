@@ -26,7 +26,7 @@ The physical PostgreSQL schema remains `msi_v2`; use the current Alembic head in
 - Google Sheets and Excel are not LMS integrations.
 - Telegram authentication and Mini App parent linking remain active web integrations.
 - `tgbot` has an explicit empty inbound router registry while new bot handlers are not yet implemented.
-- The current tree includes a read-only Teacher workspace; Teacher remains staff data managed by authorized roles. System Admin is internal operations.
+- The current tree includes a read-only Teacher workspace; Teacher remains staff data managed by authorized roles. The former System Admin and Internal Operations surfaces were removed.
 
 ## Supporting Engineering Docs
 

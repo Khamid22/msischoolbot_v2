@@ -233,19 +233,8 @@ def test_active_teacher_account_authenticates_to_teacher_workspace():
     assert result["session"]["auth_login"] == "TCH0001"
 
 
-def test_system_admin_authenticates_with_legacy_admin_compatibility():
-    result = _authenticate("admin")
-
-    assert result is not None
-    assert result["account"]["role"] == "system_admin"
-    assert result["session"]["account_role"] == "system_admin"
-    assert result["session"]["canonical_role"] == "system_admin"
-    assert result["session"]["auth_role"] == "admin"
-    assert result["session"]["staff_role"] == "system_admin"
-    assert result["session"]["staff_id"] == 1
-    assert result["session"]["admin_id"] == 1
-    assert result["session"]["admin_role"] == "owner"
-    assert result["session"]["admin_is_owner"] is True
+def test_removed_system_admin_account_cannot_authenticate():
+    assert _authenticate("admin") is None
 
 
 def test_head_of_department_authenticates_as_staff_role():

@@ -11,12 +11,11 @@ def test_student_domain_modules_import_successfully():
 
     assert not hasattr(student_repository, "get_student_login_row")
     assert callable(student_repository.get_student_enrollment_map_row)
-    assert callable(student_repository.get_student_admin_row)
+    assert callable(student_repository.get_student_dashboard_row_by_id)
     assert callable(student_repository.list_public_dashboard_targets_for_student_row)
     assert callable(student_repository.get_student_ref_by_public_dashboard_id)
     assert callable(student_repository.get_student_ref_by_public_dashboard_id_and_school)
     assert callable(student_repository.list_active_subject_options_for_student)
-    assert callable(student_service.get_admin_student_profile)
     assert callable(student_service.get_dashboard_student_profile)
     assert callable(student_service.get_student_db_id_by_enrollment_id)
     assert callable(student_service.get_student_subject_enrollments)
@@ -46,8 +45,6 @@ def test_student_domain_imports_are_used_where_safe():
     student_page_source = Path("backend/workspaces/student/page.py").read_text()
     student_routes_source = Path("backend/workspaces/student/forms.py").read_text()
     auth_routes_source = Path("backend/modules/identity/api.py").read_text()
-    admin_student_routes_source = Path("backend/internal_operations/people/students/form_routes.py").read_text()
-    admin_page_service_source = Path("backend/internal_operations/pages/context.py").read_text()
     parent_service_source = Path("backend/modules/people/parents/service.py").read_text()
     office_hours_source = Path("backend/workspaces/student/office_hours.py").read_text()
 
@@ -55,8 +52,7 @@ def test_student_domain_imports_are_used_where_safe():
     assert "from backend.modules.people.students.service import (" in student_page_source
     assert "change_student_password" not in student_routes_source
     assert "from backend.modules.identity.service import change_own_password" in auth_routes_source
-    assert "from backend.modules.people.students.service import (" in admin_student_routes_source
-    assert "from backend.modules.people.students.service import get_admin_student_profile, list_students_for_admin" in admin_page_service_source
+    assert not Path("backend/internal_operations").exists()
     assert "from backend.modules.people.students.service import resolve_public_dashboard_for_student_row" in parent_service_source
     assert "from backend.modules.people.students.service import list_enrolled_subject_options" in office_hours_source
     assert "from backend.modules.people.teachers.service import list_teachers" in office_hours_source
@@ -70,14 +66,10 @@ def test_student_query_sql_is_owned_by_the_domain():
 
 
 def test_student_public_dashboard_resolution_uses_student_domain():
-    route_service_source = Path("backend/internal_operations/people/students/form_routes.py").read_text()
     parent_service_source = Path("backend/modules/people/parents/service.py").read_text()
     academic_dashboard_source = Path("backend/modules/reporting/academic_dashboard.py").read_text()
     office_hours_source = Path("backend/workspaces/student/office_hours.py").read_text()
 
-    assert "resolve_student_for_internal_operations" in route_service_source
-    assert "list_public_dashboard_targets_for_student_row" not in route_service_source
-    assert "legacy_public_dashboard_id" not in route_service_source
     assert "resolve_public_dashboard_for_student_row(student_row_id)" in parent_service_source
     assert "canonical PostgreSQL academic tables" in academic_dashboard_source
     assert "legacy_public_dashboard_id" not in office_hours_source

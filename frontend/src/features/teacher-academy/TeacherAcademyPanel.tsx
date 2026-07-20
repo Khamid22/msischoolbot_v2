@@ -247,11 +247,11 @@ function assignmentById(assignments: AcademyAssignment[], assignmentId: number) 
 }
 
 function subjectOptionsFromState(state: any) {
-  const subjects = Array.isArray(state.props?.adminAcademicSubjects)
-    ? state.props.adminAcademicSubjects as Array<Record<string, unknown>>
+  const subjects = Array.isArray(state.props?.academicManagementSubjects)
+    ? state.props.academicManagementSubjects as Array<Record<string, unknown>>
     : [];
-  const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
-    ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+  const programs = Array.isArray(state.props?.academicManagementCurriculumPrograms)
+    ? state.props.academicManagementCurriculumPrograms as Array<Record<string, unknown>>
     : [];
   const byId = new Map<number, string>();
   subjects.forEach((subject) => {
@@ -273,9 +273,9 @@ function metric(label: string, value: string | number, detail: string) {
   return <MetricCard label={label} value={value} detail={detail} density="compact" className="bg-background" />;
 }
 
-function teacherAcademyActionRoutes(adminMode: string, authRole: string): TeacherAcademyActionRoutes {
-  const roleMode = authRole || adminMode;
-  if (roleMode === "academic_director" || adminMode === "academic_director") {
+function teacherAcademyActionRoutes(managementMode: string, authRole: string): TeacherAcademyActionRoutes {
+  const roleMode = authRole || managementMode;
+  if (roleMode === "academic_director" || managementMode === "academic_director") {
     return {
       create: routes.academicDirectorTeacherAcademyCreate,
       assignmentUpdate: routes.academicDirectorTeacherAcademyAssignmentUpdate,
@@ -286,7 +286,7 @@ function teacherAcademyActionRoutes(adminMode: string, authRole: string): Teache
       promote: routes.academicDirectorTeacherAcademyPromote,
     };
   }
-  if (roleMode === "head_of_department" || adminMode === "head_of_department") {
+  if (roleMode === "head_of_department" || managementMode === "head_of_department") {
     return {
       create: "",
       assignmentUpdate: routes.headOfDepartmentTeacherAcademyAssignmentUpdate,
@@ -386,11 +386,11 @@ function NewAcademyTeacherModal({
     academy_department_head_id: "",
     academy_notes: "",
   };
-  const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
-    ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+  const programs = Array.isArray(state.props?.academicManagementCurriculumPrograms)
+    ? state.props.academicManagementCurriculumPrograms as Array<Record<string, unknown>>
     : [];
-  const curriculumItems = Array.isArray(state.props?.adminAcademicCurriculumItems)
-    ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+  const curriculumItems = Array.isArray(state.props?.academicManagementCurriculumItems)
+    ? state.props.academicManagementCurriculumItems as Array<Record<string, unknown>>
     : [];
   const teachers = Array.isArray(state.teachers) ? state.teachers as Array<Record<string, unknown>> : [];
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
@@ -1441,8 +1441,8 @@ function AcademyDetailModal({
   } | null>(null);
 
   const curriculumLessons = useMemo(() => {
-    const items = Array.isArray(state.props?.adminAcademicCurriculumItems)
-      ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+    const items = Array.isArray(state.props?.academicManagementCurriculumItems)
+      ? state.props.academicManagementCurriculumItems as Array<Record<string, unknown>>
       : [];
     const programId = asNumber(teacher.subject_program_id);
     return items
@@ -1452,7 +1452,7 @@ function AcademyDetailModal({
         return itemProgramId === programId && itemType === "lesson";
       })
       .sort((left, right) => asNumber(left.item_order || left.itemOrder) - asNumber(right.item_order || right.itemOrder));
-  }, [state.props?.adminAcademicCurriculumItems, teacher.subject_program_id]);
+  }, [state.props?.academicManagementCurriculumItems, teacher.subject_program_id]);
 
   const latestAssessmentByAssignment = useMemo(() => {
     const map = new Map<number, Record<string, unknown>>();
@@ -2301,23 +2301,20 @@ export function TeacherAcademyPanel({
     }
   }
 
-  const adminMode = asString(state.adminMode || state.props?.adminMode).toLowerCase();
+  const managementMode = asString(state.managementMode || state.props?.managementMode).toLowerCase();
   const authRole = asString(state.props?.authRole).toLowerCase();
-  const academyApi = useMemo(() => teacherAcademyActionRoutes(adminMode, authRole), [adminMode, authRole]);
-  const canCreateHeadOfDepartment = adminMode === "academic_director" || authRole === "academic_director";
-  const canCreateAcademyTeacher = Boolean(academyApi.create) && adminMode !== "head_of_department" && authRole !== "head_of_department";
+  const academyApi = useMemo(() => teacherAcademyActionRoutes(managementMode, authRole), [managementMode, authRole]);
+  const canCreateHeadOfDepartment = managementMode === "academic_director" || authRole === "academic_director";
+  const canCreateAcademyTeacher = Boolean(academyApi.create) && managementMode !== "head_of_department" && authRole !== "head_of_department";
   const canScheduleAcademyLesson = Boolean(academyApi.assignmentUpdate(0));
   const canAssessAcademyLesson = Boolean(academyApi.assessmentCreate(0));
   const canEditAcademyLessons = Boolean(academyApi.lessonsSync(0));
   const canDeleteAssessmentReport = Boolean(academyApi.assessmentDelete(0, 0));
-  const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
-  const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
-  const isAcademicDirectorMode = adminMode === "academic_director" || authRole === "academic_director";
-  const isHeadOfDepartmentMode = adminMode === "head_of_department" || authRole === "head_of_department";
-  const canOnboardRecruitmentTeacher = isAcademicDirectorMode
-    || isHeadOfDepartmentMode
-    || adminMode === "admin"
-    || authRole === "admin";
+  const canPromoteAcademyTeacher = Boolean(academyApi.promote) && managementMode !== "head_of_department" && authRole !== "head_of_department";
+  const canDeleteAcademyTeacher = Boolean(academyApi.delete) && managementMode !== "head_of_department" && authRole !== "head_of_department";
+  const isAcademicDirectorMode = managementMode === "academic_director" || authRole === "academic_director";
+  const isHeadOfDepartmentMode = managementMode === "head_of_department" || authRole === "head_of_department";
+  const canOnboardRecruitmentTeacher = isAcademicDirectorMode || isHeadOfDepartmentMode;
 
   // Highest performers first: rank by weighted average score, teachers without a
   // score last, then a stable name tiebreak.
@@ -2335,15 +2332,15 @@ export function TeacherAcademyPanel({
   const activeTeachers = useMemo(() => {
     const rows = Array.isArray(state.teachers)
       ? state.teachers as Array<Record<string, unknown>>
-      : Array.isArray(state.props?.adminTeachers)
-        ? state.props.adminTeachers as Array<Record<string, unknown>>
+      : Array.isArray(state.props?.managementTeachers)
+        ? state.props.managementTeachers as Array<Record<string, unknown>>
         : [];
     return rows.filter((teacher) => {
       const employmentType = asString(teacher.employment_type || teacher.teacher_employment_type).toLowerCase();
       const status = asString(teacher.status || teacher.teacher_status || "active").toLowerCase();
       return employmentType !== "academy" && !["inactive", "deleted", "archived"].includes(status);
     });
-  }, [state.props?.adminTeachers, state.teachers]);
+  }, [state.props?.managementTeachers, state.teachers]);
   const academyRosterRefreshToken = useMemo(
     () => academyTeachers
       .map((teacher) => [
@@ -2596,13 +2593,13 @@ export function TeacherAcademyPanel({
         <AssignCurriculumModal
           teacher={curriculumTarget}
           programs={
-            Array.isArray(state.props?.adminAcademicCurriculumPrograms)
-              ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+            Array.isArray(state.props?.academicManagementCurriculumPrograms)
+              ? state.props.academicManagementCurriculumPrograms as Array<Record<string, unknown>>
               : []
           }
           curriculumItems={
-            Array.isArray(state.props?.adminAcademicCurriculumItems)
-              ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+            Array.isArray(state.props?.academicManagementCurriculumItems)
+              ? state.props.academicManagementCurriculumItems as Array<Record<string, unknown>>
               : []
           }
           submitting={submitting}

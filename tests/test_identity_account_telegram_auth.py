@@ -277,18 +277,8 @@ def test_active_teacher_telegram_link_authenticates_to_teacher_workspace():
     assert result["session"]["teacher_id"] == 10
 
 
-def test_system_admin_telegram_link_authenticates_with_admin_compatibility():
-    result = _authenticate(9004)
-
-    assert result is not None
-    assert result["account"]["role"] == "system_admin"
-    assert result["session"]["account_role"] == "system_admin"
-    assert result["session"]["canonical_role"] == "system_admin"
-    assert result["session"]["auth_role"] == "admin"
-    assert result["session"]["staff_role"] == "system_admin"
-    assert result["session"]["admin_id"] == 1
-    assert result["session"]["admin_role"] == "owner"
-    assert result["session"]["telegram_user_id"] == 9004
+def test_removed_system_admin_telegram_link_cannot_authenticate():
+    assert _authenticate(9004) is None
 
 
 def test_revoked_link_rejected():

@@ -297,7 +297,6 @@ def test_academic_director_can_create_hod_account_route(client, monkeypatch):
             },
         ),
     )
-    monkeypatch.setattr(academic_director_api, "invalidate_admin_page_context_cache", lambda: None)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
 
     response = client.post(
@@ -352,7 +351,6 @@ def test_academic_director_can_reset_hod_password_and_receives_it_once(client, m
         )
 
     monkeypatch.setattr(academic_director_api, "reset_head_of_department_password", fake_reset)
-    monkeypatch.setattr(academic_director_api, "invalidate_admin_page_context_cache", lambda: None)
     _set_session(
         client,
         {"auth_role": "academic_director", "auth_login": "AD0001", "account_id": 12},
@@ -456,7 +454,7 @@ def test_head_of_department_can_access_subject_scoped_academy_page(client, monke
     assert 'data-react-page="head-of-departments-academy"' in response.text
     assert 'data-react-page="internal-operations-home"' not in response.text
     assert "head_of_department" in response.text
-    assert "adminTeacherAcademy" in response.text
+    assert "managementAcademyTeachers" in response.text
     assert "Math Teacher" in response.text
     assert "Training tab" not in response.text
 
@@ -495,7 +493,6 @@ def test_academy_assessment_route_accepts_lesson_assignment_id(client, monkeypat
         return True, ""
 
     monkeypatch.setattr(academy_api, "add_assessment", fake_add_assessment)
-    monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [])
     monkeypatch.setattr(academy_api, "list_teachers", lambda: [])
     monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: rows)

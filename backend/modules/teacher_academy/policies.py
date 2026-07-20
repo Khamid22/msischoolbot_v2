@@ -119,7 +119,7 @@ def can_context_manage_academy_teacher(
     account_id: Any = 0,
     staff_id: Any = 0,
 ) -> bool:
-    if role in {"admin", "academic_director"}:
+    if role == "academic_director":
         return True
     if role != "head_of_department":
         return False
@@ -149,7 +149,7 @@ def can_context_manage_academy_assignment(
     account_id: Any = 0,
     staff_id: Any = 0,
 ) -> bool:
-    if role in {"admin", "academic_director"}:
+    if role == "academic_director":
         return True
     if role != "head_of_department":
         return False
@@ -172,56 +172,6 @@ def can_user_manage_academy_assignment(user: CurrentUser, assignment_id: Any) ->
     )
 
 
-def filter_admin_context_for_hod_scope(
-    page_context: dict[str, Any],
-    academic_context: dict[str, Any],
-    *,
-    role: str,
-    account_id: Any = 0,
-    staff_id: Any = 0,
-) -> None:
-    """Mutate admin/academic context to an explicit HOD subject scope."""
-
-    if str(role or "").strip() != "head_of_department":
-        return
-    subject_ids = hod_subject_ids_for_context(role=role, account_id=account_id, staff_id=staff_id)
-    page_context["admin_teacher_academy"] = filter_rows_by_subject_scope(
-        page_context.get("admin_teacher_academy") or [],
-        subject_ids,
-    )
-
-    if not subject_ids:
-        page_context["admin_teachers"] = []
-        for key in ("subjects", "groups", "lessons", "schedules", "sessions", "curriculum_programs", "curriculum_items"):
-            if isinstance(academic_context.get(key), list):
-                academic_context[key] = []
-        return
-
-    subject_name_scope = {
-        str(row.get("subject") or row.get("subject_name") or "").strip().casefold()
-        for row in page_context["admin_teacher_academy"]
-        if str(row.get("subject") or row.get("subject_name") or "").strip()
-    }
-    if subject_name_scope:
-        page_context["admin_teachers"] = [
-            row for row in page_context.get("admin_teachers") or []
-            if str(row.get("subject") or row.get("subject_name") or "").strip().casefold() in subject_name_scope
-        ]
-
-    for key in ("subjects", "groups", "lessons", "schedules", "sessions", "curriculum_programs", "curriculum_items"):
-        values = academic_context.get(key)
-        if not isinstance(values, list):
-            continue
-        filtered = []
-        for row in values:
-            subject_id = _to_int(row.get("subject_id") or row.get("subjectId"))
-            if subject_id and subject_id in subject_ids:
-                filtered.append(row)
-            elif not subject_id and str(row.get("subject_name") or row.get("subject") or "").strip().casefold() in subject_name_scope:
-                filtered.append(row)
-        academic_context[key] = filtered
-
-
 __all__ = [
     "can_context_manage_academy_assignment",
     "can_context_manage_academy_teacher",
@@ -229,7 +179,6 @@ __all__ = [
     "can_user_manage_academy_teacher",
     "filter_academy_teachers_for_context",
     "filter_academy_teachers_for_user",
-    "filter_admin_context_for_hod_scope",
     "filter_rows_by_subject_scope",
     "hod_subject_ids_for_context",
     "hod_subject_ids_for_user",

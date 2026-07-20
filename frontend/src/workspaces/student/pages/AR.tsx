@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Calendar } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { formatLessonDateDisplay } from "@/shared/lib/lesson-date";
@@ -19,7 +18,6 @@ interface ArPageProps {
   studentFullName?: string;
   subjectName?: string;
   lessonRows?: LessonRow[];
-  embedMode?: string;
 }
 
 function formatLessonNumber(value: string) {
@@ -63,7 +61,6 @@ function normalizeAttendanceType(value: string | undefined) {
 
 export default function ARPage(props: ArPageProps) {
   const lessonRows = Array.isArray(props.lessonRows) ? props.lessonRows : [];
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const isChemistrySubject = String(props.subjectName || "").trim().toLowerCase() === "chemistry";
   const hasTypedRows = lessonRows.some(
     (row) => normalizeAttendanceType(row.attendance_type) !== "",
@@ -204,19 +201,6 @@ export default function ARPage(props: ArPageProps) {
       )}
     </ChartCard>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Attendance Record"
-        subtitle={subtitle}
-        backUrl={props.backUrl}
-        badge="AR"
-      >
-        {content}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

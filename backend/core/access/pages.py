@@ -85,10 +85,8 @@ def require_auth(request: Request) -> str:
     return role
 
 
-def require_role(*roles, allow_admin: bool = False):
+def require_role(*roles):
     allowed_roles = {normalize_role(role) for role in roles if normalize_role(role)}
-    if allow_admin:
-        allowed_roles.add("admin")
 
     def _dependency(request: Request):
         role = require_auth(request)

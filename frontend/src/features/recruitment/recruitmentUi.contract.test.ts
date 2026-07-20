@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test, { describe } from "node:test";
 
 import {
@@ -20,14 +20,15 @@ function projectSource(relativePath: string) {
 describe("compact recruitment pipeline", () => {
   const pipeline = source("PipelineView.tsx");
 
-  test("makes the whole card draggable without dotted handle or menu controls", () => {
+  test("makes the whole card draggable without dotted handle or move menu", () => {
     assert.match(pipeline, /<article[\s\S]*draggable=\{canMove\}/);
     assert.match(pipeline, /draggedCandidateRef/);
     assert.doesNotMatch(pipeline, /GripVertical/);
-    assert.doesNotMatch(pipeline, /<ActionMenu/);
     assert.doesNotMatch(pipeline, /MoveCandidateDialog/);
     assert.doesNotMatch(pipeline, /The dragged candidate could not be read/);
     assert.doesNotMatch(pipeline, /Move candidate\s*<select/);
+    // The only card menu is the appointment 3-dot (reschedule/cancel).
+    assert.match(pipeline, /label="Appointment actions"/);
   });
 
   test("uses a single-stage compact view and five screen-fitted desktop columns", () => {
@@ -185,7 +186,7 @@ describe("candidate navigation and progressive disclosure", () => {
     for (const tab of ["overview", "evaluations", "documents", "hiring"]) {
       assert.match(profile, new RegExp(`key: "${tab}"`));
     }
-    assert.match(profile, /const hrProfileTabs = profileTabs\.filter\(\(item\) => item\.key !== "activity"\)/);
+    assert.match(profile, /const hrProfileTabs = profileTabs\.filter\(\(item\) => item\.key !== "activity" && item\.key !== "hiring"\)/);
     assert.match(profile, /key: "training"/);
     assert.match(profile, /detail\.data\?\.academy[\s\S]*\[\.\.\.hrProfileTabs, trainingProfileTab\]/);
     assert.match(profile, /tab === "training" && role === "hr_manager" && candidate\.academy/);
@@ -585,10 +586,12 @@ describe("Academy training data matching", () => {
   });
 });
 
-test("Admin workspace no longer exposes Recruitment navigation or routes", () => {
-  const adminWorkspace = projectSource("internal_operations/pages/InternalOperations.tsx");
+test("removed Internal Operations workspace exposes no Recruitment routes", () => {
   const routes = projectSource("shared/lib/routes.ts");
-  assert.doesNotMatch(adminWorkspace, /label: "Teacher Recruitment"/);
+  assert.equal(
+    existsSync(new URL("../../internal_operations", import.meta.url)),
+    false,
+  );
   assert.doesNotMatch(routes, /adminRecruitment/);
 });
 

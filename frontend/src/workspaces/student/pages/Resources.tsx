@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, ExternalLink, FileText, Link, Loader2, MessageSquare, Play, Send, X, ChevronRight } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
@@ -24,7 +23,6 @@ interface ResourcesPageProps {
   subjectName?: string;
   currentStudent?: { fullName?: string; group?: string };
   groupedResources?: ResourceGroup[];
-  embedMode?: string;
 }
 
 interface ResourceModalState {
@@ -326,7 +324,6 @@ export default function ResourcesPage(props: ResourcesPageProps) {
     activeFilter === "all"
       ? groupedResources
       : groupedResources.filter((_g, i) => activeFilter === `group-${i + 1}`);
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const subtitle = `${props.subjectName || "Resources"} · ${totalCount} item${totalCount === 1 ? "" : "s"}`;
 
   const pageContent = (
@@ -450,19 +447,6 @@ export default function ResourcesPage(props: ResourcesPageProps) {
       ) : null}
     </>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Subject Resources"
-        subtitle={subtitle}
-        backUrl={props.backUrl}
-        badge={props.currentStudent?.group || "Resources"}
-      >
-        {pageContent}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

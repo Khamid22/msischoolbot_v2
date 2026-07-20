@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from backend.internal_operations.academics import gradebook_routes as admin_academics_api
 from backend.modules.academics.gradebook import trends as operations
 from backend.workspaces.academic_director import academics_api as director_academics_api
 
@@ -134,8 +133,8 @@ def test_trend_query_returns_none_for_a_missing_group(monkeypatch):
     assert operations.get_group_gradebook_trends(99, through="2026-04") is None
 
 
-@pytest.mark.parametrize("api_module", [admin_academics_api, director_academics_api])
-def test_both_role_handlers_return_success_and_meaningful_errors(monkeypatch, api_module):
+def test_academic_director_handler_returns_success_and_meaningful_errors(monkeypatch):
+    api_module = director_academics_api
     payload = {"range": {"from": "2025-11", "through": "2026-04", "months": 6}, "items": []}
     monkeypatch.setattr(api_module, "get_group_gradebook_trends", lambda *args, **kwargs: payload)
     response = api_module.gradebook_trends(12, "2026-04", 6)
@@ -156,7 +155,7 @@ def test_both_role_handlers_return_success_and_meaningful_errors(monkeypatch, ap
     assert "YYYY-MM" in bad_request.value.detail
 
 
-def test_trend_aggregation_is_read_only_and_both_roles_expose_it():
+def test_trend_aggregation_is_read_only_and_academic_director_exposes_it():
     trend_source = (ROOT / "backend/modules/academics/gradebook/trends.py").read_text(
         encoding="utf-8"
     )
@@ -165,13 +164,11 @@ def test_trend_aggregation_is_read_only_and_both_roles_expose_it():
     assert "DELETE " not in trend_source
     assert "conn.commit()" not in trend_source
 
-    for path in (
-        "backend/internal_operations/academics/gradebook_routes.py",
-        "backend/workspaces/academic_director/academics_api.py",
-    ):
-        route_source = (ROOT / path).read_text(encoding="utf-8")
-        assert '"/groups/{group_id}/gradebook-trends"' in route_source
-        assert "get_group_gradebook_trends" in route_source
+    route_source = (
+        ROOT / "backend/workspaces/academic_director/academics_api.py"
+    ).read_text(encoding="utf-8")
+    assert '"/groups/{group_id}/gradebook-trends"' in route_source
+    assert "get_group_gradebook_trends" in route_source
 
 
 def test_frontend_trends_are_lazy_accessible_and_mutation_aware():

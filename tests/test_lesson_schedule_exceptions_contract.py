@@ -30,13 +30,11 @@ def test_cancel_and_recover_reflow_existing_curriculum_session_ids():
     assert '"can_recover": True' in read_service
 
 
-def test_both_management_roles_expose_cancel_and_recover_routes():
-    admin = source("backend/internal_operations/academics/timetable_routes.py")
+def test_academic_director_exposes_cancel_and_recover_routes():
     director = source("backend/workspaces/academic_director/academics_api.py")
 
-    for route_source in (admin, director):
-        assert '"/lessons/{lesson_session_id}/cancel"' in route_source
-        assert '"/lessons/{lesson_session_id}/recover"' in route_source
+    assert '"/lessons/{lesson_session_id}/cancel"' in director
+    assert '"/lessons/{lesson_session_id}/recover"' in director
 
 
 def test_timetable_actions_and_validation_are_visible_in_the_ui():
@@ -64,14 +62,12 @@ def test_range_payload_keeps_exceptions_separate_and_marks_recorded_lessons():
 def test_reflow_mutations_lock_rows_and_return_deltas_not_gradebook():
     repository = source("backend/modules/academics/timetable/repository.py")
     operations = source("backend/modules/academics/timetable/operations.py")
-    admin = source("backend/internal_operations/academics/timetable_routes.py")
     director = source("backend/workspaces/academic_director/academics_api.py")
 
     assert "def lock_group_timetable_for_reflow(" in repository
     assert "ORDER BY id FOR UPDATE" in repository
     assert "allow_recorded_lesson_changes" in operations
     assert '"affectedIds": affected_ids' in operations
-    for route_source in (admin, director):
-        cancel_block = route_source.split("def cancel_lesson", 1)[1].split("@router.post", 1)[0]
-        assert "get_group_gradebook" not in cancel_block
-        assert "AcademicConflictError" in cancel_block
+    cancel_block = director.split("def cancel_lesson", 1)[1].split("@router.post", 1)[0]
+    assert "get_group_gradebook" not in cancel_block
+    assert "AcademicConflictError" in cancel_block

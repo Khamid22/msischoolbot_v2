@@ -27,10 +27,6 @@ Audience: engineers locating the owner of a change.
 | complaints | `modules/support` | `features/support` |
 | announcements/chat | `modules/communications` | `features/communications` |
 | dashboards/read models | `modules/reporting` | `features/reporting` |
-| System Admin page composition | `internal_operations/pages` | `internal_operations` |
-| System Admin academic transport | `internal_operations/academics` | `internal_operations` |
-| System Admin people/staffing transport | `internal_operations/people`, `internal_operations/staffing` | `internal_operations` |
-| System Admin finance/support/resources transport | corresponding `internal_operations` package | `internal_operations` |
 | shared API/web/runtime infrastructure | `core/api`, `core/web`, `core/runtime` | n/a |
 | storage, Redis, Telegram adapter | `platform` | n/a |
 
@@ -61,6 +57,24 @@ Audience: engineers locating the owner of a change.
 
 When one physical table serves closely related academic concerns, the write contract is owned by the row's domain service; other domains consume a public read contract.
 
+## Recruitment Internal Map
+
+`modules/hr/recruitment/service.py` and `repository.py` are compatibility facades that preserve existing imports and API behavior. New Recruitment work belongs in the focused owner:
+
+| Capability | Service owner | Persistence owner |
+| --- | --- | --- |
+| candidate lifecycle and profiles | `candidates/service.py`, `candidates/read_service.py` | `candidates/repository.py`, `candidates/read_repository.py` |
+| appointments and interview sessions | `appointments/service.py` | `appointments/repository.py` |
+| interview, test, and demo evaluations | `evaluations/service.py` | `evaluations/repository.py` |
+| approvals and final decisions | `decisions/service.py` | `decisions/repository.py` |
+| candidate documents | `documents/service.py` | `documents/repository.py` |
+| Academy and active-teacher handoffs | `handoffs/service.py` | `handoffs/intake_repository.py`, `handoffs/lifecycle_repository.py` |
+| tasks and assignments | compatibility service facade | `tasks/repository.py` |
+| settings and options | compatibility service facade | `settings_repository.py` |
+| notification delivery | `notifications.py`, `worker.py` | `notification_repository.py` |
+
+The web process never starts notification polling. Deploy `python main.py worker` as one independently managed process.
+
 ## Explicit Size Exceptions
 
 These existing stateful orchestrators remain above the target threshold after extracting their models, calculations, dialogs, or child views. They are documented compatibility exceptions and must not grow without first extracting another focused unit:
@@ -72,16 +86,10 @@ These existing stateful orchestrators remain above the target threshold after ex
 - `features/academics/timetable/ModernGroupTimetable.tsx`
 - `features/teacher-academy/TeacherAcademyPanel.tsx`
 - `features/recruitment/CandidateProfile.tsx` — retained recruitment profile orchestrator; its tab panels and form drawers should be extracted before adding another profile subdomain.
-- `features/finance/PaymentsPanel.tsx`
-- `features/reporting/overview/RoleOverviewPanel.tsx`
-- `features/reporting/overview/SchoolOverviewPanel.tsx`
-- `features/academics/office-hours/OfficeHoursPanel.tsx`
-- `features/people/students/StudentsPanel.tsx`
-- `features/communications/AnnouncementsPanel.tsx`
-- internal-operation and workspace orchestrators (transport composition, not domain features)
-- `modules/reporting/insights.py`, `modules/people/students/dashboard.py`, and `platform/storage/r2.py`
-- `modules/hr/recruitment/service.py` — cohesive transaction/orchestration boundary for the MVP; persistence remains extracted to its repository and the next expansion should split documents and decisions into focused services.
-- `modules/hr/recruitment/repository.py` — one SQL ownership boundary for the normalized recruitment aggregate; split read projections from mutation persistence before adding another recruitment subdomain.
+- workspace orchestrators (transport composition, not domain features)
+- `modules/people/students/dashboard.py` and `platform/storage/r2.py`
+- `modules/hr/recruitment/service.py` — compatibility facade for stable imports and monkeypatch contracts plus the remaining task/settings/scheduling orchestration; new candidate, appointment, evaluation, decision, document, or handoff logic must go to its focused service.
+- `modules/hr/recruitment/api.py` — stable public route surface for the existing Recruitment API; extract route groups before adding another Recruitment capability.
 
 No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 
@@ -93,6 +101,7 @@ Do not import or recreate:
 - academic catch-alls: `academics/operations.py`, `academics/service.py`, `academics/repository.py`;
 - `backend/integrations` (use `backend/platform`);
 - `frontend/src/features/management` and `frontend/src/features/accounts`;
+- the former `backend/internal_operations` and `frontend/src/internal_operations` trees;
 - generic backend `api`, `pages`, `services`, `repositories`, or `schemas` trees.
 
 Future observations, interventions, payroll, and expanded finance capabilities remain documentation-only until implemented.

@@ -91,7 +91,7 @@ def test_light_academic_context_omits_group_collection(monkeypatch):
         lambda _conn: {},
     )
 
-    context = service.list_academic_admin_rows(
+    context = service.list_academic_management_rows(
         include_heavy=False, include_groups=False
     )
 
@@ -199,12 +199,6 @@ def test_permanent_group_purge_requires_archival_and_exact_confirmation(monkeypa
 
 def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
     paths = [
-        Path("backend/internal_operations/academics/routes.py"),
-        Path("backend/internal_operations/academics/group_routes.py"),
-        Path("backend/internal_operations/academics/timetable_routes.py"),
-        Path("backend/internal_operations/academics/gradebook_routes.py"),
-        Path("backend/internal_operations/academics/curriculum_routes.py"),
-        Path("backend/internal_operations/academics/class_routes.py"),
         Path("backend/workspaces/academic_director/academics_api.py"),
         Path("backend/modules/academics/groups/read_service.py"),
     ]
@@ -215,9 +209,8 @@ def test_workspace_adapters_do_not_own_academic_sql_or_internal_schemas():
         assert "backend.internal_operations.schemas" not in source
 
 
-def test_granular_routes_exist_for_both_management_roles(app):
-    del app  # Route prefixes are registered separately; assert the shared adapters here.
-    from backend.internal_operations.academics.routes import router as admin_router
+def test_granular_routes_exist_for_academic_director(app):
+    del app
     from backend.workspaces.academic_director.academics_api import router as director_router
 
     def collect_paths(router, prefix=""):
@@ -233,10 +226,9 @@ def test_granular_routes_exist_for_both_management_roles(app):
                 paths.setdefault(prefix + route.path, set()).update(route.methods or [])
         return paths
 
-    for router in (admin_router, director_router):
-        paths = collect_paths(router)
-        assert "GET" in paths["/academic/groups"]
-        assert "GET" in paths["/academic/groups/{group_id}/summary"]
-        assert "GET" in paths["/academic/groups/{group_id}/timetable"]
-        assert "GET" in paths["/academic/timetable"]
-        assert "GET" in paths["/academic/programs"]
+    paths = collect_paths(director_router)
+    assert "GET" in paths["/academic/groups"]
+    assert "GET" in paths["/academic/groups/{group_id}/summary"]
+    assert "GET" in paths["/academic/groups/{group_id}/timetable"]
+    assert "GET" in paths["/academic/timetable"]
+    assert "GET" in paths["/academic/programs"]

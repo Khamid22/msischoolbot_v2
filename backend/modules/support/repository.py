@@ -1,13 +1,3 @@
-"""Support ticket queries against the Alembic-managed ``msi_v2`` schema.
-
-The public Python function names still say "complaint" because admin routes and
-frontend payloads use that word. The storage model is now:
-
-- msi_v2.support_tickets: ticket metadata
-- msi_v2.ticket_messages: parent/staff conversation thread
-"""
-
-
 def _ticket_row_select():
     return """
         SELECT
@@ -48,7 +38,7 @@ def _ticket_row_select():
             SELECT body
             FROM msi_v2.ticket_messages msg
             WHERE msg.ticket_id = t.id
-              AND msg.author_type IN ('owner', 'admin', 'staff', 'customer_support', 'ceo', 'system')
+              AND msg.author_type <> 'parent'
             ORDER BY msg.created_at DESC, msg.id DESC
             LIMIT 1
         ) latest_staff ON true
@@ -195,7 +185,14 @@ def _author_type(author_role):
     role = str(author_role or "system").strip().casefold()
     if role == "parent":
         return "parent"
-    if role in {"owner", "admin", "staff", "ceo", "customer_support", "academic_director", "teacher"}:
+    if role in {
+        "ceo",
+        "customer_support",
+        "academic_director",
+        "head_of_department",
+        "hr_manager",
+        "teacher",
+    }:
         return role
     return "system"
 

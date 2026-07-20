@@ -16,7 +16,6 @@ from backend.core.web.rendering import render_react_page
 from backend.modules.people.parents.service import (
     claim_parent_invite_code,
     list_parent_client_children,
-    list_parent_children,
     load_parent_invite_code_payload,
     parent_can_access_student,
     resolve_parent_child_dashboard,
@@ -521,17 +520,13 @@ def build_render_parent_page():
     def render_parent_page():
         try:
             parent_id = int(session.get("parent_id", 0) or 0)
-            admin_id = int(session.get("admin_id", 0) or 0)
         except (TypeError, ValueError):
             parent_id = 0
-            admin_id = 0
 
         children = []
         children_for_cards = None
         try:
             children = list_parent_client_children(parent_id) if parent_id else []
-            if not children and admin_id:
-                children = list_parent_children(admin_id)
             children_for_cards = children
         except Exception:
             children = []
@@ -563,7 +558,7 @@ def build_render_parent_page():
                 "parentChildren": children,
                 "workspaceCards": workspace_cards,
                 "resourcesList": resources,
-                "adminAnnouncements": announcements,
+                "workspaceAnnouncements": announcements,
                 "currentSchool": "all",
                 "csrfToken": generate_csrf(),
                 "logoutUrl": "/logout",

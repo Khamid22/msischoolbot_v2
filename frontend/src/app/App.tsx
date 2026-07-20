@@ -12,7 +12,6 @@ const pageMap = {
   "student-rating": lazy(() => import("@/workspaces/student/pages/Rating")),
   "student-aap": lazy(() => import("@/workspaces/student/pages/AAP")),
   "student-ar": lazy(() => import("@/workspaces/student/pages/AR")),
-  "internal-operations-home": lazy(() => import("@/internal_operations/pages/InternalOperations")),
   "parent-home": lazy(() => import("@/workspaces/parent/pages/ParentHome")),
   "ceo-home": lazy(() => import("@/workspaces/ceo/pages/Home")),
   "customer-support-home": lazy(() => import("@/workspaces/customer_support/pages/Home")),
@@ -31,7 +30,6 @@ const pageMap = {
   "teacher-home": lazy(() => import("@/workspaces/teacher/pages/Home")),
   "account-security": lazy(() => import("@/features/identity/pages/AccountSecurity")),
   unauthorized: lazy(() => import("@/features/identity/pages/Unauthorized")),
-  "internal-edit-student": lazy(() => import("@/features/people/students/EditStudentProfile")),
   "student-chat": lazy(() => import("@/workspaces/student/pages/Chat")),
   "student-office-hours": lazy(() => import("@/workspaces/student/pages/OfficeHours")),
   "student-not-found": lazy(() => import("@/workspaces/student/pages/StudentNotFound")),
@@ -83,10 +81,6 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
       return;
     }
 
-    if (String(props.embedMode || "").trim().toLowerCase() === "admin") {
-      return;
-    }
-
     const pingActivity = () => {
       void fetch("/api/v1/student/activity/ping", {
         method: "GET",
@@ -108,7 +102,7 @@ function useStudentActivityHeartbeat(page: string, props: Record<string, unknown
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [page, props.embedMode]);
+  }, [page]);
 }
 
 const App = () => {
@@ -118,8 +112,8 @@ const App = () => {
     initTelegramViewport();
     // Send the parent to the invite-link page ONCE per launch. Telegram keeps
     // initDataUnsafe.start_param for the whole mini-app session, so without this
-    // guard every reload — including after a parent logs out to sign in as an
-    // admin — would re-trigger registration and trap them back in parent mode.
+    // guard every reload — including after a parent logs out to sign in as
+    // another account — would re-trigger registration and trap them back in parent mode.
     const startParam = getTelegramStartParam();
     if (startParam.startsWith("parent_")) {
       const handledKey = `msi_parent_link_handled:${startParam}`;

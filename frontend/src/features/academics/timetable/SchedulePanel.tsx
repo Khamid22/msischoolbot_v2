@@ -144,14 +144,14 @@ export function SchedulePanel({ state }: { state: any }) {
   const props = state.props || {};
   const csrf: string = asString(props.csrfToken);
   const academicRoutes = state.academicRoutes || routes;
-  const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
+  const isTeacherMode = asString(state.managementMode).toLowerCase() === "teacher";
   const canDrag = !isTeacherMode;
-  const groups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
-  const schools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
-  const teachers = Array.isArray(props.adminTeachers) ? props.adminTeachers : [];
-  const initialSchedules = Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : [];
-  const initialSessions = Array.isArray(props.adminAcademicSessions) ? props.adminAcademicSessions : [];
-  const initialLessons = Array.isArray(props.adminAcademicLessons) ? props.adminAcademicLessons : [];
+  const groups = Array.isArray(props.academicManagementGroups) ? props.academicManagementGroups : [];
+  const schools = Array.isArray(props.academicManagementSchools) ? props.academicManagementSchools : [];
+  const teachers = Array.isArray(props.managementTeachers) ? props.managementTeachers : [];
+  const initialSchedules = Array.isArray(props.academicManagementSchedules) ? props.academicManagementSchedules : [];
+  const initialSessions = Array.isArray(props.academicManagementSessions) ? props.academicManagementSessions : [];
+  const initialLessons = Array.isArray(props.academicManagementLessons) ? props.academicManagementLessons : [];
   const [schedules, setSchedules] = useState<ScheduleRow[]>(initialSchedules as ScheduleRow[]);
   const [sessions, setSessions] = useState<SessionRow[]>(initialSessions as SessionRow[]);
   const [lessons, setLessons] = useState<LessonHistoryRow[]>(initialLessons as LessonHistoryRow[]);
@@ -201,13 +201,13 @@ export function SchedulePanel({ state }: { state: any }) {
     setSchedules(initialSchedules as ScheduleRow[]);
     setSessions(initialSessions as SessionRow[]);
     setLessons(initialLessons as LessonHistoryRow[]);
-  }, [props.adminAcademicSchedules, props.adminAcademicSessions, props.adminAcademicLessons]);
+  }, [props.academicManagementSchedules, props.academicManagementSessions, props.academicManagementLessons]);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_item, index) => addDays(weekStart, index)), [weekStart]);
   const weekDateSet = useMemo(() => new Set(weekDays.map(isoDate)), [weekDays]);
 
   useEffect(() => {
-    if (typeof academicRoutes.adminAcademicTimetableApi !== "function") return;
+    if (typeof academicRoutes.academicManagementTimetableApi !== "function") return;
     let active = true;
     const query = new URLSearchParams({
       date_from: isoDate(weekDays[0]),
@@ -217,7 +217,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setError("");
     void fetchApiQuery<{ schedules?: ScheduleRow[]; sessions?: SessionRow[]; calendarClosures?: CalendarClosure[] }>(
       ["academic", "timetable", query.toString()],
-      academicRoutes.adminAcademicTimetableApi(query.toString()),
+      academicRoutes.academicManagementTimetableApi(query.toString()),
     )
       .then((data) => {
         if (!active) return;
@@ -235,7 +235,7 @@ export function SchedulePanel({ state }: { state: any }) {
     return () => {
       active = false;
     };
-  }, [academicRoutes.adminAcademicTimetableApi, weekStart, rangeRevision]);
+  }, [academicRoutes.academicManagementTimetableApi, weekStart, rangeRevision]);
 
   // Any lesson session that already carries explicit times (server sessions or
   // this session's drag placements) must not re-render from lesson history.
@@ -544,7 +544,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setSelectedLessonId(payload.id);
 
     try {
-      const response = await fetch(academicRoutes.adminAcademicLessonApi(payload.id), {
+      const response = await fetch(academicRoutes.academicManagementLessonApi(payload.id), {
         method: "PATCH",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({ lesson_date: dayIso, start_time: start, end_time: end }),
@@ -731,7 +731,7 @@ export function SchedulePanel({ state }: { state: any }) {
     setError("");
     clearToast();
     try {
-      const response = await fetch(academicRoutes.adminAcademicScheduleCreate, {
+      const response = await fetch(academicRoutes.academicManagementScheduleCreate, {
         method: "POST",
         headers: jsonCsrfHeaders(csrf),
         body: JSON.stringify({

@@ -1,6 +1,6 @@
 # Current Architecture
 
-Date: 2026-07-14
+Date: 2026-07-20
 
 Branch: `FastAPI-Run-System`
 
@@ -12,13 +12,13 @@ MSI School is a product-domain modular monolith. PostgreSQL is the sole LMS sour
 
 ```text
 React workspace
-  -> FastAPI workspace/internal adapter
+  -> FastAPI workspace adapter
     -> domain service or public read contract
       -> owning repository
         -> PostgreSQL (msi_v2)
 ```
 
-Alembic is the only DDL owner. Migration `0013_teacher_recruitment_mvp.py` preserves historical candidates and adds the normalized recruitment workflow.
+Alembic is the only DDL owner. The current migration head is `0028_remove_system_admin`; the Recruitment migrations preserve historical candidates while providing the normalized workflow and unified Teacher Academy profiles.
 
 ## Backend Layout
 
@@ -49,26 +49,22 @@ backend/
 │   │   ├── assessments/         exam results
 │   │   ├── calendar/            school/group closures and teaching dates
 │   │   └── resources/           learning resources and comments
+│   ├── hr/
+│   │   ├── recruitment/         candidates, appointments, evaluations, decisions
+│   │   │                        documents, notifications, and academy handoffs
+│   │   └── analytics/           HR recruitment operations read models
 │   ├── teacher_academy/         training, evaluation, progression
 │   ├── support/                 complaints and support cases
 │   ├── finance/                 payments
 │   ├── communications/          chat and announcements
 │   └── reporting/               cross-domain read models
 ├── workspaces/                  role-specific HTTP/page adapters
-├── internal_operations/         protected System Admin adapters
-│   ├── pages/                    page routes, bootstrap context, options
-│   ├── academics/                focused academic route adapters
-│   ├── people/                   student and parent adapters
-│   ├── staffing/                 active-teacher form adapters
-│   ├── resources/                learning-resource adapters
-│   ├── finance/                  payment adapters
-│   └── support/                  complaint adapters
 └── platform/                    Redis, storage, Telegram integration
 ```
 
 Every SQL statement under `backend/modules` is in a repository module. Services own validation, policy, calculations, transactions, and response assembly. Cross-domain reads use public contracts; a domain never imports another domain's repository.
 
-Identity owns password and session helpers. Core is product-agnostic infrastructure, while Internal Operations is an outer transport adapter: modules and role workspaces never import it.
+Identity owns password and session helpers. Core is product-agnostic infrastructure. Role workspaces are the only role-facing transport adapters.
 
 ## Frontend Layout
 
@@ -85,7 +81,6 @@ frontend/src/
 │   ├── communications/
 │   └── reporting/
 ├── workspaces/                  role-specific composition
-├── internal_operations/         protected System Admin composition
 └── shared/                      cross-domain UI, API, and utilities only
 ```
 
@@ -93,7 +88,7 @@ The old generic `features/management` owner is removed. Workspace adapters impor
 
 ## Workspace Note
 
-The current working tree includes a pre-existing read-only Teacher workspace restoration. It remains preserved by this refactor; Teacher is still managed through People/Teacher Academy records and has no academic mutation permissions. System Admin remains isolated at `/internal/operations`.
+The current working tree includes a read-only Teacher workspace. Teacher is still managed through People/Teacher Academy records and has no academic mutation permissions. The former System Admin role and Internal Operations workspace were removed in migration `0028`.
 
 ## Compatibility Boundaries
 
@@ -103,6 +98,8 @@ The current working tree includes a pre-existing read-only Teacher workspace res
 - `Asia/Tashkent` remains the school calendar timezone.
 - There is no runtime Excel or Google Sheets integration.
 - Teacher Recruitment is active under `/api/v1/recruitment` and role-scoped pages. Legacy candidate events remain read-only and are copied into the audit timeline.
+- Recruitment acceptance into Teacher Academy delegates Teacher account provisioning to `modules/teacher_academy`; Recruitment does not own account persistence.
+- Recruitment notification delivery runs as a separate `python main.py worker` process and is not started by FastAPI.
 
 ## Verification
 

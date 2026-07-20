@@ -34,7 +34,6 @@ def test_required_modular_architecture_paths_exist():
     for path in [
         Path("backend/application/api.py"),
         Path("backend/application/registry.py"),
-        Path("backend/internal_operations/pages/routes.py"),
         Path("backend/modules/identity/service.py"),
         Path("backend/modules/organization/service.py"),
         Path("backend/modules/academics/groups/service.py"),

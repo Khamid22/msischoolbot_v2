@@ -16,7 +16,6 @@ from backend.modules.people.staff.service import (
     create_head_of_department_account,
     reset_head_of_department_password,
 )
-from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.core.access import CurrentUser, get_current_user, require_role
 
 router = APIRouter(prefix="/academic-director", dependencies=[Depends(require_role("academic_director"))])
@@ -38,7 +37,6 @@ def create_hod(
     )
     if not created:
         raise HTTPException(status_code=400, detail=error_message or "Unable to create Head of Department.")
-    invalidate_admin_page_context_cache()
     return api_success(
         {
             "message": "Head of Department account created.",
@@ -77,7 +75,6 @@ def reset_hod_password(
     if not reset:
         status_code = 404 if "not found" in (error_message or "").casefold() else 400
         raise HTTPException(status_code=status_code, detail=error_message or "Unable to reset password.")
-    invalidate_admin_page_context_cache()
     return api_success(
         {
             "message": "Temporary password generated.",

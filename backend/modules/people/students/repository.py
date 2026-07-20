@@ -1,6 +1,6 @@
 """Student SQL helpers against the current LMS schema.
 
-The external "student_row_id" used by sessions, the admin UI and the bot is the
+The external "student_row_id" used by sessions, role workspaces, and the bot is the
 ``msi_v2.students.legacy_student_row_id`` value (the migrated id for existing
 students, a freshly minted high-band id for students created after the cutover).
 Every lookup here resolves a student by that legacy id and uses the msi_v2
@@ -169,84 +169,13 @@ def update_student_last_seen(conn, student_db_id, now):
     return int(updated.rowcount or 0)
 
 
-def list_students_for_admin_rows(conn, school_key="", school_name=""):
-    normalized_school_key = str(school_key or "").strip().casefold()
-    base = f"""
-        SELECT
-            st.legacy_student_row_id AS id,
-            st.full_name,
-            st.student_code AS student_id,
-            {_SUBJECTS_SUBQUERY} AS subjects,
-            st.telegram_user_id,
-            st.photo_url,
-            st.profile_description,
-            st.class_name,
-            COALESCE(sch.school_name, '') AS school_name,
-            COALESCE(to_char(st.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS last_seen_at
-        FROM msi_v2.students st
-        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
-        WHERE st.legacy_student_row_id IS NOT NULL
-    """
-    if normalized_school_key:
-        return conn.execute(
-            base + " AND lower(sch.school_key) = lower(%s) ORDER BY st.legacy_student_row_id ASC",
-            (_normalize_school_key(normalized_school_key),),
-        ).fetchall()
-    normalized_school_name = str(school_name or "").strip()
-    if normalized_school_name:
-        return conn.execute(
-            base + " AND lower(sch.school_name) = lower(%s) ORDER BY st.legacy_student_row_id ASC",
-            (normalized_school_name,),
-        ).fetchall()
-    return conn.execute(base + " ORDER BY st.legacy_student_row_id ASC").fetchall()
 
 
-def list_online_only_student_rows(conn):
-    return conn.execute(
-        """
-        SELECT DISTINCT st.full_name, s.school_name AS school_name
-        FROM msi_v2.group_students gs
-        JOIN msi_v2.students st ON st.id = gs.student_id
-        JOIN msi_v2.groups g ON g.id = gs.group_id
-        JOIN msi_v2.schools s ON s.id = g.school_id
-        WHERE gs.enrollment_status = 'active'
-          AND lower(g.group_name) = 'online'
-          AND NOT EXISTS (
-            SELECT 1
-            FROM msi_v2.group_students other_gs
-            JOIN msi_v2.groups other_g ON other_g.id = other_gs.group_id
-            JOIN msi_v2.students other_st ON other_st.id = other_gs.student_id
-            WHERE other_g.school_id = g.school_id
-              AND lower(trim(other_st.full_name)) = lower(trim(st.full_name))
-              AND other_gs.enrollment_status = 'active'
-              AND lower(other_g.group_name) <> 'online'
-          )
-        """
-    ).fetchall()
 
 
-def get_student_admin_row(conn, student_row_id):
-    return conn.execute(
-        f"""
-        SELECT
-            st.legacy_student_row_id AS id,
-            st.full_name,
-            st.student_code AS student_id,
-            {_SUBJECTS_SUBQUERY} AS subjects,
-            st.photo_url,
-            st.profile_description,
-            st.class_name,
-            COALESCE(sch.school_name, '') AS school_name,
-            st.teacher_name
-        FROM msi_v2.students st
-        LEFT JOIN msi_v2.schools sch ON sch.id = st.school_id
-        WHERE st.legacy_student_row_id = %s
-        """,
-        (student_row_id,),
-    ).fetchone()
 
 
-def get_student_admin_row_by_id(conn, student_db_id):
+def get_student_dashboard_row_by_id(conn, student_db_id):
     return conn.execute(
         f"""
         SELECT
@@ -268,44 +197,10 @@ def get_student_admin_row_by_id(conn, student_db_id):
     ).fetchone()
 
 
-def get_active_enrollment_for_student_row(conn, student_row_id):
-    return conn.execute(
-        """
-        SELECT gs.group_id, gs.student_id, g.group_name
-        FROM msi_v2.group_students gs
-        JOIN msi_v2.students st ON st.id = gs.student_id
-        JOIN msi_v2.groups g ON g.id = gs.group_id
-        WHERE st.legacy_student_row_id = %s AND gs.enrollment_status = 'active'
-        LIMIT 1
-        """,
-        (student_row_id,),
-    ).fetchone()
 
 
-def list_active_student_enrollments(conn):
-    return conn.execute(
-        """
-        SELECT gs.group_id, gs.student_id, g.group_name, st.full_name
-        FROM msi_v2.group_students gs
-        JOIN msi_v2.students st ON st.id = gs.student_id
-        JOIN msi_v2.groups g ON g.id = gs.group_id
-        WHERE gs.enrollment_status = 'active'
-        """
-    ).fetchall()
 
 
-def list_classmate_names(conn, group_id, student_id):
-    return conn.execute(
-        """
-        SELECT st.full_name
-        FROM msi_v2.group_students gs
-        JOIN msi_v2.students st ON st.id = gs.student_id
-        WHERE gs.group_id = %s AND gs.enrollment_status = 'active'
-          AND gs.student_id != %s
-        ORDER BY st.full_name
-        """,
-        (int(group_id), int(student_id)),
-    ).fetchall()
 
 
 def list_public_dashboard_targets_for_student_row(conn, student_row_id):
@@ -331,43 +226,6 @@ def list_public_dashboard_targets_for_student_row(conn, student_row_id):
     ).fetchall()
 
 
-def update_student_admin_profile(
-    conn,
-    student_row_id,
-    photo_url,
-    profile_description,
-    class_name,
-    school_name,
-    teacher_name,
-):
-    conn.execute(
-        """
-        UPDATE msi_v2.students
-        SET
-            photo_url = %s,
-            profile_description = %s,
-            class_name = %s,
-            teacher_name = %s,
-            school_id = COALESCE(
-                (
-                    SELECT id FROM msi_v2.schools
-                    WHERE lower(school_name) = lower(%s) OR lower(school_key) = lower(%s)
-                    LIMIT 1
-                ),
-                school_id
-            )
-        WHERE legacy_student_row_id = %s
-        """,
-        (
-            photo_url,
-            profile_description,
-            class_name,
-            teacher_name,
-            school_name,
-            school_name,
-            student_row_id,
-        ),
-    )
 
 
 def get_student_conflict_by_telegram_id(conn, telegram_user_id, student_row_id):
@@ -427,15 +285,8 @@ __all__ = [
     "list_subject_enrollment_rows_for_student",
     "list_active_subject_options_for_student",
     "update_student_last_seen",
-    "list_students_for_admin_rows",
-    "list_online_only_student_rows",
-    "get_student_admin_row",
-    "get_student_admin_row_by_id",
-    "get_active_enrollment_for_student_row",
-    "list_active_student_enrollments",
-    "list_classmate_names",
+    "get_student_dashboard_row_by_id",
     "list_public_dashboard_targets_for_student_row",
-    "update_student_admin_profile",
     "get_student_conflict_by_telegram_id",
     "clear_student_telegram_user_conflicts",
     "update_student_telegram_user",

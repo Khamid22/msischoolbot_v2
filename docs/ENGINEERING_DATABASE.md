@@ -15,7 +15,7 @@ flowchart LR
     Alembic --> DB
 ```
 
-Runtime code does not own schema DDL. Table, index, and constraint changes belong only in Alembic. Workspace, internal-operations, and application packages contain no SQL.
+Runtime code does not own schema DDL. Table, index, and constraint changes belong only in Alembic. Workspace and application packages contain no SQL.
 
 ## Repository Ownership
 

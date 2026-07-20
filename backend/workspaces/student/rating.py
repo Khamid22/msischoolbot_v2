@@ -248,7 +248,6 @@ def register_rating_board_routes(students):
                 "leaderboard": leaderboard,
                 "scopeOptions": scope_options,
                 "ratingScopeLabel": rating_scope_label,
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Student Rating Board",
             description="Subject student rating board.",

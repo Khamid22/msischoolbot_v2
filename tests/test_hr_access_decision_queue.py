@@ -70,7 +70,7 @@ def _connection_factory(conn):
     return connect
 
 
-def test_admin_candidate_apis_fail_closed_but_handoff_remains_available(client, monkeypatch):
+def test_removed_admin_roles_fail_closed_but_director_handoff_remains_available(client, monkeypatch):
     for role in ("admin", "system_admin"):
         _set_session(client, role)
         assert client.get("/api/v1/recruitment/candidates/1", headers=XHR).status_code == 403
@@ -85,7 +85,7 @@ def test_admin_candidate_apis_fail_closed_but_handoff_remains_available(client, 
             {"login": "T0001", "temporary_password": "temporary"},
         ),
     )
-    _set_session(client, "admin")
+    _set_session(client, "academic_director")
     response = client.post(
         "/api/v1/recruitment/active-teacher-intakes/7/provision-account",
         headers=XHR,

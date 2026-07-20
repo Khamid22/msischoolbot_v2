@@ -1,8 +1,10 @@
 import {
   Activity,
   ArrowLeft,
+  Ban,
   BriefcaseBusiness,
   CalendarClock,
+  CalendarPlus,
   Check,
   ChevronDown,
   ClipboardCheck,
@@ -90,6 +92,7 @@ type ProfileAction =
     }
   | { kind: "assign_evaluators" }
   | { kind: "request_approval"; previous?: Record<string, unknown> }
+  | { kind: "reject_candidate" }
   | { kind: "record_outcome" }
   | {
       kind: "review_approval";
@@ -114,7 +117,10 @@ const profileTabs: Array<{ key: ProfileTab; label: string }> = [
   { key: "hiring", label: "Hiring" },
   { key: "activity", label: "Activity" },
 ];
-const hrProfileTabs = profileTabs.filter((item) => item.key !== "activity");
+// HR does not use the Hiring tab: acceptance is a direct Accept/Reject action
+// (Accept routes the Academic Director sign-off). The Hiring tab stays for the
+// Academic Director / HOD deciders via the full profileTabs set.
+const hrProfileTabs = profileTabs.filter((item) => item.key !== "activity" && item.key !== "hiring");
 const trainingProfileTab: { key: ProfileTab; label: string } = {
   key: "training",
   label: "Training",
@@ -1595,6 +1601,24 @@ function ActionFields({
           </label>
         </div>
       );
+    case "reject_candidate":
+      return (
+        <div className="grid gap-2">
+          <label className="text-xs font-semibold">
+            Rejection reason
+            <select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}>
+              <option value="">Select a reason</option>
+              {(options?.rejection_reason_options || []).map((reason) => (
+                <option key={reason.value} value={reason.value}>{reason.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold">
+            Explanation
+            <textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} />
+          </label>
+        </div>
+      );
     case "record_outcome":
       return (
         <div className="grid gap-2">
@@ -1720,6 +1744,8 @@ function actionTitle(action: ProfileAction | null) {
       return "Assign evaluators";
     case "request_approval":
       return "Request hiring approval";
+    case "reject_candidate":
+      return "Reject candidate";
     case "record_outcome":
       return "Record outcome";
     case "review_approval":
@@ -1752,6 +1778,7 @@ function actionSubmitLabel(action: ProfileAction | null) {
       : "Return request";
   if (action.kind === "upload_document")
     return action.document ? "Replace" : "Upload";
+  if (action.kind === "reject_candidate") return "Reject candidate";
   return "Save";
 }
 
@@ -1900,6 +1927,33 @@ export function CandidateProfile({
   const latestDemo = candidate.demo_lessons?.find((item) => !item.voided_at);
   const scheduledAppointments = (candidate.appointments || []).filter(
     (item) => ["scheduled", "in_progress"].includes(item.status),
+  );
+  const canManageAppointments = Boolean(permissions?.can_manage_appointments);
+  const hasScheduledInterview = scheduledAppointments.some((item) => item.appointment_type === "job_interview");
+  const hasScheduledDemo = scheduledAppointments.some((item) => item.appointment_type === "demo_lesson");
+  const openReschedule = (appointment: RecruitmentAppointment) => {
+    setAppointmentConflicts([]);
+    setAction({ kind: "reschedule_appointment", appointment });
+  };
+  const appointmentActionMenu = (appointment: RecruitmentAppointment) =>
+    canManageAppointments ? (
+      <ActionMenu
+        label="Appointment actions"
+        items={[
+          { key: "reschedule", label: "Reschedule", onClick: () => openReschedule(appointment) },
+          { key: "cancel", label: "Cancel appointment", danger: true, onClick: () => setAction({ kind: "appointment_status", appointment, status: "cancelled" }) },
+        ]}
+      />
+    ) : null;
+  const scheduleHeaderButton = (appointmentType: "job_interview" | "demo_lesson") => (
+    <button
+      type="button"
+      className={secondaryButtonClass}
+      onClick={() => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType }); }}
+    >
+      <CalendarPlus className="h-4 w-4" />
+      <span className="hidden sm:inline">Schedule</span>
+    </button>
   );
   const pendingTasks = (candidate.tasks || []).filter((task) =>
     ["pending", "overdue"].includes(task.effective_status),
@@ -2147,6 +2201,11 @@ export function CandidateProfile({
       );
     } else if (action.kind === "request_approval") {
       submit("/approval-requests", formValues(form));
+    } else if (action.kind === "reject_candidate") {
+      submit("/final-decisions", {
+        decision: "rejected",
+        ...formValues(form),
+      });
     } else if (action.kind === "record_outcome") {
       const values = formValues(form);
       submit("/final-decisions", {
@@ -2303,6 +2362,38 @@ export function CandidateProfile({
       </button>
     ) : null;
 
+  // HR accepts/rejects directly at the Final Decision stage. Accept routes the
+  // Academic Director sign-off (request_approval); Reject finalizes a rejection.
+  const hrDecisionActions =
+    role === "hr_manager" &&
+    candidate.status === "under_review" &&
+    (permissions?.can_request_approval || permissions?.can_reject) ? (
+      <div className="flex items-center gap-1">
+        {permissions?.can_request_approval ? (
+          <button
+            type="button"
+            className={buttonClass}
+            title={returnedApproval ? "Resubmit to Academic Director" : "Accept and send to Academic Director"}
+            onClick={() => setAction({ kind: "request_approval", previous: returnedApproval })}
+          >
+            <GraduationCap className="h-4 w-4" />
+            <span className="hidden sm:inline">{returnedApproval ? "Resubmit" : "Accept"}</span>
+          </button>
+        ) : null}
+        {permissions?.can_reject ? (
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            title="Reject candidate"
+            onClick={() => setAction({ kind: "reject_candidate" })}
+          >
+            <Ban className="h-4 w-4" />
+            <span className="hidden sm:inline">Reject</span>
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
   const tabAction =
     tab === "overview" &&
     (permissions?.can_edit_profile || overviewItems.length) ? (
@@ -2347,6 +2438,34 @@ export function CandidateProfile({
     ) : tab === "activity" && activityItems.length ? (
       <ActionMenu items={activityItems} label="Activity actions" />
     ) : null;
+
+  // A single, unambiguous "do this next" CTA derived from the candidate's real
+  // state so HR always knows the exact step to complete.
+  const nextStep: { label: string; sublabel: string; onClick: () => void } | null = (() => {
+    const appt = candidate.next_appointment;
+    if (appt) {
+      return {
+        label: appt.appointment_type === "job_interview" ? "Start interview" : "Open demo lesson",
+        sublabel: `${dateTimeLabel(appt.starts_at)}${appt.responsible_name ? ` · ${appt.responsible_name}` : ""}`,
+        onClick: () => { if (appt.appointment_type === "job_interview") setInterviewSession(appt); else setProfileTab("evaluations"); },
+      };
+    }
+    if (candidate.status === "job_interview" && canManageAppointments && candidate.latest_interview_result !== "passed") {
+      return { label: "Schedule interview", sublabel: "No interview scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }); } };
+    }
+    if (candidate.status === "test_and_demo") {
+      if (candidate.evaluation_states?.interview === "missing") return { label: "Review interview", sublabel: "No interview recorded", onClick: () => setProfileTab("evaluations") };
+      if (canManageAppointments && !candidate.latest_demo_result) return { label: "Schedule demo lesson", sublabel: "No demo scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }); } };
+      if (permissions?.can_add_subject_test && candidate.evaluation_states?.subject_test !== "passed") return { label: "Record subject test", sublabel: "Subject test pending", onClick: () => { setProfileTab("evaluations"); setAction({ kind: "record_test" }); } };
+    }
+    if (candidate.status === "under_review" && permissions?.can_request_approval) {
+      return { label: returnedApproval ? "Resubmit to Academic Director" : "Accept → Academic Director", sublabel: "Ready for final sign-off", onClick: () => setAction({ kind: "request_approval", previous: returnedApproval }) };
+    }
+    if (candidate.next_task) {
+      return { label: candidate.next_task.title, sublabel: `Due ${dateLabel(candidate.next_task.due_at)}`, onClick: () => setProfileTab("evaluations") };
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-2">
@@ -2395,7 +2514,7 @@ export function CandidateProfile({
                   : ""}
             </p>
           </div>
-          <div className="shrink-0">{tabAction}</div>
+          <div className="flex shrink-0 items-center gap-1">{hrDecisionActions}{tabAction}</div>
         </div>
         <label className="mt-2 block text-xs font-semibold text-muted-foreground sm:hidden">
           Profile section
@@ -2716,39 +2835,18 @@ export function CandidateProfile({
               title="Next action"
               icon={<CalendarClock className="h-4 w-4" />}
             >
-              {candidate.next_appointment ? (
+              {nextStep ? (
                 <button
                   type="button"
-                  className="w-full rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                  onClick={() => {
-                    const next = candidate.next_appointment;
-                    if (!next) return;
-                    if (next.appointment_type === "job_interview") setInterviewSession(next);
-                    else setTab("evaluations");
-                  }}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-left transition-colors hover:bg-primary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  onClick={nextStep.onClick}
                 >
-                  <p className="text-sm font-semibold">
-                    {candidate.next_appointment.appointment_type ===
-                    "job_interview"
-                      ? "Job interview"
-                      : "Demo lesson"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {dateTimeLabel(candidate.next_appointment.starts_at)}
-                    {candidate.next_appointment.responsible_name
-                      ? ` · ${candidate.next_appointment.responsible_name}`
-                      : ""}
-                  </p>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-primary">{nextStep.label}</span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">{nextStep.sublabel}</span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-primary" aria-hidden="true" />
                 </button>
-              ) : candidate.next_task ? (
-                <div>
-                  <p className="text-sm font-semibold">
-                    {candidate.next_task.title}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Due {dateLabel(candidate.next_task.due_at)}
-                  </p>
-                </div>
               ) : (
                 <EmptyLine>No next action.</EmptyLine>
               )}
@@ -2779,10 +2877,21 @@ export function CandidateProfile({
             <Panel
               title="Job Interviews"
               icon={<ClipboardCheck className="h-4 w-4" />}
+              action={canManageAppointments && candidate.status === "job_interview" && !hasScheduledInterview ? scheduleHeaderButton("job_interview") : undefined}
             >
               <div className="mb-3 space-y-2">
-                {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => <button key={appointment.id} type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>)}
+                {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => (
+                  <div key={appointment.id} className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>
+                    {appointmentActionMenu(appointment)}
+                  </div>
+                ))}
               </div>
+              {candidate.evaluation_states?.interview === "missing" && !hasScheduledInterview && !(candidate.interviews || []).length ? (
+                <p className="mb-3 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+                  <Ban className="h-4 w-4 shrink-0" />No interview recorded for this candidate.
+                </p>
+              ) : null}
               <AttemptList
                 items={candidate.interviews || []}
                 empty="No interviews recorded."
@@ -2802,10 +2911,21 @@ export function CandidateProfile({
             <Panel
               title="Demo Lessons"
               icon={<ClipboardCheck className="h-4 w-4" />}
+              action={canManageAppointments && candidate.status === "test_and_demo" && !hasScheduledDemo ? scheduleHeaderButton("demo_lesson") : undefined}
             >
               <div className="mb-3 space-y-2">
-                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => <button key={appointment.id} type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>)}
+                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
+                  <div key={appointment.id} className="flex items-center gap-1.5">
+                    <button type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>
+                    {appointmentActionMenu(appointment)}
+                  </div>
+                ))}
               </div>
+              {candidate.evaluation_states?.demo === "missing" && !hasScheduledDemo && !(candidate.demo_lessons || []).length ? (
+                <p className="mb-3 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200">
+                  <Ban className="h-4 w-4 shrink-0" />No demo lesson recorded for this candidate.
+                </p>
+              ) : null}
               <AttemptList
                 items={candidate.demo_lessons || []}
                 empty="No demo lessons recorded."

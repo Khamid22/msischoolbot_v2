@@ -27,7 +27,7 @@ def group_belongs_to_school(group_name, school_code):
         return True
 
 
-def list_academic_admin_rows(*, include_heavy=True, include_groups=True):
+def list_academic_management_rows(*, include_heavy=True, include_groups=True):
     with _connect() as conn:
         schools = [dict(row) for row in organization_contract.list_school_rows(conn)]
         classes = [dict(row) for row in organization_contract.list_class_rows(conn)]

@@ -77,7 +77,7 @@ def _payment_record_from_row(row):
         "created_at": str(row["created_at"] or "").strip(),
         "updated_at": str(row["updated_at"] or "").strip(),
     }
-    # `state` is the live, time-derived bucket the parent/admin views render.
+    # `state` is the live, time-derived bucket the role workspaces render.
     # It is recomputed on every read, so an unpaid charge rolls from
     # upcoming -> due -> debt on its own without anyone re-editing the row.
     record["paid"] = _is_paid(record)

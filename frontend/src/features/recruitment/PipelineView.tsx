@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, CalendarPlus, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, UserMinus, X } from "lucide-react";
+import { AlertTriangle, Ban, CalendarPlus, Check, CheckCircle2, Clock3, GraduationCap, ListFilter, Loader2, Plus, Search, Trash2, UserMinus, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   memo,
@@ -42,6 +42,7 @@ import {
   secondaryButtonClass,
 } from "@/features/recruitment/ui";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
+import { ActionMenu } from "@/shared/ui/ActionMenu";
 import { Drawer } from "@/shared/ui/Drawer";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
@@ -64,6 +65,9 @@ type PipelineFilters = {
 };
 type RejectSelection = { candidate: RecruitmentCandidate };
 type ScheduleSelection = { candidate: RecruitmentCandidate; appointmentType: "job_interview" | "demo_lesson" };
+type RescheduleSelection = { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment };
+type CancelSelection = { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment };
+type AcceptSelection = { candidate: RecruitmentCandidate };
 type UndoTrash = { candidate: RecruitmentCandidate; previousCandidate: RecruitmentCandidate };
 
 const filterKeys: Array<keyof PipelineFilters> = [
@@ -179,6 +183,10 @@ const CandidateCard = memo(function CandidateCard({
   onDragEnd,
   onSchedule,
   onInterview,
+  onReschedule,
+  onCancelAppointment,
+  onAccept,
+  onReject,
   compact = false,
 }: {
   candidate: RecruitmentCandidate;
@@ -187,13 +195,18 @@ const CandidateCard = memo(function CandidateCard({
   onDragEnd: () => void;
   onSchedule: (candidate: RecruitmentCandidate, appointmentType: "job_interview" | "demo_lesson") => void;
   onInterview: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
+  onReschedule: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
+  onCancelAppointment: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
+  onAccept: (candidate: RecruitmentCandidate) => void;
+  onReject: (candidate: RecruitmentCandidate) => void;
   compact?: boolean;
 }) {
   const canMove = Boolean(candidate.permissions?.can_move_stage) && !["teacher_academy", "active_teacher"].includes(candidate.status);
+  const canManageAppointments = Boolean(candidate.permissions?.can_manage_appointments);
   const appointment = matchingAppointment(candidate);
-  const unscheduledType = candidate.status === "job_interview" && !appointment
+  const unscheduledType = candidate.status === "job_interview" && !appointment && candidate.latest_interview_result !== "passed"
     ? "job_interview"
-    : candidate.status === "test_and_demo" && !appointment
+    : candidate.status === "test_and_demo" && !appointment && !candidate.latest_demo_result
       ? "demo_lesson"
       : null;
   let detailLabel = "";
@@ -205,22 +218,33 @@ const CandidateCard = memo(function CandidateCard({
   if (["teacher_academy", "active_teacher"].includes(candidate.status)) { detailLabel = "Accepted"; detailValue = dateLabel(candidate.final_decision_at || candidate.stage_changed_at); }
 
   const overdue = Boolean(appointment?.is_overdue);
+  const evaluationStates = candidate.evaluation_states;
+  // Truthful, record-backed states: a stage reached without a real evaluation
+  // record reads as "missing" (red), never a fabricated "passed".
+  const interviewMissing = candidate.status === "test_and_demo" && evaluationStates?.interview === "missing";
+  const demoMissing = candidate.status === "under_review" && evaluationStates?.demo === "missing";
+  const demoResult = candidate.status === "test_and_demo" ? candidate.latest_demo_result || "" : "";
+  const demoPassed = demoResult === "passed";
   const passedInterview = candidate.status === "job_interview" && candidate.latest_interview_result === "passed" && !appointment;
-  const toneClass = overdue
+  const alertState = overdue || interviewMissing || demoMissing;
+  const toneClass = alertState
     ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/25"
-    : passedInterview || candidate.status === "under_review"
+    : passedInterview || demoPassed || candidate.status === "under_review"
         ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-950/20"
         : ["job_interview", "test_and_demo"].includes(candidate.status)
           ? "border-amber-400 bg-amber-50 dark:border-amber-500/50 dark:bg-amber-950/20"
           : "border-border bg-card";
   if (overdue) { detailLabel = "Overdue"; detailValue = dateTimeLabel(appointment?.starts_at); }
   if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
-  const StatusIcon = overdue ? AlertTriangle : passedInterview || candidate.status === "under_review" ? CheckCircle2 : Clock3;
+  if (demoResult) { detailLabel = demoPassed ? "Demo lesson passed" : "Demo lesson evaluated"; detailValue = candidate.latest_demo_at ? dateTimeLabel(candidate.latest_demo_at) : detailValue; }
+  const StatusIcon = alertState ? AlertTriangle : passedInterview || demoPassed || candidate.status === "under_review" ? CheckCircle2 : Clock3;
   const sla = candidate.current_sla;
   const slaLabel = sla ? (sla.status === "red" ? "SLA overdue" : `${Math.max(0, Math.ceil(sla.remaining_seconds / 86400))}d SLA left`) : "";
   const slaClass = sla?.status === "red" ? "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200" : sla?.status === "yellow" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-100" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100";
-  const evaluationStates = candidate.evaluation_states;
   const subjectKnowledgeWarning = candidate.status === "under_review" && evaluationStates?.subject_test !== "passed";
+  const chipBase = compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]";
+  const emeraldChip = "bg-emerald-100 font-semibold text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100";
+  const redChip = "bg-red-100 font-semibold text-red-700 dark:bg-red-400/15 dark:text-red-200";
 
   return (
     <article
@@ -239,8 +263,14 @@ const CandidateCard = memo(function CandidateCard({
         <p className={`truncate font-semibold text-foreground ${compact ? "text-[13px] leading-4" : "text-sm"}`}>{candidate.full_name}</p>
         <p className={`truncate text-muted-foreground ${compact ? "mt-0.5 text-[11px] leading-4" : "mt-1 text-xs"}`}>{candidate.applied_position || candidate.subject || "Position not set"}</p>
         {detailLabel ? <div className={`rounded-md bg-background/65 ${compact ? "mt-1.5 px-1.5 py-1 text-[11px] leading-4" : "mt-2 px-2 py-1.5 text-xs"}`}><span className="flex items-center gap-1.5 truncate font-semibold text-foreground"><StatusIcon className={`${compact ? "h-3 w-3" : "h-3.5 w-3.5"} shrink-0`} />{detailLabel}</span><span className={`block truncate text-muted-foreground ${compact ? "" : "mt-0.5"}`}>{detailValue}</span>{candidate.status === "test_and_demo" && appointment ? <span className={`${compact ? "mt-0.5" : "mt-1"} block text-muted-foreground`}><span className="block truncate">Evaluator: {appointment.responsible_name || "Not assigned"}</span>{appointment.topic ? <span className="block truncate">Topic: {appointment.topic}</span> : null}<span className={`block font-semibold ${overdue ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-200"}`}>{overdue ? "Overdue" : "Scheduled"}</span></span> : null}</div> : null}
-        {candidate.status === "test_and_demo" && evaluationStates?.interview === "passed" ? <span className={`inline-flex rounded-full bg-emerald-100 font-semibold text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100 ${compact ? "mt-1 px-1.5 py-0.5 text-[9px]" : "mt-2 px-2 py-1 text-[10px]"}`}>Interview passed</span> : null}
-        {candidate.status === "under_review" ? <div className={`flex flex-wrap gap-1 ${compact ? "mt-1" : "mt-2"}`}><span className={`inline-flex rounded-full bg-emerald-100 font-semibold text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100 ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]"}`}>Demo passed</span><span className={`inline-flex rounded-full font-semibold ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]"} ${subjectKnowledgeWarning ? "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-100"}`}>{subjectKnowledgeWarning ? "Subject test missing/not passed" : "Subject test passed"}</span></div> : null}
+        {candidate.status === "test_and_demo" ? (
+          <div className={`flex flex-wrap gap-1 ${compact ? "mt-1" : "mt-2"}`}>
+            {evaluationStates?.interview === "passed" ? <span className={`inline-flex rounded-full ${emeraldChip} ${chipBase}`}>Interview passed</span> : interviewMissing ? <span className={`inline-flex rounded-full ${redChip} ${chipBase}`}>No interview recorded</span> : null}
+            {demoResult ? <span className={`inline-flex rounded-full ${demoPassed ? emeraldChip : redChip} ${chipBase}`}>{demoPassed ? "Demo passed" : "Demo not passed"}</span> : null}
+          </div>
+        ) : null}
+        {candidate.status === "test_and_demo" && demoResult && candidate.latest_demo_note ? <p className={`mt-1 truncate italic text-muted-foreground ${compact ? "text-[10px] leading-4" : "text-[11px]"}`} title={candidate.latest_demo_note}>“{candidate.latest_demo_note}”</p> : null}
+        {candidate.status === "under_review" ? <div className={`flex flex-wrap gap-1 ${compact ? "mt-1" : "mt-2"}`}><span className={`inline-flex rounded-full ${demoMissing ? redChip : emeraldChip} ${chipBase}`}>{demoMissing ? "No demo recorded" : "Demo passed"}</span><span className={`inline-flex rounded-full ${subjectKnowledgeWarning ? redChip : emeraldChip} ${chipBase}`}>{subjectKnowledgeWarning ? "Subject test missing/not passed" : "Subject test passed"}</span></div> : null}
         {sla ? <span className={`inline-flex rounded-full font-semibold ${slaClass} ${compact ? "mt-1 px-1.5 py-0.5 text-[9px]" : "mt-2 px-2 py-1 text-[10px]"}`} title={`SLA due ${dateLabel(sla.due_at)}`}>{slaLabel}</span> : null}
       </a>
       {unscheduledType ? (
@@ -248,7 +278,30 @@ const CandidateCard = memo(function CandidateCard({
           <CalendarPlus className="h-4 w-4 shrink-0" />{unscheduledType === "job_interview" ? "Interview not scheduled" : "Demo lesson not scheduled"}
         </button>
       ) : null}
-      {appointment?.appointment_type === "job_interview" && ["scheduled", "in_progress"].includes(appointment.status) ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className={`${compact ? "mx-1.5 mb-1.5 w-[calc(100%-0.75rem)] text-[11px]" : "mx-2 mb-2 w-[calc(100%-1rem)] text-xs"} flex min-h-9 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button> : null}
+      {appointment ? (
+        <div draggable={false} onClick={(event) => event.stopPropagation()} className={`flex items-center gap-1.5 ${compact ? "mx-1.5 mb-1.5" : "mx-2 mb-2"}`}>
+          {appointment.appointment_type === "job_interview" ? (
+            <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onInterview(candidate, appointment); }} className={`flex min-h-9 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-2 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${compact ? "text-[11px]" : "text-xs"}`}><Clock3 className="h-4 w-4" />{appointment.status === "in_progress" ? "Resume interview" : "Start interview"}</button>
+          ) : (
+            <span className={`flex min-h-9 flex-1 items-center gap-2 truncate rounded-md border border-amber-400/50 bg-amber-50 px-2 font-semibold text-amber-900 dark:bg-amber-400/10 dark:text-amber-100 ${compact ? "text-[11px]" : "text-xs"}`}><CalendarPlus className="h-4 w-4 shrink-0" /><span className="truncate">Demo scheduled</span></span>
+          )}
+          {canManageAppointments ? (
+            <ActionMenu
+              label="Appointment actions"
+              items={[
+                { key: "reschedule", label: "Reschedule", onClick: () => onReschedule(candidate, appointment) },
+                { key: "cancel", label: "Cancel appointment", danger: true, onClick: () => onCancelAppointment(candidate, appointment) },
+              ]}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {candidate.status === "under_review" && (candidate.permissions?.can_request_approval || candidate.permissions?.can_reject) ? (
+        <div draggable={false} onClick={(event) => event.stopPropagation()} className={`flex items-center gap-1.5 ${compact ? "mx-1.5 mb-1.5" : "mx-2 mb-2"}`}>
+          {candidate.permissions?.can_request_approval ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onAccept(candidate); }} className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${compact ? "text-[11px]" : "text-xs"}`}><GraduationCap className="h-4 w-4 shrink-0" />Accept</button> : null}
+          {candidate.permissions?.can_reject ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onReject(candidate); }} className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 font-semibold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200 ${compact ? "text-[11px]" : "text-xs"}`}><Ban className="h-4 w-4 shrink-0" />Reject</button> : null}
+        </div>
+      ) : null}
     </article>
   );
 });
@@ -276,10 +329,13 @@ export function PipelineView({
   const [boardPanning, setBoardPanning] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
-  const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | "candidate_withdrew" | null>(null);
+  const [dragOverOutcome, setDragOverOutcome] = useState<"trash_bin" | "rejected" | "candidate_withdrew" | "teacher_academy" | null>(null);
   const [rejectSelection, setRejectSelection] = useState<RejectSelection | null>(null);
   const [withdrawSelection, setWithdrawSelection] = useState<RejectSelection | null>(null);
   const [scheduleSelection, setScheduleSelection] = useState<ScheduleSelection | null>(null);
+  const [rescheduleSelection, setRescheduleSelection] = useState<RescheduleSelection | null>(null);
+  const [cancelSelection, setCancelSelection] = useState<CancelSelection | null>(null);
+  const [acceptSelection, setAcceptSelection] = useState<AcceptSelection | null>(null);
   const [interviewSelection, setInterviewSelection] = useState<{ candidate: RecruitmentCandidate; appointment: RecruitmentAppointment } | null>(null);
   const [scheduleConflicts, setScheduleConflicts] = useState<RecruitmentAppointment[]>([]);
   const [undoTrash, setUndoTrash] = useState<UndoTrash | null>(null);
@@ -372,6 +428,24 @@ export function PipelineView({
     onError: (error) => { const conflicts = appointmentConflictDetails<RecruitmentAppointment>(error); if (conflicts.length) setScheduleConflicts(conflicts); onAnnouncement(queryError(error), "error"); },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
   });
+  const reschedule = useMutation({
+    mutationFn: ({ candidate, appointment, values }: { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${appointment.id}`, { method: "PATCH", body: jsonBody({ ...values, expected_version: appointment.version, allow_conflict: Boolean(scheduleConflicts.length) }) }),
+    onSuccess: (result) => { setRescheduleSelection(null); setScheduleConflicts([]); onAnnouncement(result.message || "Appointment rescheduled."); },
+    onError: (error) => { const conflicts = appointmentConflictDetails<RecruitmentAppointment>(error); if (conflicts.length) setScheduleConflicts(conflicts); onAnnouncement(queryError(error), "error"); },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
+  const cancelAppointment = useMutation({
+    mutationFn: ({ candidate, appointment, values }: { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/appointments/${appointment.id}/cancel`, { method: "POST", body: jsonBody({ ...values, expected_version: appointment.version }) }),
+    onSuccess: (result) => { setCancelSelection(null); onAnnouncement(result.message || "Appointment cancelled."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
+  const accept = useMutation({
+    mutationFn: ({ candidate, values }: { candidate: RecruitmentCandidate; values: Record<string, unknown> }) => recruitmentRequest<MutationPayload>(`${RECRUITMENT_API}/candidates/${candidate.id}/approval-requests`, { method: "POST", body: jsonBody({ requested_outcome: "teacher_academy", ...values }) }),
+    onSuccess: (result) => { setAcceptSelection(null); onAnnouncement(result.message || "Candidate sent to the Academic Director."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["recruitment"] }),
+  });
 
   const activeAdvanced = filterKeys.filter((key) => key !== "search" && Boolean(filters[key]));
   const activeFilterCount = activeAdvanced.length + (filters.search ? 1 : 0);
@@ -384,6 +458,10 @@ export function PipelineView({
   const handleCardDragStart = useCallback((value: RecruitmentCandidate) => { draggedCandidateRef.current = value; setDraggedCandidate(value); }, []);
   const handleCardSchedule = useCallback((value: RecruitmentCandidate, appointmentType: "job_interview" | "demo_lesson") => { setScheduleConflicts([]); setScheduleSelection({ candidate: value, appointmentType }); }, []);
   const handleCardInterview = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setInterviewSelection({ candidate: value, appointment }), []);
+  const handleCardReschedule = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => { setScheduleConflicts([]); setRescheduleSelection({ candidate: value, appointment }); }, []);
+  const handleCardCancelAppointment = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setCancelSelection({ candidate: value, appointment }), []);
+  const handleCardAccept = useCallback((value: RecruitmentCandidate) => setAcceptSelection({ candidate: value }), []);
+  const handleCardReject = useCallback((value: RecruitmentCandidate) => setRejectSelection({ candidate: value }), []);
 
   const canStartBoardPan = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return true;
@@ -427,10 +505,10 @@ export function PipelineView({
 
   const cards = useCallback((items: RecruitmentCandidate[], compact = false) => (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
-      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} compact={compact} />)}
+      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} onReschedule={handleCardReschedule} onCancelAppointment={handleCardCancelAppointment} onAccept={handleCardAccept} onReject={handleCardReject} compact={compact} />)}
       {!items.length ? <EmptyLine>No candidates in this stage.</EmptyLine> : null}
     </div>
-  ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview]);
+  ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview, handleCardReschedule, handleCardCancelAppointment, handleCardAccept, handleCardReject]);
 
   const data = pipeline.data;
   const summaryCounts = useMemo(() => ({
@@ -522,19 +600,25 @@ export function PipelineView({
         {desktopBoard}
       </div>
 
-      {draggedCandidate ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+1rem)] z-40 flex justify-center px-3">
-          <section aria-label="Candidate outcome drop targets" className="pointer-events-auto grid w-full max-w-2xl grid-cols-3 gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur">
-            {(["trash_bin", "rejected", "candidate_withdrew"] as const).map((target) => {
-              const danger = target === "trash_bin";
-              const highlighted = dragOverOutcome === target;
-              const Icon = target === "trash_bin" ? Trash2 : target === "rejected" ? Ban : UserMinus;
-              const label = target === "trash_bin" ? "Trash Bin" : target === "rejected" ? "Reject" : "Withdraw";
-              return <div key={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragOverOutcome(null)} onDrop={(event) => { event.preventDefault(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else if (target === "rejected") setRejectSelection({ candidate }); else setWithdrawSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-2 text-center text-xs font-semibold transition-colors sm:text-sm ${danger ? "border-destructive/50 bg-destructive/10 text-destructive" : target === "rejected" ? "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300" : "border-rose-400/50 bg-rose-100/70 text-rose-800 dark:bg-rose-400/10 dark:text-rose-200"} ${highlighted ? "ring-2 ring-current/20" : ""}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
-            })}
-          </section>
-        </div>
-      ) : null}
+      {draggedCandidate ? (() => {
+        const canAccept = draggedCandidate.status === "under_review" && Boolean(draggedCandidate.permissions?.can_request_approval);
+        const targets = (canAccept
+          ? ["teacher_academy", "trash_bin", "rejected", "candidate_withdrew"]
+          : ["trash_bin", "rejected", "candidate_withdrew"]) as Array<"teacher_academy" | "trash_bin" | "rejected" | "candidate_withdrew">;
+        return (
+          <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-inset)+1rem)] z-40 flex justify-center px-3">
+            <section aria-label="Candidate outcome drop targets" className={`pointer-events-auto grid w-full max-w-2xl gap-2 rounded-xl border border-border bg-card/95 p-2 shadow-card-hover backdrop-blur ${canAccept ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+              {targets.map((target) => {
+                const highlighted = dragOverOutcome === target;
+                const Icon = target === "teacher_academy" ? GraduationCap : target === "trash_bin" ? Trash2 : target === "rejected" ? Ban : UserMinus;
+                const label = target === "teacher_academy" ? "Accept" : target === "trash_bin" ? "Trash Bin" : target === "rejected" ? "Reject" : "Withdraw";
+                const toneCls = target === "teacher_academy" ? "border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:bg-emerald-400/10 dark:text-emerald-200" : target === "trash_bin" ? "border-destructive/50 bg-destructive/10 text-destructive" : target === "rejected" ? "border-red-700/40 bg-red-700/5 text-red-800 dark:text-red-300" : "border-rose-400/50 bg-rose-100/70 text-rose-800 dark:bg-rose-400/10 dark:text-rose-200";
+                return <div key={target} onDragEnter={(event) => { event.preventDefault(); setDragOverOutcome(target); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragOverOutcome(null)} onDrop={(event) => { event.preventDefault(); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate) return; if (target === "trash_bin") move.mutate({ candidate, stage: "trash_bin" }); else if (target === "rejected") setRejectSelection({ candidate }); else if (target === "candidate_withdrew") setWithdrawSelection({ candidate }); else setAcceptSelection({ candidate }); }} className={`flex min-h-14 items-center justify-center gap-2 rounded-lg border border-dashed px-2 text-center text-xs font-semibold transition-colors sm:text-sm ${toneCls} ${highlighted ? "ring-2 ring-current/20" : ""}`}><Icon className="h-4 w-4 shrink-0" />{label}</div>;
+              })}
+            </section>
+          </div>
+        );
+      })() : null}
 
       {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-9 rounded-md px-2 text-primary underline" onClick={() => { move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
 
@@ -550,6 +634,17 @@ export function PipelineView({
 
       <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) { setScheduleSelection(null); setScheduleConflicts([]); } }} title={scheduleSelection?.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">
         {scheduleSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); schedule.mutate({ candidate: scheduleSelection.candidate, appointmentType: scheduleSelection.appointmentType, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={scheduleSelection.appointmentType} options={options} conflicts={scheduleConflicts} allowHistoricalRestoration={canAddCandidate} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => { setScheduleSelection(null); setScheduleConflicts([]); }}>Cancel</button><button type="submit" className={buttonClass} disabled={schedule.isPending}>{schedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{scheduleConflicts.length ? "Schedule anyway" : "Schedule"}</button></div></ModalFooter></form> : null}
+      </Modal>
+      <Modal open={Boolean(rescheduleSelection)} onClose={() => { if (!reschedule.isPending) { setRescheduleSelection(null); setScheduleConflicts([]); } }} title={rescheduleSelection?.appointment.appointment_type === "job_interview" ? "Reschedule job interview" : "Reschedule demo lesson"} subtitle={rescheduleSelection?.candidate.full_name} size="md">
+        {rescheduleSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reschedule.mutate({ candidate: rescheduleSelection.candidate, appointment: rescheduleSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><AppointmentForm appointmentType={rescheduleSelection.appointment.appointment_type} appointment={rescheduleSelection.appointment} options={options} conflicts={scheduleConflicts} allowHistoricalRestoration={canAddCandidate} /></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => { setRescheduleSelection(null); setScheduleConflicts([]); }}>Cancel</button><button type="submit" className={buttonClass} disabled={reschedule.isPending}>{reschedule.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{scheduleConflicts.length ? "Reschedule anyway" : "Save appointment"}</button></div></ModalFooter></form> : null}
+      </Modal>
+
+      <Modal open={Boolean(cancelSelection)} onClose={() => { if (!cancelAppointment.isPending) setCancelSelection(null); }} title={cancelSelection?.appointment.appointment_type === "job_interview" ? "Cancel job interview" : "Cancel demo lesson"} subtitle={cancelSelection?.candidate.full_name} size="sm">
+        {cancelSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); cancelAppointment.mutate({ candidate: cancelSelection.candidate, appointment: cancelSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Reason / note<textarea autoFocus required name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The booking is cancelled and the candidate stays in {stageLabels[cancelSelection.candidate.status] || humanize(cancelSelection.candidate.status)}. You can schedule a new one anytime.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setCancelSelection(null)}>Keep appointment</button><button type="submit" className={buttonClass} disabled={cancelAppointment.isPending}>{cancelAppointment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Cancel appointment</button></div></ModalFooter></form> : null}
+      </Modal>
+
+      <Modal open={Boolean(acceptSelection)} onClose={() => { if (!accept.isPending) setAcceptSelection(null); }} title="Accept candidate" subtitle={acceptSelection?.candidate.full_name} size="sm">
+        {acceptSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); accept.mutate({ candidate: acceptSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-2"><label className="text-xs font-semibold">Requested outcome<select name="requested_outcome" defaultValue="teacher_academy" className={`${fieldClass} mt-1`}><option value="teacher_academy">Teacher Academy</option><option value="active_teacher">Active Teacher</option></select></label><label className="text-xs font-semibold">Note for the Academic Director<textarea name="request_note" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The candidate is sent to the Academic Director for final sign-off. The Teacher Academy account is provisioned once approved.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setAcceptSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={accept.isPending}>{accept.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <GraduationCap className="h-4 w-4" />}Send to Academic Director</button></div></ModalFooter></form> : null}
       </Modal>
       {interviewSelection ? <InterviewSessionModal candidate={interviewSelection.candidate} appointment={interviewSelection.appointment} open onClose={() => setInterviewSelection(null)} onAnnouncement={onAnnouncement} /> : null}
     </div>

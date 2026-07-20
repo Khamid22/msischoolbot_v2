@@ -16,7 +16,6 @@ from backend.modules.teacher_academy.schemas import (
     UpdateAcademyStatusForm,
     form_list,
 )
-from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.modules.teacher_academy.policies import filter_academy_teachers_for_user
 from backend.modules.teacher_academy.service import (
     add_assessment,
@@ -55,7 +54,6 @@ def academy_payload(
     credentials: dict | None = None,
     scope_user: CurrentUser | None = None,
 ):
-    invalidate_admin_page_context_cache()
     academy_rows = list_academy_teachers()
     if scope_user is not None:
         academy_rows = filter_academy_teachers_for_user(academy_rows, scope_user)

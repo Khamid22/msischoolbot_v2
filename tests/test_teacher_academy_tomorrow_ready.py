@@ -246,7 +246,6 @@ def _minimal_academic_context():
 
 
 def _patch_admin_page_context(monkeypatch):
-    import backend.internal_operations.pages.routes as admin_page
     import backend.workspaces.academic_director.page as academic_director_routes
 
     def fake_teacher_academy_page_context():
@@ -261,9 +260,6 @@ def _patch_admin_page_context(monkeypatch):
             "curriculum_items": academic_context["curriculum_items"],
         }
 
-    monkeypatch.setattr(admin_page, "build_admin_page_context", lambda **kwargs: _minimal_admin_page_context())
-    monkeypatch.setattr(admin_page, "list_admin_academic_context", _minimal_academic_context)
-    monkeypatch.setattr(admin_page, "list_announcements", lambda: [])
     monkeypatch.setattr(academic_director_routes, "list_teacher_academy_page_context", fake_teacher_academy_page_context)
 
 
@@ -276,7 +272,7 @@ def test_academic_director_can_access_academy_management_route(client, monkeypat
     assert response.status_code == 200
     assert 'data-react-page="academic-director-academy"' in response.text
     assert "academic_director" in response.text
-    assert "adminTeacherAcademy" in response.text
+    assert "managementAcademyTeachers" in response.text
     assert 'data-react-page="internal-operations-home"' not in response.text
 
 
@@ -292,7 +288,6 @@ def test_academic_director_can_create_academy_teacher_through_api_v1(client, mon
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [_academy_workspace()["academy"]])
     monkeypatch.setattr(academy_api, "list_teachers", lambda: [])
     monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: list(rows))
-    monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     _set_session(client, {"auth_role": "academic_director", "auth_login": "ad@test"})
 
     response = client.post(
@@ -438,7 +433,6 @@ def test_new_teacher_direct_message_is_greeting_only(monkeypatch):
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("GET", "/admin"),
         ("GET", "/parent"),
         ("GET", "/student"),
         ("GET", "/dashboard/{student_id}"),

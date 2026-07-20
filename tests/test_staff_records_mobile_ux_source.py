@@ -40,11 +40,9 @@ def test_academic_director_workspace_has_no_teacher_portal_preview():
 
 def test_obsolete_admin_role_previews_are_deleted():
     academy = _read("features/teacher-academy/TeacherAcademyPanel.tsx")
-    state = _read("internal_operations/hooks/useInternalOperationsState.ts")
     workspace = _read("shared/lib/workspace.ts")
     assert "Preview as Teacher" not in academy
-    assert "switchWorkspaceMode" not in state
-    assert "previewRole" not in state
+    assert not (ROOT / "internal_operations").exists()
     assert "devPreviewEnabled" not in workspace
     assert not (ROOT / "features/reporting/overview/RoleOverviewPanel.tsx").exists()
     assert not (ROOT / "shared/lib/staleUiState.ts").exists()

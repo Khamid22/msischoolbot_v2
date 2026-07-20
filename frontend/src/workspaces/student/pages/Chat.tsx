@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Globe, Layers, Loader2, MessageSquare, Pencil, Send, Trash2, Users, X } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
 
@@ -24,7 +23,6 @@ interface ChatPageProps {
     group?: string;
   };
   availableRooms?: Array<{ key: string; label: string; icon: string }>;
-  embedMode?: string;
 }
 
 const ROOM_ICONS: Record<string, typeof Globe> = {
@@ -267,10 +265,9 @@ export default function ChatPage(props: ChatPageProps) {
   }
 
   const activeRoomLabel = rooms.find((r) => r.key === activeRoom)?.label ?? activeRoom;
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const pageContent = (
     <>
-      <div className={`flex flex-col animate-in ${isAdminEmbed ? "h-[calc(var(--tg-app-height)-8rem)] min-h-[34rem]" : "h-full"}`}>
+      <div className="flex h-full flex-col animate-in">
         <div className="mb-3 flex gap-2 overflow-x-auto pb-0.5">
           {rooms.map((room) => (
             <button
@@ -407,19 +404,6 @@ export default function ChatPage(props: ChatPageProps) {
       )}
     </>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Chat Room"
-        subtitle={activeRoomLabel}
-        backUrl={props.backUrl}
-        badge={props.currentStudent?.group || "Chat"}
-      >
-        {pageContent}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

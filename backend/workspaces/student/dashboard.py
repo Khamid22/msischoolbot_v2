@@ -83,8 +83,6 @@ def register_dashboard_routes(students):
         requested_subject = request.args.get("subject", "").strip()
         requested_group = request.args.get("group", "").strip()
         requested_school = request.args.get("school", "").strip()
-        admin_return_panel = request.args.get("admin_return_panel", "").strip().lower()
-        admin_return_school = request.args.get("admin_return_school", "").strip().lower()
         profile_notice = request.args.get("profile_notice", "").strip()
         profile_error = request.args.get("profile_error", "").strip()
         force_refresh = should_force_refresh()
@@ -124,8 +122,6 @@ def register_dashboard_routes(students):
             requested_subject=requested_subject,
             requested_group=requested_group,
             requested_school=requested_school,
-            admin_return_panel=admin_return_panel,
-            admin_return_school=admin_return_school,
             profile_notice=profile_notice,
             profile_error=profile_error,
             force_refresh=force_refresh,
@@ -148,11 +144,6 @@ def register_dashboard_routes(students):
             refresh_params["group"] = refresh_group
         if school_code:
             refresh_params["school"] = school_code
-        if admin_return_panel:
-            refresh_params["admin_return_panel"] = admin_return_panel
-        if admin_return_school:
-            refresh_params["admin_return_school"] = admin_return_school
-
         context["refresh_url"] = url_for("student.dashboard", **refresh_params)
         context["last_updated_label"] = _format_last_updated_label(last_updated_at_value)
 
@@ -206,7 +197,6 @@ def register_dashboard_routes(students):
                 "csrfToken": generate_csrf(),
                 "logoutUrl": url_for("student.logout"),
                 "changePasswordUrl": "/account/security",
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Academic Dashboard",
             description="Mobile-optimized MSI School dashboard with attendance and performance charts.",
@@ -272,7 +262,6 @@ def register_dashboard_routes(students):
                 "studentFullName": context["student_full_name"],
                 "subjectName": context["subject_name"],
                 "lessonRows": context["lesson_rows"],
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="AAP Lesson Mastery",
             description="Average Academic Performance by lesson.",
@@ -326,7 +315,6 @@ def register_dashboard_routes(students):
                 "studentFullName": context["student_full_name"],
                 "subjectName": context["subject_name"],
                 "lessonRows": context["lesson_rows"],
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Attendance By Lesson",
             description="Attendance record by lesson.",

@@ -1,9 +1,7 @@
 from fastapi.responses import JSONResponse
-import os
 import json
 
 from fastapi import APIRouter, Request
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from backend.core.web.rendering import generate_csrf, render_react_page
 from backend.platform.telegram.init_data import (
@@ -16,7 +14,6 @@ from backend.modules.people.students.service import record_student_activity
 from backend.modules.identity.service import authenticate_account_password
 from backend.modules.identity.telegram_auth import authenticate_account_telegram
 from backend.core.access.roles import dashboard_path_for_role
-from backend.core.access.pages import unauthorized_response
 from backend.modules.identity.session import (
     build_dashboard_url,
     current_auth_role,
@@ -24,16 +21,11 @@ from backend.modules.identity.session import (
     dashboard_url_for_current_session,
     logout_portal_session,
     set_account_session,
-    set_admin_session,
     url_for,
 )
 from backend.core.web.request_context import request as request_proxy, session
 from backend.core.web.responses import redirect, with_status
 from backend.core.runtime.rate_limit import limiter
-
-_ADMIN_HANDOFF_SALT = "admin-website-handoff"
-_ADMIN_HANDOFF_MAX_AGE_SECONDS = 180
-
 
 def _telegram_auth_context(init_data):
     fields = verify_telegram_init_data(init_data)
@@ -85,87 +77,6 @@ def _link_parent_from_telegram_start_param(telegram_context):
         telegram_username=str(telegram_context.get("telegram_username") or "").strip(),
         telegram_user_id=int(telegram_context["telegram_user_id"]),
     )
-
-
-def _admin_handoff_serializer():
-    secret = os.environ.get("APP_SECRET_KEY", os.environ.get("FLASK_SECRET_KEY", "")).strip()
-    if not secret:
-        if os.environ.get("APP_ENV", "").strip().lower() in {"dev", "development", "local"}:
-            secret = "dev-only-insecure-key-do-not-use-in-prod"
-        else:
-            raise RuntimeError(
-                "APP_SECRET_KEY must be set. Generate one with: "
-                'python -c "import secrets; print(secrets.token_hex(32))"'
-            )
-    return URLSafeTimedSerializer(
-        secret,
-        salt=_ADMIN_HANDOFF_SALT,
-    )
-
-
-def _normalize_admin_handoff_payload(admin):
-    if not isinstance(admin, dict):
-        return None
-
-    try:
-        admin_id = int(admin["id"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    if admin_id <= 0:
-        return None
-
-    return {
-        "id": admin_id,
-        "login": str(admin.get("login", "")).strip(),
-        "role": str(admin.get("role", "admin")).strip() or "admin",
-        "is_owner": bool(admin.get("is_owner")),
-    }
-
-
-def _current_admin_session_payload():
-    try:
-        admin_id = int(session.get("admin_id"))
-    except (TypeError, ValueError):
-        return None
-    if admin_id <= 0:
-        return None
-
-    return {
-        "id": admin_id,
-        "login": str(session.get("auth_login", "")).strip(),
-        "role": "admin",
-        "is_owner": bool(session.get("admin_is_owner")),
-    }
-
-
-def _build_admin_handoff_url(admin):
-    normalized_admin = _normalize_admin_handoff_payload(admin)
-    if not normalized_admin:
-        return ""
-
-    handoff_token = _admin_handoff_serializer().dumps(normalized_admin)
-    return url_for("student.admin_continue", handoff=handoff_token, _external=True)
-
-
-def _load_admin_handoff_payload(raw_token):
-    token = str(raw_token or "").strip()
-    if not token:
-        return None, "Admin website handoff is missing. Please sign in again."
-
-    try:
-        payload = _admin_handoff_serializer().loads(
-            token,
-            max_age=_ADMIN_HANDOFF_MAX_AGE_SECONDS,
-        )
-    except SignatureExpired:
-        return None, "Admin website handoff expired. Please sign in again."
-    except BadSignature:
-        return None, "Invalid admin website handoff. Please sign in again."
-
-    normalized_payload = _normalize_admin_handoff_payload(payload)
-    if not normalized_payload:
-        return None, "Admin website handoff is invalid. Please sign in again."
-    return normalized_payload, ""
 
 
 def register_portal_routes(app):
@@ -265,48 +176,9 @@ def register_portal_routes(app):
             telegram=True,
         )
 
-    @portal.get("/admin")
-    def admin_entry(request_obj: Request):
-        if current_auth_role() == "admin":
-            query = request_obj.url.query
-            destination = "/internal/operations"
-            if query:
-                destination = f"{destination}?{query}"
-            return redirect(destination)
-        if current_auth_role():
-            return unauthorized_response(
-                request_obj,
-                message="This workspace requires Admin access.",
-                status_code=403,
-            )
-        return render_login_page()
-
-    @portal.get("/admin/continue")
-    def admin_continue():
-        admin_payload, handoff_error = _load_admin_handoff_payload(
-            request_proxy.args.get("handoff")
-        )
-        if not admin_payload:
-            return with_status(render_login_page(auth_error=handoff_error), 401)
-
-        if not set_admin_session(admin_payload):
-            return with_status(render_login_page(
-                auth_error="Unable to initialize admin session. Please sign in again.",
-            ), 500)
-
-        return redirect(dashboard_url_for_current_session() or dashboard_path_for_role("admin"))
-
     @portal.get("/")
-    def home(request_obj: Request):
+    def home():
         role = current_auth_role()
-
-        if role == "admin":
-            # Keep panel/school/student params so old /?panel=... links
-            # still open the right admin console view.
-            destination = dashboard_path_for_role("admin")
-            if request_obj.url.query:
-                destination = f"{destination}?{request_obj.url.query}"
-            return redirect(destination)
 
         if role == "student":
             enrollment_id = current_student_enrollment_id()

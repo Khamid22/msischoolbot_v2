@@ -39,8 +39,8 @@ Each account has one canonical role:
 
 | Role | Current identity/profile | Workspace scope |
 | --- | --- | --- |
-| `system_admin` | staff profile | protected internal operations (not a business workspace) |
 | `ceo` | staff profile | executive workspace |
+| `hr_manager` | staff profile | recruitment and HR operations |
 | `academic_director` | staff profile | full academic management |
 | `head_of_department` | staff profile plus subject scopes | subject-scoped academic management |
 | `customer_support` | staff profile | parent/support operations |
@@ -48,7 +48,7 @@ Each account has one canonical role:
 | `parent` | parent profile | linked children only |
 | `teacher` | teacher profile | own read-only Teacher Academy profile |
 
-`system_admin` may still be represented as `auth_role="admin"` inside presentation compatibility code. Its canonical account role remains `system_admin`; the compatibility value must not grant business roles equivalent privileges.
+The former `admin`, `owner`, and `system_admin` values are not valid runtime roles. Migration `0028_remove_system_admin` archives those accounts, revokes their Telegram links, invalidates their sessions, and removes the System Admin workspace and routes.
 
 Teacher profiles remain managed staff records. The current tree permits an active canonical Teacher account to open a read-only Teacher Academy profile at `/teacher`; it does not grant academic-management mutations.
 
@@ -59,7 +59,6 @@ New Student, staff, and Teacher provisioners use the canonical login as the init
 - student/staff hashes that already verify their login are marked for change;
 - independently changed canonical hashes are preserved;
 - newly provisioned Teacher credentials follow the same forced-change lifecycle;
-- owner bootstrap preserves an existing independent owner password instead of rotating it on every startup.
 
 Parents are Telegram-first. A parent always receives a canonical account/profile, but a Telegram-only or manual-invite parent can legitimately have no password login. If a parent is later given a password credential, the same canonical password lifecycle and self-service endpoint apply.
 
@@ -99,7 +98,7 @@ While `must_change_password` is true, middleware allows only the security page, 
 7. records an `account.password_changed` audit event;
 8. updates the current cookie to the new version.
 
-Administrator student resets use the same account authority, set `must_change_password=true`, increment `session_version`, and audit `account.password_reset`.
+Authorized role-specific student resets use the same account authority, set `must_change_password=true`, increment `session_version`, and audit `account.password_reset`.
 
 ## Versioned Sessions
 
@@ -180,13 +179,12 @@ Alembic `0007_lms_integrity` enforces credential requirements for active passwor
 
 Identity changes should cover:
 
-- canonical password login for each current workspace role and System Admin;
+- canonical password login for each current workspace role;
 - Teacher access limited to its own read-only Academy profile;
 - initial-password redirect and API blocking;
 - successful and rejected self-service changes;
 - session-version invalidation;
-- administrator reset and forced change;
-- owner bootstrap preservation;
+- authorized reset and forced change;
 - canonical Telegram account resolution;
 - expired, reused, or concurrent parent invite claims;
 - parent child-object authorization;

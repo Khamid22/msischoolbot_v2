@@ -10,25 +10,6 @@ This document lists known technical debt and risks that should be addressed duri
 
 ## Current High-Priority Debt
 
-### Mixed Admin Responsibility
-
-Current `admin` code handles:
-
-- internal operations.
-- students.
-- parents.
-- teachers.
-- payments.
-- academic structure.
-- resources.
-- support.
-- role previews.
-
-Target:
-
-- `system_admin` for internal operations.
-- real LMS role workspaces for business users.
-
 ### Bot And Backend Coupling
 
 Current bot imports backend identity modules.

@@ -30,10 +30,10 @@ async def run(args) -> dict:
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
     paths = [
-        "/api/v1/admin/academic/groups?limit=50",
-        f"/api/v1/admin/academic/gradebook?group_id={args.group_id}&month={today:%Y-%m}&section=gradebook",
+        "/api/v1/academic-director/academic/groups?limit=50",
+        f"/api/v1/academic-director/academic/gradebook?group_id={args.group_id}&month={today:%Y-%m}&section=gradebook",
         (
-            "/api/v1/admin/academic/timetable"
+            "/api/v1/academic-director/academic/timetable"
             f"?date_from={week_start.isoformat()}"
             f"&date_to={(week_start + timedelta(days=6)).isoformat()}"
             f"&group_id={args.group_id}"

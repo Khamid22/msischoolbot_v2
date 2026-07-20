@@ -10,30 +10,30 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.core.access import CurrentUser, get_current_user
 from backend.core.api import ApiSuccess, api_success
 from backend.modules.academics.schemas import (
-    AdminAcademicContextDelta,
-    AdminAcademicContextPayload,
-    AdminCreateAcademicGroupRequest,
-    AdminCreateAcademicClassRequest,
-    AdminCreateAcademicSchoolRequest,
-    AdminCreateScheduleRequest,
-    AdminEnrollmentGroupRequest,
-    AdminEnrollmentStatusRequest,
-    AdminEnrollmentUpdated,
-    AdminLessonUpdateRequest,
-    AdminLessonCancelRequest,
-    AdminLessonRecoverRequest,
-    AdminLessonUpdated,
-    AdminRecordAttendanceRequest,
-    AdminRecordCoinRequest,
-    AdminRecordCreated,
-    AdminRecordExamRequest,
-    AdminRecordHomeworkRequest,
-    AdminScheduleCreated,
-    AdminUpdateGroupScheduleRequest,
-    AdminCreateGroupStudentRequest,
-    AdminStudentCreated,
-    AdminCalendarClosureRequest,
-    AdminCalendarClosureUnlockRequest,
+    AcademicManagementAcademicContextDelta,
+    AcademicManagementAcademicContextPayload,
+    AcademicManagementCreateAcademicGroupRequest,
+    AcademicManagementCreateAcademicClassRequest,
+    AcademicManagementCreateAcademicSchoolRequest,
+    AcademicManagementCreateScheduleRequest,
+    AcademicManagementEnrollmentGroupRequest,
+    AcademicManagementEnrollmentStatusRequest,
+    AcademicManagementEnrollmentUpdated,
+    AcademicManagementLessonUpdateRequest,
+    AcademicManagementLessonCancelRequest,
+    AcademicManagementLessonRecoverRequest,
+    AcademicManagementLessonUpdated,
+    AcademicManagementRecordAttendanceRequest,
+    AcademicManagementRecordCoinRequest,
+    AcademicManagementRecordCreated,
+    AcademicManagementRecordExamRequest,
+    AcademicManagementRecordHomeworkRequest,
+    AcademicManagementScheduleCreated,
+    AcademicManagementUpdateGroupScheduleRequest,
+    AcademicManagementCreateGroupStudentRequest,
+    AcademicManagementStudentCreated,
+    AcademicManagementCalendarClosureRequest,
+    AcademicManagementCalendarClosureUnlockRequest,
 )
 from backend.modules.academics.calendar.service import (
     CalendarClosureConflictError,
@@ -42,12 +42,11 @@ from backend.modules.academics.calendar.service import (
     preview_calendar_closure,
     unlock_calendar_closure,
 )
-from backend.platform.admin_page_cache import invalidate_admin_page_context_cache
 from backend.modules.academics.exceptions import AcademicConflictError
 from backend.modules.academics.groups.operations import (
     create_group_from_payload,
     delete_group,
-    list_admin_academic_context,
+    list_academic_management_context,
     move_enrollment_group_from_payload,
     update_enrollment_status_from_payload,
     create_student_with_enrollment_from_payload,
@@ -91,11 +90,11 @@ def _payload(model) -> dict[str, Any]:
 @router.get(
     "/context",
     operation_id="api_v1_academic_director_academic_context",
-    response_model=ApiSuccess[AdminAcademicContextPayload],
+    response_model=ApiSuccess[AcademicManagementAcademicContextPayload],
     deprecated=True,
 )
 def academic_context():
-    return api_success(list_admin_academic_context(include_heavy=True))
+    return api_success(list_academic_management_context(include_heavy=True))
 
 
 @router.get(
@@ -194,7 +193,7 @@ def academic_calendar_closures(
     operation_id="api_v1_academic_director_preview_academic_calendar_closure",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def preview_academic_calendar_closure(payload: AdminCalendarClosureRequest):
+def preview_academic_calendar_closure(payload: AcademicManagementCalendarClosureRequest):
     try:
         return api_success(preview_calendar_closure(_payload(payload)))
     except CalendarClosureConflictError as exc:
@@ -209,7 +208,7 @@ def preview_academic_calendar_closure(payload: AdminCalendarClosureRequest):
     response_model=ApiSuccess[dict[str, Any]],
 )
 def create_academic_calendar_closure(
-    payload: AdminCalendarClosureRequest,
+    payload: AcademicManagementCalendarClosureRequest,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -222,7 +221,6 @@ def create_academic_calendar_closure(
         raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success(result)
 
 
@@ -233,7 +231,7 @@ def create_academic_calendar_closure(
 )
 def unlock_academic_calendar_closure(
     closure_id: int,
-    payload: AdminCalendarClosureUnlockRequest,
+    payload: AcademicManagementCalendarClosureUnlockRequest,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -247,7 +245,6 @@ def unlock_academic_calendar_closure(
         raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success(result)
 
 
@@ -294,52 +291,49 @@ def group_timetable_range(group_id: int, date_from: str, date_to: str):
 @router.post(
     "/schools",
     operation_id="api_v1_academic_director_create_academic_school",
-    response_model=ApiSuccess[AdminAcademicContextPayload],
+    response_model=ApiSuccess[AcademicManagementAcademicContextPayload],
 )
-def create_academic_school(payload: AdminCreateAcademicSchoolRequest):
+def create_academic_school(payload: AcademicManagementCreateAcademicSchoolRequest):
     try:
         create_school_from_payload(_payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
-    return api_success(list_admin_academic_context(include_heavy=False))
+    return api_success(list_academic_management_context(include_heavy=False))
 
 
 @router.post(
     "/classes",
     operation_id="api_v1_academic_director_create_academic_class",
-    response_model=ApiSuccess[AdminAcademicContextPayload],
+    response_model=ApiSuccess[AcademicManagementAcademicContextPayload],
 )
-def create_academic_class(payload: AdminCreateAcademicClassRequest):
+def create_academic_class(payload: AcademicManagementCreateAcademicClassRequest):
     try:
         create_class_from_payload(_payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
-    return api_success(list_admin_academic_context(include_heavy=False))
+    return api_success(list_academic_management_context(include_heavy=False))
 
 
 @router.post(
     "/groups",
     operation_id="api_v1_academic_director_create_academic_group",
-    response_model=ApiSuccess[AdminAcademicContextPayload],
+    response_model=ApiSuccess[AcademicManagementAcademicContextPayload],
 )
-def create_academic_group(payload: AdminCreateAcademicGroupRequest):
+def create_academic_group(payload: AcademicManagementCreateAcademicGroupRequest):
     try:
         create_group_from_payload(_payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
-    return api_success(list_admin_academic_context(include_heavy=False))
+    return api_success(list_academic_management_context(include_heavy=False))
 
 
 @router.post(
     "/schedules",
     operation_id="api_v1_academic_director_create_academic_schedule",
-    response_model=ApiSuccess[AdminScheduleCreated],
+    response_model=ApiSuccess[AcademicManagementScheduleCreated],
 )
 def create_schedule(
-    payload: AdminCreateScheduleRequest,
+    payload: AcademicManagementCreateScheduleRequest,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -350,7 +344,6 @@ def create_schedule(
         )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     timetable = list_timetable_range(
         start_date=result.get("firstLessonDate", ""),
         end_date=min(
@@ -372,10 +365,10 @@ def create_schedule(
     )
 
 
-@router.put("/groups/{group_id}/schedule", operation_id="api_v1_academic_director_upsert_group_schedule", response_model=ApiSuccess[AdminScheduleCreated])
+@router.put("/groups/{group_id}/schedule", operation_id="api_v1_academic_director_upsert_group_schedule", response_model=ApiSuccess[AcademicManagementScheduleCreated])
 def upsert_group_schedule(
     group_id: int,
-    payload: AdminUpdateGroupScheduleRequest,
+    payload: AcademicManagementUpdateGroupScheduleRequest,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -387,7 +380,6 @@ def upsert_group_schedule(
         )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success({
         "schedule": result,
         "schedules": list_group_schedule_rows(group_id),
@@ -399,13 +391,12 @@ def upsert_group_schedule(
     })
 
 
-@router.post("/groups/{group_id}/students", operation_id="api_v1_academic_director_create_group_student", response_model=ApiSuccess[AdminStudentCreated])
-def create_group_student(group_id: int, payload: AdminCreateGroupStudentRequest):
+@router.post("/groups/{group_id}/students", operation_id="api_v1_academic_director_create_group_student", response_model=ApiSuccess[AcademicManagementStudentCreated])
+def create_group_student(group_id: int, payload: AcademicManagementCreateGroupStudentRequest):
     try:
         student = create_student_with_enrollment_from_payload({"full_name": payload.full_name, "group_id": group_id})
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success({"student": student})
 
 
@@ -459,7 +450,7 @@ def gradebook_trends(group_id: int, through: str, months: int = 6):
 @router.delete(
     "/groups/{group_id}",
     operation_id="api_v1_academic_director_delete_academic_group",
-    response_model=ApiSuccess[AdminAcademicContextDelta],
+    response_model=ApiSuccess[AcademicManagementAcademicContextDelta],
 )
 def delete_academic_group(
     group_id: int,
@@ -476,8 +467,7 @@ def delete_academic_group(
     if not deleted:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    invalidate_admin_page_context_cache()
-    academic_context = list_admin_academic_context(include_heavy=False)
+    academic_context = list_academic_management_context(include_heavy=False)
     return api_success(
         {
             "group": deleted,
@@ -492,29 +482,27 @@ def delete_academic_group(
 @router.patch(
     "/enrollments/{enrollment_id}/status",
     operation_id="api_v1_academic_director_update_academic_enrollment_status",
-    response_model=ApiSuccess[AdminEnrollmentUpdated],
+    response_model=ApiSuccess[AcademicManagementEnrollmentUpdated],
 )
-def update_enrollment_status(enrollment_id: int, payload: AdminEnrollmentStatusRequest):
+def update_enrollment_status(enrollment_id: int, payload: AcademicManagementEnrollmentStatusRequest):
     try:
         result = update_enrollment_status_from_payload(enrollment_id, _payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success({"enrollment": result})
 
 
 @router.patch(
     "/enrollments/{enrollment_id}/group",
     operation_id="api_v1_academic_director_move_academic_enrollment_group",
-    response_model=ApiSuccess[AdminEnrollmentUpdated],
+    response_model=ApiSuccess[AcademicManagementEnrollmentUpdated],
 )
-def move_enrollment_group(enrollment_id: int, payload: AdminEnrollmentGroupRequest):
+def move_enrollment_group(enrollment_id: int, payload: AcademicManagementEnrollmentGroupRequest):
     try:
         result = move_enrollment_group_from_payload(enrollment_id, _payload(payload))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
-    academic_context = list_admin_academic_context(include_heavy=False)
+    academic_context = list_academic_management_context(include_heavy=False)
     return api_success({"enrollment": result, "groups": academic_context.get("groups", [])})
 
 
@@ -523,7 +511,7 @@ def move_enrollment_group(enrollment_id: int, payload: AdminEnrollmentGroupReque
     operation_id="api_v1_academic_director_record_academic_attendance",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def record_attendance(payload: AdminRecordAttendanceRequest, user: CurrentUser = Depends(get_current_user)):
+def record_attendance(payload: AcademicManagementRecordAttendanceRequest, user: CurrentUser = Depends(get_current_user)):
     try:
         record_id = record_attendance_from_payload(_payload(payload), user.staff_id)
         summary = get_enrollment_gradebook_summary(payload.enrollment_id)
@@ -537,7 +525,7 @@ def record_attendance(payload: AdminRecordAttendanceRequest, user: CurrentUser =
     operation_id="api_v1_academic_director_record_academic_homework",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def record_homework(payload: AdminRecordHomeworkRequest, user: CurrentUser = Depends(get_current_user)):
+def record_homework(payload: AcademicManagementRecordHomeworkRequest, user: CurrentUser = Depends(get_current_user)):
     try:
         record_id = record_homework_from_payload(_payload(payload), user.staff_id)
         summary = get_enrollment_gradebook_summary(payload.enrollment_id)
@@ -549,11 +537,11 @@ def record_homework(payload: AdminRecordHomeworkRequest, user: CurrentUser = Dep
 @router.patch(
     "/lessons/{lesson_session_id}",
     operation_id="api_v1_academic_director_update_academic_lesson",
-    response_model=ApiSuccess[AdminLessonUpdated],
+    response_model=ApiSuccess[AcademicManagementLessonUpdated],
 )
 def update_lesson(
     lesson_session_id: int,
-    payload: AdminLessonUpdateRequest,
+    payload: AcademicManagementLessonUpdateRequest,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -564,7 +552,6 @@ def update_lesson(
         raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success({"lesson": lesson})
 
 
@@ -573,7 +560,7 @@ def update_lesson(
     operation_id="api_v1_academic_director_cancel_academic_lesson",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, user: CurrentUser = Depends(get_current_user)):
+def cancel_lesson(lesson_session_id: int, payload: AcademicManagementLessonCancelRequest, user: CurrentUser = Depends(get_current_user)):
     try:
         result = cancel_lesson_session(
             lesson_session_id,
@@ -585,7 +572,6 @@ def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, use
         raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success(result)
 
 
@@ -596,7 +582,7 @@ def cancel_lesson(lesson_session_id: int, payload: AdminLessonCancelRequest, use
 )
 def recover_lesson(
     lesson_session_id: int,
-    payload: AdminLessonRecoverRequest | None = None,
+    payload: AcademicManagementLessonRecoverRequest | None = None,
     user: CurrentUser = Depends(get_current_user),
 ):
     try:
@@ -611,7 +597,6 @@ def recover_lesson(
         raise HTTPException(status_code=409, detail=str(exc))
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    invalidate_admin_page_context_cache()
     return api_success(result)
 
 
@@ -620,7 +605,7 @@ def recover_lesson(
     operation_id="api_v1_academic_director_record_academic_exam",
     response_model=ApiSuccess[dict[str, Any]],
 )
-def record_exam(payload: AdminRecordExamRequest, user: CurrentUser = Depends(get_current_user)):
+def record_exam(payload: AcademicManagementRecordExamRequest, user: CurrentUser = Depends(get_current_user)):
     try:
         record_id = record_exam_from_payload(_payload(payload), user.staff_id)
         summary = get_enrollment_gradebook_summary(payload.enrollment_id)
@@ -632,9 +617,9 @@ def record_exam(payload: AdminRecordExamRequest, user: CurrentUser = Depends(get
 @router.post(
     "/coins",
     operation_id="api_v1_academic_director_record_academic_coins",
-    response_model=ApiSuccess[AdminRecordCreated],
+    response_model=ApiSuccess[AcademicManagementRecordCreated],
 )
-def record_coins(payload: AdminRecordCoinRequest):
+def record_coins(payload: AcademicManagementRecordCoinRequest):
     try:
         record_id = record_coin_from_payload(_payload(payload))
     except (TypeError, ValueError) as exc:

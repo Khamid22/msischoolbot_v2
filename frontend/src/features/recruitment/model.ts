@@ -318,9 +318,10 @@ export type RecruitmentCandidate = {
   latest_subject_test_at?: string;
   latest_demo_result?: string;
   latest_demo_at?: string;
+  latest_demo_note?: string;
   evaluation_states?: {
-    interview: string;
-    demo: string;
+    interview: "passed" | "failed" | "missing" | "pending" | string;
+    demo: "passed" | "failed" | "missing" | "pending" | string;
     subject_test: "passed" | "not_passed" | "missing";
   };
   next_task?: RecruitmentTask | null;

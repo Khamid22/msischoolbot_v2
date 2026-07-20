@@ -88,9 +88,7 @@ def get_staff_profile_row(conn: Any, account_id: int) -> Any:
         """
         SELECT sp.id AS profile_id, sp.account_id, sp.staff_id, sp.job_title,
                sp.department, sp.status AS profile_status,
-               staff.login AS staff_login,
-               staff.role AS legacy_staff_role,
-               CASE WHEN lower(COALESCE(staff.role, '')) = 'owner' THEN 1 ELSE 0 END AS is_owner
+               staff.login AS staff_login
         FROM msi_v2.staff_profiles sp
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = sp.staff_id
         WHERE sp.account_id = %s
@@ -420,7 +418,7 @@ def find_staff_account_row(conn: Any, *, staff_id: int, login: str) -> Any:
            OR (account.legacy_source_table = 'msi_staff' AND account.legacy_source_id = %s)
            OR (
                 account.role IN (
-                    'system_admin', 'ceo', 'customer_support', 'hr_manager',
+                    'ceo', 'customer_support', 'hr_manager',
                     'academic_director', 'head_of_department'
                 )
                 AND lower(btrim(account.login)) = lower(btrim(%s))
@@ -630,69 +628,6 @@ def save_staff_account(
     return account_id
 
 
-def get_staff_by_login(conn: Any, login: str):
-    return conn.execute(
-        "SELECT id, password_hash FROM msi_v2.msi_staff WHERE lower(login) = lower(%s)",
-        (login,),
-    ).fetchone()
-
-
-def promote_staff_owner(conn: Any, staff_id: int) -> None:
-    conn.execute(
-        """
-        UPDATE msi_v2.msi_staff
-        SET role = 'owner', status = 'active', updated_at = now()
-        WHERE id = %s
-        """,
-        (int(staff_id),),
-    )
-
-
-def demote_other_staff_owners(conn: Any, owner_staff_id: int) -> None:
-    conn.execute(
-        """
-        UPDATE msi_v2.msi_staff
-        SET role = 'admin', updated_at = now()
-        WHERE lower(role) = 'owner' AND id != %s
-        """,
-        (int(owner_staff_id),),
-    )
-
-
-def get_first_owner_staff(conn: Any):
-    return conn.execute(
-        """
-        SELECT id, password_hash
-        FROM msi_v2.msi_staff
-        WHERE lower(role) = 'owner'
-        ORDER BY id ASC
-        LIMIT 1
-        """
-    ).fetchone()
-
-
-def rename_owner_staff(conn: Any, *, staff_id: int, login: str) -> None:
-    conn.execute(
-        """
-        UPDATE msi_v2.msi_staff
-        SET login = %s, role = 'owner', status = 'active', updated_at = now()
-        WHERE id = %s
-        """,
-        (login, int(staff_id)),
-    )
-
-
-def insert_owner_staff(conn: Any, *, login: str, password_hash: str):
-    return conn.execute(
-        """
-        INSERT INTO msi_v2.msi_staff (login, password_hash, role, status)
-        VALUES (%s, %s, 'owner', 'active')
-        RETURNING id
-        """,
-        (login, password_hash),
-    ).fetchone()
-
-
 __all__ = [
     "change_account_password",
     "find_staff_account_row",
@@ -707,14 +642,8 @@ __all__ = [
     "get_staff_profile_row",
     "get_student_account_by_legacy_id_row",
     "get_student_profile_row",
-    "get_first_owner_staff",
-    "get_staff_by_login",
     "insert_account_audit_event",
     "mark_account_login",
-    "demote_other_staff_owners",
-    "insert_owner_staff",
-    "promote_staff_owner",
-    "rename_owner_staff",
     "save_staff_account",
     "save_parent_account",
     "save_student_account",

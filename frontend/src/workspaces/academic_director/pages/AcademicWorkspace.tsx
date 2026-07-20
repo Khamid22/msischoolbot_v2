@@ -1,7 +1,7 @@
 import { Suspense, lazy, useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { AcademicDirectorPageShell, type AcademicDirectorNavKey } from "@/workspaces/academic_shared/AcademicDirectorShell";
-import type { AdminTab } from "@/shared/lib/workspace";
+import type { AcademicPanelKind } from "@/shared/lib/workspace";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { routes } from "@/shared/lib/routes";
 
@@ -15,22 +15,22 @@ type AcademicWorkspaceProps = {
   csrfToken?: string;
   workspace?: AcademicWorkspaceKind;
   warning?: string;
-  adminMode?: string;
-  adminSchool?: string;
-  adminAcademicSchools?: Array<Record<string, unknown>>;
-  adminAcademicSubjects?: Array<Record<string, unknown>>;
-  adminAcademicGroups?: Array<Record<string, unknown>>;
-  adminAcademicEnrollments?: Array<Record<string, unknown>>;
-  adminAcademicLessons?: Array<Record<string, unknown>>;
-  adminAcademicSchedules?: Array<Record<string, unknown>>;
-  adminAcademicSessions?: Array<Record<string, unknown>>;
-  adminAcademicCurriculumPrograms?: Array<Record<string, unknown>>;
-  adminAcademicCurriculumItems?: Array<Record<string, unknown>>;
-  adminAcademicEnrollmentSummary?: Record<string, unknown>;
-  adminAcademicContextMode?: "summary" | "full";
+  managementMode?: string;
+  managementSchool?: string;
+  academicManagementSchools?: Array<Record<string, unknown>>;
+  academicManagementSubjects?: Array<Record<string, unknown>>;
+  academicManagementGroups?: Array<Record<string, unknown>>;
+  academicManagementEnrollments?: Array<Record<string, unknown>>;
+  academicManagementLessons?: Array<Record<string, unknown>>;
+  academicManagementSchedules?: Array<Record<string, unknown>>;
+  academicManagementSessions?: Array<Record<string, unknown>>;
+  academicManagementCurriculumPrograms?: Array<Record<string, unknown>>;
+  academicManagementCurriculumItems?: Array<Record<string, unknown>>;
+  academicManagementEnrollmentSummary?: Record<string, unknown>;
+  academicManagementContextMode?: "summary" | "full";
 };
 
-const workspaceMeta: Record<AcademicWorkspaceKind, { active: AcademicDirectorNavKey; kind: AdminTab; title: string; subtitle: string }> = {
+const workspaceMeta: Record<AcademicWorkspaceKind, { active: AcademicDirectorNavKey; kind: AcademicPanelKind; title: string; subtitle: string }> = {
   groups: {
     active: "groups",
     kind: "groups",
@@ -52,33 +52,33 @@ const workspaceMeta: Record<AcademicWorkspaceKind, { active: AcademicDirectorNav
 };
 
 const academicDirectorAcademicRoutes = {
-  adminAcademicSchoolCreateApi: routes.academicDirectorAcademicSchoolCreate,
-  adminAcademicGroupCreateApi: routes.academicDirectorAcademicGroupCreate,
-  adminAcademicContextApi: routes.academicDirectorAcademicContextApi,
-  adminAcademicGroupsApi: routes.academicDirectorAcademicGroupsApi,
-  adminAcademicProgramsApi: routes.academicDirectorAcademicProgramsApi,
-  adminAcademicProgramItemsApi: routes.academicDirectorAcademicProgramItemsApi,
-  adminAcademicTimetableApi: routes.academicDirectorAcademicTimetableApi,
-  adminAcademicGroupTimetableApi: routes.academicDirectorAcademicGroupTimetableApi,
-  adminAcademicCalendarClosuresApi: routes.academicDirectorAcademicCalendarClosuresApi,
-  adminAcademicCalendarClosurePreview: routes.academicDirectorAcademicCalendarClosurePreview,
-  adminAcademicCalendarClosureCreate: routes.academicDirectorAcademicCalendarClosureCreate,
-  adminAcademicCalendarClosureUnlock: routes.academicDirectorAcademicCalendarClosureUnlock,
-  adminAcademicGroupApi: routes.academicDirectorAcademicGroupApi,
-  adminAcademicGroupSummaryApi: routes.academicDirectorAcademicGroupSummaryApi,
-  adminAcademicScheduleCreate: routes.academicDirectorAcademicScheduleCreate,
-  adminAcademicGroupSchedule: routes.academicDirectorAcademicGroupSchedule,
-  adminAcademicGroupStudents: routes.academicDirectorAcademicGroupStudents,
-  adminAcademicGradebookApi: routes.academicDirectorAcademicGradebookApi,
-  adminAcademicGradebookTrendsApi: routes.academicDirectorAcademicGradebookTrendsApi,
-  adminAcademicAttendanceApi: routes.academicDirectorAcademicAttendanceApi,
-  adminAcademicHomeworkApi: routes.academicDirectorAcademicHomeworkApi,
-  adminAcademicExamApi: routes.academicDirectorAcademicExamApi,
-  adminAcademicLessonApi: routes.academicDirectorAcademicLessonApi,
-  adminAcademicLessonCancelApi: routes.academicDirectorAcademicLessonCancelApi,
-  adminAcademicLessonRecoverApi: routes.academicDirectorAcademicLessonRecoverApi,
-  adminAcademicEnrollmentStatusApi: routes.academicDirectorAcademicEnrollmentStatusApi,
-  adminAcademicEnrollmentGroupApi: routes.academicDirectorAcademicEnrollmentGroupApi,
+  academicManagementSchoolCreateApi: routes.academicDirectorAcademicSchoolCreate,
+  academicManagementGroupCreateApi: routes.academicDirectorAcademicGroupCreate,
+  academicManagementContextApi: routes.academicDirectorAcademicContextApi,
+  academicManagementGroupsApi: routes.academicDirectorAcademicGroupsApi,
+  academicManagementProgramsApi: routes.academicDirectorAcademicProgramsApi,
+  academicManagementProgramItemsApi: routes.academicDirectorAcademicProgramItemsApi,
+  academicManagementTimetableApi: routes.academicDirectorAcademicTimetableApi,
+  academicManagementGroupTimetableApi: routes.academicDirectorAcademicGroupTimetableApi,
+  academicManagementCalendarClosuresApi: routes.academicDirectorAcademicCalendarClosuresApi,
+  academicManagementCalendarClosurePreview: routes.academicDirectorAcademicCalendarClosurePreview,
+  academicManagementCalendarClosureCreate: routes.academicDirectorAcademicCalendarClosureCreate,
+  academicManagementCalendarClosureUnlock: routes.academicDirectorAcademicCalendarClosureUnlock,
+  academicManagementGroupApi: routes.academicDirectorAcademicGroupApi,
+  academicManagementGroupSummaryApi: routes.academicDirectorAcademicGroupSummaryApi,
+  academicManagementScheduleCreate: routes.academicDirectorAcademicScheduleCreate,
+  academicManagementGroupSchedule: routes.academicDirectorAcademicGroupSchedule,
+  academicManagementGroupStudents: routes.academicDirectorAcademicGroupStudents,
+  academicManagementGradebookApi: routes.academicDirectorAcademicGradebookApi,
+  academicManagementGradebookTrendsApi: routes.academicDirectorAcademicGradebookTrendsApi,
+  academicManagementAttendanceApi: routes.academicDirectorAcademicAttendanceApi,
+  academicManagementHomeworkApi: routes.academicDirectorAcademicHomeworkApi,
+  academicManagementExamApi: routes.academicDirectorAcademicExamApi,
+  academicManagementLessonApi: routes.academicDirectorAcademicLessonApi,
+  academicManagementLessonCancelApi: routes.academicDirectorAcademicLessonCancelApi,
+  academicManagementLessonRecoverApi: routes.academicDirectorAcademicLessonRecoverApi,
+  academicManagementEnrollmentStatusApi: routes.academicDirectorAcademicEnrollmentStatusApi,
+  academicManagementEnrollmentGroupApi: routes.academicDirectorAcademicEnrollmentGroupApi,
 };
 
 export default function AcademicDirectorAcademicWorkspace(props: AcademicWorkspaceProps) {
@@ -86,14 +86,14 @@ export default function AcademicDirectorAcademicWorkspace(props: AcademicWorkspa
   const meta = workspaceMeta[workspace];
   const panelState = useMemo(
     () => ({
-      adminMode: "academic_director",
-      currentSchool: props.adminSchool || "all",
+      managementMode: "academic_director",
+      currentSchool: props.managementSchool || "all",
       academicRoutes: academicDirectorAcademicRoutes,
       props: {
         ...props,
         authRole: props.authRole || "academic_director",
-        adminMode: "academic_director",
-        adminSchool: props.adminSchool || "all",
+        managementMode: "academic_director",
+        managementSchool: props.managementSchool || "all",
       },
     }),
     [props],

@@ -73,7 +73,7 @@ def _head_of_department_academy_context():
 
 def _head_of_department_timetable_context():
     # The HoD timetable shows subject-scoped Teacher Academy lessons only —
-    # regular gradebook sessions live in the admin panel.
+    # regular gradebook sessions live in the Academic Director workspace.
     try:
         subject_ids = current_hod_subject_ids()
         academy_lessons = list_academy_timetable_events(subject_ids)
@@ -113,7 +113,7 @@ def register_head_of_department_page_routes(app):
                 "authRole": current_auth_role(),
                 "role": "head_of_department",
                 "workspace": "timetable",
-                "adminAcademyLessonEvents": timetable_context.get("academy_lessons", []),
+                "academyLessonEvents": timetable_context.get("academy_lessons", []),
                 "warning": timetable_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },
@@ -132,7 +132,7 @@ def register_head_of_department_page_routes(app):
                 "authRole": current_auth_role(),
                 "role": "head_of_department",
                 "workspace": "announcements",
-                "adminAnnouncements": announcement_context.get("announcements", []),
+                "workspaceAnnouncements": announcement_context.get("announcements", []),
                 "warning": announcement_context.get("warning", ""),
                 "csrfToken": generate_csrf(),
             },
@@ -160,14 +160,14 @@ def register_head_of_department_page_routes(app):
             {
                 "authLogin": current_auth_login(),
                 "authRole": current_auth_role(),
-                "adminMode": "head_of_department",
-                "adminSchool": "all",
-                "adminTeachers": academy_context.get("teachers", []),
-                "adminTeacherAcademy": academy_context.get("academy_teachers", []),
-                "adminGroupOptions": academy_context.get("group_options", []),
-                "adminAcademicSubjects": academy_context.get("subjects", []),
-                "adminAcademicCurriculumPrograms": academy_context.get("curriculum_programs", []),
-                "adminAcademicCurriculumItems": academy_context.get("curriculum_items", []),
+                "managementMode": "head_of_department",
+                "managementSchool": "all",
+                "managementTeachers": academy_context.get("teachers", []),
+                "managementAcademyTeachers": academy_context.get("academy_teachers", []),
+                "managementGroupOptions": academy_context.get("group_options", []),
+                "academicManagementSubjects": academy_context.get("subjects", []),
+                "academicManagementCurriculumPrograms": academy_context.get("curriculum_programs", []),
+                "academicManagementCurriculumItems": academy_context.get("curriculum_items", []),
                 "csrfToken": generate_csrf(),
             },
             title="Head of Departments Teacher Academy",

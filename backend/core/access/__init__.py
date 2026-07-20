@@ -1,9 +1,7 @@
 """Re-export role constants, permission constants, and FastAPI security dependencies."""
 
 from backend.core.access.roles import (
-    ROLE_OWNER,
     ROLE_CEO,
-    ROLE_ADMIN,
     ROLE_CUSTOMER_SUPPORT,
     ROLE_PARENT,
     ROLE_STUDENT,
@@ -22,7 +20,6 @@ from backend.core.access.management_permissions import (
     PERMISSION_MANAGE_COMPLAINTS,
     PERMISSION_MANAGE_PAYMENTS,
     PERMISSION_MANAGE_ACADEMICS,
-    PERMISSION_SYSTEM_SETTINGS,
     PERMISSION_MANAGE_RECRUITMENT,
     ALL_PERMISSIONS,
     role_has_permission,
@@ -36,9 +33,7 @@ from backend.core.access.api import (
 )
 
 __all__ = [
-    "ROLE_OWNER",
     "ROLE_CEO",
-    "ROLE_ADMIN",
     "ROLE_CUSTOMER_SUPPORT",
     "ROLE_PARENT",
     "ROLE_STUDENT",
@@ -55,7 +50,6 @@ __all__ = [
     "PERMISSION_MANAGE_COMPLAINTS",
     "PERMISSION_MANAGE_PAYMENTS",
     "PERMISSION_MANAGE_ACADEMICS",
-    "PERMISSION_SYSTEM_SETTINGS",
     "PERMISSION_MANAGE_RECRUITMENT",
     "ALL_PERMISSIONS",
     "role_has_permission",

@@ -28,7 +28,6 @@ import {
   buildHomeworkChartData,
   buildStudentDisplayName,
 } from "@/shared/lib/dashboard-data";
-import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 
 const DashboardChartsSection = lazy(() => import("@/workspaces/student/components/DashboardChartsSection"));
 
@@ -85,7 +84,6 @@ interface DashboardPageProps {
   csrfToken?: string;
   logoutUrl?: string;
   changePasswordUrl?: string;
-  embedMode?: string;
 }
 
 const modalInsetStyle = {
@@ -101,7 +99,6 @@ function SubjectSwitcher({
   open,
   onToggle,
   onClose,
-  embedMode,
   align = "right",
 }: {
   options: SubjectOption[];
@@ -109,7 +106,6 @@ function SubjectSwitcher({
   open: boolean;
   onToggle: () => void;
   onClose?: () => void;
-  embedMode?: string;
   align?: "left" | "right";
 }) {
   const label = currentLabel || "Subject";
@@ -140,12 +136,10 @@ function SubjectSwitcher({
       </button>
       {open ? (
         <nav className={`absolute ${menuAlignClass} top-full z-50 mt-1 w-56 rounded-xl border border-foreground/5 bg-surface py-1 shadow-card-hover ${motion.panel}`}>
-          {options.map((option) => {
-            const optionUrl = isAdminEmbedMode(embedMode) ? withEmbedMode(option.url) : option.url;
-            return (
+          {options.map((option) => (
               <a
                 key={`${option.subject}-${option.group}-${option.url}`}
-                href={optionUrl}
+                href={option.url}
                 onClick={onClose}
                 className={`flex items-center justify-between gap-3 px-4 py-2.5 text-xs font-medium hover:bg-muted ${
                   option.is_current ? "font-bold text-primary" : ""
@@ -154,8 +148,7 @@ function SubjectSwitcher({
                 <span className="min-w-0 truncate">{option.subject}</span>
                 <strong className="shrink-0 text-muted-foreground">{option.subject_short || option.group}</strong>
               </a>
-            );
-          })}
+          ))}
         </nav>
       ) : null}
     </div>
@@ -212,9 +205,8 @@ export default function DashboardPage(props: DashboardPageProps) {
     ? String(Math.round(rawProgramTotal))
     : "—";
   const announcements = Array.isArray(props.announcements) ? props.announcements : [];
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
-  const aapLessonsUrl = isAdminEmbed ? withEmbedMode(props.aapLessonsUrl) : props.aapLessonsUrl;
-  const arLessonsUrl = isAdminEmbed ? withEmbedMode(props.arLessonsUrl) : props.arLessonsUrl;
+  const aapLessonsUrl = props.aapLessonsUrl;
+  const arLessonsUrl = props.arLessonsUrl;
   const currentSubjectLabel = props.currentSubjectShortName || props.currentSubjectName;
 
   useEffect(() => {
@@ -291,28 +283,6 @@ export default function DashboardPage(props: DashboardPageProps) {
       </div>
     </>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Academic Dashboard"
-        subtitle={`${studentName || "Student"}${currentGroup ? ` · ${currentGroup}` : ""}`}
-        badge={currentSubjectLabel}
-        headerAction={
-          <SubjectSwitcher
-            options={subjectOptions}
-            currentLabel={currentSubjectLabel}
-            open={subjectOpen}
-            onToggle={() => setSubjectOpen((current) => !current)}
-            onClose={() => setSubjectOpen(false)}
-            embedMode={props.embedMode}
-          />
-        }
-      >
-        {dashboardContent}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout
@@ -393,7 +363,6 @@ export default function DashboardPage(props: DashboardPageProps) {
                       setAnnouncementsOpen(false);
                     }}
                     onClose={() => setSubjectOpen(false)}
-                    embedMode={props.embedMode}
                   />
                 </div>
               </div>

@@ -66,7 +66,6 @@ def register_office_hours_routes(students):
                 "subjects": subjects_options,
                 "teachers": teachers_list,
                 "csrfToken": generate_csrf(),
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Book Office Hour",
             description="Book an office hour session with a teacher.",

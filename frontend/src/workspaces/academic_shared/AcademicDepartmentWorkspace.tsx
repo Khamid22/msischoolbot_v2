@@ -42,8 +42,8 @@ interface AcademicDepartmentWorkspaceProps {
   role?: string;
   csrfToken?: string;
   workspace?: WorkspaceKind;
-  adminAcademyLessonEvents?: Row[];
-  adminAnnouncements?: Row[];
+  academyLessonEvents?: Row[];
+  workspaceAnnouncements?: Row[];
   warning?: string;
 }
 
@@ -542,8 +542,8 @@ export default function AcademicDepartmentWorkspace({
   role = "",
   csrfToken = "",
   workspace = "timetable",
-  adminAcademyLessonEvents = [],
-  adminAnnouncements = [],
+  academyLessonEvents = [],
+  workspaceAnnouncements = [],
   warning = "",
 }: AcademicDepartmentWorkspaceProps) {
   const normalizedRole = workspaceRole(role || authRole);
@@ -559,8 +559,8 @@ export default function AcademicDepartmentWorkspace({
     : isHod
       ? "Scheduled Teacher Academy lessons within your subject scope."
       : "Scheduled Teacher Academy lessons across Academic Department.";
-  const academyLessons = rowsFrom(adminAcademyLessonEvents);
-  const announcements = rowsFrom(adminAnnouncements);
+  const academyLessons = rowsFrom(academyLessonEvents);
+  const announcements = rowsFrom(workspaceAnnouncements);
   const content = (
     <>
       <PageHeader

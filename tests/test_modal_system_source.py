@@ -80,14 +80,4 @@ def test_teacher_academy_modals_use_shared_modal_system_and_keep_assignment_sele
     assert "academy_curriculum_item_ids: selectedLessonIds.join" in source
 
 
-def test_announcement_composer_uses_shared_modal_system():
-    source = Path("frontend/src/features/communications/AnnouncementsPanel.tsx").read_text()
-
-    assert 'import { Modal } from "@/shared/ui/Modal";' in source
-    assert "<Modal" in source
-    assert 'size="md"' in source
-    assert "fixed inset-0 z-50" not in source
-    assert 'role="dialog"' not in source
     assert "useDismissibleLayer" not in source
-    assert "New Announcement" in source
-    assert "Edit Announcement" in source

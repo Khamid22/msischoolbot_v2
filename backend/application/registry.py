@@ -1,7 +1,5 @@
 from backend.workspaces.academic_director.page import register_academic_director_page_routes
 from backend.workspaces.head_of_departments.page import register_head_of_department_page_routes
-from backend.modules.academics.gradebook.rating import clear_group_cache
-from backend.internal_operations.pages.routes import register_internal_operations_page_routes
 from backend.workspaces.parent.page import register_parent_invite_routes, register_parent_page_routes
 from backend.modules.identity.page import register_portal_routes
 from backend.workspaces.ceo.page import register_ceo_page_routes
@@ -14,10 +12,6 @@ from backend.modules.hr.recruitment.page import register_recruitment_page_routes
 def register_application_pages(app) -> None:
     """Register page adapters without introducing role-to-role dependencies."""
 
-    register_internal_operations_page_routes(
-        app,
-        clear_group_cache=clear_group_cache,
-    )
     register_portal_routes(app)
     register_student_page_routes(app)
     register_parent_page_routes(app)

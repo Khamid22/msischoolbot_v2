@@ -72,7 +72,6 @@ def register_chat_page_routes(students):
                     "group": current_group,
                 },
                 "availableRooms": available_rooms,
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Chat Room",
             description="Student chat room — global, subject, and group channels.",

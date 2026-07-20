@@ -6,7 +6,7 @@ import { routes } from "@/shared/lib/routes";
 import { apiData, apiErrorMessage, apiSucceeded, csrfHeaders, jsonCsrfHeaders } from "@/shared/lib/api";
 import { fetchApiQuery, queryClient } from "@/shared/api/queryClient";
 import { useDismissibleLayer } from "@/shared/lib/useDismissibleLayer";
-import { asNumber, asString, AdminTab, normalizeSubjectKey } from "@/shared/lib/workspace";
+import { asNumber, asString, AcademicPanelKind, normalizeSubjectKey } from "@/shared/lib/workspace";
 import { schoolNamesByCode, schoolStatsByCode } from "@/features/organization/model";
 import { filterProgramItems } from "./curriculum/model";
 import { filteredGroupRows, groupContextSummary, groupSections, subjectFilterOptions as buildSubjectFilterOptions } from "./groups/model";
@@ -53,17 +53,17 @@ class AcademicFeatureErrorBoundary extends Component<
   }
 }
 
-export default function AcademicPanel({ state, kind }: { state: any; kind: AdminTab }) {
+export default function AcademicPanel({ state, kind }: { state: any; kind: AcademicPanelKind }) {
   const props = state.props || {};
-  const isTeacherMode = asString(state.adminMode).toLowerCase() === "teacher";
-  const initialSchools = Array.isArray(props.adminAcademicSchools) ? props.adminAcademicSchools : [];
-  const subjects = Array.isArray(props.adminAcademicSubjects) ? props.adminAcademicSubjects : [];
-  const initialGroups = Array.isArray(props.adminAcademicGroups) ? props.adminAcademicGroups : [];
-  const initialCurriculumPrograms = Array.isArray(props.adminAcademicCurriculumPrograms)
-    ? props.adminAcademicCurriculumPrograms
+  const isTeacherMode = asString(state.managementMode).toLowerCase() === "teacher";
+  const initialSchools = Array.isArray(props.academicManagementSchools) ? props.academicManagementSchools : [];
+  const subjects = Array.isArray(props.academicManagementSubjects) ? props.academicManagementSubjects : [];
+  const initialGroups = Array.isArray(props.academicManagementGroups) ? props.academicManagementGroups : [];
+  const initialCurriculumPrograms = Array.isArray(props.academicManagementCurriculumPrograms)
+    ? props.academicManagementCurriculumPrograms
     : [];
-  const initialCurriculumItems = Array.isArray(props.adminAcademicCurriculumItems)
-    ? props.adminAcademicCurriculumItems
+  const initialCurriculumItems = Array.isArray(props.academicManagementCurriculumItems)
+    ? props.academicManagementCurriculumItems
     : [];
   const csrf: string = asString(props.csrfToken);
   const academicRoutes = state.academicRoutes || routes;
@@ -105,7 +105,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   const groupRequestRef = useRef(0);
 
   async function loadGroupPage(cursor = "", append = false) {
-    if (typeof academicRoutes.adminAcademicGroupsApi !== "function") return;
+    if (typeof academicRoutes.academicManagementGroupsApi !== "function") return;
     const requestId = ++groupRequestRef.current;
     setGroupLoading(true);
     setGroupLoadError("");
@@ -130,7 +130,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
         total?: number;
       }>(
         ["academic", "groups", query.toString()],
-        academicRoutes.adminAcademicGroupsApi(query.toString()),
+        academicRoutes.academicManagementGroupsApi(query.toString()),
       );
       if (requestId !== groupRequestRef.current) return;
       const items = Array.isArray(page.items) ? page.items : [];
@@ -156,12 +156,12 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
   }, [kind, groupSchool, groupSubject, groupSearch]);
 
   useEffect(() => {
-    if ((kind !== "subjects" && kind !== "groups") || typeof academicRoutes.adminAcademicProgramsApi !== "function") return;
+    if ((kind !== "subjects" && kind !== "groups") || typeof academicRoutes.academicManagementProgramsApi !== "function") return;
     setProgramLoading(true);
     setProgramLoadError("");
     void fetchApiQuery<{ items?: Array<Record<string, unknown>> }>(
       ["academic", "programs"],
-      academicRoutes.adminAcademicProgramsApi("limit=100"),
+      academicRoutes.academicManagementProgramsApi("limit=100"),
     )
       .then((page) => {
         setCurriculumPrograms(Array.isArray(page.items) ? page.items : []);
@@ -237,7 +237,7 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     setDeletingGroupId(id);
     clearGroupToast();
     try {
-      const response = await fetch(academicRoutes.adminAcademicGroupApi(id), {
+      const response = await fetch(academicRoutes.academicManagementGroupApi(id), {
         method: "DELETE",
         headers: csrfHeaders(csrf),
       });
@@ -332,12 +332,12 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
     null;
   const activeProgramId = asNumber(activeProgram?.id);
   useEffect(() => {
-    if (kind !== "subjects" || !activeProgramId || typeof academicRoutes.adminAcademicProgramItemsApi !== "function") return;
+    if (kind !== "subjects" || !activeProgramId || typeof academicRoutes.academicManagementProgramItemsApi !== "function") return;
     setProgramLoading(true);
     setProgramLoadError("");
     void fetchApiQuery<{ items?: Array<Record<string, unknown>> }>(
       ["academic", "programs", activeProgramId, "items"],
-      academicRoutes.adminAcademicProgramItemsApi(activeProgramId, "limit=250"),
+      academicRoutes.academicManagementProgramItemsApi(activeProgramId, "limit=250"),
     )
       .then((page) => {
         setCurriculumItems(Array.isArray(page.items) ? page.items : []);
@@ -359,8 +359,8 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
           groupId={openGroupId}
           csrf={csrf}
           groups={groups}
-          teachers={Array.isArray(state.teachers) ? state.teachers : Array.isArray(props.adminTeachers) ? props.adminTeachers : []}
-          schedules={Array.isArray(props.adminAcademicSchedules) ? props.adminAcademicSchedules : []}
+          teachers={Array.isArray(state.teachers) ? state.teachers : Array.isArray(props.managementTeachers) ? props.managementTeachers : []}
+          schedules={Array.isArray(props.academicManagementSchedules) ? props.academicManagementSchedules : []}
           academicRoutes={academicRoutes}
           onClose={() => setOpenGroupId(null)}
         />
@@ -550,12 +550,12 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </button>
                 </div>
                 <form
-                  action={academicRoutes.adminAcademicGroupCreate || routes.adminAcademicGroupCreate}
+                  action={academicRoutes.academicManagementGroupCreate || routes.academicDirectorAcademicGroupCreate}
                   method="post"
                   onSubmit={(event) =>
                     submitAcademicJsonForm(
                       event,
-                      academicRoutes.adminAcademicGroupCreateApi,
+                      academicRoutes.academicManagementGroupCreateApi,
                       "Group created.",
                       () => setAddGroupOpen(false),
                     )
@@ -670,12 +670,12 @@ export default function AcademicPanel({ state, kind }: { state: any; kind: Admin
                   </div>
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                     <form
-                      action={academicRoutes.adminAcademicSchoolCreate || routes.adminAcademicSchoolCreate}
+                      action={academicRoutes.academicManagementSchoolCreate || routes.academicDirectorAcademicSchoolCreate}
                       method="post"
                       onSubmit={(event) =>
                         submitAcademicJsonForm(
                           event,
-                          academicRoutes.adminAcademicSchoolCreateApi,
+                          academicRoutes.academicManagementSchoolCreateApi,
                           "School created.",
                         )
                       }

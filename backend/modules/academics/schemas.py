@@ -7,24 +7,24 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class AdminCreateGroupStudentRequest(BaseModel):
+class AcademicManagementCreateGroupStudentRequest(BaseModel):
     full_name: str
 
 
-class AdminPurgeGroupRequest(BaseModel):
+class AcademicManagementPurgeGroupRequest(BaseModel):
     confirmation: str
 
 
-class AdminStudentCreated(BaseModel):
+class AcademicManagementStudentCreated(BaseModel):
     student: dict[str, Any]
 
 
-class AdminCreateAcademicSchoolRequest(BaseModel):
+class AcademicManagementCreateAcademicSchoolRequest(BaseModel):
     school_name: str
     school_code: str = ""
 
 
-class AdminCreateAcademicGroupRequest(BaseModel):
+class AcademicManagementCreateAcademicGroupRequest(BaseModel):
     school_code: str
     program_subject_key: str = ""
     program_subject_keys: list[str] = Field(default_factory=list)
@@ -34,13 +34,13 @@ class AdminCreateAcademicGroupRequest(BaseModel):
     set_name: str = "Set 1"
 
 
-class AdminCreateAcademicClassRequest(BaseModel):
+class AcademicManagementCreateAcademicClassRequest(BaseModel):
     school_code: str
     class_name: str
     class_code: str = ""
 
 
-class AdminCreateScheduleRequest(BaseModel):
+class AcademicManagementCreateScheduleRequest(BaseModel):
     group_id: int
     teacher_id: int = 0
     weekdays: list[int] = Field(default_factory=list)
@@ -54,7 +54,7 @@ class AdminCreateScheduleRequest(BaseModel):
     title: str = ""
 
 
-class AdminUpdateGroupScheduleRequest(BaseModel):
+class AcademicManagementUpdateGroupScheduleRequest(BaseModel):
     teacher_id: int = 0
     weekdays: list[int] = Field(default_factory=list)
     start_time: str = ""
@@ -72,7 +72,7 @@ class AdminUpdateGroupScheduleRequest(BaseModel):
     allow_recorded_lesson_changes: bool = False
 
 
-class AdminScheduleCreated(BaseModel):
+class AcademicManagementScheduleCreated(BaseModel):
     schedule: dict[str, Any]
     schedules: list[dict[str, Any]] = Field(default_factory=list)
     sessions: list[dict[str, Any]] = Field(default_factory=list)
@@ -82,7 +82,7 @@ class AdminScheduleCreated(BaseModel):
     revision: str = ""
 
 
-class AdminAcademicContextDelta(BaseModel):
+class AcademicManagementAcademicContextDelta(BaseModel):
     group: dict[str, Any] | None = None
     groups: list[dict[str, Any]] = Field(default_factory=list)
     enrollments: list[dict[str, Any]] = Field(default_factory=list)
@@ -94,7 +94,7 @@ class AdminAcademicContextDelta(BaseModel):
     revision: str = ""
 
 
-class AdminAcademicContextPayload(BaseModel):
+class AcademicManagementAcademicContextPayload(BaseModel):
     schools: list[dict[str, Any]] = Field(default_factory=list)
     classes: list[dict[str, Any]] = Field(default_factory=list)
     subjects: list[dict[str, Any]] = Field(default_factory=list)
@@ -108,21 +108,21 @@ class AdminAcademicContextPayload(BaseModel):
     enrollment_summary: dict[str, Any] = Field(default_factory=dict)
 
 
-class AdminEnrollmentStatusRequest(BaseModel):
+class AcademicManagementEnrollmentStatusRequest(BaseModel):
     status: str
     reason: str = ""
 
 
-class AdminEnrollmentGroupRequest(BaseModel):
+class AcademicManagementEnrollmentGroupRequest(BaseModel):
     group_id: int
 
 
-class AdminEnrollmentUpdated(BaseModel):
+class AcademicManagementEnrollmentUpdated(BaseModel):
     enrollment: dict[str, Any]
     groups: list[dict[str, Any]] | None = None
 
 
-class AdminRecordAttendanceRequest(BaseModel):
+class AcademicManagementRecordAttendanceRequest(BaseModel):
     enrollment_id: int
     status: str = ""
     lesson_session_id: int | None = None
@@ -133,7 +133,7 @@ class AdminRecordAttendanceRequest(BaseModel):
     attendance_type: str = "regular"
 
 
-class AdminRecordHomeworkRequest(BaseModel):
+class AcademicManagementRecordHomeworkRequest(BaseModel):
     enrollment_id: int
     score: float
     lesson_session_id: int | None = None
@@ -144,7 +144,7 @@ class AdminRecordHomeworkRequest(BaseModel):
     score_type: str = "Homework"
 
 
-class AdminRecordExamRequest(BaseModel):
+class AcademicManagementRecordExamRequest(BaseModel):
     enrollment_id: int
     exam_name: str = ""
     label: str = ""
@@ -152,17 +152,17 @@ class AdminRecordExamRequest(BaseModel):
     score: float
 
 
-class AdminRecordCoinRequest(BaseModel):
+class AcademicManagementRecordCoinRequest(BaseModel):
     enrollment_id: int
     amount: int
     source: str = "manual"
 
 
-class AdminRecordCreated(BaseModel):
+class AcademicManagementRecordCreated(BaseModel):
     id: int
 
 
-class AdminLessonUpdateRequest(BaseModel):
+class AcademicManagementLessonUpdateRequest(BaseModel):
     lesson_date: str | None = None
     date: str | None = None
     status: str | None = None
@@ -174,20 +174,20 @@ class AdminLessonUpdateRequest(BaseModel):
     allow_recorded_lesson_changes: bool = False
 
 
-class AdminLessonCancelRequest(BaseModel):
+class AcademicManagementLessonCancelRequest(BaseModel):
     reason: str
     allow_recorded_lesson_changes: bool = False
 
 
-class AdminLessonRecoverRequest(BaseModel):
+class AcademicManagementLessonRecoverRequest(BaseModel):
     allow_recorded_lesson_changes: bool = False
 
 
-class AdminLessonUpdated(BaseModel):
+class AcademicManagementLessonUpdated(BaseModel):
     lesson: dict[str, Any]
 
 
-class AdminCalendarClosureRequest(BaseModel):
+class AcademicManagementCalendarClosureRequest(BaseModel):
     school_id: int
     group_id: int = 0
     title: str = "Summer holiday"
@@ -195,7 +195,7 @@ class AdminCalendarClosureRequest(BaseModel):
     end_date: str
 
 
-class AdminCalendarClosureUnlockRequest(BaseModel):
+class AcademicManagementCalendarClosureUnlockRequest(BaseModel):
     rebuild_future: bool = False
 
 

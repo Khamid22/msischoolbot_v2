@@ -169,45 +169,6 @@ def test_active_teacher_telegram_link_is_not_a_portal_login(client, monkeypatch)
     }
 
 
-def test_system_admin_telegram_link_returns_admin_compatibility(client, monkeypatch):
-    import backend.modules.identity.page as identity_routes
-
-    monkeypatch.setattr(identity_routes, "_telegram_auth_context", lambda init_data: _telegram_context(9004))
-    monkeypatch.setattr(identity_routes, "_link_parent_from_telegram_start_param", lambda context: None)
-    monkeypatch.setattr(
-        identity_routes,
-        "authenticate_account_telegram",
-        lambda telegram_user_id: _auth_result(
-            "admin",
-            account_role="system_admin",
-            auth_login="admin",
-            staff_id=1,
-            staff_role="system_admin",
-            admin_id=1,
-            admin_role="owner",
-            admin_is_owner=True,
-            admin_last_panel="overview",
-            admin_last_school="all",
-            telegram_user_id=telegram_user_id,
-        ),
-    )
-
-    response = _post_telegram_auth(client)
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "ok": True,
-        "linked": True,
-        "role": "system_admin",
-        "redirect": "/internal/operations",
-    }
-    session_payload = _decode_session(client)
-    assert session_payload["auth_role"] == "admin"
-    assert session_payload["account_role"] == "system_admin"
-    assert session_payload["canonical_role"] == "system_admin"
-    assert session_payload["admin_id"] == 1
-
-
 def test_missing_link_returns_safe_shape(client, monkeypatch):
     import backend.modules.identity.page as identity_routes
 

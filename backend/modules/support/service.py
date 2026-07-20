@@ -120,7 +120,7 @@ def _build_thread(conn, base):
         messages.append(
             {
                 "id": 0,
-                "author_role": "admin",
+                "author_role": "customer_support",
                 "author_login": base["assigned_to"],
                 "body": base["reply"],
                 "created_at": base["updated_at"],
@@ -240,7 +240,13 @@ def update_complaint(complaint_id, payload):
         return _complaint_payload(conn, updated) if updated else None
 
 
-def add_complaint_reply(complaint_id, payload, *, author_role="admin", author_login=""):
+def add_complaint_reply(
+    complaint_id,
+    payload,
+    *,
+    author_role="customer_support",
+    author_login="",
+):
     """Append a reply to the ticket thread and advance its status."""
     complaint_id = int(complaint_id or 0)
     if complaint_id <= 0:

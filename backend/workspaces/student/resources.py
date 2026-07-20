@@ -65,7 +65,6 @@ def register_resources_routes(students):
                 "subjectName": subject_name,
                 "currentStudent": student,
                 "groupedResources": grouped_resources,
-                "embedMode": request.args.get("embed", "").strip(),
             },
             title="Subject Resources",
             description="Shared learning resources for the selected subject.",

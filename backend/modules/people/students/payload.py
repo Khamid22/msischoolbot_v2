@@ -46,11 +46,6 @@ def load_student_payload_for_view(
             return None, dataset, "Parent session is invalid. Please open the mini app again.", 401
         if not parent_can_access_dashboard(parent_id, student_id):
             return None, dataset, "Access denied: this student is not linked to your parent account.", 403
-    elif role == "admin":
-        # System-admin student previews are an explicit operational workflow.
-        # Other roles must use a scoped domain endpoint instead of falling
-        # through to an unrestricted student dashboard.
-        pass
     elif not role:
         return None, dataset, session_invalid_message, 401
     else:

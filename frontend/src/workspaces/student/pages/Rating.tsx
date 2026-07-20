@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { BarChart3, Calculator, Trophy } from "lucide-react";
-import { AdminEmbedLayout, isAdminEmbedMode, withEmbedMode } from "@/shared/ui/AdminEmbedLayout";
 import { ChartCard } from "@/shared/ui/ChartCard";
 import { TelegramLayout, Topbar } from "@/shared/ui/TelegramLayout";
 
@@ -37,14 +36,12 @@ interface RatingPageProps {
   leaderboard?: LeaderboardRow[];
   scopeOptions?: ScopeOption[];
   ratingScopeLabel?: string;
-  embedMode?: string;
 }
 
 export default function RatingPage(props: RatingPageProps) {
   const leaderboard = Array.isArray(props.leaderboard) ? props.leaderboard : [];
   const scopeOptions = Array.isArray(props.scopeOptions) ? props.scopeOptions : [];
   const [formulaOpen, setFormulaOpen] = useState(false);
-  const isAdminEmbed = isAdminEmbedMode(props.embedMode);
   const subtitle = `Top performers in ${props.subjectName || "this subject"}${props.ratingScopeLabel ? ` · ${props.ratingScopeLabel}` : ""}`;
   const content = (
     <ChartCard
@@ -71,7 +68,7 @@ export default function RatingPage(props: RatingPageProps) {
               {scopeOptions.map((option) => (
                 <a
                   key={option.code}
-                  href={isAdminEmbed ? withEmbedMode(option.url) : option.url}
+                  href={option.url}
                   className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                     option.is_current ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground"
                   }`}
@@ -210,19 +207,6 @@ export default function RatingPage(props: RatingPageProps) {
       )}
     </ChartCard>
   );
-
-  if (isAdminEmbed) {
-    return (
-      <AdminEmbedLayout
-        title="Rating Board"
-        subtitle={props.subjectName || "Subject ranking"}
-        backUrl={props.backUrl}
-        badge={props.ratingScopeLabel || "Rating"}
-      >
-        {content}
-      </AdminEmbedLayout>
-    );
-  }
 
   return (
     <TelegramLayout

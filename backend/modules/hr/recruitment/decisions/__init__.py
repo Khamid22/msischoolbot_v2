@@ -1,0 +1,1 @@
+"""Recruitment hiring-decision capability."""

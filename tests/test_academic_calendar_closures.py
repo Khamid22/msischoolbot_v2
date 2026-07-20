@@ -118,16 +118,12 @@ def test_closure_migration_is_auditable_and_never_deletes_academic_records():
     assert "DELETE FROM msi_v2.attendance_records" not in migration
 
 
-def test_both_management_roles_expose_preview_create_list_and_unlock_routes():
-    for path in (
-        "backend/internal_operations/academics/timetable_routes.py",
-        "backend/workspaces/academic_director/academics_api.py",
-    ):
-        route_source = source(path)
-        assert '"/calendar-closures"' in route_source
-        assert '"/calendar-closures/preview"' in route_source
-        assert '"/calendar-closures/{closure_id}/unlock"' in route_source
-        assert "CalendarClosureConflictError" in route_source
+def test_academic_director_exposes_preview_create_list_and_unlock_routes():
+    route_source = source("backend/workspaces/academic_director/academics_api.py")
+    assert '"/calendar-closures"' in route_source
+    assert '"/calendar-closures/preview"' in route_source
+    assert '"/calendar-closures/{closure_id}/unlock"' in route_source
+    assert "CalendarClosureConflictError" in route_source
 
 
 def test_all_timetable_mutations_share_closure_aware_date_generation():

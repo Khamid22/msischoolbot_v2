@@ -1,0 +1,1 @@
+"""Recruitment evaluation capability."""

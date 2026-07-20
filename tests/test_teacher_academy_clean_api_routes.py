@@ -31,7 +31,6 @@ def _set_session(client, data):
 def _patch_api_payload(monkeypatch):
     import backend.modules.teacher_academy.responses as academy_api
 
-    monkeypatch.setattr(academy_api, "invalidate_admin_page_context_cache", lambda: None)
     monkeypatch.setattr(academy_api, "list_academy_teachers", lambda: [{"id": 91, "subject_id": 2}])
     monkeypatch.setattr(academy_api, "filter_academy_teachers_for_user", lambda rows, user: list(rows))
     monkeypatch.setattr(academy_api, "list_teachers", lambda: [{"id": 44, "full_name": "Example Teacher"}])
@@ -519,8 +518,8 @@ def test_frontend_teacher_academy_uses_clean_role_routes_without_admin_action_fa
     assert "/head-of-departments/api" not in routes_source
     assert "/academic-director/api" not in api_routes_source
     assert "/head-of-departments/api" not in api_routes_source
-    assert "adminMode: props.adminMode || \"academic_director\"" in ad_page
-    assert "adminMode: \"head_of_department\"" in hod_page
+    assert 'managementMode: props.managementMode || "academic_director"' in ad_page
+    assert 'managementMode: "head_of_department"' in hod_page
 
 
 def test_teacher_academy_legacy_deletion_plan_documents_completed_admin_cleanup():

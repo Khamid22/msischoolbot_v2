@@ -1,7 +1,7 @@
 """Payment SQL helpers backed by ``msi_v2.payments``.
 
 ``payments.student_id`` is a foreign key to the canonical ``students.id``.
-Public/admin routes still accept the migration-era ``legacy_student_row_id``;
+Role workspaces still accept the migration-era ``legacy_student_row_id``;
 the conversion happens at this repository boundary so legacy ids never leak
 into foreign-key columns.
 """

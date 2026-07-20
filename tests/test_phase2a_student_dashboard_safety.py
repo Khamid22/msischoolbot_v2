@@ -303,81 +303,6 @@ def test_parent_direct_dashboard_access_uses_parent_validation(client, monkeypat
     assert calls == [(50, 654)]
 
 
-def test_admin_student_dashboard_redirects_to_embed_dashboard(client, monkeypatch):
-    import backend.internal_operations.people.students.form_routes as student_routes
-
-    monkeypatch.setattr(
-        student_routes,
-        "resolve_student_for_internal_operations",
-        lambda student_row_id, get_profile: (
-            {
-                "student_id": 654,
-                "subject": "Mathematics",
-                "group": "Example Group",
-                "school": "sehriyo",
-            },
-            "",
-            200,
-        ),
-    )
-    _set_session(
-        client,
-        {
-            "auth_role": "admin",
-            "auth_login": "admin",
-            "admin_id": 1,
-            "admin_role": "owner",
-            "admin_last_school": "all",
-        },
-    )
-
-    response = client.get("/admin/students/101/dashboard")
-
-    assert response.status_code == 302
-    location = response.headers["location"]
-    assert location.startswith("/dashboard/654?")
-    assert "embed=admin" in location
-    assert "admin_return_panel=students" in location
-    assert "admin_return_school=all" in location
-
-
-def test_admin_student_dashboard_target_preserves_embed_admin(client, monkeypatch):
-    import backend.internal_operations.people.students.form_routes as student_routes
-
-    monkeypatch.setattr(
-        student_routes,
-        "resolve_student_for_internal_operations",
-        lambda student_row_id, get_profile: (
-            {
-                "student_id": 654,
-                "subject": "Mathematics",
-                "group": "Example Group",
-                "school": "sehriyo",
-            },
-            "",
-            200,
-        ),
-    )
-    _set_session(
-        client,
-        {
-            "auth_role": "admin",
-            "auth_login": "admin",
-            "admin_id": 1,
-            "admin_role": "owner",
-            "admin_last_school": "all",
-        },
-    )
-
-    response = client.get("/admin/students/101/dashboard/resources")
-
-    assert response.status_code == 302
-    location = response.headers["location"]
-    assert location.startswith("/dashboard/654/resources?")
-    assert "embed=admin" in location
-    assert "admin_return_panel=students" in location
-
-
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -389,7 +314,6 @@ def test_admin_student_dashboard_target_preserves_embed_admin(client, monkeypatc
         ("GET", "/dashboard/{student_id}/resources"),
         ("GET", "/dashboard/{student_id}/chat"),
         ("GET", "/dashboard/{student_id}/office-hours"),
-        ("GET", "/admin"),
         ("GET", "/parent"),
         ("GET", "/api/v1/auth/me"),
     ],

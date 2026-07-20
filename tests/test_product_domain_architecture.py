@@ -31,19 +31,12 @@ BACKEND_REQUIRED = {
 FRONTEND_REQUIRED = {
     "identity",
     "organization",
-    "people/students",
-    "people/parents",
     "people/teachers",
     "academics/gradebook",
     "academics/curriculum",
     "academics/groups",
     "academics/timetable",
-    "academics/resources",
     "teacher-academy",
-    "support",
-    "finance",
-    "communications",
-    "reporting",
 }
 
 OBSOLETE_BACKEND_MODULES = {
@@ -126,7 +119,7 @@ def test_implemented_product_domains_are_navigable_packages():
         assert (feature_root / relative).is_dir(), f"Missing frontend product domain: {relative}"
 
 
-def test_core_and_internal_operations_are_navigable_packages():
+def test_core_is_navigable_and_internal_operations_is_removed():
     core_root = Path("backend/core")
     for relative in CORE_REQUIRED:
         package = core_root / relative
@@ -138,15 +131,7 @@ def test_core_and_internal_operations_are_navigable_packages():
         "Keep API and workspace permission vocabularies in separate named files"
     )
 
-    internal_root = Path("backend/internal_operations")
-    for relative in INTERNAL_OPERATIONS_REQUIRED:
-        package = internal_root / relative
-        assert package.is_dir(), f"Missing Internal Operations package: {relative}"
-        assert (package / "__init__.py").is_file()
-    for file_name in OBSOLETE_INTERNAL_OPERATION_FILES:
-        assert not (internal_root / file_name).exists(), (
-            f"Internal Operations catch-all returned: {file_name}"
-        )
+    assert not Path("backend/internal_operations").exists()
 
 
 def test_core_and_product_domains_do_not_depend_on_internal_operations():
@@ -187,9 +172,8 @@ def test_recruitment_domain_does_not_restore_the_legacy_pipeline_or_lesson_pract
     ):
         assert path.exists()
 
-    teacher_panel = Path("frontend/src/internal_operations/pages/TeachersPanel.tsx").read_text()
     teacher_model = Path("frontend/src/features/people/teachers/model.ts").read_text()
-    combined = f"{teacher_panel}\n{teacher_model}"
+    combined = teacher_model
     assert "Teacher Academy" in combined
     assert "Active Teachers" in combined
     assert "Hiring Pipeline" not in combined

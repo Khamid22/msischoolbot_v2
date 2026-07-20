@@ -66,8 +66,6 @@ def _patch_workspace_cards(monkeypatch):
 @pytest.mark.parametrize(
     ("raw_role", "normalized", "path", "label"),
     [
-        ("owner", "admin", "/internal/operations", "Admin"),
-        ("system_admin", "system_admin", "/internal/operations", "System Admin"),
         ("sales", "customer_support", "/customer-support", "Customer Support"),
         ("academic-director", "academic_director", "/academic-director", "Academic Director"),
         ("hod", "head_of_department", "/head-of-departments", "Head of Departments"),
@@ -86,11 +84,12 @@ def test_teacher_has_a_portal_destination():
     assert role_display_name("teacher") == "Teacher"
 
 
-def test_admin_has_all_permissions():
-    assert has_permission("admin", "view_global_reports") is True
-    assert has_permission("system_admin", "view_global_reports") is True
-    assert has_permission("admin", "delete_the_moon") is True
-    assert has_permission("system_admin", "delete_the_moon") is True
+def test_removed_admin_roles_have_no_permissions_or_workspace():
+    for role in ("admin", "system_admin", "owner"):
+        assert normalize_role(role) == ""
+        assert dashboard_path_for_role(role) == "/"
+        assert role_display_name(role) == "Unknown Role"
+        assert has_permission(role, "view_global_reports") is False
 
 
 def test_customer_support_permission_alias():
@@ -146,21 +145,6 @@ def test_hr_role_aliases_route_to_the_recruitment_workspace():
         assert normalize_role(role) == "hr_manager"
         assert dashboard_path_for_role(role) == "/hr-manager"
         assert role_display_name(role) == "HR Manager"
-
-
-def test_hr_role_can_initialize_staff_session_and_routes_to_its_workspace(client, monkeypatch):
-    import backend.modules.identity.page as identity_page
-
-    monkeypatch.setattr(
-        identity_page,
-        "_load_admin_handoff_payload",
-        lambda _token: ({"id": 91, "login": "former-hr", "role": "hr_manager"}, ""),
-    )
-
-    response = client.get("/admin/continue?handoff=test")
-
-    assert response.status_code == 302
-    assert response.headers["location"] == "/hr-manager"
 
 
 def test_invalid_session_role_fails_closed(client):

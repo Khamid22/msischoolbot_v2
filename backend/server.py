@@ -1,5 +1,3 @@
-import asyncio
-import contextlib
 import logging
 import os
 import re
@@ -45,7 +43,6 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
     role_page_prefixes = (
         "/academic-director",
         "/academic_director",
-        "/admin",
         "/ceo",
         "/support",
         "/customer-support",
@@ -54,7 +51,6 @@ def _resolve_cache_control_header(request_path: str, query_version: str = ""):
         "/head-of-department",
         "/head-of-departments",
         "/hr-manager",
-        "/internal/operations",
         "/account",
     )
     if request_path in role_page_prefixes or request_path.startswith(
@@ -90,7 +86,6 @@ PUBLIC_PATHS = {
     "/login",
     "/auth/telegram",
     # Signed handoff token, not ambient-cookie auth.
-    "/admin/continue",
     "/unauthorized",
     "/manifest.webmanifest",
     "/sw.js",
@@ -126,8 +121,7 @@ class AuthAndSecurityMiddleware:
         request_obj = Request(scope, receive=receive)
         path = request_obj.url.path
         # 1. Reject cross-origin state changes (Same-Origin check). Applies to
-        # every mutating method on every path (not just /api/), so plain admin
-        # form posts like /admin/teachers are covered too.
+        # every mutating method on every path, including plain HTML form posts.
         if request_obj.method in _STATE_CHANGING_METHODS and path not in _SAME_ORIGIN_EXEMPT_PATHS:
             origin = request_obj.headers.get("Origin") or request_obj.headers.get("Referer") or ""
             is_api = path.startswith("/api/")
@@ -310,7 +304,6 @@ app = FastAPI(
     openapi_tags=[
         {"name": "identity", "description": "Authentication and user session management."},
         {"name": "student", "description": "Student-specific views and dashboard APIs."},
-        {"name": "admin", "description": "System administration, settings, and general management."},
         {"name": "parent", "description": "Parent dashboard, student linked data access."},
         {"name": "resources", "description": "Study materials, resources, and file management."},
         {"name": "payments", "description": "Payment history, details, and billing APIs."},
@@ -320,39 +313,6 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 
-
-async def _recruitment_notification_worker() -> None:
-    from backend.modules.hr.recruitment.notifications import process_due_notifications
-
-    while True:
-        try:
-            await asyncio.to_thread(process_due_notifications)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            LOGGER.exception("Recruitment notification delivery cycle failed")
-        await asyncio.sleep(60)
-
-
-@app.on_event("startup")
-async def start_recruitment_notification_worker() -> None:
-    enabled = os.getenv("RECRUITMENT_NOTIFICATION_WORKER_ENABLED", "1").strip().lower()
-    if enabled in {"0", "false", "no", "off"}:
-        return
-    app.state.recruitment_notification_worker = asyncio.create_task(
-        _recruitment_notification_worker(),
-        name="recruitment-notification-worker",
-    )
-
-
-@app.on_event("shutdown")
-async def stop_recruitment_notification_worker() -> None:
-    task = getattr(app.state, "recruitment_notification_worker", None)
-    if not task:
-        return
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
 
 app.name = "backend.server"
 app.static_folder = _STATIC_DIR

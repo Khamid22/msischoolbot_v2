@@ -10,11 +10,12 @@ Audience: engineers preparing a reviewed release.
 python3 main.py
 python3 main.py web
 python3 main.py bot
+python3 main.py worker
 ```
 
-The web process serves FastAPI and built React assets. The bot process currently starts aiogram with an empty inbound router registry; Telegram Mini App authentication and parent linking are web flows and remain active without bot command handlers.
+The web process serves FastAPI and built React assets. The bot process currently starts aiogram with an empty inbound router registry; Telegram Mini App authentication and parent linking are web flows and remain active without bot command handlers. The worker process delivers due Recruitment notifications in bounded batches.
 
-Web and bot can be separated into independent services later while sharing PostgreSQL.
+Deploy web, bot, and worker as independent services sharing PostgreSQL. Do not run Recruitment notification polling inside a web replica.
 
 ## Database Deployment
 
@@ -25,7 +26,7 @@ python -m alembic upgrade head
 python main.py "$RUN_MODE"
 ```
 
-Repository migration head is `0007_lms_integrity`. A failed migration stops startup. Test the entire chain on a disposable representative clone before release, especially the intentionally irreversible `0006_secure_parent_invites` revision.
+Repository migration head is `0027_unified_profiles`. A failed migration stops startup. Test the entire chain on a disposable representative clone before release, especially intentionally irreversible revisions.
 
 Never substitute manual production DDL for a migration.
 
@@ -49,9 +50,7 @@ Required deployed settings include:
 - Telegram bot token and Mini App URL;
 - host/port/runtime mode.
 
-Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache configuration, object storage, Teacher Academy notification chat IDs, and owner bootstrap credentials.
-
-`ADMIN_PREVIEW_ROLES` is development-only and should be disabled for real role sessions.
+Optional settings include database pool limits, `WEBAPP_INIT_DATA_TTL`, rate-limit/cache configuration, object storage, Teacher Academy notification chat IDs, `RECRUITMENT_NOTIFICATION_POLL_SECONDS`, and `RECRUITMENT_NOTIFICATION_BATCH_LIMIT`.
 
 ## Pre-release Gate
 

@@ -341,8 +341,6 @@ def build_dashboard_page_context(
     requested_subject,
     requested_group,
     requested_school,
-    admin_return_panel,
-    admin_return_school,
     profile_notice,
     profile_error,
     force_refresh=False,
@@ -461,19 +459,7 @@ def build_dashboard_page_context(
     )
 
     dashboard_back_url = url_for("student.home")
-    if auth_role == "admin":
-        return_panel = admin_return_panel or "students"
-        return_school = admin_return_school or str(
-            session.get("admin_last_school", "all")
-        ).strip().casefold() or "all"
-        session["admin_last_panel"] = return_panel
-        session["admin_last_school"] = return_school
-        dashboard_back_url = url_for(
-            "student.home",
-            panel=return_panel,
-            school=return_school,
-        )
-    elif auth_role == "parent":
+    if auth_role == "parent":
         dashboard_back_url = url_for("student.home")
 
     return {
@@ -495,7 +481,7 @@ def build_dashboard_page_context(
         "profile_notice": profile_notice,
         "profile_error": profile_error,
         "dashboard_back_url": dashboard_back_url,
-        "show_dashboard_back": auth_role in {"admin", "parent"},
+        "show_dashboard_back": auth_role == "parent",
     }
 
 
