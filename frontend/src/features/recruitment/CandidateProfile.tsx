@@ -2825,13 +2825,7 @@ export function CandidateProfile({
                 <DefinitionGrid
                   values={[
                     ["Status", humanize(candidate.academy.status || "not_set")],
-                    ["Academy since", dateLabel(candidate.academy.start_date)],
                     ["Subject", candidate.academy.subject],
-                    ["Curriculum", candidate.academy.curriculum],
-                    ["Lessons", candidate.academy.lesson_count ?? 0],
-                    ["Assessments", candidate.academy.assessment_count ?? 0],
-                    ["Onboarding", humanize(candidate.academy.onboarding_status || "pending")],
-                    ["Account", candidate.academy.login || (candidate.academy.account_state === "onboarding_pending" ? "Onboarding pending" : "Not linked")],
                   ]}
                 />
                 {candidate.profile_origin === "academy_direct" ? (
