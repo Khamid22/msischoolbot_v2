@@ -2097,6 +2097,22 @@ def update_candidate(
     return int(getattr(cursor, "rowcount", 0) or 0) > 0
 
 
+_STAGE_HISTORY_TRANSITION_SOURCES = frozenset(
+    {"manual", "automatic", "migration", "restored"}
+)
+_STAGE_HISTORY_TRANSITION_SOURCE_ALIASES = {
+    "historical_restoration": "restored",
+}
+
+
+def _stage_history_transition_source(value: str) -> str:
+    source = str(value or "manual").strip().lower()
+    source = _STAGE_HISTORY_TRANSITION_SOURCE_ALIASES.get(source, source)
+    if source not in _STAGE_HISTORY_TRANSITION_SOURCES:
+        raise ValueError(f"Unsupported stage-history transition source: {value!r}")
+    return source
+
+
 def update_candidate_stage(
     conn: Any,
     *,
@@ -2108,6 +2124,7 @@ def update_candidate_stage(
     comment: str = "",
     transition_source: str = "manual",
 ) -> Any:
+    transition_source = _stage_history_transition_source(transition_source)
     return conn.execute(
         """
         WITH current_candidate AS (

@@ -64,12 +64,39 @@ class _NotificationListConnection:
         return _QueryResult(rows=[])
 
 
+class _StageUpdateConnection:
+    def __init__(self):
+        self.params = ()
+
+    def execute(self, _query, params):
+        self.params = tuple(params)
+        return _QueryResult(row={"id": 7, "status": "test_and_demo", "version": 5})
+
+
 def _connection_factory(conn):
     @contextmanager
     def connect():
         yield conn
 
     return connect
+
+
+def test_stage_update_normalizes_legacy_historical_transition_source():
+    conn = _StageUpdateConnection()
+
+    updated = repository.update_candidate_stage(
+        conn,
+        candidate_id=7,
+        stage="test_and_demo",
+        expected_version=4,
+        actor_account_id=41,
+        now="2026-07-20T05:19:26+00:00",
+        comment="Passed historical job interview",
+        transition_source="historical_restoration",
+    )
+
+    assert updated["version"] == 5
+    assert conn.params[11] == "restored"
 
 
 def _future_values(**overrides):
