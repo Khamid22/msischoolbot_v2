@@ -383,6 +383,8 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /MOBILE_PAGE_SIZE = 5/);
     assert.match(roster, /className="group h-14/);
     assert.doesNotMatch(roster, /<th[^>]*>Actions<\/th>/);
+    assert.doesNotMatch(roster, /<th[^>]*>Account<\/th>/);
+    assert.doesNotMatch(roster, /<dt[^>]*>Account<\/dt>/);
     assert.match(roster, /toolbarLeading/);
     assert.match(teachers, /toolbarLeading=\{teacherTabs\}/);
     assert.match(roster, /ResponsiveTable/);

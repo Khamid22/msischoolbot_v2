@@ -149,20 +149,6 @@ function isInteractiveTarget(target: EventTarget | null) {
     && Boolean(target.closest("a,button,input,select,textarea,[role='menuitem']"));
 }
 
-function AccountStatus({ teacher }: { teacher: TeacherRosterItem }) {
-  const pending = teacher.onboarding_status === "pending"
-    || teacher.onboarding_status === "onboarding_pending";
-  return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-semibold ${
-      pending
-        ? "bg-amber-100 text-amber-900"
-        : "bg-emerald-100 text-emerald-900"
-    }`}>
-      {pending ? "Onboarding pending" : "Connected"}
-    </span>
-  );
-}
-
 function AcademyStatus({ status }: { status: string }) {
   const normalized = String(status || "").toLowerCase();
   const tone = normalized.includes("improvement")
@@ -322,10 +308,6 @@ function TeacherMobileCard({
               ? <AcademyStatus status={teacher.status} />
               : statusLabel(teacher.status)}
           </dd>
-        </div>
-        <div>
-          <dt className="font-medium text-muted-foreground">Account</dt>
-          <dd className="mt-1"><AccountStatus teacher={teacher} /></dd>
         </div>
         {isAcademy ? (
           <>
@@ -573,20 +555,19 @@ export function TeacherAcademyRoster({
               ariaLabel={kind === "teacher_academy" ? "Teacher Academy teachers" : "Active teachers"}
               className="overflow-x-auto overflow-y-visible"
             >
-              <table className="w-full min-w-[1080px] table-fixed border-collapse text-left">
+              <table className="w-full min-w-[880px] table-fixed border-collapse text-left">
                 <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr className="h-10">
-                    <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
-                    <th scope="col" className="w-[14%] px-3 font-semibold">
+                    <th scope="col" className="w-[23%] px-4 font-semibold">Teacher</th>
+                    <th scope="col" className="w-[17%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
                     </th>
-                    <th scope="col" className="w-[18%] px-3 font-semibold">Position</th>
-                    <th scope="col" className="w-[13%] px-3 font-semibold">
+                    <th scope="col" className="w-[21%] px-3 font-semibold">Position</th>
+                    <th scope="col" className="w-[15%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Academy status" : "Status"}
                     </th>
-                    <th scope="col" className="w-[11%] px-3 font-semibold">Lessons completed</th>
-                    <th scope="col" className="w-[10%] px-3 font-semibold">Average score</th>
-                    <th scope="col" className="w-[14%] px-3 font-semibold">Account</th>
+                    <th scope="col" className="w-[13%] px-3 font-semibold">Lessons completed</th>
+                    <th scope="col" className="w-[11%] px-3 font-semibold">Average score</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -627,7 +608,6 @@ export function TeacherAcademyRoster({
                       </td>
                       <td className="px-3 py-1.5"><LessonsCompleted teacher={teacher} /></td>
                       <td className="px-3 py-1.5"><AverageScore teacher={teacher} /></td>
-                      <td className="px-3 py-1.5"><AccountStatus teacher={teacher} /></td>
                     </tr>
                   ))}
                 </tbody>
