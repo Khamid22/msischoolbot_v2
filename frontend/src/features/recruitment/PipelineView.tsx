@@ -95,14 +95,15 @@ function initialFilters(): PipelineFilters {
 }
 
 function matchingAppointment(candidate: RecruitmentCandidate) {
-  const expectedType = candidate.status === "job_interview"
-    ? "job_interview"
-    : candidate.status === "test_and_demo"
-      ? "demo_lesson"
-      : "";
-  if (!expectedType) return null;
-  const appointments = candidate.appointments || [];
-  return appointments.find((item) => ["scheduled", "in_progress"].includes(item.status) && item.appointment_type === expectedType)
+  if (!["responded", "job_interview", "test_and_demo"].includes(candidate.status)) return null;
+  // Sequential flow: interview bookings surface until the interview is passed,
+  // then demo bookings take over.
+  const expectedType = candidate.status === "test_and_demo" && candidate.latest_interview_result === "passed"
+    ? "demo_lesson"
+    : "job_interview";
+  const active = (candidate.appointments || []).filter((item) => ["scheduled", "in_progress"].includes(item.status));
+  return active.find((item) => item.appointment_type === expectedType)
+    || active[0]
     || (candidate.next_appointment?.appointment_type === expectedType ? candidate.next_appointment : null);
 }
 
@@ -200,11 +201,15 @@ const CandidateCard = memo(function CandidateCard({
   const canMove = Boolean(candidate.permissions?.can_move_stage) && !["teacher_academy", "active_teacher"].includes(candidate.status);
   const canManageAppointments = Boolean(candidate.permissions?.can_manage_appointments);
   const appointment = matchingAppointment(candidate);
-  const unscheduledType = candidate.status === "job_interview" && !appointment && candidate.latest_interview_result !== "passed"
-    ? "job_interview"
-    : candidate.status === "test_and_demo" && !appointment && !candidate.latest_demo_result
-      ? "demo_lesson"
-      : null;
+  const interviewDone = candidate.latest_interview_result === "passed";
+  // Buttons unlock one by one: interview first, then the demo lesson.
+  const unscheduledType = appointment
+    ? null
+    : ["responded", "job_interview"].includes(candidate.status) && !interviewDone
+      ? "job_interview"
+      : candidate.status === "test_and_demo"
+        ? (!interviewDone ? "job_interview" : !candidate.latest_demo_result ? "demo_lesson" : null)
+        : null;
   let detailLabel = "";
   let detailValue = "";
   if (candidate.status === "new_candidate") { detailLabel = "Applied"; detailValue = dateLabel(candidate.application_date); }

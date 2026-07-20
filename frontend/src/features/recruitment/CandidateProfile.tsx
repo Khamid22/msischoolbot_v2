@@ -1936,11 +1936,23 @@ export function CandidateProfile({
     (item) => ["scheduled", "in_progress"].includes(item.status),
   );
   const canManageAppointments = Boolean(permissions?.can_manage_appointments);
-  // Both interview and demo can be scheduled anywhere in the interview/demo
-  // phase (e.g. record a missed interview while already in Test & Demo).
-  const canScheduleHere = canManageAppointments && ["job_interview", "test_and_demo"].includes(candidate.status);
   const hasScheduledInterview = scheduledAppointments.some((item) => item.appointment_type === "job_interview");
   const hasScheduledDemo = scheduledAppointments.some((item) => item.appointment_type === "demo_lesson");
+  // Evaluations unlock one by one: interview -> demo lesson -> subject test.
+  const interviewPassed = candidate.evaluation_states?.interview === "passed";
+  const demoPassed = candidate.evaluation_states?.demo === "passed";
+  const canScheduleInterview =
+    canManageAppointments &&
+    ["responded", "job_interview", "test_and_demo"].includes(candidate.status) &&
+    !interviewPassed &&
+    !hasScheduledInterview;
+  const canScheduleDemo =
+    canManageAppointments &&
+    ["job_interview", "test_and_demo"].includes(candidate.status) &&
+    interviewPassed &&
+    !demoPassed &&
+    !hasScheduledDemo;
+  const canRecordSubjectTest = Boolean(permissions?.can_add_subject_test) && demoPassed;
   const openReschedule = (appointment: RecruitmentAppointment) => {
     setAppointmentConflicts([]);
     setAction({ kind: "reschedule_appointment", appointment });
@@ -2248,32 +2260,30 @@ export function CandidateProfile({
   };
 
   const evaluationItems: ActionMenuItem[] = [];
-  if (canScheduleHere) {
-    if (!hasScheduledInterview)
-      evaluationItems.push({
-        key: "schedule_interview",
-        label: "Schedule interview",
-        onClick: () => {
-          setAppointmentConflicts([]);
-          setAction({
-            kind: "schedule_appointment",
-            appointmentType: "job_interview",
-          });
-        },
-      });
-    if (!hasScheduledDemo)
-      evaluationItems.push({
-        key: "schedule_demo",
-        label: "Schedule demo lesson",
-        onClick: () => {
-          setAppointmentConflicts([]);
-          setAction({
-            kind: "schedule_appointment",
-            appointmentType: "demo_lesson",
-          });
-        },
-      });
-  }
+  if (canScheduleInterview)
+    evaluationItems.push({
+      key: "schedule_interview",
+      label: "Schedule interview",
+      onClick: () => {
+        setAppointmentConflicts([]);
+        setAction({
+          kind: "schedule_appointment",
+          appointmentType: "job_interview",
+        });
+      },
+    });
+  if (canScheduleDemo)
+    evaluationItems.push({
+      key: "schedule_demo",
+      label: "Schedule demo lesson",
+      onClick: () => {
+        setAppointmentConflicts([]);
+        setAction({
+          kind: "schedule_appointment",
+          appointmentType: "demo_lesson",
+        });
+      },
+    });
   if (permissions?.can_add_academic_evaluation) {
     const scheduledDemo = scheduledAppointments.find((item) => item.appointment_type === "demo_lesson" && item.status === "scheduled");
     if (scheduledDemo) evaluationItems.push({
@@ -2460,13 +2470,15 @@ export function CandidateProfile({
         onClick: () => { if (appt.appointment_type === "job_interview") setInterviewSession(appt); else setProfileTab("evaluations"); },
       };
     }
-    if (candidate.status === "job_interview" && canManageAppointments && candidate.latest_interview_result !== "passed") {
-      return { label: "Schedule interview", sublabel: "No interview scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }); } };
+    // Sequential flow: interview -> demo lesson -> subject test.
+    if (canScheduleInterview) {
+      return { label: "Schedule job interview", sublabel: candidate.evaluation_states?.interview === "missing" ? "No interview recorded" : "No interview scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "job_interview" }); } };
     }
-    if (candidate.status === "test_and_demo") {
-      if (candidate.evaluation_states?.interview === "missing") return { label: "Review interview", sublabel: "No interview recorded", onClick: () => setProfileTab("evaluations") };
-      if (canManageAppointments && !candidate.latest_demo_result) return { label: "Schedule demo lesson", sublabel: "No demo scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }); } };
-      if (permissions?.can_add_subject_test && candidate.evaluation_states?.subject_test !== "passed") return { label: "Record subject test", sublabel: "Subject test pending", onClick: () => { setProfileTab("evaluations"); setAction({ kind: "record_test" }); } };
+    if (canScheduleDemo) {
+      return { label: "Schedule demo lesson", sublabel: "No demo scheduled yet", onClick: () => { setAppointmentConflicts([]); setAction({ kind: "schedule_appointment", appointmentType: "demo_lesson" }); } };
+    }
+    if (candidate.status === "test_and_demo" && canRecordSubjectTest && candidate.evaluation_states?.subject_test !== "passed") {
+      return { label: "Record subject test", sublabel: "Subject test pending", onClick: () => { setProfileTab("evaluations"); setAction({ kind: "record_test" }); } };
     }
     if (candidate.status === "under_review" && permissions?.can_request_approval) {
       return { label: returnedApproval ? "Resubmit to Academic Director" : "Accept → Academic Director", sublabel: "Ready for final sign-off", onClick: () => setAction({ kind: "request_approval", previous: returnedApproval }) };
@@ -2881,7 +2893,7 @@ export function CandidateProfile({
             <Panel
               title="Job Interviews"
               icon={<ClipboardCheck className="h-4 w-4" />}
-              action={canScheduleHere && !hasScheduledInterview ? scheduleHeaderButton("job_interview") : undefined}
+              action={canScheduleInterview ? scheduleHeaderButton("job_interview") : undefined}
             >
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => (
@@ -2915,7 +2927,7 @@ export function CandidateProfile({
             <Panel
               title="Demo Lessons"
               icon={<ClipboardCheck className="h-4 w-4" />}
-              action={canScheduleHere && !hasScheduledDemo ? scheduleHeaderButton("demo_lesson") : undefined}
+              action={canScheduleDemo ? scheduleHeaderButton("demo_lesson") : undefined}
             >
               <div className="mb-3 space-y-2">
                 {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => (
@@ -2949,7 +2961,7 @@ export function CandidateProfile({
               title="Subject Knowledge Tests"
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
-              {permissions?.can_add_subject_test ? (
+              {canRecordSubjectTest ? (
                 <button
                   type="button"
                   onClick={() => setAction({ kind: "record_test" })}
@@ -2957,6 +2969,10 @@ export function CandidateProfile({
                 >
                   Record subject test
                 </button>
+              ) : permissions?.can_add_subject_test && !demoPassed ? (
+                <p className="mb-3 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                  Available after the demo lesson is passed.
+                </p>
               ) : null}
               <SubjectTestList
                 items={candidate.subject_tests || []}
