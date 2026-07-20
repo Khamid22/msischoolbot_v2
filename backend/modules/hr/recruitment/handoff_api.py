@@ -6,6 +6,7 @@ from backend.core.access import CurrentUser, require_role
 from backend.core.api import api_success
 from backend.modules.hr.recruitment.schemas import AcademyIntakeOnboarding
 from backend.modules.people.teachers.service import provision_recruitment_teacher_account
+from backend.modules.teacher_academy.policies import can_user_manage_academy_teacher
 from backend.modules.teacher_academy.service import onboard_recruitment_academy_teacher
 
 
@@ -19,8 +20,18 @@ router = APIRouter(prefix="/recruitment", tags=["teacher-onboarding-handoff"])
 def onboard_academy_intake(
     academy_teacher_id: int,
     payload: AcademyIntakeOnboarding,
-    user: CurrentUser = Depends(require_role("admin", "system_admin", "academic_director")),
+    user: CurrentUser = Depends(
+        require_role("admin", "system_admin", "academic_director", "head_of_department")
+    ),
 ):
+    if user.role == "head_of_department" and not can_user_manage_academy_teacher(
+        user,
+        academy_teacher_id,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="This Teacher Academy teacher is outside your subject scope.",
+        )
     created, message, credentials = onboard_recruitment_academy_teacher(
         academy_teacher_id=academy_teacher_id,
         subject_program_id=payload.subject_program_id,

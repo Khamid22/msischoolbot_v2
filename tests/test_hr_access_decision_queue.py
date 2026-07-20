@@ -113,6 +113,39 @@ def test_admin_candidate_apis_fail_closed_but_handoff_remains_available(client, 
     assert academy_response.json()["data"]["message"] == "Academy onboarding completed."
 
 
+def test_subject_scoped_hod_can_assign_academy_curriculum(client, monkeypatch):
+    monkeypatch.setattr(
+        handoff_api,
+        "can_user_manage_academy_teacher",
+        lambda user, academy_teacher_id: user.role == "head_of_department"
+        and academy_teacher_id == 8,
+    )
+    monkeypatch.setattr(
+        handoff_api,
+        "onboard_recruitment_academy_teacher",
+        lambda **_values: (
+            True,
+            "Teacher account is ready and the curriculum was assigned.",
+            {"login": "TCH0008", "temporary_password": ""},
+        ),
+    )
+    _set_session(client, "head_of_department")
+
+    allowed = client.post(
+        "/api/v1/recruitment/academy-intakes/8/onboard",
+        headers=XHR,
+        json={"subject_program_id": 3, "curriculum_item_ids": [11]},
+    )
+    denied = client.post(
+        "/api/v1/recruitment/academy-intakes/9/onboard",
+        headers=XHR,
+        json={"subject_program_id": 3, "curriculum_item_ids": [11]},
+    )
+
+    assert allowed.status_code == 200
+    assert denied.status_code == 403
+
+
 def test_hr_login_routes_directly_to_recruitment_when_password_change_is_optional(client, monkeypatch):
     import backend.modules.identity.page as identity_page
 
@@ -335,6 +368,38 @@ def test_academic_director_approval_atomically_finalizes_and_consumes(
         assert any(event == "candidate.hire_approval_approved" for event, _detail in events)
     else:
         assert ("approved", "approved") not in events
+    assert conn.commits == 1
+
+
+def test_academic_director_academy_approval_provisions_account_before_stage_commit(
+    monkeypatch,
+):
+    conn, events, candidate, approval = _patch_approval_transaction(monkeypatch)
+    approval["requested_outcome"] = "teacher_academy"
+    monkeypatch.setattr(
+        service,
+        "provision_recruitment_academy_account",
+        lambda *_args, **_kwargs: events.append(
+            ("account", _kwargs["academy_teacher_id"])
+        ),
+    )
+    monkeypatch.setattr(
+        service,
+        "get_candidate",
+        lambda *_args: {"id": 8, "status": "teacher_academy"},
+    )
+
+    result = service.review_approval(
+        _user(),
+        8,
+        9,
+        status="approved",
+        review_comment="Approved for Academy.",
+    )
+
+    assert result["status"] == "teacher_academy"
+    assert events.index(("academy", 88)) < events.index(("account", 88))
+    assert events.index(("account", 88)) < events.index(("stage", "teacher_academy"))
     assert conn.commits == 1
 
 

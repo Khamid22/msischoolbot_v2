@@ -1498,10 +1498,27 @@ function AcademyDetailModal({
           {metric("Average", progress.average == null ? "-" : progress.average.toFixed(2), "weighted score")}
           {metric("Latest", progress.latest == null ? "-" : progress.latest.toFixed(2), "last report")}
         </div>
-        <div className="mt-3 rounded-xl border border-primary/10 bg-primary/5 p-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-wide text-primary">Teacher account login</p>
-            <p className="mt-1 truncate font-mono text-sm font-black text-foreground">{login || "Account not created yet"}</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-primary/10 bg-primary/5 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-primary">
+              {login ? "Account ready" : "Account pending"}
+            </p>
+            <p className="mt-1 truncate font-mono text-sm font-black text-foreground">
+              {login || "Login is being provisioned"}
+            </p>
+            {login ? (
+              <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+                Temporary password equals the login and can be changed in Account Security.
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-xl border border-foreground/10 bg-muted/40 p-3">
+            <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+              Training configuration
+            </p>
+            <p className="mt-1 text-sm font-black text-foreground">
+              {asNumber(teacher.subject_program_id) ? "Curriculum assigned" : "Curriculum not assigned"}
+            </p>
           </div>
         </div>
 
@@ -1727,10 +1744,10 @@ function AcademyTeacherCard({
           className: "bg-foreground text-background",
         };
   const secondaryActions: ActionMenuItem[] = [];
-  if (canOnboard && asString(teacher.account_onboarding_status) === "pending") {
+  if (canOnboard) {
     secondaryActions.push({
-      key: "complete-onboarding",
-      label: "Complete onboarding",
+      key: "assign-curriculum",
+      label: asNumber(teacher.subject_program_id) ? "Edit curriculum" : "Assign curriculum",
       icon: <KeyRound className="h-4 w-4" />,
       onClick: onOnboard,
     });
@@ -2035,6 +2052,138 @@ function ModalActions({
   );
 }
 
+function AssignCurriculumModal({
+  teacher,
+  programs,
+  curriculumItems,
+  submitting,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  teacher: AcademyTeacher;
+  programs: Array<Record<string, unknown>>;
+  curriculumItems: Array<Record<string, unknown>>;
+  submitting: boolean;
+  error: string;
+  onSubmit: (programId: number, lessonIds: number[]) => void;
+  onClose: () => void;
+}) {
+  const initialProgramId = asNumber(teacher.subject_program_id);
+  const [programId, setProgramId] = useState(initialProgramId);
+  const [lessonIds, setLessonIds] = useState<number[]>(() =>
+    academyAssignments(teacher)
+      .map((assignment) => asNumber(assignment.curriculum_item_id))
+      .filter(Boolean),
+  );
+  const lessons = useMemo(
+    () =>
+      curriculumItems
+        .filter(
+          (item) =>
+            asNumber(item.program_id || item.programId) === programId
+            && asString(item.item_type || item.itemType).toLowerCase() === "lesson",
+        )
+        .sort(
+          (left, right) =>
+            asNumber(left.item_order || left.itemOrder)
+            - asNumber(right.item_order || right.itemOrder),
+        ),
+    [curriculumItems, programId],
+  );
+
+  return (
+    <Modal
+      title={initialProgramId ? "Edit curriculum" : "Assign curriculum"}
+      subtitle={asString(teacher.full_name)}
+      onClose={onClose}
+      size="md"
+      initialFocusSelector="#academy-curriculum-program"
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (programId && lessonIds.length) onSubmit(programId, lessonIds);
+        }}
+      >
+        <ModalBody className="space-y-4">
+          <label className="block">
+            <FieldLabel>Subject curriculum</FieldLabel>
+            <select
+              id="academy-curriculum-program"
+              value={programId || ""}
+              onChange={(event) => {
+                setProgramId(asNumber(event.target.value));
+                setLessonIds([]);
+              }}
+              className="min-h-11 w-full rounded-lg border border-foreground/15 bg-surface px-3 text-sm font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">Select curriculum</option>
+              {programs.map((program) => (
+                <option key={asNumber(program.id)} value={asNumber(program.id)}>
+                  {asString(program.program_name || program.name || program.subject_name)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <fieldset>
+            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Academy lessons
+            </legend>
+            <div className="miniapp-scroll mt-2 max-h-[42dvh] space-y-1 overflow-y-auto rounded-lg border border-foreground/10 p-2">
+              {lessons.length ? lessons.map((lesson) => {
+                const lessonId = asNumber(lesson.id);
+                const checked = lessonIds.includes(lessonId);
+                return (
+                  <label
+                    key={lessonId}
+                    className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setLessonIds((current) =>
+                          checked
+                            ? current.filter((id) => id !== lessonId)
+                            : [...current, lessonId],
+                        )
+                      }
+                      className="h-4 w-4 rounded border-foreground/20 text-primary focus:ring-primary"
+                    />
+                    <span className="min-w-0 text-sm font-semibold">
+                      {asString(lesson.lesson_number || lesson.lessonNumber)}
+                      {" · "}
+                      {asString(lesson.title)}
+                    </span>
+                  </label>
+                );
+              }) : (
+                <p className="px-2 py-4 text-sm text-muted-foreground">
+                  {programId ? "No lessons found for this curriculum." : "Select a curriculum first."}
+                </p>
+              )}
+            </div>
+          </fieldset>
+
+          {error ? (
+            <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive">
+              {error}
+            </p>
+          ) : null}
+        </ModalBody>
+        <ModalActions
+          onClose={onClose}
+          submitting={submitting}
+          submitLabel={initialProgramId ? "Save curriculum" : "Assign curriculum"}
+          disabled={!programId || !lessonIds.length}
+        />
+      </form>
+    </Modal>
+  );
+}
+
 export function TeacherAcademyPanel({
   state,
   academyTeachers,
@@ -2059,6 +2208,7 @@ export function TeacherAcademyPanel({
   const [promoteTeacher, setPromoteTeacher] = useState<AcademyTeacher | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AcademyTeacher | null>(null);
   const [assessmentDeleteTarget, setAssessmentDeleteTarget] = useState<{ teacher: AcademyTeacher; assessment: Record<string, unknown> } | null>(null);
+  const [curriculumTarget, setCurriculumTarget] = useState<AcademyTeacher | null>(null);
   const [activeTeacherAccount, setActiveTeacherAccount] = useState<Record<string, unknown> | null>(null);
   const [teacherPasswordResetting, setTeacherPasswordResetting] = useState(false);
   const [teacherPasswordResetError, setTeacherPasswordResetError] = useState("");
@@ -2111,22 +2261,11 @@ export function TeacherAcademyPanel({
     return data;
   }
 
-  async function onboardRecruitmentAcademyTeacher(teacher: AcademyTeacher) {
-    const programs = Array.isArray(state.props?.adminAcademicCurriculumPrograms)
-      ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
-      : [];
-    const items = Array.isArray(state.props?.adminAcademicCurriculumItems)
-      ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
-      : [];
-    const programGuide = programs.map((program) => `${asNumber(program.id)}: ${asString(program.program_name || program.name || program.subject_name)}`).join("\n");
-    const selectedProgram = window.prompt(`Select a curriculum program ID for ${asString(teacher.full_name)}:\n${programGuide}`);
-    const programId = asNumber(selectedProgram);
-    if (!programId) return;
-    const programLessons = items.filter((item) => asNumber(item.program_id || item.programId) === programId && asString(item.item_type || item.itemType).toLowerCase() === "lesson");
-    const lessonGuide = programLessons.map((item) => `${asNumber(item.id)}: ${asString(item.lesson_number || item.title)}`).join("\n");
-    const selectedLessons = window.prompt(`Enter one or more lesson IDs, separated by commas:\n${lessonGuide}`);
-    const lessonIds = String(selectedLessons || "").split(",").map((value) => asNumber(value)).filter(Boolean);
-    if (!lessonIds.length) return;
+  async function onboardRecruitmentAcademyTeacher(
+    teacher: AcademyTeacher,
+    programId: number,
+    lessonIds: number[],
+  ) {
     setSubmitting(true);
     setError("");
     try {
@@ -2145,7 +2284,7 @@ export function TeacherAcademyPanel({
       }
       const data = apiData<Record<string, any>>(payload);
       const generated = data.credentials || {};
-      setCredentials(generated);
+      setCredentials(asString(generated.temporary_password) ? generated : null);
       onAcademyChange(academyTeachers.map((row) => asNumber(row.id) === asNumber(teacher.id) ? {
         ...row,
         account_onboarding_status: "complete",
@@ -2153,7 +2292,8 @@ export function TeacherAcademyPanel({
         subject_program_id: programId,
         login: asString(generated.login),
       } : row));
-      showToast(asString(data.message) || "Academy onboarding completed.");
+      setCurriculumTarget(null);
+      showToast(asString(data.message) || "Curriculum assigned.");
     } catch {
       showToast("Network error. Please try again.", "danger");
     } finally {
@@ -2173,7 +2313,11 @@ export function TeacherAcademyPanel({
   const canPromoteAcademyTeacher = Boolean(academyApi.promote) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const canDeleteAcademyTeacher = Boolean(academyApi.delete) && adminMode !== "head_of_department" && authRole !== "head_of_department";
   const isAcademicDirectorMode = adminMode === "academic_director" || authRole === "academic_director";
-  const canOnboardRecruitmentTeacher = isAcademicDirectorMode || adminMode === "admin" || authRole === "admin";
+  const isHeadOfDepartmentMode = adminMode === "head_of_department" || authRole === "head_of_department";
+  const canOnboardRecruitmentTeacher = isAcademicDirectorMode
+    || isHeadOfDepartmentMode
+    || adminMode === "admin"
+    || authRole === "admin";
 
   // Highest performers first: rank by weighted average score, teachers without a
   // score last, then a stable name tiebreak.
@@ -2446,6 +2590,36 @@ export function TeacherAcademyPanel({
           onResetPassword={resetActiveTeacherPassword}
           onCopy={copyTeacherCredential}
           onClose={closeActiveTeacherAccount}
+        />
+      ) : null}
+      {curriculumTarget ? (
+        <AssignCurriculumModal
+          teacher={curriculumTarget}
+          programs={
+            Array.isArray(state.props?.adminAcademicCurriculumPrograms)
+              ? state.props.adminAcademicCurriculumPrograms as Array<Record<string, unknown>>
+              : []
+          }
+          curriculumItems={
+            Array.isArray(state.props?.adminAcademicCurriculumItems)
+              ? state.props.adminAcademicCurriculumItems as Array<Record<string, unknown>>
+              : []
+          }
+          submitting={submitting}
+          error={error}
+          onSubmit={(programId, lessonIds) => {
+            void onboardRecruitmentAcademyTeacher(
+              curriculumTarget,
+              programId,
+              lessonIds,
+            );
+          }}
+          onClose={() => {
+            if (!submitting) {
+              setError("");
+              setCurriculumTarget(null);
+            }
+          }}
         />
       ) : null}
       {createOpen ? (
@@ -2939,7 +3113,10 @@ export function TeacherAcademyPanel({
                         setDeleteTarget(teacher);
                       }}
                       onAccount={() => openActiveTeacherAccount(teacher)}
-                      onOnboard={() => void onboardRecruitmentAcademyTeacher(teacher)}
+                      onOnboard={() => {
+                        setError("");
+                        setCurriculumTarget(teacher);
+                      }}
                       onCopyLogin={copyLogin}
                       canPromote={canPromoteAcademyTeacher}
                     />
@@ -2979,12 +3156,15 @@ export function TeacherAcademyPanel({
                       const scheduled = assignmentIsScheduled(nextAssignment);
                       const canUsePrimaryLessonAction = nextAssignment && canAssessAcademyLesson;
                       const rowActions: ActionMenuItem[] = [];
-                      if (canOnboardRecruitmentTeacher && asString(teacher.account_onboarding_status) === "pending") {
+                      if (canOnboardRecruitmentTeacher) {
                         rowActions.push({
-                          key: "complete-onboarding",
-                          label: "Complete onboarding",
+                          key: "assign-curriculum",
+                          label: asNumber(teacher.subject_program_id) ? "Edit curriculum" : "Assign curriculum",
                           icon: <KeyRound className="h-4 w-4" />,
-                          onClick: () => void onboardRecruitmentAcademyTeacher(teacher),
+                          onClick: () => {
+                            setError("");
+                            setCurriculumTarget(teacher);
+                          },
                         });
                       }
                       if (nextAssignment && canScheduleAcademyLesson) {

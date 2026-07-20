@@ -5,6 +5,10 @@ from backend.core.database import connect_auth_db
 
 from backend.modules.teacher_academy import repository as repository
 from backend.modules.teacher_academy import mutations_repository
+from backend.modules.teacher_academy.account_provisioning import (
+    AcademyAccountProvisioningError,
+    provision_recruitment_academy_account,
+)
 from backend.modules.hr.recruitment import repository as recruitment_repository
 from backend.modules.people.teachers.service import list_teachers, upsert_teacher
 
@@ -251,14 +255,14 @@ def onboard_recruitment_academy_teacher(
     actor_account_id=None,
     actor_login="",
 ):
-    """Explicitly attach curriculum and provision a pending Academy intake."""
+    """Assign curriculum while reusing or provisioning the Academy account."""
     now = _utc_now_iso()
     with connect_auth_db() as conn:
         intake = mutations_repository.get_pending_recruitment_academy_intake(
             conn, _as_int(academy_teacher_id)
         )
         if not intake:
-            return False, "Pending recruitment Academy intake was not found.", {}
+            return False, "Recruitment Academy intake was not found.", {}
         program = _program_row(conn, subject_program_id)
         if not program:
             return False, "Select a subject curriculum program.", {}
@@ -268,60 +272,66 @@ def onboard_recruitment_academy_teacher(
         if lesson_error:
             return False, lesson_error, {}
 
-        teacher_id = repository.insert_teacher_profile_row(
-            conn,
-            str(intake["full_name"] or "").strip(),
-            notes=str(intake["notes"] or "").strip(),
-            status="academy",
-            subject_id=int(program["subject_id"]),
-            created_at=now,
-            updated_at=now,
-        )
-        login = repository.get_next_teacher_code(conn)
-        password_hash = generate_password_hash(login)
-        staff_id = repository.insert_teacher_auth(
-            conn, teacher_id, login, login, password_hash, now
-        )
-        if not staff_id:
-            return False, "Unable to provision the Academy teacher login.", {}
-        account_id = _provision_teacher_account_v2(
-            conn,
-            teacher_id=teacher_id,
-            staff_id=staff_id,
-            login=login,
-            password_hash=password_hash,
-            full_name=str(intake["full_name"] or login),
-        )
-        if not account_id:
-            return False, "Unable to provision the Academy teacher account.", {}
-        for sequence_no, lesson in enumerate(lessons, start=1):
-            mutations_repository.insert_academy_lesson_assignment(
+        try:
+            provisioned = provision_recruitment_academy_account(
                 conn,
                 academy_teacher_id=int(intake["id"]),
-                subject_id=int(program["subject_id"]),
-                subject_program_id=int(program["id"]),
-                curriculum_item_id=int(lesson["id"]),
-                sequence_no=sequence_no,
-                lesson_number=str(lesson["lesson_number"] or ""),
-                lesson_topic=str(lesson["title"] or ""),
-                focus_areas_json=json.dumps([]),
-                created_by=str(actor_login or "Academic Director"),
-                created_at=now,
+                actor_account_id=_as_int(actor_account_id) or None,
+                actor_login=str(actor_login or ""),
+                now=now,
             )
-        mutations_repository.complete_recruitment_academy_intake(
+        except AcademyAccountProvisioningError as exc:
+            conn.rollback()
+            return False, str(exc), {}
+
+        existing_rows = repository.list_assignment_rows(conn, int(intake["id"]))
+        assignment_id_by_item = {
+            int(row["curriculum_item_id"]): int(row["id"])
+            for row in existing_rows
+            if int(row["curriculum_item_id"] or 0)
+        }
+        selected_item_ids = {int(lesson["id"]) for lesson in lessons}
+        removed_assignment_ids = [
+            int(row["id"])
+            for row in existing_rows
+            if int(row["curriculum_item_id"] or 0) not in selected_item_ids
+        ]
+        mutations_repository.delete_assignment_rows_with_assessments(
+            conn,
+            removed_assignment_ids,
+        )
+        for sequence_no, lesson in enumerate(lessons, start=1):
+            assignment_id = assignment_id_by_item.get(int(lesson["id"]))
+            if assignment_id:
+                mutations_repository.update_assignment_sequence(
+                    conn,
+                    assignment_id=assignment_id,
+                    sequence_no=sequence_no,
+                    updated_at=now,
+                )
+            else:
+                mutations_repository.insert_academy_lesson_assignment(
+                    conn,
+                    academy_teacher_id=int(intake["id"]),
+                    subject_id=int(program["subject_id"]),
+                    subject_program_id=int(program["id"]),
+                    curriculum_item_id=int(lesson["id"]),
+                    sequence_no=sequence_no,
+                    lesson_number=str(lesson["lesson_number"] or ""),
+                    lesson_topic=str(lesson["title"] or ""),
+                    focus_areas_json=json.dumps([]),
+                    created_by=str(actor_login or "Academic Director"),
+                    created_at=now,
+                )
+        if not mutations_repository.complete_recruitment_academy_curriculum(
             conn,
             academy_teacher_id=int(intake["id"]),
-            staff_id=staff_id,
             subject_id=int(program["subject_id"]),
             subject_program_id=int(program["id"]),
             updated_at=now,
-        )
-        mutations_repository.attach_lifecycle_profile_account(
-            conn,
-            candidate_id=int(intake["recruitment_candidate_id"]),
-            account_id=int(account_id),
-            updated_at=now,
-        )
+        ):
+            conn.rollback()
+            return False, "Unable to assign the Teacher Academy curriculum.", {}
         mutations_repository.insert_recruitment_academy_onboarding_audit(
             conn,
             academy_teacher_id=int(intake["id"]),
@@ -331,11 +341,11 @@ def onboard_recruitment_academy_teacher(
             created_at=now,
         )
         conn.commit()
-    return True, "Academy onboarding completed with selected curriculum lessons.", {
+    return True, "Teacher account is ready and the curriculum was assigned.", {
         "role": "teacher",
-        "login": login,
-        "teacher_code": login,
-        "temporary_password": login,
+        "login": provisioned.login,
+        "teacher_code": provisioned.login,
+        "temporary_password": provisioned.login if provisioned.created else "",
         "display_name": str(intake["full_name"] or ""),
         "subject_name": str(program["subject_name"] or ""),
     }

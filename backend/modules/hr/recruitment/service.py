@@ -34,6 +34,10 @@ from backend.modules.hr.recruitment.constants import (
     OPTIONAL_DOCUMENT_TYPES,
 )
 from backend.modules.hr.recruitment.policies import visible_account_id
+from backend.modules.teacher_academy.account_provisioning import (
+    AcademyAccountProvisioningError,
+    provision_recruitment_academy_account,
+)
 from backend.platform.storage.r2 import (
     build_private_candidate_document_url,
     delete_private_candidate_document,
@@ -3430,7 +3434,26 @@ def _approve_and_finalize_request(
             )
 
         if outcome == "teacher_academy":
-            repository.ensure_academy_intake(conn, candidate=candidate, actor_login=user.login, now=now)
+            academy_teacher_id = repository.ensure_academy_intake(
+                conn,
+                candidate=candidate,
+                actor_login=user.login,
+                now=now,
+            )
+            try:
+                provision_recruitment_academy_account(
+                    conn,
+                    academy_teacher_id=academy_teacher_id,
+                    actor_account_id=_actor_account(user),
+                    actor_login=user.login,
+                    now=now,
+                )
+            except AcademyAccountProvisioningError as exc:
+                raise RecruitmentError(
+                    str(exc),
+                    status_code=409,
+                    code="academy_account_provisioning_failed",
+                ) from exc
         else:
             repository.ensure_active_teacher_intake(conn, candidate=candidate, now=now)
 
@@ -4125,7 +4148,26 @@ def make_final_decision(user: CurrentUser, candidate_id: int, values: dict[str, 
                 raise RecruitmentError("Use an approved Academic Director request for this outcome.", status_code=409)
 
         if decision == "teacher_academy":
-            repository.ensure_academy_intake(conn, candidate=candidate, actor_login=user.login, now=now)
+            academy_teacher_id = repository.ensure_academy_intake(
+                conn,
+                candidate=candidate,
+                actor_login=user.login,
+                now=now,
+            )
+            try:
+                provision_recruitment_academy_account(
+                    conn,
+                    academy_teacher_id=academy_teacher_id,
+                    actor_account_id=_actor_account(user),
+                    actor_login=user.login,
+                    now=now,
+                )
+            except AcademyAccountProvisioningError as exc:
+                raise RecruitmentError(
+                    str(exc),
+                    status_code=409,
+                    code="academy_account_provisioning_failed",
+                ) from exc
         elif decision == "active_teacher":
             repository.ensure_active_teacher_intake(conn, candidate=candidate, now=now)
 

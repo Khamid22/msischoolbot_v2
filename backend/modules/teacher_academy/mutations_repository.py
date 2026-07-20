@@ -99,36 +99,148 @@ def get_pending_recruitment_academy_intake(conn: Any, academy_teacher_id: int) -
     return conn.execute(
         """
         SELECT id, full_name, phone, telegram_username, notes,
-               recruitment_candidate_id, account_onboarding_status
+               recruitment_candidate_id, account_onboarding_status,
+               user_id, subject_id, subject_program_id, academy_status
         FROM msi_v2.academy_teachers
         WHERE id = %s
           AND recruitment_candidate_id IS NOT NULL
-          AND account_onboarding_status = 'pending'
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
         FOR UPDATE
         """,
         (academy_teacher_id,),
     ).fetchone()
 
 
-def complete_recruitment_academy_intake(
+def get_recruitment_academy_account_context(conn: Any, academy_teacher_id: int) -> Any:
+    """Lock an Academy intake and expose every canonical identity link."""
+    return conn.execute(
+        """
+        SELECT
+            academy.id,
+            academy.full_name,
+            academy.phone,
+            academy.email,
+            academy.telegram_username,
+            academy.notes,
+            academy.subject_id,
+            academy.subject_program_id,
+            academy.academy_status,
+            academy.account_onboarding_status,
+            academy.user_id AS academy_staff_id,
+            academy.recruitment_candidate_id AS candidate_id,
+            candidate.linked_account_id AS candidate_account_id,
+            candidate.status AS candidate_status,
+            COALESCE(academy_staff.id, linked_staff.id, candidate_account_staff.id) AS staff_id,
+            COALESCE(
+                academy_staff.login,
+                linked_staff.login,
+                candidate_account_staff.login,
+                ''
+            ) AS staff_login,
+            COALESCE(
+                academy_staff.password_hash,
+                linked_staff.password_hash,
+                candidate_account_staff.password_hash,
+                ''
+            ) AS staff_password_hash,
+            COALESCE(
+                academy_staff.role,
+                linked_staff.role,
+                candidate_account_staff.role,
+                ''
+            ) AS staff_role,
+            COALESCE(
+                academy_staff.teacher_id,
+                linked_teacher.id,
+                candidate_account_teacher.id
+            ) AS teacher_id,
+            COALESCE(
+                linked_teacher.recruitment_candidate_id,
+                candidate_account_teacher.recruitment_candidate_id
+            ) AS teacher_candidate_id,
+            staff_account.id AS staff_account_id,
+            candidate_account.id AS linked_candidate_account_id,
+            COALESCE(staff_account.id, candidate_account.id) AS account_id,
+            COALESCE(staff_account.role, candidate_account.role, '') AS account_role,
+            COALESCE(staff_account.legacy_source_id, candidate_account.legacy_source_id) AS account_staff_id
+        FROM msi_v2.academy_teachers academy
+        JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = academy.recruitment_candidate_id
+        LEFT JOIN msi_v2.accounts candidate_account
+          ON candidate_account.id = candidate.linked_account_id
+        LEFT JOIN msi_v2.msi_staff candidate_account_staff
+          ON candidate_account.legacy_source_table = 'msi_staff'
+         AND candidate_account_staff.id = candidate_account.legacy_source_id
+        LEFT JOIN msi_v2.teachers candidate_account_teacher
+          ON candidate_account_teacher.id = candidate_account_staff.teacher_id
+        LEFT JOIN msi_v2.teachers linked_teacher
+          ON linked_teacher.recruitment_candidate_id = candidate.id
+        LEFT JOIN msi_v2.msi_staff academy_staff
+          ON academy_staff.id = academy.user_id
+        LEFT JOIN msi_v2.msi_staff linked_staff
+          ON linked_staff.teacher_id = linked_teacher.id
+        LEFT JOIN msi_v2.accounts staff_account
+          ON staff_account.role = 'teacher'
+         AND staff_account.legacy_source_table = 'msi_staff'
+         AND staff_account.legacy_source_id = COALESCE(
+             academy_staff.id,
+             linked_staff.id,
+             candidate_account_staff.id
+         )
+        WHERE academy.id = %s
+        FOR UPDATE OF academy, candidate
+        """,
+        (int(academy_teacher_id),),
+    ).fetchone()
+
+
+def mark_recruitment_academy_account_ready(
     conn: Any,
     *,
     academy_teacher_id: int,
     staff_id: int,
+    updated_at: str,
+) -> bool:
+    row = conn.execute(
+        """
+        UPDATE msi_v2.academy_teachers
+        SET user_id = %s,
+            account_onboarding_status = 'complete',
+            updated_at = %s::timestamptz
+        WHERE id = %s
+          AND (user_id IS NULL OR user_id = %s)
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
+        RETURNING id
+        """,
+        (int(staff_id), updated_at, int(academy_teacher_id), int(staff_id)),
+    ).fetchone()
+    return bool(row)
+
+
+def complete_recruitment_academy_curriculum(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
     subject_id: int,
     subject_program_id: int,
     updated_at: str,
-) -> None:
-    conn.execute(
+) -> bool:
+    row = conn.execute(
         """
         UPDATE msi_v2.academy_teachers
-        SET user_id = %s, subject_id = %s, subject_program_id = %s,
-            academy_status = 'in_training', account_onboarding_status = 'complete',
+        SET subject_id = %s,
+            subject_program_id = %s,
+            academy_status = 'in_training',
             updated_at = %s::timestamptz
-        WHERE id = %s AND account_onboarding_status = 'pending'
+        WHERE id = %s
+          AND user_id IS NOT NULL
+          AND account_onboarding_status = 'complete'
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
+        RETURNING id
         """,
-        (staff_id, subject_id, subject_program_id, updated_at, academy_teacher_id),
-    )
+        (subject_id, subject_program_id, updated_at, academy_teacher_id),
+    ).fetchone()
+    return bool(row)
 
 
 def attach_lifecycle_profile_account(
@@ -137,15 +249,61 @@ def attach_lifecycle_profile_account(
     candidate_id: int,
     account_id: int,
     updated_at: str,
-) -> None:
-    conn.execute(
+) -> bool:
+    row = conn.execute(
         """
         UPDATE msi_v2.teacher_candidates
         SET linked_account_id = %s, updated_at = %s::timestamptz
         WHERE id = %s
           AND (linked_account_id IS NULL OR linked_account_id = %s)
+        RETURNING id
         """,
         (int(account_id), updated_at, int(candidate_id), int(account_id)),
+    ).fetchone()
+    return bool(row)
+
+
+def insert_recruitment_academy_account_audit(
+    conn: Any,
+    *,
+    academy_teacher_id: int,
+    candidate_id: int,
+    teacher_id: int,
+    staff_id: int,
+    account_id: int,
+    login: str,
+    actor_account_id: int | None,
+    actor_login: str,
+    created_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO msi_v2.audit_events (
+            actor_account_id, event_type, entity_type, entity_id, detail_json, created_at
+        ) VALUES (
+            %s, 'candidate.academy_account_provisioned', 'teacher_candidate', %s,
+            jsonb_build_object(
+                'academy_teacher_id', %s,
+                'teacher_id', %s,
+                'staff_id', %s,
+                'account_id', %s,
+                'login', %s::text,
+                'actor_login', %s::text
+            ),
+            %s::timestamptz
+        )
+        """,
+        (
+            actor_account_id,
+            candidate_id,
+            academy_teacher_id,
+            teacher_id,
+            staff_id,
+            account_id,
+            login,
+            actor_login,
+            created_at,
+        ),
     )
 
 
