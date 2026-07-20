@@ -158,23 +158,27 @@ function Panel({
   title,
   icon,
   action,
+  compact = false,
   children,
 }: {
   title: string;
   icon: ReactNode;
   action?: ReactNode;
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-border px-3 py-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <div className={`flex items-center justify-between gap-3 border-b border-border px-3 ${
+        compact ? "min-h-11 flex-wrap py-1.5 sm:flex-nowrap" : "min-h-12 py-2"
+      }`}>
+        <h2 className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
           {icon}
           {title}
         </h2>
         {action}
       </div>
-      <div className="p-3">{children}</div>
+      <div className={compact ? "p-2" : "p-3"}>{children}</div>
     </section>
   );
 }
@@ -736,17 +740,19 @@ function TrainingPanel({
   subject,
   position,
   startDate,
+  promotionState,
+  onPromote,
 }: {
   rows: AcademyTrainingRow[];
   subject?: string;
   position?: string;
   startDate?: string | null;
+  promotionState?: "available" | "requested" | "approved" | "returned";
+  onPromote?: () => void;
 }) {
   const [expandedLessonId, setExpandedLessonId] = useState<number | null>(null);
   const summary = academyTrainingSummary(rows);
-  const progressPercentage = summary.assigned
-    ? Math.round((summary.evaluated / summary.assigned) * 100)
-    : 0;
+  const progressPercentage = summary.completionPercentage;
   const lessonsLeft = Math.max(0, summary.assigned - summary.evaluated);
   const metrics = [
     {
@@ -786,20 +792,22 @@ function TrainingPanel({
       id="candidate-panel-training"
       role="tabpanel"
       aria-labelledby="candidate-tab-training"
-      className="space-y-3"
+      className="space-y-2"
     >
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className={`grid grid-cols-2 gap-1.5 rounded-xl ${
+        summary.isComplete ? "ring-2 ring-emerald-300/60" : ""
+      } md:grid-cols-5`}>
         {metrics.map(({ label, value, tone, valueTone }) => (
           <section
             key={label}
-            className={`min-w-0 rounded-lg border px-3 py-2.5 shadow-sm ${tone}`}
+            className={`min-w-0 rounded-lg border px-2.5 py-1.5 shadow-sm ${tone}`}
             aria-label={`${label}: ${value}`}
           >
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               {label}
             </p>
             <p
-              className={`mt-0.5 truncate text-lg font-bold tabular-nums ${valueTone}`}
+              className={`truncate text-base font-bold tabular-nums ${valueTone}`}
               title={String(value)}
             >
               {value}
@@ -811,25 +819,52 @@ function TrainingPanel({
       <Panel
         title="Academy training"
         icon={<GraduationCap className="h-4 w-4" />}
+        compact
         action={
-          <div className="min-w-40 max-w-64 flex-1" aria-label={`${summary.evaluated} of ${summary.assigned} lessons covered, ${lessonsLeft} left`}>
-            <div className="mb-1 flex items-center justify-between gap-3 text-[10px] font-semibold text-muted-foreground">
-              <span>{summary.evaluated}/{summary.assigned} covered</span>
-              <span>{lessonsLeft} left · {progressPercentage}%</span>
-            </div>
+          <div className="flex w-full min-w-0 flex-1 items-center justify-end gap-2 sm:w-auto">
             <div
-              role="progressbar"
-              aria-label="Academy training progress"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progressPercentage}
-              className="h-2 overflow-hidden rounded-full bg-muted"
+              className="min-w-32 max-w-5xl flex-1"
+              aria-label={`${summary.evaluated} of ${summary.assigned} lessons covered, ${lessonsLeft} left`}
             >
+              <div className="mb-0.5 flex items-center justify-between gap-3 text-[10px] font-semibold text-muted-foreground">
+                <span>
+                  {summary.isComplete ? "Teacher Academy completed" : `${summary.evaluated}/${summary.assigned} covered`}
+                </span>
+                <span>{lessonsLeft} left · {progressPercentage}%</span>
+              </div>
               <div
-                className="h-full rounded-full bg-primary transition-[width] duration-200 motion-reduce:transition-none"
-                style={{ width: `${progressPercentage}%` }}
-              />
+                role="progressbar"
+                aria-label="Academy training progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progressPercentage}
+                className="h-2 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className={`h-full rounded-full transition-[width] duration-200 motion-reduce:transition-none ${
+                    summary.isComplete ? "bg-emerald-500" : "bg-primary"
+                  }`}
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
             </div>
+            {summary.canPromote && onPromote ? (
+              <button
+                type="button"
+                onClick={onPromote}
+                disabled={promotionState === "requested" || promotionState === "approved"}
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {promotionState === "requested"
+                  ? "Requested"
+                  : promotionState === "approved"
+                    ? "Approved"
+                    : promotionState === "returned"
+                      ? "Resubmit"
+                      : "Promote"}
+              </button>
+            ) : null}
           </div>
         }
       >
@@ -844,11 +879,11 @@ function TrainingPanel({
                 </caption>
                 <thead className="bg-muted/60 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th scope="col" className="w-[31%] px-3 py-2">Assigned Topics</th>
-                    <th scope="col" className="w-[19%] px-3 py-2">Evaluated Date</th>
-                    <th scope="col" className="w-[20%] px-3 py-2">Evaluated By</th>
-                    <th scope="col" className="w-[14%] px-3 py-2">Average Score</th>
-                    <th scope="col" className="w-[16%] px-3 py-2">Result</th>
+                    <th scope="col" className="w-[31%] px-3 py-1.5">Assigned Topics</th>
+                    <th scope="col" className="w-[19%] px-3 py-1.5">Evaluated Date</th>
+                    <th scope="col" className="w-[20%] px-3 py-1.5">Evaluated By</th>
+                    <th scope="col" className="w-[14%] px-3 py-1.5">Average Score</th>
+                    <th scope="col" className="w-[16%] px-3 py-1.5">Result</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -882,7 +917,7 @@ function TrainingPanel({
                               : ""
                           }`}
                         >
-                          <th scope="row" className="px-3 py-2.5">
+                          <th scope="row" className="px-3 py-1.5">
                             <span className="block truncate text-[13px] font-semibold text-foreground" title={title.number}>
                               {title.number}
                             </span>
@@ -890,15 +925,15 @@ function TrainingPanel({
                               {title.topic}
                             </span>
                           </th>
-                          <td className="px-3 py-2.5 text-xs">
+                          <td className="px-3 py-1.5 text-xs">
                             <span className="block text-foreground">
                               {trainingEvaluationDate(row)}
                             </span>
                           </td>
-                          <td className="truncate px-3 py-2.5 text-xs text-foreground" title={evaluator.title}>
+                          <td className="truncate px-3 py-1.5 text-xs text-foreground" title={evaluator.title}>
                             {evaluator.label}
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td className="px-3 py-1.5">
                             {assessment ? (
                               <span className="text-[13px] font-semibold tabular-nums text-foreground">
                                 {trainingScore(assessment.weighted_overall_score)}
@@ -907,7 +942,7 @@ function TrainingPanel({
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td className="px-3 py-1.5">
                             {assessment ? (
                               <span className="flex items-center justify-between gap-2">
                                 <StatusBadge status={academyAssessmentPassed(row) ? "completed" : "failed"}>
@@ -1854,6 +1889,11 @@ export function CandidateProfile({
   );
   const pendingApprovals = (candidate.approvals || []).filter(
     (item) => item.status === "requested",
+  );
+  const activeTeacherPromotionRequest = (candidate.approvals || []).find(
+    (item) =>
+      text(item.requested_outcome) === "active_teacher" &&
+      ["requested", "approved", "returned"].includes(text(item.status)),
   );
   const latestInterview = candidate.interviews?.find((item) => !item.voided_at);
   const latestTest = candidate.subject_tests?.find((item) => !item.voided_at);
@@ -3051,6 +3091,29 @@ export function CandidateProfile({
           subject={candidate.academy.subject}
           position={candidate.applied_position}
           startDate={candidate.academy.start_date}
+          promotionState={
+            activeTeacherPromotionRequest?.status as
+              | "requested"
+              | "approved"
+              | "returned"
+              | undefined
+          }
+          onPromote={
+            candidate.status === "teacher_academy" &&
+            permissions?.can_request_approval
+              ? () =>
+                  setAction({
+                    kind: "request_approval",
+                    previous: {
+                      ...(activeTeacherPromotionRequest || {}),
+                      requested_outcome: "active_teacher",
+                      request_note:
+                        text(activeTeacherPromotionRequest?.request_note) ||
+                        "Teacher Academy completed: all assigned lessons passed with an average score above 7.0.",
+                    },
+                  })
+              : undefined
+          }
         />
       ) : null}
 

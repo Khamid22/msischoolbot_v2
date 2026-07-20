@@ -48,8 +48,11 @@ export type TeacherRosterItem = {
   joined_at: string;
   added_on: string;
   assigned_count: number;
+  evaluated_count: number;
   passed_count: number;
+  failed_count: number;
   average_score: number | null;
+  academy_completed: boolean;
   can_remove: boolean;
   can_delete: boolean;
   can_reject: boolean;
@@ -105,8 +108,8 @@ type TeacherAcademyRosterProps = {
   toolbarLeading?: ReactNode;
 };
 
-const DESKTOP_ROW_HEIGHT = 56;
-const DESKTOP_HEADER_HEIGHT = 40;
+const DESKTOP_ROW_HEIGHT = 48;
+const DESKTOP_HEADER_HEIGHT = 36;
 const PAGINATION_HEIGHT = 48;
 const VIEWPORT_GUTTER = 16;
 const DESKTOP_MIN_PAGE_SIZE = 10;
@@ -151,7 +154,20 @@ function isInteractiveTarget(target: EventTarget | null) {
     && Boolean(target.closest("a,button,input,select,textarea,[role='menuitem']"));
 }
 
-function AcademyStatus({ status }: { status: string }) {
+function AcademyStatus({
+  status,
+  completed = false,
+}: {
+  status: string;
+  completed?: boolean;
+}) {
+  if (completed) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-900">
+        Academy completed
+      </span>
+    );
+  }
   const normalized = String(status || "").toLowerCase();
   const tone = normalized.includes("improvement")
     ? "bg-rose-100 text-rose-900"
@@ -256,7 +272,11 @@ function TeacherMobileCard({
 }) {
   const isAcademy = teacher.kind === "teacher_academy";
   return (
-    <article className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <article className={`rounded-xl border p-3 shadow-sm ${
+      teacher.academy_completed
+        ? "border-emerald-300 bg-emerald-50/70"
+        : "border-border bg-card"
+    }`}>
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -288,7 +308,7 @@ function TeacherMobileCard({
           </dt>
           <dd className="mt-1">
             {isAcademy
-              ? <AcademyStatus status={teacher.status} />
+              ? <AcademyStatus status={teacher.status} completed={teacher.academy_completed} />
               : statusLabel(teacher.status)}
           </dd>
         </div>
@@ -583,7 +603,7 @@ export function TeacherAcademyRoster({
             >
               <table className="w-full min-w-[1040px] table-fixed border-collapse text-left">
                 <thead className="bg-muted/80 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <tr className="h-10">
+                  <tr className="h-9">
                     <th scope="col" className="w-[20%] px-4 font-semibold">Teacher</th>
                     <th scope="col" className="w-[15%] px-3 font-semibold">
                       {kind === "teacher_academy" ? "Added to Teacher Academy" : "Active since"}
@@ -604,9 +624,13 @@ export function TeacherAcademyRoster({
                       tabIndex={0}
                       onClick={(event) => handleRowClick(event, teacher)}
                       onKeyDown={(event) => handleRowKeyboard(event, teacher)}
-                      className="group h-14 cursor-pointer bg-card transition-colors duration-150 hover:bg-muted/40 focus:outline-none focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none"
+                      className={`group h-12 cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 motion-reduce:transition-none ${
+                        teacher.academy_completed
+                          ? "bg-emerald-50/70 hover:bg-emerald-50 focus-visible:bg-emerald-50"
+                          : "bg-card hover:bg-muted/40 focus-visible:bg-muted/50"
+                      }`}
                     >
-                      <td className="px-4 py-1.5">
+                      <td className="px-4 py-0.5">
                         <button
                           type="button"
                           onClick={() => openTeacher(teacher)}
@@ -620,22 +644,22 @@ export function TeacherAcademyRoster({
                           </span>
                         </button>
                       </td>
-                      <td className="px-3 py-1.5 text-xs font-medium text-foreground">
+                      <td className="px-3 py-0.5 text-xs font-medium text-foreground">
                         {teacher.added_on ? dateLabel(teacher.added_on) : "Not recorded"}
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-0.5">
                         <span className="line-clamp-2 text-xs text-foreground">
                           {teacher.position || "Position not set"}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-0.5">
                         {kind === "teacher_academy"
-                          ? <AcademyStatus status={teacher.status} />
+                          ? <AcademyStatus status={teacher.status} completed={teacher.academy_completed} />
                           : <span className="text-xs font-medium">{statusLabel(teacher.status)}</span>}
                       </td>
-                      <td className="px-3 py-1.5"><LessonsCompleted teacher={teacher} /></td>
-                      <td className="px-3 py-1.5"><AverageScore teacher={teacher} /></td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-0.5"><LessonsCompleted teacher={teacher} /></td>
+                      <td className="px-3 py-0.5"><AverageScore teacher={teacher} /></td>
+                      <td className="px-3 py-0.5">
                         <div className="flex items-center justify-end gap-1.5">
                           {teacher.can_delete ? (
                             <button

@@ -785,11 +785,24 @@ def list_teacher_handoffs(
                 "joined_at": _iso(row["joined_at"]),
                 "added_on": _text(row.get("added_on")),
                 "assigned_count": int(row.get("assigned_count") or 0),
+                "evaluated_count": int(row.get("evaluated_count") or 0),
                 "passed_count": int(row.get("passed_count") or 0),
+                "failed_count": int(row.get("failed_count") or 0),
                 "average_score": (
                     round(float(row["average_score"]), 1)
                     if row.get("average_score") is not None
                     else None
+                ),
+                "academy_completed": bool(
+                    normalized_kind == "teacher_academy"
+                    and int(row.get("assigned_count") or 0) > 0
+                    and int(row.get("evaluated_count") or 0)
+                    == int(row.get("assigned_count") or 0)
+                    and int(row.get("passed_count") or 0)
+                    == int(row.get("assigned_count") or 0)
+                    and int(row.get("failed_count") or 0) == 0
+                    and row.get("average_score") is not None
+                    and float(row["average_score"]) > 7
                 ),
                 "can_remove": (
                     user.role in {"hr_manager", "academic_director"}

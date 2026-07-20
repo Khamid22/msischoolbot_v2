@@ -157,6 +157,9 @@ export type AcademyTrainingSummary = {
   passed: number;
   failed: number;
   averageScore: number | null;
+  completionPercentage: number;
+  isComplete: boolean;
+  canPromote: boolean;
 };
 
 const academyPassingDecisions = new Set([
@@ -215,25 +218,41 @@ export function academyTrainingSummary(
     .filter((score): score is number => score !== null && score !== undefined)
     .map((score) => Number(score))
     .filter((score) => Number.isFinite(score));
-  return {
-    assigned: rows.length,
-    evaluated: evaluatedRows.length,
-    passed: evaluatedRows.filter((row) =>
+  const assigned = rows.length;
+  const evaluated = evaluatedRows.length;
+  const passed = evaluatedRows.filter((row) =>
       academyPassingDecisions.has(String(row.assessment?.decision || "").toLowerCase()),
-    ).length,
-    failed: evaluatedRows.filter(
+    ).length;
+  const failed = evaluatedRows.filter(
       (row) =>
         !academyPassingDecisions.has(
           String(row.assessment?.decision || "").toLowerCase(),
         ),
-    ).length,
-    averageScore: numericScores.length
+    ).length;
+  const averageScore = numericScores.length
       ? Math.round(
           (numericScores.reduce((total, score) => total + score, 0) /
             numericScores.length) *
             10,
         ) / 10
-      : null,
+      : null;
+  const completionPercentage = assigned
+    ? Math.round((evaluated / assigned) * 100)
+    : 0;
+  const isComplete =
+    assigned > 0 &&
+    evaluated === assigned &&
+    passed === assigned &&
+    failed === 0;
+  return {
+    assigned,
+    evaluated,
+    passed,
+    failed,
+    averageScore,
+    completionPercentage,
+    isComplete,
+    canPromote: isComplete && averageScore !== null && averageScore > 7,
   };
 }
 

@@ -590,7 +590,9 @@ def list_teacher_handoff_rows(
                 COALESCE(academy.academy_start_date::timestamptz, academy.created_at)
                     AS sort_at,
                 COALESCE(academy_progress.assigned_count, 0)::integer AS assigned_count,
+                COALESCE(academy_progress.evaluated_count, 0)::integer AS evaluated_count,
                 COALESCE(academy_progress.passed_count, 0)::integer AS passed_count,
+                COALESCE(academy_progress.failed_count, 0)::integer AS failed_count,
                 academy_progress.average_score,
                 (
                     academy.user_id IS NOT NULL
@@ -613,23 +615,38 @@ def list_teacher_handoff_rows(
                         FROM msi_v2.academy_lesson_assignments assignment
                         WHERE assignment.academy_teacher_id = academy.id
                     ) AS assigned_count,
-                    (
-                        SELECT COUNT(DISTINCT assessment.lesson_assignment_id)::integer
-                        FROM msi_v2.academy_assessments assessment
-                        WHERE assessment.academy_teacher_id = academy.id
-                          AND assessment.lesson_assignment_id IS NOT NULL
-                          AND assessment.decision IN (
-                              'passed',
-                              'ready_for_final_evaluation',
-                              'approved_for_active_teacher'
-                          )
-                    ) AS passed_count,
-                    (
-                        SELECT AVG(assessment.weighted_overall_score)
-                        FROM msi_v2.academy_assessments assessment
-                        WHERE assessment.academy_teacher_id = academy.id
-                          AND assessment.weighted_overall_score > 0
+                    COUNT(latest_assessment.id)::integer AS evaluated_count,
+                    COUNT(latest_assessment.id) FILTER (
+                        WHERE latest_assessment.decision IN (
+                            'passed',
+                            'ready_for_final_evaluation',
+                            'approved_for_active_teacher'
+                        )
+                    )::integer AS passed_count,
+                    COUNT(latest_assessment.id) FILTER (
+                        WHERE latest_assessment.decision NOT IN (
+                            'passed',
+                            'ready_for_final_evaluation',
+                            'approved_for_active_teacher'
+                        )
+                    )::integer AS failed_count,
+                    AVG(latest_assessment.weighted_overall_score) FILTER (
+                        WHERE latest_assessment.weighted_overall_score > 0
                     ) AS average_score
+                FROM (
+                    SELECT DISTINCT ON (assessment.lesson_assignment_id)
+                        assessment.id,
+                        assessment.lesson_assignment_id,
+                        assessment.decision,
+                        assessment.weighted_overall_score
+                    FROM msi_v2.academy_assessments assessment
+                    WHERE assessment.academy_teacher_id = academy.id
+                      AND assessment.lesson_assignment_id IS NOT NULL
+                    ORDER BY
+                        assessment.lesson_assignment_id,
+                        assessment.assessment_datetime DESC NULLS LAST,
+                        assessment.id DESC
+                ) latest_assessment
             ) academy_progress ON true
             LEFT JOIN msi_v2.teacher_candidates candidate
               ON candidate.id = academy.recruitment_candidate_id
@@ -661,7 +678,9 @@ def list_teacher_handoff_rows(
                 (teacher.created_at AT TIME ZONE 'Asia/Tashkent')::date::text AS added_on,
                 teacher.created_at AS sort_at,
                 0::integer AS assigned_count,
+                0::integer AS evaluated_count,
                 0::integer AS passed_count,
+                0::integer AS failed_count,
                 NULL::numeric AS average_score,
                 false AS generated_login_will_be_deleted
             FROM msi_v2.teachers teacher
@@ -751,7 +770,8 @@ def list_teacher_handoff_rows(
         SELECT record.kind, record.record_id, record.recruitment_candidate_id,
                record.full_name, record.position, record.subject, record.status,
                record.onboarding_status, record.joined_at::text AS joined_at,
-               record.added_on, record.assigned_count, record.passed_count,
+               record.added_on, record.assigned_count, record.evaluated_count,
+               record.passed_count, record.failed_count,
                record.average_score,
                record.generated_login_will_be_deleted
         FROM record

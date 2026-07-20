@@ -433,7 +433,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(roster, /teacher_page/);
     assert.match(roster, /DESKTOP_MIN_PAGE_SIZE = 10/);
     assert.match(roster, /MOBILE_PAGE_SIZE = 5/);
-    assert.match(roster, /className="group h-14/);
+    assert.match(roster, /group h-12 cursor-pointer/);
     assert.match(roster, />Actions<\/th>/);
     assert.doesNotMatch(roster, /<th[^>]*>Account<\/th>/);
     assert.doesNotMatch(roster, /<dt[^>]*>Account<\/dt>/);
@@ -524,6 +524,9 @@ describe("Academy training data matching", () => {
       passed: 1,
       failed: 0,
       averageScore: 8,
+      completionPercentage: 50,
+      isComplete: false,
+      canPromote: false,
     });
   });
 
@@ -545,6 +548,39 @@ describe("Academy training data matching", () => {
       passed: 0,
       failed: 1,
       averageScore: null,
+      completionPercentage: 50,
+      isComplete: false,
+      canPromote: false,
+    });
+  });
+
+  test("promotes only after every assigned lesson passes above a 7.0 average", () => {
+    const rows = academyTrainingRows(
+      [{ id: 51 }, { id: 52 }],
+      [
+        {
+          id: 61,
+          lesson_assignment_id: 51,
+          weighted_overall_score: 7.1,
+          decision: "passed",
+        },
+        {
+          id: 62,
+          lesson_assignment_id: 52,
+          weighted_overall_score: 7.3,
+          decision: "passed",
+        },
+      ],
+    );
+    assert.deepEqual(academyTrainingSummary(rows), {
+      assigned: 2,
+      evaluated: 2,
+      passed: 2,
+      failed: 0,
+      averageScore: 7.2,
+      completionPercentage: 100,
+      isComplete: true,
+      canPromote: true,
     });
   });
 });

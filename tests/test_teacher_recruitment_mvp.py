@@ -160,7 +160,9 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
                     "joined_at": "2026-07-17T10:00:00+00:00",
                     "added_on": "2026-07-17",
                     "assigned_count": 12,
-                    "passed_count": 8,
+                    "evaluated_count": 12,
+                    "passed_count": 12,
+                    "failed_count": 0,
                     "average_score": 7.24,
                 }
             ],
@@ -179,8 +181,11 @@ def test_teacher_handoff_service_normalizes_canonical_records_and_fails_closed(m
     assert result["items"][0]["position"] == "IGCSE Math Teacher"
     assert result["items"][0]["added_on"] == "2026-07-17"
     assert result["items"][0]["assigned_count"] == 12
-    assert result["items"][0]["passed_count"] == 8
+    assert result["items"][0]["evaluated_count"] == 12
+    assert result["items"][0]["passed_count"] == 12
+    assert result["items"][0]["failed_count"] == 0
     assert result["items"][0]["average_score"] == 7.2
+    assert result["items"][0]["academy_completed"] is True
     assert result["items"][0]["can_delete"] is True
     assert result["items"][0]["can_reject"] is True
 
