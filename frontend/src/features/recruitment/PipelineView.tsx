@@ -185,8 +185,6 @@ const CandidateCard = memo(function CandidateCard({
   onInterview,
   onReschedule,
   onCancelAppointment,
-  onAccept,
-  onReject,
   compact = false,
 }: {
   candidate: RecruitmentCandidate;
@@ -197,8 +195,6 @@ const CandidateCard = memo(function CandidateCard({
   onInterview: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
   onReschedule: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
   onCancelAppointment: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
-  onAccept: (candidate: RecruitmentCandidate) => void;
-  onReject: (candidate: RecruitmentCandidate) => void;
   compact?: boolean;
 }) {
   const canMove = Boolean(candidate.permissions?.can_move_stage) && !["teacher_academy", "active_teacher"].includes(candidate.status);
@@ -294,12 +290,6 @@ const CandidateCard = memo(function CandidateCard({
               ]}
             />
           ) : null}
-        </div>
-      ) : null}
-      {candidate.status === "under_review" && (candidate.permissions?.can_request_approval || candidate.permissions?.can_reject) ? (
-        <div draggable={false} onClick={(event) => event.stopPropagation()} className={`flex items-center gap-1.5 ${compact ? "mx-1.5 mb-1.5" : "mx-2 mb-2"}`}>
-          {candidate.permissions?.can_request_approval ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onAccept(candidate); }} className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-2 font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${compact ? "text-[11px]" : "text-xs"}`}><GraduationCap className="h-4 w-4 shrink-0" />Accept</button> : null}
-          {candidate.permissions?.can_reject ? <button type="button" draggable={false} onClick={(event) => { event.stopPropagation(); onReject(candidate); }} className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-2 font-semibold text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200 ${compact ? "text-[11px]" : "text-xs"}`}><Ban className="h-4 w-4 shrink-0" />Reject</button> : null}
         </div>
       ) : null}
     </article>
@@ -460,8 +450,6 @@ export function PipelineView({
   const handleCardInterview = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setInterviewSelection({ candidate: value, appointment }), []);
   const handleCardReschedule = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => { setScheduleConflicts([]); setRescheduleSelection({ candidate: value, appointment }); }, []);
   const handleCardCancelAppointment = useCallback((value: RecruitmentCandidate, appointment: RecruitmentAppointment) => setCancelSelection({ candidate: value, appointment }), []);
-  const handleCardAccept = useCallback((value: RecruitmentCandidate) => setAcceptSelection({ candidate: value }), []);
-  const handleCardReject = useCallback((value: RecruitmentCandidate) => setRejectSelection({ candidate: value }), []);
 
   const canStartBoardPan = (target: EventTarget | null) => {
     if (!(target instanceof Element)) return true;
@@ -505,10 +493,10 @@ export function PipelineView({
 
   const cards = useCallback((items: RecruitmentCandidate[], compact = false) => (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
-      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} onReschedule={handleCardReschedule} onCancelAppointment={handleCardCancelAppointment} onAccept={handleCardAccept} onReject={handleCardReject} compact={compact} />)}
+      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} onReschedule={handleCardReschedule} onCancelAppointment={handleCardCancelAppointment} compact={compact} />)}
       {!items.length ? <EmptyLine>No candidates in this stage.</EmptyLine> : null}
     </div>
-  ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview, handleCardReschedule, handleCardCancelAppointment, handleCardAccept, handleCardReject]);
+  ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview, handleCardReschedule, handleCardCancelAppointment]);
 
   const data = pipeline.data;
   const summaryCounts = useMemo(() => ({
