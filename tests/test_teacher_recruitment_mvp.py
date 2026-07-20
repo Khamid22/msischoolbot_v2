@@ -438,6 +438,35 @@ def test_non_terminal_stage_move_keeps_scheduled_appointment(monkeypatch):
     assert "candidate.appointments_cancelled" not in events
 
 
+def test_candidate_audit_insert_serializes_detail_json():
+    """insert_audit must serialize detail to JSON (regression: missing import)."""
+
+    from backend.modules.hr.recruitment.candidates import (
+        repository as candidates_repository,
+    )
+
+    captured: dict[str, object] = {}
+
+    class _Conn:
+        def execute(self, _sql, params):
+            captured["params"] = params
+
+    candidates_repository.insert_audit(
+        _Conn(),
+        candidate_id=7,
+        event_type="candidate.moved",
+        detail={"from": "job_interview", "to": "test_and_demo"},
+        actor_account_id=1,
+        actor_staff_id=None,
+        now="2026-07-20T00:00:00Z",
+    )
+
+    assert json.loads(captured["params"][4]) == {
+        "from": "job_interview",
+        "to": "test_and_demo",
+    }
+
+
 def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):
     class Connection:
         commits = 0
