@@ -202,10 +202,12 @@ const CandidateCard = memo(function CandidateCard({
   const canManageAppointments = Boolean(candidate.permissions?.can_manage_appointments);
   const appointment = matchingAppointment(candidate);
   const interviewDone = candidate.latest_interview_result === "passed";
-  // Buttons unlock one by one: interview first, then the demo lesson.
+  // Buttons unlock one by one: interview first, then the demo lesson. The
+  // Interview Schedule (responded) column shows no prompt — scheduling starts
+  // at the Job Interview column (still available from the profile earlier).
   const unscheduledType = appointment
     ? null
-    : ["responded", "job_interview"].includes(candidate.status) && !interviewDone
+    : candidate.status === "job_interview" && !interviewDone
       ? "job_interview"
       : candidate.status === "test_and_demo"
         ? (!interviewDone ? "job_interview" : !candidate.latest_demo_result ? "demo_lesson" : null)
