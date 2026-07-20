@@ -81,6 +81,7 @@ export function useCanonicalTeacherRosterTotals(refreshToken = "", enabled = tru
   return {
     teacher_academy: academy.data?.total ?? 0,
     active_teacher: active.data?.total ?? 0,
+    isLoading: academy.isLoading || active.isLoading,
   };
 }
 

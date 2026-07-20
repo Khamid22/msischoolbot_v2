@@ -17,6 +17,7 @@ import {
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
 import { InterviewSessionModal } from "@/features/recruitment/InterviewSessionModal";
 import { appointmentConflictDetails, formValues, jsonBody, recruitmentRequest } from "@/features/recruitment/api";
+import { useCanonicalTeacherRosterTotals } from "@/features/teacher-academy/TeacherAcademyRoster";
 import {
   dateLabel,
   dateTimeLabel,
@@ -103,19 +104,11 @@ function matchingAppointment(candidate: RecruitmentCandidate) {
 
 function PipelineSummary({ counts, action }: { counts: Record<string, number>; action?: ReactNode }) {
   const total = chartStages.reduce((sum, item) => sum + Number(counts[item.stage] || 0), 0);
-  const rawValues = chartStages.map((item) => ({
+  const values = chartStages.map((item) => ({
     ...item,
     count: Number(counts[item.stage] || 0),
     rawPercentage: total ? Number(counts[item.stage] || 0) / total * 100 : 0,
-  }));
-  const floorTotal = rawValues.reduce((sum, item) => sum + Math.floor(item.rawPercentage), 0);
-  const remainderOrder = rawValues
-    .map((item, index) => ({ index, fraction: item.rawPercentage - Math.floor(item.rawPercentage) }))
-    .sort((left, right) => right.fraction - left.fraction || left.index - right.index);
-  const roundedUp = new Set(remainderOrder.slice(0, total ? 100 - floorTotal : 0).map((item) => item.index));
-  const values = rawValues.map((item, index) => ({
-    ...item,
-    percentage: Math.floor(item.rawPercentage) + (roundedUp.has(index) ? 1 : 0),
+    percentage: (total ? Number(counts[item.stage] || 0) / total * 100 : 0).toFixed(1),
   }));
   const summary = values.map((item) => `${item.label}: ${item.count} (${item.percentage}%)`).join(", ");
   return (
@@ -302,6 +295,7 @@ export function PipelineView({
     active: boolean;
   } | null>(null);
   const deferredSearch = useDeferredValue(filters.search);
+  const teacherRosterTotals = useCanonicalTeacherRosterTotals();
   const requestParams = new URLSearchParams();
   Object.entries({ ...filters, search: deferredSearch }).forEach(([key, value]) => { if (value) requestParams.set(key, value); });
   const pipeline = useQuery({
@@ -439,6 +433,15 @@ export function PipelineView({
   ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview]);
 
   const data = pipeline.data;
+  const summaryCounts = useMemo(() => ({
+    ...(pipeline.data?.counts || {}),
+    teacher_academy: teacherRosterTotals.teacher_academy,
+    active_teacher: teacherRosterTotals.active_teacher,
+  }), [
+    pipeline.data?.counts,
+    teacherRosterTotals.active_teacher,
+    teacherRosterTotals.teacher_academy,
+  ]);
   const moveMutate = move.mutate;
   const desktopBoard = useMemo(() => {
     if (!data) return null;
@@ -460,13 +463,13 @@ export function PipelineView({
   }, [data, dragOverStage, canAddCandidate, onAddCandidate, cards, moveMutate, finishDrag]);
   const mobileCards = useMemo(() => (data ? cards(data.stages[mobileStage] || []) : null), [data, mobileStage, cards]);
 
-  if (pipeline.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
+  if (pipeline.isLoading || teacherRosterTotals.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
   if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
 
   return (
     <div className="space-y-2">
       <PipelineSummary
-        counts={pipeline.data.counts}
+        counts={summaryCounts}
         action={(
           <div ref={searchLayerRef} className="relative shrink-0">
             <button

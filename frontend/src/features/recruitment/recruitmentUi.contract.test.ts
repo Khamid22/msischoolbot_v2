@@ -88,15 +88,19 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /setScheduleSelection/);
   });
 
-  test("renders the six-segment filtered percentage summary without a chart dependency", () => {
+  test("renders the six-segment summary with canonical teacher totals and one-decimal percentages", () => {
     assert.match(pipeline, /const chartStages = \[/);
     for (const stage of ["new_candidate", "responded", "job_interview", "test_and_demo", "teacher_academy", "active_teacher"]) {
       assert.match(pipeline, new RegExp(`stage: "${stage}"`));
     }
     assert.match(pipeline, /Pipeline distribution\. Total/);
     assert.match(pipeline, /h-2\.5/);
-    assert.match(pipeline, /100 - floorTotal/);
+    assert.match(pipeline, /useCanonicalTeacherRosterTotals/);
+    assert.match(pipeline, /teacher_academy: teacherRosterTotals\.teacher_academy/);
+    assert.match(pipeline, /active_teacher: teacherRosterTotals\.active_teacher/);
+    assert.match(pipeline, /\.toFixed\(1\)/);
     assert.match(pipeline, /\{item\.percentage\}%/);
+    assert.doesNotMatch(pipeline, /floorTotal|roundedUp/);
     assert.doesNotMatch(pipeline, /recharts|chart\.js/i);
   });
 
