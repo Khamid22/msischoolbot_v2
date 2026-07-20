@@ -225,24 +225,24 @@ export function ScheduleView({
   if (appointments.error || !appointments.data) return <PageState tone="error">{queryError(appointments.error)}</PageState>;
 
   const agenda = (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {appointments.data.items.map((item) => <AppointmentCard key={item.id} item={item} basePath={basePath} canManage={canManage} onEdit={(value) => { setConflicts([]); setEditing(value); }} onStatus={(value, nextStatus) => setStatusAction({ item: value, status: nextStatus })} />)}
       {!appointments.data.items.length ? <EmptyLine>No appointments in this period.</EmptyLine> : null}
     </div>
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <section className="rounded-xl border border-border bg-card p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="inline-flex min-h-11 rounded-lg border border-border bg-muted/40 p-1">
+          <div className="inline-flex min-h-9 rounded-lg border border-border bg-muted/40 p-1">
             <button type="button" onClick={() => setMode("agenda")} aria-pressed={mode === "agenda"} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold ${mode === "agenda" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}><List className="h-4 w-4" />Agenda</button>
             <button type="button" onClick={() => setMode("week")} aria-pressed={mode === "week"} className={`hidden min-h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold md:inline-flex ${mode === "week" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}><CalendarDays className="h-4 w-4" />Week</button>
           </div>
-          <div className="inline-flex min-h-11 items-center rounded-lg border border-border">
-            <button type="button" className="flex h-11 w-11 items-center justify-center" onClick={() => moveRange(-1)} aria-label="Previous schedule period"><ChevronLeft className="h-4 w-4" /></button>
-            <button type="button" className="min-h-11 border-x border-border px-3 text-xs font-semibold" onClick={() => setAnchor(schoolDateKey())}>Today</button>
-            <button type="button" className="flex h-11 w-11 items-center justify-center" onClick={() => moveRange(1)} aria-label="Next schedule period"><ChevronRight className="h-4 w-4" /></button>
+          <div className="inline-flex min-h-9 items-center rounded-lg border border-border">
+            <button type="button" className="flex h-9 w-9 items-center justify-center" onClick={() => moveRange(-1)} aria-label="Previous schedule period"><ChevronLeft className="h-4 w-4" /></button>
+            <button type="button" className="min-h-9 border-x border-border px-3 text-xs font-semibold" onClick={() => setAnchor(schoolDateKey())}>Today</button>
+            <button type="button" className="flex h-9 w-9 items-center justify-center" onClick={() => moveRange(1)} aria-label="Next schedule period"><ChevronRight className="h-4 w-4" /></button>
           </div>
           <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Type<select className={`${fieldClass} mt-1`} value={type} onChange={(event) => setType(event.target.value)}><option value="">All types</option><option value="job_interview">Job interviews</option><option value="demo_lesson">Demo lessons</option></select></label>
           <label className="min-w-36 flex-1 text-xs font-semibold text-muted-foreground">Status<select className={`${fieldClass} mt-1`} value={status} onChange={(event) => setStatus(event.target.value)}><option value={defaultStatusFilter}>Current & completed</option><option value="scheduled">Scheduled</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No-show</option><option value="">All statuses</option></select></label>
@@ -258,7 +258,7 @@ export function ScheduleView({
             <section className="grid min-w-[70rem] grid-cols-7">
               {weekDays.map((day) => (
                 <div key={day} className="min-w-0 border-r border-border last:border-r-0">
-                  <div className="sticky top-0 z-10 border-b border-border bg-muted px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide">{scheduleDayLabel(day)}</div>
+                  <div className="sticky top-0 z-10 border-b border-border bg-muted px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide">{scheduleDayLabel(day)}</div>
                   <div className="min-h-56 space-y-2 p-2">
                     {itemsForDay(day).map((item) => <AppointmentCard key={item.id} item={item} basePath={basePath} canManage={canManage} compact onEdit={(value) => { setConflicts([]); setEditing(value); }} onStatus={(value, nextStatus) => setStatusAction({ item: value, status: nextStatus })} />)}
                     {!itemsForDay(day).length ? <p className="py-4 text-center text-[11px] text-muted-foreground">No appointments</p> : null}

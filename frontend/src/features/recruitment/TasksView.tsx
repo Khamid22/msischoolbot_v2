@@ -58,7 +58,7 @@ export function TasksView({ basePath }: { basePath: string }) {
             aria-controls="task-status-panel"
             onClick={() => selectTab(tab)}
             onKeyDown={(event) => handleTabKeyDown(event, tab)}
-            className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${active === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+            className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-[13px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${active === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
             {humanize(tab)}
             <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${active === tab ? "bg-white/15" : "bg-muted"}`}>{tabItems[tab].length}</span>
@@ -71,7 +71,7 @@ export function TasksView({ basePath }: { basePath: string }) {
             key={task.id}
             href={`${basePath}/candidates/${task.candidate_id}?tab=activity&origin=tasks`}
             onClick={() => rememberRecruitmentReturn("tasks")}
-            className="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
+            className="flex min-h-14 items-center justify-between gap-2 px-3 py-1.5 transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"
           >
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{task.title}</p>

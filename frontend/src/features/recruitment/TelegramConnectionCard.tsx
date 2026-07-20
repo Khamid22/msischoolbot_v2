@@ -37,9 +37,9 @@ export function TelegramConnectionCard() {
   const initData = typeof window !== "undefined" ? telegramInitData() : "";
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4" aria-labelledby="telegram-connection-title">
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><Link2 className="h-5 w-5" /></span>
+    <section className="rounded-xl border border-border bg-card p-3" aria-labelledby="telegram-connection-title">
+      <div className="flex items-start gap-2">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600"><Link2 className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
           <h2 id="telegram-connection-title" className="text-sm font-semibold">Telegram notifications</h2>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">Link your own Telegram account to receive assigned Demo Lesson changes and reminders.</p>
@@ -48,7 +48,7 @@ export function TelegramConnectionCard() {
       {connection.isLoading ? <p className="mt-4 text-sm text-muted-foreground">Checking connection…</p> : null}
       {connection.error ? <p role="alert" className="mt-4 text-sm text-destructive">{queryError(connection.error)}</p> : null}
       {data ? <div className="mt-4 rounded-lg bg-muted/55 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
             <p className="mt-1 text-sm font-semibold">{data.connected ? `Connected${data.username ? ` as @${data.username}` : ""}` : "Not connected"}</p>

@@ -76,7 +76,7 @@ function SettingsPanel({
               type="button"
               onClick={() => onRemove(item)}
               disabled={busy}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:opacity-50"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30 disabled:opacity-50"
               aria-label={`Remove ${item.label}`}
               title={`Remove ${item.label}`}
             >
@@ -139,7 +139,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
         </div>
         {settings.data.read_only ? <p className="mt-2 text-xs text-muted-foreground">Read-only CEO view.</p> : null}
       </section>
-      {!settings.data.read_only ? <div className="grid gap-3 lg:grid-cols-2">
+      {!settings.data.read_only ? <div className="grid gap-2 lg:grid-cols-2">
         {panels.map((panel) => <SettingsPanel key={panel.category} {...panel} items={settings.data.items.filter((item) => item.category === panel.category)} parentItems={panel.category === "subsource" ? settings.data.sources : undefined} busy={mutation.isPending} onAdd={add} onRemove={setRemoveSetting} />)}
       </div> : null}
       <ConfirmDialog

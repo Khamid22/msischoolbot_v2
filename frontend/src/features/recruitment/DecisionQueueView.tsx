@@ -49,7 +49,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
   if (queue.error || !queue.data) return <PageState tone="error">Unable to load the decision queue.</PageState>;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {showUpdatedNotice ? (
         <div role="status" className="rounded-xl border border-success/25 bg-success/10 px-3 py-3 text-sm font-semibold text-success">
           Recruitment decision recorded. The queue has been refreshed.
@@ -57,7 +57,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
       ) : null}
 
       <section className="rounded-xl border border-border bg-card p-3" aria-labelledby="decision-queue-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 id="decision-queue-heading" className="flex items-center gap-2 text-sm font-semibold">
               <ShieldCheck className="h-4 w-4 text-primary" /> Academic decisions
@@ -73,12 +73,12 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
       </section>
 
       {queue.data.items.length ? (
-        <section className="grid gap-3 lg:grid-cols-2" aria-label="Candidates awaiting Academic Director action">
+        <section className="grid gap-2 lg:grid-cols-2" aria-label="Candidates awaiting Academic Director action">
           {queue.data.items.map((candidate) => {
             const approval = candidate.actionable_approval;
             return (
               <article key={candidate.id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h3 className="truncate text-sm font-semibold text-foreground">{candidate.full_name}</h3>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -88,7 +88,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                   <StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge>
                 </div>
 
-                <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2.5">
+                <div className="mt-3 rounded-lg bg-muted/50 px-3 py-1.5">
                   {approval ? (
                     <>
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -113,7 +113,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                 <a
                   href={openCandidate(candidate.id)}
                   onClick={() => rememberRecruitmentReturn("decisions")}
-                  className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
+                  className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 motion-reduce:transition-none"
                 >
                   Review candidate <ArrowRight className="h-4 w-4" />
                 </a>

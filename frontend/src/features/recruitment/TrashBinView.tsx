@@ -159,7 +159,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
           </button>
           <button
             type="button"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-destructive/30 px-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-destructive/30 px-3 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
             disabled={!candidates.data?.total}
             onClick={() => setEmptyOpen(true)}
           >
@@ -177,11 +177,11 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
               <table className="w-full table-fixed text-left text-[13px]">
                 <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="w-[25%] px-3 py-2">Candidate</th>
-                    <th className="w-[18%] px-3 py-2">Position</th>
-                    <th className="w-[15%] px-3 py-2">Deleted</th>
-                    <th className="w-[15%] px-3 py-2">Previous stage</th>
-                    <th className="w-[27%] px-3 py-2 text-right">Actions</th>
+                    <th className="w-[25%] px-3 py-1.5">Candidate</th>
+                    <th className="w-[18%] px-3 py-1.5">Position</th>
+                    <th className="w-[15%] px-3 py-1.5">Deleted</th>
+                    <th className="w-[15%] px-3 py-1.5">Previous stage</th>
+                    <th className="w-[27%] px-3 py-1.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -211,7 +211,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
                 </article>
               ))}
             </div>
-            {!deletedCandidates.length ? <div className="p-4"><EmptyLine><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4" />Trash Bin is empty.</span></EmptyLine></div> : null}
+            {!deletedCandidates.length ? <div className="p-3"><EmptyLine><span className="inline-flex items-center gap-2"><Trash2 className="h-4 w-4" />Trash Bin is empty.</span></EmptyLine></div> : null}
             <div className="border-t border-border p-2.5"><Pagination page={page} totalPages={candidates.data.total_pages} onPageChange={setPage} label={`${candidates.data.total} deleted candidates · Page ${page} of ${candidates.data.total_pages}`} /></div>
           </section>
         ) : null}
@@ -224,11 +224,11 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
         footer={(
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryButtonClass} onClick={() => { setDraftFilters(emptyFilters); setFilters(emptyFilters); setPage(1); setFilterOpen(false); }}>Clear</button>
-            <button type="button" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground" onClick={() => { setFilters(draftFilters); setPage(1); setFilterOpen(false); }}>Apply</button>
+            <button type="button" className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground" onClick={() => { setFilters(draftFilters); setPage(1); setFilterOpen(false); }}>Apply</button>
           </div>
         )}
       >
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draftFilters.position} onChange={(event) => setDraftFilters({ ...draftFilters, position: event.target.value })}><option value="">All positions</option>{options?.option_categories.position?.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draftFilters.source} onChange={(event) => setDraftFilters({ ...draftFilters, source: event.target.value })}><option value="">All sources</option>{options?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Previous stage<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{Object.entries(stageLabels).filter(([value]) => !["trash_bin", "rejected", "candidate_withdrew", "teacher_academy", "active_teacher"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -240,7 +240,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
       </Drawer>
 
       <Modal open={emptyOpen} onClose={() => { if (!emptyTrash.isPending) { setEmptyOpen(false); setEmptyConfirmation(""); } }} title="Empty Trash Bin permanently?" size="sm" closeOnEscape={!emptyTrash.isPending} closeOnOutsideClick={!emptyTrash.isPending}>
-        <ModalBody className="space-y-3">
+        <ModalBody className="space-y-2">
           <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             Every candidate in Trash Bin and all of their recruitment data will be permanently deleted. This cannot be undone.
           </div>
@@ -249,7 +249,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
         <ModalFooter>
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryButtonClass} disabled={emptyTrash.isPending} onClick={() => setEmptyOpen(false)}>Cancel</button>
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50" disabled={emptyConfirmation !== "EMPTY TRASH BIN" || emptyTrash.isPending} onClick={() => emptyTrash.mutate()}>{emptyTrash.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Delete all permanently</button>
+            <button type="button" className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground disabled:opacity-50" disabled={emptyConfirmation !== "EMPTY TRASH BIN" || emptyTrash.isPending} onClick={() => emptyTrash.mutate()}>{emptyTrash.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Delete all permanently</button>
           </div>
         </ModalFooter>
       </Modal>

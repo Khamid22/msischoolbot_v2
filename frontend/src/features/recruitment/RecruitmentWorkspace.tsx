@@ -105,7 +105,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
         delete values.candidate_cv;
         create.mutate({ values, cv: cvInput?.files?.[0] });
       }}>
-        <ModalBody className="grid content-start gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <ModalBody className="grid content-start gap-2 md:grid-cols-2 lg:grid-cols-3">
           {create.error ? <div role="alert" className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive md:col-span-2 lg:col-span-3">{queryError(create.error)}</div> : null}
           <label className="text-xs font-semibold lg:col-span-2">Full name<input autoFocus required name="full_name" className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Phone<input name="phone" type="tel" className={`${fieldClass} mt-1`} /></label>
@@ -115,7 +115,7 @@ function NewCandidateModal({ open, onClose, onCreated, options }: { open: boolea
           <label className="text-xs font-semibold">Application date<input name="application_date" type="date" defaultValue={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date())} className={`${fieldClass} mt-1`} /></label>
           <label className="text-xs font-semibold">Source<select name="source_option_id" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setSubsourceId(""); }} className={`${fieldClass} mt-1`}><option value="">Not set</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Subsource<select name="subsource_option_id" value={subsourceId} onChange={(event) => setSubsourceId(event.target.value)} disabled={!sourceId} required={Boolean(sourceId && options?.subsources.some((item) => String(item.parent_id || "") === sourceId))} className={`${fieldClass} mt-1 disabled:cursor-not-allowed disabled:opacity-60`}><option value="">{sourceId ? "Select subsource" : "Select a source first"}</option>{options?.subsources.filter((item) => String(item.parent_id || "") === sourceId).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-          <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-2 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
+          <label className="text-xs font-semibold">CV <span className="font-normal text-muted-foreground">(optional)</span><input name="candidate_cv" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" disabled={!options?.document_upload_enabled} className={`${fieldClass} mt-1 cursor-pointer px-2 py-1.5 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-primary/10 file:px-2 file:py-1 file:font-semibold file:text-primary disabled:cursor-not-allowed disabled:opacity-60`} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">{options?.document_upload_enabled ? "PDF, DOC, DOCX, JPG or PNG · max 20 MB" : "Document storage is unavailable. Add the CV later."}</span></label>
         </ModalBody>
         <ModalFooter><div className="flex justify-end gap-2"><button className={secondaryButtonClass} type="button" disabled={create.isPending} onClick={close}>Cancel</button><button className={buttonClass} disabled={create.isPending} type="submit">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Create candidate</button></div></ModalFooter>
       </form>
@@ -169,10 +169,10 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
   const content = (
     <>
       {view !== "candidate" ? (
-        <header className={`flex flex-wrap items-center justify-between ${view === "pipeline" ? "gap-2" : "gap-3"}`}>
+        <header className={`flex flex-wrap items-center justify-between ${view === "pipeline" ? "gap-2" : "gap-2"}`}>
           <div className="min-w-0">
             <p className={`${view === "pipeline" ? "text-[10px] leading-3" : "text-[11px]"} font-semibold uppercase tracking-[0.14em] text-primary`}>Teacher Recruitment</p>
-            <h1 className={`${view === "pipeline" ? "mt-0 text-lg leading-6 sm:text-xl" : "mt-0.5 text-xl sm:text-2xl"} font-bold tracking-tight`}>{title}</h1>
+            <h1 className={`${view === "pipeline" ? "mt-0 text-lg leading-6 sm:text-xl" : "mt-0.5 text-lg sm:text-xl"} font-bold tracking-tight`}>{title}</h1>
             {view === "decisions" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review assigned evaluations and pending hiring requests.</p> : null}
             {view === "schedule" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Review current and completed interviews and demo lessons in Asia/Tashkent time.</p> : null}
             {view === "trash" ? <p className="mt-0.5 hidden max-w-2xl text-[13px] text-muted-foreground sm:block">Deleted candidates only. Open a profile to restore one.</p> : null}
@@ -193,7 +193,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       {view === "settings" && ["hr_manager", "ceo"].includes(effectiveRole) ? <SettingsView onAnnouncement={showToast} /> : null}
       {view === "trash" && effectiveRole === "hr_manager" ? <TrashBinView basePath={basePath} options={options.data} onAnnouncement={showToast} /> : null}
       {view === "candidate" && Number(candidateId) > 0 ? <CandidateProfile candidateId={Number(candidateId)} basePath={basePath} role={effectiveRole} onAnnouncement={showToast} /> : null}
-      {view === "profile" ? <div className="space-y-3"><section className="rounded-xl border border-border bg-card p-4"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
+      {view === "profile" ? <div className="space-y-2"><section className="rounded-xl border border-border bg-card p-3"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BriefcaseBusiness className="h-5 w-5" /></div><div><h2 className="text-sm font-semibold">{authLogin || roleLabel(effectiveRole)}</h2><p className="text-xs text-muted-foreground">{roleLabel(effectiveRole)} recruitment access</p></div></div><div className="mt-4 flex flex-wrap gap-2">{effectiveRole !== "hr_manager" ? <a className={secondaryButtonClass} href={home}>Back to main workspace</a> : null}<a className={secondaryButtonClass} href="/account/security">Account security</a></div></section>{["hr_manager", "academic_director", "head_of_department"].includes(effectiveRole) ? <TelegramConnectionCard /> : null}</div> : null}
 
       <NewCandidateModal open={newCandidateOpen} onClose={() => setNewCandidateOpen(false)} onCreated={showToast} options={options.data} />
     </>
@@ -207,7 +207,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         active="recruitment"
         recruitmentView={academicRecruitmentView}
         maxWidthClass="max-w-[1600px]"
-        sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
+        sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
       </AcademicDirectorPageShell>
@@ -222,7 +222,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
         active="recruitment"
         recruitmentView={academicRecruitmentView}
         maxWidthClass="max-w-[1600px]"
-        sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
+        sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
       >
         {content}
       </HeadOfDepartmentPageShell>
@@ -246,7 +246,7 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
       workspaceBackLink={workspaceBackLink}
       profileHref={`${basePath}/profile`}
       maxWidthClass="max-w-[1600px]"
-      sectionClassName={view === "pipeline" ? "gap-2" : "gap-3"}
+      sectionClassName={view === "pipeline" ? "gap-2" : "gap-2"}
     >
       {content}
     </RoleWorkspaceShell>

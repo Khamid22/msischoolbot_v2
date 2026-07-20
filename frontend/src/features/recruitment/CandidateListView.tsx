@@ -84,7 +84,7 @@ function AdvancedFilters({
       footer={(
         <div className="flex justify-end gap-2">
           <button type="button" className={secondaryButtonClass} onClick={onClose}>Cancel</button>
-          <button type="button" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground" onClick={() => onApply(draft)}>Apply filters</button>
+          <button type="button" className="inline-flex min-h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground" onClick={() => onApply(draft)}>Apply filters</button>
         </div>
       )}
     >
@@ -93,7 +93,7 @@ function AdvancedFilters({
         <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         <label className="text-xs font-semibold">Final outcome<select className={`${fieldClass} mt-1`} value={draft.final_decision} onChange={(event) => update("final_decision", event.target.value)}><option value="">All outcomes</option>{["teacher_academy", "active_teacher", "rejected", "candidate_withdrew"].map((outcome) => <option key={outcome} value={outcome}>{stageLabels[outcome]}</option>)}</select></label>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label>
           <label className="text-xs font-semibold">Applied to<input type="date" className={`${fieldClass} mt-1`} value={draft.application_to} onChange={(event) => update("application_to", event.target.value)} /></label>
         </div>
@@ -145,7 +145,7 @@ export function CandidateListView({ basePath }: { basePath: string }) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <section className="rounded-xl border border-border bg-card p-3">
         <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_220px_auto]">
           <label className="text-xs font-semibold text-muted-foreground">
@@ -172,7 +172,7 @@ export function CandidateListView({ basePath }: { basePath: string }) {
               <button
                 key={key}
                 type="button"
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 text-xs font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 text-xs font-semibold hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 onClick={() => update(key, "")}
                 aria-label={`Remove ${humanize(key)} filter`}
               >
@@ -180,7 +180,7 @@ export function CandidateListView({ basePath }: { basePath: string }) {
                 <X className="h-3.5 w-3.5" />
               </button>
             ))}
-            <button type="button" className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary hover:underline" onClick={clearFilters}>Clear all</button>
+            <button type="button" className="min-h-9 rounded-lg px-2 text-xs font-semibold text-primary hover:underline" onClick={clearFilters}>Clear all</button>
           </div>
         ) : null}
       </section>
@@ -191,8 +191,8 @@ export function CandidateListView({ basePath }: { basePath: string }) {
         <section className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-[13px]">
-              <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Candidate</th><th className="px-3 py-2.5">Position</th><th className="px-3 py-2.5">Stage</th><th className="px-3 py-2.5">Applied</th><th className="px-3 py-2.5">Next action</th></tr></thead>
-              <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => <tr key={candidate.id} className="hover:bg-muted/30"><td className="px-3 py-2.5"><a className="inline-flex min-h-11 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")}>{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.phone || "No phone"}</p></td><td className="px-3 py-2.5">{candidate.applied_position || candidate.subject || "—"}</td><td className="px-3 py-2.5"><StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge></td><td className="px-3 py-2.5">{dateLabel(candidate.application_date)}</td><td className="px-3 py-2.5">{candidate.next_task?.title || "—"}</td></tr>)}</tbody>
+              <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Candidate</th><th className="px-3 py-1.5">Position</th><th className="px-3 py-1.5">Stage</th><th className="px-3 py-1.5">Applied</th><th className="px-3 py-1.5">Next action</th></tr></thead>
+              <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => <tr key={candidate.id} className="hover:bg-muted/30"><td className="px-3 py-1.5"><a className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")}>{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.phone || "No phone"}</p></td><td className="px-3 py-1.5">{candidate.applied_position || candidate.subject || "—"}</td><td className="px-3 py-1.5"><StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge></td><td className="px-3 py-1.5">{dateLabel(candidate.application_date)}</td><td className="px-3 py-1.5">{candidate.next_task?.title || "—"}</td></tr>)}</tbody>
             </table>
           </div>
           <div className="divide-y divide-border md:hidden">{candidates.data.items.map((candidate) => <a key={candidate.id} href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")} className="block min-h-14 p-3 hover:bg-muted/40"><div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={candidate.status}>{stageLabels[candidate.status]}</StatusBadge></div><p className="mt-1 text-xs text-muted-foreground">{candidate.applied_position || "Position not set"}</p></a>)}</div>

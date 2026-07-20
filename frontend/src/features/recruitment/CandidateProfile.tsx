@@ -169,8 +169,8 @@ function Panel({
 }) {
   return (
     <section className="rounded-xl border border-border bg-card shadow-sm">
-      <div className={`flex items-center justify-between gap-3 border-b border-border px-3 ${
-        compact ? "min-h-11 flex-wrap py-1.5 sm:flex-nowrap" : "min-h-12 py-2"
+      <div className={`flex items-center justify-between gap-2 border-b border-border px-3 ${
+        compact ? "min-h-9 flex-wrap py-1.5 sm:flex-nowrap" : "min-h-12 py-1.5"
       }`}>
         <h2 className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
           {icon}
@@ -238,7 +238,7 @@ function InlineField({
         type="button"
         disabled={busy}
         onClick={onRequestEdit}
-        className="h-16 w-full min-w-0 overflow-hidden rounded-lg bg-muted/45 px-3 py-2.5 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait"
+        className="h-16 w-full min-w-0 overflow-hidden rounded-lg bg-muted/45 px-3 py-1.5 text-left transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-wait"
         aria-label={`Edit ${label}`}
       >
         <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -304,7 +304,7 @@ function InlineField({
                   onDirtyChange(false);
                   onCancel();
                 }}
-                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 aria-label={`Cancel editing ${label}`}
                 title="Cancel"
               >
@@ -313,7 +313,7 @@ function InlineField({
               <button
                 type="submit"
                 disabled={busy}
-                className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-wait disabled:opacity-50"
                 aria-label={`Save ${label}`}
                 title="Save"
               >
@@ -440,7 +440,7 @@ function SubjectTestList({
             key={text(item.id)}
             className={`rounded-lg border p-3 ${text(item.result).toLowerCase() === "failed" && !isVoided ? "border-destructive/30 bg-destructive/5" : "border-border"} ${isVoided ? "opacity-60" : ""}`}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-semibold">{paper}</p>
                 <p className="mt-1 flex items-center gap-2 text-xs font-semibold">
@@ -642,7 +642,7 @@ function AcademyAssessmentDetails({
   ].filter((item) => item[1]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold text-foreground">
           Full lesson evaluation
@@ -662,7 +662,7 @@ function AcademyAssessmentDetails({
             {sections.map((item) => (
               <div
                 key={item.key}
-                className="rounded-md border border-border bg-card px-2.5 py-2"
+                className="rounded-md border border-border bg-card px-2.5 py-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <strong className="text-xs text-foreground">{item.label}</strong>
@@ -692,7 +692,7 @@ function AcademyAssessmentDetails({
             {criteria.map((item) => (
               <div
                 key={item.key}
-                className="rounded-md border border-primary/10 bg-primary/5 px-2.5 py-2"
+                className="rounded-md border border-primary/10 bg-primary/5 px-2.5 py-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <strong className="text-xs text-foreground">{item.label}</strong>
@@ -714,7 +714,7 @@ function AcademyAssessmentDetails({
       {notes.length ? (
         <dl className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {notes.map(([label, value]) => (
-            <div key={label} className="rounded-md bg-muted/55 px-2.5 py-2">
+            <div key={label} className="rounded-md bg-muted/55 px-2.5 py-1.5">
               <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {label}
               </dt>
@@ -727,7 +727,7 @@ function AcademyAssessmentDetails({
       ) : null}
 
       {!sections.length && !criteria.length && !notes.length ? (
-        <p className="rounded-md border border-dashed border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+        <p className="rounded-md border border-dashed border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
           No detailed comments were recorded for this evaluation.
         </p>
       ) : null}
@@ -826,7 +826,7 @@ function TrainingPanel({
               className="min-w-32 max-w-5xl flex-1"
               aria-label={`${summary.evaluated} of ${summary.assigned} lessons covered, ${lessonsLeft} left`}
             >
-              <div className="mb-0.5 flex items-center justify-between gap-3 text-[10px] font-semibold text-muted-foreground">
+              <div className="mb-0.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-muted-foreground">
                 <span>
                   {summary.isComplete ? "Teacher Academy completed" : `${summary.evaluated}/${summary.assigned} covered`}
                 </span>
@@ -853,7 +853,7 @@ function TrainingPanel({
                 type="button"
                 onClick={onPromote}
                 disabled={promotionState === "requested" || promotionState === "approved"}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <ShieldCheck className="h-4 w-4" />
                 {promotionState === "requested"
@@ -960,7 +960,7 @@ function TrainingPanel({
                         </tr>
                         {assessment && expanded ? (
                           <tr id={`training-evaluation-${row.lesson.id}`}>
-                            <td colSpan={5} className="bg-muted/35 px-4 py-3">
+                            <td colSpan={5} className="bg-muted/35 px-3 py-3">
                               <AcademyAssessmentDetails row={row} />
                             </td>
                           </tr>
@@ -1003,7 +1003,7 @@ function TrainingPanel({
                         : ""
                     }`}
                   >
-                    <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
                       <div className="min-w-0">
                         <h3 className="truncate text-sm font-semibold" title={title.number}>
                           {title.number}
@@ -1017,17 +1017,17 @@ function TrainingPanel({
                       </StatusBadge>
                     </div>
                     <dl className="mt-3 grid min-w-0 grid-cols-2 gap-2 text-xs">
-                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
+                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-1.5">
                         <dt className="font-semibold text-muted-foreground">Evaluated date</dt>
                         <dd className="mt-0.5 text-foreground">{trainingEvaluationDate(row)}</dd>
                       </div>
-                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2">
+                      <div className="min-w-0 rounded-md bg-muted/45 px-2.5 py-1.5">
                         <dt className="font-semibold text-muted-foreground">Evaluated by</dt>
                         <dd className="mt-0.5 truncate text-foreground" title={evaluator.title}>{evaluator.label}</dd>
                       </div>
                     </dl>
                     {assessment ? (
-                      <div className="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border px-3">
+                      <div className="mt-2 flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-border px-3">
                         <span className="text-xs">
                           <strong className="mr-2 tabular-nums text-foreground">
                             {trainingScore(assessment.weighted_overall_score)}
@@ -1040,7 +1040,7 @@ function TrainingPanel({
                         />
                       </div>
                     ) : (
-                      <div className="mt-2 flex min-h-11 items-center">
+                      <div className="mt-2 flex min-h-9 items-center">
                         <StatusBadge status="pending">
                           Awaiting evaluation
                         </StatusBadge>
@@ -1049,7 +1049,7 @@ function TrainingPanel({
                     {assessment && expanded ? (
                       <div
                         id={`training-card-evaluation-${row.lesson.id}`}
-                        className="mt-2 rounded-md bg-muted/45 px-3 py-2.5"
+                        className="mt-2 rounded-md bg-muted/45 px-3 py-1.5"
                       >
                         <AcademyAssessmentDetails row={row} />
                       </div>
@@ -1169,7 +1169,7 @@ function MoveCandidateFields({
 }) {
   const [stage, setStage] = useState("");
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <label className="text-xs font-semibold">
         New stage
         <select
@@ -1241,7 +1241,7 @@ function ActionFields({
   switch (action.kind) {
     case "edit_profile":
       return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-xs font-semibold">
             Full name
             <input
@@ -1352,7 +1352,7 @@ function ActionFields({
       return <MoveCandidateFields candidate={candidate} />;
     case "upload_document":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <label className="text-xs font-semibold">
             Document type
             <select
@@ -1395,7 +1395,7 @@ function ActionFields({
       );
     case "record_interview":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           {action.appointment ? (
             <input
               type="hidden"
@@ -1420,7 +1420,7 @@ function ActionFields({
               className={`${fieldClass} mt-1`}
             />
           </label>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-xs font-semibold">CEFR<select name="cefr_level" className={`${fieldClass} mt-1`}><option value="">Not set</option>{["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => <option key={value}>{value}</option>)}</select></label>
             <label className="text-xs font-semibold">Overall (0–10)<input name="overall_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
             <label className="text-xs font-semibold">Communication (0–10)<input name="communication_score" type="number" min="0" max="10" step="0.1" className={`${fieldClass} mt-1`} /></label>
@@ -1441,8 +1441,8 @@ function ActionFields({
       );
     case "record_test":
       return (
-        <div className="grid gap-3">
-          <div className="rounded-lg bg-muted/60 px-3 py-2.5">
+        <div className="grid gap-2">
+          <div className="rounded-lg bg-muted/60 px-3 py-1.5">
             <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Subject test
             </span>
@@ -1478,14 +1478,14 @@ function ActionFields({
       );
     case "record_demo":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <input type="hidden" name="appointment_id" value={action.appointment?.id || ""} />
           <input type="hidden" name="topic" value={action.appointment?.topic || ""} />
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</span><strong className="mt-0.5 block text-sm">{scheduledDatePart(action.appointment?.starts_at)}</strong></div>
-            <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Time</span><strong className="mt-0.5 block text-sm">{scheduledTimePart(action.appointment?.starts_at)}</strong></div>
+            <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</span><strong className="mt-0.5 block text-sm">{scheduledDatePart(action.appointment?.starts_at)}</strong></div>
+            <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Time</span><strong className="mt-0.5 block text-sm">{scheduledTimePart(action.appointment?.starts_at)}</strong></div>
           </div>
-          <div className="rounded-lg bg-muted/60 px-3 py-2"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Full name</span><strong className="mt-0.5 block text-sm">{candidate.full_name}</strong></div>
+          <div className="rounded-lg bg-muted/60 px-3 py-1.5"><span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Full name</span><strong className="mt-0.5 block text-sm">{candidate.full_name}</strong></div>
           <label className="text-xs font-semibold">
             Evaluator's notes
             <textarea
@@ -1545,7 +1545,7 @@ function ActionFields({
             {evaluators.map((person) => (
               <label
                 key={person.id}
-                className="flex min-h-11 items-center gap-3 rounded-lg border border-border px-3 text-sm"
+                className="flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm"
               >
                 <input
                   type="checkbox"
@@ -1571,7 +1571,7 @@ function ActionFields({
     }
     case "request_approval":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <label className="text-xs font-semibold">
             Requested outcome
             <select
@@ -1597,13 +1597,13 @@ function ActionFields({
       );
     case "record_outcome":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <OutcomeFields candidate={candidate} options={options} />
         </div>
       );
     case "review_approval":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <p className="rounded-lg bg-muted/50 p-3 text-sm">
             {action.status === "approved"
               ? `${stageLabels[text(action.approval.requested_outcome)]} will be approved and finalized. The onboarding record will remain pending.`
@@ -1638,7 +1638,7 @@ function ActionFields({
       );
     case "void_evaluation":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <p className="rounded-lg bg-muted/50 p-3 text-sm">
             This keeps the result in history but excludes it from the
             candidate's latest evaluation summary.
@@ -1656,7 +1656,7 @@ function ActionFields({
       );
     case "add_task":
       return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <label className="text-xs font-semibold">
             Title
             <input required name="title" className={`${fieldClass} mt-1`} />
@@ -2349,7 +2349,7 @@ export function CandidateProfile({
     ) : null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <header className="sticky top-[calc(var(--app-top-inset)+4.5rem)] z-20 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur lg:top-3">
         <div className="flex items-start gap-2">
           <a
@@ -2369,7 +2369,7 @@ export function CandidateProfile({
                 /* Direct deep links use the safe fallback href. */
               }
             }}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
             aria-label={`Back to ${backLabel}`}
             title={`Back to ${backLabel}`}
           >
@@ -2429,7 +2429,7 @@ export function CandidateProfile({
               aria-controls={`candidate-panel-${item.key}`}
               onClick={() => setProfileTab(item.key)}
               onKeyDown={(event) => handleTabKeyDown(event, item.key)}
-              className={`min-h-11 rounded-lg px-3 text-[13px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              className={`min-h-9 rounded-lg px-3 text-[13px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${tab === item.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
               {item.label}
             </button>
@@ -2442,7 +2442,7 @@ export function CandidateProfile({
           id="candidate-panel-overview"
           role="tabpanel"
           aria-labelledby="candidate-tab-overview"
-          className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]"
+          className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]"
         >
           <Panel
             title="Personal & background"
@@ -2687,7 +2687,7 @@ export function CandidateProfile({
               </>
             )}
           </Panel>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {candidate.academy ? (
               <Panel
                 title="Teacher Academy"
@@ -2706,7 +2706,7 @@ export function CandidateProfile({
                   ]}
                 />
                 {candidate.profile_origin === "academy_direct" ? (
-                  <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  <p className="mt-2 rounded-lg bg-muted px-3 py-1.5 text-xs text-muted-foreground">
                     Created directly from Teacher Academy. No application history has been generated.
                   </p>
                 ) : null}
@@ -2752,7 +2752,7 @@ export function CandidateProfile({
               ) : (
                 <EmptyLine>No next action.</EmptyLine>
               )}
-              {candidate.current_sla ? <div className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold ${candidate.current_sla.status === "red" ? "bg-red-50 text-red-700" : candidate.current_sla.status === "yellow" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>{candidate.current_sla.status === "red" ? "SLA overdue" : `Stage SLA due ${dateLabel(candidate.current_sla.due_at)}`}</div> : null}
+              {candidate.current_sla ? <div className={`mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold ${candidate.current_sla.status === "red" ? "bg-red-50 text-red-700" : candidate.current_sla.status === "yellow" ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>{candidate.current_sla.status === "red" ? "SLA overdue" : `Stage SLA due ${dateLabel(candidate.current_sla.due_at)}`}</div> : null}
             </Panel>
             <Panel
               title="Recruitment progress"
@@ -2773,15 +2773,15 @@ export function CandidateProfile({
           id="candidate-panel-evaluations"
           role="tabpanel"
           aria-labelledby="candidate-tab-evaluations"
-          className="space-y-3"
+          className="space-y-2"
         >
-          <div className="grid gap-3 xl:grid-cols-3">
+          <div className="grid gap-2 xl:grid-cols-3">
             <Panel
               title="Job Interviews"
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
               <div className="mb-3 space-y-2">
-                {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => <button key={appointment.id} type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>)}
+                {scheduledAppointments.filter((item) => item.appointment_type === "job_interview").map((appointment) => <button key={appointment.id} type="button" onClick={() => setInterviewSession(appointment)} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span><strong className="block text-[13px]">{appointment.status === "in_progress" ? "Interview in progress" : appointment.is_overdue ? "Interview overdue" : "Scheduled interview"}</strong><span className="mt-0.5 block text-xs">{dateTimeLabel(appointment.starts_at)}</span></span><span className="text-xs font-semibold">{appointment.status === "in_progress" ? "Resume" : "Start"}</span></button>)}
               </div>
               <AttemptList
                 items={candidate.interviews || []}
@@ -2804,7 +2804,7 @@ export function CandidateProfile({
               icon={<ClipboardCheck className="h-4 w-4" />}
             >
               <div className="mb-3 space-y-2">
-                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => <button key={appointment.id} type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>)}
+                {scheduledAppointments.filter((item) => item.appointment_type === "demo_lesson").map((appointment) => <button key={appointment.id} type="button" disabled={!permissions?.can_add_academic_evaluation} onClick={() => setAction({ kind: "record_demo", appointment })} className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-lg border px-3 py-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-default ${appointment.is_overdue ? "border-red-300 bg-red-50 text-red-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><span className="min-w-0"><strong className="block truncate text-[13px]">{appointment.is_overdue ? "Demo lesson overdue" : "Scheduled demo lesson"}</strong><span className="mt-0.5 block truncate text-xs">{dateTimeLabel(appointment.starts_at)}{appointment.responsible_name ? ` · ${appointment.responsible_name}` : ""}</span>{appointment.topic ? <span className="mt-0.5 block truncate text-xs">Topic: {appointment.topic}</span> : null}</span>{permissions?.can_add_academic_evaluation ? <span className="text-xs font-semibold">Evaluate</span> : null}</button>)}
               </div>
               <AttemptList
                 items={candidate.demo_lessons || []}
@@ -2829,7 +2829,7 @@ export function CandidateProfile({
                 <button
                   type="button"
                   onClick={() => setAction({ kind: "record_test" })}
-                  className="mb-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  className="mb-3 inline-flex min-h-9 w-full items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 >
                   Record subject test
                 </button>
@@ -2879,7 +2879,7 @@ export function CandidateProfile({
                       href={`${RECRUITMENT_API}/candidates/${candidateId}/documents/${text(document.id)}/open`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35"
+                      className="flex min-h-14 min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-1.5 transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35"
                       aria-label={`Open ${fileName}`}
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -2916,20 +2916,20 @@ export function CandidateProfile({
           id="candidate-panel-hiring"
           role="tabpanel"
           aria-labelledby="candidate-tab-hiring"
-          className="space-y-3"
+          className="space-y-2"
         >
           <Panel
             title="Under-review summary"
             icon={<ShieldCheck className="h-4 w-4" />}
           >
-            {candidate.status === "under_review" && candidate.evaluation_states?.subject_test !== "passed" ? <div role="status" className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">Subject test missing/not passed. This warning is informational and does not block the final decision.</div> : null}
+            {candidate.status === "under_review" && candidate.evaluation_states?.subject_test !== "passed" ? <div role="status" className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">Subject test missing/not passed. This warning is informational and does not block the final decision.</div> : null}
             <DefinitionGrid
               values={Object.entries(candidate.under_review || {}).map(
                 ([key, value]) => [humanize(key), value],
               )}
             />
           </Panel>
-          <div className="grid gap-3 xl:grid-cols-3">
+          <div className="grid gap-2 xl:grid-cols-3">
             <Panel title="Assignments" icon={<UserRound className="h-4 w-4" />}>
               <div className="space-y-2">
                 {(candidate.assignments || []).map((item) => (
@@ -3122,14 +3122,14 @@ export function CandidateProfile({
           id="candidate-panel-activity"
           role="tabpanel"
           aria-labelledby="candidate-tab-activity"
-          className="grid gap-3 xl:grid-cols-3"
+          className="grid gap-2 xl:grid-cols-3"
         >
           <Panel title="Tasks" icon={<CalendarClock className="h-4 w-4" />}>
             <div className="space-y-2">
               {(candidate.tasks || []).map((task) => (
                 <article
                   key={task.id}
-                  className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-border p-3"
+                  className="flex min-h-14 items-center justify-between gap-2 rounded-lg border border-border p-3"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold">
@@ -3169,7 +3169,7 @@ export function CandidateProfile({
             </div>
           </Panel>
           <Panel title="Timeline" icon={<Activity className="h-4 w-4" />}>
-            <ol className="space-y-3">
+            <ol className="space-y-2">
               {(candidate.activity || []).map((item) => (
                 <li
                   key={Number(item.id)}
@@ -3332,8 +3332,8 @@ export function CandidateProfile({
           <ModalFooter>
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className={secondaryButtonClass} disabled={mutation.isPending} onClick={() => { mutation.reset(); setAction(null); }}>Cancel</button>
-              <button type="submit" name="result" value="passed" className="flex min-h-11 items-center justify-center rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-60" disabled={mutation.isPending}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Pass</button>
-              <button type="submit" name="result" value="failed" className="flex min-h-11 items-center justify-center rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:opacity-60" disabled={mutation.isPending}><X className="h-4 w-4" />Reject</button>
+              <button type="submit" name="result" value="passed" className="flex min-h-9 items-center justify-center rounded-lg bg-emerald-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 disabled:opacity-60" disabled={mutation.isPending}>{mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Pass</button>
+              <button type="submit" name="result" value="failed" className="flex min-h-9 items-center justify-center rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:opacity-60" disabled={mutation.isPending}><X className="h-4 w-4" />Reject</button>
             </div>
           </ModalFooter>
         </form>
@@ -3346,7 +3346,7 @@ export function CandidateProfile({
         description="Read-only audit trail"
         widthClass="sm:max-w-md"
       >
-        <ol className="space-y-3">
+        <ol className="space-y-2">
           {(candidate.stage_history || []).map((item) => (
             <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[13px] font-semibold">Entered {stageLabels[item.stage] || humanize(item.stage)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
           ))}

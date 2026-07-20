@@ -56,9 +56,9 @@ export function AppointmentForm({
   const staff = (options?.staff || []).filter((person) => ["academic_director", "head_of_department"].includes(person.role));
   const defaultDuration = appointmentDuration(appointment) || (demo ? 45 : 30);
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <input type="hidden" name="starts_at" value={appointmentDate && appointmentTime ? `${appointmentDate}T${appointmentTime}` : ""} />
-      <div className={`grid gap-3 ${historical ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+      <div className={`grid gap-2 ${historical ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
         <label className="text-xs font-semibold">
           Date
           <input
@@ -106,7 +106,7 @@ export function AppointmentForm({
           </p>
           <div className="grid grid-cols-2 gap-2">
             {(["passed", "failed"] as const).map((result) => (
-              <label key={result} className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40">
+              <label key={result} className="flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40">
                 <input required type="radio" name="historical_result" value={result} className="h-4 w-4" />
                 {result === "passed" ? "Passed" : "Failed"}
               </label>
@@ -126,7 +126,7 @@ export function AppointmentForm({
           {staff.map((person) => <option key={person.id} value={person.id}>{person.name} · {humanize(person.role)}</option>)}
         </select>
       </label> : null}
-      {!historical ? <div className="grid gap-3 sm:grid-cols-2">
+      {!historical ? <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs font-semibold">Format<select required name="appointment_format" value={format} onChange={(event) => setFormat(event.target.value)} className={`${fieldClass} mt-1`}><option value="">Select format</option><option value="Online">Online</option><option value="In person">In person</option>{!demo ? <option value="Phone">Phone</option> : null}</select></label>
         <label className="text-xs font-semibold">{format === "Online" ? "Conference link (optional)" : format === "In person" ? "Location (optional)" : "Location or link (optional)"}<input type={format === "Online" ? "url" : "text"} name="location_or_link" defaultValue={appointment?.location_or_link} placeholder={format === "Online" ? "https://meet.example/..." : ""} className={`${fieldClass} mt-1`} /></label>
       </div> : null}

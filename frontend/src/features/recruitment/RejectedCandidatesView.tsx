@@ -107,8 +107,8 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
       <section className="rounded-xl border border-border bg-card p-2.5">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
           <div role="tablist" aria-label="Closed recruitment outcomes" className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-1">
-            <button type="button" role="tab" aria-selected={tab === "rejected"} onClick={() => switchTab("rejected")} className={`min-h-11 rounded-md px-3 text-sm font-semibold ${tab === "rejected" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Rejected</button>
-            <button type="button" role="tab" aria-selected={tab === "candidate_withdrew"} onClick={() => switchTab("candidate_withdrew")} className={`min-h-11 rounded-md px-3 text-sm font-semibold ${tab === "candidate_withdrew" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Withdrawn</button>
+            <button type="button" role="tab" aria-selected={tab === "rejected"} onClick={() => switchTab("rejected")} className={`min-h-9 rounded-md px-3 text-sm font-semibold ${tab === "rejected" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Rejected</button>
+            <button type="button" role="tab" aria-selected={tab === "candidate_withdrew"} onClick={() => switchTab("candidate_withdrew")} className={`min-h-9 rounded-md px-3 text-sm font-semibold ${tab === "candidate_withdrew" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Withdrawn</button>
           </div>
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search closed candidates</span>
@@ -135,12 +135,12 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
               <table className="w-full table-fixed text-left text-[13px]">
                 <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="w-[20%] px-3 py-2">Candidate</th>
-                    <th className="w-[13%] px-3 py-2">Failed / left at</th>
-                    <th className="w-[22%] px-3 py-2">Reason</th>
-                    <th className="w-[14%] px-3 py-2">Recorded by</th>
-                    <th className="w-[12%] px-3 py-2">Recorded</th>
-                    <th className="w-[19%] px-3 py-2 text-right">Actions</th>
+                    <th className="w-[20%] px-3 py-1.5">Candidate</th>
+                    <th className="w-[13%] px-3 py-1.5">Failed / left at</th>
+                    <th className="w-[22%] px-3 py-1.5">Reason</th>
+                    <th className="w-[14%] px-3 py-1.5">Recorded by</th>
+                    <th className="w-[12%] px-3 py-1.5">Recorded</th>
+                    <th className="w-[19%] px-3 py-1.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -170,7 +170,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                 </article>
               ))}
             </div>
-            {!candidates.data.items.length ? <div className="p-4"><EmptyLine><span className="inline-flex items-center gap-2">{tab === "rejected" ? <Ban className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}{tab === "rejected" ? "No rejected candidates." : "No withdrawn candidates."}</span></EmptyLine></div> : null}
+            {!candidates.data.items.length ? <div className="p-3"><EmptyLine><span className="inline-flex items-center gap-2">{tab === "rejected" ? <Ban className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}{tab === "rejected" ? "No rejected candidates." : "No withdrawn candidates."}</span></EmptyLine></div> : null}
             <div className="border-t border-border p-2.5"><Pagination page={page} totalPages={candidates.data.total_pages} onPageChange={setPage} label={`${candidates.data.total} candidates · Page ${page} of ${candidates.data.total_pages}`} /></div>
           </section>
         ) : null}
@@ -183,11 +183,11 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
         footer={(
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryButtonClass} onClick={() => { setDraftFilters(emptyFilters); setFilters(emptyFilters); setPage(1); setFilterOpen(false); }}>Clear</button>
-            <button type="button" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground" onClick={() => { setFilters(draftFilters); setPage(1); setFilterOpen(false); }}>Apply</button>
+            <button type="button" className="inline-flex min-h-9 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground" onClick={() => { setFilters(draftFilters); setPage(1); setFilterOpen(false); }}>Apply</button>
           </div>
         )}
       >
-        <div className="grid gap-3">
+        <div className="grid gap-2">
           <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draftFilters.position} onChange={(event) => setDraftFilters({ ...draftFilters, position: event.target.value })}><option value="">All positions</option>{options?.option_categories.position?.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draftFilters.source} onChange={(event) => setDraftFilters({ ...draftFilters, source: event.target.value })}><option value="">All sources</option>{options?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Failed / left at<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{Object.entries(stageLabels).filter(([value]) => !["trash_bin", "rejected", "candidate_withdrew"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

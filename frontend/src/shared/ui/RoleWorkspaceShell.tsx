@@ -187,14 +187,14 @@ export function RoleWorkspaceShell<Key extends string = string>({
       />
 
       <main
-        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+1rem)] transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-8 lg:pt-6 motion-reduce:transition-none ${desktopMarginClass} ${
+        className={`min-h-[var(--tg-viewport-height)] px-3 pt-[calc(var(--app-top-inset)+0.5rem)] transition-[margin] duration-200 sm:px-5 lg:px-8 lg:pb-6 lg:pt-4 motion-reduce:transition-none ${desktopMarginClass} ${
           shouldUseBottomNav
             ? "pb-[calc(var(--app-bottom-inset)+6.25rem)]"
             : "pb-[calc(var(--app-bottom-inset)+1.25rem)]"
         }`}
       >
         {shouldUseDrawer ? (
-          <div className="sticky top-[calc(var(--app-top-inset)+0.5rem)] z-30 mb-3 flex items-center gap-3 rounded-lg border border-border/80 bg-card/95 px-3 py-2 shadow-card backdrop-blur lg:hidden">
+          <div className="sticky top-[calc(var(--app-top-inset)+0.5rem)] z-30 mb-2 flex items-center gap-3 rounded-lg border border-border/80 bg-card/95 px-3 py-1.5 shadow-card backdrop-blur lg:hidden">
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -248,7 +248,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
               <a
                 href={homeHref}
                 onClick={() => setDrawerOpen(false)}
-                className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="flex min-h-9 min-w-0 items-center gap-2.5 rounded-lg text-left transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/12 font-bold text-white ring-1 ring-white/10">
                   {(brandLabel || "MSI School").charAt(0) || "M"}
@@ -274,7 +274,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                   <a
                     href={workspaceBackLink.href}
                     onClick={() => setDrawerOpen(false)}
-                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-300 hover:bg-sidebar-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    className="flex min-h-9 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-300 hover:bg-sidebar-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     <span>{workspaceBackLink.label}</span>
@@ -290,7 +290,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                   const hasChildren = Boolean(item.children?.length);
                   const groupIsOpen = hasChildren && openDrawerGroupKey === item.key;
                   const childGroupId = `mobile-role-nav-${String(item.key)}-children`;
-                  const itemClasses = `relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 pl-4 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
+                  const itemClasses = `relative flex min-h-9 w-full items-center gap-3 rounded-lg px-3 py-1.5 pl-4 text-left text-sm font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 motion-reduce:transition-none ${
                     isActive || groupIsOpen
                       ? childIsActive
                         ? "bg-sidebar-accent text-sidebar-accent-foreground"
@@ -343,7 +343,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
                                     onClick={() => setDrawerOpen(false)}
                                     tabIndex={groupIsOpen ? 0 : -1}
                                     aria-current={child.active ? "page" : undefined}
-                                    className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${child.active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-slate-300 hover:bg-sidebar-accent hover:text-white"}`}
+                                    className={`flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${child.active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-slate-300 hover:bg-sidebar-accent hover:text-white"}`}
                                   >
                                     {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
                                     <span className="min-w-0 truncate">{child.label}</span>
@@ -363,7 +363,7 @@ export function RoleWorkspaceShell<Key extends string = string>({
 
             <div className="border-t border-white/10 p-3">
               <div className="flex items-center gap-2.5 rounded-lg px-2 py-2">
-                <a href={profileHref || routes.accountSecurity} onClick={() => setDrawerOpen(false)} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
+                <a href={profileHref || routes.accountSecurity} onClick={() => setDrawerOpen(false)} className="flex min-h-9 min-w-0 flex-1 items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-900">
                     {initialsFromLogin(login, initialsFallback || "MS")}
                   </div>

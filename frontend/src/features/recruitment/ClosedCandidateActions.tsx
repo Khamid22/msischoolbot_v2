@@ -50,10 +50,10 @@ export function ClosedCandidateActions({ candidate, onAnnouncement }: Props) {
 
   return (
     <>
-      <div className="flex min-h-11 items-center justify-end gap-1.5">
+      <div className="flex min-h-9 items-center justify-end gap-1.5">
         <button
           type="button"
-          className={`${secondaryButtonClass} min-h-11 px-2.5 text-xs`}
+          className={`${secondaryButtonClass} min-h-9 px-2.5 text-xs`}
           disabled={busy}
           onClick={() => restore.mutate()}
         >
@@ -62,7 +62,7 @@ export function ClosedCandidateActions({ candidate, onAnnouncement }: Props) {
         </button>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-destructive/30 px-2.5 text-xs font-semibold text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-destructive/30 px-2.5 text-xs font-semibold text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/30"
           disabled={busy}
           onClick={() => setConfirmDelete(true)}
         >
@@ -80,11 +80,11 @@ export function ClosedCandidateActions({ candidate, onAnnouncement }: Props) {
         closeOnEscape={!purge.isPending}
         closeOnOutsideClick={!purge.isPending}
       >
-        <ModalBody className="space-y-3">
+        <ModalBody className="space-y-2">
           <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             This permanently deletes the candidate profile, recruitment history, evaluations, appointments, tasks, decisions, documents, and audit records. It cannot be undone.
           </div>
-          <label className="flex min-h-11 cursor-pointer items-start gap-2 rounded-lg border border-border p-3 text-sm">
+          <label className="flex min-h-9 cursor-pointer items-start gap-2 rounded-lg border border-border p-3 text-sm">
             <input
               autoFocus
               type="checkbox"
@@ -100,7 +100,7 @@ export function ClosedCandidateActions({ candidate, onAnnouncement }: Props) {
             <button type="button" className={secondaryButtonClass} disabled={purge.isPending} onClick={() => setConfirmDelete(false)}>Cancel</button>
             <button
               type="button"
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-destructive px-3 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
               disabled={!understood || purge.isPending}
               onClick={() => purge.mutate()}
             >

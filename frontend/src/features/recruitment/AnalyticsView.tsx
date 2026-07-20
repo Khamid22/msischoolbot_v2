@@ -228,7 +228,7 @@ function Panel({
 }) {
   return (
     <section className={`min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className}`}>
-      <header className="flex min-h-12 items-start justify-between gap-2 border-b border-border/70 px-3 py-2">
+      <header className="flex min-h-12 items-start justify-between gap-2 border-b border-border/70 px-3 py-1.5">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-[13px] font-semibold leading-tight">{icon}{title}</h2>
           {description ? <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-muted-foreground">{description}</p> : null}
@@ -240,7 +240,7 @@ function Panel({
 }
 
 function EmptyChart({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-52 items-center justify-center px-4 text-center text-sm text-muted-foreground">{children}</div>;
+  return <div className="flex min-h-52 items-center justify-center px-3 text-center text-sm text-muted-foreground">{children}</div>;
 }
 
 function AnalyticsSkeleton() {
@@ -292,7 +292,7 @@ function FilterDrawer({
             const cleared = { ...draft, source: "", subsource: "", position: "", subject_id: "", responsible_account_id: "" };
             setDraft(cleared);
           }}>Clear</button>
-          <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => onApply(draft)}>
+          <button type="button" className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => onApply(draft)}>
             <Check className="h-4 w-4" />Apply
           </button>
         </div>
@@ -402,7 +402,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
   if (dashboard.error || !dashboard.data) {
     return (
       <PageState tone="error">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span>{queryError(dashboard.error)}</span>
           <button type="button" className={secondaryButtonClass} onClick={() => void dashboard.refetch()}><RotateCcw className="h-4 w-4" />Retry</button>
         </div>
@@ -573,7 +573,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
           <div className="space-y-2 p-3">
             {data.journey.map((item) => (
               <div key={item.stage}>
-                <div className="mb-1 flex items-center justify-between gap-3 text-[11px]">
+                <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
                   <span className="font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</span>
                   <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                     {item.conversion_percentage !== null && item.conversion_percentage !== undefined ? `${item.conversion_percentage}% from prior` : "Entry stage"}
@@ -620,7 +620,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               const target = Number(item.sla_target_days || 0);
               const ratio = target ? Math.min(100, Number(item.average_days || 0) / target * 100) : 0;
               return (
-                <div key={item.stage} className="grid gap-2 px-3 py-2 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center">
+                <div key={item.stage} className="grid gap-2 px-3 py-1.5 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center">
                   <div>
                     <p className="text-xs font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</p>
                     <p className="text-[11px] text-muted-foreground">{item.entries} stage entries</p>
@@ -639,14 +639,14 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         <Panel title="Source quality" description="Subsource-level shortlisting and Active Teacher conversion." icon={<TrendingUp className="h-4 w-4 text-primary" />} className="xl:col-span-6">
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[540px] text-left text-xs">
-              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-2.5">Source</th><th className="px-3 py-2.5">Applicants</th><th className="px-3 py-2.5">Shortlisted</th><th className="px-3 py-2.5">Hired</th><th className="px-3 py-2.5">Conversion</th></tr></thead>
+              <thead className="bg-muted/45 text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Source</th><th className="px-3 py-1.5">Applicants</th><th className="px-3 py-1.5">Shortlisted</th><th className="px-3 py-1.5">Hired</th><th className="px-3 py-1.5">Conversion</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-2.5"><strong className="block">{item.source}</strong><span className="text-[10px] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-2.5 tabular-nums">{item.candidates}</td><td className="px-3 py-2.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-2.5 tabular-nums">{item.hired}</td><td className="px-3 py-2.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
+                {data.source_quality.slice(0, 10).map((item) => <tr key={`${item.source}:${item.subsource}`} className="hover:bg-muted/25"><td className="px-3 py-1.5"><strong className="block">{item.source}</strong><span className="text-[10px] text-muted-foreground">{item.subsource}</span></td><td className="px-3 py-1.5 tabular-nums">{item.candidates}</td><td className="px-3 py-1.5 tabular-nums">{item.shortlisted}</td><td className="px-3 py-1.5 tabular-nums">{item.hired}</td><td className="px-3 py-1.5 font-semibold tabular-nums">{item.conversion_percentage ?? 0}%</td></tr>)}
               </tbody>
             </table>
           </div>
           <div className="divide-y divide-border/70 sm:hidden">
-            {data.source_quality.slice(0, 10).map((item) => <div key={`${item.source}:${item.subsource}`} className="px-3 py-2 text-xs"><div className="flex justify-between gap-2"><strong>{item.source} · {item.subsource}</strong><strong>{item.conversion_percentage ?? 0}%</strong></div><p className="mt-1 text-muted-foreground">{item.candidates} applicants · {item.shortlisted} shortlisted · {item.hired} hired</p></div>)}
+            {data.source_quality.slice(0, 10).map((item) => <div key={`${item.source}:${item.subsource}`} className="px-3 py-1.5 text-xs"><div className="flex justify-between gap-2"><strong>{item.source} · {item.subsource}</strong><strong>{item.conversion_percentage ?? 0}%</strong></div><p className="mt-1 text-muted-foreground">{item.candidates} applicants · {item.shortlisted} shortlisted · {item.hired} hired</p></div>)}
           </div>
           {!data.source_quality.length ? <EmptyChart>No source-quality data in this cohort.</EmptyChart> : null}
         </Panel>
@@ -687,14 +687,14 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
                 <col className="w-[18%]" />
                 <col className="w-[23%]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-2">Candidate</th><th className="px-2 py-2">Position</th><th className="px-2 py-2">Source</th><th className="px-2 py-2">Applied</th><th className="px-2 py-2">Stage</th><th className="px-2 py-2">Next action</th></tr></thead>
+              <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-1.5">Candidate</th><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5">Source</th><th className="px-2 py-1.5">Applied</th><th className="px-2 py-1.5">Stage</th><th className="px-2 py-1.5">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
                 {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>
           <div className="no-scrollbar max-h-[300px] divide-y divide-border/70 overflow-y-auto md:hidden">
-            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-2 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
+            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-1.5 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
           </div>
           {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
         </Panel>
@@ -702,7 +702,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
         <Panel title="Recent activity" description="Actor-attributed events that occurred within the selected dates." icon={<Activity className="h-4 w-4 text-primary" />} className="xl:col-span-12">
           <ol className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-3">
             {data.recent_activity.map((item) => (
-              <li key={item.id} className="flex min-h-[68px] gap-2 bg-card px-3 py-2">
+              <li key={item.id} className="flex min-h-[68px] gap-2 bg-card px-3 py-1.5">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary"><Activity className="h-4 w-4" /></span>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold">{activityLabel(item.event_type)}</p>
