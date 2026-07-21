@@ -70,7 +70,9 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /onWheel=\{scrollWheelBoard\}/);
     assert.match(pipeline, /smoothScrollBoardBy/);
     assert.match(pipeline, /prefers-reduced-motion: reduce/);
-    assert.match(pipeline, /columnCanScroll/);
+    assert.match(pipeline, /columnScroller && verticalIntent && !event\.shiftKey/);
+    assert.doesNotMatch(pipeline, /columnCanScroll/);
+    assert.doesNotMatch(pipeline, /columnScroller\.scrollTop \+ columnScroller\.clientHeight/);
     assert.match(pipeline, /\["ArrowLeft", "ArrowRight"\]/);
     assert.match(pipeline, /\[data-candidate-card\], a, button, input, select, textarea/);
   });

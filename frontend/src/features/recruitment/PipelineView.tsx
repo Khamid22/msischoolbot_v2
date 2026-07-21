@@ -806,16 +806,10 @@ export function PipelineView({
     const columnScroller = event.target instanceof Element
       ? event.target.closest<HTMLElement>("[data-pipeline-column-scroll]")
       : null;
-    const columnCanScroll = Boolean(
-      columnScroller
-      && verticalIntent
-      && !event.shiftKey
-      && (
-        (event.deltaY < 0 && columnScroller.scrollTop > 0)
-        || (event.deltaY > 0 && columnScroller.scrollTop + columnScroller.clientHeight < columnScroller.scrollHeight - 1)
-      )
-    );
-    if (columnCanScroll) return;
+    // A vertical gesture that starts inside a column always belongs to that
+    // column, even when it has reached its top or bottom. Converting the
+    // leftover delta at an edge made the board jump sideways unexpectedly.
+    if (columnScroller && verticalIntent && !event.shiftKey) return;
     const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
     const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
       ? 16
