@@ -415,9 +415,12 @@ const CandidateCard = memo(function CandidateCard({
       : candidate.status === "test_and_demo"
         ? (!interviewDone ? "job_interview" : !candidate.latest_demo_result ? "demo_lesson" : null)
         : null;
-  let detailLabel = "";
-  let detailValue = "";
-  if (candidate.status === "new_candidate") { detailLabel = "Applied"; detailValue = dateLabel(candidate.application_date); }
+  // The application date belongs to the candidate, not to a workflow stage.
+  // Keep it visible when the candidate enters a custom column (for example,
+  // "Not Responding") while allowing operational stages to show their more
+  // relevant appointment or stage-entry detail below.
+  let detailLabel = "Applied";
+  let detailValue = dateLabel(candidate.application_date);
   if (candidate.status === "responded") { detailLabel = "Responded"; detailValue = dateLabel(candidate.stage_changed_at); }
   if (appointment) { detailLabel = appointment.status === "in_progress" ? "Interview in progress" : appointment.appointment_type === "job_interview" ? "Job interview" : "Demo lesson"; detailValue = dateTimeLabel(appointment.started_at || appointment.starts_at); }
   if (candidate.status === "under_review") { detailLabel = "Under review since"; detailValue = dateLabel(candidate.stage_changed_at); }

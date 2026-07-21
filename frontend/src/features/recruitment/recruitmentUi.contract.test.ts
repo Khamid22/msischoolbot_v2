@@ -82,6 +82,12 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /aria-label="Add candidate"/);
   });
 
+  test("keeps the original application date visible in custom pipeline stages", () => {
+    assert.match(pipeline, /let detailLabel = "Applied"/);
+    assert.match(pipeline, /let detailValue = dateLabel\(candidate\.application_date\)/);
+    assert.doesNotMatch(pipeline, /candidate\.status === "new_candidate"\) \{ detailLabel = "Applied"/);
+  });
+
   test("reveals Trash Bin, Reject, and Candidate Withdraw targets during a drag", () => {
     assert.match(pipeline, /Candidate outcome drop targets/);
     assert.match(pipeline, /\["trash_bin", "rejected", "candidate_withdrew"\]/);
