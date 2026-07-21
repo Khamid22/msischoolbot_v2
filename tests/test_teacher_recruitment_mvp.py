@@ -471,6 +471,45 @@ def test_candidate_audit_insert_serializes_detail_json():
     }
 
 
+def test_candidate_creation_anchors_new_stage_sla_to_application_date():
+    """The SLA clock must start from application_date, not the row's created_at."""
+
+    from backend.modules.hr.recruitment.candidates import (
+        repository as candidates_repository,
+    )
+
+    class Result:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def fetchone(self):
+            return self.rows[0] if self.rows else None
+
+    class Connection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            return Result([{"id": 42}])
+
+    conn = Connection()
+    candidate_id = candidates_repository.insert_candidate(
+        conn,
+        values={"full_name": "Jane Doe", "application_date": "2026-07-17"},
+        now="2026-07-21T10:00:00Z",
+        actor_account_id=10,
+    )
+
+    assert candidate_id == 42
+    sql, params = conn.calls[0]
+    assert (
+        "COALESCE(candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent', %s::timestamptz)"
+        in sql
+    )
+    assert params[7] == "2026-07-17"
+
+
 def test_hr_recovers_closed_candidate_to_recorded_pipeline_stage(monkeypatch):
     class Connection:
         commits = 0

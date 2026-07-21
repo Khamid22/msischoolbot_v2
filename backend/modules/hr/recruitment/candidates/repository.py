@@ -151,16 +151,22 @@ def insert_candidate(
                 'new_candidate', %s::timestamptz, true, 'application', 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
-            RETURNING id
+            RETURNING id, application_date
         ), inserted_history AS (
+            -- The SLA clock starts from the candidate's application date (when they
+            -- actually applied), not from the moment HR entered the record, so a
+            -- historical application_date immediately reflects elapsed/overdue SLA.
             INSERT INTO msi_v2.teacher_candidate_stage_history (
                 candidate_id, stage, entered_at, responsible_account_id,
                 comment, transition_source, sla_target_days, sla_due_at
             )
-            SELECT candidate.id, 'new_candidate', %s::timestamptz, %s,
+            SELECT candidate.id, 'new_candidate',
+                   COALESCE(candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent', %s::timestamptz),
+                   %s,
                    'Candidate created.', 'manual', rule.target_days,
                    CASE WHEN rule.target_days IS NULL THEN NULL
-                        ELSE %s::timestamptz + make_interval(days => rule.target_days)
+                        ELSE COALESCE(candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent', %s::timestamptz)
+                             + make_interval(days => rule.target_days)
                    END
             FROM inserted_candidate candidate
             LEFT JOIN msi_v2.teacher_recruitment_sla_rules rule
