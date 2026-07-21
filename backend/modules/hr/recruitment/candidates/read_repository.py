@@ -365,7 +365,29 @@ def list_pipeline_rows(
         FROM msi_v2.teacher_candidates candidate
         {_candidate_joins()}
         {where_sql}
-        ORDER BY candidate.updated_at DESC, candidate.id DESC
+        ORDER BY
+            CASE
+                WHEN candidate.status IN ('job_interview', 'test_and_demo')
+                     AND appointment.id IS NOT NULL
+                    THEN 0
+                WHEN candidate.status IN ('job_interview', 'test_and_demo')
+                    THEN 1
+                ELSE 2
+            END,
+            CASE
+                WHEN candidate.status IN ('job_interview', 'test_and_demo')
+                    THEN appointment.starts_at
+            END ASC NULLS LAST,
+            CASE
+                WHEN candidate.status = 'new_candidate'
+                     OR current_stage_definition.stage_kind = 'custom'
+                    THEN COALESCE(
+                        candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent',
+                        candidate.created_at
+                    )
+                ELSE COALESCE(candidate.stage_changed_at, candidate.created_at)
+            END DESC,
+            candidate.id DESC
         """,
         tuple(params) if params else None,
     ).fetchall()

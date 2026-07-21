@@ -124,6 +124,37 @@ function matchingAppointment(candidate: RecruitmentCandidate) {
     || (candidate.next_appointment?.appointment_type === expectedType ? candidate.next_appointment : null);
 }
 
+function sortableTime(value?: string | null) {
+  const parsed = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function pipelineCardRecency(candidate: RecruitmentCandidate) {
+  if (candidate.status === "new_candidate" || candidate.status_kind === "custom") {
+    return sortableTime(candidate.application_date || candidate.stage_changed_at);
+  }
+  return sortableTime(candidate.stage_changed_at || candidate.application_date);
+}
+
+function sortPipelineCards(stageKey: string, candidates: RecruitmentCandidate[]) {
+  return [...candidates].sort((left, right) => {
+    if (["job_interview", "test_and_demo"].includes(stageKey)) {
+      const leftAppointment = matchingAppointment(left);
+      const rightAppointment = matchingAppointment(right);
+      if (leftAppointment && rightAppointment) {
+        const appointmentDifference = sortableTime(leftAppointment.starts_at) - sortableTime(rightAppointment.starts_at);
+        if (appointmentDifference !== 0) return appointmentDifference;
+      } else if (leftAppointment) {
+        return -1;
+      } else if (rightAppointment) {
+        return 1;
+      }
+    }
+    const recencyDifference = pipelineCardRecency(right) - pipelineCardRecency(left);
+    return recencyDifference || right.id - left.id;
+  });
+}
+
 function PipelineSummary({ counts, stages, action }: { counts: Record<string, number>; stages: RecruitmentPipelineStage[]; action?: ReactNode }) {
   const total = stages.reduce((sum, item) => sum + Number(counts[item.stage_key] || 0), 0);
   const values = stages.map((item) => {
@@ -633,7 +664,8 @@ export function PipelineView({
         if (!previous) return;
         const stages = Object.fromEntries(Object.entries(previous.stages).map(([name, values]) => [name, values.filter((item) => item.id !== candidate.id)]));
         const target = previous.columns.find((item) => item.stage_key === stage);
-        stages[stage] = [{ ...candidate, status: stage, status_label: target?.label, status_kind: target?.stage_kind, status_color_token: target?.color_token, stage_changed_at: new Date().toISOString(), next_appointment: null, version: candidate.version + 1 }, ...(stages[stage] || [])];
+        const movedCandidate = { ...candidate, status: stage, status_label: target?.label, status_kind: target?.stage_kind, status_color_token: target?.color_token, stage_changed_at: new Date().toISOString(), next_appointment: null, version: candidate.version + 1 };
+        stages[stage] = sortPipelineCards(stage, [movedCandidate, ...(stages[stage] || [])]);
         queryClient.setQueryData(key, { ...previous, stages, counts: Object.fromEntries(Object.entries(stages).map(([name, values]) => [name, values.length])) });
       });
       return { entries };

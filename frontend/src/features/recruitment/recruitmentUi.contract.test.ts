@@ -88,6 +88,14 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /candidate\.status === "new_candidate"\) \{ detailLabel = "Applied"/);
   });
 
+  test("keeps optimistic card moves in the canonical column order", () => {
+    assert.match(pipeline, /function sortPipelineCards\(stageKey: string/);
+    assert.match(pipeline, /\["job_interview", "test_and_demo"\]\.includes\(stageKey\)/);
+    assert.match(pipeline, /sortableTime\(leftAppointment\.starts_at\) - sortableTime\(rightAppointment\.starts_at\)/);
+    assert.match(pipeline, /pipelineCardRecency\(right\) - pipelineCardRecency\(left\)/);
+    assert.match(pipeline, /stages\[stage\] = sortPipelineCards\(stage,/);
+  });
+
   test("reveals Trash Bin, Reject, and Candidate Withdraw targets during a drag", () => {
     assert.match(pipeline, /Candidate outcome drop targets/);
     assert.match(pipeline, /\["trash_bin", "rejected", "candidate_withdrew"\]/);

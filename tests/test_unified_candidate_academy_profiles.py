@@ -50,6 +50,20 @@ def test_pipeline_and_candidate_lists_exclude_academy_direct_profiles():
     assert "candidate.profile_origin = 'academy_direct'" in rejected_sql
 
 
+def test_pipeline_orders_evaluations_by_appointment_and_other_cards_by_business_date():
+    conn = _CaptureConnection()
+    repository.list_pipeline_rows(conn)
+    pipeline_sql = conn.calls[-1][0]
+
+    assert "candidate.status IN ('job_interview', 'test_and_demo')" in pipeline_sql
+    assert "appointment.starts_at" in pipeline_sql
+    assert "END ASC NULLS LAST" in pipeline_sql
+    assert "current_stage_definition.stage_kind = 'custom'" in pipeline_sql
+    assert "candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'" in pipeline_sql
+    assert "COALESCE(candidate.stage_changed_at, candidate.created_at)" in pipeline_sql
+    assert "END DESC" in pipeline_sql
+
+
 def test_candidate_summary_exposes_one_academy_block_and_exact_identity_state():
     payload = service._candidate_summary(
         {
