@@ -5,6 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from backend.modules.hr.recruitment.handoffs.lifecycle_repository import (
+    delete_generated_academy_identity,
+    list_teacher_account_ids_for_staff,
+)
+
 
 _STAGE_HISTORY_TRANSITION_SOURCES = frozenset(
     {"manual", "automatic", "migration", "restored"}
@@ -64,6 +69,67 @@ def list_trash_candidates_for_purge(conn: Any) -> list[Any]:
         FOR UPDATE OF candidate
         """
     ).fetchall()
+
+
+def purge_closed_academy_handoff(conn: Any, *, candidate_id: int) -> bool:
+    """Delete one terminal Academy handoff and its generated-only identity."""
+    academy = conn.execute(
+        """
+        SELECT academy.id, academy.user_id AS staff_id,
+               academy.academy_status, academy.promoted_teacher_id,
+               COALESCE(staff.teacher_id, 0) AS teacher_id,
+               COALESCE(identity_teacher.status, '') AS teacher_status
+        FROM msi_v2.academy_teachers academy
+        LEFT JOIN msi_v2.msi_staff staff ON staff.id = academy.user_id
+        LEFT JOIN msi_v2.teachers identity_teacher
+          ON identity_teacher.id = staff.teacher_id
+        WHERE academy.recruitment_candidate_id = %s
+        FOR UPDATE OF academy
+        """,
+        (int(candidate_id),),
+    ).fetchone()
+    if not academy:
+        return True
+    if (
+        str(academy["academy_status"] or "").strip()
+        not in {"rejected", "removed", "trash_bin"}
+        or int(academy["promoted_teacher_id"] or 0)
+    ):
+        return False
+
+    academy_teacher_id = int(academy["id"])
+    staff_id = int(academy["staff_id"] or 0)
+    teacher_id = int(academy["teacher_id"] or 0)
+    generated_identity = bool(
+        staff_id
+        and teacher_id
+        and str(academy["teacher_status"] or "").strip() == "academy"
+    )
+    account_ids = (
+        list_teacher_account_ids_for_staff(conn, staff_id)
+        if generated_identity
+        else []
+    )
+    deleted = conn.execute(
+        """
+        DELETE FROM msi_v2.academy_teachers
+        WHERE id = %s
+          AND promoted_teacher_id IS NULL
+          AND academy_status IN ('rejected', 'removed', 'trash_bin')
+        RETURNING id
+        """,
+        (academy_teacher_id,),
+    ).fetchone()
+    if not deleted:
+        return False
+    if generated_identity:
+        delete_generated_academy_identity(
+            conn,
+            staff_id=staff_id,
+            teacher_id=teacher_id,
+            account_ids=account_ids,
+        )
+    return True
 
 
 def insert_candidate(

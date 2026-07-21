@@ -17,6 +17,9 @@ from backend.modules.hr.recruitment.candidates.read_service import (
     list_pipeline,
     list_teacher_handoffs,
 )
+from backend.modules.hr.recruitment.candidates.repository import (
+    purge_closed_academy_handoff,
+)
 from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
     ALTERNATIVE_STAGES,
@@ -251,6 +254,15 @@ def permanently_delete_candidate(
             for document in repository.list_document_rows(conn, int(candidate_id))
             if _text(document["object_key"])
         ]
+        if int(candidate["academy_teacher_id"] or 0) and (
+            not purge_closed_academy_handoff(
+                conn, candidate_id=int(candidate_id)
+            )
+        ):
+            raise RecruitmentError(
+                "The linked Teacher Academy record changed. Refresh and try again.",
+                status_code=409,
+            )
         if not repository.delete_closed_candidate(
             conn, candidate_id=int(candidate_id), expected_version=int(expected_version)
         ):
@@ -284,6 +296,15 @@ def empty_trash_bin(
                 )
             )
         for candidate in candidates:
+            if int(candidate["academy_teacher_id"] or 0) and (
+                not purge_closed_academy_handoff(
+                    conn, candidate_id=int(candidate["id"])
+                )
+            ):
+                raise RecruitmentError(
+                    "A linked Teacher Academy record changed. Refresh and try again.",
+                    status_code=409,
+                )
             if not repository.delete_closed_candidate(
                 conn,
                 candidate_id=int(candidate["id"]),

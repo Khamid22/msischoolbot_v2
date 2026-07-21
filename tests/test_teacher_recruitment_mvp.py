@@ -562,6 +562,17 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
         },
     )
     monkeypatch.setattr(repository, "list_document_rows", lambda *_args, **_kwargs: [])
+    purged_academy_candidate_ids = []
+
+    def purge_academy(_conn, *, candidate_id):
+        purged_academy_candidate_ids.append(candidate_id)
+        return True
+
+    monkeypatch.setattr(
+        service.candidate_service,
+        "purge_closed_academy_handoff",
+        purge_academy,
+    )
     monkeypatch.setattr(
         repository, "delete_closed_candidate", lambda *_args, **_kwargs: True
     )
@@ -623,6 +634,7 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
         "deleted_candidate_id": 9,
         "deleted_name": "Closed Academy Candidate",
     }
+    assert purged_academy_candidate_ids == [9]
     assert conn.commits == 2
 
     monkeypatch.setattr(
@@ -682,6 +694,14 @@ def test_empty_trash_bin_accepts_closed_teacher_handoff_links(monkeypatch):
         ],
     )
     monkeypatch.setattr(repository, "list_document_rows", lambda *_args, **_kwargs: [])
+    purged_academy_candidate_ids = []
+    monkeypatch.setattr(
+        service.candidate_service,
+        "purge_closed_academy_handoff",
+        lambda _conn, *, candidate_id: (
+            purged_academy_candidate_ids.append(candidate_id) or True
+        ),
+    )
 
     def delete_candidate(_conn, *, candidate_id, expected_version):
         deleted_candidate_ids.append((candidate_id, expected_version))
@@ -695,6 +715,7 @@ def test_empty_trash_bin_accepts_closed_teacher_handoff_links(monkeypatch):
 
     assert result == {"deleted_count": 1}
     assert deleted_candidate_ids == [(9, 3)]
+    assert purged_academy_candidate_ids == [9]
     assert conn.commits == 1
 
 

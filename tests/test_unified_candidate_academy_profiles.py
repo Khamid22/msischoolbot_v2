@@ -215,6 +215,18 @@ def test_academy_roster_excludes_closed_and_promoted_lifecycle_profiles():
     assert "candidate.academy_lifecycle_synchronized" in migration_source
 
 
+def test_permanent_candidate_purge_deletes_only_closed_academy_handoffs():
+    repository_source = Path(
+        "backend/modules/hr/recruitment/candidates/repository.py"
+    ).read_text()
+
+    assert "def purge_closed_academy_handoff" in repository_source
+    assert "DELETE FROM msi_v2.academy_teachers" in repository_source
+    assert "promoted_teacher_id IS NULL" in repository_source
+    assert "academy_status IN ('rejected', 'removed', 'trash_bin')" in repository_source
+    assert "delete_generated_academy_identity" in repository_source
+
+
 def test_academy_removal_rejects_transactionally_without_deleting_history(monkeypatch):
     class Connection:
         committed = False
