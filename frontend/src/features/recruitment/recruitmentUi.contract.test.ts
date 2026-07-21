@@ -576,7 +576,9 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(schedule, /Failed/);
     assert.match(schedule, /Overdue/);
     assert.match(schedule, /evaluated_by_name/);
-    assert.match(schedule, /grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-7/);
+    assert.match(schedule, /Array\.from\(\{ length: 6 \}/);
+    assert.match(schedule, /addDaysToDateKey\(fullWeekBounds\.start, 5\)/);
+    assert.match(schedule, /grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6/);
     assert.match(schedule, /xl:overflow-y-auto/);
     assert.match(schedule, /InterviewSessionModal/);
     assert.match(schedule, /DemoSessionModal/);

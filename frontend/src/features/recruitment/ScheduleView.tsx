@@ -518,9 +518,13 @@ export function ScheduleView({
     status: "cancelled" | "no_show";
   } | null>(null);
 
+  const fullWeekBounds = schoolWeekBounds(new Date(`${anchor}T12:00:00Z`));
   const bounds =
     mode === "week"
-      ? schoolWeekBounds(new Date(`${anchor}T12:00:00Z`))
+      ? {
+          start: fullWeekBounds.start,
+          end: addDaysToDateKey(fullWeekBounds.start, 5),
+        }
       : { start: anchor, end: anchor };
   const rangeEnd = addDaysToDateKey(bounds.end, 1);
   const selectedStatus =
@@ -626,7 +630,7 @@ export function ScheduleView({
 
   const weekDays = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, index) =>
+      Array.from({ length: 6 }, (_, index) =>
         addDaysToDateKey(bounds.start, index),
       ),
     [bounds.start],
@@ -778,7 +782,7 @@ export function ScheduleView({
       </div>
     </section>
   ) : (
-    <section className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-7">
+    <section className="grid min-w-0 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-6">
       {weekDays.map((day) => {
         const dayItems = itemsForDay(day);
         const isToday = day === schoolDateKey();
