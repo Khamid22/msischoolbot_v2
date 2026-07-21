@@ -1332,6 +1332,26 @@ def test_candidate_education_migration_preserves_existing_candidates():
     assert "DROP TABLE" not in upgrade_source
 
 
+def test_sla_anchor_backfill_migration_only_touches_original_open_creation_rows():
+    source = Path(
+        "database/alembic/versions/0032_backfill_new_candidate_sla_anchor.py"
+    ).read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    # Only the original creation entry for a candidate still open in that
+    # stage may be corrected -- never a restored/moved-back stage entry.
+    assert "h.stage = 'new_candidate'" in upgrade_source
+    assert "h.exited_at IS NULL" in upgrade_source
+    assert "h.transition_source = 'manual'" in upgrade_source
+    assert "h.comment = 'Candidate created.'" in upgrade_source
+    assert "c.status = 'new_candidate'" in upgrade_source
+    assert "c.application_date IS NOT NULL" in upgrade_source
+    # No-op when already correct, and no destructive statements.
+    assert "history.entered_at <> anchor.new_entered_at" in upgrade_source
+    assert "DELETE FROM" not in upgrade_source
+    assert "DROP TABLE" not in upgrade_source
+
+
 def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candidate_loss():
     source = Path("database/alembic/versions/0016_recruitment_settings.py").read_text()
     upgrade_source = source.split("def downgrade", 1)[0]
