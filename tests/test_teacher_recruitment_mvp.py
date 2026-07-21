@@ -584,16 +584,95 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
             "status": "rejected",
             "version": 2,
             "academy_teacher_id": 12,
+            "academy_status": "in_training",
+            "academy_promoted_teacher_id": None,
             "active_teacher_id": None,
+            "active_teacher_status": None,
         },
     )
-    with pytest.raises(service.RecruitmentError, match="linked"):
+    with pytest.raises(service.RecruitmentError, match="open Teacher Academy"):
         service.permanently_delete_candidate(
             _user(),
             8,
             expected_version=2,
             confirmation="PERMANENTLY DELETE",
         )
+
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 9,
+            "full_name": "Closed Academy Candidate",
+            "status": "trash_bin",
+            "version": 3,
+            "academy_teacher_id": 13,
+            "academy_status": "trash_bin",
+            "academy_promoted_teacher_id": None,
+            "active_teacher_id": None,
+            "active_teacher_status": None,
+        },
+    )
+    result = service.permanently_delete_candidate(
+        _user(),
+        9,
+        expected_version=3,
+        confirmation="PERMANENTLY DELETE",
+    )
+    assert result == {
+        "deleted_candidate_id": 9,
+        "deleted_name": "Closed Academy Candidate",
+    }
+    assert conn.commits == 2
+
+
+def test_empty_trash_bin_accepts_closed_teacher_handoff_links(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    deleted_candidate_ids = []
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "list_trash_candidates_for_purge",
+        lambda *_args, **_kwargs: [
+            {
+                "id": 9,
+                "full_name": "Closed Academy Candidate",
+                "status": "trash_bin",
+                "version": 3,
+                "academy_teacher_id": 13,
+                "academy_status": "trash_bin",
+                "academy_promoted_teacher_id": None,
+                "active_teacher_id": None,
+                "active_teacher_status": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(repository, "list_document_rows", lambda *_args, **_kwargs: [])
+
+    def delete_candidate(_conn, *, candidate_id, expected_version):
+        deleted_candidate_ids.append((candidate_id, expected_version))
+        return True
+
+    monkeypatch.setattr(repository, "delete_closed_candidate", delete_candidate)
+
+    result = service.empty_trash_bin(
+        _user(), confirmation="EMPTY TRASH BIN"
+    )
+
+    assert result == {"deleted_count": 1}
+    assert deleted_candidate_ids == [(9, 3)]
+    assert conn.commits == 1
 
 
 def test_recruitment_api_is_role_scoped_and_hr_pipeline_is_available(

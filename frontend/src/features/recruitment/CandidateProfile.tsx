@@ -326,16 +326,27 @@ function AttemptList({
   items,
   empty,
   onDelete,
+  latestDetails,
 }: {
   items: Array<Record<string, unknown>>;
   empty: string;
   onDelete?: (item: Record<string, unknown>) => void;
+  latestDetails?: Array<{
+    label: string;
+    value: unknown;
+  }>;
 }) {
   if (!items.length) return <EmptyLine>{empty}</EmptyLine>;
   return (
     <div className="space-y-2">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const isFailed = text(item.result).toLowerCase() === "failed";
+        const note = text(
+          item.notes || item.overview || item.recommendation,
+        ).trim();
+        const visibleDetails = index === 0
+          ? (latestDetails || []).filter((detail) => text(detail.value).trim())
+          : [];
         return (
           <article
             key={text(item.id)}
@@ -388,14 +399,33 @@ function AttemptList({
             {item.paper ? <p className="mt-1 text-xs text-muted-foreground">Paper: {text(item.paper)}</p> : null}
             {Array.isArray(item.topic_scores) && item.topic_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.topic_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.topic)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.topic)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
             {Array.isArray(item.criteria_scores) && item.criteria_scores.length ? <div className="mt-2 flex flex-wrap gap-1">{item.criteria_scores.map((entry, index) => { const score = entry as Record<string, unknown>; return <span key={`${text(score.criterion)}-${index}`} className="rounded-full bg-muted px-2 py-1 text-[11px]">{text(score.criterion)}: {text(score.score)}/{text(score.maximum_score)}</span>; })}</div> : null}
-            <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-5 text-muted-foreground">
-              {text(
-                item.notes ||
-                  item.overview ||
-                  item.recommendation ||
-                  "No notes",
-              )}
-            </p>
+            {visibleDetails.length ? (
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Interview notes
+                </p>
+                <dl className="mt-2 grid gap-2">
+                  {visibleDetails.map((detail) => (
+                    <div
+                      key={detail.label}
+                      className="min-w-0 rounded-md bg-muted/45 px-2.5 py-2"
+                    >
+                      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {detail.label}
+                      </dt>
+                      <dd className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-foreground">
+                        {text(detail.value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+            {note || !visibleDetails.length ? (
+              <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-5 text-muted-foreground">
+                {note || "No notes"}
+              </p>
+            ) : null}
           </article>
         );
       })}
@@ -2736,6 +2766,22 @@ export function CandidateProfile({
               <AttemptList
                 items={candidate.interviews || []}
                 empty="No interviews recorded."
+                latestDetails={[
+                  { label: "English level", value: candidate.english_level },
+                  {
+                    label: "Education background",
+                    value: candidate.education_background,
+                  },
+                  {
+                    label: "Teaching experience",
+                    value: candidate.teaching_experience,
+                  },
+                  { label: "Interests", value: candidate.interests_hobbies },
+                  {
+                    label: "Motivation",
+                    value: candidate.motivation_expectations,
+                  },
+                ]}
                 onDelete={
                   permissions?.can_delete_evaluations &&
                   !["academic_director", "head_of_department"].includes(role)

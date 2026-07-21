@@ -85,6 +85,8 @@ _RESTORABLE_PIPELINE_STAGES = {
 
 
 _CLOSED_CANDIDATE_STAGES = {"trash_bin", "rejected", "candidate_withdrew"}
+_CLOSED_ACADEMY_STATUSES = {"rejected", "removed", "trash_bin"}
+_CLOSED_ACTIVE_TEACHER_STATUSES = {"rejected", "removed", "trash_bin"}
 
 
 _CANDIDATE_OPTION_FIELDS = {
@@ -187,16 +189,30 @@ def restore_closed_candidate(
 def _validate_permanent_delete_row(candidate: Any) -> None:
     if not candidate:
         raise RecruitmentError("Candidate was not found.", status_code=404)
-    if _text(candidate["status"]) not in _CLOSED_CANDIDATE_STAGES:
+    row = _row_dict(candidate)
+    if _text(row.get("status")) not in _CLOSED_CANDIDATE_STAGES:
         raise RecruitmentError(
             "Only Trash Bin, Rejected, or Withdrawn candidates can be permanently deleted.",
             status_code=409,
         )
-    if int(candidate["academy_teacher_id"] or 0) or int(
-        candidate["active_teacher_id"] or 0
+    academy_teacher_id = int(row.get("academy_teacher_id") or 0)
+    academy_status = _text(row.get("academy_status"))
+    academy_promoted_teacher_id = int(row.get("academy_promoted_teacher_id") or 0)
+    if academy_teacher_id and (
+        academy_status not in _CLOSED_ACADEMY_STATUSES
+        or academy_promoted_teacher_id
     ):
         raise RecruitmentError(
-            "This profile is linked to a Teacher Academy or Active Teacher record and cannot be permanently deleted.",
+            "This profile is linked to an open Teacher Academy record and cannot be permanently deleted.",
+            status_code=409,
+        )
+    active_teacher_id = int(row.get("active_teacher_id") or 0)
+    active_teacher_status = _text(row.get("active_teacher_status"))
+    if active_teacher_id and (
+        active_teacher_status not in _CLOSED_ACTIVE_TEACHER_STATUSES
+    ):
+        raise RecruitmentError(
+            "This profile is linked to an open Active Teacher record and cannot be permanently deleted.",
             status_code=409,
         )
 
@@ -434,11 +450,25 @@ def update_candidate(
                 "This candidate changed elsewhere. Refresh and try again.",
                 status_code=409,
             )
+        synchronized_academy_subject_id = None
+        if "subject_id" in prepared and prepared.get("subject_id"):
+            synchronized_academy_subject_id = (
+                repository.sync_academy_subject_from_candidate(
+                    conn,
+                    candidate_id=int(candidate_id),
+                    now=now,
+                )
+            )
+        audit_detail: dict[str, Any] = {"fields": sorted(prepared)}
+        if synchronized_academy_subject_id:
+            audit_detail["academy_subject_synchronized"] = (
+                synchronized_academy_subject_id
+            )
         repository.insert_audit(
             conn,
             candidate_id=int(candidate_id),
             event_type="candidate.profile_updated",
-            detail={"fields": sorted(prepared)},
+            detail=audit_detail,
             actor_account_id=_actor_account(user),
             actor_staff_id=_actor_staff(user),
             now=now,

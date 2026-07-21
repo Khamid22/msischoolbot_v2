@@ -104,7 +104,7 @@ def get_pending_recruitment_academy_intake(conn: Any, academy_teacher_id: int) -
         FROM msi_v2.academy_teachers
         WHERE id = %s
           AND recruitment_candidate_id IS NOT NULL
-          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed', 'trash_bin')
         FOR UPDATE
         """,
         (academy_teacher_id,),
@@ -209,7 +209,7 @@ def mark_recruitment_academy_account_ready(
             updated_at = %s::timestamptz
         WHERE id = %s
           AND (user_id IS NULL OR user_id = %s)
-          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed', 'trash_bin')
         RETURNING id
         """,
         (int(staff_id), updated_at, int(academy_teacher_id), int(staff_id)),
@@ -235,7 +235,7 @@ def complete_recruitment_academy_curriculum(
         WHERE id = %s
           AND user_id IS NOT NULL
           AND account_onboarding_status = 'complete'
-          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed')
+          AND COALESCE(academy_status, '') NOT IN ('rejected', 'removed', 'trash_bin')
         RETURNING id
         """,
         (subject_id, subject_program_id, updated_at, academy_teacher_id),

@@ -50,7 +50,10 @@ def list_trash_candidates_for_purge(conn: Any) -> list[Any]:
         """
         SELECT candidate.id, candidate.full_name, candidate.status, candidate.version,
                academy.id AS academy_teacher_id,
-               teacher.id AS active_teacher_id
+               academy.academy_status,
+               academy.promoted_teacher_id AS academy_promoted_teacher_id,
+               teacher.id AS active_teacher_id,
+               teacher.status AS active_teacher_status
         FROM msi_v2.teacher_candidates candidate
         LEFT JOIN msi_v2.academy_teachers academy
           ON academy.recruitment_candidate_id = candidate.id

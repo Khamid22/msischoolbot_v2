@@ -315,8 +315,27 @@ def make_final_decision(
                         status_code=409,
                     )
         if decision == "teacher_academy":
+            subject_id = int(candidate.get("subject_id") or 0)
+            if not subject_id:
+                raise RecruitmentError(
+                    "Set the candidate subject before adding them to Teacher Academy.",
+                    status_code=409,
+                )
+            subject_program_id = repository.active_subject_program_id(
+                conn,
+                subject_id=subject_id,
+            )
+            if not subject_program_id:
+                raise RecruitmentError(
+                    "No active curriculum is configured for the candidate subject.",
+                    status_code=409,
+                )
             academy_teacher_id = repository.ensure_academy_intake(
-                conn, candidate=candidate, actor_login=user.login, now=now
+                conn,
+                candidate=candidate,
+                actor_login=user.login,
+                now=now,
+                subject_program_id=subject_program_id,
             )
             try:
                 dependencies.provision_academy_account(

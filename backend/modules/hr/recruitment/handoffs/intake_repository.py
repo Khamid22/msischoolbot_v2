@@ -450,9 +450,34 @@ def link_academy_profile(
     return True
 
 
+def active_subject_program_id(conn: Any, *, subject_id: int) -> int | None:
+    row = conn.execute(
+        """
+        SELECT id
+        FROM msi_v2.subject_programs
+        WHERE subject_id = %s AND status = 'active'
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        (int(subject_id),),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
 def ensure_academy_intake(
-    conn: Any, *, candidate: Any, actor_login: str, now: str
+    conn: Any,
+    *,
+    candidate: Any,
+    actor_login: str,
+    now: str,
+    subject_program_id: int | None = None,
 ) -> int:
+    subject_id = int(candidate["subject_id"] or 0)
+    resolved_program_id = int(
+        subject_program_id
+        or active_subject_program_id(conn, subject_id=subject_id)
+        or 0
+    )
     existing = conn.execute(
         """
         SELECT id, academy_status, user_id
@@ -464,20 +489,33 @@ def ensure_academy_intake(
         (candidate["id"],),
     ).fetchone()
     if existing:
-        if str(existing["academy_status"] or "") == "rejected":
-            conn.execute(
-                """
-                UPDATE msi_v2.academy_teachers
-                SET academy_status = 'new_academy_teacher',
-                    account_onboarding_status = CASE
-                        WHEN user_id IS NULL THEN 'pending'
-                        ELSE 'complete'
-                    END,
-                    updated_at = %s::timestamptz
-                WHERE id = %s
-                """,
-                (now, int(existing["id"])),
-            )
+        conn.execute(
+            """
+            UPDATE msi_v2.academy_teachers
+            SET subject_id = COALESCE(subject_id, NULLIF(%s::bigint, 0)),
+                subject_program_id = COALESCE(
+                    subject_program_id,
+                    NULLIF(%s::bigint, 0)
+                ),
+                academy_status = CASE
+                    WHEN academy_status = 'rejected' THEN 'new_academy_teacher'
+                    ELSE academy_status
+                END,
+                account_onboarding_status = CASE
+                    WHEN academy_status = 'rejected' AND user_id IS NULL THEN 'pending'
+                    WHEN academy_status = 'rejected' THEN 'complete'
+                    ELSE account_onboarding_status
+                END,
+                updated_at = %s::timestamptz
+            WHERE id = %s
+            """,
+            (
+                subject_id,
+                resolved_program_id,
+                now,
+                int(existing["id"]),
+            ),
+        )
         return int(existing["id"])
     row = conn.execute(
         """
@@ -487,14 +525,15 @@ def ensure_academy_intake(
             notes, created_by, recruitment_candidate_id,
             account_onboarding_status, created_at, updated_at
         ) VALUES (
-            NULL, %s, NULLIF(%s::bigint, 0), NULL, %s,
+            NULL, %s, NULLIF(%s::bigint, 0), NULLIF(%s::bigint, 0), %s,
             'academy', %s, %s, %s, 'new_academy_teacher',
             %s, %s, %s, 'pending', %s::timestamptz, %s::timestamptz
         ) RETURNING id
         """,
         (
             candidate["full_name"],
-            int(candidate["subject_id"] or 0),
+            subject_id,
+            resolved_program_id,
             candidate["applied_position"] or "Trainee Teacher",
             candidate["telegram_username"],
             candidate["phone"],
@@ -511,6 +550,45 @@ def ensure_academy_intake(
         ),
     ).fetchone()
     return int(row["id"]) if row else 0
+
+
+def sync_academy_subject_from_candidate(
+    conn: Any, *, candidate_id: int, now: str
+) -> int | None:
+    """Fill missing Academy subject and curriculum from the candidate profile."""
+
+    row = conn.execute(
+        """
+        UPDATE msi_v2.academy_teachers academy
+        SET subject_id = candidate.subject_id,
+            subject_program_id = COALESCE(
+                academy.subject_program_id,
+                (
+                    SELECT program.id
+                    FROM msi_v2.subject_programs program
+                    WHERE program.subject_id = candidate.subject_id
+                      AND program.status = 'active'
+                    ORDER BY program.updated_at DESC, program.id DESC
+                    LIMIT 1
+                )
+            ),
+            updated_at = %s::timestamptz
+        FROM msi_v2.teacher_candidates candidate
+        WHERE candidate.id = %s
+          AND academy.recruitment_candidate_id = candidate.id
+          AND candidate.subject_id IS NOT NULL
+          AND (
+              academy.subject_id IS NULL
+              OR (
+                  academy.subject_id = candidate.subject_id
+                  AND academy.subject_program_id IS NULL
+              )
+          )
+        RETURNING academy.subject_id, academy.subject_program_id
+        """,
+        (now, int(candidate_id)),
+    ).fetchone()
+    return int(row["subject_id"]) if row else None
 
 
 def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
@@ -593,10 +671,12 @@ def ensure_active_teacher_intake(conn: Any, *, candidate: Any, now: str) -> int:
 
 
 __all__ = [
+    "active_subject_program_id",
     "ensure_academy_intake",
     "ensure_active_teacher_intake",
     "exact_academy_identity_match",
     "insert_academy_direct_profile",
     "link_academy_profile",
     "list_teacher_handoff_rows",
+    "sync_academy_subject_from_candidate",
 ]

@@ -36,9 +36,16 @@ def list_hod_subject_scope_rows(conn: Any, *, account_id: int, staff_id: int) ->
 def get_academy_teacher_subject_id(conn: Any, academy_teacher_id: int) -> int:
     row = conn.execute(
         """
-        SELECT subject_id
-        FROM msi_v2.academy_teachers
-        WHERE id = %s
+        SELECT academy.subject_id
+        FROM msi_v2.academy_teachers academy
+        LEFT JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = academy.recruitment_candidate_id
+        WHERE academy.id = %s
+          AND academy.promoted_teacher_id IS NULL
+          AND COALESCE(academy.academy_status, '')
+              NOT IN ('rejected', 'removed', 'trash_bin')
+          AND COALESCE(candidate.status, '')
+              NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
         LIMIT 1
         """,
         (int(academy_teacher_id or 0),),
@@ -186,6 +193,13 @@ def list_academy_teacher_rows(conn: Any) -> list[Any]:
         LEFT JOIN msi_v2.subject_programs sp ON sp.id = at.subject_program_id
         LEFT JOIN msi_v2.teachers mentor ON mentor.id = at.mentor_id
         LEFT JOIN msi_v2.teachers head ON head.id = at.department_head_id
+        LEFT JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = at.recruitment_candidate_id
+        WHERE at.promoted_teacher_id IS NULL
+          AND COALESCE(at.academy_status, '')
+              NOT IN ('rejected', 'removed', 'trash_bin')
+          AND COALESCE(candidate.status, '')
+              NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
         ORDER BY at.updated_at DESC, at.id DESC
         """
     ).fetchall()
@@ -225,9 +239,17 @@ def get_academy_teacher_row_for_account(conn: Any, *, teacher_id: int, staff_id:
         LEFT JOIN msi_v2.subject_programs sp ON sp.id = at.subject_program_id
         LEFT JOIN msi_v2.teachers mentor ON mentor.id = at.mentor_id
         LEFT JOIN msi_v2.teachers head ON head.id = at.department_head_id
-        WHERE (%s > 0 AND at.user_id = %s)
-           OR (%s > 0 AND staff.teacher_id = %s)
-           OR (%s > 0 AND at.promoted_teacher_id = %s)
+        LEFT JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = at.recruitment_candidate_id
+        WHERE (
+               (%s > 0 AND at.user_id = %s)
+            OR (%s > 0 AND staff.teacher_id = %s)
+            OR (%s > 0 AND at.promoted_teacher_id = %s)
+        )
+          AND COALESCE(at.academy_status, '')
+              NOT IN ('rejected', 'removed', 'trash_bin')
+          AND COALESCE(candidate.status, '')
+              NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
         ORDER BY
             CASE
                 WHEN %s > 0 AND at.user_id = %s THEN 0
@@ -334,8 +356,14 @@ def list_academy_teacher_account_backfill_rows(conn: Any) -> list[Any]:
         FROM msi_v2.academy_teachers at
         LEFT JOIN msi_v2.msi_staff staff ON staff.id = at.user_id
         LEFT JOIN msi_v2.subjects subj ON subj.id = at.subject_id
+        LEFT JOIN msi_v2.teacher_candidates candidate
+          ON candidate.id = at.recruitment_candidate_id
         WHERE COALESCE(at.full_name, '') <> ''
-          AND COALESCE(at.academy_status, '') NOT IN ('rejected')
+          AND at.promoted_teacher_id IS NULL
+          AND COALESCE(at.academy_status, '')
+              NOT IN ('rejected', 'removed', 'trash_bin')
+          AND COALESCE(candidate.status, '')
+              NOT IN ('rejected', 'candidate_withdrew', 'trash_bin')
           AND COALESCE(at.account_onboarding_status, 'complete') <> 'pending'
           AND (
             at.user_id IS NULL

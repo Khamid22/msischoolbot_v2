@@ -187,11 +187,32 @@ def test_academy_removal_is_audited_and_history_preserving():
     assert "DELETE FROM msi_v2.academy_teachers" not in repository_source
     assert "'rejected', 'removed', 'trash_bin'" in repository_source
     assert "def ensure_academy_intake" in repository_source
-    assert "academy_status = 'new_academy_teacher'" in repository_source
+    assert "def sync_academy_subject_from_candidate" in repository_source
+    assert "subject_id = COALESCE(subject_id, NULLIF(%s::bigint, 0))" in repository_source
+    assert "subject_program_id = COALESCE" in repository_source
+    assert "WHEN academy_status = 'rejected' THEN 'new_academy_teacher'" in repository_source
     assert "account_onboarding_status = 'removed'" not in repository_source
     assert (
         '@router.post("/teacher-academy/{academy_teacher_id}/delete")' not in ad_routes
     )
+
+
+def test_academy_roster_excludes_closed_and_promoted_lifecycle_profiles():
+    repository_source = Path(
+        "backend/modules/teacher_academy/repository.py"
+    ).read_text()
+    mutations_source = Path(
+        "backend/modules/teacher_academy/mutations_repository.py"
+    ).read_text()
+    migration_source = Path(
+        "database/alembic/versions/0031_academy_roster_lifecycle.py"
+    ).read_text()
+
+    assert "WHERE at.promoted_teacher_id IS NULL" in repository_source
+    assert "'rejected', 'removed', 'trash_bin'" in repository_source
+    assert "'rejected', 'candidate_withdrew', 'trash_bin'" in repository_source
+    assert "'rejected', 'removed', 'trash_bin'" in mutations_source
+    assert "candidate.academy_lifecycle_synchronized" in migration_source
 
 
 def test_academy_removal_rejects_transactionally_without_deleting_history(monkeypatch):

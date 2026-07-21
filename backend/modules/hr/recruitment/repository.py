@@ -84,6 +84,7 @@ from backend.modules.hr.recruitment.evaluations.repository import (
     responsible_account_row,
 )
 from backend.modules.hr.recruitment.handoffs.repository import (
+    active_subject_program_id,
     cancel_pending_candidate_tasks,
     delete_generated_academy_identity,
     ensure_academy_intake,
@@ -100,6 +101,7 @@ from backend.modules.hr.recruitment.handoffs.repository import (
     mark_teacher_handoff_closed,
     restore_teacher_handoff,
     set_teacher_identity_enabled,
+    sync_academy_subject_from_candidate,
 )
 from backend.modules.hr.recruitment.notification_repository import (
     cancel_recruitment_notification_reminders,

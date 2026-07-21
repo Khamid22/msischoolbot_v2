@@ -47,7 +47,10 @@ def lock_candidate_decision_row(conn: Any, candidate_id: int) -> Any:
                candidate.profile_origin, candidate.is_application_received,
                candidate.linked_account_id,
                academy.id AS academy_teacher_id,
-               teacher.id AS active_teacher_id
+               academy.academy_status,
+               academy.promoted_teacher_id AS academy_promoted_teacher_id,
+               teacher.id AS active_teacher_id,
+               teacher.status AS active_teacher_status
         FROM msi_v2.teacher_candidates candidate
         LEFT JOIN msi_v2.academy_teachers academy
           ON academy.recruitment_candidate_id = candidate.id

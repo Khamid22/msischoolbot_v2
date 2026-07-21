@@ -13,6 +13,8 @@ from itsdangerous import TimestampSigner
 
 from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import handoff_api, policies, repository, service
+from backend.modules.hr.recruitment.decisions import service as decision_service
+from backend.modules.hr.recruitment.handoffs import intake_repository
 
 
 XHR = {"X-Requested-With": "XMLHttpRequest"}
@@ -60,6 +62,140 @@ class _Connection:
 
     def rollback(self):
         self.rollbacks += 1
+
+
+def test_teacher_academy_promotion_requires_a_canonical_subject(monkeypatch):
+    conn = _Connection()
+    candidate = {
+        "id": 8,
+        "full_name": "Ada Teacher",
+        "status": "under_review",
+        "version": 4,
+        "subject_id": None,
+        "academy_teacher_id": None,
+        "active_teacher_id": None,
+    }
+    monkeypatch.setattr(
+        decision_service.repository,
+        "candidate_evaluation_state",
+        lambda *_args, **_kwargs: {
+            "interview_passed": True,
+            "demo_passed": True,
+            "subject_test_passed": True,
+        },
+    )
+    dependencies = decision_service.DecisionDependencies(
+        connect=_connection_factory(conn),
+        lock_candidate=lambda *_args, **_kwargs: candidate,
+        get_candidate=lambda *_args, **_kwargs: candidate,
+        sync_next_actions=lambda *_args, **_kwargs: None,
+        notify_cancelled_appointments=lambda *_args, **_kwargs: None,
+        provision_academy_account=lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(
+        service.RecruitmentError,
+        match="Set the candidate subject before adding them to Teacher Academy",
+    ) as exc:
+        decision_service.make_final_decision(
+            _user("hr_manager"),
+            8,
+            {"decision": "teacher_academy"},
+            dependencies=dependencies,
+        )
+
+    assert exc.value.status_code == 409
+    assert conn.commits == 0
+
+
+def test_teacher_academy_promotion_requires_an_active_subject_curriculum(monkeypatch):
+    conn = _Connection()
+    candidate = {
+        "id": 8,
+        "full_name": "Ada Teacher",
+        "status": "under_review",
+        "version": 4,
+        "subject_id": 3,
+        "academy_teacher_id": None,
+        "active_teacher_id": None,
+    }
+    monkeypatch.setattr(
+        decision_service.repository,
+        "candidate_evaluation_state",
+        lambda *_args, **_kwargs: {
+            "interview_passed": True,
+            "demo_passed": True,
+            "subject_test_passed": True,
+        },
+    )
+    monkeypatch.setattr(
+        decision_service.repository,
+        "active_subject_program_id",
+        lambda *_args, **_kwargs: None,
+    )
+    dependencies = decision_service.DecisionDependencies(
+        connect=_connection_factory(conn),
+        lock_candidate=lambda *_args, **_kwargs: candidate,
+        get_candidate=lambda *_args, **_kwargs: candidate,
+        sync_next_actions=lambda *_args, **_kwargs: None,
+        notify_cancelled_appointments=lambda *_args, **_kwargs: None,
+        provision_academy_account=lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(
+        service.RecruitmentError,
+        match="No active curriculum is configured for the candidate subject",
+    ) as exc:
+        decision_service.make_final_decision(
+            _user("hr_manager"),
+            8,
+            {"decision": "teacher_academy"},
+            dependencies=dependencies,
+        )
+
+    assert exc.value.status_code == 409
+    assert conn.commits == 0
+
+
+def test_existing_academy_intake_inherits_candidate_subject():
+    class _Cursor:
+        def __init__(self, row=None):
+            self.row = row
+
+        def fetchone(self):
+            return self.row
+
+    class _IntakeConnection:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params=None):
+            self.calls.append((sql, params))
+            if "FROM msi_v2.subject_programs" in sql:
+                return _Cursor({"id": 3})
+            if "SELECT id, academy_status, user_id" in sql:
+                return _Cursor(
+                    {
+                        "id": 31,
+                        "academy_status": "new_academy_teacher",
+                        "user_id": 17,
+                    }
+                )
+            return _Cursor()
+
+    conn = _IntakeConnection()
+    academy_teacher_id = intake_repository.ensure_academy_intake(
+        conn,
+        candidate={"id": 8, "subject_id": 3},
+        actor_login="hr@test",
+        now="2026-07-21T00:00:00Z",
+    )
+
+    assert academy_teacher_id == 31
+    update_sql, update_params = conn.calls[2]
+    assert "subject_id = COALESCE(subject_id, NULLIF(%s::bigint, 0))" in update_sql
+    assert "subject_program_id = COALESCE" in update_sql
+    assert update_params == (3, 3, "2026-07-21T00:00:00Z", 31)
 
 
 def _connection_factory(conn):

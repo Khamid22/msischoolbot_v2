@@ -208,6 +208,17 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(profile, /title="Upcoming appointments"/);
     assert.match(profile, /<InterviewSessionModal/);
     assert.match(profile, /title="Job Interviews"/);
+    assert.match(profile, /latestDetails=\{\[/);
+    assert.match(profile, /Interview notes/);
+    for (const field of [
+      "English level",
+      "Education background",
+      "Teaching experience",
+      "Interests",
+      "Motivation",
+    ]) {
+      assert.match(profile, new RegExp(`label: "${field}"`));
+    }
     assert.match(profile, /can_add_subject_test/);
     assert.match(profile, /Record subject test/);
   });

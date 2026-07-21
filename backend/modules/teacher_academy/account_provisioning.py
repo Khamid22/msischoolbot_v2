@@ -17,7 +17,7 @@ from backend.modules.teacher_academy.read_service import _provision_teacher_acco
 
 
 _TEACHER_LOGIN_ADVISORY_LOCK = 763_210_044
-_INELIGIBLE_ACADEMY_STATUSES = {"rejected", "removed"}
+_INELIGIBLE_ACADEMY_STATUSES = {"rejected", "removed", "trash_bin"}
 _INELIGIBLE_CANDIDATE_STATUSES = {"rejected", "candidate_withdrew", "trash_bin"}
 
 
