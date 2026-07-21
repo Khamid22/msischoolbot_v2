@@ -609,8 +609,8 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
             "academy_teacher_id": 13,
             "academy_status": "trash_bin",
             "academy_promoted_teacher_id": None,
-            "active_teacher_id": None,
-            "active_teacher_status": None,
+            "active_teacher_id": 21,
+            "active_teacher_status": "academy",
         },
     )
     result = service.permanently_delete_candidate(
@@ -624,6 +624,29 @@ def test_permanent_candidate_delete_requires_closed_unlinked_profile(monkeypatch
         "deleted_name": "Closed Academy Candidate",
     }
     assert conn.commits == 2
+
+    monkeypatch.setattr(
+        repository,
+        "lock_candidate_decision_row",
+        lambda *_args, **_kwargs: {
+            "id": 10,
+            "full_name": "Open Active Teacher",
+            "status": "trash_bin",
+            "version": 2,
+            "academy_teacher_id": None,
+            "academy_status": None,
+            "academy_promoted_teacher_id": None,
+            "active_teacher_id": 22,
+            "active_teacher_status": "active",
+        },
+    )
+    with pytest.raises(service.RecruitmentError, match="open Active Teacher"):
+        service.permanently_delete_candidate(
+            _user(),
+            10,
+            expected_version=2,
+            confirmation="PERMANENTLY DELETE",
+        )
 
 
 def test_empty_trash_bin_accepts_closed_teacher_handoff_links(monkeypatch):
@@ -653,8 +676,8 @@ def test_empty_trash_bin_accepts_closed_teacher_handoff_links(monkeypatch):
                 "academy_teacher_id": 13,
                 "academy_status": "trash_bin",
                 "academy_promoted_teacher_id": None,
-                "active_teacher_id": None,
-                "active_teacher_status": None,
+                "active_teacher_id": 21,
+                "active_teacher_status": "academy",
             }
         ],
     )

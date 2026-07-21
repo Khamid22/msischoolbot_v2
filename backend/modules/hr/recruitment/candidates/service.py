@@ -208,8 +208,16 @@ def _validate_permanent_delete_row(candidate: Any) -> None:
         )
     active_teacher_id = int(row.get("active_teacher_id") or 0)
     active_teacher_status = _text(row.get("active_teacher_status"))
+    is_closed_academy_identity = bool(
+        active_teacher_id
+        and active_teacher_status == "academy"
+        and academy_teacher_id
+        and academy_status in _CLOSED_ACADEMY_STATUSES
+        and not academy_promoted_teacher_id
+    )
     if active_teacher_id and (
         active_teacher_status not in _CLOSED_ACTIVE_TEACHER_STATUSES
+        and not is_closed_academy_identity
     ):
         raise RecruitmentError(
             "This profile is linked to an open Active Teacher record and cannot be permanently deleted.",
