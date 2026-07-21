@@ -300,13 +300,13 @@ def exact_academy_identity_match(
                 )
             )
             OR (
-                %s IS NOT NULL
+                CAST(%s AS BIGINT) IS NOT NULL
                 AND (
-                    candidate.linked_account_id = %s
+                    candidate.linked_account_id = CAST(%s AS BIGINT)
                     OR EXISTS (
                         SELECT 1
                         FROM msi_v2.accounts account
-                        WHERE account.id = %s
+                        WHERE account.id = CAST(%s AS BIGINT)
                           AND account.legacy_source_table = 'msi_staff'
                           AND account.legacy_source_id = academy.user_id
                     )

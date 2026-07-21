@@ -107,6 +107,9 @@ def test_exact_duplicate_match_never_uses_a_name():
     sql, params = conn.calls[-1]
     assert "full_name" not in sql.split("WHERE", 1)[1]
     assert "teacher@example.com" in params
+    assert "CAST(%s AS BIGINT) IS NOT NULL" in sql
+    assert "candidate.linked_account_id = CAST(%s AS BIGINT)" in sql
+    assert "account.id = CAST(%s AS BIGINT)" in sql
 
 
 def test_unified_profile_migration_and_reconciliation_are_history_safe():
