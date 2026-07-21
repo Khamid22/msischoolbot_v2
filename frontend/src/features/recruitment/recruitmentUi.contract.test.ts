@@ -36,7 +36,9 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /data\.columns\.map/);
     assert.match(pipeline, /gridTemplateColumns: `repeat\(\$\{data\.columns\.length\}/);
     assert.match(pipeline, /minWidth: `max\(100%, \$\{data\.columns\.length \* 15\}rem\)`/);
-    assert.match(pipeline, /no-scrollbar/);
+    assert.match(pipeline, /pipeline-board-scroll/);
+    assert.match(pipeline, /overflow-x-clip/);
+    assert.match(pipeline, /overscroll-x-contain/);
     assert.match(pipeline, /xl:block/);
     assert.match(pipeline, /w-full min-w-0 overflow-hidden border/);
     assert.match(pipeline, /compact \? "rounded-md" : "rounded-lg"/);
@@ -58,12 +60,17 @@ describe("compact recruitment pipeline", () => {
     assert.doesNotMatch(pipeline, /rounded-xl border border-border bg-card p-3[\s\S]{0,220}>Search</);
   });
 
-  test("supports empty-space board panning without taking over candidate cards", () => {
+  test("keeps horizontal board movement contained without taking over vertically scrollable columns", () => {
     assert.match(pipeline, /boardPanRef/);
     assert.match(pipeline, /data-candidate-card/);
+    assert.match(pipeline, /data-pipeline-column-scroll/);
     assert.match(pipeline, /Math\.abs\(deltaX\) < 6/);
     assert.match(pipeline, /onPointerMove=\{moveBoardPan\}/);
-    assert.match(pipeline, /onWheel=\{shiftWheelBoard\}/);
+    assert.match(pipeline, /addEventListener\("wheel", scrollWheelBoard, \{ passive: false \}\)/);
+    assert.doesNotMatch(pipeline, /onWheel=\{scrollWheelBoard\}/);
+    assert.match(pipeline, /smoothScrollBoardBy/);
+    assert.match(pipeline, /prefers-reduced-motion: reduce/);
+    assert.match(pipeline, /columnCanScroll/);
     assert.match(pipeline, /\["ArrowLeft", "ArrowRight"\]/);
     assert.match(pipeline, /\[data-candidate-card\], a, button, input, select, textarea/);
   });

@@ -11,7 +11,6 @@ import {
   type FormEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 
 import { AppointmentForm } from "@/features/recruitment/AppointmentForm";
@@ -566,6 +565,8 @@ export function PipelineView({
   const searchTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const boardViewportRef = useRef<HTMLDivElement>(null);
+  const boardScrollFrameRef = useRef<number | null>(null);
+  const boardScrollTargetRef = useRef(0);
   const boardPanRef = useRef<{
     pointerId: number;
     startX: number;
@@ -599,6 +600,11 @@ export function PipelineView({
     const timer = window.setTimeout(() => setUndoTrash(null), 5000);
     return () => window.clearTimeout(timer);
   }, [undoTrash]);
+  useEffect(() => () => {
+    if (boardScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(boardScrollFrameRef.current);
+    }
+  }, []);
 
   const closeSearch = useCallback((event?: KeyboardEvent | PointerEvent) => {
     setSearchOpen(false);
@@ -687,8 +693,50 @@ export function PipelineView({
     if (!(target instanceof Element)) return true;
     return !target.closest("[data-candidate-card], a, button, input, select, textarea, [role='menu'], [role='dialog']");
   };
+  const stopBoardScrollAnimation = useCallback(() => {
+    if (boardScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(boardScrollFrameRef.current);
+      boardScrollFrameRef.current = null;
+    }
+    boardScrollTargetRef.current = boardViewportRef.current?.scrollLeft || 0;
+  }, []);
+  const smoothScrollBoardBy = useCallback((delta: number) => {
+    const viewport = boardViewportRef.current;
+    if (!viewport) return false;
+    const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    const currentTarget = boardScrollFrameRef.current === null
+      ? viewport.scrollLeft
+      : boardScrollTargetRef.current;
+    const nextTarget = Math.min(maxScrollLeft, Math.max(0, currentTarget + delta));
+    if (Math.abs(nextTarget - currentTarget) < 0.5) return false;
+    boardScrollTargetRef.current = nextTarget;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      viewport.scrollLeft = nextTarget;
+      return true;
+    }
+    if (boardScrollFrameRef.current === null) {
+      const move = () => {
+        const activeViewport = boardViewportRef.current;
+        if (!activeViewport) {
+          boardScrollFrameRef.current = null;
+          return;
+        }
+        const remaining = boardScrollTargetRef.current - activeViewport.scrollLeft;
+        if (Math.abs(remaining) < 0.75) {
+          activeViewport.scrollLeft = boardScrollTargetRef.current;
+          boardScrollFrameRef.current = null;
+          return;
+        }
+        activeViewport.scrollLeft += remaining * 0.24;
+        boardScrollFrameRef.current = window.requestAnimationFrame(move);
+      };
+      boardScrollFrameRef.current = window.requestAnimationFrame(move);
+    }
+    return true;
+  }, []);
   const startBoardPan = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !canStartBoardPan(event.target)) return;
+    stopBoardScrollAnimation();
     boardPanRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -715,13 +763,40 @@ export function PipelineView({
     if (boardPanRef.current?.pointerId !== event.pointerId) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     boardPanRef.current = null;
+    boardScrollTargetRef.current = event.currentTarget.scrollLeft;
     setBoardPanning(false);
   };
-  const shiftWheelBoard = (event: ReactWheelEvent<HTMLDivElement>) => {
-    if (!event.shiftKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.currentTarget.scrollLeft += event.deltaY;
+  const scrollWheelBoard = useCallback((event: WheelEvent) => {
+    const verticalIntent = Math.abs(event.deltaY) >= Math.abs(event.deltaX);
+    const columnScroller = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("[data-pipeline-column-scroll]")
+      : null;
+    const columnCanScroll = Boolean(
+      columnScroller
+      && verticalIntent
+      && !event.shiftKey
+      && (
+        (event.deltaY < 0 && columnScroller.scrollTop > 0)
+        || (event.deltaY > 0 && columnScroller.scrollTop + columnScroller.clientHeight < columnScroller.scrollHeight - 1)
+      )
+    );
+    if (columnCanScroll) return;
+    const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? 16
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? boardViewportRef.current?.clientWidth || window.innerWidth
+        : 1;
+    if (!rawDelta || !smoothScrollBoardBy(rawDelta * unit)) return;
     event.preventDefault();
-  };
+    event.stopPropagation();
+  }, [smoothScrollBoardBy]);
+  useEffect(() => {
+    const viewport = boardViewportRef.current;
+    if (!viewport) return undefined;
+    viewport.addEventListener("wheel", scrollWheelBoard, { passive: false });
+    return () => viewport.removeEventListener("wheel", scrollWheelBoard);
+  }, [pipeline.data, scrollWheelBoard]);
 
   const cards = useCallback((items: RecruitmentCandidate[], compact = false, stage?: RecruitmentPipelineStage) => (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
@@ -757,7 +832,7 @@ export function PipelineView({
           return (
             <section key={stage.stage_key} aria-label={`${stage.label} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage.stage_key); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage.stage_key || !acceptsDrop) return; moveMutate({ candidate, stage: stage.stage_key }); }} className={`flex min-w-0 h-[calc(100dvh-9.75rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
               <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage.stage_key === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}{stage.stage_kind === "custom" ? <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" /> : null}<h2 className="break-words text-[11px] font-semibold uppercase leading-4 tracking-wide text-foreground">{stage.label}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
-              <div className="miniapp-scroll flex-1 overflow-y-auto p-1.5">{cards(items, true, stage)}</div>
+              <div data-pipeline-column-scroll className="miniapp-scroll flex-1 overflow-y-auto overscroll-y-contain p-1.5">{cards(items, true, stage)}</div>
             </section>
           );
         })}
@@ -771,7 +846,7 @@ export function PipelineView({
   if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 max-w-full space-y-2 overflow-x-clip">
       <PipelineSummary
         counts={summaryCounts}
         stages={summaryStages}
@@ -813,18 +888,17 @@ export function PipelineView({
 
       <div
         ref={boardViewportRef}
-        className={`no-scrollbar hidden w-full min-w-0 max-w-full overflow-x-auto pb-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 xl:block ${boardPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}
+        className={`pipeline-board-scroll hidden w-full min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 xl:block ${boardPanning ? "cursor-grabbing select-none" : "cursor-grab"}`}
         tabIndex={0}
         aria-label="Recruitment pipeline board. Use left and right arrow keys to move horizontally."
         onPointerDown={startBoardPan}
         onPointerMove={moveBoardPan}
         onPointerUp={finishBoardPan}
         onPointerCancel={finishBoardPan}
-        onWheel={shiftWheelBoard}
         onKeyDown={(event) => {
           if (event.currentTarget !== event.target || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
           event.preventDefault();
-          event.currentTarget.scrollBy({ left: event.key === "ArrowLeft" ? -240 : 240, behavior: "smooth" });
+          smoothScrollBoardBy(event.key === "ArrowLeft" ? -240 : 240);
         }}
       >
         {desktopBoard}
