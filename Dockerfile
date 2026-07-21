@@ -21,8 +21,8 @@ RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt requirements.lock ./
-RUN pip install --no-cache-dir -r requirements.lock
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY alembic.ini config.py main.py ./
 COPY backend ./backend
