@@ -202,6 +202,9 @@ def test_frontend_contract_is_search_first_responsive_and_never_asks_for_interna
     assert "Search records" in source and "Name, code, phone, Telegram" in source
     assert "Student record ID" not in source
     assert "LinkChildModal" in source
+    assert "RoleWorkspaceShell" in source
+    assert 'desktopSidebarMode="collapsible"' in source
+    assert 'mobileNavigationMode="drawer"' in source
     assert "/payments/${dialog.targetId}/void" in source
     assert 'method: "DELETE"' in api  # unlinking a family link only
     assert "password_hash" not in source

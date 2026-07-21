@@ -13,6 +13,7 @@ from backend.modules.people.staff import repository
 
 
 HR_MANAGER_LOGIN = "HR0001"
+CUSTOMER_SUPPORT_LOGIN = "cs0001"
 
 
 def _text(value: Any) -> str:
@@ -154,6 +155,116 @@ def _create_hr_manager_account(
 
     return True, "", {
         "role": "hr_manager",
+        "login": login,
+        "temporary_password": password,
+        "display_name": normalized_display_name,
+        "must_change_password": False,
+        "account_id": account_id,
+        "staff_id": staff_id,
+    }
+
+
+def create_customer_support_account(
+    *,
+    display_name: str = "Customer Support",
+) -> tuple[bool, str, dict[str, Any]]:
+    """Create or reset the fixed standalone Customer Support identity."""
+
+    with connect_auth_db() as conn:
+        return _create_customer_support_account(
+            conn,
+            display_name=display_name,
+            commit=True,
+        )
+
+
+def _create_customer_support_account(
+    conn: Any,
+    *,
+    display_name: str = "Customer Support",
+    commit: bool = False,
+) -> tuple[bool, str, dict[str, Any]]:
+    if not repository._phase1_accounts_available(conn):
+        return False, "Shared accounts are not available. Apply the account schema first.", {}
+
+    login = CUSTOMER_SUPPORT_LOGIN
+    normalized_display_name = _text(display_name) or "Customer Support"
+    staff = repository._staff_identity_by_login(conn, login)
+    if staff and normalize_role(staff["role"]) != "customer_support":
+        return False, f"{login} already belongs to another staff role.", {}
+
+    account_by_login = repository._account_identity_by_login(conn, login)
+    if account_by_login and normalize_role(account_by_login["role"]) != "customer_support":
+        return False, f"{login} already belongs to another account role.", {}
+
+    staff_id = _to_int(staff["id"]) if staff else 0
+    account_by_staff = (
+        repository._account_identity_by_staff_id(conn, staff_id) if staff_id else None
+    )
+    if account_by_staff and normalize_role(account_by_staff["role"]) != "customer_support":
+        return False, "The linked staff identity belongs to another account role.", {}
+    if (
+        account_by_login
+        and account_by_staff
+        and _to_int(account_by_login["id"]) != _to_int(account_by_staff["id"])
+    ):
+        return False, f"{login} is linked to conflicting account records.", {}
+
+    password = login
+    password_hash = generate_password_hash(password)
+    now = _utc_now_iso()
+    existing_account = account_by_login or account_by_staff
+
+    staff_id = repository._insert_or_update_staff_role(
+        conn,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="customer_support",
+        subject_scope="",
+        now=now,
+    )
+    if not staff_id:
+        conn.rollback()
+        return False, "Unable to create the Customer Support staff row.", {}
+
+    account_id = repository._upsert_staff_account(
+        conn,
+        staff_id=staff_id,
+        login=login,
+        password_hash=password_hash,
+        display_name=normalized_display_name,
+        role="customer_support",
+        must_change_password=False,
+        now=now,
+    )
+    if not account_id:
+        conn.rollback()
+        return False, "Unable to create the Customer Support account.", {}
+
+    profile_id = repository._upsert_staff_profile_role(
+        conn,
+        account_id=account_id,
+        staff_id=staff_id,
+        job_title="Customer Support",
+        department="Customer Support",
+        now=now,
+    )
+    if not profile_id:
+        conn.rollback()
+        return False, "Unable to create the Customer Support profile.", {}
+
+    repository._insert_account_audit_event(
+        conn,
+        event_type="account.password_reset" if existing_account else "account.created",
+        entity_account_id=account_id,
+        detail={"role": "customer_support", "method": "operator_cli"},
+    )
+    if commit:
+        conn.commit()
+
+    return True, "", {
+        "role": "customer_support",
         "login": login,
         "temporary_password": password,
         "display_name": normalized_display_name,

@@ -42,6 +42,7 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { PageHeader } from "@/shared/ui/PageHeader";
+import { RoleWorkspaceShell } from "@/shared/ui/RoleWorkspaceShell";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type Props = {
@@ -831,10 +832,28 @@ export default function CustomerSupportWorkspace({
   const activeSubjects = detail?.kind === "student"
     ? detail.academic.filter((item) => asText(item.status) === "active")
     : [];
+  const navItems = useMemo(() => [
+    { key: "records", label: "Records", href: "/customer-support", icon: UsersRound },
+  ] as const, []);
 
   return (
-    <main className="min-h-[var(--tg-viewport-height)] overflow-x-hidden bg-background px-3 py-4 text-foreground sm:px-5 lg:px-6">
-      <div className="mx-auto flex max-w-[100rem] flex-col gap-4">
+    <RoleWorkspaceShell
+      authLogin={authLogin}
+      csrfToken={csrfToken}
+      active="records"
+      homeHref="/customer-support"
+      navItems={navItems}
+      roleLabel="Customer Support"
+      sectionLabel="Customer Support"
+      workspaceLabel="Customer Support"
+      mobileNavigationMode="drawer"
+      desktopSidebarMode="collapsible"
+      desktopSidebarInitialState="adaptive"
+      desktopSidebarStorageKey="msi:customer-support:sidebar:v1"
+      maxWidthClass="max-w-[100rem]"
+      sectionClassName="gap-0"
+    >
+      <div className="flex min-w-0 flex-col gap-4 overflow-x-hidden">
         <PageHeader
           title={title}
           subtitle={description}
@@ -937,6 +956,6 @@ export default function CustomerSupportWorkspace({
       ) : null}
 
       <FloatingToast toast={toast} onClose={clearToast} />
-    </main>
+    </RoleWorkspaceShell>
   );
 }
