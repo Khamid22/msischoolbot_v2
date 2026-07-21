@@ -309,7 +309,11 @@ def update_candidate_stage(
                       candidate.stage_changed_at
         ), closed_history AS (
             UPDATE msi_v2.teacher_candidate_stage_history history
-            SET entered_at = LEAST(history.entered_at, updated.stage_changed_at),
+            SET entered_at = LEAST(
+                    history.entered_at,
+                    updated.stage_changed_at,
+                    %s::timestamptz
+                ),
                 exited_at = updated.stage_changed_at
             FROM updated_candidate updated
             WHERE history.candidate_id = updated.id AND history.exited_at IS NULL

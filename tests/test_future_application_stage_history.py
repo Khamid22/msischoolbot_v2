@@ -54,9 +54,11 @@ def test_stage_transition_repairs_legacy_future_entry_before_closing_it():
         transition_source="manual",
     )
 
-    assert "entered_at = LEAST(history.entered_at, updated.stage_changed_at)" in conn.sql
+    assert "history.entered_at," in conn.sql
+    assert "updated.stage_changed_at," in conn.sql
     assert "exited_at = updated.stage_changed_at" in conn.sql
     assert "LEAST(" in conn.sql
+    assert conn.sql.count("%s") == len(conn.params)
 
 
 def test_migration_repairs_open_future_history_and_preserves_sla_due_date():
