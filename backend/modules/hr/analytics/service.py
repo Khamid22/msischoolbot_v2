@@ -16,13 +16,6 @@ from backend.modules.hr.analytics import repository
 TASHKENT = ZoneInfo("Asia/Tashkent")
 ANALYTICS_ROLES = frozenset({"hr_manager", "ceo"})
 PERIODS = frozenset({"today", "week", "month", "quarter", "year", "custom"})
-JOURNEY_STAGES = (
-    "new_candidate",
-    "responded",
-    "job_interview",
-    "test_and_demo",
-    "under_review",
-)
 OUTCOMES = ("teacher_academy", "active_teacher", "rejected", "candidate_withdrew")
 
 
@@ -287,17 +280,17 @@ def dashboard(
     all_time_events = _dict(rows["total_event_summary"])
     live = _dict(rows["live_summary"])
     stage_time = [_dict(row) for row in rows["time_in_stage"]]
-    journey_counts = {
-        str(row["stage"]): int(row["candidates"] or 0)
-        for row in rows["journey"]
-    }
     journey: list[dict[str, Any]] = []
     previous_count: int | None = None
-    for stage in JOURNEY_STAGES:
-        count = journey_counts.get(stage, 0)
+    for row in rows["journey"]:
+        stage_row = _dict(row)
+        stage = str(stage_row["stage"])
+        count = int(stage_row["candidates"] or 0)
         journey.append(
             {
                 "stage": stage,
+                "stage_label": str(stage_row.get("stage_label") or stage),
+                "color_token": str(stage_row.get("color_token") or "neutral"),
                 "candidates": count,
                 "previous_stage_candidates": previous_count,
                 "conversion_percentage": (

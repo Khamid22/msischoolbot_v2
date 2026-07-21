@@ -356,7 +356,8 @@ def test_analytics_repository_queries_bind_every_placeholder():
     assert "msi_v2.teachers" in all_queries
     assert "academy_status NOT IN (" in all_queries
     assert "'rejected', 'removed', 'trash_bin'" in all_queries
-    assert "candidate.status = ANY" in all_queries
+    assert "teacher_recruitment_pipeline_stages active_stage" in all_queries
+    assert "active_stage.is_pipeline = true" in all_queries
 
 
 def test_migration_contains_append_only_history_and_snapshotted_sla():

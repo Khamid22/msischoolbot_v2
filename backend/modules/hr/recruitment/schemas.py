@@ -251,6 +251,31 @@ class RecruitmentSlaRuleUpdate(StrictModel):
     target_days: int = Field(ge=1, le=90)
 
 
+class PipelineStageCreate(StrictModel):
+    label: str = Field(min_length=1, max_length=80)
+    color_token: str = Field(
+        pattern="^(neutral|blue|cyan|violet|green|amber|orange|rose)$"
+    )
+    after_stage_key: str = Field(min_length=1, max_length=80)
+    sla_target_days: int = Field(ge=1, le=90)
+
+
+class PipelineStageUpdate(StrictModel):
+    expected_version: int = Field(ge=1)
+    label: str = Field(min_length=1, max_length=80)
+    color_token: str | None = Field(
+        default=None,
+        pattern="^(neutral|blue|cyan|violet|green|amber|orange|rose)$",
+    )
+    after_stage_key: str | None = Field(default=None, min_length=1, max_length=80)
+    sla_target_days: OptionalInt = Field(default=None, ge=1, le=90)
+
+
+class PipelineStageArchive(StrictModel):
+    expected_version: int = Field(ge=1)
+    replacement_stage_key: str = Field(min_length=1, max_length=80)
+
+
 class RecruitmentMutationResult(BaseModel):
     message: str
     candidate: dict[str, Any] | None = None
@@ -280,6 +305,9 @@ __all__ = [
     "InterviewSessionComplete",
     "InterviewSessionStart",
     "NoteCreate",
+    "PipelineStageArchive",
+    "PipelineStageCreate",
+    "PipelineStageUpdate",
     "RecruitmentSettingCreate",
     "RecruitmentSlaRuleUpdate",
     "RecruitmentMutationResult",

@@ -98,7 +98,7 @@ def test_stage_update_normalizes_legacy_historical_transition_source():
     )
 
     assert updated["version"] == 5
-    assert conn.params[11] == "restored"
+    assert conn.params[10] == "restored"
 
 
 def test_stage_update_anchors_new_candidate_sla_to_application_date():
@@ -121,10 +121,30 @@ def test_stage_update_anchors_new_candidate_sla_to_application_date():
     assert "candidate.application_date" in sql
     assert "updated.status = 'new_candidate'" in sql
     assert "AT TIME ZONE 'Asia/Tashkent'" in sql
-    # The positional params for comment/transition_source/rule-stage lookup
-    # must stay put -- only the SQL text gained a conditional anchor.
-    assert conn.params[10] == "Moved to Application Received."
-    assert conn.params[11] == "manual"
+    assert conn.params[9] == "Moved to Application Received."
+    assert conn.params[10] == "manual"
+    assert "teacher_recruitment_pipeline_stages definition" in sql
+
+
+def test_stage_update_anchors_custom_stage_sla_without_rewriting_history_time():
+    conn = _StageUpdateConnection()
+
+    repository.update_candidate_stage(
+        conn,
+        candidate_id=7,
+        stage="custom_reference_check",
+        expected_version=4,
+        actor_account_id=41,
+        now="2026-07-21T12:00:00+00:00",
+        comment="Moved to Reference Check.",
+        transition_source="manual",
+    )
+
+    sql = conn.last_sql
+    assert "definition.stage_kind = 'custom'" in sql
+    assert "updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'" in sql
+    assert "updated.created_at" in sql
+    assert "SELECT updated.id, updated.status" in sql
 
 
 def _future_values(**overrides):

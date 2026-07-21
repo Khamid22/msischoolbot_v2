@@ -298,7 +298,8 @@ def update_candidate_stage(
                 version = candidate.version + 1
             FROM current_candidate current
             WHERE candidate.id = current.id AND current.version = %s
-            RETURNING candidate.id, candidate.status, candidate.version, candidate.application_date
+            RETURNING candidate.id, candidate.status, candidate.version,
+                      candidate.application_date, candidate.created_at
         ), closed_history AS (
             UPDATE msi_v2.teacher_candidate_stage_history history
             SET exited_at = %s::timestamptz
@@ -314,7 +315,7 @@ def update_candidate_stage(
                 candidate_id, stage, entered_at, responsible_account_id,
                 comment, transition_source, sla_target_days, sla_due_at
             )
-            SELECT updated.id, %s,
+            SELECT updated.id, updated.status,
                    COALESCE(
                        CASE WHEN updated.status = 'new_candidate'
                             THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
@@ -322,19 +323,25 @@ def update_candidate_stage(
                        %s::timestamptz
                    ),
                    %s, %s, %s,
-                   rule.target_days,
-                   CASE WHEN rule.target_days IS NULL THEN NULL
+                   definition.sla_target_days,
+                   CASE WHEN definition.sla_target_days IS NULL THEN NULL
                         ELSE COALESCE(
-                            CASE WHEN updated.status = 'new_candidate'
-                                 THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
+                            CASE
+                                WHEN definition.stage_kind = 'custom'
+                                    THEN COALESCE(
+                                        updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent',
+                                        updated.created_at
+                                    )
+                                WHEN updated.status = 'new_candidate'
+                                    THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
                             END,
                             %s::timestamptz
-                        ) + make_interval(days => rule.target_days)
+                        ) + make_interval(days => definition.sla_target_days)
                    END
             FROM updated_candidate updated
             CROSS JOIN (SELECT count(*) FROM closed_history) closed
-            LEFT JOIN msi_v2.teacher_recruitment_sla_rules rule
-              ON rule.stage = %s AND rule.is_active = true
+            JOIN msi_v2.teacher_recruitment_pipeline_stages definition
+              ON definition.stage_key = updated.status
             RETURNING id
         )
         SELECT updated.id, updated.status, updated.version,
@@ -350,13 +357,11 @@ def update_candidate_stage(
             actor_account_id,
             int(expected_version),
             now,
-            stage,
             now,
             actor_account_id,
             comment,
             transition_source,
             now,
-            stage,
         ),
     ).fetchone()
 

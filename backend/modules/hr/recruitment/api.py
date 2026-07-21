@@ -42,6 +42,9 @@ from backend.modules.hr.recruitment.schemas import (
     InterviewSessionStart,
     InterviewWrite,
     NoteCreate,
+    PipelineStageArchive,
+    PipelineStageCreate,
+    PipelineStageUpdate,
     RecruitmentSettingCreate,
     RecruitmentSettingRename,
     RecruitmentSlaRuleUpdate,
@@ -316,6 +319,87 @@ def options():
 @router.get("/settings", operation_id="api_v1_recruitment_settings")
 def settings(user: CurrentUser = Depends(get_current_user)):
     return api_success(_call(service.list_settings, user))
+
+
+@router.get(
+    "/pipeline-stages",
+    operation_id="api_v1_recruitment_pipeline_stages",
+)
+def pipeline_stages(
+    include_inactive: bool = False,
+    user: CurrentUser = Depends(get_current_user),
+):
+    return api_success(
+        _call(
+            service.list_pipeline_stages,
+            user,
+            include_inactive=include_inactive,
+        )
+    )
+
+
+@router.post(
+    "/pipeline-stages",
+    status_code=201,
+    operation_id="api_v1_recruitment_create_pipeline_stage",
+)
+def create_pipeline_stage(
+    payload: PipelineStageCreate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    stage = _call(
+        service.create_pipeline_stage,
+        user,
+        **payload.model_dump(),
+    )
+    return api_success(
+        {"message": "Pipeline column created.", "stage": stage},
+        status_code=201,
+    )
+
+
+@router.patch(
+    "/pipeline-stages/{stage_key}",
+    operation_id="api_v1_recruitment_update_pipeline_stage",
+)
+def update_pipeline_stage(
+    stage_key: str,
+    payload: PipelineStageUpdate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    stage = _call(
+        service.update_pipeline_stage_definition,
+        user,
+        stage_key,
+        **payload.model_dump(),
+    )
+    return api_success({"message": "Pipeline column updated.", "stage": stage})
+
+
+@router.post(
+    "/pipeline-stages/{stage_key}/archive",
+    operation_id="api_v1_recruitment_archive_pipeline_stage",
+)
+def archive_pipeline_stage(
+    stage_key: str,
+    payload: PipelineStageArchive,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    result = _call(
+        service.archive_pipeline_stage_definition,
+        user,
+        stage_key,
+        **payload.model_dump(),
+    )
+    return api_success(
+        {
+            "message": f"Pipeline column removed. {result['moved_count']} candidate(s) moved.",
+            **result,
+        }
+    )
 
 
 @router.patch(

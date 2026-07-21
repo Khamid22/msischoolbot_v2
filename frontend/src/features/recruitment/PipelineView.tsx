@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, CalendarPlus, Check, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Search, Trash2, UserMinus, X } from "lucide-react";
+import { AlertTriangle, Archive, Ban, CalendarPlus, Check, CheckCircle2, Clock3, ListFilter, Loader2, Plus, Save, Search, Settings2, Trash2, UserMinus, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   memo,
@@ -21,13 +21,13 @@ import { useCanonicalTeacherRosterTotals } from "@/features/teacher-academy/Teac
 import {
   dateLabel,
   dateTimeLabel,
-  boardStages,
   humanize,
-  manualStages,
-  stageLabels,
+  recruitmentStageLabel,
   type RecruitmentAppointment,
   type RecruitmentCandidate,
   type RecruitmentOptions,
+  type RecruitmentPipelineStage,
+  type PipelineStageColorToken,
 } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
@@ -48,6 +48,7 @@ import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
 import { Modal, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 
 type PipelineData = {
+  columns: RecruitmentPipelineStage[];
   stages: Record<string, RecruitmentCandidate[]>;
   counts: Record<string, number>;
   total: number;
@@ -69,6 +70,12 @@ type RescheduleSelection = { candidate: RecruitmentCandidate; appointment: Recru
 type CancelSelection = { candidate: RecruitmentCandidate; appointment: RecruitmentAppointment };
 type UndoTrash = { candidate: RecruitmentCandidate; previousCandidate: RecruitmentCandidate };
 
+type PipelineStagesData = {
+  items: RecruitmentPipelineStage[];
+  read_only: boolean;
+  color_tokens: PipelineStageColorToken[];
+};
+
 const filterKeys: Array<keyof PipelineFilters> = [
   "search",
   "position",
@@ -79,14 +86,26 @@ const filterKeys: Array<keyof PipelineFilters> = [
   "evaluator_account_id",
 ];
 
-const chartStages = [
-  { stage: "new_candidate", label: "Application Received", color: "bg-white ring-1 ring-inset ring-slate-400 dark:bg-slate-100", legend: "bg-white border border-slate-400" },
-  { stage: "responded", label: "Interview Schedule", color: "bg-blue-600", legend: "bg-blue-600" },
-  { stage: "job_interview", label: "Job Interview", color: "bg-emerald-300", legend: "bg-emerald-300" },
-  { stage: "test_and_demo", label: "Demo & Test", color: "bg-emerald-600", legend: "bg-emerald-600" },
-  { stage: "teacher_academy", label: "Teacher Academy", color: "bg-amber-500", legend: "bg-amber-500" },
-  { stage: "active_teacher", label: "Active Teachers", color: "bg-emerald-900", legend: "bg-emerald-900" },
-] as const;
+const stageColorStyles: Record<PipelineStageColorToken, { card: string; segment: string; legend: string; swatch: string }> = {
+  neutral: { card: "border-slate-300 bg-slate-50 dark:border-slate-600 dark:bg-slate-900/45", segment: "bg-slate-400", legend: "border border-slate-400 bg-slate-100", swatch: "bg-slate-400" },
+  blue: { card: "border-blue-300 bg-blue-50 dark:border-blue-600/60 dark:bg-blue-950/30", segment: "bg-blue-600", legend: "bg-blue-600", swatch: "bg-blue-600" },
+  cyan: { card: "border-cyan-300 bg-cyan-50 dark:border-cyan-600/60 dark:bg-cyan-950/30", segment: "bg-cyan-500", legend: "bg-cyan-500", swatch: "bg-cyan-500" },
+  violet: { card: "border-violet-300 bg-violet-50 dark:border-violet-600/60 dark:bg-violet-950/30", segment: "bg-violet-600", legend: "bg-violet-600", swatch: "bg-violet-600" },
+  green: { card: "border-emerald-300 bg-emerald-50 dark:border-emerald-600/60 dark:bg-emerald-950/30", segment: "bg-emerald-600", legend: "bg-emerald-600", swatch: "bg-emerald-600" },
+  amber: { card: "border-amber-300 bg-amber-50 dark:border-amber-600/60 dark:bg-amber-950/30", segment: "bg-amber-500", legend: "bg-amber-500", swatch: "bg-amber-500" },
+  orange: { card: "border-orange-300 bg-orange-50 dark:border-orange-600/60 dark:bg-orange-950/30", segment: "bg-orange-500", legend: "bg-orange-500", swatch: "bg-orange-500" },
+  rose: { card: "border-rose-300 bg-rose-50 dark:border-rose-600/60 dark:bg-rose-950/30", segment: "bg-rose-500", legend: "bg-rose-500", swatch: "bg-rose-500" },
+};
+
+const canonicalSummaryColors: Record<string, PipelineStageColorToken> = {
+  new_candidate: "neutral",
+  responded: "blue",
+  job_interview: "green",
+  test_and_demo: "green",
+  under_review: "violet",
+  teacher_academy: "amber",
+  active_teacher: "blue",
+};
 
 function initialFilters(): PipelineFilters {
   const params = new URLSearchParams(window.location.search);
@@ -106,14 +125,21 @@ function matchingAppointment(candidate: RecruitmentCandidate) {
     || (candidate.next_appointment?.appointment_type === expectedType ? candidate.next_appointment : null);
 }
 
-function PipelineSummary({ counts, action }: { counts: Record<string, number>; action?: ReactNode }) {
-  const total = chartStages.reduce((sum, item) => sum + Number(counts[item.stage] || 0), 0);
-  const values = chartStages.map((item) => ({
-    ...item,
-    count: Number(counts[item.stage] || 0),
-    rawPercentage: total ? Number(counts[item.stage] || 0) / total * 100 : 0,
-    percentage: (total ? Number(counts[item.stage] || 0) / total * 100 : 0).toFixed(1),
-  }));
+function PipelineSummary({ counts, stages, action }: { counts: Record<string, number>; stages: RecruitmentPipelineStage[]; action?: ReactNode }) {
+  const total = stages.reduce((sum, item) => sum + Number(counts[item.stage_key] || 0), 0);
+  const values = stages.map((item) => {
+    const colorToken = item.color_token || canonicalSummaryColors[item.stage_key] || "neutral";
+    const count = Number(counts[item.stage_key] || 0);
+    return {
+      stage: item.stage_key,
+      label: item.label,
+      color: stageColorStyles[colorToken].segment,
+      legend: stageColorStyles[colorToken].legend,
+      count,
+      rawPercentage: total ? count / total * 100 : 0,
+      percentage: (total ? count / total * 100 : 0).toFixed(1),
+    };
+  });
   const summary = values.map((item) => `${item.label}: ${item.count} (${item.percentage}%)`).join(", ");
   return (
     <section className="rounded-xl border border-border bg-card px-3 py-1.5" aria-label={`Pipeline distribution. Total ${total}. ${summary}`}>
@@ -176,6 +202,183 @@ function FiltersDrawer({
   );
 }
 
+function StageColorPicker({ value, onChange }: { value: PipelineStageColorToken; onChange: (value: PipelineStageColorToken) => void }) {
+  return (
+    <fieldset>
+      <legend className="text-xs font-semibold">Card color</legend>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        {(Object.keys(stageColorStyles) as PipelineStageColorToken[]).map((token) => (
+          <label key={token} className={`flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border bg-card px-2 focus-within:ring-2 focus-within:ring-primary/35 ${value === token ? "border-primary ring-1 ring-primary/20" : "border-border"}`} title={humanize(token)}>
+            <input className="sr-only" type="radio" name="color_token" value={token} checked={value === token} onChange={() => onChange(token)} />
+            <span className={`h-5 w-5 rounded-full ${stageColorStyles[token].swatch}`} aria-hidden="true" />
+            <span className="sr-only">{humanize(token)}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function PipelineStageEditor({
+  stage,
+  stages,
+  pending,
+  readOnly,
+  onSave,
+  onArchive,
+}: {
+  stage: RecruitmentPipelineStage;
+  stages: RecruitmentPipelineStage[];
+  pending: boolean;
+  readOnly: boolean;
+  onSave: (stage: RecruitmentPipelineStage, values: { label: string; color_token?: PipelineStageColorToken; sla_target_days?: number; after_stage_key?: string }) => void;
+  onArchive: (stage: RecruitmentPipelineStage) => void;
+}) {
+  const [label, setLabel] = useState(stage.label);
+  const [color, setColor] = useState<PipelineStageColorToken>(stage.color_token);
+  const [slaDays, setSlaDays] = useState(String(stage.sla_target_days || 1));
+  const [afterStage, setAfterStage] = useState("");
+  const custom = stage.stage_kind === "custom";
+  if (readOnly) {
+    return (
+      <article className="rounded-xl border border-border bg-card p-3 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2">
+            <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="break-words text-sm font-semibold">{stage.label}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{custom ? "Custom manual stage" : "Protected system stage"}</p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[10px] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
+        </div>
+      </article>
+    );
+  }
+  return (
+    <form
+      className="rounded-xl border border-border bg-card p-3 shadow-sm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(stage, {
+          label,
+          ...(custom ? { color_token: color, sla_target_days: Number(slaDays), ...(afterStage ? { after_stage_key: afterStage } : {}) } : {}),
+        });
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{custom ? "Custom workflow stage" : "System workflow stage"}</p>
+          <p className="mt-0.5 break-all text-[10px] text-muted-foreground">{stage.stage_key}</p>
+        </div>
+        <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold">SLA {stage.sla_target_days || "—"}d</span>
+      </div>
+      <label className="mt-3 block text-xs font-semibold">Column name<input required maxLength={80} className={`${fieldClass} mt-1`} value={label} onChange={(event) => setLabel(event.target.value)} /></label>
+      {custom ? (
+        <div className="mt-3 grid gap-3">
+          <StageColorPicker value={color} onChange={setColor} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={slaDays} onChange={(event) => setSlaDays(event.target.value)} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">Calendar days in Asia/Tashkent.</span></label>
+            <label className="text-xs font-semibold">Move after<select className={`${fieldClass} mt-1`} value={afterStage} onChange={(event) => setAfterStage(event.target.value)}><option value="">Keep current position</option>{stages.filter((item) => item.stage_key !== stage.stage_key).map((item) => <option key={item.stage_key} value={item.stage_key}>{item.label}</option>)}</select></label>
+          </div>
+        </div>
+      ) : <p className="mt-2 text-[11px] text-muted-foreground">Renaming changes this stage label everywhere. Its workflow behavior and position stay protected.</p>}
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {custom ? <button type="button" className={`${secondaryButtonClass} text-destructive hover:text-destructive`} disabled={pending} onClick={() => onArchive(stage)}><Archive className="h-4 w-4" />Remove</button> : null}
+        <button type="submit" className={buttonClass} disabled={pending || !label.trim()}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Save</button>
+      </div>
+    </form>
+  );
+}
+
+function PipelineStagesDrawer({
+  open,
+  onClose,
+  onAnnouncement,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
+}) {
+  const queryClient = useQueryClient();
+  const stagesQuery = useQuery({
+    queryKey: ["recruitment", "pipeline-stages"],
+    queryFn: () => recruitmentRequest<PipelineStagesData>(`${RECRUITMENT_API}/pipeline-stages`),
+    enabled: open,
+  });
+  const stages = stagesQuery.data?.items || [];
+  const readOnly = Boolean(stagesQuery.data?.read_only);
+  const [createLabel, setCreateLabel] = useState("");
+  const [createColor, setCreateColor] = useState<PipelineStageColorToken>("blue");
+  const [createAfter, setCreateAfter] = useState("");
+  const [createSla, setCreateSla] = useState("2");
+  const [archiveStage, setArchiveStage] = useState<RecruitmentPipelineStage | null>(null);
+  const [archiveDestination, setArchiveDestination] = useState("");
+
+  useEffect(() => {
+    if (!open || !stages.length) return;
+    setCreateAfter((current) => current && stages.some((stage) => stage.stage_key === current) ? current : stages[stages.length - 1].stage_key);
+  }, [open, stages]);
+
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["recruitment", "pipeline-stages"] }),
+    queryClient.invalidateQueries({ queryKey: ["recruitment", "pipeline"] }),
+    queryClient.invalidateQueries({ queryKey: ["recruitment", "options"] }),
+    queryClient.invalidateQueries({ queryKey: ["hr-analytics"] }),
+  ]);
+  const createStage = useMutation({
+    mutationFn: (values: Record<string, unknown>) => recruitmentRequest<{ message: string; stage: RecruitmentPipelineStage }>(`${RECRUITMENT_API}/pipeline-stages`, { method: "POST", body: jsonBody(values) }),
+    onSuccess: (result) => { setCreateLabel(""); onAnnouncement(result.message || "Pipeline column created."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: refresh,
+  });
+  const updateStage = useMutation({
+    mutationFn: ({ stage, values }: { stage: RecruitmentPipelineStage; values: Record<string, unknown> }) => recruitmentRequest<{ message: string; stage: RecruitmentPipelineStage }>(`${RECRUITMENT_API}/pipeline-stages/${encodeURIComponent(stage.stage_key)}`, { method: "PATCH", body: jsonBody({ ...values, expected_version: stage.version }) }),
+    onSuccess: (result) => onAnnouncement(result.message || "Pipeline column updated."),
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: refresh,
+  });
+  const archive = useMutation({
+    mutationFn: ({ stage, destination }: { stage: RecruitmentPipelineStage; destination: string }) => recruitmentRequest<{ message: string }>(`${RECRUITMENT_API}/pipeline-stages/${encodeURIComponent(stage.stage_key)}/archive`, { method: "POST", body: jsonBody({ expected_version: stage.version, replacement_stage_key: destination }) }),
+    onSuccess: (result) => { setArchiveStage(null); setArchiveDestination(""); onAnnouncement(result.message || "Pipeline column removed."); },
+    onError: (error) => onAnnouncement(queryError(error), "error"),
+    onSettled: refresh,
+  });
+  const anyPending = createStage.isPending || updateStage.isPending || archive.isPending;
+
+  return (
+    <Drawer open={open} onClose={() => { if (!anyPending) onClose(); }} title="Pipeline columns" description="Rename system columns or add manual workflow stages. Automatic interview, demo, and test progression continues to use the protected system stages." widthClass="sm:max-w-2xl" footer={<div className="flex justify-end"><button type="button" className={secondaryButtonClass} disabled={anyPending} onClick={onClose}>Close</button></div>}>
+      {stagesQuery.isLoading ? <PageState>Loading pipeline columns…</PageState> : stagesQuery.error ? <PageState tone="error">{queryError(stagesQuery.error)}</PageState> : (
+        <div className="space-y-4">
+          {!readOnly ? <form className="rounded-xl border border-primary/20 bg-primary/5 p-3" onSubmit={(event) => { event.preventDefault(); createStage.mutate({ label: createLabel, color_token: createColor, after_stage_key: createAfter, sla_target_days: Number(createSla) }); }}>
+            <div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Plus className="h-4 w-4" /></div><div><h3 className="text-sm font-semibold">Add workflow stage</h3><p className="text-[11px] text-muted-foreground">Candidates enter this stage only when HR or CEO drags them here.</p></div></div>
+            <div className="mt-3 grid gap-3">
+              <label className="text-xs font-semibold">Column name<input autoFocus required maxLength={80} className={`${fieldClass} mt-1`} value={createLabel} onChange={(event) => setCreateLabel(event.target.value)} placeholder="For example: Reference Check" /></label>
+              <StageColorPicker value={createColor} onChange={setCreateColor} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-semibold">Insert after<select required className={`${fieldClass} mt-1`} value={createAfter} onChange={(event) => setCreateAfter(event.target.value)}>{stages.map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label}</option>)}</select></label>
+                <label className="text-xs font-semibold">SLA after application<input required type="number" min={1} max={90} className={`${fieldClass} mt-1`} value={createSla} onChange={(event) => setCreateSla(event.target.value)} /><span className="mt-1 block text-[10px] font-normal text-muted-foreground">Deadline = application date + calendar days.</span></label>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end"><button type="submit" className={buttonClass} disabled={anyPending || !createLabel.trim() || !createAfter}>{createStage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}Add column</button></div>
+          </form> : <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs text-muted-foreground">You can review the live column order, labels, colors, and SLAs. Only the HR Manager can change pipeline columns.</div>}
+
+          <section aria-labelledby="existing-pipeline-columns"><div className="mb-2 flex items-center justify-between gap-2"><div><h3 id="existing-pipeline-columns" className="text-sm font-semibold">Existing columns</h3><p className="text-[11px] text-muted-foreground">Shown in the same order as the board.</p></div><span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold tabular-nums">{stages.length}</span></div><div className="grid gap-3">{stages.map((stage) => <PipelineStageEditor key={`${stage.stage_key}:${stage.version}`} stage={stage} stages={stages} pending={anyPending} readOnly={readOnly} onSave={(selected, values) => updateStage.mutate({ stage: selected, values })} onArchive={(selected) => { setArchiveStage(selected); setArchiveDestination(stages.find((item) => item.stage_key !== selected.stage_key)?.stage_key || ""); }} />)}</div></section>
+
+          {archiveStage ? (
+            <section role="alertdialog" aria-labelledby="archive-stage-title" className="sticky bottom-0 rounded-xl border border-destructive/30 bg-card p-3 shadow-card-hover">
+              <h3 id="archive-stage-title" className="text-sm font-semibold text-destructive">Remove “{archiveStage.label}”?</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Candidates currently in this stage will be moved transactionally. Historical visits keep this stage name.</p>
+              <label className="mt-3 block text-xs font-semibold">Move candidates to<select autoFocus required className={`${fieldClass} mt-1`} value={archiveDestination} onChange={(event) => setArchiveDestination(event.target.value)}>{stages.filter((stage) => stage.stage_key !== archiveStage.stage_key).map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label}</option>)}</select></label>
+              <div className="mt-3 flex flex-wrap justify-end gap-2"><button type="button" className={secondaryButtonClass} disabled={archive.isPending} onClick={() => setArchiveStage(null)}>Cancel</button><button type="button" className={`${buttonClass} bg-destructive text-destructive-foreground hover:bg-destructive/90`} disabled={archive.isPending || !archiveDestination} onClick={() => archive.mutate({ stage: archiveStage, destination: archiveDestination })}>{archive.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}Move and remove</button></div>
+            </section>
+          ) : null}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
 const CandidateCard = memo(function CandidateCard({
   candidate,
   basePath,
@@ -185,6 +388,7 @@ const CandidateCard = memo(function CandidateCard({
   onInterview,
   onReschedule,
   onCancelAppointment,
+  stage,
   compact = false,
 }: {
   candidate: RecruitmentCandidate;
@@ -195,6 +399,7 @@ const CandidateCard = memo(function CandidateCard({
   onInterview: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
   onReschedule: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
   onCancelAppointment: (candidate: RecruitmentCandidate, appointment: RecruitmentAppointment) => void;
+  stage?: RecruitmentPipelineStage;
   compact?: boolean;
 }) {
   const canMove = Boolean(candidate.permissions?.can_move_stage) && !["teacher_academy", "active_teacher"].includes(candidate.status);
@@ -229,6 +434,9 @@ const CandidateCard = memo(function CandidateCard({
   const demoPassed = demoResult === "passed";
   const passedInterview = candidate.status === "job_interview" && candidate.latest_interview_result === "passed" && !appointment;
   const alertState = interviewMissing || demoMissing;
+  const customTone = stage?.stage_kind === "custom"
+    ? stageColorStyles[stage.color_token || "neutral"].card
+    : "border-border bg-card";
   const toneClass = alertState
     ? "border-red-400 bg-red-50 dark:border-red-500/50 dark:bg-red-950/25"
     : overdue
@@ -237,7 +445,7 @@ const CandidateCard = memo(function CandidateCard({
         ? "border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-950/20"
         : ["job_interview", "test_and_demo"].includes(candidate.status)
           ? "border-amber-400 bg-amber-50 dark:border-amber-500/50 dark:bg-amber-950/20"
-          : "border-border bg-card";
+          : customTone;
   if (overdue) { detailLabel = "Overdue"; detailValue = dateTimeLabel(appointment?.starts_at); }
   if (passedInterview) { detailLabel = "Interview passed"; detailValue = "Ready for the next stage"; }
   if (demoResult) { detailLabel = demoPassed ? "Demo lesson passed" : "Demo lesson evaluated"; detailValue = candidate.latest_demo_at ? dateTimeLabel(candidate.latest_demo_at) : detailValue; }
@@ -324,22 +532,25 @@ export function PipelineView({
   basePath,
   options,
   canAddCandidate = false,
+  canViewStageConfiguration = false,
   onAddCandidate,
   onAnnouncement,
 }: {
   basePath: string;
   options?: RecruitmentOptions;
   canAddCandidate?: boolean;
+  canViewStageConfiguration?: boolean;
   onAddCandidate?: () => void;
   onAnnouncement: (message: string, tone?: FloatingToastTone) => void;
 }) {
   const queryClient = useQueryClient();
   const initial = new URLSearchParams(window.location.search);
-  const initialStage = initial.get("stage") || boardStages[0];
-  const [mobileStage, setMobileStage] = useState((boardStages as readonly string[]).includes(initialStage) ? initialStage : boardStages[0]);
+  const initialStage = initial.get("stage") || "new_candidate";
+  const [mobileStage, setMobileStage] = useState(initialStage);
   const [filters, setFilters] = useState<PipelineFilters>(initialFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [stageManagerOpen, setStageManagerOpen] = useState(false);
   const [boardPanning, setBoardPanning] = useState(false);
   const [draggedCandidate, setDraggedCandidate] = useState<RecruitmentCandidate | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
@@ -379,6 +590,11 @@ export function PipelineView({
     if (pipeline.data) restoreRecruitmentReturn("pipeline");
   }, [pipeline.data]);
   useEffect(() => {
+    const columns = pipeline.data?.columns || [];
+    if (!columns.length || columns.some((stage) => stage.stage_key === mobileStage)) return;
+    setMobileStage(columns[0].stage_key);
+  }, [mobileStage, pipeline.data?.columns]);
+  useEffect(() => {
     if (!undoTrash) return undefined;
     const timer = window.setTimeout(() => setUndoTrash(null), 5000);
     return () => window.clearTimeout(timer);
@@ -407,7 +623,8 @@ export function PipelineView({
       entries.forEach(([key, previous]) => {
         if (!previous) return;
         const stages = Object.fromEntries(Object.entries(previous.stages).map(([name, values]) => [name, values.filter((item) => item.id !== candidate.id)]));
-        stages[stage] = [{ ...candidate, status: stage, stage_changed_at: new Date().toISOString(), next_appointment: null, version: candidate.version + 1 }, ...(stages[stage] || [])];
+        const target = previous.columns.find((item) => item.stage_key === stage);
+        stages[stage] = [{ ...candidate, status: stage, status_label: target?.label, status_kind: target?.stage_kind, status_color_token: target?.color_token, stage_changed_at: new Date().toISOString(), next_appointment: null, version: candidate.version + 1 }, ...(stages[stage] || [])];
         queryClient.setQueryData(key, { ...previous, stages, counts: Object.fromEntries(Object.entries(stages).map(([name, values]) => [name, values.length])) });
       });
       return { entries };
@@ -506,9 +723,9 @@ export function PipelineView({
     event.preventDefault();
   };
 
-  const cards = useCallback((items: RecruitmentCandidate[], compact = false) => (
+  const cards = useCallback((items: RecruitmentCandidate[], compact = false, stage?: RecruitmentPipelineStage) => (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
-      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} onReschedule={handleCardReschedule} onCancelAppointment={handleCardCancelAppointment} compact={compact} />)}
+      {items.map((candidate) => <CandidateCard key={candidate.id} candidate={candidate} stage={stage} basePath={basePath} onDragStart={handleCardDragStart} onDragEnd={finishDrag} onSchedule={handleCardSchedule} onInterview={handleCardInterview} onReschedule={handleCardReschedule} onCancelAppointment={handleCardCancelAppointment} compact={compact} />)}
       {!items.length ? <EmptyLine>No candidates in this stage.</EmptyLine> : null}
     </div>
   ), [basePath, handleCardDragStart, finishDrag, handleCardSchedule, handleCardInterview, handleCardReschedule, handleCardCancelAppointment]);
@@ -523,26 +740,32 @@ export function PipelineView({
     teacherRosterTotals.active_teacher,
     teacherRosterTotals.teacher_academy,
   ]);
+  const summaryStages = useMemo(() => {
+    const active = data?.columns || [];
+    const terminal = (options?.stage_definitions || []).filter((stage) => ["teacher_academy", "active_teacher"].includes(stage.stage_key));
+    return [...active, ...terminal];
+  }, [data?.columns, options?.stage_definitions]);
   const moveMutate = move.mutate;
   const desktopBoard = useMemo(() => {
     if (!data) return null;
     return (
-      <div className="grid w-full min-w-0 grid-cols-5 gap-2 2xl:gap-2">
-        {boardStages.map((stage) => {
-          const acceptsDrop = (manualStages as readonly string[]).includes(stage);
-          const highlighted = dragOverStage === stage;
-          const items = data.stages[stage] || [];
+      <div className="grid w-full gap-2 2xl:gap-2" style={{ gridTemplateColumns: `repeat(${data.columns.length}, minmax(15rem, 1fr))`, minWidth: `max(100%, ${data.columns.length * 15}rem)` }}>
+        {data.columns.map((stage) => {
+          const acceptsDrop = true;
+          const highlighted = dragOverStage === stage.stage_key;
+          const items = data.stages[stage.stage_key] || [];
           return (
-            <section key={stage} aria-label={`${stageLabels[stage]} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage || !acceptsDrop) return; moveMutate({ candidate, stage }); }} className={`flex min-w-0 h-[calc(100dvh-9.75rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
-              <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-[11px] font-semibold uppercase tracking-wide text-foreground">{stageLabels[stage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
-              <div className="miniapp-scroll flex-1 overflow-y-auto p-1.5">{cards(items, true)}</div>
+            <section key={stage.stage_key} aria-label={`${stage.label} candidates`} onDragEnter={(event) => { if (acceptsDrop && draggedCandidateRef.current) { event.preventDefault(); setDragOverStage(stage.stage_key); } }} onDragOver={(event) => { if (acceptsDrop && draggedCandidateRef.current) event.preventDefault(); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverStage(null); }} onDrop={(event) => { event.preventDefault(); setDragOverStage(null); const candidate = draggedCandidateRef.current; finishDrag(); if (!candidate || candidate.status === stage.stage_key || !acceptsDrop) return; moveMutate({ candidate, stage: stage.stage_key }); }} className={`flex min-w-0 h-[calc(100dvh-9.75rem)] min-h-[32rem] flex-col overflow-hidden rounded-t-xl border-x border-t transition-colors motion-reduce:transition-none ${highlighted ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-muted/25"}`}>
+              <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border bg-muted/95 px-2"><div className="flex min-w-0 items-center gap-1.5">{stage.stage_key === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary transition-colors hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}{stage.stage_kind === "custom" ? <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageColorStyles[stage.color_token].swatch}`} aria-hidden="true" /> : null}<h2 className="break-words text-[11px] font-semibold uppercase leading-4 tracking-wide text-foreground">{stage.label}</h2></div><span className="rounded-full bg-card px-2 py-1 text-[11px] font-semibold text-muted-foreground tabular-nums">{items.length}</span></div>
+              <div className="miniapp-scroll flex-1 overflow-y-auto p-1.5">{cards(items, true, stage)}</div>
             </section>
           );
         })}
       </div>
     );
   }, [data, dragOverStage, canAddCandidate, onAddCandidate, cards, moveMutate, finishDrag]);
-  const mobileCards = useMemo(() => (data ? cards(data.stages[mobileStage] || []) : null), [data, mobileStage, cards]);
+  const mobileStageDefinition = data?.columns.find((stage) => stage.stage_key === mobileStage);
+  const mobileCards = useMemo(() => (data ? cards(data.stages[mobileStage] || [], false, mobileStageDefinition) : null), [data, mobileStage, mobileStageDefinition, cards]);
 
   if (pipeline.isLoading || teacherRosterTotals.isLoading) return <PageState>Loading recruitment pipeline…</PageState>;
   if (pipeline.error || !pipeline.data) return <PageState tone="error">{queryError(pipeline.error)}</PageState>;
@@ -551,8 +774,11 @@ export function PipelineView({
     <div className="space-y-2">
       <PipelineSummary
         counts={summaryCounts}
+        stages={summaryStages}
         action={(
-          <div ref={searchLayerRef} className="relative shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
+            {canViewStageConfiguration ? <button type="button" className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setStageManagerOpen(true)} aria-label="View pipeline columns" title="Pipeline columns"><Settings2 className="h-4 w-4" /></button> : null}
+          <div ref={searchLayerRef} className="relative">
             <button
               ref={searchTriggerRef}
               type="button"
@@ -576,12 +802,13 @@ export function PipelineView({
               </div>
             ) : null}
           </div>
+          </div>
         )}
       />
 
       <div className="xl:hidden">
-        <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value as typeof mobileStage)}>{boardStages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage]} · {pipeline.data.counts[stage] || 0}</option>)}</select></label>
-        <section aria-label={`${stageLabels[mobileStage]} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-9 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}<h2 className="truncate text-xs font-semibold uppercase tracking-wide">{stageLabels[mobileStage]}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{mobileCards}</section>
+        <label className="text-xs font-semibold text-muted-foreground">Pipeline stage<select className={`${fieldClass} mt-1`} value={mobileStage} onChange={(event) => setMobileStage(event.target.value)}>{pipeline.data.columns.map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label} · {pipeline.data.counts[stage.stage_key] || 0}</option>)}</select></label>
+        <section aria-label={`${mobileStageDefinition?.label || recruitmentStageLabel(mobileStage, options?.stage_labels)} candidates`} className="mt-3 rounded-xl border border-border bg-muted/25 p-2.5"><div className="mb-2 flex min-h-9 items-center justify-between gap-2 px-1"><div className="flex min-w-0 items-center gap-2">{mobileStage === "new_candidate" && canAddCandidate && onAddCandidate ? <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={onAddCandidate} aria-label="Add candidate" title="Add candidate"><Plus className="h-4 w-4" /></button> : null}{mobileStageDefinition?.stage_kind === "custom" ? <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${stageColorStyles[mobileStageDefinition.color_token].swatch}`} aria-hidden="true" /> : null}<h2 className="break-words text-xs font-semibold uppercase tracking-wide">{mobileStageDefinition?.label || recruitmentStageLabel(mobileStage, options?.stage_labels)}</h2></div><span className="rounded-full bg-card px-2 py-1 text-xs font-semibold tabular-nums">{pipeline.data.counts[mobileStage] || 0}</span></div>{mobileCards}</section>
       </div>
 
       <div
@@ -623,13 +850,14 @@ export function PipelineView({
       {undoTrash ? <div role="status" className="fixed bottom-[calc(var(--app-bottom-inset)+1rem)] left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-sm font-semibold text-background shadow-card-hover"><span>{undoTrash.candidate.full_name} moved to Trash Bin.</span><button type="button" className="min-h-9 rounded-md px-2 text-primary underline" onClick={() => { move.mutate({ candidate: undoTrash.candidate, stage: undoTrash.previousCandidate.status }); setUndoTrash(null); }}>Undo</button></div> : null}
 
       <FiltersDrawer open={filtersOpen} filters={filters} options={options} onClose={closeFilters} onApply={(next) => { setFilters(next); closeFilters(); }} />
+      <PipelineStagesDrawer open={stageManagerOpen} onClose={() => setStageManagerOpen(false)} onAnnouncement={onAnnouncement} />
 
       <Modal open={Boolean(rejectSelection)} onClose={() => { if (!reject.isPending) setRejectSelection(null); }} title="Reject candidate" subtitle={rejectSelection?.candidate.full_name} size="sm">
-        {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-2"><label className="text-xs font-semibold">Rejection reason<select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{(options?.rejection_reason_options || []).map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><label className="text-xs font-semibold">Explanation<textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {stageLabels[rejectSelection.candidate.status] || humanize(rejectSelection.candidate.status)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}
+        {rejectSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); reject.mutate({ candidate: rejectSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody className="grid gap-2"><label className="text-xs font-semibold">Rejection reason<select autoFocus required name="rejection_reason" className={`${fieldClass} mt-1`}><option value="">Select a reason</option>{(options?.rejection_reason_options || []).map((reason) => <option key={reason.value} value={reason.value}>{reason.label}</option>)}</select></label><label className="text-xs font-semibold">Explanation<textarea name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="text-xs text-muted-foreground">The system will record that the candidate was rejected from {rejectSelection.candidate.status_label || recruitmentStageLabel(rejectSelection.candidate.status, options?.stage_labels)}.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setRejectSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={reject.isPending}>{reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Reject</button></div></ModalFooter></form> : null}
       </Modal>
 
       <Modal open={Boolean(withdrawSelection)} onClose={() => { if (!withdraw.isPending) setWithdrawSelection(null); }} title="Candidate withdrew" subtitle={withdrawSelection?.candidate.full_name} size="sm">
-        {withdrawSelection ? <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); withdraw.mutate({ candidate: withdrawSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Withdrawal reason<textarea autoFocus required name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The system records that this candidate withdrew from {stageLabels[withdrawSelection.candidate.status] || humanize(withdrawSelection.candidate.status)} and cancels active appointments.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setWithdrawSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={withdraw.isPending}>{withdraw.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}Confirm withdrawal</button></div></ModalFooter></form> : null}
+        {withdrawSelection ? <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); withdraw.mutate({ candidate: withdrawSelection.candidate, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Withdrawal reason<textarea autoFocus required name="reason_detail" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The system records that this candidate withdrew from {withdrawSelection.candidate.status_label || recruitmentStageLabel(withdrawSelection.candidate.status, options?.stage_labels)} and cancels active appointments.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setWithdrawSelection(null)}>Cancel</button><button type="submit" className={buttonClass} disabled={withdraw.isPending}>{withdraw.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}Confirm withdrawal</button></div></ModalFooter></form> : null}
       </Modal>
 
       <Modal open={Boolean(scheduleSelection)} onClose={() => { if (!schedule.isPending) setScheduleSelection(null); }} title={scheduleSelection?.appointmentType === "job_interview" ? "Schedule job interview" : "Schedule demo lesson"} subtitle={scheduleSelection?.candidate.full_name} size="md">
@@ -640,7 +868,7 @@ export function PipelineView({
       </Modal>
 
       <Modal open={Boolean(cancelSelection)} onClose={() => { if (!cancelAppointment.isPending) setCancelSelection(null); }} title={cancelSelection?.appointment.appointment_type === "job_interview" ? "Cancel job interview" : "Cancel demo lesson"} subtitle={cancelSelection?.candidate.full_name} size="sm">
-        {cancelSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); cancelAppointment.mutate({ candidate: cancelSelection.candidate, appointment: cancelSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Reason / note<textarea autoFocus required name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The booking is cancelled and the candidate stays in {stageLabels[cancelSelection.candidate.status] || humanize(cancelSelection.candidate.status)}. You can schedule a new one anytime.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setCancelSelection(null)}>Keep appointment</button><button type="submit" className={buttonClass} disabled={cancelAppointment.isPending}>{cancelAppointment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Cancel appointment</button></div></ModalFooter></form> : null}
+        {cancelSelection ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); cancelAppointment.mutate({ candidate: cancelSelection.candidate, appointment: cancelSelection.appointment, values: formValues(event.currentTarget) }); }}><ModalBody><label className="text-xs font-semibold">Reason / note<textarea autoFocus required name="reason" className={`${fieldClass} mt-1 min-h-24`} /></label><p className="mt-3 text-xs text-muted-foreground">The booking is cancelled and the candidate stays in {cancelSelection.candidate.status_label || recruitmentStageLabel(cancelSelection.candidate.status, options?.stage_labels)}. You can schedule a new one anytime.</p></ModalBody><ModalFooter><div className="flex justify-end gap-2"><button type="button" className={secondaryButtonClass} onClick={() => setCancelSelection(null)}>Keep appointment</button><button type="submit" className={buttonClass} disabled={cancelAppointment.isPending}>{cancelAppointment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}Cancel appointment</button></div></ModalFooter></form> : null}
       </Modal>
 
       {interviewSelection ? <InterviewSessionModal candidate={interviewSelection.candidate} appointment={interviewSelection.appointment} options={options} open onClose={() => setInterviewSelection(null)} onAnnouncement={onAnnouncement} /> : null}

@@ -24,7 +24,6 @@ from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
     ALTERNATIVE_STAGES,
     DOCUMENT_TYPES,
-    PRIMARY_STAGES,
     PROTECTED_HIRE_STAGES,
 )
 from backend.modules.hr.recruitment.errors import RecruitmentError
@@ -122,10 +121,17 @@ def restore_closed_candidate(
                 "Only closed candidates can be recovered.", status_code=409
             )
         restore_stage = _text(candidate["restore_stage"])
+        resolved_pipeline_stage = (
+            restore_stage
+            if restore_stage in _RESTORABLE_PIPELINE_STAGES
+            else repository.resolve_active_pipeline_stage_key(conn, restore_stage)
+        )
+        if resolved_pipeline_stage:
+            restore_stage = resolved_pipeline_stage
         restoring_teacher_handoff = (
             from_stage == "trash_bin" and restore_stage in PROTECTED_HIRE_STAGES
         )
-        if restore_stage not in _RESTORABLE_PIPELINE_STAGES and (
+        if not resolved_pipeline_stage and restore_stage not in _RESTORABLE_PIPELINE_STAGES and (
             not restoring_teacher_handoff
         ):
             restore_stage = (
@@ -516,7 +522,7 @@ def move_candidate(
     dependencies: CandidateDependencies,
 ) -> dict[str, Any]:
     normalized_stage = _text(stage)
-    if normalized_stage not in ALL_STAGES:
+    if normalized_stage == "on_hold":
         raise RecruitmentError("Unknown candidate stage.")
     if normalized_stage in PROTECTED_HIRE_STAGES or normalized_stage in {
         "rejected",
@@ -525,6 +531,10 @@ def move_candidate(
         raise RecruitmentError("Use the protected outcome action for this stage.")
     now = _now()
     with dependencies.connect() as conn:
+        if normalized_stage not in ALL_STAGES and not repository.active_pipeline_stage_by_key(
+            conn, normalized_stage
+        ):
+            raise RecruitmentError("Unknown or inactive candidate stage.")
         existing = repository.get_candidate_row(conn, int(candidate_id))
         if not existing:
             raise RecruitmentError("Candidate was not found.", status_code=404)

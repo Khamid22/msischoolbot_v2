@@ -32,6 +32,7 @@ export type RecruitmentSlaState = {
 export type RecruitmentStageHistory = {
   id: number;
   stage: string;
+  stage_label?: string;
   entered_at: string;
   exited_at?: string | null;
   responsible_name?: string;
@@ -292,6 +293,9 @@ export type RecruitmentCandidate = {
   subsource_option_id?: number | null;
   source_detail?: string;
   status: string;
+  status_label?: string;
+  status_kind?: "system" | "custom" | "terminal" | string;
+  status_color_token?: PipelineStageColorToken;
   english_level?: string;
   english_level_option_id?: number | null;
   motivation_expectations?: string;
@@ -316,6 +320,7 @@ export type RecruitmentCandidate = {
   decision_reason_detail?: string;
   restore_stage?: string;
   decision_origin_stage?: string;
+  decision_origin_stage_label?: string;
   decision_source_evaluation_type?: string;
   decision_source_evaluation_id?: number | null;
   final_decision_actor?: string;
@@ -388,8 +393,31 @@ export type RecruitmentCandidate = {
   } | null;
 };
 
+export type PipelineStageColorToken = "neutral" | "blue" | "cyan" | "violet" | "green" | "amber" | "orange" | "rose";
+
+export type RecruitmentPipelineStage = {
+  id: number;
+  stage_key: string;
+  label: string;
+  stage_kind: "system" | "custom" | "terminal";
+  color_token: PipelineStageColorToken;
+  sort_order: number;
+  is_pipeline: boolean;
+  is_active: boolean;
+  replacement_stage_key?: string | null;
+  sla_target_days?: number | null;
+  version: number;
+  is_system?: boolean;
+  can_rename?: boolean;
+  can_recolor?: boolean;
+  can_reposition?: boolean;
+  can_archive?: boolean;
+};
+
 export type RecruitmentOptions = {
   stages: string[];
+  stage_definitions: RecruitmentPipelineStage[];
+  stage_labels: Record<string, string>;
   sources: RecruitmentOption[];
   subsources: RecruitmentOption[];
   option_categories: Record<string, RecruitmentOption[]>;
@@ -426,7 +454,7 @@ export type RecruitmentSettingsData = {
   availabilitys: RecruitmentSetting[];
   expected_salarys: RecruitmentSetting[];
   teaching_experiences: RecruitmentSetting[];
-  sla_rules: Array<{ stage: string; target_days: number; updated_at?: string; updated_by_name?: string }>;
+  sla_rules: Array<{ stage: string; stage_label?: string; target_days: number; updated_at?: string; updated_by_name?: string }>;
   read_only: boolean;
 };
 
@@ -476,15 +504,15 @@ export type HrAnalyticsDashboard = {
     cohort_sla_breaches: number;
   };
   kpis: { active_candidates: number; new_this_month: number; hired_this_month: number; average_time_to_hire_days?: number | null; overall_conversion_percentage?: number | null };
-  funnel: Array<{ stage: string; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
-  journey: Array<{ stage: string; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
+  funnel: Array<{ stage: string; stage_label?: string; color_token?: PipelineStageColorToken; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
+  journey: Array<{ stage: string; stage_label?: string; color_token?: PipelineStageColorToken; candidates: number; previous_stage_candidates?: number | null; conversion_percentage?: number | null }>;
   outcomes: Array<{ outcome: string; candidates: number }>;
   activity_trend: Array<{ bucket: string; applications: number; shortlisted: number; hired: number; rejected: number }>;
   position_distribution: Array<{ position: string; candidates: number }>;
   source_distribution: Array<{ source: string; candidates: number; shortlisted: number; hired: number; percentage: number }>;
   source_quality: Array<{ source: string; subsource: string; candidates: number; shortlisted: number; hired: number; conversion_percentage: number }>;
   source_conversion: Array<{ source: string; candidates: number; hired: number; conversion_percentage: number }>;
-  time_in_stage: Array<{ stage: string; average_days: number; sla_target_days?: number | null; sla_breaches: number; entries: number }>;
+  time_in_stage: Array<{ stage: string; stage_label?: string; average_days: number; sla_target_days?: number | null; sla_breaches: number; entries: number }>;
   sla: { breaches: number; overdue_now: number; bottlenecks: Array<{ stage: string; average_days: number; sla_breaches: number }> };
   overdue_actions: Array<{ id: number; candidate_id: number; candidate_name: string; title: string; due_at: string }>;
   upcoming_appointments: Array<{ id: number; candidate_id: number; candidate_name: string; appointment_type: string; starts_at: string; responsible_name?: string }>;
@@ -496,6 +524,7 @@ export type HrAnalyticsDashboard = {
     subsource?: string;
     application_date?: string;
     status: string;
+    status_label?: string;
     next_action?: string;
   }>;
   recent_activity: Array<{
@@ -509,18 +538,6 @@ export type HrAnalyticsDashboard = {
   }>;
 };
 
-export const primaryStages = [
-  "new_candidate",
-  "responded",
-  "job_interview",
-  "test_and_demo",
-  "under_review",
-  "teacher_academy",
-  "active_teacher",
-] as const;
-
-export const boardStages = ["new_candidate", "responded", "job_interview", "test_and_demo", "under_review"] as const;
-export const manualStages = boardStages;
 export const alternativeStages = ["rejected", "candidate_withdrew", "trash_bin"] as const;
 
 export const stageLabels: Record<string, string> = {
@@ -535,6 +552,14 @@ export const stageLabels: Record<string, string> = {
   candidate_withdrew: "Candidate Withdrew",
   trash_bin: "Trash Bin",
 };
+
+export function recruitmentStageLabel(
+  value: unknown,
+  configuredLabels?: Record<string, string>,
+) {
+  const key = String(value || "");
+  return configuredLabels?.[key] || stageLabels[key] || humanize(key);
+}
 
 export function humanize(value: unknown) {
   return String(value || "")

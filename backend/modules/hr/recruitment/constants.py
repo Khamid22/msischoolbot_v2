@@ -34,6 +34,9 @@ SLA_STAGES = (
     "test_and_demo",
     "under_review",
 )
+PIPELINE_STAGE_COLOR_TOKENS = frozenset(
+    {"neutral", "blue", "cyan", "violet", "green", "amber", "orange", "rose"}
+)
 RECRUITMENT_OPTION_CATEGORIES = frozenset(
     {
         "source",
@@ -104,6 +107,7 @@ __all__ = [
     "SCHEDULED_STAGE_TYPES",
     "SLA_STAGES",
     "OPTIONAL_DOCUMENT_TYPES",
+    "PIPELINE_STAGE_COLOR_TOKENS",
     "SUBJECT_TEST_RESULTS",
     "TASK_STATUSES",
 ]

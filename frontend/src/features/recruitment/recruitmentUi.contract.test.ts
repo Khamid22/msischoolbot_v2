@@ -31,10 +31,11 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /label="Appointment actions"/);
   });
 
-  test("uses a single-stage compact view and five screen-fitted desktop columns", () => {
+  test("uses a single-stage compact view and a dynamically scrollable desktop board", () => {
     assert.match(pipeline, /xl:hidden/);
-    assert.match(pipeline, /grid w-full min-w-0 grid-cols-5/);
-    assert.doesNotMatch(pipeline, /min-w-\[1200px\]|minmax\(240px,1fr\)/);
+    assert.match(pipeline, /data\.columns\.map/);
+    assert.match(pipeline, /gridTemplateColumns: `repeat\(\$\{data\.columns\.length\}/);
+    assert.match(pipeline, /minWidth: `max\(100%, \$\{data\.columns\.length \* 15\}rem\)`/);
     assert.match(pipeline, /no-scrollbar/);
     assert.match(pipeline, /xl:block/);
     assert.match(pipeline, /w-full min-w-0 overflow-hidden border/);
@@ -69,7 +70,7 @@ describe("compact recruitment pipeline", () => {
 
   test("places the HR-only add action in New Candidate headers", () => {
     assert.match(pipeline, /canAddCandidate && onAddCandidate/);
-    assert.match(pipeline, /stage === "new_candidate"/);
+    assert.match(pipeline, /stage\.stage_key === "new_candidate"/);
     assert.match(pipeline, /mobileStage === "new_candidate"/);
     assert.match(pipeline, /aria-label="Add candidate"/);
   });
@@ -96,13 +97,12 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /setScheduleSelection/);
   });
 
-  test("renders the six-segment summary with canonical teacher totals and one-decimal percentages", () => {
-    assert.match(pipeline, /const chartStages = \[/);
-    for (const stage of ["new_candidate", "responded", "job_interview", "test_and_demo", "teacher_academy", "active_teacher"]) {
-      assert.match(pipeline, new RegExp(`stage: "${stage}"`));
-    }
+  test("renders a dynamic summary with canonical teacher totals and one-decimal percentages", () => {
+    assert.match(pipeline, /function PipelineSummary\(\{ counts, stages/);
+    assert.match(pipeline, /const active = data\?\.columns/);
+    assert.match(pipeline, /\["teacher_academy", "active_teacher"\]/);
     assert.match(pipeline, /Pipeline distribution\. Total/);
-    assert.match(pipeline, /h-2\.5/);
+    assert.match(pipeline, /h-2 min-w-0/);
     assert.match(pipeline, /useCanonicalTeacherRosterTotals/);
     assert.match(pipeline, /teacher_academy: teacherRosterTotals\.teacher_academy/);
     assert.match(pipeline, /active_teacher: teacherRosterTotals\.active_teacher/);
@@ -122,6 +122,19 @@ describe("compact recruitment pipeline", () => {
     assert.match(pipeline, /Evaluator:/);
     assert.match(pipeline, /Topic:/);
     assert.match(pipeline, /overdue \? "Overdue" : "Scheduled"/);
+  });
+
+  test("manages dynamic columns in an HR-only drawer with CEO read-only access", () => {
+    const workspace = source("RecruitmentWorkspace.tsx");
+    assert.match(pipeline, /RECRUITMENT_API}\/pipeline-stages/);
+    assert.match(pipeline, /Add workflow stage/);
+    assert.match(pipeline, /StageColorPicker/);
+    assert.match(pipeline, /SLA after application/);
+    assert.match(pipeline, /Move candidates to/);
+    assert.match(pipeline, /expected_version: stage\.version/);
+    assert.match(pipeline, /stage\.stage_kind === "custom"/);
+    assert.match(pipeline, /Only the HR Manager can change pipeline columns/);
+    assert.match(workspace, /canViewStageConfiguration=\{\["hr_manager", "ceo"\]\.includes\(effectiveRole\)\}/);
   });
 });
 
@@ -382,7 +395,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(settings, /groupByParent/);
     assert.match(settings, /No source/);
     // SLA stage names reuse the same labels as the pipeline board.
-    assert.match(settings, /stageLabels\[rule\.stage\]/);
+    assert.match(settings, /rule\.stage_label \|\| humanize\(rule\.stage\)/);
     // CEO sees the option panels (read-only), not a hidden section.
     assert.doesNotMatch(settings, /!settings\.data\.read_only \? <div className="grid/);
     assert.match(settings, /readOnly=\{settings\.data\.read_only\}/);

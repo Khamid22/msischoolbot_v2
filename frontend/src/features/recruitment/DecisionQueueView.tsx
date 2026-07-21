@@ -85,7 +85,7 @@ export function DecisionQueueView({ basePath }: { basePath: string }) {
                       {candidate.applied_position || candidate.subject || "Position not set"}
                     </p>
                   </div>
-                  <StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge>
+                  <StatusBadge status={candidate.status}>{candidate.status_label || stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge>
                 </div>
 
                 <div className="mt-3 rounded-lg bg-muted/50 px-3 py-1.5">

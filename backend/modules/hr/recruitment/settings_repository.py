@@ -28,18 +28,18 @@ def list_sla_rule_rows(conn: Any) -> list[Any]:
     return conn.execute(
         """
         SELECT rule.stage, rule.target_days, rule.is_active,
+               stage.label AS stage_label,
+               stage.stage_kind, stage.color_token, stage.sort_order,
                rule.updated_by_account_id,
                COALESCE(account.full_name, account.login, '') AS updated_by,
                rule.updated_at::text AS updated_at
         FROM msi_v2.teacher_recruitment_sla_rules rule
+        JOIN msi_v2.teacher_recruitment_pipeline_stages stage
+          ON stage.stage_key = rule.stage
         LEFT JOIN msi_v2.accounts account ON account.id = rule.updated_by_account_id
-        ORDER BY CASE rule.stage
-            WHEN 'new_candidate' THEN 1
-            WHEN 'responded' THEN 2
-            WHEN 'job_interview' THEN 3
-            WHEN 'test_and_demo' THEN 4
-            WHEN 'under_review' THEN 5
-            ELSE 99 END
+        WHERE stage.is_pipeline = true AND stage.is_active = true
+          AND stage.stage_kind = 'system'
+        ORDER BY stage.sort_order, stage.id
         """
     ).fetchall()
 
@@ -52,7 +52,7 @@ def update_sla_rule(
     actor_account_id: int | None,
     now: str,
 ) -> Any:
-    return conn.execute(
+    row = conn.execute(
         """
         UPDATE msi_v2.teacher_recruitment_sla_rules
         SET target_days = %s,
@@ -65,6 +65,19 @@ def update_sla_rule(
         """,
         (int(target_days), actor_account_id, now, stage),
     ).fetchone()
+    if row:
+        conn.execute(
+            """
+            UPDATE msi_v2.teacher_recruitment_pipeline_stages
+            SET sla_target_days = %s,
+                updated_by_account_id = %s,
+                updated_at = %s::timestamptz,
+                version = version + 1
+            WHERE stage_key = %s
+            """,
+            (int(target_days), actor_account_id, now, stage),
+        )
+    return row
 
 
 def recruitment_setting_by_label_or_value(

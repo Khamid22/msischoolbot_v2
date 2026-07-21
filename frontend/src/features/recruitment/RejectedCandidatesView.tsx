@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ClosedCandidateActions } from "@/features/recruitment/ClosedCandidateActions";
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, stageLabels, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
+import { dateLabel, humanize, recruitmentStageLabel, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
   EmptyLine,
@@ -147,7 +147,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                   {candidates.data.items.map((candidate) => (
                     <tr key={candidate.id} className="h-[62px] hover:bg-muted/30">
                       <td className="px-3 py-1"><a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block truncate font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{candidate.full_name}</a><p className="truncate text-[11px] text-muted-foreground">{candidate.applied_position || candidate.subject || "Position not set"}</p></td>
-                      <td className="px-3 py-1"><StatusBadge status={candidate.decision_origin_stage || "new_candidate"}>{stageLabels[candidate.decision_origin_stage || ""] || humanize(candidate.decision_origin_stage || "Unknown")}</StatusBadge></td>
+                      <td className="px-3 py-1"><StatusBadge status={candidate.decision_origin_stage || "new_candidate"}>{candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown", options?.stage_labels)}</StatusBadge></td>
                       <td className="px-3 py-1"><p className="truncate">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>{candidate.rejection_reason && candidate.decision_reason_detail ? <p className="truncate text-[11px] text-muted-foreground">{candidate.decision_reason_detail}</p> : null}</td>
                       <td className="truncate px-3 py-1">{candidate.final_decision_actor || "System"}</td>
                       <td className="px-3 py-1 text-muted-foreground">{dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</td>
@@ -162,7 +162,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
                 <article key={candidate.id} className="p-3">
                   <a href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("rejected")} className="block rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                     <div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={tab}>{tab === "rejected" ? "Rejected" : "Withdrawn"}</StatusBadge></div>
-                    <p className="mt-1 text-xs text-muted-foreground">From {stageLabels[candidate.decision_origin_stage || ""] || humanize(candidate.decision_origin_stage || "Unknown stage")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">From {candidate.decision_origin_stage_label || recruitmentStageLabel(candidate.decision_origin_stage || "Unknown stage", options?.stage_labels)}</p>
                     <p className="mt-1 line-clamp-2 text-[13px]">{candidate.rejection_reason ? humanize(candidate.rejection_reason) : candidate.decision_reason_detail || "No reason recorded"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">By {candidate.final_decision_actor || "System"} · {dateLabel(candidate.final_decision_at || candidate.stage_changed_at)}</p>
                   </a>
@@ -190,7 +190,7 @@ export function RejectedCandidatesView({ basePath, options, onAnnouncement }: Pr
         <div className="grid gap-2">
           <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draftFilters.position} onChange={(event) => setDraftFilters({ ...draftFilters, position: event.target.value })}><option value="">All positions</option>{options?.option_categories.position?.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draftFilters.source} onChange={(event) => setDraftFilters({ ...draftFilters, source: event.target.value })}><option value="">All sources</option>{options?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-          <label className="text-xs font-semibold">Failed / left at<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{Object.entries(stageLabels).filter(([value]) => !["trash_bin", "rejected", "candidate_withdrew"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="text-xs font-semibold">Failed / left at<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{(options?.stage_definitions || []).filter((stage) => !["trash_bin", "rejected", "candidate_withdrew"].includes(stage.stage_key)).map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label}</option>)}</select></label>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs font-semibold">Recorded from<input type="date" className={`${fieldClass} mt-1`} value={draftFilters.closed_from} onChange={(event) => setDraftFilters({ ...draftFilters, closed_from: event.target.value })} /></label>
             <label className="text-xs font-semibold">Recorded to<input type="date" className={`${fieldClass} mt-1`} value={draftFilters.closed_to} onChange={(event) => setDraftFilters({ ...draftFilters, closed_to: event.target.value })} /></label>

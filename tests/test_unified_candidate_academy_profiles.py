@@ -35,10 +35,9 @@ def test_pipeline_and_candidate_lists_exclude_academy_direct_profiles():
     repository.list_pipeline_rows(conn)
     pipeline_sql = conn.calls[-1][0]
     assert "candidate.is_application_received = true" in pipeline_sql
-    assert (
-        "candidate.status IN ('new_candidate', 'responded', 'job_interview', 'test_and_demo', 'under_review')"
-        in pipeline_sql
-    )
+    assert "teacher_recruitment_pipeline_stages pipeline_stage" in pipeline_sql
+    assert "pipeline_stage.is_pipeline = true" in pipeline_sql
+    assert "pipeline_stage.is_active = true" in pipeline_sql
 
     conn = _CaptureConnection()
     repository.list_candidate_rows(conn)

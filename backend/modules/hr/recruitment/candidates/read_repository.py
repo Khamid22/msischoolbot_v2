@@ -26,6 +26,9 @@ _CANDIDATE_COLUMNS = """
     COALESCE(subsource_option.label, '') AS subsource,
     candidate.source_detail,
     candidate.status,
+    COALESCE(current_stage_definition.label, '') AS status_label,
+    current_stage_definition.stage_kind AS status_kind,
+    current_stage_definition.color_token AS status_color_token,
     candidate.english_level_option_id,
     COALESCE(english_option.label, candidate.english_level, '') AS english_level,
     candidate.motivation_expectations,
@@ -56,10 +59,19 @@ _CANDIDATE_COLUMNS = """
     stage_history.transition_source AS current_stage_transition_source,
     stage_history.sla_target_days AS current_sla_target_days,
     stage_history.sla_due_at::text AS current_sla_due_at,
+    CASE
+        WHEN current_stage_definition.stage_kind = 'custom'
+            THEN COALESCE(
+                candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent',
+                candidate.created_at
+            )
+        ELSE stage_history.entered_at
+    END::text AS current_sla_anchor_at,
     COALESCE(decision.decision, '') AS final_decision,
     COALESCE(decision.rejection_reason, '') AS rejection_reason,
     COALESCE(decision.reason_detail, '') AS decision_reason_detail,
     COALESCE(decision.origin_stage, '') AS decision_origin_stage,
+    COALESCE(decision_origin_definition.label, '') AS decision_origin_stage_label,
     CASE
         WHEN candidate.status = 'trash_bin'
             THEN COALESCE(previous_stage.stage, NULLIF(decision.origin_stage, ''), '')
@@ -137,6 +149,8 @@ def _candidate_joins() -> str:
           ON expected_salary_option.id = candidate.expected_salary_option_id
         LEFT JOIN msi_v2.teacher_recruitment_settings teaching_experience_option
           ON teaching_experience_option.id = candidate.teaching_experience_option_id
+        LEFT JOIN msi_v2.teacher_recruitment_pipeline_stages current_stage_definition
+          ON current_stage_definition.stage_key = candidate.status
         LEFT JOIN LATERAL (
             SELECT history.id, history.entered_at, history.responsible_account_id,
                    history.comment, history.transition_source,
@@ -159,6 +173,8 @@ def _candidate_joins() -> str:
             LIMIT 1
         ) decision ON true
         LEFT JOIN msi_v2.accounts decision_actor ON decision_actor.id = decision.decided_by_account_id
+        LEFT JOIN msi_v2.teacher_recruitment_pipeline_stages decision_origin_definition
+          ON decision_origin_definition.stage_key = decision.origin_stage
         LEFT JOIN LATERAL (
             SELECT history.stage
             FROM msi_v2.teacher_candidate_stage_history history
@@ -298,7 +314,7 @@ def list_pipeline_rows(
     )
     clauses: list[str] = [
         "candidate.is_application_received = true",
-        "candidate.status IN ('new_candidate', 'responded', 'job_interview', 'test_and_demo', 'under_review')",
+        "EXISTS (SELECT 1 FROM msi_v2.teacher_recruitment_pipeline_stages pipeline_stage WHERE pipeline_stage.stage_key = candidate.status AND pipeline_stage.is_pipeline = true AND pipeline_stage.is_active = true)",
     ]
     params: list[Any] = []
     if visibility:
@@ -671,6 +687,7 @@ def list_stage_history_rows(conn: Any, candidate_id: int) -> list[Any]:
     return conn.execute(
         """
         SELECT history.id, history.candidate_id, history.stage,
+               stage_definition.label AS stage_label,
                history.entered_at::text AS entered_at,
                history.exited_at::text AS exited_at,
                history.responsible_account_id,
@@ -679,6 +696,8 @@ def list_stage_history_rows(conn: Any, candidate_id: int) -> list[Any]:
                history.sla_target_days,
                history.sla_due_at::text AS sla_due_at
         FROM msi_v2.teacher_candidate_stage_history history
+        JOIN msi_v2.teacher_recruitment_pipeline_stages stage_definition
+          ON stage_definition.stage_key = history.stage
         LEFT JOIN msi_v2.accounts account ON account.id = history.responsible_account_id
         WHERE history.candidate_id = %s
         ORDER BY history.entered_at DESC, history.id DESC

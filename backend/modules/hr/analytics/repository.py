@@ -5,15 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 
-ACTIVE_STAGES = (
-    "new_candidate",
-    "responded",
-    "job_interview",
-    "test_and_demo",
-    "under_review",
-)
-
-
 def _stage_rank_sql(expression: str) -> str:
     return f"""CASE {expression}
         WHEN 'new_candidate' THEN 0
@@ -247,7 +238,13 @@ def _cohort_summary(
                   AND academy_teacher_id IS NULL
                   AND latest_decision = 'candidate_withdrew'
               ) AS withdrawn,
-              COUNT(*) FILTER (WHERE status = ANY(%s::text[])) AS active_candidates,
+              COUNT(*) FILTER (WHERE EXISTS (
+                SELECT 1
+                FROM msi_v2.teacher_recruitment_pipeline_stages active_stage
+                WHERE active_stage.stage_key = candidate_facts.status
+                  AND active_stage.is_pipeline = true
+                  AND active_stage.is_active = true
+              )) AS active_candidates,
               ROUND(AVG(
                 EXTRACT(EPOCH FROM (
                   active_teacher_created_at
@@ -264,7 +261,7 @@ def _cohort_summary(
               ) AS overall_conversion_percentage,
               COALESCE(SUM(cohort_sla_breaches), 0) AS cohort_sla_breaches
             FROM candidate_facts""",
-        tuple([now, *params, list(ACTIVE_STAGES)]),
+        tuple([now, *params]),
     ).fetchone()
 
 
@@ -278,7 +275,13 @@ def _live_summary(
     return conn.execute(
         f"""SELECT
               COUNT(*) FILTER (
-                WHERE candidate.status = ANY(%s::text[])
+                WHERE EXISTS (
+                  SELECT 1
+                  FROM msi_v2.teacher_recruitment_pipeline_stages active_stage
+                  WHERE active_stage.stage_key = candidate.status
+                    AND active_stage.is_pipeline = true
+                    AND active_stage.is_active = true
+                )
               ) AS active_candidates,
               COUNT(*) FILTER (
                 WHERE EXISTS (
@@ -315,7 +318,7 @@ def _live_summary(
               ) AS active_teacher_roster_total
             FROM msi_v2.teacher_candidates candidate
             WHERE {where_sql}""",
-        tuple([list(ACTIVE_STAGES), now, *params]),
+        tuple([now, *params]),
     ).fetchone()
 
 
@@ -589,22 +592,36 @@ def dashboard_rows(
     facts_cte = _candidate_facts_cte(where_sql=where_sql)
     journey = conn.execute(
         f"""WITH {facts_cte},
-            stages(stage, stage_rank) AS (
-              VALUES
-                ('new_candidate'::text, 0),
-                ('responded'::text, 1),
-                ('job_interview'::text, 2),
-                ('test_and_demo'::text, 3),
-                ('under_review'::text, 4)
+            stages AS (
+              SELECT stage.stage_key AS stage,
+                     stage.label AS stage_label,
+                     stage.color_token,
+                     stage.stage_kind,
+                     stage.sort_order,
+                     {_stage_rank_sql('stage.stage_key')} AS stage_rank
+              FROM msi_v2.teacher_recruitment_pipeline_stages stage
+              WHERE stage.is_pipeline = true AND stage.is_active = true
             )
-            SELECT stages.stage,
+            SELECT stages.stage, stages.stage_label, stages.color_token,
                    COUNT(*) FILTER (
-                     WHERE candidate_facts.furthest_rank >= stages.stage_rank
+                     WHERE (
+                       stages.stage_kind = 'system'
+                       AND candidate_facts.furthest_rank >= stages.stage_rank
+                     ) OR (
+                       stages.stage_kind = 'custom'
+                       AND EXISTS (
+                         SELECT 1
+                         FROM msi_v2.teacher_candidate_stage_history custom_history
+                         WHERE custom_history.candidate_id = candidate_facts.id
+                           AND custom_history.stage = stages.stage
+                       )
+                     )
                    ) AS candidates
             FROM stages
             CROSS JOIN candidate_facts
-            GROUP BY stages.stage, stages.stage_rank
-            ORDER BY stages.stage_rank""",
+            GROUP BY stages.stage, stages.stage_label, stages.color_token,
+                     stages.stage_kind, stages.stage_rank, stages.sort_order
+            ORDER BY stages.sort_order""",
         tuple([now, *params]),
     ).fetchall()
 
@@ -768,7 +785,7 @@ def dashboard_rows(
     ).fetchall()
 
     stage_time = conn.execute(
-        f"""SELECT history.stage,
+        f"""SELECT history.stage, stage_definition.label AS stage_label,
                    ROUND(AVG(
                      EXTRACT(EPOCH FROM (
                        COALESCE(history.exited_at, %s::timestamptz) - history.entered_at
@@ -782,8 +799,10 @@ def dashboard_rows(
                    COUNT(*) AS entries
             FROM msi_v2.teacher_candidate_stage_history history
             JOIN msi_v2.teacher_candidates candidate ON candidate.id = history.candidate_id
+            JOIN msi_v2.teacher_recruitment_pipeline_stages stage_definition
+              ON stage_definition.stage_key = history.stage
             WHERE {where_sql}
-            GROUP BY history.stage
+            GROUP BY history.stage, stage_definition.label
             ORDER BY average_days DESC NULLS LAST""",
         tuple([now, now, *params]),
     ).fetchall()
@@ -829,8 +848,11 @@ def dashboard_rows(
                    COALESCE(subsource_setting.label, '') AS subsource,
                    candidate.application_date::text AS application_date,
                    candidate.status,
+                   stage_definition.label AS status_label,
                    next_task.title AS next_action
             FROM msi_v2.teacher_candidates candidate
+            JOIN msi_v2.teacher_recruitment_pipeline_stages stage_definition
+              ON stage_definition.stage_key = candidate.status
             LEFT JOIN msi_v2.teacher_recruitment_settings position_setting
               ON position_setting.id = candidate.position_option_id
             LEFT JOIN msi_v2.teacher_recruitment_settings source_setting

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { jsonBody, recruitmentRequest } from "@/features/recruitment/api";
-import { stageLabels, humanize, type RecruitmentSetting, type RecruitmentSettingsData } from "@/features/recruitment/model";
+import { humanize, type RecruitmentSetting, type RecruitmentSettingsData } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, buttonClass, fieldClass, queryError } from "@/features/recruitment/ui";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import type { FloatingToastTone } from "@/shared/ui/FloatingToast";
@@ -258,7 +258,7 @@ export function SettingsView({ onAnnouncement }: { onAnnouncement: (message: str
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {settings.data.sla_rules.map((rule) => (
             <label key={rule.stage} className="rounded-lg border border-border p-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {stageLabels[rule.stage] || humanize(rule.stage)}
+              {rule.stage_label || humanize(rule.stage)}
               <div className="mt-1 flex items-center gap-2">
                 <input
                   type="number"

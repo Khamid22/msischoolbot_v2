@@ -45,6 +45,7 @@ import {
   dateLabel,
   dateTimeLabel,
   humanize,
+  recruitmentStageLabel,
   stageLabels,
   type RecruitmentAppointment,
   type RecruitmentCandidate,
@@ -2358,7 +2359,7 @@ export function CandidateProfile({
                 {candidate.full_name}
               </h1>
               <StatusBadge status={candidate.status}>
-                {stageLabels[candidate.status] || humanize(candidate.status)}
+                {candidate.status_label || recruitmentStageLabel(candidate.status, options.data?.stage_labels)}
               </StatusBadge>
             </div>
             <p className="mt-0.5 break-words text-xs text-muted-foreground">
@@ -3375,7 +3376,7 @@ export function CandidateProfile({
       >
         <ol className="space-y-2">
           {(candidate.stage_history || []).map((item) => (
-            <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[13px] font-semibold">Entered {stageLabels[item.stage] || humanize(item.stage)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
+            <li key={`stage-${item.id}`} className="border-l-2 border-emerald-400 pl-3"><p className="text-[13px] font-semibold">Entered {item.stage_label || recruitmentStageLabel(item.stage, options.data?.stage_labels)}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.responsible_name || "System"} · {dateLabel(item.entered_at)} · {humanize(item.transition_source)}</p>{item.comment ? <p className="mt-1 text-xs text-muted-foreground">{item.comment}</p> : null}</li>
           ))}
           {(candidate.activity || []).map((item) => (
             <li

@@ -11,9 +11,7 @@ from backend.core.access import CurrentUser
 from backend.modules.hr.recruitment import repository
 from backend.modules.hr.recruitment.constants import (
     ALL_STAGES,
-    ALTERNATIVE_STAGES,
     DOCUMENT_TYPES,
-    PRIMARY_STAGES,
 )
 from backend.modules.hr.recruitment.errors import RecruitmentError
 from backend.modules.hr.recruitment.projections import (
@@ -60,6 +58,7 @@ def list_pipeline(
 ) -> dict[str, Any]:
     restricted = dependencies.academic_visible_id(user)
     with dependencies.connect() as conn:
+        stage_rows = repository.list_pipeline_stage_rows(conn)
         rows = repository.list_pipeline_rows(
             conn,
             visible_account_id=restricted,
@@ -76,12 +75,14 @@ def list_pipeline(
     candidates = [
         {**_candidate_summary(row), "permissions": _permissions(user)} for row in rows
     ]
-    grouped = {stage: [] for stage in (*PRIMARY_STAGES, *ALTERNATIVE_STAGES)}
+    columns = [_row_dict(row) for row in stage_rows]
+    grouped = {_text(stage.get("stage_key")): [] for stage in columns}
     for candidate in candidates:
         grouped.setdefault(
             _text(candidate.get("status")) or "new_candidate", []
         ).append(candidate)
     return {
+        "columns": columns,
         "stages": grouped,
         "counts": {stage: len(items) for stage, items in grouped.items()},
         "total": len(candidates),
@@ -110,11 +111,7 @@ def list_candidates(
     safe_page = max(1, int(page or 1))
     safe_per_page = max(1, min(int(per_page or 25), 100))
     normalized_stage = _text(stage)
-    if normalized_stage and normalized_stage not in ALL_STAGES:
-        raise RecruitmentError("Unknown candidate stage.")
     normalized_origin_stage = _text(origin_stage)
-    if normalized_origin_stage and normalized_origin_stage not in ALL_STAGES:
-        raise RecruitmentError("Unknown origin stage.")
     normalized_closed_from = _text(closed_from)
     normalized_closed_to = _text(closed_to)
     try:
@@ -135,6 +132,10 @@ def list_candidates(
     ):
         raise RecruitmentError("Closed from date cannot be after closed to date.")
     with dependencies.connect() as conn:
+        if normalized_stage and normalized_stage not in ALL_STAGES and not repository.pipeline_stage_by_key(conn, normalized_stage):
+            raise RecruitmentError("Unknown candidate stage.")
+        if normalized_origin_stage and normalized_origin_stage not in ALL_STAGES and not repository.pipeline_stage_by_key(conn, normalized_origin_stage):
+            raise RecruitmentError("Unknown origin stage.")
         rows, total = repository.list_candidate_rows(
             conn,
             visible_account_id=dependencies.academic_visible_id(user),

@@ -42,8 +42,9 @@ import { recruitmentRequest } from "@/features/recruitment/api";
 import {
   dateLabel,
   humanize,
-  stageLabels,
+  recruitmentStageLabel,
   type HrAnalyticsDashboard,
+  type RecruitmentOptions,
   type RecruitmentRole,
 } from "@/features/recruitment/model";
 import {
@@ -417,7 +418,7 @@ function activityLabel(eventType: string) {
   return known[eventType] || humanize(eventType.replace(/^candidate\./, ""));
 }
 
-export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: string; role?: RecruitmentRole }) {
+export function AnalyticsView({ basePath, role = "hr_manager", recruitmentOptions }: { basePath: string; role?: RecruitmentRole; recruitmentOptions?: RecruitmentOptions }) {
   const [filters, setFilters] = useState(() => initialFilters(role));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const tashkentToday = useMemo(() => tashkentDateKey(), []);
@@ -663,7 +664,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
             {data.journey.map((item) => (
               <div key={item.stage}>
                 <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
-                  <span className="font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</span>
+                  <span className="font-semibold">{item.stage_label || recruitmentStageLabel(item.stage, recruitmentOptions?.stage_labels)}</span>
                   <span className="flex items-center gap-2 tabular-nums text-muted-foreground">
                     {item.conversion_percentage !== null && item.conversion_percentage !== undefined ? `${item.conversion_percentage}% from prior` : "Entry stage"}
                     <strong className="text-foreground">{item.candidates}</strong>
@@ -677,7 +678,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
             <div className="grid gap-1.5 border-t border-border pt-2 sm:grid-cols-2">
               {data.outcomes.map((item) => (
                 <div key={item.outcome} className="flex min-h-9 items-center justify-between rounded-lg bg-muted/45 px-2.5 text-[11px]">
-                  <span className="font-semibold">{stageLabels[item.outcome] || humanize(item.outcome)}</span>
+                  <span className="font-semibold">{recruitmentStageLabel(item.outcome, recruitmentOptions?.stage_labels)}</span>
                   <strong className="tabular-nums">{item.candidates}</strong>
                 </div>
               ))}
@@ -711,7 +712,7 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               return (
                 <div key={item.stage} className="grid gap-2 px-3 py-1.5 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1.2fr)_auto] sm:items-center">
                   <div>
-                    <p className="text-xs font-semibold">{stageLabels[item.stage] || humanize(item.stage)}</p>
+                    <p className="text-xs font-semibold">{item.stage_label || recruitmentStageLabel(item.stage, recruitmentOptions?.stage_labels)}</p>
                     <p className="text-[11px] text-muted-foreground">{item.entries} stage entries</p>
                   </div>
                   <div>
@@ -778,12 +779,12 @@ export function AnalyticsView({ basePath, role = "hr_manager" }: { basePath: str
               </colgroup>
               <thead className="sticky top-0 z-10 bg-muted text-[10px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-2 py-1.5">Candidate</th><th className="px-2 py-1.5">Position</th><th className="px-2 py-1.5">Source</th><th className="px-2 py-1.5">Applied</th><th className="px-2 py-1.5">Stage</th><th className="px-2 py-1.5">Next action</th></tr></thead>
               <tbody className="divide-y divide-border/70">
-                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center break-words font-semibold leading-tight hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{stageLabels[item.status] || humanize(item.status)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
+                {data.recent_candidates.map((item) => <tr key={item.id} className="h-12 hover:bg-muted/25"><td className="px-2 py-1"><a href={`${basePath}/candidates/${item.id}`} className="inline-flex min-h-10 max-w-full items-center break-words font-semibold leading-tight hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">{item.full_name}</a></td><td className="truncate px-2 py-1">{item.position}</td><td className="px-2 py-1 leading-tight"><span className="block truncate">{item.source}</span>{item.subsource ? <span className="block truncate text-[10px] text-muted-foreground">{item.subsource}</span> : null}</td><td className="truncate px-2 py-1">{dateLabel(item.application_date)}</td><td className="truncate px-2 py-1">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</td><td className="truncate px-2 py-1">{item.next_action || "—"}</td></tr>)}
               </tbody>
             </table>
           </div>
           <div className="no-scrollbar max-h-[300px] divide-y divide-border/70 overflow-y-auto md:hidden">
-            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-1.5 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{stageLabels[item.status] || humanize(item.status)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
+            {data.recent_candidates.map((item) => <a key={item.id} href={`${basePath}/candidates/${item.id}`} className="block min-h-[60px] px-3 py-1.5 hover:bg-muted/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30"><div className="flex items-start justify-between gap-2"><strong className="truncate text-xs">{item.full_name}</strong><span className="shrink-0 text-[10px] font-semibold text-primary">{item.status_label || recruitmentStageLabel(item.status, recruitmentOptions?.stage_labels)}</span></div><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{item.position} · {item.source}{item.subsource ? ` / ${item.subsource}` : ""}</p><p className="mt-0.5 truncate text-[10px] text-muted-foreground">{dateLabel(item.application_date)} · {item.next_action || "No next action"}</p></a>)}
           </div>
           {!data.recent_candidates.length ? <EmptyChart>No recent candidates in this cohort.</EmptyChart> : null}
         </Panel>

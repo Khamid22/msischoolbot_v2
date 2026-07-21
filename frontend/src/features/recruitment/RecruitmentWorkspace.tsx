@@ -182,9 +182,9 @@ export default function RecruitmentWorkspace({ authLogin = "", authRole = "", ro
 
       <FloatingToast toast={toast} onClose={clearToast} />
 
-      {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} canAddCandidate={effectiveRole === "hr_manager"} onAddCandidate={() => setNewCandidateOpen(true)} onAnnouncement={showToast} /> : null}
+      {view === "pipeline" ? <PipelineView basePath={basePath} options={options.data} canAddCandidate={effectiveRole === "hr_manager"} canViewStageConfiguration={["hr_manager", "ceo"].includes(effectiveRole)} onAddCandidate={() => setNewCandidateOpen(true)} onAnnouncement={showToast} /> : null}
       {view === "teachers" && effectiveRole === "hr_manager" ? <TeachersView basePath={basePath} onAnnouncement={showToast} /> : null}
-      {view === "analytics" && ["hr_manager", "ceo"].includes(effectiveRole) ? <AnalyticsView basePath={basePath} role={effectiveRole} /> : null}
+      {view === "analytics" && ["hr_manager", "ceo"].includes(effectiveRole) ? <AnalyticsView basePath={basePath} role={effectiveRole} recruitmentOptions={options.data} /> : null}
       {view === "decisions" ? <DecisionQueueView basePath={basePath} /> : null}
       {view === "candidates" ? <CandidateListView basePath={basePath} /> : null}
       {view === "schedule" ? <ScheduleView basePath={basePath} role={effectiveRole} options={options.data} onAnnouncement={showToast} /> : null}

@@ -117,6 +117,21 @@ from backend.modules.hr.recruitment.notification_repository import (
     recover_stale_recruitment_notification_deliveries,
     recruitment_notification_unread_count,
 )
+from backend.modules.hr.recruitment.pipeline_stages_repository import (
+    active_pipeline_stage_by_key,
+    archive_pipeline_stage,
+    insert_pipeline_stage,
+    insert_pipeline_stage_audit,
+    insert_pipeline_stage_sla_rule,
+    list_candidate_stage_rows_for_update,
+    list_pipeline_stage_rows,
+    pipeline_stage_by_key,
+    pipeline_stage_label_exists,
+    reorder_pipeline_stages,
+    resolve_active_pipeline_stage_key,
+    update_pipeline_stage,
+    update_pipeline_stage_sla_rule,
+)
 from backend.modules.hr.recruitment.settings_repository import (
     active_subsource_exists,
     deactivate_recruitment_setting,

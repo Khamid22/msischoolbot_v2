@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from math import ceil
 from typing import Any
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from backend.core.access import CurrentUser
@@ -17,14 +18,12 @@ from backend.modules.hr.recruitment import notifications as recruitment_notifica
 from backend.modules.hr.recruitment.appointments import service as appointment_service
 from backend.modules.hr.recruitment.candidates import service as candidate_service
 from backend.modules.hr.recruitment.constants import (
-    ALL_STAGES,
-    ALTERNATIVE_STAGES,
     APPOINTMENT_STATUSES,
     APPOINTMENT_TYPES,
     DEMO_RESULTS,
     DOCUMENT_TYPES,
     INTERVIEW_RESULTS,
-    PRIMARY_STAGES,
+    PIPELINE_STAGE_COLOR_TOKENS,
     PROTECTED_HIRE_STAGES,
     REQUIRED_DOCUMENT_TYPES,
     RECRUITMENT_ROLES,
@@ -218,6 +217,343 @@ def _candidate_dependencies() -> candidate_service.CandidateDependencies:
         visible_subject_ids=_visible_subject_ids,
         setting_value=_setting_value,
     )
+
+
+def _pipeline_stage_payload(row: Any, *, can_manage: bool = False) -> dict[str, Any]:
+    item = _row_dict(row)
+    is_custom = _text(item.get("stage_kind")) == "custom"
+    item["is_system"] = not is_custom
+    item["can_rename"] = can_manage and bool(item.get("is_pipeline")) and bool(item.get("is_active"))
+    item["can_recolor"] = item["can_rename"] and is_custom
+    item["can_reposition"] = item["can_rename"] and is_custom
+    item["can_archive"] = item["can_rename"] and is_custom
+    return item
+
+
+def list_pipeline_stages(
+    user: CurrentUser,
+    *,
+    include_inactive: bool = False,
+) -> dict[str, Any]:
+    if user.role not in {"hr_manager", "ceo"}:
+        raise RecruitmentError(
+            "Pipeline stages require HR or CEO access.", status_code=403
+        )
+    with connect_auth_db() as conn:
+        rows = repository.list_pipeline_stage_rows(
+            conn,
+            include_inactive=bool(include_inactive and user.role == "hr_manager"),
+            pipeline_only=True,
+        )
+    return {
+        "items": [
+            _pipeline_stage_payload(row, can_manage=user.role == "hr_manager")
+            for row in rows
+        ],
+        "read_only": user.role != "hr_manager",
+        "color_tokens": sorted(PIPELINE_STAGE_COLOR_TOKENS),
+    }
+
+
+def _ordered_stage_keys_after(
+    rows: list[Any],
+    *,
+    stage_key: str,
+    after_stage_key: str,
+) -> list[str]:
+    ordered = [_text(row["stage_key"]) for row in rows if _text(row["stage_key"]) != stage_key]
+    if after_stage_key not in ordered:
+        raise RecruitmentError("Select an active pipeline column to insert after.")
+    ordered.insert(ordered.index(after_stage_key) + 1, stage_key)
+    return ordered
+
+
+def create_pipeline_stage(
+    user: CurrentUser,
+    *,
+    label: str,
+    color_token: str,
+    after_stage_key: str,
+    sla_target_days: int,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can configure pipeline columns.", status_code=403
+        )
+    normalized_label = " ".join(_text(label).split())
+    normalized_color = _text(color_token).lower()
+    normalized_after = _text(after_stage_key)
+    if not normalized_label:
+        raise RecruitmentError("Column name is required.")
+    if normalized_color not in PIPELINE_STAGE_COLOR_TOKENS:
+        raise RecruitmentError("Select an available column color.")
+    if int(sla_target_days) < 1 or int(sla_target_days) > 90:
+        raise RecruitmentError("SLA target must be between 1 and 90 calendar days.")
+    now = _now()
+    stage_key = f"custom_{uuid4().hex[:24]}"
+    with connect_auth_db() as conn:
+        if repository.pipeline_stage_label_exists(conn, label=normalized_label):
+            raise RecruitmentError("A pipeline column with this name already exists.", status_code=409)
+        anchor = repository.active_pipeline_stage_by_key(conn, normalized_after)
+        if not anchor:
+            raise RecruitmentError("The selected placement column is no longer available.", status_code=409)
+        created = repository.insert_pipeline_stage(
+            conn,
+            stage_key=stage_key,
+            label=normalized_label,
+            color_token=normalized_color,
+            sla_target_days=int(sla_target_days),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        repository.insert_pipeline_stage_sla_rule(
+            conn,
+            stage_key=stage_key,
+            target_days=int(sla_target_days),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        rows = repository.list_pipeline_stage_rows(conn)
+        repository.reorder_pipeline_stages(
+            conn,
+            _ordered_stage_keys_after(
+                rows,
+                stage_key=stage_key,
+                after_stage_key=normalized_after,
+            ),
+        )
+        repository.insert_pipeline_stage_audit(
+            conn,
+            stage_id=int(created["id"]),
+            event_type="recruitment.pipeline_stage_created",
+            detail={
+                "stage_key": stage_key,
+                "label": normalized_label,
+                "color_token": normalized_color,
+                "after_stage_key": normalized_after,
+                "sla_target_days": int(sla_target_days),
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+        saved = repository.pipeline_stage_by_key(conn, stage_key)
+    return _pipeline_stage_payload(saved, can_manage=True)
+
+
+def update_pipeline_stage_definition(
+    user: CurrentUser,
+    stage_key: str,
+    *,
+    label: str,
+    expected_version: int,
+    color_token: str | None = None,
+    after_stage_key: str | None = None,
+    sla_target_days: int | None = None,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can configure pipeline columns.", status_code=403
+        )
+    normalized_key = _text(stage_key)
+    normalized_label = " ".join(_text(label).split())
+    if not normalized_label:
+        raise RecruitmentError("Column name is required.")
+    now = _now()
+    with connect_auth_db() as conn:
+        current = repository.pipeline_stage_by_key(conn, normalized_key, for_update=True)
+        if not current or not bool(current["is_pipeline"]) or not bool(current["is_active"]):
+            raise RecruitmentError("Pipeline column was not found.", status_code=404)
+        if int(current["version"] or 0) != int(expected_version):
+            raise RecruitmentError(
+                "This pipeline column changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        if repository.pipeline_stage_label_exists(
+            conn,
+            label=normalized_label,
+            exclude_stage_key=normalized_key,
+        ):
+            raise RecruitmentError("A pipeline column with this name already exists.", status_code=409)
+        is_custom = _text(current["stage_kind"]) == "custom"
+        normalized_color = _text(color_token or current["color_token"]).lower()
+        target_days = int(sla_target_days or current["sla_target_days"] or 1)
+        if normalized_color not in PIPELINE_STAGE_COLOR_TOKENS:
+            raise RecruitmentError("Select an available column color.")
+        if target_days < 1 or target_days > 90:
+            raise RecruitmentError("SLA target must be between 1 and 90 calendar days.")
+        if (color_token is not None or sla_target_days is not None or after_stage_key is not None) and not is_custom:
+            raise RecruitmentError("System columns can only be renamed.", status_code=409)
+        ordered_rows = repository.list_pipeline_stage_rows(conn)
+        ordered_keys = [_text(row["stage_key"]) for row in ordered_rows]
+        if after_stage_key is not None:
+            normalized_after = _text(after_stage_key)
+            if normalized_after == normalized_key:
+                raise RecruitmentError("A column cannot be placed after itself.")
+            ordered_keys = _ordered_stage_keys_after(
+                ordered_rows,
+                stage_key=normalized_key,
+                after_stage_key=normalized_after,
+            )
+        saved = repository.update_pipeline_stage(
+            conn,
+            stage_key=normalized_key,
+            label=normalized_label,
+            color_token=normalized_color,
+            sla_target_days=target_days,
+            expected_version=int(expected_version),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not saved:
+            raise RecruitmentError(
+                "This pipeline column changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        if is_custom:
+            repository.update_pipeline_stage_sla_rule(
+                conn,
+                stage_key=normalized_key,
+                target_days=target_days,
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
+        if after_stage_key is not None:
+            repository.reorder_pipeline_stages(conn, ordered_keys)
+        repository.insert_pipeline_stage_audit(
+            conn,
+            stage_id=int(saved["id"]),
+            event_type="recruitment.pipeline_stage_updated",
+            detail={
+                "stage_key": normalized_key,
+                "previous": {
+                    "label": _text(current["label"]),
+                    "color_token": _text(current["color_token"]),
+                    "sla_target_days": current["sla_target_days"],
+                },
+                "current": {
+                    "label": normalized_label,
+                    "color_token": normalized_color,
+                    "sla_target_days": target_days,
+                    "after_stage_key": _text(after_stage_key),
+                },
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+        refreshed = repository.pipeline_stage_by_key(conn, normalized_key)
+    return _pipeline_stage_payload(refreshed, can_manage=True)
+
+
+def archive_pipeline_stage_definition(
+    user: CurrentUser,
+    stage_key: str,
+    *,
+    replacement_stage_key: str,
+    expected_version: int,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can configure pipeline columns.", status_code=403
+        )
+    normalized_key = _text(stage_key)
+    normalized_replacement = _text(replacement_stage_key)
+    if normalized_key == normalized_replacement:
+        raise RecruitmentError("Select a different destination column.")
+    now = _now()
+    moved_candidate_ids: list[int] = []
+    with connect_auth_db() as conn:
+        current = repository.pipeline_stage_by_key(conn, normalized_key, for_update=True)
+        if not current or not bool(current["is_pipeline"]) or not bool(current["is_active"]):
+            raise RecruitmentError("Pipeline column was not found.", status_code=404)
+        if _text(current["stage_kind"]) != "custom":
+            raise RecruitmentError("System columns cannot be removed.", status_code=409)
+        if int(current["version"] or 0) != int(expected_version):
+            raise RecruitmentError(
+                "This pipeline column changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        replacement = repository.active_pipeline_stage_by_key(conn, normalized_replacement)
+        if not replacement:
+            raise RecruitmentError("The destination column is no longer available.", status_code=409)
+        candidates = repository.list_candidate_stage_rows_for_update(conn, normalized_key)
+        for candidate in candidates:
+            candidate_id = int(candidate["id"])
+            updated = repository.update_candidate_stage(
+                conn,
+                candidate_id=candidate_id,
+                stage=normalized_replacement,
+                expected_version=int(candidate["version"]),
+                actor_account_id=_actor_account(user),
+                now=now,
+                comment=f"Moved because {_text(current['label'])} was removed.",
+                transition_source="manual",
+            )
+            if not updated:
+                raise RecruitmentError(
+                    "A candidate changed while the column was being removed. Refresh and try again.",
+                    status_code=409,
+                )
+            repository.insert_audit(
+                conn,
+                candidate_id=candidate_id,
+                event_type="candidate.stage_changed",
+                detail={
+                    "from": normalized_key,
+                    "to": normalized_replacement,
+                    "reason": "Pipeline column archived.",
+                },
+                actor_account_id=_actor_account(user),
+                actor_staff_id=_actor_staff(user),
+                now=now,
+            )
+            _sync_system_next_actions(
+                conn,
+                candidate_id=candidate_id,
+                actor_account_id=_actor_account(user),
+                now=now,
+            )
+            moved_candidate_ids.append(candidate_id)
+        archived = repository.archive_pipeline_stage(
+            conn,
+            stage_key=normalized_key,
+            replacement_stage_key=normalized_replacement,
+            expected_version=int(expected_version),
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not archived:
+            raise RecruitmentError(
+                "This pipeline column changed elsewhere. Refresh and try again.",
+                status_code=409,
+            )
+        active_rows = repository.list_pipeline_stage_rows(conn)
+        repository.reorder_pipeline_stages(
+            conn, [_text(row["stage_key"]) for row in active_rows]
+        )
+        repository.insert_pipeline_stage_audit(
+            conn,
+            stage_id=int(archived["id"]),
+            event_type="recruitment.pipeline_stage_archived",
+            detail={
+                "stage_key": normalized_key,
+                "label": _text(current["label"]),
+                "replacement_stage_key": normalized_replacement,
+                "moved_candidate_ids": moved_candidate_ids,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return {
+        "stage": _pipeline_stage_payload(archived, can_manage=False),
+        "moved_candidate_ids": moved_candidate_ids,
+        "moved_count": len(moved_candidate_ids),
+    }
 
 
 def list_pipeline(
@@ -475,6 +811,9 @@ def list_tasks(user: CurrentUser) -> dict[str, Any]:
 def options() -> dict[str, Any]:
     with connect_auth_db() as conn:
         values = repository.list_recruitment_options(conn)
+        stage_rows = repository.list_pipeline_stage_rows(
+            conn, include_inactive=True, pipeline_only=False
+        )
     configured_sources = list(values.get("sources") or [])
     configured_reasons = list(
         values.get("rejection_reason_options")
@@ -483,9 +822,14 @@ def options() -> dict[str, Any]:
             for value in REJECTION_REASONS
         ]
     )
+    stage_definitions = [_pipeline_stage_payload(row) for row in stage_rows]
     return {
         **values,
-        "stages": list(PRIMARY_STAGES) + list(ALTERNATIVE_STAGES),
+        "stages": [item["stage_key"] for item in stage_definitions if item["is_active"]],
+        "stage_definitions": stage_definitions,
+        "stage_labels": {
+            item["stage_key"]: item["label"] for item in stage_definitions
+        },
         "sources": configured_sources,
         "document_types": list(DOCUMENT_TYPES),
         "required_document_types": sorted(REQUIRED_DOCUMENT_TYPES),

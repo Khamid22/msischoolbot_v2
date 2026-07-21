@@ -108,9 +108,12 @@ def sla_payload(
     now: datetime | None = None,
 ) -> dict[str, Any] | None:
     stage = text(candidate.get("status"))
-    if stage not in SLA_STAGES:
+    if stage not in SLA_STAGES and text(candidate.get("status_kind")) != "custom":
         return None
-    entered_at = parse_datetime(candidate.get("current_stage_entered_at"))
+    entered_at = parse_datetime(
+        candidate.get("current_sla_anchor_at")
+        or candidate.get("current_stage_entered_at")
+    )
     due_at = parse_datetime(candidate.get("current_sla_due_at"))
     target_days = int(candidate.get("current_sla_target_days") or 0)
     if not entered_at or not due_at or target_days <= 0:

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ClosedCandidateActions } from "@/features/recruitment/ClosedCandidateActions";
 import { jsonBody, recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, stageLabels, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
+import { dateLabel, recruitmentStageLabel, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
 import {
   RECRUITMENT_API,
   EmptyLine,
@@ -193,7 +193,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
                       </td>
                       <td className="truncate px-3 py-1">{candidate.applied_position || candidate.subject || "—"}</td>
                       <td className="px-3 py-1 text-muted-foreground">{dateLabel(candidate.stage_changed_at)}</td>
-                      <td className="px-3 py-1"><StatusBadge status={candidate.restore_stage || "new_candidate"}>{stageLabels[candidate.restore_stage || ""] || "Application Received"}</StatusBadge></td>
+                      <td className="px-3 py-1"><StatusBadge status={candidate.restore_stage || "new_candidate"}>{recruitmentStageLabel(candidate.restore_stage || "new_candidate", options?.stage_labels)}</StatusBadge></td>
                       <td className="px-3 py-1"><ClosedCandidateActions candidate={candidate} onAnnouncement={onAnnouncement} /></td>
                     </tr>
                   ))}
@@ -231,7 +231,7 @@ export function TrashBinView({ basePath, options, onAnnouncement }: Props) {
         <div className="grid gap-2">
           <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draftFilters.position} onChange={(event) => setDraftFilters({ ...draftFilters, position: event.target.value })}><option value="">All positions</option>{options?.option_categories.position?.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
           <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draftFilters.source} onChange={(event) => setDraftFilters({ ...draftFilters, source: event.target.value })}><option value="">All sources</option>{options?.sources.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
-          <label className="text-xs font-semibold">Previous stage<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{Object.entries(stageLabels).filter(([value]) => !["trash_bin", "rejected", "candidate_withdrew", "teacher_academy", "active_teacher"].includes(value)).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="text-xs font-semibold">Previous stage<select className={`${fieldClass} mt-1`} value={draftFilters.origin_stage} onChange={(event) => setDraftFilters({ ...draftFilters, origin_stage: event.target.value })}><option value="">All stages</option>{(options?.stage_definitions || []).filter((stage) => !["trash_bin", "rejected", "candidate_withdrew", "teacher_academy", "active_teacher"].includes(stage.stage_key)).map((stage) => <option key={stage.stage_key} value={stage.stage_key}>{stage.label}</option>)}</select></label>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs font-semibold">Deleted from<input type="date" className={`${fieldClass} mt-1`} value={draftFilters.closed_from} onChange={(event) => setDraftFilters({ ...draftFilters, closed_from: event.target.value })} /></label>
             <label className="text-xs font-semibold">Deleted to<input type="date" className={`${fieldClass} mt-1`} value={draftFilters.closed_to} onChange={(event) => setDraftFilters({ ...draftFilters, closed_to: event.target.value })} /></label>

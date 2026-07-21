@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, stageLabels, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
+import { dateLabel, humanize, recruitmentStageLabel, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, fieldClass, queryError, rememberRecruitmentReturn, replaceUrlParams, restoreRecruitmentReturn, secondaryButtonClass } from "@/features/recruitment/ui";
 import { Drawer } from "@/shared/ui/Drawer";
 import { Pagination } from "@/shared/ui/Pagination";
@@ -47,7 +47,7 @@ function initialFilters(): CandidateFilters {
 }
 
 function filterLabel(key: keyof CandidateFilters, value: string, options?: RecruitmentOptions) {
-  if (key === "stage" || key === "final_decision") return stageLabels[value] || humanize(value);
+  if (key === "stage" || key === "final_decision") return recruitmentStageLabel(value, options?.stage_labels);
   if (key === "evaluator_account_id") return options?.staff.find((person) => String(person.id) === value)?.name || `Evaluator ${value}`;
   if (key === "subject_id") return options?.subjects.find((subject) => String(subject.id) === value)?.name || `Subject ${value}`;
   if (key === "source") return options?.sources.find((source) => String(source.id) === value)?.label || value;
@@ -92,7 +92,7 @@ function AdvancedFilters({
         <label className="text-xs font-semibold">Position<select className={`${fieldClass} mt-1`} value={draft.position} onChange={(event) => update("position", event.target.value)}><option value="">All positions</option>{options?.option_categories.position?.map((position) => <option key={position.id} value={position.id}>{position.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Source<select className={`${fieldClass} mt-1`} value={draft.source} onChange={(event) => update("source", event.target.value)}><option value="">All sources</option>{options?.sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}</select></label>
         <label className="text-xs font-semibold">Subject<select className={`${fieldClass} mt-1`} value={draft.subject_id} onChange={(event) => update("subject_id", event.target.value)}><option value="">All subjects</option>{options?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-        <label className="text-xs font-semibold">Final outcome<select className={`${fieldClass} mt-1`} value={draft.final_decision} onChange={(event) => update("final_decision", event.target.value)}><option value="">All outcomes</option>{["teacher_academy", "active_teacher", "rejected", "candidate_withdrew"].map((outcome) => <option key={outcome} value={outcome}>{stageLabels[outcome]}</option>)}</select></label>
+        <label className="text-xs font-semibold">Final outcome<select className={`${fieldClass} mt-1`} value={draft.final_decision} onChange={(event) => update("final_decision", event.target.value)}><option value="">All outcomes</option>{["teacher_academy", "active_teacher", "rejected", "candidate_withdrew"].map((outcome) => <option key={outcome} value={outcome}>{recruitmentStageLabel(outcome, options?.stage_labels)}</option>)}</select></label>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label>
           <label className="text-xs font-semibold">Applied to<input type="date" className={`${fieldClass} mt-1`} value={draft.application_to} onChange={(event) => update("application_to", event.target.value)} /></label>
@@ -159,7 +159,7 @@ export function CandidateListView({ basePath }: { basePath: string }) {
             Stage
             <select className={`${fieldClass} mt-1`} value={filters.stage} onChange={(event) => update("stage", event.target.value)}>
               <option value="">All stages</option>
-              {options.data?.stages.map((stage) => <option key={stage} value={stage}>{stageLabels[stage] || humanize(stage)}</option>)}
+              {options.data?.stages.map((stage) => <option key={stage} value={stage}>{recruitmentStageLabel(stage, options.data?.stage_labels)}</option>)}
             </select>
           </label>
           <button type="button" className={`${secondaryButtonClass} self-end`} onClick={() => setFiltersOpen(true)}>
@@ -192,10 +192,10 @@ export function CandidateListView({ basePath }: { basePath: string }) {
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-[13px]">
               <thead className="bg-muted/60 text-[11px] uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-1.5">Candidate</th><th className="px-3 py-1.5">Position</th><th className="px-3 py-1.5">Stage</th><th className="px-3 py-1.5">Applied</th><th className="px-3 py-1.5">Next action</th></tr></thead>
-              <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => <tr key={candidate.id} className="hover:bg-muted/30"><td className="px-3 py-1.5"><a className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")}>{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.phone || "No phone"}</p></td><td className="px-3 py-1.5">{candidate.applied_position || candidate.subject || "—"}</td><td className="px-3 py-1.5"><StatusBadge status={candidate.status}>{stageLabels[candidate.status] || humanize(candidate.status)}</StatusBadge></td><td className="px-3 py-1.5">{dateLabel(candidate.application_date)}</td><td className="px-3 py-1.5">{candidate.next_task?.title || "—"}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-border">{candidates.data.items.map((candidate) => <tr key={candidate.id} className="hover:bg-muted/30"><td className="px-3 py-1.5"><a className="inline-flex min-h-9 items-center font-semibold hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30" href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")}>{candidate.full_name}</a><p className="text-xs text-muted-foreground">{candidate.phone || "No phone"}</p></td><td className="px-3 py-1.5">{candidate.applied_position || candidate.subject || "—"}</td><td className="px-3 py-1.5"><StatusBadge status={candidate.status}>{candidate.status_label || recruitmentStageLabel(candidate.status, options.data?.stage_labels)}</StatusBadge></td><td className="px-3 py-1.5">{dateLabel(candidate.application_date)}</td><td className="px-3 py-1.5">{candidate.next_task?.title || "—"}</td></tr>)}</tbody>
             </table>
           </div>
-          <div className="divide-y divide-border md:hidden">{candidates.data.items.map((candidate) => <a key={candidate.id} href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")} className="block min-h-14 p-3 hover:bg-muted/40"><div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={candidate.status}>{stageLabels[candidate.status]}</StatusBadge></div><p className="mt-1 text-xs text-muted-foreground">{candidate.applied_position || "Position not set"}</p></a>)}</div>
+          <div className="divide-y divide-border md:hidden">{candidates.data.items.map((candidate) => <a key={candidate.id} href={candidateHref(candidate.id)} onClick={() => rememberRecruitmentReturn("candidates")} className="block min-h-14 p-3 hover:bg-muted/40"><div className="flex items-start justify-between gap-2"><span className="text-sm font-semibold">{candidate.full_name}</span><StatusBadge status={candidate.status}>{candidate.status_label || recruitmentStageLabel(candidate.status, options.data?.stage_labels)}</StatusBadge></div><p className="mt-1 text-xs text-muted-foreground">{candidate.applied_position || "Position not set"}</p></a>)}</div>
           {!candidates.data.items.length ? <div className="p-3"><EmptyLine>No candidates match these filters.</EmptyLine></div> : null}
           <div className="p-3"><Pagination page={page} totalPages={candidates.data.total_pages} onPageChange={setPage} label={`${candidates.data.total} candidates · Page ${page} of ${candidates.data.total_pages}`} /></div>
         </section>
