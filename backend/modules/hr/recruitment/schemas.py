@@ -243,6 +243,10 @@ class RecruitmentSettingCreate(StrictModel):
     parent_id: OptionalInt = Field(default=None, ge=1)
 
 
+class RecruitmentSettingRename(StrictModel):
+    label: str = Field(min_length=1, max_length=120)
+
+
 class RecruitmentSlaRuleUpdate(StrictModel):
     target_days: int = Field(ge=1, le=90)
 

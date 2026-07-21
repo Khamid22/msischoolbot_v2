@@ -367,6 +367,27 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(pipeline, /option_categories\.position/);
   });
 
+  test("gives Settings inline rename, restore of removed options, usage counts, grouped subsources, and board-matching SLA labels", () => {
+    const settings = source("SettingsView.tsx");
+    // Inline rename via PATCH, not delete-and-readd.
+    assert.match(settings, /RECRUITMENT_API\}\/settings\/\$\{setting\.id\}`,\s*\n\s*body: \{ label \}/);
+    assert.match(settings, /startRename/);
+    // Removed options stay visible and restorable instead of disappearing.
+    assert.match(settings, /Show removed/);
+    assert.match(settings, /\/restore`/);
+    // Usage counts shown on rows and surfaced in the delete confirmation.
+    assert.match(settings, /usage_count/);
+    assert.match(settings, /Used by/);
+    // Source details are grouped under their parent source, not a flat list.
+    assert.match(settings, /groupByParent/);
+    assert.match(settings, /No source/);
+    // SLA stage names reuse the same labels as the pipeline board.
+    assert.match(settings, /stageLabels\[rule\.stage\]/);
+    // CEO sees the option panels (read-only), not a hidden section.
+    assert.doesNotMatch(settings, /!settings\.data\.read_only \? <div className="grid/);
+    assert.match(settings, /readOnly=\{settings\.data\.read_only\}/);
+  });
+
   test("adds an essential HR and CEO recruitment analytics dashboard", () => {
     const analytics = source("AnalyticsView.tsx");
     assert.match(workspace, /key: "analytics", label: "Analytics"/);

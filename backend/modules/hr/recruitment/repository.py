@@ -126,7 +126,9 @@ from backend.modules.hr.recruitment.settings_repository import (
     list_sla_rule_rows,
     recruitment_setting_by_id,
     recruitment_setting_by_label_or_value,
+    recruitment_setting_usage_counts,
     recruitment_setting_value_exists,
+    rename_recruitment_setting,
     save_recruitment_setting,
     update_sla_rule,
 )

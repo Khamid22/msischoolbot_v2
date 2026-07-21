@@ -412,6 +412,7 @@ export type RecruitmentSetting = {
   is_active: boolean;
   sort_order: number;
   is_system?: boolean;
+  usage_count?: number;
 };
 
 export type RecruitmentSettingsData = {

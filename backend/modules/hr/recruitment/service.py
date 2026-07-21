@@ -513,9 +513,12 @@ def list_settings(user: CurrentUser) -> dict[str, Any]:
             "Recruitment settings require HR or CEO access.", status_code=403
         )
     with connect_auth_db() as conn:
-        rows = repository.list_recruitment_setting_rows(conn)
+        rows = repository.list_recruitment_setting_rows(conn, include_inactive=True)
         sla_rows = repository.list_sla_rule_rows(conn)
+        usage_counts = repository.recruitment_setting_usage_counts(conn)
     items = [_row_dict(row) for row in rows]
+    for item in items:
+        item["usage_count"] = usage_counts.get(int(item["id"]), 0)
     grouped = {
         category: [item for item in items if item["category"] == category]
         for category in sorted(_RECRUITMENT_SETTING_CATEGORIES)
@@ -651,6 +654,74 @@ def add_setting(
     return setting
 
 
+def rename_setting(
+    user: CurrentUser,
+    setting_id: int,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can manage recruitment settings.", status_code=403
+        )
+    normalized_label = " ".join(_text(label).split())
+    if not normalized_label:
+        raise RecruitmentError("Setting name is required.")
+    if len(normalized_label) > 120:
+        raise RecruitmentError("Setting name must be 120 characters or fewer.")
+    now = _now()
+    with connect_auth_db() as conn:
+        existing = repository.recruitment_setting_by_id(conn, int(setting_id))
+        if not existing:
+            raise RecruitmentError("Recruitment setting was not found.", status_code=404)
+        if bool(existing["is_system"]):
+            raise RecruitmentError(
+                "System rejection reasons cannot be renamed.", status_code=409
+            )
+        duplicate = repository.recruitment_setting_by_label_or_value(
+            conn,
+            category=_text(existing["category"]),
+            value="__rename_label_check__",
+            label=normalized_label,
+            parent_id=existing["parent_id"],
+        )
+        if (
+            duplicate
+            and int(duplicate["id"]) != int(setting_id)
+            and bool(duplicate["is_active"])
+        ):
+            raise RecruitmentError(
+                "This recruitment setting already exists.", status_code=409
+            )
+        old_label = _text(existing["label"])
+        renamed = repository.rename_recruitment_setting(
+            conn,
+            setting_id=int(setting_id),
+            label=normalized_label,
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not renamed:
+            raise RecruitmentError("Recruitment setting was not found.", status_code=404)
+        setting = _row_dict(renamed)
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=int(setting["id"]),
+            event_type="recruitment.setting_renamed",
+            detail={
+                "category": setting["category"],
+                "value": setting["value"],
+                "from_label": old_label,
+                "to_label": normalized_label,
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return setting
+
+
 def remove_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
     if user.role != "hr_manager":
         raise RecruitmentError(
@@ -678,6 +749,56 @@ def remove_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
             conn,
             setting_id=int(setting["id"]),
             event_type="recruitment.setting_removed",
+            detail={
+                "category": setting["category"],
+                "value": setting["value"],
+                "label": setting["label"],
+            },
+            actor_account_id=_actor_account(user),
+            actor_staff_id=_actor_staff(user),
+            now=now,
+        )
+        conn.commit()
+    return setting
+
+
+def restore_setting(user: CurrentUser, setting_id: int) -> dict[str, Any]:
+    if user.role != "hr_manager":
+        raise RecruitmentError(
+            "Only HR Manager can manage recruitment settings.", status_code=403
+        )
+    now = _now()
+    with connect_auth_db() as conn:
+        existing = repository.recruitment_setting_by_id(conn, int(setting_id))
+        if not existing:
+            raise RecruitmentError("Recruitment setting was not found.", status_code=404)
+        if bool(existing["is_active"]):
+            raise RecruitmentError("This recruitment setting is already active.")
+        if existing["category"] == "subsource" and existing["parent_id"]:
+            parent = repository.recruitment_setting_by_id(
+                conn, int(existing["parent_id"])
+            )
+            if not parent or not bool(parent["is_active"]):
+                raise RecruitmentError(
+                    "Restore the source before restoring this subsource."
+                )
+        restored = repository.save_recruitment_setting(
+            conn,
+            existing_id=int(setting_id),
+            category=existing["category"],
+            value=existing["value"],
+            label=existing["label"],
+            parent_id=existing["parent_id"],
+            actor_account_id=_actor_account(user),
+            now=now,
+        )
+        if not restored:
+            raise RecruitmentError("Recruitment setting was not found.", status_code=404)
+        setting = _row_dict(restored)
+        repository.insert_recruitment_setting_audit(
+            conn,
+            setting_id=int(setting["id"]),
+            event_type="recruitment.setting_reactivated",
             detail={
                 "category": setting["category"],
                 "value": setting["value"],

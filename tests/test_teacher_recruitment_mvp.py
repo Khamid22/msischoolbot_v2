@@ -971,6 +971,267 @@ def test_hr_setting_creation_is_normalized_committed_and_audited(monkeypatch):
     ]
 
 
+def test_hr_setting_rename_keeps_value_and_audits_old_and_new_label(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    existing = {
+        "id": 7,
+        "category": "position",
+        "value": "igcse_math_teacher",
+        "label": "IGCSE Math Teacher",
+        "parent_id": None,
+        "is_active": True,
+        "is_system": False,
+    }
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository, "recruitment_setting_by_id", lambda *_args, **_kwargs: existing
+    )
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_label_or_value",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        repository,
+        "rename_recruitment_setting",
+        lambda *_args, **kwargs: {
+            **existing,
+            "label": kwargs["label"],
+            "sort_order": 10,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_recruitment_setting_audit",
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
+    )
+
+    setting = service.rename_setting(_user(), 7, label="  IGCSE Mathematics Teacher  ")
+
+    assert setting["label"] == "IGCSE Mathematics Teacher"
+    assert setting["value"] == "igcse_math_teacher"
+    assert conn.commits == 1
+    assert events == [
+        (
+            "recruitment.setting_renamed",
+            {
+                "category": "position",
+                "value": "igcse_math_teacher",
+                "from_label": "IGCSE Math Teacher",
+                "to_label": "IGCSE Mathematics Teacher",
+            },
+        )
+    ]
+
+
+def test_hr_setting_rename_rejects_system_rows_and_duplicate_labels(monkeypatch):
+    @contextmanager
+    def connect():
+        yield object()
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_id",
+        lambda *_args, **_kwargs: {
+            "id": 1,
+            "category": "rejection_reason",
+            "value": "failed_job_interview",
+            "label": "Failed job interview",
+            "parent_id": None,
+            "is_active": True,
+            "is_system": True,
+        },
+    )
+    with pytest.raises(service.RecruitmentError, match="cannot be renamed"):
+        service.rename_setting(_user(), 1, label="New name")
+
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_id",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "category": "position",
+            "value": "igcse_math_teacher",
+            "label": "IGCSE Math Teacher",
+            "parent_id": None,
+            "is_active": True,
+            "is_system": False,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_label_or_value",
+        lambda *_args, **_kwargs: {"id": 9, "is_active": True},
+    )
+    with pytest.raises(service.RecruitmentError, match="already exists"):
+        service.rename_setting(_user(), 7, label="IGCSE Physics Teacher")
+
+
+def test_hr_setting_restore_reactivates_and_audits(monkeypatch):
+    class Connection:
+        commits = 0
+
+        def commit(self):
+            self.commits += 1
+
+    conn = Connection()
+    events = []
+
+    @contextmanager
+    def connect():
+        yield conn
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_id",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "category": "position",
+            "value": "igcse_math_teacher",
+            "label": "IGCSE Math Teacher",
+            "parent_id": None,
+            "is_active": False,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "save_recruitment_setting",
+        lambda *_args, **kwargs: {
+            "id": 7,
+            "category": "position",
+            "value": "igcse_math_teacher",
+            "label": "IGCSE Math Teacher",
+            "is_active": True,
+            "sort_order": 10,
+        },
+    )
+    monkeypatch.setattr(
+        repository,
+        "insert_recruitment_setting_audit",
+        lambda *_args, **kwargs: events.append(
+            (kwargs["event_type"], kwargs["detail"])
+        ),
+    )
+
+    setting = service.restore_setting(_user(), 7)
+
+    assert setting["is_active"] is True
+    assert conn.commits == 1
+    assert events == [
+        (
+            "recruitment.setting_reactivated",
+            {
+                "category": "position",
+                "value": "igcse_math_teacher",
+                "label": "IGCSE Math Teacher",
+            },
+        )
+    ]
+
+
+def test_hr_setting_restore_blocks_already_active_and_orphaned_subsource(monkeypatch):
+    @contextmanager
+    def connect():
+        yield object()
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    monkeypatch.setattr(
+        repository,
+        "recruitment_setting_by_id",
+        lambda *_args, **_kwargs: {
+            "id": 7,
+            "category": "position",
+            "is_active": True,
+            "parent_id": None,
+        },
+    )
+    with pytest.raises(service.RecruitmentError, match="already active"):
+        service.restore_setting(_user(), 7)
+
+    def by_id(_conn, setting_id):
+        if setting_id == 8:
+            return {
+                "id": 8,
+                "category": "subsource",
+                "is_active": False,
+                "parent_id": 3,
+            }
+        return {"id": 3, "category": "source", "is_active": False}
+
+    monkeypatch.setattr(repository, "recruitment_setting_by_id", by_id)
+    with pytest.raises(service.RecruitmentError, match="Restore the source"):
+        service.restore_setting(_user(), 8)
+
+
+def test_recruitment_settings_listing_includes_inactive_rows_with_usage_counts(
+    monkeypatch,
+):
+    @contextmanager
+    def connect():
+        yield object()
+
+    monkeypatch.setattr(service, "connect_auth_db", connect)
+    captured_kwargs = {}
+
+    def list_rows(_conn, **kwargs):
+        captured_kwargs.update(kwargs)
+        return [
+            {
+                "id": 1,
+                "category": "position",
+                "value": "igcse_math_teacher",
+                "label": "IGCSE Math Teacher",
+                "parent_id": None,
+                "is_active": True,
+                "sort_order": 10,
+                "is_system": False,
+                "is_legacy": False,
+            },
+            {
+                "id": 2,
+                "category": "position",
+                "value": "igcse_biology_teacher",
+                "label": "IGCSE Biology Teacher",
+                "parent_id": None,
+                "is_active": False,
+                "sort_order": 20,
+                "is_system": False,
+                "is_legacy": False,
+            },
+        ]
+
+    monkeypatch.setattr(repository, "list_recruitment_setting_rows", list_rows)
+    monkeypatch.setattr(repository, "list_sla_rule_rows", lambda *_a, **_k: [])
+    monkeypatch.setattr(
+        repository, "recruitment_setting_usage_counts", lambda *_a, **_k: {1: 4}
+    )
+
+    result = service.list_settings(_user())
+
+    assert captured_kwargs == {"include_inactive": True}
+    by_id = {item["id"]: item for item in result["items"]}
+    assert by_id[1]["usage_count"] == 4
+    assert by_id[2]["usage_count"] == 0
+    assert by_id[2]["is_active"] is False
+
+
 def test_internal_operations_recruitment_pages_are_not_registered(app):
     paths = {getattr(route, "path", "") for route in app.routes}
     for path in (

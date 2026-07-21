@@ -110,6 +110,8 @@
 /api/v1/recruitment/settings | POST
 /api/v1/recruitment/settings/sla-rules/{stage} | PATCH
 /api/v1/recruitment/settings/{setting_id} | DELETE
+/api/v1/recruitment/settings/{setting_id} | PATCH
+/api/v1/recruitment/settings/{setting_id}/restore | POST
 /api/v1/recruitment/tasks | GET
 /api/v1/recruitment/teachers | GET
 /api/v1/recruitment/teachers/{academy_teacher_id}/remove | POST

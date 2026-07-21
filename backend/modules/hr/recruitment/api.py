@@ -43,6 +43,7 @@ from backend.modules.hr.recruitment.schemas import (
     InterviewWrite,
     NoteCreate,
     RecruitmentSettingCreate,
+    RecruitmentSettingRename,
     RecruitmentSlaRuleUpdate,
     ScheduledStageMove,
     StageChange,
@@ -355,11 +356,32 @@ def create_setting(
     )
 
 
+@router.patch("/settings/{setting_id}", operation_id="api_v1_recruitment_rename_setting")
+def rename_setting(
+    setting_id: int,
+    payload: RecruitmentSettingRename,
+    user: CurrentUser = Depends(get_current_user),
+):
+    ensure_hr_management(user)
+    setting = _call(service.rename_setting, user, setting_id, label=payload.label)
+    return api_success({"message": "Recruitment setting renamed.", "setting": setting})
+
+
 @router.delete("/settings/{setting_id}", operation_id="api_v1_recruitment_remove_setting")
 def remove_setting(setting_id: int, user: CurrentUser = Depends(get_current_user)):
     ensure_hr_management(user)
     setting = _call(service.remove_setting, user, setting_id)
     return api_success({"message": "Recruitment setting removed.", "setting": setting})
+
+
+@router.post(
+    "/settings/{setting_id}/restore",
+    operation_id="api_v1_recruitment_restore_setting",
+)
+def restore_setting(setting_id: int, user: CurrentUser = Depends(get_current_user)):
+    ensure_hr_management(user)
+    setting = _call(service.restore_setting, user, setting_id)
+    return api_success({"message": "Recruitment setting restored.", "setting": setting})
 
 
 @router.post("/candidates", status_code=201, operation_id="api_v1_recruitment_create_candidate")

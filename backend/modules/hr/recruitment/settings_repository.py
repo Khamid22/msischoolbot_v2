@@ -176,6 +176,81 @@ def save_recruitment_setting(
     ).fetchone()
 
 
+def rename_recruitment_setting(
+    conn: Any,
+    *,
+    setting_id: int,
+    label: str,
+    actor_account_id: int | None,
+    now: str,
+) -> Any:
+    return conn.execute(
+        """
+        UPDATE msi_v2.teacher_recruitment_settings
+        SET label = %s,
+            updated_by_account_id = %s,
+            updated_at = %s::timestamptz
+        WHERE id = %s AND is_system = false
+        RETURNING id, category, value, label, parent_id, is_active,
+                  sort_order, is_system, is_legacy,
+                  created_at::text AS created_at, updated_at::text AS updated_at
+        """,
+        (label, actor_account_id, now, int(setting_id)),
+    ).fetchone()
+
+
+def recruitment_setting_usage_counts(conn: Any) -> dict[int, int]:
+    """Map setting id -> number of candidates/decisions referencing it."""
+
+    option_rows = conn.execute(
+        """
+        SELECT setting_id, count(*) AS usage_count
+        FROM (
+            SELECT source_option_id AS setting_id FROM msi_v2.teacher_candidates
+            WHERE source_option_id IS NOT NULL
+            UNION ALL
+            SELECT subsource_option_id FROM msi_v2.teacher_candidates
+            WHERE subsource_option_id IS NOT NULL
+            UNION ALL
+            SELECT position_option_id FROM msi_v2.teacher_candidates
+            WHERE position_option_id IS NOT NULL
+            UNION ALL
+            SELECT english_level_option_id FROM msi_v2.teacher_candidates
+            WHERE english_level_option_id IS NOT NULL
+            UNION ALL
+            SELECT schedule_option_id FROM msi_v2.teacher_candidates
+            WHERE schedule_option_id IS NOT NULL
+            UNION ALL
+            SELECT availability_option_id FROM msi_v2.teacher_candidates
+            WHERE availability_option_id IS NOT NULL
+            UNION ALL
+            SELECT teaching_experience_option_id FROM msi_v2.teacher_candidates
+            WHERE teaching_experience_option_id IS NOT NULL
+            UNION ALL
+            SELECT expected_salary_option_id FROM msi_v2.teacher_candidates
+            WHERE expected_salary_option_id IS NOT NULL
+        ) usage
+        GROUP BY setting_id
+        """
+    ).fetchall()
+    reason_rows = conn.execute(
+        """
+        SELECT s.id AS setting_id, count(d.id) AS usage_count
+        FROM msi_v2.teacher_recruitment_settings s
+        JOIN msi_v2.teacher_candidate_final_decisions d ON d.rejection_reason = s.value
+        WHERE s.category = 'rejection_reason'
+        GROUP BY s.id
+        """
+    ).fetchall()
+    counts: dict[int, int] = {}
+    for row in (*option_rows, *reason_rows):
+        row = dict(row)
+        counts[int(row["setting_id"])] = counts.get(int(row["setting_id"]), 0) + int(
+            row["usage_count"]
+        )
+    return counts
+
+
 def deactivate_recruitment_setting(
     conn: Any,
     *,
@@ -295,7 +370,9 @@ __all__ = [
     "list_sla_rule_rows",
     "recruitment_setting_by_id",
     "recruitment_setting_by_label_or_value",
+    "recruitment_setting_usage_counts",
     "recruitment_setting_value_exists",
+    "rename_recruitment_setting",
     "save_recruitment_setting",
     "update_sla_rule",
 ]
