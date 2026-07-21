@@ -16,8 +16,8 @@ def register_customer_support_page_routes(app):
         return render_role_home(
             "customer-support-home",
             "customer_support",
-            title="Customer Support Dashboard",
-            description="Parent contacts, support tickets, payment follow-up, and student basics.",
+            title="Customer Records",
+            description="Find students and parents, restore account access, and manage payment records.",
             cards=customer_support_workspace_cards(),
         )
 

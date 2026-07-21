@@ -6,7 +6,7 @@ from backend.modules.finance import repository
 from backend.modules.organization import canonical
 
 
-VALID_PAYMENT_STATUSES = {"paid", "due", "debt", "upcoming"}
+VALID_PAYMENT_STATUSES = {"paid", "due", "debt", "upcoming", "voided"}
 
 
 def _connect():
@@ -69,6 +69,9 @@ def _payment_record_from_row(row):
         "due_date": str(row["due_date"] or "").strip(),
         "paid_at": str(row["paid_at"] or "").strip(),
         "notes": str(row["notes"] or "").strip(),
+        "version": int(row.get("version") or 1),
+        "voided_at": str(row.get("voided_at") or "").strip(),
+        "void_reason": str(row.get("void_reason") or "").strip(),
         "created_by_admin_id": (
             int(row["created_by_admin_id"])
             if row["created_by_admin_id"] is not None
@@ -94,6 +97,7 @@ _BUCKET_TO_STATE = {
     "debts": "debt",
     "due_payments": "due",
     "upcoming_payments": "upcoming",
+    "voided_payments": "voided",
 }
 
 
@@ -103,6 +107,8 @@ def _is_paid(record):
     `status == 'paid'` is honored too for records created/marked paid without
     an explicit date, but `paid_at` is the canonical signal.
     """
+    if str(record.get("voided_at") or "").strip() or _normalize_status(record.get("status")) == "voided":
+        return False
     if str(record.get("paid_at") or "").strip():
         return True
     return _normalize_status(record.get("status")) == "paid"
@@ -112,6 +118,8 @@ def _payment_bucket(record):
     # Paid charges are history; everything unpaid is bucketed purely by how its
     # due date compares to today. The stored status is intentionally NOT used to
     # freeze a charge as debt/upcoming, so buckets never go stale.
+    if str(record.get("voided_at") or "").strip() or _normalize_status(record.get("status")) == "voided":
+        return "voided_payments"
     if _is_paid(record):
         return "monthly_history"
 
@@ -134,6 +142,7 @@ def summarize_payment_records(records, progress=None):
         "debts": [],
         "due_payments": [],
         "upcoming_payments": [],
+        "voided_payments": [],
     }
 
     for record in records:
@@ -150,6 +159,10 @@ def summarize_payment_records(records, progress=None):
         buckets[key].sort(
             key=lambda row: (_date_sort_value(row.get("due_date")), int(row.get("id") or 0))
         )
+    buckets["voided_payments"].sort(
+        key=lambda row: (_date_sort_value(row.get("voided_at") or row.get("updated_at")), int(row.get("id") or 0)),
+        reverse=True,
+    )
 
     paid_total = sum(_normalize_amount(row.get("amount")) for row in buckets["monthly_history"])
     debt_total = sum(_normalize_amount(row.get("amount")) for row in buckets["debts"])

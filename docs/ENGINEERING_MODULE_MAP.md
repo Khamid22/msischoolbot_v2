@@ -10,6 +10,7 @@ Audience: engineers locating the owner of a change.
 | school, subject, class | `modules/organization` | composed by academic workspaces |
 | student records | `modules/people/students` | `features/people/students` |
 | parent records and links | `modules/people/parents` | `features/people/parents` |
+| Customer Support record operations | `modules/customer_support` (scoped orchestration over People, Identity, Academic, and Finance contracts) | `workspaces/customer_support` |
 | teacher records | `modules/people/teachers` | `features/people/teachers` |
 | staff account registration | `modules/people/staff` | authorized workspace adapters |
 | Teacher Academy | `modules/teacher_academy` | `features/teacher-academy` |
@@ -90,6 +91,7 @@ These existing stateful orchestrators remain above the target threshold after ex
 - `modules/people/students/dashboard.py` and `platform/storage/r2.py`
 - `modules/hr/recruitment/service.py` — compatibility facade for stable imports and monkeypatch contracts plus the remaining task/settings/scheduling orchestration; new candidate, appointment, evaluation, decision, document, or handoff logic must go to its focused service.
 - `modules/hr/recruitment/api.py` — stable public route surface for the existing Recruitment API; extract route groups before adding another Recruitment capability.
+- `modules/customer_support/service.py` and `modules/customer_support/repository.py` — Phase 1 transactional records-desk facade. They keep school-scope checks, optimistic versions, account/profile synchronization, finance audit writes, and refreshed read models together for review; split Payments and Family/Access into focused units before adding ticket management in Phase 2.
 
 No new backend domain implementation may exceed 800 lines and no new frontend feature component may exceed 600 lines without adding a named rationale here.
 

@@ -39,6 +39,7 @@ function isWorkspacePath(pathname: string) {
   return pathname === "/academic-director" || pathname.startsWith("/academic-director/") ||
     pathname === "/head-of-departments" || pathname.startsWith("/head-of-departments/") ||
     pathname === "/hr-manager" || pathname.startsWith("/hr-manager/") ||
+    pathname === "/customer-support" || pathname.startsWith("/customer-support/") ||
     pathname.startsWith("/ceo/recruitment");
 }
 

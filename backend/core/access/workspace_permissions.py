@@ -17,6 +17,10 @@ ROLE_FEATURE_PERMISSIONS = {
         "reply_tickets",
         "view_parent_contacts",
         "view_student_basic_info",
+        "manage_student_records",
+        "manage_parent_records",
+        "manage_student_access",
+        "manage_payments",
     },
     "student": {
         "view_own_dashboard",

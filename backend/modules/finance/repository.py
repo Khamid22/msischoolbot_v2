@@ -19,6 +19,9 @@ def _payment_select():
         COALESCE(p.due_date::text, '') AS due_date,
         COALESCE(p.paid_at::text, '') AS paid_at,
         p.notes,
+        COALESCE(p.version, 1) AS version,
+        COALESCE(p.voided_at::text, '') AS voided_at,
+        COALESCE(p.void_reason, '') AS void_reason,
         p.created_by_staff_id AS created_by_admin_id,
         p.created_at::text AS created_at,
         p.updated_at::text AS updated_at
