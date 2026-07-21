@@ -689,6 +689,61 @@ def test_schedule_service_routes_semantic_statuses_to_the_derived_filter(monkeyp
     assert captured["display_status"] == "passed,overdue,not_conducted"
 
 
+@pytest.mark.parametrize(
+    ("role", "account_id", "appointment_type", "responsible_id", "status", "can_start", "can_resume"),
+    [
+        ("hr_manager", 41, "job_interview", 99, "scheduled", True, False),
+        ("academic_director", 41, "job_interview", 41, "scheduled", False, False),
+        ("hr_manager", 41, "demo_lesson", 41, "scheduled", True, False),
+        ("head_of_department", 41, "demo_lesson", 41, "in_progress", False, True),
+        ("academic_director", 41, "demo_lesson", 99, "scheduled", False, False),
+        ("head_of_department", None, "demo_lesson", None, "scheduled", False, False),
+    ],
+)
+def test_schedule_service_returns_role_aware_session_actions(
+    monkeypatch,
+    role,
+    account_id,
+    appointment_type,
+    responsible_id,
+    status,
+    can_start,
+    can_resume,
+):
+    conn = _Connection()
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "list_appointment_rows",
+        lambda *_args, **_kwargs: (
+            [
+                {
+                    "id": 91,
+                    "candidate_id": 7,
+                    "appointment_type": appointment_type,
+                    "responsible_account_id": responsible_id,
+                    "status": status,
+                    "starts_at": "2026-07-21T10:00:00+00:00",
+                    "evaluation_outcome": "",
+                }
+            ],
+            1,
+        ),
+    )
+
+    result = service.list_appointments(
+        CurrentUser(
+            login=f"{role}@test",
+            role=role,
+            account_id=account_id,
+            staff_id=51,
+        )
+    )
+
+    assert result["items"][0]["can_start"] is can_start
+    assert result["items"][0]["can_resume"] is can_resume
+
+
 @pytest.mark.parametrize("stage", ["job_interview", "test_and_demo"])
 def test_ordinary_stage_endpoint_enters_scheduled_stage_without_an_appointment(monkeypatch, stage):
     conn = _Connection()

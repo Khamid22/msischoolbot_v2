@@ -550,28 +550,41 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.doesNotMatch(hodNav, /Pipeline|Analytics|Rejected|Trash Bin|Settings|Decisions|Tasks/);
   });
 
-  test("adds URL-backed agenda and week schedule views without a calendar dependency", () => {
+  test("adds an action-first URL-backed day and week schedule without a calendar dependency", () => {
     const schedule = source("ScheduleView.tsx");
     assert.match(workspace, /key: "schedule", label: "Schedule"/);
     assert.match(workspace, /view === "schedule" \? <ScheduleView/);
+    assert.match(workspace, /Manage upcoming sessions and review evaluation history/);
+    assert.match(schedule, /type ScheduleMode = "day" \| "week"/);
+    assert.match(schedule, /type ScheduleSection = "queue" \| "history"/);
     assert.match(schedule, /mode === "week"/);
-    assert.match(schedule, /overflow-x-auto/);
+    assert.match(schedule, /queueStatusFilter = "scheduled,in_progress"/);
+    assert.match(schedule, /historyStatusFilter = "passed,failed,not_conducted"/);
+    assert.match(schedule, /schedule_section/);
     assert.match(schedule, /replaceUrlParams/);
     assert.match(schedule, /appointment_type/);
     assert.match(schedule, /responsible_account_id/);
     assert.match(schedule, /Asia\/Tashkent/);
     assert.match(schedule, /scheduleDayLabel\(day\)/);
     assert.match(schedule, /appointmentTimeLabel\(item\)/);
+    assert.match(schedule, /type="date"/);
+    assert.match(schedule, /Work Queue/);
+    assert.match(schedule, /History/);
+    assert.match(schedule, /overdue.*appointment/);
     assert.match(schedule, /not_conducted/);
     assert.match(schedule, /Passed/);
     assert.match(schedule, /Failed/);
     assert.match(schedule, /Overdue/);
     assert.match(schedule, /evaluated_by_name/);
-    assert.match(schedule, /min-w-\[84rem\]/);
-    assert.match(schedule, /overflow-y-auto/);
+    assert.match(schedule, /grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-7/);
+    assert.match(schedule, /xl:overflow-y-auto/);
+    assert.match(schedule, /InterviewSessionModal/);
+    assert.match(schedule, /DemoSessionModal/);
+    assert.match(schedule, /item\.can_start/);
+    assert.match(schedule, /item\.can_resume/);
     assert.match(schedule, /placeholderData: keepPreviousData/);
     assert.doesNotMatch(schedule, /Completed/);
-    assert.doesNotMatch(schedule, /dateLabel\(schoolDayStartIso\(day\)\)/);
+    assert.doesNotMatch(schedule, /overflow-x-auto|min-w-\[84rem\]/);
     assert.doesNotMatch(schedule, /fullcalendar|react-big-calendar|dnd-kit/i);
   });
 });

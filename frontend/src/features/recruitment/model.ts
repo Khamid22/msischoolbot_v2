@@ -106,6 +106,7 @@ export type RecruitmentAppointment = {
   start_available_at?: string | null;
   overdue_at?: string | null;
   can_start?: boolean;
+  can_resume?: boolean;
   created_at?: string;
   updated_at?: string;
   subject_id?: number | null;

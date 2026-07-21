@@ -50,6 +50,26 @@ def _actor_staff(user: CurrentUser) -> int | None:
     return int(user.staff_id) if user.staff_id else None
 
 
+def _appointment_payload_for_user(
+    user: CurrentUser, row: Any
+) -> dict[str, Any]:
+    payload = _appointment_payload(row)
+    appointment_type = _text(payload.get("appointment_type"))
+    actor_account_id = _actor_account(user)
+    responsible_account_id = payload.get("responsible_account_id")
+    is_authorized = (
+        user.role == "hr_manager"
+        if appointment_type == "job_interview"
+        else actor_account_id is not None
+        and responsible_account_id is not None
+        and int(responsible_account_id) == int(actor_account_id)
+    )
+    status = _text(payload.get("status"))
+    payload["can_start"] = is_authorized and status == "scheduled"
+    payload["can_resume"] = is_authorized and status == "in_progress"
+    return payload
+
+
 def start_appointment_session(
     user: CurrentUser,
     candidate_id: int,
@@ -380,7 +400,7 @@ def list_appointments(
             offset=(safe_page - 1) * safe_per_page,
         )
     return {
-        "items": [_appointment_payload(item) for item in rows],
+        "items": [_appointment_payload_for_user(user, item) for item in rows],
         "page": safe_page,
         "per_page": safe_per_page,
         "total": total,
