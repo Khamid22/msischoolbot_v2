@@ -163,6 +163,7 @@ describe("compact recruitment pipeline", () => {
 
 describe("recruitment scheduling and assigned-demo notifications", () => {
   const appointmentForm = source("AppointmentForm.tsx");
+  const model = source("model.ts");
   const pipeline = source("PipelineView.tsx");
   const profile = source("CandidateProfile.tsx");
   const notifications = source("RecruitmentNotifications.tsx");
@@ -180,6 +181,14 @@ describe("recruitment scheduling and assigned-demo notifications", () => {
     assert.doesNotMatch(appointmentForm, /name="note"|>Notes</);
     assert.doesNotMatch(appointmentForm, /Historical result|historical_result|duration_minutes/);
     assert.doesNotMatch(appointmentForm, /min=/);
+  });
+
+  test("includes HR staff in the shared demo evaluator role contract", () => {
+    assert.match(model, /function isDemoEvaluatorRole/);
+    assert.match(model, /\["hr_manager", "academic_director", "head_of_department"\]/);
+    assert.match(appointmentForm, /isDemoEvaluatorRole\(person\.role\)/);
+    assert.match(pipeline, /isDemoEvaluatorRole\(person\.role\)/);
+    assert.match(profile, /isDemoEvaluatorRole\(person\.role\)/);
   });
 
   test("keeps pipeline-only cards compact and warns about missing subject knowledge", () => {

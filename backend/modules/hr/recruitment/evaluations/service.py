@@ -180,6 +180,11 @@ def _add_record(
                 }
             )
         appointment_id = int(values.get("appointment_id") or 0)
+        if evaluation_type == "demo" and user.role == "hr_manager" and not appointment_id:
+            raise RecruitmentError(
+                "HR can record only a demo lesson assigned to their account.",
+                status_code=403,
+            )
         appointment = None
         if appointment_id:
             appointment = repository.get_appointment_row(

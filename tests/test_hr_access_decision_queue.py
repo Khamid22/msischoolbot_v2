@@ -403,6 +403,20 @@ def test_hr_can_record_subject_tests_without_academic_assignment():
     assert permissions["can_add_subject_test"] is True
     assert permissions["can_add_academic_evaluation"] is False
 
+    assigned_demo_permissions = service._permissions(
+        _user("hr_manager"), can_add_academic_evaluation=True
+    )
+    assert assigned_demo_permissions["can_add_academic_evaluation"] is True
+
+
+def test_hr_can_enter_demo_write_flow_for_service_level_assignment_check():
+    policies.ensure_demo_write(_user("hr_manager"), 8)
+
+    with pytest.raises(HTTPException) as exc:
+        policies.ensure_demo_write(_user("ceo"), 8)
+
+    assert exc.value.status_code == 403
+
 
 def test_subject_test_write_remains_fail_closed_for_unrelated_roles():
     with pytest.raises(HTTPException) as exc:

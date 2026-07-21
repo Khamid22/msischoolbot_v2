@@ -4,6 +4,10 @@ export type RecruitmentRole =
   | "academic_director"
   | "head_of_department";
 
+export function isDemoEvaluatorRole(role: string) {
+  return ["hr_manager", "academic_director", "head_of_department"].includes(role);
+}
+
 export type RecruitmentView = "pipeline" | "teachers" | "analytics" | "decisions" | "candidates" | "schedule" | "tasks" | "rejected" | "settings" | "trash" | "candidate" | "profile";
 
 export type RecruitmentOption = {

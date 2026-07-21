@@ -35,7 +35,10 @@ def _portal_base_url() -> str:
 
 
 def _candidate_action_url(candidate_id: int, recipient_role: str = "") -> str:
-    base = "/head-of-departments/recruitment" if recipient_role == "head_of_department" else "/academic-director/recruitment"
+    base = {
+        "hr_manager": "/hr-manager/recruitment",
+        "head_of_department": "/head-of-departments/recruitment",
+    }.get(recipient_role, "/academic-director/recruitment")
     return f"{base}/candidates/{int(candidate_id)}?tab=evaluations"
 
 

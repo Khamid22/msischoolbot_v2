@@ -489,7 +489,7 @@ def get_candidate(
                             for item in assignments
                         )
                     )
-                    if user.role in {"academic_director", "head_of_department"}
+                    if user.role in {"hr_manager", "academic_director", "head_of_department"}
                     else None
                 ),
             ),

@@ -45,6 +45,7 @@ import {
   dateLabel,
   dateTimeLabel,
   humanize,
+  isDemoEvaluatorRole,
   recruitmentStageLabel,
   stageLabels,
   type RecruitmentAppointment,
@@ -1421,9 +1422,7 @@ function ActionFields({
         ),
       );
       const evaluators =
-        options?.staff.filter((person) =>
-          ["academic_director", "head_of_department"].includes(person.role),
-        ) || [];
+        options?.staff.filter((person) => isDemoEvaluatorRole(person.role)) || [];
       return (
         <fieldset>
           <legend className="text-xs font-semibold">Assigned evaluators</legend>

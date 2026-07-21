@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { recruitmentRequest } from "@/features/recruitment/api";
-import { dateLabel, humanize, recruitmentStageLabel, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
+import { dateLabel, humanize, isDemoEvaluatorRole, recruitmentStageLabel, type RecruitmentCandidate, type RecruitmentOptions } from "@/features/recruitment/model";
 import { RECRUITMENT_API, EmptyLine, PageState, fieldClass, queryError, rememberRecruitmentReturn, replaceUrlParams, restoreRecruitmentReturn, secondaryButtonClass } from "@/features/recruitment/ui";
 import { Drawer } from "@/shared/ui/Drawer";
 import { Pagination } from "@/shared/ui/Pagination";
@@ -97,7 +97,7 @@ function AdvancedFilters({
           <label className="text-xs font-semibold">Applied from<input type="date" className={`${fieldClass} mt-1`} value={draft.application_from} onChange={(event) => update("application_from", event.target.value)} /></label>
           <label className="text-xs font-semibold">Applied to<input type="date" className={`${fieldClass} mt-1`} value={draft.application_to} onChange={(event) => update("application_to", event.target.value)} /></label>
         </div>
-        <label className="text-xs font-semibold">Evaluator<select className={`${fieldClass} mt-1`} value={draft.evaluator_account_id} onChange={(event) => update("evaluator_account_id", event.target.value)}><option value="">All evaluators</option>{options?.staff.filter((person) => ["academic_director", "head_of_department"].includes(person.role)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+        <label className="text-xs font-semibold">Evaluator<select className={`${fieldClass} mt-1`} value={draft.evaluator_account_id} onChange={(event) => update("evaluator_account_id", event.target.value)}><option value="">All evaluators</option>{options?.staff.filter((person) => isDemoEvaluatorRole(person.role)).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
       </div>
     </Drawer>
   );

@@ -276,6 +276,33 @@ def test_past_appointment_uses_the_same_point_in_time_contract(monkeypatch):
     assert prepared["appointment_format"] == "In person"
 
 
+def test_hr_manager_can_be_assigned_as_demo_evaluator(monkeypatch):
+    conn = _Connection()
+    monkeypatch.setattr(
+        repository,
+        "responsible_account_row",
+        lambda *_args, **_kwargs: {
+            "id": 41,
+            "role": "hr_manager",
+            "status": "active",
+        },
+    )
+
+    prepared = service._prepare_appointment(
+        conn,
+        user=_user(),
+        candidate={"id": 7, "subject_id": 3},
+        appointment_type="demo_lesson",
+        values={
+            "starts_at": datetime(2099, 7, 16, 10, 0),
+            "responsible_account_id": 41,
+            "appointment_format": "In person",
+        },
+    )
+
+    assert prepared["responsible_account_id"] == 41
+
+
 def test_start_overwrites_scheduled_time_and_uses_optimistic_version(monkeypatch):
     conn = _Connection()
     calls = []
@@ -742,7 +769,7 @@ def test_recording_demo_from_appointment_links_and_completes_atomically(monkeypa
     monkeypatch.setattr(service, "get_candidate", lambda *_args, **_kwargs: {"id": 7})
 
     service.add_demo(
-        _user("academic_director"),
+        _user("hr_manager"),
         7,
         {
             "appointment_id": 92,
@@ -761,6 +788,28 @@ def test_recording_demo_from_appointment_links_and_completes_atomically(monkeypa
         "candidate.appointment_completed",
         "candidate.demo_lesson_recorded",
     ]
+
+
+def test_hr_cannot_record_demo_without_an_assigned_appointment(monkeypatch):
+    conn = _Connection()
+    monkeypatch.setattr(service, "connect_auth_db", _connection_factory(conn))
+    monkeypatch.setattr(
+        repository,
+        "get_candidate_row",
+        lambda *_args, **_kwargs: {"id": 7, "status": "test_and_demo"},
+    )
+
+    with pytest.raises(service.RecruitmentError, match="assigned to their account") as exc:
+        service.add_demo(_user("hr_manager"), 7, {"result": "passed"})
+
+    assert exc.value.status_code == 403
+    assert conn.commits == 0
+
+
+def test_hr_demo_notification_links_back_to_hr_recruitment():
+    assert notifications._candidate_action_url(7, "hr_manager") == (
+        "/hr-manager/recruitment/candidates/7?tab=evaluations"
+    )
 
 
 def test_cancel_appointment_uses_version_and_writes_audit(monkeypatch):

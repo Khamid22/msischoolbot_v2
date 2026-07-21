@@ -19,6 +19,7 @@ from backend.modules.hr.recruitment.policies import (
     ensure_approval_review,
     ensure_assignment_management,
     ensure_candidate_view,
+    ensure_demo_write,
     ensure_final_decision,
     ensure_hr_management,
     ensure_pipeline_management,
@@ -745,7 +746,7 @@ def add_subject_test(candidate_id: int, payload: SubjectTestWrite, user: Current
 
 @router.post("/candidates/{candidate_id}/demo-lessons", status_code=201, operation_id="api_v1_recruitment_add_demo")
 def add_demo(candidate_id: int, payload: DemoLessonWrite, user: CurrentUser = Depends(get_current_user)):
-    ensure_academic_write(user, candidate_id)
+    ensure_demo_write(user, candidate_id)
     candidate = _call(service.add_demo, user, candidate_id, payload.model_dump())
     return api_success({"message": "Demo lesson recorded.", "candidate": candidate}, status_code=201)
 

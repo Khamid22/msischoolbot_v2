@@ -20,6 +20,7 @@ from backend.modules.hr.recruitment.candidates import service as candidate_servi
 from backend.modules.hr.recruitment.constants import (
     APPOINTMENT_STATUSES,
     APPOINTMENT_TYPES,
+    DEMO_EVALUATOR_ROLES,
     DEMO_RESULTS,
     DOCUMENT_TYPES,
     INTERVIEW_RESULTS,
@@ -1344,14 +1345,11 @@ def _prepare_appointment(
     if appointment_type == "demo_lesson":
         if not responsible:
             raise RecruitmentError(
-                "Select an Academic Director or HOD for the demo lesson."
+                "Select an HR Manager, Academic Director, or HOD for the demo lesson."
             )
-        if _text(responsible["role"]) not in {
-            "academic_director",
-            "head_of_department",
-        }:
+        if _text(responsible["role"]) not in DEMO_EVALUATOR_ROLES:
             raise RecruitmentError(
-                "Demo evaluator must be an Academic Director or HOD."
+                "Demo evaluator must be an HR Manager, Academic Director, or HOD."
             )
     prepared = {
         **values,

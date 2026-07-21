@@ -475,7 +475,8 @@ def list_valid_evaluator_accounts(conn: Any, account_ids: Iterable[int]) -> set[
     rows = conn.execute(
         """
         SELECT id FROM msi_v2.accounts
-        WHERE id = ANY(%s::bigint[]) AND role IN ('academic_director', 'head_of_department')
+        WHERE id = ANY(%s::bigint[])
+          AND role IN ('hr_manager', 'academic_director', 'head_of_department')
           AND status = 'active'
         """,
         (values,),

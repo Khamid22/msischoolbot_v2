@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import {
   humanize,
+  isDemoEvaluatorRole,
   type RecruitmentAppointment,
   type RecruitmentOptions,
 } from "@/features/recruitment/model";
@@ -50,7 +51,7 @@ export function AppointmentForm({
     initialStart.slice(11, 16),
   );
   const staff = (options?.staff || []).filter((person) =>
-    ["academic_director", "head_of_department"].includes(person.role),
+    isDemoEvaluatorRole(person.role),
   );
 
   return (

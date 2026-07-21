@@ -83,6 +83,9 @@ SCHEDULED_STAGE_TYPES = {"job_interview": "job_interview", "test_and_demo": "dem
 RECRUITMENT_ROLES = frozenset(
     {"hr_manager", "academic_director", "head_of_department", "ceo"}
 )
+DEMO_EVALUATOR_ROLES = frozenset(
+    {"hr_manager", "academic_director", "head_of_department"}
+)
 FULL_VIEW_ROLES = frozenset({"hr_manager", "ceo"})
 ACADEMIC_ROLES = frozenset({"academic_director", "head_of_department"})
 
@@ -96,6 +99,7 @@ __all__ = [
     "ALTERNATIVE_STAGES",
     "DEMO_RESULTS",
     "DOCUMENT_TYPES",
+    "DEMO_EVALUATOR_ROLES",
     "FULL_VIEW_ROLES",
     "INTERVIEW_RESULTS",
     "PRIMARY_STAGES",
