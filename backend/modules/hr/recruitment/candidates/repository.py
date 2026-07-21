@@ -151,7 +151,7 @@ def insert_candidate(
                 'new_candidate', %s::timestamptz, true, 'application', 1, %s,
                 %s::timestamptz, %s::timestamptz
             )
-            RETURNING id, application_date
+            RETURNING id, application_date, stage_changed_at
         ), inserted_history AS (
             -- The SLA clock starts from the candidate's application date (when they
             -- actually applied), not from the moment HR entered the record, so a
@@ -161,7 +161,13 @@ def insert_candidate(
                 comment, transition_source, sla_target_days, sla_due_at
             )
             SELECT candidate.id, 'new_candidate',
-                   COALESCE(candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent', %s::timestamptz),
+                   LEAST(
+                       COALESCE(
+                           candidate.application_date::timestamp AT TIME ZONE 'Asia/Tashkent',
+                           %s::timestamptz
+                       ),
+                       candidate.stage_changed_at
+                   ),
                    %s,
                    'Candidate created.', 'manual', rule.target_days,
                    CASE WHEN rule.target_days IS NULL THEN NULL
@@ -299,10 +305,12 @@ def update_candidate_stage(
             FROM current_candidate current
             WHERE candidate.id = current.id AND current.version = %s
             RETURNING candidate.id, candidate.status, candidate.version,
-                      candidate.application_date, candidate.created_at
+                      candidate.application_date, candidate.created_at,
+                      candidate.stage_changed_at
         ), closed_history AS (
             UPDATE msi_v2.teacher_candidate_stage_history history
-            SET exited_at = %s::timestamptz
+            SET entered_at = LEAST(history.entered_at, updated.stage_changed_at),
+                exited_at = updated.stage_changed_at
             FROM updated_candidate updated
             WHERE history.candidate_id = updated.id AND history.exited_at IS NULL
             RETURNING history.id
@@ -316,11 +324,14 @@ def update_candidate_stage(
                 comment, transition_source, sla_target_days, sla_due_at
             )
             SELECT updated.id, updated.status,
-                   COALESCE(
-                       CASE WHEN updated.status = 'new_candidate'
-                            THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
-                       END,
-                       %s::timestamptz
+                   LEAST(
+                       COALESCE(
+                           CASE WHEN updated.status = 'new_candidate'
+                                THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
+                           END,
+                           %s::timestamptz
+                       ),
+                       updated.stage_changed_at
                    ),
                    %s, %s, %s,
                    definition.sla_target_days,
