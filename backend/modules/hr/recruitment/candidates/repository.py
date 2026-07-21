@@ -298,7 +298,7 @@ def update_candidate_stage(
                 version = candidate.version + 1
             FROM current_candidate current
             WHERE candidate.id = current.id AND current.version = %s
-            RETURNING candidate.id, candidate.status, candidate.version
+            RETURNING candidate.id, candidate.status, candidate.version, candidate.application_date
         ), closed_history AS (
             UPDATE msi_v2.teacher_candidate_stage_history history
             SET exited_at = %s::timestamptz
@@ -306,14 +306,30 @@ def update_candidate_stage(
             WHERE history.candidate_id = updated.id AND history.exited_at IS NULL
             RETURNING history.id
         ), new_history AS (
+            -- Landing back on new_candidate (drag out and back in, or a
+            -- restore) anchors the SLA to the candidate's actual
+            -- application_date, not this transition's timestamp, so it
+            -- never resets an already-elapsed/overdue SLA to fresh/green.
             INSERT INTO msi_v2.teacher_candidate_stage_history (
                 candidate_id, stage, entered_at, responsible_account_id,
                 comment, transition_source, sla_target_days, sla_due_at
             )
-            SELECT updated.id, %s, %s::timestamptz, %s, %s, %s,
+            SELECT updated.id, %s,
+                   COALESCE(
+                       CASE WHEN updated.status = 'new_candidate'
+                            THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
+                       END,
+                       %s::timestamptz
+                   ),
+                   %s, %s, %s,
                    rule.target_days,
                    CASE WHEN rule.target_days IS NULL THEN NULL
-                        ELSE %s::timestamptz + make_interval(days => rule.target_days)
+                        ELSE COALESCE(
+                            CASE WHEN updated.status = 'new_candidate'
+                                 THEN updated.application_date::timestamp AT TIME ZONE 'Asia/Tashkent'
+                            END,
+                            %s::timestamptz
+                        ) + make_interval(days => rule.target_days)
                    END
             FROM updated_candidate updated
             CROSS JOIN (SELECT count(*) FROM closed_history) closed

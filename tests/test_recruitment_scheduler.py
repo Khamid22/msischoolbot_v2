@@ -67,8 +67,10 @@ class _NotificationListConnection:
 class _StageUpdateConnection:
     def __init__(self):
         self.params = ()
+        self.last_sql = ""
 
-    def execute(self, _query, params):
+    def execute(self, query, params):
+        self.last_sql = query
         self.params = tuple(params)
         return _QueryResult(row={"id": 7, "status": "test_and_demo", "version": 5})
 
@@ -97,6 +99,32 @@ def test_stage_update_normalizes_legacy_historical_transition_source():
 
     assert updated["version"] == 5
     assert conn.params[11] == "restored"
+
+
+def test_stage_update_anchors_new_candidate_sla_to_application_date():
+    """Dragging a card back to Application Received must not reset an
+    already-elapsed/overdue SLA to a fresh countdown from "now"."""
+    conn = _StageUpdateConnection()
+
+    repository.update_candidate_stage(
+        conn,
+        candidate_id=7,
+        stage="new_candidate",
+        expected_version=4,
+        actor_account_id=41,
+        now="2026-07-21T12:00:00+00:00",
+        comment="Moved to Application Received.",
+        transition_source="manual",
+    )
+
+    sql = conn.last_sql
+    assert "candidate.application_date" in sql
+    assert "updated.status = 'new_candidate'" in sql
+    assert "AT TIME ZONE 'Asia/Tashkent'" in sql
+    # The positional params for comment/transition_source/rule-stage lookup
+    # must stay put -- only the SQL text gained a conditional anchor.
+    assert conn.params[10] == "Moved to Application Received."
+    assert conn.params[11] == "manual"
 
 
 def _future_values(**overrides):
