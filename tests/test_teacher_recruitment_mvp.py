@@ -1352,6 +1352,28 @@ def test_sla_anchor_backfill_migration_only_touches_original_open_creation_rows(
     assert "DROP TABLE" not in upgrade_source
 
 
+def test_broadened_sla_anchor_backfill_migration_covers_every_current_entry():
+    source = Path(
+        "database/alembic/versions/0033_broaden_sla_anchor_backfill.py"
+    ).read_text()
+    upgrade_source = source.split("def downgrade", 1)[0]
+
+    # Unlike 0032, this migration must NOT restrict by comment/transition
+    # source -- it corrects every candidate currently open in the stage,
+    # regardless of how that stage entry was created (creation, restore,
+    # or a manual move back into Application Received).
+    assert "h.stage = 'new_candidate'" in upgrade_source
+    assert "h.exited_at IS NULL" in upgrade_source
+    assert "h.transition_source" not in upgrade_source
+    assert "h.comment" not in upgrade_source
+    assert "c.status = 'new_candidate'" in upgrade_source
+    assert "c.application_date IS NOT NULL" in upgrade_source
+    assert "history.entered_at <> anchor.new_entered_at" in upgrade_source
+    assert "DELETE FROM" not in upgrade_source
+    assert "DROP TABLE" not in upgrade_source
+    assert 'down_revision = "0032_backfill_sla_anchor"' in source
+
+
 def test_recruitment_settings_migration_seeds_editable_taxonomies_without_candidate_loss():
     source = Path("database/alembic/versions/0016_recruitment_settings.py").read_text()
     upgrade_source = source.split("def downgrade", 1)[0]
