@@ -1,5 +1,4 @@
 import {
-  BookOpenCheck,
   CalendarClock,
   CheckCircle2,
   GraduationCap,
@@ -134,7 +133,7 @@ export function TeacherAcademyDashboard({
             ) : null}
           </div>
 
-          <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <MetricCard
               label="In Academy"
               value={stats.total}
@@ -158,13 +157,6 @@ export function TeacherAcademyDashboard({
               tone="info"
               className="min-h-[7.5rem]"
             />
-            <MetricCard
-              label="Appointed Lessons"
-              value={stats.appointedLessons}
-              detail="across academy paths"
-              icon={<BookOpenCheck className="h-4 w-4" />}
-              className="min-h-[7.5rem]"
-            />
           </div>
         </div>
       </header>
@@ -172,7 +164,7 @@ export function TeacherAcademyDashboard({
       <nav
         role="tablist"
         aria-label="Teacher Academy views"
-        className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm"
+        className="no-scrollbar flex max-w-full gap-1.5 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm"
       >
         {tabs.map((tab, index) => {
           const Icon = tab.icon;
@@ -191,7 +183,7 @@ export function TeacherAcademyDashboard({
               tabIndex={active ? 0 : -1}
               onClick={() => onViewChange(tab.key)}
               onKeyDown={(event) => handleTabKeyDown(event, index)}
-              className={`inline-flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-black transition-colors duration-150 motion-reduce:transition-none ${focusClasses} ${
+              className={`inline-flex min-h-14 min-w-[11rem] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-colors duration-150 motion-reduce:transition-none ${focusClasses} ${
                 active
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"

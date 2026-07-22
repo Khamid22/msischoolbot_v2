@@ -50,7 +50,7 @@ interface TeacherRosterToolbarProps {
 }
 
 const fieldClass =
-  "min-h-11 w-full rounded-xl border border-input bg-card px-3 text-sm font-semibold text-foreground shadow-sm outline-none placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20";
+  "min-h-14 w-full rounded-xl border border-input bg-card px-3 text-sm font-semibold text-foreground shadow-sm outline-none placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/20";
 
 const avatarTones = [
   "bg-primary text-primary-foreground",
@@ -92,8 +92,8 @@ export function TeacherRosterToolbar({
   return (
     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       {leading ? <div className="min-w-0 flex-1">{leading}</div> : null}
-      <div className={`grid w-full gap-2 md:grid-cols-2 ${showSort ? "xl:max-w-4xl xl:grid-cols-[minmax(16rem,1fr)_minmax(13rem,0.8fr)_minmax(12rem,0.7fr)_auto]" : "xl:max-w-2xl xl:grid-cols-[minmax(16rem,1fr)_minmax(13rem,0.8fr)_auto]"}`}>
-        <label className="relative md:col-span-2 xl:col-span-1">
+      <div className={`grid w-full grid-cols-1 gap-2 md:grid-cols-2 ${showSort ? "lg:max-w-[74rem] lg:grid-cols-[minmax(16rem,1.35fr)_minmax(13rem,1fr)_minmax(12rem,0.9fr)_3.5rem]" : "lg:max-w-[52rem] lg:grid-cols-[minmax(16rem,1.35fr)_minmax(13rem,1fr)_3.5rem]"}`}>
+        <label className="relative">
           <span className="sr-only">Search teachers</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
@@ -139,10 +139,11 @@ export function TeacherRosterToolbar({
             type="button"
             onClick={onClear}
             disabled={!hasFilters}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 text-sm font-black text-foreground shadow-sm hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Reset teacher filters and sorting"
+            title="Reset filters and sorting"
+            className="inline-flex h-14 w-14 items-center justify-center justify-self-start rounded-xl border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            <span className="xl:sr-only">Clear filters</span>
           </button>
         ) : null}
       </div>

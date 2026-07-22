@@ -582,6 +582,11 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(dashboard, /active_teachers/);
     assert.match(dashboard, /appointed_lessons/);
     assert.match(dashboard, /\.\.\.\(isDirector/);
+    assert.match(dashboard, /min-h-14 min-w-\[11rem\] flex-1/);
+    assert.match(dashboard, /sm:grid-cols-2 lg:grid-cols-3/);
+    assert.doesNotMatch(dashboard, /label="Appointed Lessons"/);
+    assert.match(cards, /lg:max-w-\[74rem\]/);
+    assert.match(cards, /aria-label="Reset teacher filters and sorting"/);
     assert.match(scopedRoster, /filterAndSortAcademyTeachers/);
     assert.match(appointedLessons, /<MobileCardList/);
     assert.match(appointedLessons, /<ResponsiveTable/);
