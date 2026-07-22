@@ -669,6 +669,35 @@ describe("Academy training data matching", () => {
     });
   });
 
+  test("sorts evaluated lessons from the oldest evaluation to the most recent", () => {
+    const rows = academyTrainingRows(
+      [
+        { id: 71, sequence_no: 1, lesson_topic: "First assigned" },
+        { id: 72, sequence_no: 2, lesson_topic: "Second assigned" },
+        { id: 73, sequence_no: 3, lesson_topic: "Not evaluated" },
+      ],
+      [
+        {
+          id: 82,
+          lesson_assignment_id: 71,
+          assessment_datetime: "2026-07-20T09:00:00Z",
+          decision: "passed",
+        },
+        {
+          id: 81,
+          lesson_assignment_id: 72,
+          assessment_datetime: "2026-07-08T09:00:00Z",
+          decision: "passed",
+        },
+      ],
+    );
+
+    assert.deepEqual(
+      rows.map((row) => row.lesson.id),
+      [72, 71, 73],
+    );
+  });
+
   test("counts evaluated lessons with missing scores without corrupting the average", () => {
     const rows = academyTrainingRows(
       [{ id: 31 }, { id: 32 }],

@@ -220,10 +220,41 @@ export function academyTrainingRows(
     }
   });
 
-  return Array.from(uniqueLessons.values()).map((lesson) => ({
-    lesson,
-    assessment: latestAssessmentByLesson.get(lesson.id) || null,
-  }));
+  return Array.from(uniqueLessons.values())
+    .map((lesson) => ({
+      lesson,
+      assessment: latestAssessmentByLesson.get(lesson.id) || null,
+    }))
+    .sort((left, right) => {
+      const leftTime = Date.parse(String(left.assessment?.assessment_datetime || ""));
+      const rightTime = Date.parse(String(right.assessment?.assessment_datetime || ""));
+      const normalizedLeftTime = Number.isNaN(leftTime)
+        ? Number.POSITIVE_INFINITY
+        : leftTime;
+      const normalizedRightTime = Number.isNaN(rightTime)
+        ? Number.POSITIVE_INFINITY
+        : rightTime;
+
+      if (normalizedLeftTime !== normalizedRightTime) {
+        return normalizedLeftTime - normalizedRightTime;
+      }
+
+      const leftSequence =
+        left.lesson.sequence_no == null ? Number.NaN : Number(left.lesson.sequence_no);
+      const rightSequence =
+        right.lesson.sequence_no == null ? Number.NaN : Number(right.lesson.sequence_no);
+      const normalizedLeftSequence = Number.isFinite(leftSequence)
+        ? leftSequence
+        : Number.POSITIVE_INFINITY;
+      const normalizedRightSequence = Number.isFinite(rightSequence)
+        ? rightSequence
+        : Number.POSITIVE_INFINITY;
+
+      if (normalizedLeftSequence !== normalizedRightSequence) {
+        return normalizedLeftSequence - normalizedRightSequence;
+      }
+      return left.lesson.id - right.lesson.id;
+    });
 }
 
 export function academyTrainingSummary(
