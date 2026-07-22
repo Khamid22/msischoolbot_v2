@@ -580,7 +580,7 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(dashboard, /teacher_academy/);
     assert.match(dashboard, /active_teachers/);
     assert.doesNotMatch(dashboard, /appointed_lessons|Appointed Lessons|appointedLessons/);
-    assert.match(dashboard, /\.\.\.\(isDirector/);
+    assert.match(dashboard, /export function TeacherAcademyViewTabs/);
     assert.match(dashboard, /min-h-11 min-w-\[9rem\] flex-1/);
     assert.match(dashboard, /density="compact"/);
     assert.match(dashboard, /sm:grid-cols-3/);
@@ -588,6 +588,10 @@ describe("candidate navigation and progressive disclosure", () => {
     assert.match(cards, /min-h-9 w-full rounded-lg/);
     assert.match(cards, /min-h-\[15rem\]/);
     assert.match(cards, /aria-label="Reset teacher filters and sorting"/);
+    assert.match(cards, /xl:flex-row xl:items-center xl:justify-between/);
+    assert.match(cards, /\{subjectControl\}\{sortControl\}\{searchControl\}/);
+    assert.match(academyPanel, /toolbarLeading=\{/);
+    assert.match(academyPanel, /toolbarLayout="academy"/);
     assert.match(scopedRoster, /filterAndSortAcademyTeachers/);
     assert.doesNotMatch(cards, /#[0-9A-Fa-f]{3,8}/);
     assert.match(workflowModals, /export function AssessmentModal/);

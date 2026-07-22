@@ -43,6 +43,7 @@ interface TeacherRosterToolbarProps {
   subjects: SubjectOption[];
   showSort?: boolean;
   leading?: ReactNode;
+  layout?: "default" | "academy";
   onSearchChange: (value: string) => void;
   onSubjectChange: (value: string) => void;
   onSortChange: (value: TeacherAcademySort) => void;
@@ -83,69 +84,88 @@ export function TeacherRosterToolbar({
   subjects,
   showSort = true,
   leading,
+  layout = "default",
   onSearchChange,
   onSubjectChange,
   onSortChange,
   onClear,
 }: TeacherRosterToolbarProps) {
+  const academyLayout = layout === "academy";
   const hasFilters = Boolean(search || subjectId || (showSort && sort !== "average_score"));
+  const searchControl = (
+    <label className="relative">
+      <span className="sr-only">Search teachers</span>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <input
+        type="search"
+        value={search}
+        onChange={(event) => onSearchChange(event.target.value)}
+        className={`${fieldClass} pl-9`}
+        placeholder="Search teachers"
+        autoComplete="off"
+      />
+    </label>
+  );
+  const subjectControl = (
+    <label className="relative">
+      <span className="sr-only">Filter teachers by subject</span>
+      <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <select
+        value={subjectId}
+        onChange={(event) => onSubjectChange(event.target.value)}
+        className={`${fieldClass} pl-9`}
+      >
+        <option value="">All subjects</option>
+        {subjects.map((subject) => (
+          <option key={subject.id} value={subject.id}>{subject.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+  const sortControl = showSort ? (
+    <label className="relative">
+      <span className="sr-only">Sort Teacher Academy teachers</span>
+      <ArrowDownWideNarrow className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+      <select
+        value={sort}
+        onChange={(event) => onSortChange(event.target.value as TeacherAcademySort)}
+        className={`${fieldClass} pl-9`}
+      >
+        <option value="average_score">Average score</option>
+        <option value="lessons">Lessons completed</option>
+        <option value="date">Date added</option>
+      </select>
+    </label>
+  ) : null;
+  const resetControl = onClear ? (
+    <button
+      type="button"
+      onClick={onClear}
+      disabled={!hasFilters}
+      aria-label="Reset teacher filters and sorting"
+      title="Reset filters and sorting"
+      className="inline-flex h-11 w-11 items-center justify-center justify-self-start rounded-lg border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-40 lg:h-9 lg:w-9"
+    >
+      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+    </button>
+  ) : null;
+
   return (
-    <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-      {leading ? <div className="min-w-0 flex-1">{leading}</div> : null}
-      <div className={`grid w-full grid-cols-1 gap-2 sm:grid-cols-2 ${showSort ? "lg:max-w-4xl lg:grid-cols-[minmax(13.75rem,1fr)_13.75rem_13.75rem_auto]" : "lg:max-w-2xl lg:grid-cols-[minmax(13.75rem,1fr)_13.75rem_auto]"}`}>
-        <label className="relative">
-          <span className="sr-only">Search teachers</span>
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            className={`${fieldClass} pl-9`}
-            placeholder="Search teachers"
-            autoComplete="off"
-          />
-        </label>
-        <label className="relative">
-          <span className="sr-only">Filter teachers by subject</span>
-          <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <select
-            value={subjectId}
-            onChange={(event) => onSubjectChange(event.target.value)}
-            className={`${fieldClass} pl-9`}
-          >
-            <option value="">All subjects</option>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>{subject.label}</option>
-            ))}
-          </select>
-        </label>
-        {showSort ? (
-          <label className="relative">
-            <span className="sr-only">Sort Teacher Academy teachers</span>
-            <ArrowDownWideNarrow className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <select
-              value={sort}
-              onChange={(event) => onSortChange(event.target.value as TeacherAcademySort)}
-              className={`${fieldClass} pl-9`}
-            >
-              <option value="average_score">Average score</option>
-              <option value="lessons">Lessons completed</option>
-              <option value="date">Date added</option>
-            </select>
-          </label>
-        ) : null}
-        {onClear ? (
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={!hasFilters}
-            aria-label="Reset teacher filters and sorting"
-            title="Reset filters and sorting"
-            className="inline-flex h-11 w-11 items-center justify-center justify-self-start rounded-lg border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-40 lg:h-9 lg:w-9"
-          >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          </button>
-        ) : null}
+    <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+      {leading ? <div className={academyLayout ? "min-w-0 w-full shrink-0 xl:w-auto" : "min-w-0 flex-1"}>{leading}</div> : null}
+      <div className={`grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:ml-auto ${academyLayout
+        ? showSort
+          ? "lg:max-w-4xl lg:grid-cols-[13.75rem_13.75rem_minmax(13.75rem,1fr)]"
+          : "lg:max-w-xl lg:grid-cols-[13.75rem_minmax(13.75rem,1fr)]"
+        : showSort
+          ? "lg:max-w-4xl lg:grid-cols-[minmax(13.75rem,1fr)_13.75rem_13.75rem_auto]"
+          : "lg:max-w-2xl lg:grid-cols-[minmax(13.75rem,1fr)_13.75rem_auto]"
+      }`}>
+        {academyLayout ? (
+          <>{subjectControl}{sortControl}{searchControl}</>
+        ) : (
+          <>{searchControl}{subjectControl}{sortControl}{resetControl}</>
+        )}
       </div>
     </div>
   );

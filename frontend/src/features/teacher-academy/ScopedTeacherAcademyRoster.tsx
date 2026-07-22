@@ -166,6 +166,7 @@ export function ScopedTeacherAcademyRoster({
         subjectId={subjectId}
         sort={sort}
         subjects={subjectOptions}
+        layout="academy"
         onSearchChange={(value) => {
           setSearch(value);
           setPage(1);

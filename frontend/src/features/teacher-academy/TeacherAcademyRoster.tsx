@@ -107,6 +107,7 @@ type TeacherAcademyRosterProps = {
   onTotalChange?: (total: number) => void;
   onAnnouncement: (message: string, tone?: RosterMessageTone) => void;
   toolbarLeading?: ReactNode;
+  toolbarLayout?: "default" | "academy";
 };
 
 function initialRosterFilters() {
@@ -177,6 +178,7 @@ export function TeacherAcademyRoster({
   onTotalChange,
   onAnnouncement,
   toolbarLeading,
+  toolbarLayout = "default",
 }: TeacherAcademyRosterProps) {
   const initial = useMemo(initialRosterFilters, []);
   const [search, setSearch] = useState(initial.search);
@@ -210,6 +212,10 @@ export function TeacherAcademyRoster({
     previousPageSize.current = perPage;
     setPage(1);
   }, [perPage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [kind]);
 
   const options = useQuery({
     queryKey: ["recruitment", "options"],
@@ -359,6 +365,7 @@ export function TeacherAcademyRoster({
         subjects={(options.data?.subjects || []).map((subject) => ({ id: subject.id, label: subject.name }))}
         showSort={kind === "teacher_academy"}
         leading={toolbarLeading}
+        layout={toolbarLayout}
         onSearchChange={(value) => {
           setSearch(value);
           setPage(1);
@@ -374,33 +381,41 @@ export function TeacherAcademyRoster({
         onClear={clearFilters}
       />
 
-      {teachers.isLoading ? <TeacherCardGridSkeleton count={perPage} /> : null}
-      {teachers.error ? (
-        <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
-          <p className="font-bold">{queryError(teachers.error)}</p>
-          <button
-            type="button"
-            onClick={() => void teachers.refetch()}
-            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-destructive/30 bg-card px-4 font-black text-destructive hover:bg-destructive/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
-          >
-            Try again
-          </button>
-        </div>
-      ) : null}
-      {!teachers.isLoading && !teachers.error ? (
-        cards.length ? <TeacherCardGrid teachers={cards} /> : (
-          <TeacherGridEmptyState filtered={hasFilters} onClear={clearFilters} />
-        )
-      ) : null}
+      <div
+        id={toolbarLayout === "academy" && toolbarLeading ? "academy-roster-results" : undefined}
+        role={toolbarLayout === "academy" && toolbarLeading ? "tabpanel" : undefined}
+        aria-labelledby={toolbarLayout === "academy" && toolbarLeading ? `academy-tab-${kind === "active_teacher" ? "active_teachers" : "teacher_academy"}` : undefined}
+        tabIndex={toolbarLayout === "academy" && toolbarLeading ? 0 : undefined}
+        className="space-y-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      >
+        {teachers.isLoading ? <TeacherCardGridSkeleton count={perPage} /> : null}
+        {teachers.error ? (
+          <div role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+            <p className="font-bold">{queryError(teachers.error)}</p>
+            <button
+              type="button"
+              onClick={() => void teachers.refetch()}
+              className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-destructive/30 bg-card px-4 font-black text-destructive hover:bg-destructive/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/35"
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {!teachers.isLoading && !teachers.error ? (
+          cards.length ? <TeacherCardGrid teachers={cards} /> : (
+            <TeacherGridEmptyState filtered={hasFilters} onClear={clearFilters} />
+          )
+        ) : null}
 
-      {!teachers.isLoading && !teachers.error && knownTotal ? (
-        <Pagination
-          page={page}
-          totalPages={teachers.data?.total_pages || 1}
-          onPageChange={setPage}
-          label={`Showing ${firstItem}–${lastItem} of ${knownTotal}`}
-        />
-      ) : null}
+        {!teachers.isLoading && !teachers.error && knownTotal ? (
+          <Pagination
+            page={page}
+            totalPages={teachers.data?.total_pages || 1}
+            onPageChange={setPage}
+            label={`Showing ${firstItem}–${lastItem} of ${knownTotal}`}
+          />
+        ) : null}
+      </div>
 
       <Modal
         open={Boolean(closeSelection)}

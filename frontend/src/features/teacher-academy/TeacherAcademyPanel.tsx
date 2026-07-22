@@ -12,7 +12,10 @@ import {
   type TeacherRosterItem,
   useCanonicalTeacherRosterTotals,
 } from "@/features/teacher-academy/TeacherAcademyRoster";
-import { TeacherAcademyDashboard } from "@/features/teacher-academy/TeacherAcademyDashboard";
+import {
+  TeacherAcademyDashboard,
+  TeacherAcademyViewTabs,
+} from "@/features/teacher-academy/TeacherAcademyDashboard";
 import { ScopedTeacherAcademyRoster } from "@/features/teacher-academy/ScopedTeacherAcademyRoster";
 import {
   ActiveTeacherAccountModal,
@@ -733,9 +736,6 @@ export function TeacherAcademyPanel({
         <TeacherAcademyDashboard
           mode={mode}
           stats={dashboardStats}
-          activeTeacherCount={directorRosterTotals.active_teacher}
-          view={activeView}
-          onViewChange={setActiveView}
           onCreateHeadOfDepartment={canCreateHeadOfDepartment ? () => {
             setError("");
             setHodOpen(true);
@@ -790,18 +790,23 @@ export function TeacherAcademyPanel({
         ) : null}
 
         <section
-          id={`academy-panel-${activeView}`}
-          role={isAcademicDirectorMode ? "tabpanel" : "region"}
-          aria-labelledby={isAcademicDirectorMode ? `academy-tab-${activeView}` : undefined}
-          aria-label={isAcademicDirectorMode ? undefined : "Teacher Academy roster"}
-          tabIndex={0}
+          role="region"
+          aria-label="Teacher Academy roster"
           className="min-w-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           {isAcademicDirectorMode ? (
             <TeacherAcademyRoster
-              key={activeView}
               kind={activeView === "active_teachers" ? "active_teacher" : "teacher_academy"}
               refreshToken={activeView === "active_teachers" ? activeRosterRefreshToken : academyRosterRefreshToken}
+              toolbarLeading={(
+                <TeacherAcademyViewTabs
+                  academyCount={dashboardStats.total}
+                  activeTeacherCount={directorRosterTotals.active_teacher}
+                  view={activeView}
+                  onViewChange={setActiveView}
+                />
+              )}
+              toolbarLayout="academy"
               onOpenTeacher={openCanonicalRosterTeacher}
               onRemoved={(teacher) => {
                 onAcademyChange(academyTeachers.filter((row) => asNumber(row.id) !== teacher.record_id));
