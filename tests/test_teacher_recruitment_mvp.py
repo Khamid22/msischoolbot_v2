@@ -104,7 +104,17 @@ def test_teacher_handoff_repository_reads_only_canonical_tables_and_sorts_server
     assert "FROM msi_v2.academy_lesson_assignments assignment" in academy_sql
     assert "FROM msi_v2.academy_assessments assessment" in academy_sql
     assert "%s = ANY(record.subject_ids)" in academy_sql
-    assert "record.average_score DESC NULLS LAST" in academy_sql
+    completion_order = (
+        "CASE WHEN record.assigned_count > 0 "
+        "AND record.evaluated_count = record.assigned_count "
+        "AND record.passed_count = record.assigned_count "
+        "AND record.failed_count = 0 "
+        "AND record.average_score > 7 THEN 1 ELSE 0 END DESC"
+    )
+    assert completion_order in academy_sql
+    assert academy_sql.index(completion_order) < academy_sql.index(
+        "record.average_score DESC NULLS LAST"
+    )
     assert "lower(record.full_name)" in academy_sql
     assert academy_conn.calls[0][1] == ("%Math%", "%Math%", "%Math%", 4)
 

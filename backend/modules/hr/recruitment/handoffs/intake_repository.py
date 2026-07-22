@@ -204,6 +204,11 @@ def list_teacher_handoff_rows(
         normalized_sort = "date"
     order_sql = {
         "average_score": (
+            "CASE WHEN record.assigned_count > 0 "
+            "AND record.evaluated_count = record.assigned_count "
+            "AND record.passed_count = record.assigned_count "
+            "AND record.failed_count = 0 "
+            "AND record.average_score > 7 THEN 1 ELSE 0 END DESC, "
             "record.average_score DESC NULLS LAST, record.passed_count DESC, "
             "record.sort_at DESC NULLS LAST, lower(record.full_name), record.record_id"
         ),
