@@ -60,10 +60,12 @@ describe("Recruitment stays inside the academic workspace navigation", () => {
 describe("Head of Departments page", () => {
   const src = rolePages["AD HeadOfDepartments"];
 
-  it("renders mobile cards with the required fields and a View action", () => {
-    assert.match(src, /<MobileCardList/);
-    for (const field of ["accountName", "login", "roleLabel", "subjectLabel", "StatusBadge", "Updated", "View"]) {
-      assert.match(src, new RegExp(field), `mobile card is missing "${field}"`);
+  it("renders one responsive account card grid with the required fields and a View action", () => {
+    assert.match(src, /grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3/);
+    assert.match(src, /<DepartmentCard/);
+    assert.doesNotMatch(src, /MobileCardList|ResponsiveTable|<table/);
+    for (const field of ["accountName", "login", "roleLabel", "subjectLabel", "StatusBadge", "Updated", "View details"]) {
+      assert.match(src, new RegExp(field), `account card is missing "${field}"`);
     }
   });
 
@@ -82,9 +84,10 @@ describe("Head of Departments page", () => {
     assert.match(src, /<EmptyState/);
   });
 
-  it("keeps the desktop action column visible instead of a clipped Read-only pill", () => {
-    assert.doesNotMatch(src, /table-fixed/);
-    assert.match(src, /whitespace-nowrap px-4 py-3 text-right/);
+  it("uses the same responsive breakpoints for account and subject coverage grids", () => {
+    const responsiveGrids = src.match(/grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3/g) || [];
+    assert.equal(responsiveGrids.length, 2);
+    assert.match(src, /Read-only records/);
   });
 
   it("opens details in the shared bottom sheet layer", () => {

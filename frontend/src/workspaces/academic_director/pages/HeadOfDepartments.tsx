@@ -20,10 +20,8 @@ import { FloatingToast, useFloatingToast } from "@/shared/ui/FloatingToast";
 import { IconButton } from "@/shared/ui/IconButton";
 import { MetricCard } from "@/shared/ui/MetricCard";
 import { MetricGrid } from "@/shared/ui/MetricGrid";
-import { MobileCardList } from "@/shared/ui/MobileCardList";
 import { BottomSheet, ModalBody, ModalFooter } from "@/shared/ui/Modal";
 import { PageHeader } from "@/shared/ui/PageHeader";
-import { ResponsiveTable } from "@/shared/ui/ResponsiveTable";
 import { StatusBadge } from "@/shared/ui/StatusBadge";
 
 type HeadOfDepartmentAccount = {
@@ -112,41 +110,54 @@ function DepartmentCard({
   onView: () => void;
 }) {
   return (
-    <article className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <UserRoundCheck className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-black text-foreground">{accountName(account)}</h2>
-            <p className="mt-1 truncate text-xs font-bold text-muted-foreground">
-              <span className="font-mono">{asText(account.login) || "-"}</span> · {roleLabel(account.role)}
-            </p>
-          </div>
+    <article className="flex min-h-[15rem] flex-col rounded-xl border border-border bg-card p-3 shadow-card transition-[border-color,box-shadow] duration-200 hover:border-primary/25 hover:shadow-card-hover motion-reduce:transition-none">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-sm">
+          <UserRoundCheck className="h-5 w-5" aria-hidden="true" />
         </div>
-        <StatusBadge status={asText(account.status) || "active"} className="text-xs" />
+        <div className="min-w-0 flex-1">
+          <h2 className="break-words font-display text-sm font-black leading-tight text-foreground">
+            {accountName(account)}
+          </h2>
+          <p className="mt-0.5 break-words text-xs font-medium text-muted-foreground">
+            {roleLabel(account.role)}
+          </p>
+        </div>
+        <StatusBadge status={asText(account.status) || "active"} className="shrink-0 text-[0.625rem]" />
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span
+          className="max-w-full truncate rounded-full bg-muted px-2 py-0.5 text-[0.625rem] font-bold text-muted-foreground"
+          title={`${subjectLabel(account)} · ${asText(account.scope_type) || "head_of_department"}`}
+        >
+          {subjectLabel(account)}
+        </span>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3">
         <div className="min-w-0">
-          <dt className="font-bold uppercase tracking-wide text-muted-foreground">Subject Scope</dt>
-          <dd className="mt-1 break-words font-black text-foreground">{subjectLabel(account)}</dd>
+          <dt className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">Account Login</dt>
+          <dd className="mt-1 break-all font-mono text-sm font-black text-foreground">{asText(account.login) || "-"}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="font-bold uppercase tracking-wide text-muted-foreground">Updated</dt>
-          <dd className="mt-1 font-black text-foreground">{dateLabel(account.updated_at || account.created_at)}</dd>
+          <dt className="text-[0.625rem] font-black uppercase tracking-wide text-muted-foreground">Updated</dt>
+          <dd className="mt-1 break-words text-sm font-black text-foreground">
+            {dateLabel(account.updated_at || account.created_at)}
+          </dd>
         </div>
       </dl>
 
-      <button
-        type="button"
-        onClick={onView}
-        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-black text-foreground transition-colors duration-150 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 motion-reduce:transition-none"
-      >
-        <Eye className="h-4 w-4" />
-        View
-      </button>
+      <div className="mt-auto pt-3">
+        <button
+          type="button"
+          onClick={onView}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-[0.8125rem] font-semibold text-primary transition-colors duration-150 hover:bg-primary/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 lg:min-h-9 motion-reduce:transition-none"
+        >
+          <Eye className="h-4 w-4" aria-hidden="true" />
+          View details
+        </button>
+      </div>
     </article>
   );
 }
@@ -436,7 +447,7 @@ function SubjectCoverage({
       </p>
 
       {subjectNames.length ? (
-        <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {subjectNames.map((subject) => {
             const owners = coverage.get(subject) || [];
             return (
@@ -633,8 +644,16 @@ export default function HeadOfDepartmentsPage({
       ) : null}
 
       {accounts.length ? (
-        <>
-          <MobileCardList hideAt="md">
+        <section aria-labelledby="department-accounts-heading">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 id="department-accounts-heading" className="text-sm font-black text-foreground">
+              Accounts
+            </h2>
+            <StatusBadge tone="neutral" className="text-[0.625rem]">
+              Read-only records
+            </StatusBadge>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {accounts.map((account, index) => (
               <DepartmentCard
                 key={accountKey(account, index)}
@@ -642,69 +661,8 @@ export default function HeadOfDepartmentsPage({
                 onView={() => openAccountDetails(account)}
               />
             ))}
-          </MobileCardList>
-
-          <section className="hidden rounded-xl border border-border bg-surface shadow-card md:block">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-              <h2 className="text-sm font-black text-foreground">Accounts</h2>
-              <StatusBadge tone="neutral" className="text-[0.625rem]">
-                Read-only records
-              </StatusBadge>
-            </div>
-            <ResponsiveTable showAt="md" className="rounded-b-xl">
-              <table className="w-full min-w-[45rem] divide-y divide-border text-left text-sm">
-                <thead className="bg-muted/60 text-xs font-black uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Account Login</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Subject Scope</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Updated</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {accounts.map((account, index) => (
-                    <tr key={accountKey(account, index)} className="transition-colors duration-150 hover:bg-muted/40 motion-reduce:transition-none">
-                      <td className="max-w-[16rem] px-4 py-3">
-                        <p className="truncate font-black text-foreground">{accountName(account)}</p>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span className="font-mono text-xs font-black text-foreground">{asText(account.login) || "-"}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-muted-foreground">
-                        {roleLabel(account.role)}
-                      </td>
-                      <td className="max-w-[16rem] px-4 py-3">
-                        <p className="truncate font-black text-foreground">{subjectLabel(account)}</p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-muted-foreground">
-                          {asText(account.scope_type) || "head_of_department"}
-                        </p>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <StatusBadge status={asText(account.status) || "active"} className="text-[0.625rem]" />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-muted-foreground">
-                        {dateLabel(account.updated_at || account.created_at)}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openAccountDetails(account)}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-black text-foreground transition-colors duration-150 hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 motion-reduce:transition-none"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ResponsiveTable>
-          </section>
-        </>
+          </div>
+        </section>
       ) : (
         <EmptyState
           icon={<UsersRound className="h-6 w-6" />}
